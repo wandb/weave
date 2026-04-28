@@ -67,6 +67,10 @@ class CallStartCHInsertable(
 
     started_at: datetime.datetime
     attributes_dump: str
+    attributes_map_str: dict[str, str] = Field(default_factory=dict)
+    attributes_map_int: dict[str, int] = Field(default_factory=dict)
+    attributes_map_float: dict[str, float] = Field(default_factory=dict)
+    attributes_map_bool: dict[str, bool] = Field(default_factory=dict)
     inputs_dump: str
     otel_dump: str | None = None
     expire_at: datetime.datetime = EXPIRE_AT_NEVER
@@ -128,6 +132,10 @@ class CallCompleteCHInsertable(
     ended_at: datetime.datetime | None = None
     exception: str | None = None
     attributes_dump: str
+    attributes_map_str: dict[str, str] = Field(default_factory=dict)
+    attributes_map_int: dict[str, int] = Field(default_factory=dict)
+    attributes_map_float: dict[str, float] = Field(default_factory=dict)
+    attributes_map_bool: dict[str, bool] = Field(default_factory=dict)
     inputs_dump: str
     output_dump: str
     summary_dump: str

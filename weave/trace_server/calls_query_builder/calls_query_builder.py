@@ -82,6 +82,22 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 
+# Maps a DSL cast-to type onto the typed Map column that stores attribute
+# values of that type. Used to route attribute filters through the typed Map
+# columns instead of JSON_VALUE over attributes_dump when the comparison type
+# is known from either $convert or the peer $literal.
+ATTRIBUTES_MAP_COLUMN_BY_CAST: dict[str, str] = {
+    "int": "attributes_map_int",
+    "double": "attributes_map_float",
+    "bool": "attributes_map_bool",
+    "string": "attributes_map_str",
+}
+
+# Field-name prefix that identifies an attributes path in the query DSL.
+# Stripping it gives the dot-joined key used to read the typed Map column
+# (which mirrors extract_typed_attrs at write time).
+ATTRIBUTES_FIELD_PREFIX = "attributes."
+
 
 class FilterConditionsResult(NamedTuple):
     """Result from building filter conditions.
@@ -2074,6 +2090,244 @@ def _get_multi_value_feedback_field(
     return None
 
 
+def _attributes_dump_json_path(field_name: str, pb: ParamBuilder) -> str:
+    """Return the ``$."a"."b"..."`` JSONPath param slot for an ``attributes.<path>`` key.
+
+    Mirrors the JSONPath shape that ``CallsMergedDynamicField.as_sql`` uses so
+    the fallback branch of the typed-map hybrid reads the same JSON location
+    the non-hybrid JSON_VALUE path would.
+    """
+    parts = field_name.removeprefix(ATTRIBUTES_FIELD_PREFIX).split(".")
+    json_path = "$" + "".join(f'."{p}"' for p in parts)
+    return param_slot(pb.add_param(json_path), "String")
+
+
+def _attributes_map_fallback_sql(
+    cast: "tsi_query.CastTo | None",
+    json_path_slot: str,
+    attributes_dump_sql: str,
+) -> str:
+    """JSON_VALUE fallback expression for the typed-map hybrid.
+
+    Returns a value whose CH type matches the typed Map column on the fast
+    branch, so the surrounding ``if(...)`` hands either branch to the outer
+    comparison without a second cast.
+
+    - ``cast=None`` (inferred string path): plain ``coalesce/nullIf`` over
+      ``JSON_VALUE``. Both branches are already ``String``, so no cast.
+    - ``cast="bool"``: ``JSON_VALUE`` on a JSON bool emits the literal string
+      ``"true"``/``"false"``, and ``toUInt8OrNull("true")`` is NULL — the
+      generic ``clickhouse_cast`` would drop legacy bool rows on the floor.
+      We compare the raw JSON_VALUE against ``'true'`` to yield ``Bool``.
+    - other casts: reuse ``clickhouse_cast`` since the numeric/string casts
+      already handle the JSON_VALUE string output.
+    """
+    json_value_expr = f"JSON_VALUE({attributes_dump_sql}, {json_path_slot})"
+    if cast == "bool":
+        return f"({json_value_expr} = 'true')"
+    coalesced = f"coalesce(nullIf({json_value_expr}, 'null'), '')"
+    if cast is None:
+        return coalesced
+    return clickhouse_cast(coalesced, cast)
+
+
+def _emit_typed_map_hybrid(
+    field_name: str,
+    column: str,
+    fallback_cast: "tsi_query.CastTo | None",
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Build ``if(mapContains(map, key), map[key], JSON_VALUE fallback)`` for
+    one ``attributes.<path>`` read.
+
+    Because migration 031 only populates the typed maps for rows inserted
+    after it runs, a pure ``map[key]`` read is unsafe on mixed-backfill
+    tables: CH returns the value-type default (``0``/``0.0``/``false``/``''``)
+    for a missing key, which silently produces wrong filter results on
+    legacy rows whose attributes live only in ``attributes_dump``. The
+    per-row ``mapContains`` gate means no cutoff timestamp, no backfill
+    completion gate, and mixed tables Just Work — the fast read fires when
+    it's safe, and the old path stays correct when it isn't.
+
+    Returns None when the path has no key (e.g. bare ``attributes.``).
+    """
+    key = field_name.removeprefix(ATTRIBUTES_FIELD_PREFIX)
+    if not key:
+        return None
+    structured_field = get_field_by_name(field_name)
+    raw_fields_used[structured_field.field] = structured_field
+
+    key_slot = param_slot(pb.add_param(key), "String")
+    column_sql = f"{table_alias}.{column}"
+    attributes_dump_sql = f"{table_alias}.attributes_dump"
+    if use_agg_fn:
+        column_sql = f"any({column_sql})"
+        attributes_dump_sql = f"any({attributes_dump_sql})"
+
+    fast_expr = f"{column_sql}[{key_slot}]"
+    fallback_expr = _attributes_map_fallback_sql(
+        fallback_cast, _attributes_dump_json_path(field_name, pb), attributes_dump_sql
+    )
+    return f"if(mapContains({column_sql}, {key_slot}), {fast_expr}, {fallback_expr})"
+
+
+def _cast_for_literal_value(value: object) -> "tsi_query.CastTo | None":
+    """Infer the typed attribute map from a scalar query literal.
+
+    Bool must be checked before int because ``bool`` is an ``int`` subclass in
+    Python. ``None`` and structured literals intentionally fall through to the
+    existing JSON_VALUE path.
+    """
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int"
+    if isinstance(value, float):
+        return "double"
+    if isinstance(value, str):
+        return "string"
+    return None
+
+
+def _all_literals_share_cast(
+    operands: Sequence["tsi_query.Operand"],
+) -> "tsi_query.CastTo | None":
+    """Return a shared cast for a list of literal operands, if unambiguous."""
+    cast: tsi_query.CastTo | None = None
+    for operand in operands:
+        if not isinstance(operand, tsi_query.LiteralOperation):
+            return None
+        operand_cast = _cast_for_literal_value(operand.literal_)
+        if operand_cast is None:
+            return None
+        if cast is None:
+            cast = operand_cast
+        elif operand_cast != cast:
+            return None
+    return cast
+
+
+def _maybe_attributes_map_literal_field_sql(
+    operand: "tsi_query.Operand",
+    peer: "tsi_query.Operand",
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Fast path for ``attributes.<path>`` compared against a scalar literal.
+
+    Fires when ``operand`` is ``$getField(attributes.<path>)`` and ``peer`` is
+    a scalar literal whose Python type maps cleanly to one typed Map column.
+    This covers common query shapes such as ``attributes.model = 'gpt-4'`` and
+    ``attributes.retries > 3`` without requiring callers to wrap the field in
+    ``$convert``.
+
+    String literals route through ``attributes_map_str`` with ``fallback_cast=None``
+    so the fallback is a plain ``coalesce/nullIf``. Explicit
+    ``$convert(..., "string")`` still adds a ``toString`` wrap for DSL
+    consistency; the inferred path skips it because both Map and JSON_VALUE
+    branches are already ``String``.
+
+    Returns None when the operand/peer shape doesn't match so callers fall
+    back to ``process_operand`` and preserve existing behavior (including
+    the ``IS NULL`` peer path and the ``$convert(..., "exists")`` case).
+    """
+    if not isinstance(operand, tsi_query.GetFieldOperator):
+        return None
+    if not isinstance(peer, tsi_query.LiteralOperation):
+        return None
+    cast = _cast_for_literal_value(peer.literal_)
+    if cast is None:
+        return None
+    field_name = operand.get_field_
+    if not field_name.startswith(ATTRIBUTES_FIELD_PREFIX):
+        return None
+    column = ATTRIBUTES_MAP_COLUMN_BY_CAST[cast]
+    fallback_cast: tsi_query.CastTo | None = None if cast == "string" else cast
+    return _emit_typed_map_hybrid(
+        field_name,
+        column,
+        fallback_cast,
+        pb,
+        table_alias,
+        use_agg_fn,
+        raw_fields_used,
+    )
+
+
+def _maybe_attributes_map_in_field_sql(
+    operand: "tsi_query.Operand",
+    literal_operands: Sequence["tsi_query.Operand"],
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Fast path for ``attributes.<path> IN [same-typed scalar literals...]``."""
+    if not isinstance(operand, tsi_query.GetFieldOperator):
+        return None
+    cast = _all_literals_share_cast(literal_operands)
+    if cast is None:
+        return None
+    field_name = operand.get_field_
+    if not field_name.startswith(ATTRIBUTES_FIELD_PREFIX):
+        return None
+    column = ATTRIBUTES_MAP_COLUMN_BY_CAST[cast]
+    fallback_cast: tsi_query.CastTo | None = None if cast == "string" else cast
+    return _emit_typed_map_hybrid(
+        field_name,
+        column,
+        fallback_cast,
+        pb,
+        table_alias,
+        use_agg_fn,
+        raw_fields_used,
+    )
+
+
+def _maybe_attributes_map_filter_sql(
+    operand: tsi_query.ConvertOperation,
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Hybrid fast/fallback SQL for ``$convert`` over ``attributes.<path>``.
+
+    Only fires when:
+    - the converted operand is a plain ``$getField`` on ``attributes.*``,
+    - the target cast maps to one of the typed Map columns populated at ingest
+      (``int``/``double``/``bool``/``string`` — ``exists`` has no typed Map and
+      falls through to the JSON_VALUE path).
+
+    The Map key is the dot-joined path after ``attributes.`` to mirror the
+    flattening done by ``extract_typed_attrs`` at write time.
+    """
+    inner = operand.convert_.input
+    if not isinstance(inner, tsi_query.GetFieldOperator):
+        return None
+    field_name = inner.get_field_
+    if not field_name.startswith(ATTRIBUTES_FIELD_PREFIX):
+        return None
+    cast = operand.convert_.to
+    column = ATTRIBUTES_MAP_COLUMN_BY_CAST.get(cast)
+    if column is None:
+        return None
+    return _emit_typed_map_hybrid(
+        field_name,
+        column,
+        cast,
+        pb,
+        table_alias,
+        use_agg_fn,
+        raw_fields_used,
+    )
+
+
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
@@ -2089,6 +2343,29 @@ def process_query_to_conditions(
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
         cond = None
+
+        def process_binary_operands(
+            ops: Sequence["tsi_query.Operand"],
+        ) -> tuple[str, str]:
+            lhs_fast = _maybe_attributes_map_literal_field_sql(
+                ops[0],
+                ops[1],
+                param_builder,
+                table_alias,
+                use_agg_fn,
+                raw_fields_used,
+            )
+            rhs_fast = _maybe_attributes_map_literal_field_sql(
+                ops[1],
+                ops[0],
+                param_builder,
+                table_alias,
+                use_agg_fn,
+                raw_fields_used,
+            )
+            lhs_part = lhs_fast if lhs_fast is not None else process_operand(ops[0])
+            rhs_part = rhs_fast if rhs_fast is not None else process_operand(ops[1])
+            return lhs_part, rhs_part
 
         if isinstance(operation, tsi_query.AndOperation):
             if len(operation.and_) == 0:
@@ -2121,54 +2398,59 @@ def process_query_to_conditions(
                 else:
                     rhs_part = process_operand(ops[1])
                     cond = f"has({array_expr}, {rhs_part})"
-            else:
+            elif (
+                isinstance(ops[1], tsi_query.LiteralOperation)
+                and ops[1].literal_ is None
+            ):
                 lhs_part = process_operand(ops[0])
-                if (
-                    isinstance(ops[1], tsi_query.LiteralOperation)
-                    and ops[1].literal_ is None
-                ):
-                    # For calls_complete, sentinel fields use equality checks
-                    # against the sentinel value instead of IS NULL.
-                    field_name = _extract_field_name(ops[0])
-                    sentinel = (
-                        ch_sentinel_values.get_sentinel_value(field_name)
-                        if use_sentinels and field_name
-                        else None
+                # For calls_complete, sentinel fields use equality checks
+                # against the sentinel value instead of IS NULL.
+                field_name = _extract_field_name(ops[0])
+                sentinel = (
+                    ch_sentinel_values.get_sentinel_value(field_name)
+                    if use_sentinels and field_name
+                    else None
+                )
+                if sentinel is not None:
+                    assert field_name is not None
+                    sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
+                    sentinel_slot = param_builder.add(
+                        sentinel, param_type=sentinel_type
                     )
-                    if sentinel is not None:
-                        assert field_name is not None
-                        sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
-                        sentinel_slot = param_builder.add(
-                            sentinel, param_type=sentinel_type
-                        )
-                        cond = f"({lhs_part} = {sentinel_slot})"
-                    else:
-                        cond = f"({lhs_part} IS NULL)"
+                    cond = f"({lhs_part} = {sentinel_slot})"
                 else:
-                    rhs_part = process_operand(ops[1])
-                    cond = f"({lhs_part} = {rhs_part})"
+                    cond = f"({lhs_part} IS NULL)"
+            else:
+                lhs_part, rhs_part = process_binary_operands(ops)
+                cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
             ops = _maybe_convert_datetime_operands(operation.gt_)
-            lhs_part = process_operand(ops[0])
-            rhs_part = process_operand(ops[1])
+            lhs_part, rhs_part = process_binary_operands(ops)
             cond = f"({lhs_part} > {rhs_part})"
         elif isinstance(operation, tsi_query.LtOperation):
             ops = _maybe_convert_datetime_operands(operation.lt_)
-            lhs_part = process_operand(ops[0])
-            rhs_part = process_operand(ops[1])
+            lhs_part, rhs_part = process_binary_operands(ops)
             cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
             ops = _maybe_convert_datetime_operands(operation.gte_)
-            lhs_part = process_operand(ops[0])
-            rhs_part = process_operand(ops[1])
+            lhs_part, rhs_part = process_binary_operands(ops)
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.LteOperation):
             ops = _maybe_convert_datetime_operands(operation.lte_)
-            lhs_part = process_operand(ops[0])
-            rhs_part = process_operand(ops[1])
+            lhs_part, rhs_part = process_binary_operands(ops)
             cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
-            lhs_part = process_operand(operation.in_[0])
+            lhs_fast = _maybe_attributes_map_in_field_sql(
+                operation.in_[0],
+                operation.in_[1],
+                param_builder,
+                table_alias,
+                use_agg_fn,
+                raw_fields_used,
+            )
+            lhs_part = (
+                lhs_fast if lhs_fast is not None else process_operand(operation.in_[0])
+            )
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
             cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
@@ -2233,6 +2515,11 @@ def process_query_to_conditions(
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
+            fast_sql = _maybe_attributes_map_filter_sql(
+                operand, param_builder, table_alias, use_agg_fn, raw_fields_used
+            )
+            if fast_sql is not None:
+                return fast_sql
             field = process_operand(operand.convert_.input)
             return clickhouse_cast(field, operand.convert_.to)
         elif isinstance(

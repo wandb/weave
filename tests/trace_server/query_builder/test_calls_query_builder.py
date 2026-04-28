@@ -1488,20 +1488,26 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_12:String}
-            WHERE ((calls_merged.op_name IN {pb_7:Array(String)})
+            PREWHERE calls_merged.project_id = {pb_14:String}
+            WHERE ((calls_merged.op_name IN {pb_9:Array(String)})
                     OR (calls_merged.op_name IS NULL))
-                AND ((calls_merged.attributes_dump LIKE {pb_8:String} OR calls_merged.attributes_dump IS NULL)
-                    AND (lower(calls_merged.inputs_dump) LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL)
-                    AND ((calls_merged.attributes_dump LIKE {pb_10:String} OR calls_merged.attributes_dump LIKE {pb_11:String})
+                AND ((calls_merged.attributes_dump LIKE {pb_10:String} OR calls_merged.attributes_dump IS NULL)
+                    AND (lower(calls_merged.inputs_dump) LIKE {pb_11:String} OR calls_merged.inputs_dump IS NULL)
+                    AND ((calls_merged.attributes_dump LIKE {pb_12:String} OR calls_merged.attributes_dump LIKE {pb_13:String})
                         OR calls_merged.attributes_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+                ((if(mapContains(any(calls_merged.attributes_map_str), {pb_0:String}),
+                     any(calls_merged.attributes_map_str)[{pb_0:String}],
+                     coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), ''))
+                 = {pb_2:String}))
                 AND
-                (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), ''), {pb_3:String}) > 0)
+                (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), ''), {pb_4:String}) > 0)
                 AND
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_4:String}), 'null'), '') IN ({pb_5:String},{pb_6:String})))
+                ((if(mapContains(any(calls_merged.attributes_map_str), {pb_5:String}),
+                     any(calls_merged.attributes_map_str)[{pb_5:String}],
+                     coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_6:String}), 'null'), ''))
+                 IN ({pb_7:String},{pb_8:String})))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             )
@@ -1511,24 +1517,26 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             any(calls_merged.attributes_dump) AS attributes_dump,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_12:String}
+        PREWHERE calls_merged.project_id = {pb_14:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
-            "pb_0": '$."model"',
-            "pb_1": "gpt-4",
-            "pb_2": '$."prompt"',
-            "pb_3": "weather",
-            "pb_4": '$."temperature"',
-            "pb_5": "0.7",
-            "pb_6": "0.8",
-            "pb_7": ["llm/openai", "llm/anthropic"],
-            "pb_8": '%"gpt-4"%',
-            "pb_9": '%"%weather%"%',
-            "pb_10": '%"0.7"%',
-            "pb_11": '%"0.8"%',
-            "pb_12": "project",
+            "pb_0": "model",
+            "pb_1": '$."model"',
+            "pb_2": "gpt-4",
+            "pb_3": '$."prompt"',
+            "pb_4": "weather",
+            "pb_5": "temperature",
+            "pb_6": '$."temperature"',
+            "pb_7": "0.7",
+            "pb_8": "0.8",
+            "pb_9": ["llm/openai", "llm/anthropic"],
+            "pb_10": '%"gpt-4"%',
+            "pb_11": '%"%weather%"%',
+            "pb_12": '%"0.7"%',
+            "pb_13": '%"0.8"%',
+            "pb_14": "project",
         },
     )
 

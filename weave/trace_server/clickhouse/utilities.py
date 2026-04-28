@@ -8,9 +8,10 @@ import datetime
 import hashlib
 import json
 import logging
+import math
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypedDict
 
 import ddtrace
 import sqlparse
@@ -96,6 +97,94 @@ def split_migration_sql(sql: str) -> list[str]:
         if stripped:
             statements.append(stripped)
     return statements
+
+
+# ---------------------------------------------------------------------------
+# Typed attribute map extraction (fast-filter path)
+# ---------------------------------------------------------------------------
+
+
+def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
+    """Flatten a nested dict into dot-joined (key, leaf-value) pairs.
+
+    Matches the dot-path convention already used by read-side filters
+    (`attributes.nested.leaf`), so a caller filtering on "attributes.foo.bar"
+    hits the same key the extractor writes.
+
+    Collision caveat: ``{"a": {"b": 1}}`` and ``{"a.b": 1}`` both flatten to
+    key ``"a.b"``; the second write wins in the typed map. The ``JSON_VALUE``
+    fallback can still distinguish them (``$."a"."b"`` vs ``$."a.b"``), so a
+    row with a literal-dot key can legitimately read different values from
+    the fast and fallback branches. We accept this divergence because nested
+    dicts are the common shape; literal-dot keys are pathological and already
+    break the existing JSONPath-based filter convention.
+    """
+    result: list[tuple[str, Any]] = []
+    for key, val in attrs.items():
+        full_key = key if not prefix else f"{prefix}.{key}"
+        if isinstance(val, dict):
+            result.extend(_flatten_attrs(val, full_key))
+        else:
+            result.append((full_key, val))
+    return result
+
+
+class TypedAttrMaps(TypedDict):
+    """Typed attribute maps keyed by their CH column name.
+
+    Keys match the ``CallStartCHInsertable`` / ``CallCompleteCHInsertable``
+    fields so call sites can ``**spread`` the result straight into the
+    insertable constructor.
+    """
+
+    attributes_map_str: dict[str, str]
+    attributes_map_int: dict[str, int]
+    attributes_map_float: dict[str, float]
+    attributes_map_bool: dict[str, bool]
+
+
+def extract_typed_attrs(attrs: dict[str, Any]) -> TypedAttrMaps:
+    """Route a Python attributes dict into four typed maps for fast filtering.
+
+    No per-map entry cap: ``attributes_dump`` already admits arbitrarily large
+    payloads, the typed maps mirror it, and ``_strip_large_values`` clears the
+    maps together with the dump when a row exceeds the insert byte limit. A
+    dedicated cap would only hide truncation from callers.
+
+    Non-finite floats (NaN, +/-Inf) are dropped because they break
+    JSON/CH round-trips. Non-scalar leaf values (lists, etc.) are
+    JSON-encoded into the string map.
+
+    The ``bool`` branch must come before the ``int`` branch: Python's ``bool``
+    is a subclass of ``int``, so ``isinstance(True, int)`` is True, and an
+    int-first dispatch would land True/False in the int map.
+    """
+    result: TypedAttrMaps = {
+        "attributes_map_str": {},
+        "attributes_map_int": {},
+        "attributes_map_float": {},
+        "attributes_map_bool": {},
+    }
+    if not isinstance(attrs, dict):
+        return result
+
+    for key, val in _flatten_attrs(attrs):
+        if val is None:
+            continue
+        if isinstance(val, bool):
+            result["attributes_map_bool"][key] = val
+        elif isinstance(val, int):
+            result["attributes_map_int"][key] = val
+        elif isinstance(val, float):
+            if not math.isfinite(val):
+                continue
+            result["attributes_map_float"][key] = val
+        elif isinstance(val, str):
+            result["attributes_map_str"][key] = val
+        else:
+            result["attributes_map_str"][key] = json.dumps(val)
+
+    return result
 
 
 # ---------------------------------------------------------------------------

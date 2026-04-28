@@ -83,6 +83,7 @@ from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
 from weave.trace_server.clickhouse.schema_converters import (
+    ATTRIBUTES_MAP_COLUMNS,
     ch_call_dict_to_call_schema_dict,
     ch_call_to_row,
     ch_complete_call_to_row,
@@ -6204,15 +6205,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if exception:
                 end.exception = exception
             end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
-            calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
-                start_call,
-                end_call,
-            ]
-            batch_data = []
-            for call in calls:
-                call_dict = call.model_dump()
-                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-                batch_data.append(values)
+            batch_data = [ch_call_to_row(start_call), ch_call_to_row(end_call)]
 
             self._insert_call_batch(batch_data)
 
@@ -6460,15 +6453,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             end.exception = res.response["error"]
 
         end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
-        calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
-            start_call,
-            end_call,
-        ]
-        batch_data = []
-        for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
+        batch_data = [ch_call_to_row(start_call), ch_call_to_row(end_call)]
 
         try:
             self._insert_call_batch(batch_data)
@@ -6857,11 +6842,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 
@@ -6975,8 +6956,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """Iterate through the batch and replace large JSON values with placeholders.
 
-        Only considers JSON dump columns and ensures their combined size stays under
-        the limit by selectively replacing the largest values.
+        Considers each ``*_dump`` JSON column individually, plus the four
+        ``attributes_map_*`` columns as a group bound to ``attributes_dump``.
+        The typed maps mirror the attributes dict at ingest and must be cleared
+        alongside the dump — otherwise stripping ``attributes_dump`` alone
+        leaves the row oversized by the sum of the map bytes.
         """
         stripped_count = 0
         final_batch = []
@@ -6985,13 +6969,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump")
             for col in ALL_CALL_JSON_COLUMNS
         ]
+        attributes_dump_idx = ALL_CALL_INSERT_COLUMNS.index("attributes_dump")
+        attributes_map_indices = [
+            ALL_CALL_INSERT_COLUMNS.index(col) for col in ATTRIBUTES_MAP_COLUMNS
+        ]
         entity_too_large_payload_byte_size = num_bytes(
             ch_settings.ENTITY_TOO_LARGE_PAYLOAD
         )
 
         for item in batch:
-            # Calculate only JSON dump bytes
-            json_idx_size_pairs = [(i, num_bytes(item[i])) for i in json_column_indices]
+            # Count attributes_dump + typed map bytes as one slot so stripping
+            # attributes hits the full byte cost in a single pass.
+            attributes_map_bytes = sum(
+                num_bytes(item[i]) for i in attributes_map_indices
+            )
+            json_idx_size_pairs = []
+            for col_idx in json_column_indices:
+                size = num_bytes(item[col_idx])
+                if col_idx == attributes_dump_idx:
+                    size += attributes_map_bytes
+                json_idx_size_pairs.append((col_idx, size))
             total_json_bytes = sum(size for _, size in json_idx_size_pairs)
 
             # If over limit, try to optimize by selectively stripping largest JSON values
@@ -7012,6 +7009,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 stripped_item[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
                 total_json_bytes -= size - entity_too_large_payload_byte_size
                 stripped_count += 1
+                # Clear typed attribute maps together with attributes_dump; the
+                # maps are derived from the dump and would otherwise keep the
+                # row oversized after the dump placeholder is in place.
+                if col_idx == attributes_dump_idx:
+                    for map_idx in attributes_map_indices:
+                        stripped_item[map_idx] = {}
 
             final_batch.append(stripped_item)
 
