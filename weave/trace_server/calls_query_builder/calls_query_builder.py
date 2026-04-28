@@ -2077,13 +2077,16 @@ def _get_multi_value_feedback_field(
     return None
 
 
-def _cast_for_literal_filter(value: object) -> tsi_query.CastTo | None:
+def _cast_for_literal_filter(
+    literal: tsi_query.LiteralOperation,
+) -> tsi_query.CastTo | None:
     """Infer a JSON dynamic-field cast from a comparison literal.
 
     ``JSON_VALUE`` returns strings, so numeric and boolean literals need the
     field side cast to match the parameter type ClickHouse receives. String,
     ``None``, and structured literals keep the existing uncast path.
     """
+    value = literal.literal_
     if isinstance(value, bool):
         return "bool"
     if isinstance(value, int):
@@ -2101,7 +2104,7 @@ def _shared_cast_for_literal_filters(
     for operand in operands:
         if not isinstance(operand, tsi_query.LiteralOperation):
             return None
-        operand_cast = _cast_for_literal_filter(operand.literal_)
+        operand_cast = _cast_for_literal_filter(operand)
         if operand_cast is None:
             return None
         if cast is None:
@@ -2148,29 +2151,32 @@ def process_query_to_conditions(
             )
 
         def process_binary_operands(
-            ops: Sequence[tsi_query.Operand],
+            lhs: tsi_query.Operand,
+            rhs: tsi_query.Operand,
         ) -> tuple[str, str]:
+            # Each side's cast is inferred from the *peer* literal: a numeric
+            # RHS tells us to cast the LHS field, and vice versa.
             lhs_cast = (
-                _cast_for_literal_filter(ops[1].literal_)
-                if isinstance(ops[1], tsi_query.LiteralOperation)
+                _cast_for_literal_filter(rhs)
+                if isinstance(rhs, tsi_query.LiteralOperation)
                 else None
             )
             rhs_cast = (
-                _cast_for_literal_filter(ops[0].literal_)
-                if isinstance(ops[0], tsi_query.LiteralOperation)
+                _cast_for_literal_filter(lhs)
+                if isinstance(lhs, tsi_query.LiteralOperation)
                 else None
             )
             lhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(
-                ops[0], lhs_cast
+                lhs, lhs_cast
             )
             rhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(
-                ops[1], rhs_cast
+                rhs, rhs_cast
             )
             lhs_part = (
-                lhs_cast_sql if lhs_cast_sql is not None else process_operand(ops[0])
+                lhs_cast_sql if lhs_cast_sql is not None else process_operand(lhs)
             )
             rhs_part = (
-                rhs_cast_sql if rhs_cast_sql is not None else process_operand(ops[1])
+                rhs_cast_sql if rhs_cast_sql is not None else process_operand(rhs)
             )
             return lhs_part, rhs_part
 
@@ -2219,23 +2225,23 @@ def process_query_to_conditions(
                 else:
                     cond = f"({lhs_part} IS NULL)"
             else:
-                lhs_part, rhs_part = process_binary_operands(ops)
+                lhs_part, rhs_part = process_binary_operands(ops[0], ops[1])
                 cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
             ops = _maybe_convert_datetime_operands(operation.gt_)
-            lhs_part, rhs_part = process_binary_operands(ops)
+            lhs_part, rhs_part = process_binary_operands(ops[0], ops[1])
             cond = f"({lhs_part} > {rhs_part})"
         elif isinstance(operation, tsi_query.LtOperation):
             ops = _maybe_convert_datetime_operands(operation.lt_)
-            lhs_part, rhs_part = process_binary_operands(ops)
+            lhs_part, rhs_part = process_binary_operands(ops[0], ops[1])
             cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
             ops = _maybe_convert_datetime_operands(operation.gte_)
-            lhs_part, rhs_part = process_binary_operands(ops)
+            lhs_part, rhs_part = process_binary_operands(ops[0], ops[1])
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.LteOperation):
             ops = _maybe_convert_datetime_operands(operation.lte_)
-            lhs_part, rhs_part = process_binary_operands(ops)
+            lhs_part, rhs_part = process_binary_operands(ops[0], ops[1])
             cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(

@@ -176,6 +176,11 @@ def json_dump_field_as_sql(
             path_str = param_slot(param_name, "String")
         val = f"coalesce(nullIf(JSON_VALUE({root_field_sanitized}, {path_str}), 'null'), '')"
         if cast == "bool":
+            # JSON_VALUE on a JSON bool emits the literal strings 'true'/
+            # 'false', which `toUInt8OrNull` would turn into NULL. Match those
+            # first; fall back to `toUInt8OrNull` for legacy rows that stored
+            # 1/0 (or any numeric-string) so a plain Bool comparison still
+            # works in CH.
             return (
                 f"multiIf({val} = 'true', 1, {val} = 'false', 0, toUInt8OrNull({val}))"
             )
