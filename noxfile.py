@@ -129,6 +129,11 @@ def tests(session: nox.Session, shard: str):
 
     session.run(*sync_args)
 
+    if shard == "openai_agents":
+        # Keep the public extra broad for runtime compatibility, but exercise the
+        # newer SDK span classes in CI.
+        session.run("uv", "pip", "install", "--upgrade", "openai-agents>=0.14.7")
+
     env = {
         k: session.env.get(k) or os.getenv(k)
         for k in [

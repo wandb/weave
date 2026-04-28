@@ -3,9 +3,17 @@ from unittest.mock import Mock
 import agents
 import pytest
 from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
-from agents.tracing import AgentSpanData, ResponseSpanData, Span, Trace
+from agents.tracing import (
+    AgentSpanData,
+    ResponseSpanData,
+    Span,
+    TaskSpanData,
+    Trace,
+    TurnSpanData,
+)
 from pydantic import BaseModel
 
+from weave.integrations.integration_utilities import op_name_from_ref
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 from weave.trace.weave_client import WeaveClient
 
@@ -31,7 +39,7 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     result = Runner.run_sync(agent, "Write a haiku about recursion in programming.")
     calls = client.get_calls()
 
-    assert len(calls) == 2
+    assert len(calls) == 4
 
     trace_root = calls[0]
     assert trace_root.inputs["name"] == "Agent workflow"
@@ -39,7 +47,21 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     assert trace_root.output["metrics"] == {}
     assert trace_root.output["metadata"] == {}
 
-    agent_call = calls[1]
+    task_call = calls[1]
+    assert op_name_from_ref(task_call.op_name) == "openai_agent_task"
+    assert task_call.parent_id == trace_root.id
+    assert task_call.inputs["name"] == "Agent workflow"
+    assert task_call.output["output"] is None
+    assert task_call.output["metrics"] == {
+        "tokens": 60,
+        "prompt_tokens": 43,
+        "completion_tokens": 17,
+    }
+    assert task_call.output["metadata"] == {"name": "Agent workflow"}
+    assert task_call.output["error"] is None
+
+    agent_call = calls[2]
+    assert agent_call.parent_id == task_call.id
     assert agent_call.inputs["name"] == "Assistant"
     assert agent_call.output["output"] is None
     assert agent_call.output["metrics"] == {}
@@ -49,6 +71,22 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
         "output_type": "str",
     }
     assert agent_call.output["error"] is None
+
+    turn_call = calls[3]
+    assert op_name_from_ref(turn_call.op_name) == "openai_agent_turn"
+    assert turn_call.parent_id == agent_call.id
+    assert turn_call.inputs["name"] == "Assistant turn 1"
+    assert turn_call.output["output"] is None
+    assert turn_call.output["metrics"] == {
+        "tokens": 60,
+        "prompt_tokens": 43,
+        "completion_tokens": 17,
+    }
+    assert turn_call.output["metadata"] == {
+        "turn": 1,
+        "agent_name": "Assistant",
+    }
+    assert turn_call.output["error"] is None
 
 
 @pytest.mark.skip(
@@ -385,3 +423,73 @@ def test_response_spans_are_skipped(client: WeaveClient) -> None:
     processor.on_trace_end(trace)
     assert "trace_1" not in processor._trace_calls
     assert "trace_1" not in processor._trace_data
+
+
+def test_newer_agent_task_and_turn_fields_prevent_unknown_blocks(
+    client: WeaveClient,
+) -> None:
+    """Task/turn span fields are required to avoid Unknown blocks in newer SDKs."""
+    processor = WeaveTracingProcessor()
+
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_real"
+    trace.name = "test_trace_real"
+    processor.on_trace_start(trace)
+
+    task_span = Mock(spec=Span)
+    task_span.trace_id = trace.trace_id
+    task_span.span_id = "task_span_real"
+    task_span.parent_id = None
+    task_span.span_data = TaskSpanData(
+        name="Runner task",
+        usage={"input_tokens": 0, "output_tokens": 5, "total_tokens": 5},
+        metadata={"session_id": "session-1"},
+    )
+    task_span.error = None
+    processor.on_span_start(task_span)
+
+    turn_span = Mock(spec=Span)
+    turn_span.trace_id = trace.trace_id
+    turn_span.span_id = "turn_span_real"
+    turn_span.parent_id = task_span.span_id
+    turn_span.span_data = TurnSpanData(
+        turn=2,
+        agent_name="Assistant",
+        usage={"input_tokens": 7, "output_tokens": 11},
+        metadata={"callback": "session_input"},
+    )
+    turn_span.error = None
+    processor.on_span_start(turn_span)
+
+    processor.on_span_end(turn_span)
+    processor.on_span_end(task_span)
+    processor.on_trace_end(trace)
+
+    trace_call, task_call, turn_call = client.get_calls()
+
+    assert op_name_from_ref(task_call.op_name) == "openai_agent_task"
+    assert task_call.parent_id == trace_call.id
+    assert task_call.inputs["name"] == "Runner task"
+    assert task_call.output["metrics"] == {
+        "tokens": 5,
+        "prompt_tokens": 0,
+        "completion_tokens": 5,
+    }
+    assert task_call.output["metadata"] == {
+        "name": "Runner task",
+        "session_id": "session-1",
+    }
+
+    assert op_name_from_ref(turn_call.op_name) == "openai_agent_turn"
+    assert turn_call.parent_id == task_call.id
+    assert turn_call.inputs["name"] == "Assistant turn 2"
+    assert turn_call.output["metrics"] == {
+        "tokens": 18,
+        "prompt_tokens": 7,
+        "completion_tokens": 11,
+    }
+    assert turn_call.output["metadata"] == {
+        "turn": 2,
+        "agent_name": "Assistant",
+        "callback": "session_input",
+    }
