@@ -10,22 +10,6 @@ from weave.trace.objectify import register_object
 from weave.trace.op import op
 
 
-def _validate_remote_scorer_endpoint_url(v: str) -> str:
-    """Ensure ``endpoint_url`` is a usable http(s) URL with a host (dev-friendly)."""
-    try:
-        parsed = urlparse(v)
-    except Exception as exc:
-        raise ValueError("endpoint_url must be a valid URL string") from exc
-    if parsed.scheme not in {"http", "https"}:
-        raise ValueError("endpoint_url must use the http or https scheme")
-    host = (parsed.hostname or "").strip()
-    if not host:
-        raise ValueError(
-            "endpoint_url must include a host, e.g. https://scoring.example.com/v1"
-        )
-    return v
-
-
 @register_object
 class RemoteScorer(Scorer):
     """Scorer backed by a customer-managed HTTPS endpoint.
@@ -86,3 +70,19 @@ class RemoteScorer(Scorer):
             "RemoteScorer is run by the Weave scoring worker against your HTTPS "
             "endpoint; score() is not part of that path."
         )
+
+
+def _validate_remote_scorer_endpoint_url(v: str) -> str:
+    """Ensure ``endpoint_url`` is a usable http(s) URL with a host (dev-friendly)."""
+    try:
+        parsed = urlparse(v)
+    except Exception as exc:
+        raise ValueError("endpoint_url must be a valid URL string") from exc
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("endpoint_url must use the http or https scheme")
+    host = (parsed.hostname or "").strip()
+    if not host:
+        raise ValueError(
+            "endpoint_url must include a host, e.g. https://scoring.example.com/v1"
+        )
+    return v
