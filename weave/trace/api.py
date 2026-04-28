@@ -235,6 +235,39 @@ def init(
 
 
 def get_client() -> weave_client.WeaveClient | None:
+    """Returns the active `WeaveClient` instance, or `None` if Weave hasn't been initialized.
+
+    Use this when you need access to the client after initialization has already 
+    happened elsewhere, or when you want to check whether Weave is active before 
+    calling client methods.
+
+    If you need the client and want an error when it's absent, use
+    `weave_client_context.require_weave_client()` instead, which raises
+    `WeaveInitError` rather than returning `None`.
+
+    Returns:
+        weave_client.WeaveClient | None: The active client bound to the project
+        passed to `weave.init()`, or `None` if `weave.init()` hasn't been called
+        in this process (or if `weave.finish()` has been called since the last
+        `weave.init()`).
+
+    Example:
+        ```python
+        import weave
+
+        weave.init("your-team/your-project")
+
+        client = weave.get_client()
+        if client is not None:
+            print(client.entity, client.project)
+        ```
+
+    See Also:
+        - `weave.init`: Initializes Weave and registers the global client.
+        - `weave.finish`: Flushes pending work and removes the global client.
+        - `weave_client_context.require_weave_client`: Like `get_client`, but raises
+          `WeaveInitError` when no client is active.
+    """
     return weave_client_context.get_weave_client()
 
 
