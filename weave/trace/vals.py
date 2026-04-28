@@ -485,6 +485,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
             yield res
 
     def _known_unfiltered_remote_row_count(self) -> int | None:
+        """Return independent proof of unfiltered table size, if already known."""
         if self._known_length is not None:
             return self._known_length
 
@@ -498,11 +499,20 @@ class WeaveTable(Traceable):  # noqa: PLW1641
         return None
 
     def _has_active_filter(self) -> bool:
+        # Empty TableRowFilter() is used as the unfiltered default. Only populated
+        # fields actually narrow the rows, and base table size does not prove that
+        # an active filter should match anything.
         return (
             self.filter is not None and self.filter.model_dump(exclude_none=True) != {}
         )
 
     def _should_retry_empty_page(self, response: TableQueryRes, offset: int) -> bool:
+        """Retry when an empty page contradicts known unfiltered table metadata.
+
+        This is a narrow client-side guard for ClickHouse read-after-write
+        visibility. A genuinely empty table, unknown table size, or filtered query
+        can all validly return an empty page and should not be retried here.
+        """
         if response.rows:
             return False
         if self._has_active_filter():
@@ -536,6 +546,8 @@ class WeaveTable(Traceable):  # noqa: PLW1641
                 return response
 
             if attempt == max_attempts - 1:
+                # Keep the historical behavior of returning the server result, but
+                # make the consistency failure visible for debugging.
                 logger.warning(
                     "Table query returned an empty page for a known non-empty "
                     "table after retries: digest=%s offset=%s "
