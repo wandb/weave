@@ -18,6 +18,12 @@ from weave.integrations.openai.openai_sdk import (
 from weave.trace.weave_client import WeaveClient
 
 model = "gpt-4o"
+RawChatCompletionResponse = (
+    LegacyAPIResponse[ChatCompletion] | APIResponse[ChatCompletion]
+)
+RawChatCompletionResponseCls = (
+    type[LegacyAPIResponse[ChatCompletion]] | type[APIResponse[ChatCompletion]]
+)
 
 
 @pytest.fixture(autouse=True)
@@ -30,8 +36,8 @@ def patch_openai() -> Generator[None, None, None]:
 
 
 def _unread_chat_completion_response(
-    response_cls: type,
-) -> LegacyAPIResponse[ChatCompletion] | APIResponse[ChatCompletion]:
+    response_cls: RawChatCompletionResponseCls,
+) -> RawChatCompletionResponse:
     body = (
         b'{"id":"chatcmpl-test","object":"chat.completion","created":1,'
         b'"model":"gpt-4o-mini","choices":[{"index":0,"message":'
@@ -62,7 +68,7 @@ def _unread_chat_completion_response(
 
 @pytest.mark.parametrize("response_cls", [LegacyAPIResponse, APIResponse])
 def test_maybe_unwrap_api_response_reads_unread_raw_response(
-    response_cls: type,
+    response_cls: RawChatCompletionResponseCls,
 ) -> None:
     # LegacyAPIResponse.parse() raises on an unread body — the bug we fix.
     # APIResponse.parse() self-reads, so it has no equivalent failure mode.
