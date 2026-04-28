@@ -26,7 +26,12 @@ from weave.trace_server.agents.constants import (
 )
 from weave.trace_server.agents.schema import NormalizedMessage
 from weave.trace_server.agents.types import (
+    AgentChatAgentStart,
+    AgentChatAssistantMessage,
+    AgentChatContextCompacted,
     AgentChatMessage,
+    AgentChatToolCall,
+    AgentChatUserMessage,
     AgentSpanSchema,
     AgentTraceChatRes,
 )
@@ -235,11 +240,13 @@ class ChatTraversal:
                     type="agent_start",
                     span_id=span.span_id,
                     agent_name=agent_start_label,
-                    model=span.request_model,
-                    status=span.status_code,
-                    system_instructions=_join_or_none(span.system_instructions),
-                    tool_definitions=span.tool_definitions or None,
                     started_at=span.started_at,
+                    agent_start=AgentChatAgentStart(
+                        model=span.request_model,
+                        status=span.status_code,
+                        system_instructions=_join_or_none(span.system_instructions),
+                        tool_definitions=span.tool_definitions or None,
+                    ),
                 )
             )
         else:
@@ -263,10 +270,12 @@ class ChatTraversal:
                     type="context_compacted",
                     span_id=span.span_id,
                     agent_name=subtree_agent,
-                    compaction_summary=span.compaction_summary,
-                    compaction_items_before=span.compaction_items_before,
-                    compaction_items_after=span.compaction_items_after,
                     started_at=span.started_at,
+                    context_compacted=AgentChatContextCompacted(
+                        compaction_summary=span.compaction_summary,
+                        compaction_items_before=span.compaction_items_before,
+                        compaction_items_after=span.compaction_items_after,
+                    ),
                 )
             )
 
@@ -283,13 +292,15 @@ class ChatTraversal:
                 type="tool_call",
                 span_id=span.span_id,
                 agent_name=agent_name,
-                tool_name=tool_name,
-                tool_arguments=span.tool_call_arguments,
-                tool_result=span.tool_call_result,
-                duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
                 started_at=span.started_at,
-                status=span.status_code,
-                content_refs=_content_refs(span),
+                tool_call=AgentChatToolCall(
+                    tool_name=tool_name,
+                    tool_arguments=span.tool_call_arguments,
+                    tool_result=span.tool_call_result,
+                    duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+                    status=span.status_code,
+                    content_refs=_content_refs(span),
+                ),
             )
         )
         return self._walk_children(node, nearest_agent=agent_name, depth=depth)
@@ -506,10 +517,12 @@ def _find_user_message(spans: list[AgentSpanSchema]) -> AgentChatMessage | None:
         if text:
             return AgentChatMessage(
                 type="user_message",
-                text=text,
                 agent_name="User",
                 started_at=s.started_at,
-                content_refs=_content_refs(s),
+                user_message=AgentChatUserMessage(
+                    text=text,
+                    content_refs=_content_refs(s),
+                ),
             )
     return None
 
@@ -548,14 +561,16 @@ def _emit_assistant_message(
         type="assistant_message",
         span_id=span.span_id,
         agent_name=agent_name,
-        model=span.response_model or span.request_model,
-        text=text,
-        reasoning_content=totals.reasoning_content,
-        reasoning_tokens=totals.reasoning_tokens,
-        input_tokens=totals.input_tokens or span.input_tokens,
-        output_tokens=totals.output_tokens or span.output_tokens,
-        duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
         started_at=span.started_at,
-        status=span.status_code,
-        content_refs=_content_refs(span),
+        assistant_message=AgentChatAssistantMessage(
+            model=span.response_model or span.request_model,
+            text=text,
+            reasoning_content=totals.reasoning_content,
+            reasoning_tokens=totals.reasoning_tokens,
+            input_tokens=totals.input_tokens or span.input_tokens,
+            output_tokens=totals.output_tokens or span.output_tokens,
+            duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+            status=span.status_code,
+            content_refs=_content_refs(span),
+        ),
     )

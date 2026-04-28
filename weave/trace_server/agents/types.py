@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from weave.trace_server.agents.constants import (
     DEFAULT_AGENT_QUERY_LIMIT,
@@ -253,50 +253,115 @@ class AgentSearchRes(BaseModel):
     total_conversations: int = 0
 
 
-class AgentChatMessage(BaseModel):
-    """A single element in the structured agent trajectory / chat view.
+AgentChatMessageType = Literal[
+    "user_message",
+    "assistant_message",
+    "tool_call",
+    "agent_handoff",
+    "agent_start",
+    "context_compacted",
+]
 
-    Produced by the backend normalization of agent spans into a linear
-    sequence of user messages, agent responses, tool calls, and agent
-    lifecycle boundaries.
 
-    Message types derived from OTel GenAI semconv operations:
-    - `user_message`, `assistant_message`, `tool_call`
+class AgentChatUserMessage(BaseModel):
+    """Payload for a user prompt in the chat timeline."""
 
-    Weave-specific product extensions (no semconv equivalent):
-    - `agent_start`: agent lifecycle boundary marker
-    - `agent_handoff`: agent-to-agent handoff marker
-    - `context_compacted`: context window compaction event
-    """
+    text: str
+    content_refs: list[str] = Field(default_factory=list)
 
-    type: Literal[
-        "user_message",
-        "assistant_message",
-        "tool_call",
-        "agent_handoff",
-        "agent_start",
-        "context_compacted",
-    ]
-    span_id: str | None = None
-    agent_name: str | None = None
-    text: str | None = None
+
+class AgentChatAssistantMessage(BaseModel):
+    """Payload for assistant text emitted by an agent or LLM span."""
+
+    text: str
     model: str | None = None
-    system_instructions: str | None = None
     reasoning_content: str | None = None
     reasoning_tokens: int | None = None
-    tool_name: str | None = None
-    tool_arguments: str | None = None
-    tool_result: str | None = None
-    tool_definitions: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
     duration_ms: int | None = None
-    started_at: datetime.datetime | None = None
     status: StatusCodeLiteral | None = None
     content_refs: list[str] = Field(default_factory=list)
+
+
+class AgentChatToolCall(BaseModel):
+    """Payload for a tool call timeline event."""
+
+    tool_name: str | None = None
+    tool_arguments: str | None = None
+    tool_result: str | None = None
+    duration_ms: int | None = None
+    status: StatusCodeLiteral | None = None
+    content_refs: list[str] = Field(default_factory=list)
+
+
+class AgentChatAgentStart(BaseModel):
+    """Payload for an agent lifecycle boundary."""
+
+    model: str | None = None
+    system_instructions: str | None = None
+    tool_definitions: str | None = None
+    status: StatusCodeLiteral | None = None
+
+
+class AgentChatAgentHandoff(BaseModel):
+    """Payload for a future agent-to-agent handoff event."""
+
+
+class AgentChatContextCompacted(BaseModel):
+    """Payload for a context-window compaction event."""
+
     compaction_summary: str | None = None
     compaction_items_before: int | None = None
     compaction_items_after: int | None = None
+
+
+class AgentChatMessage(BaseModel):
+    """A single element in the structured agent trajectory / chat view.
+
+    Common event fields live at the top level. Type-specific fields are
+    grouped under the payload matching `type`, and exactly one payload must be
+    set. This keeps subtype nullability explicit while preserving a single
+    ordered timeline model for callers.
+    """
+
+    type: AgentChatMessageType
+    span_id: str | None = None
+    agent_name: str | None = None
+    started_at: datetime.datetime | None = None
+
+    user_message: AgentChatUserMessage | None = None
+    assistant_message: AgentChatAssistantMessage | None = None
+    tool_call: AgentChatToolCall | None = None
+    agent_start: AgentChatAgentStart | None = None
+    agent_handoff: AgentChatAgentHandoff | None = None
+    context_compacted: AgentChatContextCompacted | None = None
+
+    @model_validator(mode="after")
+    def validate_single_payload(self) -> AgentChatMessage:
+        payload_field_by_type: dict[AgentChatMessageType, str] = {
+            "user_message": "user_message",
+            "assistant_message": "assistant_message",
+            "tool_call": "tool_call",
+            "agent_handoff": "agent_handoff",
+            "agent_start": "agent_start",
+            "context_compacted": "context_compacted",
+        }
+        expected_field = payload_field_by_type[self.type]
+        payload_fields = payload_field_by_type.values()
+        missing_expected = getattr(self, expected_field) is None
+        unexpected_fields = [
+            field
+            for field in payload_fields
+            if field != expected_field and getattr(self, field) is not None
+        ]
+
+        if missing_expected or unexpected_fields:
+            raise ValueError(
+                f"AgentChatMessage type={self.type!r} must set only "
+                f"{expected_field!r}; unexpected payloads={unexpected_fields!r}"
+            )
+        return self
 
 
 class AgentTraceChatReq(BaseModel):

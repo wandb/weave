@@ -6,12 +6,22 @@ end-to-end against ClickHouse; these tests pin the pure projection rules.
 
 import datetime
 
+import pytest
+
 from weave.trace_server.agents.chat_view import (
     build_chat_messages,
     build_span_tree,
     build_trace_chat,
 )
-from weave.trace_server.agents.types import AgentSpanSchema
+from weave.trace_server.agents.types import (
+    AgentChatAgentStart,
+    AgentChatAssistantMessage,
+    AgentChatContextCompacted,
+    AgentChatMessage,
+    AgentChatToolCall,
+    AgentChatUserMessage,
+    AgentSpanSchema,
+)
 
 
 def _span(
@@ -61,11 +71,58 @@ def _span(
     )
 
 
+def _user_payload(message: AgentChatMessage) -> AgentChatUserMessage:
+    assert message.user_message is not None
+    return message.user_message
+
+
+def _assistant_payload(message: AgentChatMessage) -> AgentChatAssistantMessage:
+    assert message.assistant_message is not None
+    return message.assistant_message
+
+
+def _tool_payload(message: AgentChatMessage) -> AgentChatToolCall:
+    assert message.tool_call is not None
+    return message.tool_call
+
+
+def _agent_start_payload(message: AgentChatMessage) -> AgentChatAgentStart:
+    assert message.agent_start is not None
+    return message.agent_start
+
+
+def _context_compacted_payload(
+    message: AgentChatMessage,
+) -> AgentChatContextCompacted:
+    assert message.context_compacted is not None
+    return message.context_compacted
+
+
 def test_empty() -> None:
     assert build_chat_messages([]) == []
     res = build_trace_chat([], "trace-empty")
     assert res.trace_id == "trace-empty"
     assert res.messages == []
+
+
+def test_agent_chat_message_requires_matching_payload() -> None:
+    msg = AgentChatMessage(
+        type="assistant_message",
+        assistant_message=AgentChatAssistantMessage(text="hello"),
+    )
+
+    assert msg.assistant_message is not None
+    assert msg.assistant_message.text == "hello"
+
+    with pytest.raises(ValueError, match="must set only"):
+        AgentChatMessage(type="assistant_message")
+
+    with pytest.raises(ValueError, match="must set only"):
+        AgentChatMessage(
+            type="assistant_message",
+            assistant_message=AgentChatAssistantMessage(text="hello"),
+            tool_call=AgentChatToolCall(tool_name="search"),
+        )
 
 
 def test_full_agent_turn() -> None:
@@ -123,7 +180,7 @@ def test_full_agent_turn() -> None:
     assert res.total_duration_ms > 0
 
     # Every expected message type is emitted exactly once.
-    by_type: dict[str, object] = {}
+    by_type: dict[str, AgentChatMessage] = {}
     for m in res.messages:
         assert m.type not in by_type, f"duplicate {m.type}"
         by_type[m.type] = m
@@ -136,21 +193,22 @@ def test_full_agent_turn() -> None:
     }
 
     # Per-message content
-    assert by_type["user_message"].text == "What's the weather?"
+    assert _user_payload(by_type["user_message"]).text == "What's the weather?"
     assert by_type["agent_start"].agent_name == "my-bot"
-    assert by_type["tool_call"].tool_name == "get_weather"
-    assert by_type["tool_call"].tool_arguments == '{"city":"NYC"}'
-    assert by_type["tool_call"].tool_result == '{"temp":72}'
+    assert _tool_payload(by_type["tool_call"]).tool_name == "get_weather"
+    assert _tool_payload(by_type["tool_call"]).tool_arguments == '{"city":"NYC"}'
+    assert _tool_payload(by_type["tool_call"]).tool_result == '{"temp":72}'
     assert by_type["tool_call"].started_at == at(1)
-    assert by_type["context_compacted"].compaction_summary == "Summarized 10 messages"
-    assert by_type["context_compacted"].compaction_items_before == 10
-    assert by_type["context_compacted"].compaction_items_after == 3
-    assert by_type["assistant_message"].text == "It's 72°F."
+    context_compacted = _context_compacted_payload(by_type["context_compacted"])
+    assert context_compacted.compaction_summary == "Summarized 10 messages"
+    assert context_compacted.compaction_items_before == 10
+    assert context_compacted.compaction_items_after == 3
+    assert _assistant_payload(by_type["assistant_message"]).text == "It's 72°F."
 
     # Token aggregation: root 10 + llm 200 = 210 in, 5 + 100 = 105 out.
     # Tool spans don't contribute tokens.
-    assert by_type["assistant_message"].input_tokens == 210
-    assert by_type["assistant_message"].output_tokens == 105
+    assert _assistant_payload(by_type["assistant_message"]).input_tokens == 210
+    assert _assistant_payload(by_type["assistant_message"]).output_tokens == 105
 
 
 def test_agent_start_uses_agent_id_when_name_missing() -> None:
@@ -187,9 +245,10 @@ def test_agent_start_emits_useful_metadata_without_agent_identity() -> None:
 
     assert [m.type for m in messages] == ["agent_start"]
     assert messages[0].agent_name is None
-    assert messages[0].model == "gpt-4o"
-    assert messages[0].system_instructions == "You are helpful."
-    assert messages[0].tool_definitions == '[{"name":"search"}]'
+    agent_start = _agent_start_payload(messages[0])
+    assert agent_start.model == "gpt-4o"
+    assert agent_start.system_instructions == "You are helpful."
+    assert agent_start.tool_definitions == '[{"name":"search"}]'
 
 
 def test_anonymous_invoke_without_metadata_skips_empty_agent_start() -> None:
@@ -280,7 +339,7 @@ def test_build_trace_chat_handles_null_started_at() -> None:
     assert res.trace_id == "trace-with-null"
     user_msgs = [m for m in res.messages if m.type == "user_message"]
     assert len(user_msgs) == 1
-    assert user_msgs[0].text == "hello from the void"
+    assert _user_payload(user_msgs[0]).text == "hello from the void"
     assert user_msgs[0].started_at is None
 
 
@@ -357,7 +416,7 @@ def test_invoke_agent_mirrors_child_llm_output_messages() -> None:
     # Exactly one assistant_message, sourced from the child chat span (not
     # duplicated from the parent invoke_agent).
     assert len(agent_messages) == 1
-    assert agent_messages[0].text == "It's 72°F."
+    assert _assistant_payload(agent_messages[0]).text == "It's 72°F."
 
 
 def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
@@ -384,7 +443,7 @@ def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
     messages = build_chat_messages(spans)
     agent_messages = [m for m in messages if m.type == "assistant_message"]
     assert len(agent_messages) == 1
-    assert agent_messages[0].text == "hi there"
+    assert _assistant_payload(agent_messages[0]).text == "hi there"
 
 
 def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:
@@ -419,7 +478,14 @@ def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:
         ]
     )
 
-    assert [(m.type, m.agent_name, m.text) for m in messages] == [
+    assert [
+        (
+            m.type,
+            m.agent_name,
+            _assistant_payload(m).text if m.assistant_message else None,
+        )
+        for m in messages
+    ] == [
         ("agent_start", "root", None),
         ("assistant_message", "root", "root reply"),
         ("agent_start", "sub", None),
