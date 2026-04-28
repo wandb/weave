@@ -65,7 +65,11 @@ class RemoteScorer(Scorer):
 
     @op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
-        """Not used for remote scoring; the Weave scoring worker performs the HTTP request."""
+        """
+        Override for the Scorer.score function containing a more specific error.
+        
+        Not used for remote scoring; the Weave scoring worker performs the HTTP request.
+        """
         raise NotImplementedError(
             "RemoteScorer is run by the Weave scoring worker against your HTTPS "
             "endpoint; score() is not part of that path."
