@@ -78,6 +78,9 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, int | str] = {
     "async_insert": 1,
     # Wait for async insert to complete to ensure errors are caught
     "wait_for_async_insert": 1,
+    # clickhouse-connect's HTTP insert path does not set wait_end_of_query.
+    # Force ClickHouse to send the response only after the insert query finishes.
+    "wait_end_of_query": 1,
     # Adaptive timeout: starts at min_ms and scales up to max_ms under load,
     # avoiding long waits on small/infrequent inserts while batching efficiently
     # under high throughput.
@@ -90,6 +93,18 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, int | str] = {
     "async_insert_busy_timeout_max_ms": wf_env.wf_clickhouse_async_insert_busy_timeout_max_ms(),
     # Max data size before flushing (10 MB), this is the default
     "async_insert_max_data_size": 10 * 1024 * 1024,
+}
+
+# Explicitly disable async inserts for write paths that expect read-after-write
+# visibility. This protects Weave from ClickHouse user/profile defaults that
+# would otherwise let an INSERT return after being queued but before the row is
+# visible to SELECT.
+CLICKHOUSE_SYNC_INSERT_SETTINGS: dict[str, int | str] = {
+    "async_insert": 0,
+    "wait_for_async_insert": 1,
+    # clickhouse-connect's HTTP insert path does not set wait_end_of_query.
+    # Without this, a returned insert response is not a reliable read-after-write barrier.
+    "wait_end_of_query": 1,
 }
 
 
@@ -105,7 +120,20 @@ def merge_default_query_settings(
 def update_settings_for_async_insert(
     settings: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:
-    merged_settings = CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
     if settings is not None:
-        merged_settings.update(settings)
+        merged_settings = settings.copy()
+    else:
+        merged_settings = {}
+    merged_settings.update(CLICKHOUSE_ASYNC_INSERT_SETTINGS)
+    return merged_settings
+
+
+def update_settings_for_sync_insert(
+    settings: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
+    if settings is not None:
+        merged_settings = settings.copy()
+    else:
+        merged_settings = {}
+    merged_settings.update(CLICKHOUSE_SYNC_INSERT_SETTINGS)
     return merged_settings

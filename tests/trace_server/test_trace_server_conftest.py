@@ -1,6 +1,8 @@
+from unittest.mock import MagicMock
+
 import pytest
 
-from tests.trace_server.conftest import get_trace_server_flag
+from tests.trace_server.conftest import _truncate_all_tables, get_trace_server_flag
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     UserInjectingExternalTraceServer,
 )
@@ -22,6 +24,16 @@ def test_skip_clickhouse_client(
 ):
     assert isinstance(trace_server, UserInjectingExternalTraceServer)
     assert get_trace_server_flag(request) != "clickhouse"
+
+
+def test_truncate_all_tables_waits_for_completion():
+    ch_client = MagicMock()
+
+    _truncate_all_tables(ch_client, "test_db", ["object_versions", "table_rows"])
+
+    ch_client.command.assert_any_call("TRUNCATE TABLE test_db.object_versions SYNC")
+    ch_client.command.assert_any_call("TRUNCATE TABLE test_db.table_rows SYNC")
+    assert ch_client.command.call_count == 2
 
 
 # All instance attributes set in ClickHouseTraceServer.__init__.

@@ -296,10 +296,7 @@ class CachingMiddlewareTraceServer(
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        # All obj_create requests are cacheable!
-        return self._with_cache_pydantic(
-            self._next_trace_server.obj_create, req, tsi.ObjCreateRes
-        )
+        return self._next_trace_server.obj_create(req)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         obj_fields: dict[str, Any] = {
@@ -462,10 +459,7 @@ class CachingMiddlewareTraceServer(
 
     # File API
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        # All file_create requests are cacheable!
-        return self._with_cache_pydantic(
-            self._next_trace_server.file_create, req, tsi.FileCreateRes
-        )
+        return self._next_trace_server.file_create(req)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._with_cache(

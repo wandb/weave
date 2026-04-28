@@ -32,10 +32,11 @@ from __future__ import annotations
 import atexit
 import concurrent.futures
 import logging
+import time
 from collections.abc import Callable
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
-from threading import Lock
+from threading import Condition, Lock
 from typing import TypeVar
 
 from typing_extensions import ParamSpec
@@ -81,6 +82,8 @@ class FutureExecutor:
             )
         self._active_futures: set[Future] = set()
         self._active_futures_lock = Lock()
+        self._active_futures_condition = Condition(self._active_futures_lock)
+        self._pending_callbacks = 0
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
@@ -167,26 +170,39 @@ class FutureExecutor:
             RuntimeError: If called from within a thread context.
             TimeoutError: If the timeout is reached.
         """
-        with self._active_futures_lock:
-            if not self._active_futures:
-                return True
-            futures_to_wait = list(self._active_futures)
-
         if self._in_thread_context.get():
             raise RuntimeError("Cannot flush from within a thread")
 
-        for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
-            try:
-                future.result()
-            except Exception as e:
-                if get_raise_on_captured_errors():
-                    raise
+        start = time.monotonic()
+        while True:
+            with self._active_futures_condition:
+                if not self._active_futures and self._pending_callbacks == 0:
+                    return True
+                futures_to_wait = list(self._active_futures)
+
+                if not futures_to_wait:
+                    wait_timeout = _remaining_timeout(start, timeout)
+                    if wait_timeout is not None and wait_timeout <= 0:
+                        raise TimeoutError("Timeout waiting for callbacks to finish")
+                    self._active_futures_condition.wait(timeout=wait_timeout)
+                    continue
+
+            wait_timeout = _remaining_timeout(start, timeout)
+            for future in concurrent.futures.as_completed(
+                futures_to_wait, timeout=wait_timeout
+            ):
+                try:
+                    future.result()
+                except Exception:
+                    if get_raise_on_captured_errors():
+                        raise
         return True
 
     def _future_done_callback(self, future: Future) -> None:
         """Callback for when a future is done to remove it from the active futures list."""
-        with self._active_futures_lock:
+        with self._active_futures_condition:
             self._active_futures.discard(future)
+            self._active_futures_condition.notify_all()
 
             if exception := future.exception():
                 logger.error("Task failed: %s", _format_exception(exception))
@@ -216,7 +232,26 @@ class FutureExecutor:
         self, future: Future[T], callback: Callable[[Future[T]], None]
     ) -> None:
         """Add a done callback to a future."""
-        future.add_done_callback(self._make_deadlock_safe(callback))
+        wrapped_callback = self._make_deadlock_safe(callback)
+
+        with self._active_futures_condition:
+            self._pending_callbacks += 1
+
+        def tracked_callback(future: Future[T]) -> None:
+            try:
+                wrapped_callback(future)
+            finally:
+                with self._active_futures_condition:
+                    self._pending_callbacks -= 1
+                    self._active_futures_condition.notify_all()
+
+        try:
+            future.add_done_callback(tracked_callback)
+        except Exception:
+            with self._active_futures_condition:
+                self._pending_callbacks -= 1
+                self._active_futures_condition.notify_all()
+            raise
 
     def _safe_submit(
         self, f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
@@ -238,8 +273,9 @@ class FutureExecutor:
                 raise
             return self._execute_directly(wrapped, *args, **kwargs)
 
-        with self._active_futures_lock:
+        with self._active_futures_condition:
             self._active_futures.add(future)
+            self._active_futures_condition.notify_all()
         future.add_done_callback(self._future_done_callback)
 
         return future
@@ -269,6 +305,12 @@ def _format_exception(e: BaseException) -> str:
     #     return exception_str
     # except:
     #     return exception_str
+
+
+def _remaining_timeout(start: float, timeout: float | None) -> float | None:
+    if timeout is None:
+        return None
+    return max(0, timeout - (time.monotonic() - start))
 
 
 __all__ = ["FutureExecutor"]

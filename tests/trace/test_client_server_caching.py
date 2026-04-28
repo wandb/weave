@@ -242,7 +242,7 @@ def test_server_cache_latency(client):
         assert added_latency < 0.003
 
 
-def test_file_create_caching(client):
+def test_file_create_is_not_cached_but_file_reads_are(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     file_bytes = b"hello"
     caching_server.reset_cache_recorder()
@@ -255,7 +255,7 @@ def test_file_create_caching(client):
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
-        "misses": 1,
+        "misses": 0,
         "skips": 0,
     }
     caching_server.reset_cache_recorder()
@@ -267,7 +267,7 @@ def test_file_create_caching(client):
         )
     )
     assert caching_server.get_cache_recorder() == {
-        "hits": 1,
+        "hits": 0,
         "misses": 0,
         "skips": 0,
     }
@@ -300,7 +300,7 @@ def test_file_create_caching(client):
     assert read_0.content == read_1.content == file_bytes
 
 
-def test_obj_create_caching(client):
+def test_obj_create_is_not_cached_but_obj_reads_are(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     val = {"hello": "world"}
     caching_server.reset_cache_recorder()
@@ -315,7 +315,7 @@ def test_obj_create_caching(client):
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
-        "misses": 1,
+        "misses": 0,
         "skips": 0,
     }
     caching_server.reset_cache_recorder()
@@ -329,7 +329,7 @@ def test_obj_create_caching(client):
         )
     )
     assert caching_server.get_cache_recorder() == {
-        "hits": 1,
+        "hits": 0,
         "misses": 0,
         "skips": 0,
     }

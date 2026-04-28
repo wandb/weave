@@ -1880,6 +1880,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         metadata_only = req.metadata_only or False
 
         objs = self._select_objs_query(object_query_builder, metadata_only)
+        if len(objs) == 0 and tsc.digest_is_content_hash(digest):
+            objs = self._select_obj_exact_digest_fallback(
+                req.project_id, req.object_id, digest, metadata_only
+            )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
@@ -1895,6 +1899,117 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             set_root_span_dd_tags({"include_tags_and_aliases": True})
             self._enrich_objs_with_tags_and_aliases(req.project_id, [obj_schema])
         return tsi.ObjReadRes(obj=obj_schema)
+
+    def _select_obj_exact_digest_fallback(
+        self,
+        project_id: str,
+        object_id: str,
+        digest: str,
+        metadata_only: bool,
+    ) -> list[SelectableCHObjSchema]:
+        """Read an exact object digest directly from object_versions.
+
+        Exact digest reads are the read-after-write path for object creation. If
+        the generic metadata query misses, check the source table directly before
+        reporting NotFound so a query-planning or MV visibility issue does not
+        look like a missing object.
+        """
+        query = """
+WITH latest_row_per_digest AS (
+    SELECT
+        project_id,
+        object_id,
+        created_at,
+        deleted_at,
+        kind,
+        base_object_class,
+        leaf_object_class,
+        refs,
+        digest,
+        wb_user_id,
+        val_dump,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id, digest
+            ORDER BY created_at DESC, (deleted_at IS NULL) ASC
+        ) AS rn
+    FROM object_versions
+    WHERE project_id = {project_id: String}
+      AND object_id = {object_id: String}
+),
+object_versions_with_index AS (
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY created_at ASC, digest ASC
+        ) - 1 AS version_index,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY (deleted_at IS NULL) DESC, created_at DESC, digest DESC
+        ) AS row_num,
+        if (row_num = 1, 1, 0) AS is_latest
+    FROM latest_row_per_digest
+    WHERE rn = 1
+)
+SELECT
+    project_id,
+    object_id,
+    created_at,
+    refs,
+    kind,
+    base_object_class,
+    leaf_object_class,
+    digest,
+    version_index,
+    is_latest,
+    deleted_at,
+    wb_user_id,
+    val_dump
+FROM object_versions_with_index
+WHERE digest = {digest: String}
+ORDER BY created_at ASC
+LIMIT 1
+"""
+        query_result = self._query_stream(
+            query,
+            {
+                "project_id": project_id,
+                "object_id": object_id,
+                "digest": digest,
+            },
+        )
+        columns = [
+            "project_id",
+            "object_id",
+            "created_at",
+            "refs",
+            "kind",
+            "base_object_class",
+            "leaf_object_class",
+            "digest",
+            "version_index",
+            "is_latest",
+            "deleted_at",
+            "wb_user_id",
+            "val_dump",
+        ]
+        objs = [
+            SelectableCHObjSchema.model_validate(dict(zip(columns, row, strict=True)))
+            for row in query_result
+        ]
+        if objs:
+            logger.warning(
+                "clickhouse_obj_read_exact_digest_fallback_hit",
+                extra={
+                    "project_id": project_id,
+                    "object_id": object_id,
+                    "digest": digest,
+                },
+            )
+            if metadata_only:
+                for obj in objs:
+                    obj.val_dump = "{}"
+        return objs
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -6811,6 +6926,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "clickhouse_trace_server_batched._insert.async_insert": True,
                 }
             )
+        else:
+            settings = ch_settings.update_settings_for_sync_insert(settings)
 
         start = time.monotonic()
         for attempt in range(ch_settings.INSERT_MAX_RETRIES):
@@ -6838,7 +6955,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             else:
                 duration_ms = round((time.monotonic() - start) * 1000, 1)
                 logger.info(
-                    "clickhouse_insert",
+                    "clickhouse_insert table=%s rows=%s async=%s",
+                    table,
+                    len(data),
+                    async_insert,
                     extra={
                         "trace_duration_ms": duration_ms,
                         "table": table,
