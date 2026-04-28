@@ -60,16 +60,16 @@ def _unread_chat_completion_response(
     )
 
 
-def test_legacy_api_response_parse_raises_on_unread_body() -> None:
-    """Documents the underlying bug that _parse_api_response handles."""
-    with pytest.raises(httpx.ResponseNotRead):
-        _unread_chat_completion_response(LegacyAPIResponse).parse()
-
-
 @pytest.mark.parametrize("response_cls", [LegacyAPIResponse, APIResponse])
 def test_maybe_unwrap_api_response_reads_unread_raw_response(
     response_cls: type,
 ) -> None:
+    # LegacyAPIResponse.parse() raises on an unread body — the bug we fix.
+    # APIResponse.parse() self-reads, so it has no equivalent failure mode.
+    if response_cls is LegacyAPIResponse:
+        with pytest.raises(httpx.ResponseNotRead):
+            _unread_chat_completion_response(response_cls).parse()
+
     raw_response = _unread_chat_completion_response(response_cls)
     parsed_for_trace = maybe_unwrap_api_response(raw_response)
 
