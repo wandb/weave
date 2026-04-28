@@ -79,10 +79,10 @@ def evaluation_equality_check(a, b):
 # When doing this, replace "llm_as_a_judge_scorer_digest" with the current value of llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python
 # Do this, rather than creating a new variable, because each new version of legacy test case will need a different value.
 llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python = (
-    "hoglXaCXaJbyUlwhJClqC0S0gYzalCBrEUP62OEC8t8"
+    "9YxDZRgBdoy8X5WEXuqYvhwTBuTtFSxKKT7ZPf9ubRA"
 )
 llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python = (
-    "hoglXaCXaJbyUlwhJClqC0S0gYzalCBrEUP62OEC8t8"
+    "9YxDZRgBdoy8X5WEXuqYvhwTBuTtFSxKKT7ZPf9ubRA"
 )
 llm_as_a_judge_scorer_digest = (
     llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python
