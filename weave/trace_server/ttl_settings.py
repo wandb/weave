@@ -23,7 +23,6 @@ import redis
 from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 
-from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.redis_client import get_redis_client
 
@@ -37,7 +36,7 @@ REDIS_TTL_KEY_PREFIX = "weave:project_ttl:"
 REDIS_TTL_EXPIRY_SECS = 300
 
 # Global cache shared across all threads. Keyed by project_id.
-# Value is retention_days (int). 0 means no TTL (sentinel 2100-01-01).
+# Value is retention_days (int). 0 means no TTL.
 _project_ttl_cache: TTLCache[str, int] = TTLCache(
     maxsize=PROJECT_TTL_CACHE_SIZE, ttl=PROJECT_TTL_CACHE_TTL_SECS
 )
@@ -86,15 +85,15 @@ def get_project_retention_days(
 
 def compute_expire_at(
     retention_days: int, started_at: datetime.datetime
-) -> datetime.datetime:
+) -> datetime.datetime | None:
     """Compute the expire_at timestamp for a call.
 
-    If retention_days == 0, returns the far-future sentinel (2100-01-01 UTC),
-    meaning the row will never expire. Otherwise returns
-    started_at + timedelta(days=retention_days).
+    If retention_days == 0, returns None, meaning no TTL. Otherwise returns
+    started_at + timedelta(days=retention_days). DB adapters convert None to
+    their non-null storage sentinel at the write boundary.
     """
     if retention_days == 0:
-        return EXPIRE_AT_NEVER
+        return None
 
     anchor = started_at
     if anchor.tzinfo is None:

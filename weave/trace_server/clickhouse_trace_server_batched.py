@@ -2627,9 +2627,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise InvalidRequest(
                 "retention_days must be None (no TTL) or >= 1 (days of retention)"
             )
-        assert req.wb_user_id, "wb_user_id is required for audit trail"
+        if not req.wb_user_id:
+            raise InvalidRequest("wb_user_id is required for audit trail")
 
-        stored_days = req.retention_days if req.retention_days is not None else 0
+        stored_days = req.retention_days or 0
         self.ch_client.insert(
             "project_ttl_settings",
             data=[
@@ -6252,9 +6253,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ]
             batch_data = []
             for call in calls:
-                call_dict = call.model_dump()
-                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-                batch_data.append(values)
+                batch_data.append(ch_call_to_row(call))
 
             self._insert_call_batch(batch_data)
 
@@ -6508,9 +6507,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ]
         batch_data = []
         for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
+            batch_data.append(ch_call_to_row(call))
 
         try:
             self._insert_call_batch(batch_data)
@@ -6892,11 +6889,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 
@@ -6939,11 +6932,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Args:
             ch_call: The complete call to insert.
         """
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 

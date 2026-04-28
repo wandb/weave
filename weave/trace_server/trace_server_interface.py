@@ -155,9 +155,13 @@ class CallSchema(BaseModel):
 
     deleted_at: datetime.datetime | None = None
 
-    # Expiration timestamp for this call. None = no TTL configured for the
-    # project (the row will not be expired).
-    expire_at: datetime.datetime | None = None
+    expire_at: datetime.datetime | None = Field(
+        default=None,
+        description=(
+            "Expiration timestamp for this call. None = no TTL configured for "
+            "the project (the row will not be expired)."
+        ),
+    )
 
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
@@ -1568,12 +1572,16 @@ class ProjectTTLSettingsReadReq(BaseModelStrict):
 
 
 class ProjectTTLSettingsReadRes(BaseModel):
-    retention_days: int | None  # None = no TTL (infinite retention)
+    retention_days: int | None = Field(
+        default=None, description="None = no TTL (infinite retention)"
+    )
 
 
 class ProjectTTLSettingsUpdateReq(BaseModelStrict):
     project_id: str
-    retention_days: int | None  # None disables TTL; must be None or >= 1
+    retention_days: int | None = Field(
+        default=None, description="None disables TTL; must be None or >= 1"
+    )
     wb_user_id: str | None = None
 
 

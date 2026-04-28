@@ -499,9 +499,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> str:
         """Compute the ISO-formatted expire_at for a call row."""
         retention_days = self._get_project_retention_days(project_id)
-        if retention_days == 0:
+        expire_at = compute_expire_at(retention_days, anchor)
+        if expire_at is None:
             return EXPIRE_AT_NEVER.isoformat(sep=" ")
-        return compute_expire_at(retention_days, anchor).isoformat(sep=" ")
+        return expire_at.isoformat(sep=" ")
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
@@ -2861,9 +2862,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             raise InvalidRequest(
                 "retention_days must be None (no TTL) or >= 1 (days of retention)"
             )
-        assert req.wb_user_id, "wb_user_id is required for audit trail"
+        if not req.wb_user_id:
+            raise InvalidRequest("wb_user_id is required for audit trail")
 
-        stored_days = req.retention_days if req.retention_days is not None else 0
+        stored_days = req.retention_days or 0
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(
             "INSERT INTO project_ttl_settings "

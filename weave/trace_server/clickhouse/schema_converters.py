@@ -21,7 +21,6 @@ from weave.trace_server.clickhouse.utilities import (
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
-    EXPIRE_AT_NEVER,
     CallCHInsertable,
     CallCompleteCHInsertable,
     CallEndCHInsertable,
@@ -95,22 +94,19 @@ def ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
         "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),
-        "expire_at": _expire_at_from_ch(ch_call_dict.get("expire_at")),
+        "expire_at": sv["expire_at"],
     }
 
 
-def _expire_at_from_ch(value: Any) -> Any:
-    """Map the CH far-future sentinel back to None at the API boundary."""
-    expire_at = ensure_datetimes_have_tz(value)
-    if expire_at == EXPIRE_AT_NEVER:
-        return None
-    return expire_at
-
-
-def ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
+def ch_call_to_row(ch_call: CallCHInsertable | CallCompleteCHInsertable) -> list[Any]:
     """Convert a CH insertable call to a row for batch insertion with the correct defaults."""
     call_dict = ch_call.model_dump()
-    return [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+    return [
+        ch_sentinel_values.to_ch_value(col, call_dict.get(col))
+        if col == "expire_at"
+        else call_dict.get(col)
+        for col in ALL_CALL_INSERT_COLUMNS
+    ]
 
 
 def start_call_for_insert_to_ch_insertable(

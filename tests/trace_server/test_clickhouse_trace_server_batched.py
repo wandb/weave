@@ -13,6 +13,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_schema import ALL_CALL_INSERT_COLUMNS
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
@@ -157,6 +158,30 @@ def test_clickhouse_storage_size_null_handling():
     ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] is None
     assert ch_schema["total_storage_size_bytes"] is None
+
+
+def test_clickhouse_expire_at_sentinel_converts_to_none():
+    """The DB far-future expire_at sentinel is hidden at the API boundary."""
+    started_at = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    test_data = {
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
+        "id": "test_id",
+        "project_id": "test_project",
+        "trace_id": "test_trace",
+        "parent_id": None,
+        "started_at": started_at,
+        "ended_at": None,
+        "summary_dump": None,
+        "wb_run_id": None,
+        "wb_run_step": None,
+        "wb_user_id": None,
+        "expire_at": EXPIRE_AT_NEVER,
+    }
+
+    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
+
+    assert ch_schema["expire_at"] is None
 
 
 def test_clickhouse_distributed_mode_properties():
