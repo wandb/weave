@@ -447,6 +447,85 @@ def test_conversation_chat_paginates_turns(ch_server):
     assert [turn.trace_id for turn in second_page.turns] == [trace_ids[0]]
 
 
+def test_conversation_chat_includes_child_spans_without_conversation_id(ch_server):
+    """Conversation membership is trace-scoped after selecting conversation turns.
+
+    Some producers attach ``conversation_id`` only to the root/invoke span. The
+    chat projection still needs child LLM/tool spans in that trace, because
+    those children usually carry the assistant text and tool bodies.
+    """
+    project_id = _make_project_id("conv_chat_children")
+    conversation_id = f"conv-{uuid.uuid4().hex[:8]}"
+    trace_id = uuid.uuid4().hex
+    root_span_id = uuid.uuid4().hex
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=root_span_id,
+            conversation_id=conversation_id,
+            operation_name="invoke_agent",
+            agent_name="chat-agent",
+            input_messages=[NormalizedMessage(role="user", content="hello")],
+            input_tokens=0,
+            output_tokens=0,
+            started_at=now,
+            ended_at=now + datetime.timedelta(seconds=3),
+        ),
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            parent_span_id=root_span_id,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="hello from child")
+            ],
+            input_tokens=12,
+            output_tokens=7,
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            parent_span_id=root_span_id,
+            operation_name="execute_tool",
+            tool_name="lookup",
+            tool_call_arguments='{"query":"hello"}',
+            tool_call_result='{"ok":true}',
+            input_tokens=0,
+            output_tokens=0,
+            started_at=now + datetime.timedelta(seconds=2),
+            ended_at=now + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_conversation_chat(
+        AgentConversationChatReq(
+            project_id=project_id,
+            conversation_id=conversation_id,
+        )
+    )
+
+    assert res.total_turns == 1
+    assert len(res.turns) == 1
+    messages = res.turns[0].messages
+    assistant = next(msg for msg in messages if msg.type == "assistant_message")
+    tool = next(msg for msg in messages if msg.type == "tool_call")
+
+    assert assistant.assistant_message is not None
+    assert assistant.assistant_message.text == "hello from child"
+    assert assistant.assistant_message.input_tokens == 12
+    assert assistant.assistant_message.output_tokens == 7
+    assert tool.tool_call is not None
+    assert tool.tool_call.tool_name == "lookup"
+    assert tool.tool_call.tool_arguments == '{"query":"hello"}'
+    assert tool.tool_call.tool_result == '{"ok":true}'
+
+
 # ---------------------------------------------------------------------------
 # Test: Message search
 # ---------------------------------------------------------------------------

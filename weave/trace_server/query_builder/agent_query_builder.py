@@ -611,7 +611,6 @@ def make_conversation_chat_spans_query(
             LIMIT {limit_slot} OFFSET {offset_slot}
         ) t ON s.trace_id = t.trace_id
         WHERE s.project_id = {pid}
-          AND s.conversation_id = {cid}
         ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
     """
 

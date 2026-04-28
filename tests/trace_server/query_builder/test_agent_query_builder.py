@@ -719,7 +719,6 @@ class TestMakeConversationChatSpansQuery:
                 LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
             ) t ON s.trace_id = t.trace_id
             WHERE s.project_id = {{genai_0:String}}
-              AND s.conversation_id = {{genai_1:String}}
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
         assert_sql(
