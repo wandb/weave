@@ -2001,8 +2001,12 @@ GROUP BY object_id, digest
             obj_id, obj_digest, val_dump = row
             object_values[obj_id, obj_digest] = val_dump
 
+        # Treat metadata-without-value as an incomplete exact read so obj_read retries.
+        if any((obj.object_id, obj.digest) not in object_values for obj in result):
+            return []
+
         for obj in result:
-            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
+            obj.val_dump = object_values[obj.object_id, obj.digest]
         return result
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:

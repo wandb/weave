@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import concurrent.futures
+import datetime
 import os
+import threading
 import time
 import uuid
 from collections import Counter
+from types import SimpleNamespace
 from typing import Any
 
 import clickhouse_connect
 import pytest
+
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
 PROBE_ENV_VAR = "WEAVE_CLICKHOUSE_READ_AFTER_WRITE_PROBE"
 
@@ -132,6 +137,59 @@ def _has_query_log_evidence(
         ):
             return True
     return False
+
+
+def test_select_obj_exact_digest_requires_value_row() -> None:
+    created_at = datetime.datetime.now(datetime.UTC)
+    metadata_row = (
+        "project",
+        "obj",
+        created_at,
+        [],
+        "object",
+        None,
+        None,
+        "digest",
+        None,
+        None,
+    )
+    first_seen_row = ("obj", "digest", created_at)
+
+    def select_with_value_rows(value_rows: list[tuple[str, str, str]]) -> list[Any]:
+        server = object.__new__(ClickHouseTraceServer)
+        server._thread_local = threading.local()
+        server._call_batch = []
+        server._calls_complete_batch = []
+        server._file_batch = []
+        server._flush_immediately = True
+        server._init_lock = threading.Lock()
+        server._kafka_producer = None
+        responses = iter(
+            [
+                SimpleNamespace(result_rows=[metadata_row]),
+                SimpleNamespace(result_rows=[first_seen_row]),
+                SimpleNamespace(result_rows=value_rows),
+            ]
+        )
+
+        def fake_query(*args: Any, **kwargs: Any) -> Any:
+            return next(responses)
+
+        server._query = fake_query
+        return server._select_obj_exact_digest(
+            "project",
+            "obj",
+            "digest",
+            metadata_only=False,
+        )
+
+    # Missing value rows are incomplete reads, not empty objects.
+    assert select_with_value_rows([]) == []
+
+    # Present value rows are attached normally.
+    objs = select_with_value_rows([("obj", "digest", '{"rows":[{"a":5,"b":6}]}')])
+    assert len(objs) == 1
+    assert objs[0].val_dump == '{"rows":[{"a":5,"b":6}]}'
 
 
 @pytest.mark.skipif(
