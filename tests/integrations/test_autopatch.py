@@ -15,6 +15,7 @@ from weave.integrations.patch import (
     _patch_if_needed,
     _patch_integration,
     implicit_patch,
+    patch_gepa,
     patch_openai,
     register_import_hook,
     reset_patched_integrations,
@@ -42,7 +43,7 @@ def setup_env(monkeypatch):
     monkeypatch.delenv("WEAVE_IMPLICITLY_PATCH_INTEGRATIONS", raising=False)
     monkeypatch.delenv("WEAVE_DISABLED", raising=False)
 
-    for module in ["openai", "anthropic", "mistralai", "groq", "litellm"]:
+    for module in ["openai", "anthropic", "mistralai", "groq", "litellm", "gepa"]:
         _reset_import(monkeypatch, module)
 
     yield
@@ -267,6 +268,29 @@ def test_explicit_patch_still_works(setup_env, monkeypatch):
         mock_patcher.attempt_patch.assert_called_once()
 
         assert "openai" in patch_module._PATCHED_INTEGRATIONS
+
+
+def test_explicit_patch_gepa_still_works(setup_env, monkeypatch):
+    """Test that explicit GEPA patching still works alongside implicit patching."""
+    _inject_fake_module(monkeypatch, "gepa")
+
+    mock_patcher = MagicMock()
+    mock_patcher.attempt_patch.return_value = True
+    mock_get_patcher = MagicMock(return_value=mock_patcher)
+
+    fake_module = types.ModuleType("weave.integrations.gepa.gepa_sdk")
+    fake_module.get_gepa_patcher = mock_get_patcher
+
+    with patch(
+        "weave.integrations.patch.importlib.import_module",
+        return_value=fake_module,
+    ):
+        patch_gepa()
+
+        mock_get_patcher.assert_called_once()
+        mock_patcher.attempt_patch.assert_called_once()
+
+        assert "gepa" in patch_module._PATCHED_INTEGRATIONS
 
 
 def test_reset_patched_integrations(setup_env, monkeypatch):
