@@ -8,8 +8,6 @@ def test_clickhouse_default_query_settings_include_estimated_runtime_guards(
 ):
     keys = [
         "WF_CLICKHOUSE_MAX_EXECUTION_TIME",
-        "WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME",
-        "WF_CLICKHOUSE_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED",
         "WF_CLICKHOUSE_DISABLE_QUERY_FAILURE_PREDICTION",
     ]
 
@@ -32,21 +30,16 @@ def test_clickhouse_default_query_settings_include_estimated_runtime_guards(
         )
         assert settings["timeout_overflow_mode"] == "throw"
 
-        # Estimated-time defaults track explicit execution-time overrides.
+        # Estimated-time tracks the configured execution-time override.
         monkeypatch.setenv("WF_CLICKHOUSE_MAX_EXECUTION_TIME", "30")
         settings_module = importlib.reload(ch_settings)
         settings = settings_module.CLICKHOUSE_DEFAULT_QUERY_SETTINGS
         assert settings["max_execution_time"] == 30
         assert settings["max_estimated_execution_time"] == 30
-
-        # Operators can tune prediction separately from the hard timeout.
-        monkeypatch.setenv("WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME", "12")
-        monkeypatch.setenv("WF_CLICKHOUSE_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED", "3")
-        settings_module = importlib.reload(ch_settings)
-        settings = settings_module.CLICKHOUSE_DEFAULT_QUERY_SETTINGS
-        assert settings["max_execution_time"] == 30
-        assert settings["max_estimated_execution_time"] == 12
-        assert settings["timeout_before_checking_execution_speed"] == 3
+        assert (
+            settings["timeout_before_checking_execution_speed"]
+            == settings_module.DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED
+        )
 
         # Command paths keep the base defaults without read-query prediction.
         command_settings = settings_module.merge_default_command_settings(

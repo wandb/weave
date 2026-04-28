@@ -68,26 +68,10 @@ CLICKHOUSE_BASE_QUERY_SETTINGS: dict[str, int | str] = {
 CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS: dict[str, int | str] = {}
 
 if not _disable_query_failure_prediction:
-    _env_max_estimated_execution_time = (
-        wf_env.wf_clickhouse_max_estimated_execution_time()
-    )
-    _max_estimated_execution_time = (
-        _env_max_estimated_execution_time
-        if _env_max_estimated_execution_time is not None
-        else _max_execution_time
-    )
-    _env_timeout_before_checking_execution_speed = (
-        wf_env.wf_clickhouse_timeout_before_checking_execution_speed()
-    )
-    _timeout_before_checking_execution_speed = (
-        _env_timeout_before_checking_execution_speed
-        if _env_timeout_before_checking_execution_speed is not None
-        else DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED
-    )
     CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS.update(
         {
-            "max_estimated_execution_time": _max_estimated_execution_time,
-            "timeout_before_checking_execution_speed": _timeout_before_checking_execution_speed,
+            "max_estimated_execution_time": _max_execution_time,
+            "timeout_before_checking_execution_speed": DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED,
             "timeout_overflow_mode": "throw",
         }
     )
