@@ -36,13 +36,21 @@ LOCAL_TABLE_SUFFIX = "_local"
 # https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
 
+# Hard ceiling on actual query runtime — ClickHouse aborts queries that run
+# longer than this.
 # https://clickhouse.com/docs/operations/settings/settings#max_execution_time
 DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 
+# Projection-based ceiling — ClickHouse extrapolates from rows already scanned
+# and aborts early if the projected total runtime would exceed this. Lets us
+# fail fast on doomed queries without waiting for max_execution_time.
 # Available in ClickHouse 24.1+.
 # https://clickhouse.com/docs/operations/settings/settings#max_estimated_execution_time
 DEFAULT_MAX_ESTIMATED_EXECUTION_TIME = DEFAULT_MAX_EXECUTION_TIME
 
+# We don't bother projecting execution time for queries that finish quickly —
+# ClickHouse waits this long before doing the projection check, avoiding the
+# overhead on short queries.
 # https://clickhouse.com/docs/operations/settings/settings#timeout_before_checking_execution_speed
 DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED = 5
 
