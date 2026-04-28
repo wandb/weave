@@ -4,15 +4,11 @@ import string
 from typing import Any
 
 import pandas as pd
+from notdiamond import NotDiamond
 
 import weave
 from weave.evaluation.eval import EvaluationResults
 from weave.utils.iterators import first
-
-try:
-    from notdiamond import NotDiamond
-except ImportError:  # pragma: no cover
-    NotDiamond = None
 
 
 @weave.op(
@@ -36,7 +32,7 @@ def train_router(
         score_col_name, eval_df = _build_dataframe(model, eval_results)
         router_dataset[model] = eval_df
 
-    client = _notdiamond_client(api_key)
+    client = NotDiamond(api_key=api_key)
     training_df = _build_training_dataframe(
         router_dataset,
         prompt_column=prompt_column,
@@ -80,7 +76,7 @@ def evaluate_router(
         score_column, model_df = _build_dataframe(model, dataset)
         router_dataset[model] = model_df[[prompt_column, response_column, score_column]]
 
-    client = _notdiamond_client(api_key)
+    client = NotDiamond(api_key=api_key)
     providers = [_llm_provider_from_model_name(model) for model in router_dataset]
     prompt_df = first(router_dataset.values())
     routed_rows = []
@@ -152,12 +148,6 @@ def evaluate_router(
     not_diamond_model = NotDiamondRoutedModel(model_results=not_diamond_results)
 
     return best_provider_model, not_diamond_model
-
-
-def _notdiamond_client(api_key: str | None) -> Any:
-    if NotDiamond is None:
-        raise ImportError("notdiamond is required for custom router support")
-    return NotDiamond(api_key=api_key)
 
 
 def _model_name(model: weave.Model | str) -> str:
