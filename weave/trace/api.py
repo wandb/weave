@@ -277,19 +277,63 @@ def publish(
     tags: list[str] | None = None,
     aliases: list[str] | None = None,
 ) -> ObjectRef:
-    """Save and version a Python object.
+    """Saves a Python object to Weave and returns a versioned reference to it.
 
-    Weave creates a new version of the object if the object's name already exists and its content hash does
-    not match the latest version of that object.
+    Weave creates a content hash for `obj` and compares it to the latest
+    version stored under the same name. A new version is created only when
+    the hash differs, so publishing the same object twice does not create 
+    a new version.
+
+    When Weave is disabled (via the `WEAVE_DISABLED` environment variable or
+    `settings={'disabled': True}` in `weave.init()`), this function returns a
+    placeholder `ObjectRef` without making any network calls.
+
+    After saving, Weave logs a link to the object in the Weave UI.
 
     Args:
-        obj: The object to save and version.
-        name: The name to save the object under.
-        tags: Optional list of tags to add to the published object version.
-        aliases: Optional list of aliases to set on the published object version.
+        obj: The Python object to save. Any serializable Python value is
+            accepted, including `weave.Model`, `weave.Dataset`, `weave.op`
+            functions, dicts, and Pydantic models.
+        name (str | None): The name to store the object under. When `None`,
+            Weave falls back to `obj.name` (if the attribute exists) and then
+            to the class name. Defaults to `None`.
+        tags (list[str] | None): Tag strings to attach to this version after
+            saving. Tags are additive labels used for filtering and grouping in
+            the Weave UI. `None` attaches no tags. Defaults to `None`.
+        aliases (list[str] | None): Alias strings to point at this version
+            after saving. An alias resolves to exactly one version at a time,
+            making it useful for stable identifiers like `"production"` or
+            `"champion"`. `None` sets no aliases. Defaults to `None`.
 
     Returns:
-        A Weave Ref to the saved object.
+        ObjectRef: A reference to the saved object version, containing
+        `entity`, `project`, `name`, and `digest` fields. Call `ref.uri()`
+        to get the fully qualified `weave:///` URI, or pass the ref directly
+        to `weave.get()` to retrieve the object later.
+
+    Raises:
+        WeaveInitError: Raised when `weave.init()` hasn't been called and
+            Weave is not disabled.
+
+    Example:
+        ```python
+        import weave
+
+        weave.init("your-team/your-project")
+
+        dataset = weave.Dataset(name="my-dataset", rows=[{"input": "hello", "output": "world"}])
+        ref = weave.publish(dataset, tags=["reviewed"], aliases=["champion"])
+
+        # Retrieve it later using the ref or its URI
+        same_dataset = weave.get(ref)
+        ```
+
+    See Also:
+        - `weave.get`: Retrieves a published object by `ObjectRef` or URI.
+        - `weave.ref`: Constructs an `ObjectRef` from a name or URI without fetching.
+        - `weave.add_tags`: Adds tags to a published version after the fact.
+        - `weave.set_aliases`: Updates aliases on a published version after the fact.
+        - `ObjectRef`: The reference type returned by this function.
     """
     save_name: str
     if name:
@@ -411,12 +455,48 @@ def add_tags(obj_ref: ObjectRef | str, tags: list[str]) -> None:
 
 
 def remove_tags(obj_ref: ObjectRef | str, tags: list[str]) -> None:
-    """Remove tags from an object version.
+    """Removes specific tags from a published object version.
+
+    Only the tags listed in `tags` are removed. All other tags on the version
+    remain untouched. To see the current tag set before removing, call
+    `weave.get_tags()` first. Tags not currently on the version are ignored.
+
+    The target object must already be published. Most callers obtain its
+    `ObjectRef` from `weave.publish()`; alternatively, pass the `weave:///`
+    URI string copied from the Weave UI or returned by a previous
+    `ref.uri()` call.
 
     Args:
-        obj_ref: Reference to the object version, either an ObjectRef
-            or a weave:/// URI string.
-        tags: List of tag strings to remove.
+        obj_ref: The version to remove tags from. Pass either an `ObjectRef`
+            returned by `weave.publish()` or a fully qualified `weave:///`
+            URI string. Short forms like `"name:version"` aren't accepted
+            here; resolve them to a URI with `weave.ref()` first.
+        tags: Tag strings to remove from the version's tag set.
+
+    Raises:
+        WeaveInitError: Raised when `weave.init()` hasn't been called in the
+            current process.
+        ValueError: Raised when `obj_ref` is a string that isn't a valid
+            `weave:///` URI.
+
+    Example:
+        ```python
+        import weave
+
+        weave.init("your-team/your-project")
+
+        dataset = weave.Dataset(name="eval-set", rows=[{"input": "hi"}])
+        ref = weave.publish(dataset, tags=["reviewed", "frozen"])
+
+        weave.remove_tags(ref, ["frozen"])
+        print(weave.get_tags(ref))  # ["reviewed"]
+        ```
+
+    See Also:
+        - `weave.add_tags`: Adds tags to a version (inverse).
+        - `weave.get_tags`: Reads the current tag set on a version.
+        - `weave.list_tags`: Lists every distinct tag across the project.
+        - `weave.publish`: Saves an object and returns the `ObjectRef` to tag.
     """
     client = weave_client_context.require_weave_client()
     client.remove_tags(obj_ref, tags)
