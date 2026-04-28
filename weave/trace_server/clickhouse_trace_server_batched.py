@@ -6605,9 +6605,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         obj_metadata_query = object_query_builder.make_metadata_query()
         parameters = object_query_builder.parameters or {}
-        query_result = self._query_stream(obj_metadata_query, parameters)
+        # Use buffered _query rather than _query_stream so clickhouse-connect
+        # keeps server_wait=True. Streaming acks the HTTP response before the
+        # query finishes server-side, which can return a stale snapshot for
+        # exact reads issued immediately after a write (object read flakes).
+        query_result = self._query(obj_metadata_query, parameters)
         metadata_result = format_metadata_objects_from_query_result(
-            query_result, object_query_builder.include_storage_size
+            query_result.result_rows,
+            object_query_builder.include_storage_size,
         )
 
         # -- Don't make second query for object values if metadata_only --
@@ -6619,10 +6624,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_ids=list({row.object_id for row in metadata_result}),
             digests=list({row.digest for row in metadata_result}),
         )
-        query_result = self._query_stream(value_query, value_parameters)
+        value_query_result = self._query(value_query, value_parameters)
         # Map (object_id, digest) to val_dump
         object_values: dict[tuple[str, str], Any] = {}
-        for row in query_result:
+        for row in value_query_result.result_rows:
             (object_id, digest, val_dump) = row
             object_values[object_id, digest] = val_dump
 
