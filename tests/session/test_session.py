@@ -20,6 +20,8 @@ from weave.session.session import (
     get_current_llm,
     get_current_session,
     get_current_turn,
+    log_session,
+    log_turn,
     start_llm,
     start_session,
     start_tool,
@@ -462,17 +464,49 @@ class TestContextVars:
         assert get_current_turn() is None
         assert get_current_llm() is None
 
-
-class TestStartTool:
-    def test_returns_tool(self) -> None:
+    def test_start_tool_returns_tool(self) -> None:
         t = start_tool(name="search", arguments='{"q":"test"}', tool_call_id="tc_1")
         assert isinstance(t, Tool)
         assert t.name == "search"
         assert t.arguments == '{"q":"test"}'
         assert t.tool_call_id == "tc_1"
 
-    def test_context_manager(self) -> None:
+    def test_start_tool_context_manager(self) -> None:
         with start_tool(name="get_weather", arguments='{"city":"Tokyo"}') as t:
             t.result = "75F"
         assert t.result == "75F"
         assert t.duration_ms >= 0
+
+    def test_log_turn_returns_log_result(self) -> None:
+        with pytest.warns(UserWarning, match="not yet implemented"):
+            result = log_turn(
+                session_id="sess-123",
+                messages=[{"role": "user", "content": "hi"}],
+                spans=[
+                    LLM(
+                        model="gpt-4o",
+                        output_messages=[Message(role="assistant", content="hello")],
+                    ),
+                    Tool(name="search", result="found"),
+                ],
+                agent_name="bot",
+                model="gpt-4o",
+            )
+        assert isinstance(result, LogResult)
+        assert result.session_id == "sess-123"
+
+    def test_log_session_returns_log_result(self) -> None:
+        with pytest.warns(UserWarning, match="not yet implemented"):
+            result = log_session(
+                turns=[{"messages": [{"role": "user", "content": "hi"}]}],
+                agent_name="bot",
+                model="gpt-4o",
+                session_id="sess-456",
+            )
+        assert isinstance(result, LogResult)
+        assert result.session_id == "sess-456"
+
+    def test_log_session_auto_generates_session_id(self) -> None:
+        with pytest.warns(UserWarning, match="not yet implemented"):
+            result = log_session(turns=[], agent_name="bot")
+        assert result.session_id != ""
