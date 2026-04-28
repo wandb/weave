@@ -1,3 +1,4 @@
+import threading
 import time
 from concurrent.futures import Future
 from typing import Any
@@ -234,6 +235,45 @@ def test_empty_futures_list() -> None:
 
     future_result: Future[int] = executor.then([], process_data)
     assert future_result.result() == 0
+
+
+def test_flush_waits_for_then_callback_work() -> None:
+    executor: FutureExecutor = FutureExecutor(max_workers=1)
+    release_root = threading.Event()
+    callback_started = threading.Event()
+    release_callback = threading.Event()
+    flush_finished = threading.Event()
+
+    def root_task() -> int:
+        assert release_root.wait(timeout=5)
+        return 1
+
+    def blocking_callback(data_list: list[int]) -> int:
+        callback_started.set()
+        assert release_callback.wait(timeout=5)
+        return data_list[0] + 1
+
+    root_future: Future[int] = executor.defer(root_task)
+    result_future: Future[int] = executor.then([root_future], blocking_callback)
+
+    release_root.set()
+    assert callback_started.wait(timeout=5)
+
+    flush_thread = threading.Thread(
+        target=lambda: (executor.flush(), flush_finished.set())
+    )
+    flush_thread.start()
+
+    try:
+        time.sleep(0.05)
+        early_finished = flush_finished.is_set()
+    finally:
+        release_callback.set()
+        flush_thread.join(timeout=5)
+
+    assert not early_finished
+    assert flush_finished.is_set()
+    assert result_future.result() == 2
 
 
 def test_nested_futures_with_1_max_worker_classic_deadlock_case() -> None:
