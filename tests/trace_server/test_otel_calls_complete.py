@@ -31,6 +31,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 
 from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
+from weave.trace_server import object_creation_utils
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.errors import CallsCompleteModeRequired
@@ -405,8 +406,6 @@ def test_otel_export_uses_placeholder_even_with_existing_real_op(
     project_id = f"{TEST_ENTITY}/otel_existing_op_collision"
     op_name = "existing_op"
 
-    from weave.trace_server import object_creation_utils
-
     real_op = trace_server.op_create(
         tsi.OpCreateReq(
             project_id=project_id,
@@ -439,6 +438,30 @@ def test_otel_export_uses_placeholder_even_with_existing_real_op(
     digests = {o.digest for o in objs}
     assert real_op.digest in digests
     assert object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST in digests
+
+    # `latest_only=True` returns the placeholder, since OTel inserts after the
+    # real op.  Callers that resolve calls.op_name see the placeholder digest
+    # explicitly (asserted above), so latest-resolution does not affect call
+    # rendering — but operators querying "latest version of <op>" will see
+    # the placeholder, which is the documented trade-off in obj_create_batch.
+    latest_objs = trace_server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[op_name], latest_only=True),
+        )
+    ).objs
+    assert len(latest_objs) == 1
+    assert latest_objs[0].digest == object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST
+
+    # The real op is still readable by its original digest — no data loss.
+    real_obj = trace_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=project_id,
+            object_id=op_name,
+            digest=real_op.digest,
+        )
+    ).obj
+    assert real_obj.digest == real_op.digest
 
 
 def test_v1_api_raises_error_for_otel_established_project(
