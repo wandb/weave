@@ -11,7 +11,7 @@ import logging
 import math
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypedDict
 
 import ddtrace
 import sqlparse
@@ -129,9 +129,21 @@ def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, A
     return result
 
 
-def extract_typed_attrs(
-    attrs: dict[str, Any],
-) -> tuple[dict[str, str], dict[str, int], dict[str, float], dict[str, bool]]:
+class TypedAttrMaps(TypedDict):
+    """Typed attribute maps keyed by their CH column name.
+
+    Keys match the ``CallStartCHInsertable`` / ``CallCompleteCHInsertable``
+    fields so call sites can ``**spread`` the result straight into the
+    insertable constructor.
+    """
+
+    attributes_map_str: dict[str, str]
+    attributes_map_int: dict[str, int]
+    attributes_map_float: dict[str, float]
+    attributes_map_bool: dict[str, bool]
+
+
+def extract_typed_attrs(attrs: dict[str, Any]) -> TypedAttrMaps:
     """Route a Python attributes dict into four typed maps for fast filtering.
 
     No per-map entry cap: ``attributes_dump`` already admits arbitrarily large
@@ -146,34 +158,33 @@ def extract_typed_attrs(
     The ``bool`` branch must come before the ``int`` branch: Python's ``bool``
     is a subclass of ``int``, so ``isinstance(True, int)`` is True, and an
     int-first dispatch would land True/False in the int map.
-
-    Returns (str_map, int_map, float_map, bool_map) in insert-column order.
     """
+    result: TypedAttrMaps = {
+        "attributes_map_str": {},
+        "attributes_map_int": {},
+        "attributes_map_float": {},
+        "attributes_map_bool": {},
+    }
     if not isinstance(attrs, dict):
-        return {}, {}, {}, {}
-
-    str_map: dict[str, str] = {}
-    int_map: dict[str, int] = {}
-    float_map: dict[str, float] = {}
-    bool_map: dict[str, bool] = {}
+        return result
 
     for key, val in _flatten_attrs(attrs):
         if val is None:
             continue
         if isinstance(val, bool):
-            bool_map[key] = val
+            result["attributes_map_bool"][key] = val
         elif isinstance(val, int):
-            int_map[key] = val
+            result["attributes_map_int"][key] = val
         elif isinstance(val, float):
             if not math.isfinite(val):
                 continue
-            float_map[key] = val
+            result["attributes_map_float"][key] = val
         elif isinstance(val, str):
-            str_map[key] = val
+            result["attributes_map_str"][key] = val
         else:
-            str_map[key] = json.dumps(val)
+            result["attributes_map_str"][key] = json.dumps(val)
 
-    return str_map, int_map, float_map, bool_map
+    return result
 
 
 # ---------------------------------------------------------------------------

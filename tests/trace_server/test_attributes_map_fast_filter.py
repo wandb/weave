@@ -202,26 +202,47 @@ def _populate_two_by_two(
     )
 
 
-def test_fast_filter_mixed_backfill_string_cast(
+@pytest.mark.parametrize(
+    ("attr_key", "matching_value", "other_value", "cast_to"),
+    [
+        # The hybrid ``if(mapContains(...))`` wins on the populated row and
+        # falls back to ``toString(coalesce(nullIf(JSON_VALUE, 'null'), ''))``
+        # on the legacy row whose typed maps are empty.
+        ("env", "prod", "staging", "string"),
+        ("retries", 5, 2, "int"),
+        ("score", 0.9, 0.1, "double"),
+        # bool is the case that would have failed before we special-cased it:
+        # the bool fallback compares the raw JSON_VALUE to ``'true'`` rather
+        # than going through the generic ``toUInt8OrNull`` cast (which returns
+        # NULL on the JSON bool strings ``"true"``/``"false"`` and would drop
+        # legacy rows with ``enabled: true`` in the dump).
+        ("enabled", True, False, "bool"),
+    ],
+    ids=["string", "int", "double", "bool"],
+)
+def test_fast_filter_mixed_backfill_convert(
     trace_server: object,
     ch_server_force_legacy: ClickHouseTraceServer,
+    attr_key: str,
+    matching_value: object,
+    other_value: object,
+    cast_to: str,
 ) -> None:
-    """``$convert(attributes.env, string)`` returns populated *and* legacy matches.
+    """``$convert(attributes.<key>, <cast>)`` returns populated *and* legacy matches.
 
-    The hybrid ``if(mapContains(...))`` wins on the populated row and falls
-    back to ``toString(coalesce(nullIf(JSON_VALUE, 'null'), ''))`` on the
-    legacy row whose typed maps are empty. Both ``env=prod`` rows come back;
-    the ``env=staging`` rows don't.
+    Both the typed-map row and the JSON_VALUE-only legacy row come back; the
+    "other" rows don't. Pinned per-cast so a regression in any one type's
+    fallback (especially bool) surfaces independently.
     """
-    external_project_id = f"{TEST_ENTITY}/string_{uuid.uuid4().hex[:8]}"
+    external_project_id = f"{TEST_ENTITY}/{cast_to}_{uuid.uuid4().hex[:8]}"
     internal_project_id = b64(external_project_id)
     reset_project_residence_cache()
     populated_match, legacy_match, *_ = _populate_two_by_two(
         ch_server_force_legacy.ch_client,
         internal_project_id,
-        attr_key="env",
-        matching_value="prod",
-        other_value="staging",
+        attr_key=attr_key,
+        matching_value=matching_value,
+        other_value=other_value,
         now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
     )
 
@@ -232,123 +253,11 @@ def test_fast_filter_mixed_backfill_string_cast(
             "$eq": [
                 {
                     "$convert": {
-                        "input": {"$getField": "attributes.env"},
-                        "to": "string",
+                        "input": {"$getField": f"attributes.{attr_key}"},
+                        "to": cast_to,
                     }
                 },
-                {"$literal": "prod"},
-            ]
-        },
-    )
-    assert matching_ids == {populated_match, legacy_match}
-
-
-def test_fast_filter_mixed_backfill_int_cast(
-    trace_server: object,
-    ch_server_force_legacy: ClickHouseTraceServer,
-) -> None:
-    """``$convert(attributes.retries, int)`` returns populated *and* legacy matches."""
-    external_project_id = f"{TEST_ENTITY}/int_{uuid.uuid4().hex[:8]}"
-    internal_project_id = b64(external_project_id)
-    reset_project_residence_cache()
-    populated_match, legacy_match, *_ = _populate_two_by_two(
-        ch_server_force_legacy.ch_client,
-        internal_project_id,
-        attr_key="retries",
-        matching_value=5,
-        other_value=2,
-        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
-    )
-
-    matching_ids = _query_ids(
-        trace_server,
-        external_project_id,
-        {
-            "$eq": [
-                {
-                    "$convert": {
-                        "input": {"$getField": "attributes.retries"},
-                        "to": "int",
-                    }
-                },
-                {"$literal": 5},
-            ]
-        },
-    )
-    assert matching_ids == {populated_match, legacy_match}
-
-
-def test_fast_filter_mixed_backfill_double_cast(
-    trace_server: object,
-    ch_server_force_legacy: ClickHouseTraceServer,
-) -> None:
-    """``$convert(attributes.score, double)`` returns populated *and* legacy matches."""
-    external_project_id = f"{TEST_ENTITY}/double_{uuid.uuid4().hex[:8]}"
-    internal_project_id = b64(external_project_id)
-    reset_project_residence_cache()
-    populated_match, legacy_match, *_ = _populate_two_by_two(
-        ch_server_force_legacy.ch_client,
-        internal_project_id,
-        attr_key="score",
-        matching_value=0.9,
-        other_value=0.1,
-        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
-    )
-
-    matching_ids = _query_ids(
-        trace_server,
-        external_project_id,
-        {
-            "$eq": [
-                {
-                    "$convert": {
-                        "input": {"$getField": "attributes.score"},
-                        "to": "double",
-                    }
-                },
-                {"$literal": 0.9},
-            ]
-        },
-    )
-    assert matching_ids == {populated_match, legacy_match}
-
-
-def test_fast_filter_mixed_backfill_bool_cast(
-    trace_server: object,
-    ch_server_force_legacy: ClickHouseTraceServer,
-) -> None:
-    """``$convert(attributes.enabled, bool)`` returns populated *and* legacy matches.
-
-    The bool fallback compares the raw JSON_VALUE to the literal string
-    ``'true'`` (rather than the generic ``toUInt8OrNull`` cast that returns
-    NULL on JSON bool strings). This is the test that would have failed
-    before we special-cased bool — legacy rows with ``enabled: true`` in
-    the dump would have been dropped.
-    """
-    external_project_id = f"{TEST_ENTITY}/bool_{uuid.uuid4().hex[:8]}"
-    internal_project_id = b64(external_project_id)
-    reset_project_residence_cache()
-    populated_match, legacy_match, *_ = _populate_two_by_two(
-        ch_server_force_legacy.ch_client,
-        internal_project_id,
-        attr_key="enabled",
-        matching_value=True,
-        other_value=False,
-        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
-    )
-
-    matching_ids = _query_ids(
-        trace_server,
-        external_project_id,
-        {
-            "$eq": [
-                {
-                    "$convert": {
-                        "input": {"$getField": "attributes.enabled"},
-                        "to": "bool",
-                    }
-                },
-                {"$literal": True},
+                {"$literal": matching_value},
             ]
         },
     )

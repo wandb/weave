@@ -470,7 +470,11 @@ def test_extract_typed_attrs_dispatch_and_edge_cases() -> None:
     for i in range(big_batch):
         attrs[f"str_{i:05d}"] = f"v{i}"
 
-    s, i, f, b = extract_typed_attrs(attrs)
+    maps = extract_typed_attrs(attrs)
+    s = maps["attributes_map_str"]
+    i = maps["attributes_map_int"]
+    f = maps["attributes_map_float"]
+    b = maps["attributes_map_bool"]
 
     assert b == {"b": True, "b2": False}
     assert i == {"i": 42, "nested.a": 1}
@@ -493,9 +497,15 @@ def test_extract_typed_attrs_dispatch_and_edge_cases() -> None:
 
 
 def test_extract_typed_attrs_non_dict_input() -> None:
-    """Non-dict input returns four empty maps rather than raising."""
-    assert extract_typed_attrs(None) == ({}, {}, {}, {})  # type: ignore[arg-type]
-    assert extract_typed_attrs("not a dict") == ({}, {}, {}, {})  # type: ignore[arg-type]
+    """Non-dict input returns empty maps rather than raising."""
+    empty = {
+        "attributes_map_str": {},
+        "attributes_map_int": {},
+        "attributes_map_float": {},
+        "attributes_map_bool": {},
+    }
+    assert extract_typed_attrs(None) == empty  # type: ignore[arg-type]
+    assert extract_typed_attrs("not a dict") == empty  # type: ignore[arg-type]
 
 
 def test_extract_typed_attrs_dot_key_collision_is_documented() -> None:
@@ -511,12 +521,14 @@ def test_extract_typed_attrs_dot_key_collision_is_documented() -> None:
 
     This test pins the current behavior so it doesn't drift silently.
     """
-    _, int_map, _, _ = extract_typed_attrs({"a": {"b": 1}, "a.b": 2})
+    int_map = extract_typed_attrs({"a": {"b": 1}, "a.b": 2})["attributes_map_int"]
     assert int_map == {"a.b": 2}, (
         "Literal-dot key must overwrite the nested flattening (insertion order)."
     )
 
-    _, int_map_reverse, _, _ = extract_typed_attrs({"a.b": 2, "a": {"b": 1}})
+    int_map_reverse = extract_typed_attrs({"a.b": 2, "a": {"b": 1}})[
+        "attributes_map_int"
+    ]
     assert int_map_reverse == {"a.b": 1}, (
         "Nested flattening must overwrite the literal-dot key when inserted later."
     )

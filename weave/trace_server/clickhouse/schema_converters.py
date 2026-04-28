@@ -139,10 +139,6 @@ def start_call_for_insert_to_ch_insertable(
     if start_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(start_call.otel_dump)
 
-    attrs_str, attrs_int, attrs_float, attrs_bool = extract_typed_attrs(
-        start_call.attributes
-    )
-
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -153,10 +149,7 @@ def start_call_for_insert_to_ch_insertable(
         op_name=start_call.op_name,
         started_at=start_call.started_at,
         attributes_dump=dict_value_to_dump(start_call.attributes),
-        attributes_map_str=attrs_str,
-        attributes_map_int=attrs_int,
-        attributes_map_float=attrs_float,
-        attributes_map_bool=attrs_bool,
+        **extract_typed_attrs(start_call.attributes),
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         otel_dump=otel_dump_str,
@@ -262,10 +255,6 @@ def start_end_calls_to_ch_complete_insertable(
     if start_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(start_call.otel_dump)
 
-    attrs_str, attrs_int, attrs_float, attrs_bool = extract_typed_attrs(
-        start_call.attributes
-    )
-
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -279,10 +268,7 @@ def start_end_calls_to_ch_complete_insertable(
         ended_at=end_call.ended_at,
         exception=end_call.exception,
         attributes_dump=dict_value_to_dump(start_call.attributes),
-        attributes_map_str=attrs_str,
-        attributes_map_int=attrs_int,
-        attributes_map_float=attrs_float,
-        attributes_map_bool=attrs_bool,
+        **extract_typed_attrs(start_call.attributes),
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),
@@ -329,10 +315,6 @@ def complete_call_to_ch_insertable(
     if complete_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(complete_call.otel_dump)
 
-    attrs_str, attrs_int, attrs_float, attrs_bool = extract_typed_attrs(
-        complete_call.attributes
-    )
-
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,
         id=complete_call.id,
@@ -346,10 +328,7 @@ def complete_call_to_ch_insertable(
         ended_at=complete_call.ended_at,
         exception=complete_call.exception,
         attributes_dump=dict_value_to_dump(complete_call.attributes),
-        attributes_map_str=attrs_str,
-        attributes_map_int=attrs_int,
-        attributes_map_float=attrs_float,
-        attributes_map_bool=attrs_bool,
+        **extract_typed_attrs(complete_call.attributes),
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),
