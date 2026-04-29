@@ -6227,11 +6227,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 start_call,
                 end_call,
             ]
-            batch_data = []
-            for call in calls:
-                call_dict = call.model_dump()
-                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-                batch_data.append(values)
+            batch_data = [ch_call_to_row(call) for call in calls]
 
             self._insert_call_batch(batch_data)
 
@@ -6483,11 +6479,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             start_call,
             end_call,
         ]
-        batch_data = []
-        for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
+        batch_data = [ch_call_to_row(call) for call in calls]
 
         try:
             self._insert_call_batch(batch_data)
@@ -6903,11 +6895,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        # ch_call_to_row substitutes empty dicts for typed-map columns the
+        # current insertable doesn't carry — non-Nullable Map(...) columns
+        # in call_parts reject None, so a raw model_dump fanout would
+        # surface as the cryptic "x.keys() on NoneType" from clickhouse-
+        # connect's data_size sampler.
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 
@@ -7021,41 +7014,65 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """Iterate through the batch and replace large JSON values with placeholders.
 
-        Only considers JSON dump columns and ensures their combined size stays under
-        the limit by selectively replacing the largest values.
+        Each ``*_dump`` column is one stripping slot, fused with its typed-map
+        siblings (``<col>_map_str|int|float|bool``) when those exist:
+        the typed maps mirror scalar leaves of the dump at ingest, so the slot
+        size is dump+maps and the strip clears all of them together. Sorting
+        slots by fused size means we strip the slot with the largest real wire
+        cost first, which is what the CH single-row byte limit actually cares
+        about.
         """
         stripped_count = 0
         final_batch = []
 
-        json_column_indices = [
-            ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump")
-            for col in ALL_CALL_JSON_COLUMNS
-        ]
+        # Per-dump-column typed-map sibling indices. Built once: which dumps
+        # have typed maps, and which columns to wipe alongside the dump.
+        dump_idx_to_map_indices: dict[int, list[int]] = {}
+        for col in ALL_CALL_JSON_COLUMNS:
+            dump_idx = ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump")
+            map_indices: list[int] = []
+            for cast_suffix in ("str", "int", "float", "bool"):
+                map_col = f"{col}_map_{cast_suffix}"
+                if map_col in ALL_CALL_INSERT_COLUMNS:
+                    map_indices.append(ALL_CALL_INSERT_COLUMNS.index(map_col))
+            dump_idx_to_map_indices[dump_idx] = map_indices
+
         entity_too_large_payload_byte_size = num_bytes(
             ch_settings.ENTITY_TOO_LARGE_PAYLOAD
         )
 
         for item in batch:
-            # Calculate only JSON dump bytes
-            json_idx_size_pairs = [(i, num_bytes(item[i])) for i in json_column_indices]
-            total_json_bytes = sum(size for _, size in json_idx_size_pairs)
+            # Slot size = dump bytes + sum(typed map bytes for that dump).
+            slot_idx_size_pairs = [
+                (
+                    dump_idx,
+                    num_bytes(item[dump_idx])
+                    + sum(num_bytes(item[m]) for m in map_indices),
+                )
+                for dump_idx, map_indices in dump_idx_to_map_indices.items()
+            ]
+            total_json_bytes = sum(size for _, size in slot_idx_size_pairs)
 
-            # If over limit, try to optimize by selectively stripping largest JSON values
+            # If over limit, try to optimize by selectively stripping largest slots.
             stripped_item = list(item)
-            sorted_json_idx_size_pairs = sorted(
-                json_idx_size_pairs, key=lambda x: x[1], reverse=True
+            sorted_slot_idx_size_pairs = sorted(
+                slot_idx_size_pairs, key=lambda x: x[1], reverse=True
             )
 
-            # Try to get under the limit by replacing largest JSON values
-            for col_idx, size in sorted_json_idx_size_pairs:
+            # Try to get under the limit by replacing largest slots.
+            for dump_idx, size in sorted_slot_idx_size_pairs:
                 if (
                     total_json_bytes
                     <= ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
                 ):
                     break
 
-                # Replace this large JSON value with placeholder, update running size
-                stripped_item[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+                # Replace dump with placeholder, wipe typed-map siblings.
+                # ``size`` already includes map bytes so the running total
+                # decrements by the full slot.
+                stripped_item[dump_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+                for map_idx in dump_idx_to_map_indices[dump_idx]:
+                    stripped_item[map_idx] = {}
                 total_json_bytes -= size - entity_too_large_payload_byte_size
                 stripped_count += 1
 

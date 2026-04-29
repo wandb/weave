@@ -27,8 +27,8 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import Callable, KeysView, Sequence
-from typing import Any, Literal, NamedTuple, cast
+from collections.abc import Callable, KeysView, Mapping, Sequence
+from typing import Any, Final, Literal, NamedTuple, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -71,6 +71,7 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
+    quote_json_path_parts,
     split_escaped_field_path,
 )
 from weave.trace_server.project_version.types import ReadTable, TableConfig
@@ -81,6 +82,80 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+
+
+# ---------------------------------------------------------------------------
+# Typed inputs/output Map dispatch (fast-filter path)
+# ---------------------------------------------------------------------------
+#
+# Migration 031 adds Map(String, T) columns alongside inputs_dump and
+# output_dump on call_parts / calls_merged / calls_complete, populated at
+# ingest by ``extract_typed_inputs`` / ``extract_typed_output``. When a
+# read-side filter declares a target type (via $convert or an implicit
+# string literal peer), we route the read through the matching typed Map
+# column instead of JSON_VALUE over the dump string. The hybrid SQL keeps
+# correctness on rows ingested before the migration: ``mapContains(map,
+# key)`` gates the fast read so legacy/empty maps fall back to JSON_VALUE.
+
+
+# Casts the typed-map fast path supports, mapped to the column-name suffix.
+# ``exists`` has no typed-map column (it's existence-only) and falls through
+# to JSON_VALUE. Keyed by the ``tsi_query.CastTo`` literal so a typo is a
+# type error, not a silently-disabled fast path. Kept module-level so the
+# extractor and the dispatch agree on the supported casts.
+PayloadMapCast = Literal["int", "double", "bool", "string"]
+PAYLOAD_MAP_COLUMN_SUFFIX_BY_CAST: Final[Mapping[PayloadMapCast, str]] = {
+    "int": "int",
+    "double": "float",
+    "bool": "bool",
+    "string": "str",
+}
+
+
+# (field-prefix, source-tag, JSON-dump column, per-cast Map column).
+# ``source_tag`` is the prefix used on the typed Map column name
+# (``inputs_map_str``, ``output_map_int``, ...). ``column_by_cast`` is
+# keyed by ``str`` for ergonomic ``.get(cast)`` lookup with a ``CastTo``
+# value — the source of truth on supported casts is
+# ``PAYLOAD_MAP_COLUMN_SUFFIX_BY_CAST``.
+class _PayloadMapSource(NamedTuple):
+    field_prefix: str
+    source_tag: str  # "inputs" or "output"
+    dump_column: str  # "inputs_dump" or "output_dump"
+    column_by_cast: Mapping[str, str]
+
+
+def _payload_map_columns(source_tag: str) -> Mapping[str, str]:
+    return {
+        cast: f"{source_tag}_map_{suffix}"
+        for cast, suffix in PAYLOAD_MAP_COLUMN_SUFFIX_BY_CAST.items()
+    }
+
+
+PAYLOAD_MAP_SOURCES: tuple[_PayloadMapSource, ...] = (
+    _PayloadMapSource(
+        field_prefix="inputs.",
+        source_tag="inputs",
+        dump_column="inputs_dump",
+        column_by_cast=_payload_map_columns("inputs"),
+    ),
+    _PayloadMapSource(
+        field_prefix="output.",
+        source_tag="output",
+        dump_column="output_dump",
+        column_by_cast=_payload_map_columns("output"),
+    ),
+)
+
+
+def _payload_map_source_for_field(field_name: str) -> _PayloadMapSource | None:
+    """Return the matching source config for a ``inputs.<x>`` / ``output.<x>``
+    path, or None if the field doesn't address one of the typed-map columns.
+    """
+    for source in PAYLOAD_MAP_SOURCES:
+        if field_name.startswith(source.field_prefix):
+            return source
+    return None
 
 
 class FilterConditionsResult(NamedTuple):
@@ -2058,6 +2133,125 @@ def _extract_field_name(operand: "tsi_query.Operand") -> str | None:
     return None
 
 
+def _payload_dump_json_path(
+    field_name: str, field_prefix: str, pb: ParamBuilder
+) -> str:
+    """Build the JSONPath param slot for the fallback branch.
+
+    Delegates to ``quote_json_path_parts`` so numeric segments become
+    ``[N]`` (array indexing) rather than ``."N"`` (object-key lookup) —
+    a filter on ``inputs.in_val.list.0`` must read the first element of
+    the list, matching the shape ``CallsMergedDynamicField.as_sql``
+    produces on the non-hybrid JSON_VALUE path.
+    """
+    parts = field_name.removeprefix(field_prefix).split(".")
+    return param_slot(pb.add_param(quote_json_path_parts(parts)), "String")
+
+
+def _payload_map_fallback_sql(
+    cast: "tsi_query.CastTo",
+    json_path_slot: str,
+    dump_sql: str,
+) -> str:
+    """JSON_VALUE fallback whose CH type matches the typed Map fast branch.
+
+    - ``cast="bool"``: ``JSON_VALUE`` on a JSON bool emits ``"true"``/
+      ``"false"``, and the generic numeric cast yields NULL on those.
+      Compare directly to ``'true'`` to yield ``Bool``.
+    - other casts: reuse ``clickhouse_cast`` since the numeric/string
+      casts handle the JSON_VALUE string output correctly.
+    """
+    json_value_expr = f"JSON_VALUE({dump_sql}, {json_path_slot})"
+    if cast == "bool":
+        return f"({json_value_expr} = 'true')"
+    coalesced = f"coalesce(nullIf({json_value_expr}, 'null'), '')"
+    return clickhouse_cast(coalesced, cast)
+
+
+def _emit_payload_map_hybrid(
+    field_name: str,
+    source: _PayloadMapSource,
+    column: str,
+    fallback_cast: "tsi_query.CastTo",
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Build ``if(mapContains(map, key), map[key], JSON_VALUE fallback)`` for
+    one ``inputs.<path>`` or ``output.<path>`` read.
+
+    The mapContains gate keeps reads correct on rows ingested before
+    migration 031 (or before the per-row backfill completes): a pure
+    ``map[key]`` read returns the value-type default on missing keys
+    (``0``/``0.0``/``false``/``''``) which would silently misfire on
+    legacy rows whose payload lives only in the JSON dump. The per-row
+    gate means no cutoff timestamp, no table-wide flag — mixed-backfill
+    data Just Works.
+
+    Returns None when the path has no key (e.g. bare ``inputs.``).
+    """
+    key = field_name.removeprefix(source.field_prefix)
+    if not key:
+        return None
+    structured_field = get_field_by_name(field_name)
+    raw_fields_used[structured_field.field] = structured_field
+
+    key_slot = param_slot(pb.add_param(key), "String")
+    column_sql = f"{table_alias}.{column}"
+    dump_sql = f"{table_alias}.{source.dump_column}"
+    if use_agg_fn:
+        column_sql = f"any({column_sql})"
+        dump_sql = f"any({dump_sql})"
+
+    fast_expr = f"{column_sql}[{key_slot}]"
+    fallback_expr = _payload_map_fallback_sql(
+        fallback_cast,
+        _payload_dump_json_path(field_name, source.field_prefix, pb),
+        dump_sql,
+    )
+    return f"if(mapContains({column_sql}, {key_slot}), {fast_expr}, {fallback_expr})"
+
+
+def _maybe_payload_map_filter_sql(
+    operand: tsi_query.ConvertOperation,
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Hybrid fast/fallback SQL for ``$convert`` over ``inputs.<path>`` or
+    ``output.<path>``.
+
+    Only fires when:
+    - the converted operand is a plain ``$getField`` on inputs/output,
+    - the target cast maps to one of the typed Map columns populated at
+      ingest (``int`` / ``double`` / ``bool`` / ``string`` — ``exists``
+      has no typed Map and falls through to JSON_VALUE).
+    """
+    inner = operand.convert_.input
+    if not isinstance(inner, tsi_query.GetFieldOperator):
+        return None
+    field_name = inner.get_field_
+    source = _payload_map_source_for_field(field_name)
+    if source is None:
+        return None
+    cast = operand.convert_.to
+    column = source.column_by_cast.get(cast)
+    if column is None:
+        return None
+    return _emit_payload_map_hybrid(
+        field_name,
+        source,
+        column,
+        cast,
+        pb,
+        table_alias,
+        use_agg_fn,
+        raw_fields_used,
+    )
+
+
 def _get_multi_value_feedback_field(
     operand: tsi_query.Operand,
 ) -> CallsMergedFeedbackPayloadField | None:
@@ -2122,6 +2316,13 @@ def process_query_to_conditions(
                     rhs_part = process_operand(ops[1])
                     cond = f"has({array_expr}, {rhs_part})"
             else:
+                # Implicit-string fast path is intentionally NOT dispatched
+                # here in this iteration. Only ``$convert`` filters route
+                # through the typed Map column (see _maybe_payload_map_filter_sql);
+                # unconverted ``inputs.x = 'gpt-4'`` shapes stay on the
+                # JSON_VALUE path. This keeps existing query-builder snapshot
+                # tests stable and matches the original attribute-maps PR's
+                # scope; the implicit shape can land in a follow-up.
                 lhs_part = process_operand(ops[0])
                 if (
                     isinstance(ops[1], tsi_query.LiteralOperation)
@@ -2233,6 +2434,11 @@ def process_query_to_conditions(
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
+            fast_sql = _maybe_payload_map_filter_sql(
+                operand, param_builder, table_alias, use_agg_fn, raw_fields_used
+            )
+            if fast_sql is not None:
+                return fast_sql
             field = process_operand(operand.convert_.input)
             return clickhouse_cast(field, operand.convert_.to)
         elif isinstance(

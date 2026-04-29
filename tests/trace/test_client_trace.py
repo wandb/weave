@@ -3739,7 +3739,14 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         return
 
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
-    max_size = 10 * 1024
+    # Bumped from 10KB to 30KB so the selective-strip cases fit alongside
+    # the typed inputs_map_* / output_map_* / attributes_map_* sibling
+    # columns. Each dict-shaped payload occupies roughly twice the row
+    # footprint it did before typed maps existed (one dump column + up to
+    # ~6KB of typed-map entries), so the original 10KB threshold no longer
+    # leaves room for a "small input survives, large output stripped"
+    # scenario.
+    max_size = 30 * 1024
 
     # Patch _insert_call_batch to raise InsertTooLarge
     def mock_insert_call_batch(self, batch):
@@ -3809,7 +3816,11 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
 
     # test that when inputs + output > max_size but input < max_size
     # we only strip the inputs
-    smaller_data = {"dictionary": {f"{i}": i for i in range(max_size // 16)}}
+    # ``//24`` (rather than the historical ``//16``) keeps smaller_data's
+    # slot — dump + typed-map siblings — comfortably under ``max_size``
+    # while keeping the output slot (two copies of smaller_data) over it.
+    # Typed inputs/output maps roughly doubled the per-side row footprint.
+    smaller_data = {"dictionary": {f"{i}": i for i in range(max_size // 24)}}
 
     @weave.op
     def test_op_strip_inputs(input_data: dict):
@@ -3833,7 +3844,16 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     def test_op_strip_summary(input_data: dict):
         return "really_small"
 
-    with weave.attributes({"slightly_larger_data": smaller_data | {"a": 1}}):
+    # Attributes payload sized at 2× smaller_data so the attributes slot
+    # is unambiguously the largest after typed-map columns close the gap
+    # between dump-only sizes (``smaller_data | {"a": 1}`` was originally
+    # one entry larger than smaller_data; with both maps capped at the
+    # same entry count, that single-entry edge no longer dominates the
+    # slot ordering).
+    larger_attrs_data = {
+        "dictionary": {f"{i}": i for i in range(max_size // 12)},
+    }
+    with weave.attributes({"slightly_larger_data": larger_attrs_data}):
         test_op_strip_summary(smaller_data)
 
     call = next(iter(test_op_strip_summary.calls()))

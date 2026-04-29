@@ -68,6 +68,10 @@ class CallStartCHInsertable(
     started_at: datetime.datetime
     attributes_dump: str
     inputs_dump: str
+    inputs_map_str: dict[str, str] = Field(default_factory=dict)
+    inputs_map_int: dict[str, int] = Field(default_factory=dict)
+    inputs_map_float: dict[str, float] = Field(default_factory=dict)
+    inputs_map_bool: dict[str, bool] = Field(default_factory=dict)
     otel_dump: str | None = None
     expire_at: datetime.datetime = EXPIRE_AT_NEVER
 
@@ -82,6 +86,10 @@ class CallEndCHInsertable(CallBaseCHInsertable):
     exception: str | None = None
     summary_dump: str
     output_dump: str
+    output_map_str: dict[str, str] = Field(default_factory=dict)
+    output_map_int: dict[str, int] = Field(default_factory=dict)
+    output_map_float: dict[str, float] = Field(default_factory=dict)
+    output_map_bool: dict[str, bool] = Field(default_factory=dict)
     wb_run_step_end: int | None = None
     expire_at: datetime.datetime = EXPIRE_AT_NEVER
 
@@ -129,7 +137,15 @@ class CallCompleteCHInsertable(
     exception: str | None = None
     attributes_dump: str
     inputs_dump: str
+    inputs_map_str: dict[str, str] = Field(default_factory=dict)
+    inputs_map_int: dict[str, int] = Field(default_factory=dict)
+    inputs_map_float: dict[str, float] = Field(default_factory=dict)
+    inputs_map_bool: dict[str, bool] = Field(default_factory=dict)
     output_dump: str
+    output_map_str: dict[str, str] = Field(default_factory=dict)
+    output_map_int: dict[str, int] = Field(default_factory=dict)
+    output_map_float: dict[str, float] = Field(default_factory=dict)
+    output_map_bool: dict[str, bool] = Field(default_factory=dict)
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
