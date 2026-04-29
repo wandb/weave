@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
 
 from weave.trace_server.agents.constants import (
     MAX_WALK_DEPTH,
@@ -40,6 +39,8 @@ logger = logging.getLogger(__name__)
 
 _USER_ROLE = "user"
 _ASSISTANT_ROLE = "assistant"
+# Provider SDKs may emit non-standard roles in their normalized message arrays.
+# Treat tool/system/assistant-like entries as context rather than user prompts.
 _NON_USER_PROMPT_ROLES = {
     _ASSISTANT_ROLE,
     "system",
@@ -255,15 +256,6 @@ class ChatTraversal:
                 span.span_id,
             )
 
-        subtree_emitted_assistant = self._walk_children(
-            node, nearest_agent=subtree_agent, depth=depth
-        )
-        if not subtree_emitted_assistant:
-            msg = _emit_assistant_message(span, subtree_agent, aggregate_node=node)
-            if msg:
-                self.messages.append(msg)
-                subtree_emitted_assistant = True
-
         if span.compaction_summary or (span.compaction_items_before or 0) > 0:
             self.messages.append(
                 AgentChatMessage(
@@ -278,6 +270,15 @@ class ChatTraversal:
                     ),
                 )
             )
+
+        subtree_emitted_assistant = self._walk_children(
+            node, nearest_agent=subtree_agent, depth=depth
+        )
+        if not subtree_emitted_assistant:
+            msg = _emit_assistant_message(span, subtree_agent, aggregate_node=node)
+            if msg:
+                self.messages.append(msg)
+                subtree_emitted_assistant = True
 
         return subtree_emitted_assistant
 
@@ -384,18 +385,6 @@ def _select_root_span(spans: list[AgentSpanSchema]) -> AgentSpanSchema:
     return max(spans, key=_root_sort_key)
 
 
-def _message_role(message: NormalizedMessage | dict[str, Any]) -> str:
-    if isinstance(message, NormalizedMessage):
-        return message.role
-    return str(message.get("role") or "")
-
-
-def _message_content(message: NormalizedMessage | dict[str, Any]) -> str:
-    if isinstance(message, NormalizedMessage):
-        return message.content
-    return str(message.get("content") or "")
-
-
 def _filter_message_texts(
     messages: list[NormalizedMessage],
     *,
@@ -405,8 +394,8 @@ def _filter_message_texts(
     """Return non-empty message content matching role include/exclude filters."""
     texts: list[str] = []
     for message in messages:
-        role = _message_role(message)
-        content = _message_content(message)
+        role = message.role
+        content = message.content
         if not content:
             continue
         if include_roles is not None and role not in include_roles:
@@ -435,7 +424,7 @@ def _extract_user_text(
         if texts:
             logger.debug(
                 "no role=user input messages; falling back to unknown/provider roles (roles=%r)",
-                [_message_role(m) for m in messages],
+                [m.role for m in messages],
             )
     if last_only and texts:
         return texts[-1]
@@ -455,26 +444,12 @@ def _extract_non_user_output_text(messages: list[NormalizedMessage]) -> str:
     return "\n\n".join(texts)
 
 
-def _compute_duration_ms(
-    started_at: datetime | str | None, ended_at: datetime | str | None
-) -> int:
+def _compute_duration_ms(started_at: datetime | None, ended_at: datetime | None) -> int:
     """Return elapsed milliseconds, or 0 when either timestamp is missing."""
     if not started_at or not ended_at:
         return 0
-    try:
-        if isinstance(started_at, str):
-            started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-        if isinstance(ended_at, str):
-            ended_at = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
-        delta = ended_at - started_at
-        return max(0, int(delta.total_seconds() * 1000))
-    except Exception:
-        logger.exception(
-            "failed to compute duration from started_at=%r ended_at=%r",
-            started_at,
-            ended_at,
-        )
-        return 0
+    delta = ended_at - started_at
+    return max(0, int(delta.total_seconds() * 1000))
 
 
 def _content_refs(span: AgentSpanSchema) -> list[str]:
