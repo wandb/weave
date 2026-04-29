@@ -488,7 +488,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         _, cursor = get_conn_cursor(self.db_path)
         cursor.execute(
             "SELECT retention_days FROM project_ttl_settings "
-            "WHERE project_id = ? ORDER BY updated_at DESC LIMIT 1",
+            "WHERE project_id = ? ORDER BY updated_at DESC, rowid DESC LIMIT 1",
             (project_id,),
         )
         row = cursor.fetchone()
@@ -2867,16 +2867,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         stored_days = req.retention_days or 0
         conn, cursor = get_conn_cursor(self.db_path)
+        # Pad microseconds so updated_at strings sort lexicographically by time.
+        # isoformat() drops microseconds when they're 0, which would make
+        # "...:52+00:00" sort before "...:51.999999+00:00".
+        updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat(
+            timespec="microseconds"
+        )
         cursor.execute(
             "INSERT INTO project_ttl_settings "
             "(project_id, retention_days, updated_at, updated_by) "
             "VALUES (?, ?, ?, ?)",
-            (
-                req.project_id,
-                stored_days,
-                datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                req.wb_user_id,
-            ),
+            (req.project_id, stored_days, updated_at, req.wb_user_id),
         )
         conn.commit()
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
