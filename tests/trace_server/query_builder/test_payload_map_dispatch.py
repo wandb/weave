@@ -200,6 +200,58 @@ def test_typed_inputs_map_dispatch_on_calls_merged_string() -> None:
     )
 
 
+def test_typed_inputs_map_dispatch_with_numeric_path_segment() -> None:
+    """``$convert(inputs.in_val.list.0, int)`` — list-index path.
+
+    Numeric segments must encode as ``[N]`` (array indexing), not
+    ``."N"`` (object-key lookup). The fast branch never matches (lists
+    are skipped at ingest, so ``mapContains`` is false) but the
+    JSON_VALUE fallback must use the right shape so list-element reads
+    keep working.
+    """
+    cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.list.0"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((if(mapContains(any(calls_merged.inputs_map_int), {pb_0:String}),
+                 any(calls_merged.inputs_map_int)[{pb_0:String}],
+                 toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_1:String}), 'null'), '')))
+             > {pb_2:Int64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": "in_val.list.0",
+            "pb_1": '$."in_val"."list"[0]',
+            "pb_2": 5,
+            "pb_3": "p",
+        },
+    )
+
+
 # ---------------------------------------------------------------------------
 # calls_merged dispatch — output.* (parallel to inputs.*, narrower coverage)
 # ---------------------------------------------------------------------------

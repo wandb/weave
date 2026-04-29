@@ -27,8 +27,8 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import Callable, KeysView, Sequence
-from typing import Any, Literal, NamedTuple, cast
+from collections.abc import Callable, KeysView, Mapping, Sequence
+from typing import Any, Final, Literal, NamedTuple, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -71,6 +71,7 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
+    quote_json_path_parts,
     split_escaped_field_path,
 )
 from weave.trace_server.project_version.types import ReadTable, TableConfig
@@ -97,22 +98,37 @@ CTE_ALL_CALLS = "all_calls"
 # key)`` gates the fast read so legacy/empty maps fall back to JSON_VALUE.
 
 
+# Casts the typed-map fast path supports, mapped to the column-name suffix.
+# ``exists`` has no typed-map column (it's existence-only) and falls through
+# to JSON_VALUE. Keyed by the ``tsi_query.CastTo`` literal so a typo is a
+# type error, not a silently-disabled fast path. Kept module-level so the
+# extractor and the dispatch agree on the supported casts.
+PayloadMapCast = Literal["int", "double", "bool", "string"]
+PAYLOAD_MAP_COLUMN_SUFFIX_BY_CAST: Final[Mapping[PayloadMapCast, str]] = {
+    "int": "int",
+    "double": "float",
+    "bool": "bool",
+    "string": "str",
+}
+
+
 # (field-prefix, source-tag, JSON-dump column, per-cast Map column).
 # ``source_tag`` is the prefix used on the typed Map column name
-# (``inputs_map_str``, ``output_map_int``, ...).
+# (``inputs_map_str``, ``output_map_int``, ...). ``column_by_cast`` is
+# keyed by ``str`` for ergonomic ``.get(cast)`` lookup with a ``CastTo``
+# value — the source of truth on supported casts is
+# ``PAYLOAD_MAP_COLUMN_SUFFIX_BY_CAST``.
 class _PayloadMapSource(NamedTuple):
     field_prefix: str
     source_tag: str  # "inputs" or "output"
     dump_column: str  # "inputs_dump" or "output_dump"
-    column_by_cast: dict[str, str]
+    column_by_cast: Mapping[str, str]
 
 
-def _payload_map_columns(source_tag: str) -> dict[str, str]:
+def _payload_map_columns(source_tag: str) -> Mapping[str, str]:
     return {
-        "int": f"{source_tag}_map_int",
-        "double": f"{source_tag}_map_float",
-        "bool": f"{source_tag}_map_bool",
-        "string": f"{source_tag}_map_str",
+        cast: f"{source_tag}_map_{suffix}"
+        for cast, suffix in PAYLOAD_MAP_COLUMN_SUFFIX_BY_CAST.items()
     }
 
 
@@ -2120,15 +2136,16 @@ def _extract_field_name(operand: "tsi_query.Operand") -> str | None:
 def _payload_dump_json_path(
     field_name: str, field_prefix: str, pb: ParamBuilder
 ) -> str:
-    """Build the ``$."a"."b"...`` JSONPath param slot for the fallback branch.
+    """Build the JSONPath param slot for the fallback branch.
 
-    Mirrors the JSONPath shape ``CallsMergedDynamicField.as_sql`` already
-    uses for ``inputs.x.y`` / ``output.x.y``, so the fallback computes the
-    same value the non-hybrid JSON_VALUE path would.
+    Delegates to ``quote_json_path_parts`` so numeric segments become
+    ``[N]`` (array indexing) rather than ``."N"`` (object-key lookup) —
+    a filter on ``inputs.in_val.list.0`` must read the first element of
+    the list, matching the shape ``CallsMergedDynamicField.as_sql``
+    produces on the non-hybrid JSON_VALUE path.
     """
     parts = field_name.removeprefix(field_prefix).split(".")
-    json_path = "$" + "".join(f'."{p}"' for p in parts)
-    return param_slot(pb.add_param(json_path), "String")
+    return param_slot(pb.add_param(quote_json_path_parts(parts)), "String")
 
 
 def _payload_map_fallback_sql(
