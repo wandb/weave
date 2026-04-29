@@ -5,6 +5,7 @@ import pytest
 from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
 from agents.tracing import (
     AgentSpanData,
+    GenerationSpanData,
     ResponseSpanData,
     Span,
     TaskSpanData,
@@ -14,7 +15,14 @@ from agents.tracing import (
 from pydantic import BaseModel
 
 from weave.integrations.integration_utilities import op_name_from_ref
-from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
+from weave.integrations.openai_agents import openai_agents as oa_module
+from weave.integrations.openai_agents.openai_agents import (
+    WeaveTracingProcessor,
+    _call_name,
+    _is_task_span_data,
+    _is_turn_span_data,
+    _usage_to_metrics,
+)
 from weave.trace.weave_client import WeaveClient
 
 
@@ -492,4 +500,150 @@ def test_newer_agent_task_and_turn_fields_prevent_unknown_blocks(
         "turn": 2,
         "agent_name": "Assistant",
         "callback": "session_input",
+    }
+
+
+@pytest.mark.parametrize(
+    ("usage", "expected"),
+    [
+        (None, {}),
+        ({}, {}),
+        (
+            {"input_tokens": 3, "output_tokens": 4, "total_tokens": 7},
+            {"tokens": 7, "prompt_tokens": 3, "completion_tokens": 4},
+        ),
+        (
+            {"input_tokens": 3, "output_tokens": 4},
+            {"tokens": 7, "prompt_tokens": 3, "completion_tokens": 4},
+        ),
+        (
+            {"input_tokens": 3},
+            {"tokens": 3, "prompt_tokens": 3, "completion_tokens": None},
+        ),
+        (
+            {"output_tokens": 4},
+            {"tokens": 4, "prompt_tokens": None, "completion_tokens": 4},
+        ),
+    ],
+)
+def test_usage_to_metrics_branches(usage, expected) -> None:
+    assert _usage_to_metrics(usage) == expected
+
+
+@pytest.mark.parametrize(
+    ("turn", "agent_name", "expected"),
+    [
+        (1, "Assistant", "Assistant turn 1"),
+        (2, None, "Turn 2"),
+        (None, "Helper", "Helper turn"),
+        (None, None, "Turn"),
+    ],
+)
+def test_call_name_for_turn_span_branches(turn, agent_name, expected) -> None:
+    span_data = Mock(spec=TurnSpanData)
+    span_data.name = None
+    span_data.turn = turn
+    span_data.agent_name = agent_name
+    span_data.__class__ = TurnSpanData
+
+    span = Mock(spec=Span)
+    span.span_data = span_data
+
+    assert _call_name(span) == expected
+
+
+def test_task_and_turn_log_data_handle_missing_optional_fields() -> None:
+    """Task/turn spans with missing optional fields produce empty metrics and
+    only the metadata they actually carry. Exercises the False branches of the
+    isinstance/getattr guards in _task_log_data and _turn_log_data.
+    """
+    processor = WeaveTracingProcessor()
+
+    task_span_data = TaskSpanData(name="placeholder")
+    task_span_data.name = None
+    task_span_data.metadata = "not-a-dict"
+    task_span_data.usage = None
+    task_span = Mock(spec=Span)
+    task_span.span_data = task_span_data
+
+    task_log = processor._task_log_data(task_span)
+    assert task_log["metadata"] == {}
+    assert task_log["metrics"] == {}
+
+    turn_span_data = TurnSpanData(turn=1, agent_name="placeholder")
+    turn_span_data.turn = None
+    turn_span_data.agent_name = None
+    turn_span_data.metadata = None
+    turn_span_data.usage = None
+    turn_span = Mock(spec=Span)
+    turn_span.span_data = turn_span_data
+
+    turn_log = processor._turn_log_data(turn_span)
+    assert turn_log["metadata"] == {}
+    assert turn_log["metrics"] == {}
+    assert _call_name(turn_span) == "Turn"
+
+
+def test_generation_log_data_uses_usage_metrics() -> None:
+    """_generation_log_data delegates token-metric assembly to _usage_to_metrics."""
+    span_data = GenerationSpanData(
+        input=[{"role": "user", "content": "hi"}],
+        output=[{"role": "assistant", "content": "hello"}],
+        model="gpt-4o",
+        model_config={"temperature": 0.0},
+        usage={"input_tokens": 5, "output_tokens": 7},
+    )
+    span = Mock(spec=Span)
+    span.span_data = span_data
+
+    result = WeaveTracingProcessor()._generation_log_data(span)
+    assert result["inputs"] == {"input": [{"role": "user", "content": "hi"}]}
+    assert result["outputs"] == {"output": [{"role": "assistant", "content": "hello"}]}
+    assert result["metadata"] == {
+        "model": "gpt-4o",
+        "model_config": {"temperature": 0.0},
+    }
+    assert result["metrics"] == {
+        "tokens": 12,
+        "prompt_tokens": 5,
+        "completion_tokens": 7,
+    }
+
+
+def test_optional_span_classes_absent_falls_back_to_unknown(
+    client: WeaveClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When TaskSpanData/TurnSpanData failed to import (older SDK), the
+    isinstance helpers must short-circuit to False and _log_data must fall
+    through to the Unknown branch instead of erroring on isinstance(None).
+    """
+    monkeypatch.setattr(oa_module, "TaskSpanData", None)
+    monkeypatch.setattr(oa_module, "TurnSpanData", None)
+
+    sentinel = object()
+    assert _is_task_span_data(sentinel) is False
+    assert _is_turn_span_data(sentinel) is False
+
+    class UnknownSpanData:
+        type = "unknown"
+        name = None
+
+    span = Mock(spec=Span)
+    span.trace_id = "trace_legacy"
+    span.span_id = "span_legacy"
+    span.parent_id = None
+    span_data = UnknownSpanData()
+    span.span_data = span_data
+    span.error = None
+
+    assert _call_name(span) == "Unknown"
+
+    processor = WeaveTracingProcessor()
+    log_data = processor._log_data(span)
+    assert log_data == {
+        "inputs": {},
+        "outputs": {},
+        "metadata": {},
+        "metrics": {},
+        "error": None,
     }

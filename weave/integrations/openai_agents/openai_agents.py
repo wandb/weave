@@ -27,7 +27,7 @@ from agents.tracing import (
 
 try:
     from agents.tracing import TaskSpanData, TurnSpanData
-except ImportError:
+except ImportError:  # pragma: no cover - older openai-agents SDKs lack these
     TaskSpanData = None
     TurnSpanData = None
 
