@@ -6821,12 +6821,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         start = time.monotonic()
-        data = sanitize_invalid_utf8_surrogates(data)
+        sanitized_invalid_utf8 = False
         for attempt in range(ch_settings.INSERT_MAX_RETRIES):
             try:
                 result = self.ch_client.insert(
                     table, data=data, column_names=column_names, settings=settings
                 )
+
+            # Invalid client Unicode: sanitize the batch and retry once.
+            except UnicodeEncodeError as e:
+                if sanitized_invalid_utf8 or attempt == ch_settings.INSERT_MAX_RETRIES - 1:
+                    log_and_raise_insert_error(e, table, data)
+                sanitized_invalid_utf8 = True
+                data = sanitize_invalid_utf8_surrogates(data)
+                continue
 
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:

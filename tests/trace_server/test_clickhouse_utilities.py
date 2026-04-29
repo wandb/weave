@@ -1,12 +1,7 @@
-import json
 from unittest.mock import MagicMock, patch
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
-from weave.trace_server.clickhouse.utilities import (
-    any_value_to_dump,
-    dict_value_to_dump,
-    sanitize_invalid_utf8_surrogates,
-)
+from weave.trace_server.clickhouse.utilities import sanitize_invalid_utf8_surrogates
 
 
 def test_sanitize_invalid_utf8_surrogates_replaces_lone_surrogates() -> None:
@@ -30,23 +25,35 @@ def test_sanitize_invalid_utf8_surrogates_replaces_lone_surrogates() -> None:
     str(sanitized).encode("utf-8")
 
 
-def test_dump_helpers_sanitize_invalid_utf8_surrogates() -> None:
-    # JSON dump columns are usually safe because `json.dumps` escapes strings,
-    # but sanitizing here prevents invalid Unicode from round-tripping back out.
-    dumped_dict = dict_value_to_dump({"bad": "broken \ud83d"})
-    dumped_any = any_value_to_dump(["nested \udc00"])
-
-    assert json.loads(dumped_dict) == {"bad": "broken \ufffd"}
-    assert json.loads(dumped_any) == ["nested \ufffd"]
-    dumped_dict.encode("utf-8")
-    dumped_any.encode("utf-8")
-
-
-def test_insert_sanitizes_invalid_utf8_surrogates_before_clickhouse() -> None:
-    # Direct string columns like `exception` or `display_name` bypass JSON dumps,
-    # so the final insert path must normalize rows before clickhouse_connect.
+def test_insert_does_not_sanitize_successful_clean_clickhouse_write() -> None:
+    # Clean inserts should stay on the old hot path: no recursive sanitation
+    # unless clickhouse_connect first reports an encoding failure.
+    data = [["valid \U0001f600"]]
     mock_ch_client = MagicMock()
     mock_ch_client.insert.return_value = MagicMock()
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._insert(
+            "call_parts",
+            data=data,
+            column_names=["valid"],
+        )
+
+    inserted_data = mock_ch_client.insert.call_args.kwargs["data"]
+    assert inserted_data is data
+
+
+def test_insert_sanitizes_invalid_utf8_surrogates_after_encode_error() -> None:
+    # Direct string columns like `exception` or `display_name` bypass JSON dumps,
+    # so a UnicodeEncodeError should trigger one sanitized retry of the same batch.
+    mock_ch_client = MagicMock()
+    mock_ch_client.insert.side_effect = [
+        UnicodeEncodeError("utf-8", "broken \ud83d", 7, 8, "surrogates not allowed"),
+        MagicMock(),
+    ]
 
     with patch.object(
         chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
@@ -58,6 +65,10 @@ def test_insert_sanitizes_invalid_utf8_surrogates_before_clickhouse() -> None:
             column_names=["valid", "broken"],
         )
 
-    inserted_data = mock_ch_client.insert.call_args.kwargs["data"]
+    first_insert = mock_ch_client.insert.call_args_list[0].kwargs["data"]
+    retried_insert = mock_ch_client.insert.call_args_list[1].kwargs["data"]
+    assert first_insert == [["valid \U0001f600", "broken \ud83d"]]
+    assert retried_insert is not first_insert
+    inserted_data = retried_insert
     assert inserted_data == [["valid \U0001f600", "broken \ufffd"]]
     str(inserted_data).encode("utf-8")

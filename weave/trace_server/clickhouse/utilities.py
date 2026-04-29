@@ -53,26 +53,57 @@ def sanitize_invalid_utf8_surrogates(value: T) -> T:
     surrogate pairs as their real code point and replaces unpaired surrogates.
     """
     if isinstance(value, str):
-        return cast(
-            T,
-            value.encode("utf-16", errors="surrogatepass").decode(
-                "utf-16", errors="replace"
-            ),
+        sanitized = value.encode("utf-16", errors="surrogatepass").decode(
+            "utf-16", errors="replace"
         )
+        return value if sanitized == value else cast(T, sanitized)
     if isinstance(value, list):
-        return cast(T, [sanitize_invalid_utf8_surrogates(item) for item in value])
-    if isinstance(value, tuple):
-        return cast(T, tuple(sanitize_invalid_utf8_surrogates(item) for item in value))
-    if isinstance(value, dict):
-        return cast(
-            T,
-            {
-                sanitize_invalid_utf8_surrogates(key): sanitize_invalid_utf8_surrogates(
-                    val
+        for idx, item in enumerate(value):
+            sanitized = sanitize_invalid_utf8_surrogates(item)
+            if sanitized is not item:
+                sanitized_items = [*value[:idx], sanitized]
+                sanitized_items.extend(
+                    sanitize_invalid_utf8_surrogates(rest)
+                    for rest in value[idx + 1 :]
                 )
-                for key, val in value.items()
-            },
-        )
+                return cast(T, sanitized_items)
+        return value
+    if isinstance(value, tuple):
+        for idx, item in enumerate(value):
+            sanitized = sanitize_invalid_utf8_surrogates(item)
+            if sanitized is not item:
+                return cast(
+                    T,
+                    (
+                        *value[:idx],
+                        sanitized,
+                        *(
+                            sanitize_invalid_utf8_surrogates(rest)
+                            for rest in value[idx + 1 :]
+                        ),
+                    ),
+                )
+        return value
+    if isinstance(value, dict):
+        items = value.items()
+        for idx, (key, val) in enumerate(items):
+            sanitized_key = sanitize_invalid_utf8_surrogates(key)
+            sanitized_val = sanitize_invalid_utf8_surrogates(val)
+            if sanitized_key is not key or sanitized_val is not val:
+                item_list = list(value.items())
+                sanitized_items = [
+                    *item_list[:idx],
+                    (sanitized_key, sanitized_val),
+                    *(
+                        (
+                            sanitize_invalid_utf8_surrogates(rest_key),
+                            sanitize_invalid_utf8_surrogates(rest_val),
+                        )
+                        for rest_key, rest_val in item_list[idx + 1 :]
+                    ),
+                ]
+                return cast(T, dict(sanitized_items))
+        return value
     return value
 
 
@@ -81,13 +112,13 @@ def dict_value_to_dump(
 ) -> str:
     if not isinstance(value, dict):
         raise TypeError(f"Value is not a dict: {value}")
-    return json.dumps(sanitize_invalid_utf8_surrogates(value))
+    return json.dumps(value)
 
 
 def any_value_to_dump(
     value: Any,
 ) -> str:
-    return json.dumps(sanitize_invalid_utf8_surrogates(value))
+    return json.dumps(value)
 
 
 def dict_dump_to_dict(val: str) -> dict[str, Any]:
