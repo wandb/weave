@@ -20,6 +20,7 @@ from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.project_version import project_version
+from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -376,6 +377,23 @@ def ch_server(trace_server):
     if not isinstance(server, ClickHouseTraceServer):
         pytest.skip("ClickHouse-only test")
     return server
+
+
+@pytest.fixture
+def clickhouse_trace_server(trace_server: object) -> ClickHouseTraceServer:
+    """Extract ClickHouseTraceServer and pin routing to AUTO for calls_complete tests.
+
+    Variant of ``ch_server`` that also sets the table routing resolver to
+    AUTO so tests exercising the calls_complete path get the same residence
+    dispatch shape production uses. Tests needing a different mode (e.g.
+    FORCE_LEGACY for raw call_parts inserts) can override the mode after
+    receiving the fixture.
+    """
+    internal_server = trace_server._internal_trace_server  # type: ignore[attr-defined]
+    if isinstance(internal_server, SqliteTraceServer):
+        pytest.skip("ClickHouse-only test")
+    internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
+    return internal_server  # type: ignore[no-any-return]
 
 
 @pytest.fixture

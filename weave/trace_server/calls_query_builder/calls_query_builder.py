@@ -82,6 +82,22 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 
+# Maps a DSL cast-to type onto the typed Map column that stores attribute
+# values of that type. Used by CallsMergedDynamicField to route attribute
+# filters through the typed Map columns instead of JSON_VALUE over
+# attributes_dump when the caller declares the field's type via $convert.
+ATTRIBUTES_MAP_COLUMN_BY_CAST: dict[str, str] = {
+    "int": "attributes_map_int",
+    "double": "attributes_map_float",
+    "bool": "attributes_map_bool",
+    "string": "attributes_map_str",
+}
+
+# Field-name prefix that identifies an attributes path in the query DSL.
+# Stripping it gives the dot-joined key used to read the typed Map column
+# (which mirrors extract_typed_attrs at write time).
+ATTRIBUTES_FIELD_PREFIX = "attributes."
+
 
 class FilterConditionsResult(NamedTuple):
     """Result from building filter conditions.
@@ -2074,6 +2090,173 @@ def _get_multi_value_feedback_field(
     return None
 
 
+def _attributes_dump_json_path(field_name: str, pb: ParamBuilder) -> str:
+    """Return the ``$."a"."b"..."`` JSONPath param slot for an ``attributes.<path>`` key.
+
+    Mirrors the JSONPath shape that ``CallsMergedDynamicField.as_sql`` uses so
+    the fallback branch of the typed-map hybrid reads the same JSON location
+    the non-hybrid JSON_VALUE path would.
+    """
+    parts = field_name.removeprefix(ATTRIBUTES_FIELD_PREFIX).split(".")
+    json_path = "$" + "".join(f'."{p}"' for p in parts)
+    return param_slot(pb.add_param(json_path), "String")
+
+
+def _attributes_map_fallback_sql(
+    cast: "tsi_query.CastTo | None",
+    json_path_slot: str,
+    attributes_dump_sql: str,
+) -> str:
+    """JSON_VALUE fallback expression for the typed-map hybrid.
+
+    Returns a value whose CH type matches the typed Map column on the fast
+    branch, so the surrounding ``if(...)`` hands either branch to the outer
+    comparison without a second cast.
+
+    - ``cast=None`` (implicit-string path): plain ``coalesce/nullIf`` over
+      ``JSON_VALUE``. Both branches are already ``String``, so no cast.
+    - ``cast="bool"``: ``JSON_VALUE`` on a JSON bool emits the literal string
+      ``"true"``/``"false"``, and ``toUInt8OrNull("true")`` is NULL — the
+      generic ``clickhouse_cast`` would drop legacy bool rows on the floor.
+      We compare the raw JSON_VALUE against ``'true'`` to yield ``Bool``.
+    - other casts: reuse ``clickhouse_cast`` since the numeric/string casts
+      already handle the JSON_VALUE string output.
+    """
+    json_value_expr = f"JSON_VALUE({attributes_dump_sql}, {json_path_slot})"
+    if cast == "bool":
+        return f"({json_value_expr} = 'true')"
+    coalesced = f"coalesce(nullIf({json_value_expr}, 'null'), '')"
+    if cast is None:
+        return coalesced
+    return clickhouse_cast(coalesced, cast)
+
+
+def _emit_typed_map_hybrid(
+    field_name: str,
+    column: str,
+    fallback_cast: "tsi_query.CastTo | None",
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Build ``if(mapContains(map, key), map[key], JSON_VALUE fallback)`` for
+    one ``attributes.<path>`` read.
+
+    Because migration 030 only populates the typed maps for rows inserted
+    after it runs, a pure ``map[key]`` read is unsafe on mixed-backfill
+    tables: CH returns the value-type default (``0``/``0.0``/``false``/``''``)
+    for a missing key, which silently produces wrong filter results on
+    legacy rows whose attributes live only in ``attributes_dump``. The
+    per-row ``mapContains`` gate means no cutoff timestamp, no backfill
+    completion gate, and mixed tables Just Work — the fast read fires when
+    it's safe, and the old path stays correct when it isn't.
+
+    Returns None when the path has no key (e.g. bare ``attributes.``).
+    """
+    key = field_name.removeprefix(ATTRIBUTES_FIELD_PREFIX)
+    if not key:
+        return None
+    structured_field = get_field_by_name(field_name)
+    raw_fields_used[structured_field.field] = structured_field
+
+    key_slot = param_slot(pb.add_param(key), "String")
+    column_sql = f"{table_alias}.{column}"
+    attributes_dump_sql = f"{table_alias}.attributes_dump"
+    if use_agg_fn:
+        column_sql = f"any({column_sql})"
+        attributes_dump_sql = f"any({attributes_dump_sql})"
+
+    fast_expr = f"{column_sql}[{key_slot}]"
+    fallback_expr = _attributes_map_fallback_sql(
+        fallback_cast, _attributes_dump_json_path(field_name, pb), attributes_dump_sql
+    )
+    return f"if(mapContains({column_sql}, {key_slot}), {fast_expr}, {fallback_expr})"
+
+
+def _maybe_attributes_map_str_field_sql(
+    operand: "tsi_query.Operand",
+    peer: "tsi_query.Operand",
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Implicit-string fast path for ``attributes.<path>`` compared against a
+    string ``$literal`` (no ``$convert`` wrapping).
+
+    Fires when ``operand`` is ``$getField(attributes.<path>)`` and ``peer`` is
+    a string literal, covering the common ``attributes.model = 'gpt-4'``
+    query shape that would otherwise require a ``$convert(..., "string")``
+    wrap to hit the typed map. Routes through ``_emit_typed_map_hybrid`` with
+    ``fallback_cast=None`` so the fallback is a plain ``coalesce/nullIf``
+    (the explicit ``$convert(..., "string")`` path adds a ``toString`` wrap
+    via ``clickhouse_cast`` for DSL consistency; the implicit path skips
+    that since both Map and JSON_VALUE branches are already ``String``).
+
+    Returns None when the operand/peer shape doesn't match so callers fall
+    back to ``process_operand`` and preserve existing behavior (including
+    the ``IS NULL`` peer path and the ``$convert(..., "exists")`` case).
+    """
+    if not isinstance(operand, tsi_query.GetFieldOperator):
+        return None
+    if not isinstance(peer, tsi_query.LiteralOperation):
+        return None
+    if not isinstance(peer.literal_, str):
+        return None
+    field_name = operand.get_field_
+    if not field_name.startswith(ATTRIBUTES_FIELD_PREFIX):
+        return None
+    return _emit_typed_map_hybrid(
+        field_name,
+        "attributes_map_str",
+        None,
+        pb,
+        table_alias,
+        use_agg_fn,
+        raw_fields_used,
+    )
+
+
+def _maybe_attributes_map_filter_sql(
+    operand: tsi_query.ConvertOperation,
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Hybrid fast/fallback SQL for ``$convert`` over ``attributes.<path>``.
+
+    Only fires when:
+    - the converted operand is a plain ``$getField`` on ``attributes.*``,
+    - the target cast maps to one of the typed Map columns populated at ingest
+      (``int``/``double``/``bool``/``string`` — ``exists`` has no typed Map and
+      falls through to the JSON_VALUE path).
+
+    The Map key is the dot-joined path after ``attributes.`` to mirror the
+    flattening done by ``extract_typed_attrs`` at write time.
+    """
+    inner = operand.convert_.input
+    if not isinstance(inner, tsi_query.GetFieldOperator):
+        return None
+    field_name = inner.get_field_
+    if not field_name.startswith(ATTRIBUTES_FIELD_PREFIX):
+        return None
+    cast = operand.convert_.to
+    column = ATTRIBUTES_MAP_COLUMN_BY_CAST.get(cast)
+    if column is None:
+        return None
+    return _emit_typed_map_hybrid(
+        field_name,
+        column,
+        cast,
+        pb,
+        table_alias,
+        use_agg_fn,
+        raw_fields_used,
+    )
+
+
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
@@ -2122,7 +2305,22 @@ def process_query_to_conditions(
                     rhs_part = process_operand(ops[1])
                     cond = f"has({array_expr}, {rhs_part})"
             else:
-                lhs_part = process_operand(ops[0])
+                # Implicit-string fast path: route $getField(attributes.x) vs
+                # a string literal through the typed Map column instead of
+                # JSON_VALUE, without requiring the caller to wrap the field
+                # in $convert(..., "string"). Falls through to the plain
+                # JSON_VALUE path for any other operand/peer shape (nested
+                # ops, typed-literal peers, attributes.* with no key, etc.),
+                # and is skipped entirely for the IS NULL peer case below.
+                lhs_fast = _maybe_attributes_map_str_field_sql(
+                    ops[0],
+                    ops[1],
+                    param_builder,
+                    table_alias,
+                    use_agg_fn,
+                    raw_fields_used,
+                )
+                lhs_part = lhs_fast if lhs_fast is not None else process_operand(ops[0])
                 if (
                     isinstance(ops[1], tsi_query.LiteralOperation)
                     and ops[1].literal_ is None
@@ -2233,6 +2431,11 @@ def process_query_to_conditions(
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
+            fast_sql = _maybe_attributes_map_filter_sql(
+                operand, param_builder, table_alias, use_agg_fn, raw_fields_used
+            )
+            if fast_sql is not None:
+                return fast_sql
             field = process_operand(operand.convert_.input)
             return clickhouse_cast(field, operand.convert_.to)
         elif isinstance(

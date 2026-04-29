@@ -17,32 +17,10 @@ from weave.trace_server.project_version.project_version import (
     reset_project_residence_cache,
 )
 from weave.trace_server.project_version.types import (
-    CallsStorageServerMode,
     ProjectDataResidence,
     ReadTable,
     WriteTarget,
 )
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-
-
-@pytest.fixture
-def clickhouse_trace_server(trace_server):
-    """Return internal ClickHouse server and enforce AUTO routing mode.
-
-    Args:
-        trace_server: External trace server fixture.
-
-    Returns:
-        ClickHouseTraceServer: The internal ClickHouse trace server.
-
-    Examples:
-        >>> internal = clickhouse_trace_server
-    """
-    internal_server = trace_server._internal_trace_server
-    if isinstance(internal_server, SqliteTraceServer):
-        pytest.skip("ClickHouse-only test")
-    internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
-    return internal_server
 
 
 def _count_project_rows(ch_client, table: str, project_id: str) -> int:
