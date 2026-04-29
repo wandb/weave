@@ -136,15 +136,15 @@ def sentinel_ch_literal(field: str) -> str:
         field: The column name (must be a sentinel field).
 
     Returns:
-        SQL expression: ``toDateTime64('YYYY-MM-DD HH:MM:SS', N)`` for datetime
-        fields, ``''`` for string fields, ``0`` for int fields.
+        SQL expression: ``toDateTime64(0, N)`` or a custom datetime sentinel
+        for datetime fields, ``''`` for string fields.
 
     Raises:
         ValueError: If the field is not a sentinel field.
 
     Examples:
         >>> sentinel_ch_literal("deleted_at")
-        "toDateTime64('1970-01-01 00:00:00', 3)"
+        'toDateTime64(0, 3)'
         >>> sentinel_ch_literal("parent_id")
         "''"
         >>> sentinel_ch_literal("wb_run_step")
@@ -155,6 +155,12 @@ def sentinel_ch_literal(field: str) -> str:
     if field in SENTINEL_DATETIME_FIELDS:
         precision = DATETIME_PRECISION[field]
         sentinel = SENTINEL_DATETIME_VALUES[field]
+        # Epoch zero gets a shorter literal that matches the canonical
+        # `toDateTime64(0, N)` form already hardcoded across the query
+        # builders; non-epoch sentinels (e.g. EXPIRE_AT_NEVER) need the
+        # full datetime string.
+        if sentinel == SENTINEL_EPOCH:
+            return f"toDateTime64(0, {precision})"
         sentinel_str = sentinel.replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
         return f"toDateTime64('{sentinel_str}', {precision})"
     if field in SENTINEL_INT_FIELDS:
@@ -182,11 +188,11 @@ def null_check_literal_sql(
 
     Returns:
         A SQL fragment like ``t.deleted_at IS NULL`` or
-        ``t.deleted_at = toDateTime64('1970-01-01 00:00:00', 3)``.
+        ``t.deleted_at = toDateTime64(0, 3)``.
 
     Examples:
         >>> null_check_literal_sql("deleted_at", "cm.deleted_at", ReadTable.CALLS_COMPLETE)
-        "cm.deleted_at = toDateTime64('1970-01-01 00:00:00', 3)"
+        "cm.deleted_at = toDateTime64(0, 3)"
         >>> null_check_literal_sql("parent_id", "t.parent_id", ReadTable.CALLS_MERGED)
         "t.parent_id IS NULL"
     """

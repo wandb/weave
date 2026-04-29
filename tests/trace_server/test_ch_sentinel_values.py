@@ -115,13 +115,9 @@ def test_sentinel_ch_literal() -> None:
         assert sentinel_ch_literal(field) == "''"
 
     # Datetime sentinel fields return their field-specific sentinel literal.
-    assert sentinel_ch_literal("ended_at") == ("toDateTime64('1970-01-01 00:00:00', 6)")
-    assert sentinel_ch_literal("updated_at") == (
-        "toDateTime64('1970-01-01 00:00:00', 3)"
-    )
-    assert sentinel_ch_literal("deleted_at") == (
-        "toDateTime64('1970-01-01 00:00:00', 3)"
-    )
+    assert sentinel_ch_literal("ended_at") == "toDateTime64(0, 6)"
+    assert sentinel_ch_literal("updated_at") == "toDateTime64(0, 3)"
+    assert sentinel_ch_literal("deleted_at") == "toDateTime64(0, 3)"
     assert sentinel_ch_literal("expire_at") == (
         "toDateTime64('2100-01-01 00:00:00', 3)"
     )
@@ -280,14 +276,14 @@ def test_null_check_literal_sql() -> None:
     )
     assert result == "t.parent_id != ''"
 
-    # calls_complete sentinel datetime field: uses = toDateTime64(...) or !=.
+    # calls_complete sentinel datetime field: uses = toDateTime64(0, N) or !=.
     result = null_check_literal_sql("ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE)
-    assert result == "t.ended_at = toDateTime64('1970-01-01 00:00:00', 6)"
+    assert result == "t.ended_at = toDateTime64(0, 6)"
 
     result = null_check_literal_sql(
         "ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE, negate=True
     )
-    assert result == "t.ended_at != toDateTime64('1970-01-01 00:00:00', 6)"
+    assert result == "t.ended_at != toDateTime64(0, 6)"
 
     # calls_merged expire_at uses the non-null far-future sentinel.
     result = null_check_literal_sql("expire_at", "t.expire_at", ReadTable.CALLS_MERGED)
