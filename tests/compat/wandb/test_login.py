@@ -1,6 +1,7 @@
 """Tests for wandb login compatibility layer."""
 
 import configparser
+import importlib
 import os
 from dataclasses import dataclass
 from unittest.mock import patch
@@ -20,6 +21,10 @@ from weave.compat.wandb.wandb_thin.login import (
     _WandbLogin,
 )
 from weave.wandb_interface.project_creator import _ensure_project_exists
+
+# See conftest.py: we patch via the actual module object to dodge a
+# Python 3.10/3.11 mock.patch resolution quirk.
+_login_module = importlib.import_module("weave.compat.wandb.wandb_thin.login")
 
 
 @dataclass
@@ -126,10 +131,7 @@ def test_get_default_host_settings_file(tmp_path, host_and_base_url):
 def test_get_default_host_fallback():
     """If there is no env var or settings file, it should fallback to api.wandb.ai."""
     with patch.dict(os.environ, {}, clear=True):
-        with patch(
-            "weave.compat.wandb.wandb_thin.login._get_host_from_settings",
-            return_value=None,
-        ):
+        with patch.object(_login_module, "_get_host_from_settings", return_value=None):
             assert _get_default_host() == "api.wandb.ai"
 
 
@@ -179,18 +181,18 @@ def test_clear_setting(tmp_path):
 
 def test_handle_host_wandb_setting_default():
     """Test host setting handling for default values."""
-    with patch("weave.compat.wandb.wandb_thin.login._clear_setting") as mock_clear:
+    with patch.object(_login_module, "_clear_setting") as mock_clear:
         _handle_host_wandb_setting("https://api.wandb.ai")
         mock_clear.assert_called_once_with("base_url")
 
-    with patch("weave.compat.wandb.wandb_thin.login._clear_setting") as mock_clear:
+    with patch.object(_login_module, "_clear_setting") as mock_clear:
         _handle_host_wandb_setting(None)
         mock_clear.assert_called_once_with("base_url")
 
 
 def test_handle_host_wandb_setting_custom():
     """Test host setting handling for custom values."""
-    with patch("weave.compat.wandb.wandb_thin.login._set_setting") as mock_set:
+    with patch.object(_login_module, "_set_setting") as mock_set:
         _handle_host_wandb_setting("https://custom.wandb.ai/")
         mock_set.assert_called_once_with("base_url", "https://custom.wandb.ai")
 
