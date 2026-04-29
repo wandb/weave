@@ -25,6 +25,7 @@ try:
         ContextEntityRecallScorer,
         ContextRelevancyScorer,
     )
+    from weave.scorers.remote_scorer import RemoteScorer
     from weave.scorers.scorer_types import LLMScorer
     from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
     from weave.scorers.string_scorer import LevenshteinScorer, StringMatchScorer
@@ -49,6 +50,7 @@ __all__ = [
     "PresidioScorer",
     "PromptInjectionLLMGuardrail",
     "PydanticScorer",
+    "RemoteScorer",
     "StringMatchScorer",
     "SummarizationScorer",
     "ValidJSONScorer",

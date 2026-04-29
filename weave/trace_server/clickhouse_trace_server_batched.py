@@ -55,6 +55,25 @@ from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
+
+# GenAI / Agent observability imports
+from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
+from weave.trace_server.agents.types import (
+    AgentConversationChatReq,
+    AgentConversationChatRes,
+    AgentSearchReq,
+    AgentSearchRes,
+    AgentSpansQueryReq,
+    AgentSpansQueryRes,
+    AgentsQueryReq,
+    AgentsQueryRes,
+    AgentTraceChatReq,
+    AgentTraceChatRes,
+    AgentVersionsQueryReq,
+    AgentVersionsQueryRes,
+    GenAIOTelExportReq,
+    GenAIOTelExportRes,
+)
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
@@ -6558,6 +6577,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsScoreRes()
 
+    # ---- GenAI / Agent Observability ------------------------------------
+    # TODO: Normalize method names across this interface before the agent
+    # observability API is considered stable.
+
+    def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
+        return AgentQueryHandler(self._query).spans_query(req)
+
+    def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
+        return AgentQueryHandler(self._query).agents_query(req)
+
+    def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
+        return AgentQueryHandler(self._query).agent_versions_query(req)
+
+    def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
+        return AgentQueryHandler(self._query).search_messages(req)
+
+    def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
+        return AgentQueryHandler(self._query).traces_chat(req)
+
+    def agent_conversation_chat(
+        self, req: AgentConversationChatReq
+    ) -> AgentConversationChatRes:
+        return AgentQueryHandler(self._query).conversation_chat(req)
+
+    def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+        return AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
@@ -6668,9 +6714,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             (object_id, digest, val_dump) = row
             object_values[object_id, digest] = val_dump
 
-        # update the val_dump for each object
+        # All-or-nothing: if any metadata row is missing its value row (e.g. due
+        # to ClickHouse replication lag), return empty so callers raise
+        # NotFoundError and retry, instead of silently filling with "{}".
+        all_value_rows_found = all(
+            (obj.object_id, obj.digest) in object_values for obj in metadata_result
+        )
+        if not all_value_rows_found:
+            return []
         for obj in metadata_result:
-            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
+            obj.val_dump = object_values[obj.object_id, obj.digest]
         return metadata_result
 
     def _run_migrations(self) -> None:
@@ -6795,7 +6848,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters: Optional dictionary of query parameters.
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        merged = ch_settings.merge_default_query_settings(settings)
+        merged = ch_settings.merge_default_command_settings(settings)
 
         processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()

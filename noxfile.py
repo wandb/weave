@@ -80,6 +80,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "cohere",
         "crewai",
         "dspy",
+        "gepa",
         "google_genai",
         "groq",
         "instructor",
@@ -128,6 +129,11 @@ def tests(session: nox.Session, shard: str):
         sync_args.extend(["--extra", "scorers", "--extra", "wandb"])
 
     session.run(*sync_args)
+
+    if shard == "openai_agents":
+        # Keep the public extra broad for runtime compatibility, but exercise the
+        # newer SDK span classes in CI.
+        session.run("uv", "pip", "install", "--upgrade", "openai-agents>=0.14.7")
 
     env = {
         k: session.env.get(k) or os.getenv(k)
@@ -185,7 +191,13 @@ def tests(session: nox.Session, shard: str):
             "tests/utils/",
             "tests/wandb_interface/",
         ],
-        "trace_no_server": ["tests/trace/", "tests/durability/"],
+        "trace_no_server": [
+            "tests/trace/",
+            "tests/durability/",
+            "tests/utils/",
+            "tests/compat/",
+            "tests/wandb_interface/",
+        ],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)

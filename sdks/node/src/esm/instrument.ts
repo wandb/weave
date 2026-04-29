@@ -1,12 +1,18 @@
-// @ts-ignore-file This file is compiled as ESM via tsconfig.instrument.json
+// Preload entry for Weave ESM host support.
+//
+// Invoked via `node --import=weave/instrument <entry>`. The file is compiled
+// as CommonJS by the main tsconfig (same as every other file under `src/`);
+// Node's `--import` flag goes through the ESM resolver but transparently
+// handles CJS targets via ESM→CJS interop, so the preload still works for
+// ESM host apps. A future PR will switch this file to true ESM output; for
+// now it stays CJS to keep the build a single tsc invocation.
+//
+// Its job is to register an `import-in-the-middle` loader hook so the host's
+// ESM graph can be patched as modules are resolved.
 
-const satisfies = require('semifies');
-const {register} = require('node:module');
-const {pathToFileURL} = require('node:url');
-
+import {register} from 'node:module';
+import {pathToFileURL} from 'node:url';
 import {Hook, createAddHookMessageChannel} from 'import-in-the-middle';
-require('../integrations/hooks');
-
 import {
   getESMInstrumentedModules,
   symESMInstrumentations,
@@ -15,6 +21,11 @@ import {
 } from '../integrations/instrumentations';
 import {requirePackageJson} from '../utils/npmModuleUtils';
 import semifies from 'semifies';
+
+// Side-effect import — populates the instrumentation registry that
+// `instrumentations.ts` exposes on `globalThis`. Must evaluate before the
+// loader hook below starts consulting that registry for matching modules.
+import '../integrations/hooks';
 
 const {registerOptions, waitForAllMessagesAcknowledged} =
   createAddHookMessageChannel();
@@ -28,7 +39,7 @@ register(
 (async () => {
   await waitForAllMessagesAcknowledged();
 
-  if (satisfies(process.versions.node, '>=14.13.1')) {
+  if (semifies(process.versions.node, '>=14.13.1')) {
     const modules = getESMInstrumentedModules();
 
     for (const module of modules) {

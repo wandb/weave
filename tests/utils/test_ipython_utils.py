@@ -1,5 +1,4 @@
 import sys
-import types
 from typing import Any, ClassVar
 
 import pytest
@@ -13,9 +12,12 @@ def test_is_running_interactively_without_ipython(monkeypatch):
 
 
 def test_is_running_interactively_with_stub(monkeypatch):
-    module = types.ModuleType("IPython")
-    module.get_ipython = object
-    monkeypatch.setitem(sys.modules, "IPython", module)
+    sentinel = object()
+
+    def fake_get_ipython():
+        return sentinel
+
+    monkeypatch.setattr(ipy, "_lazy_get_ipython", fake_get_ipython)
     assert ipy.is_running_interactively() is True
 
 
@@ -26,11 +28,11 @@ def test_get_notebook_source_requires_interactive(monkeypatch):
 
 
 def test_get_notebook_source_reads_cells(monkeypatch):
-    module = types.ModuleType("IPython")
-
     class DummyShell:
         user_ns: ClassVar[dict[str, Any]] = {"In": ["", "a = 1", "", "b = 2"]}
 
-    module.get_ipython = DummyShell
-    monkeypatch.setitem(sys.modules, "IPython", module)
+    def fake_get_ipython():
+        return DummyShell()
+
+    monkeypatch.setattr(ipy, "_lazy_get_ipython", fake_get_ipython)
     assert ipy.get_notebook_source() == "a = 1\n\nb = 2"

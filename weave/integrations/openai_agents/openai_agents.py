@@ -25,6 +25,12 @@ from agents.tracing import (
     TranscriptionSpanData,
 )
 
+try:
+    from agents.tracing import TaskSpanData, TurnSpanData
+except ImportError:  # pragma: no cover - older openai-agents SDKs lack these
+    TaskSpanData = None
+    TurnSpanData = None
+
 from weave.integrations.patcher import NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.call import Call
@@ -39,10 +45,28 @@ def _call_type(span: Span) -> str:
     return span.span_data.type or "task"
 
 
+def _is_task_span_data(span_data: object) -> bool:
+    return TaskSpanData is not None and isinstance(span_data, TaskSpanData)
+
+
+def _is_turn_span_data(span_data: object) -> bool:
+    return TurnSpanData is not None and isinstance(span_data, TurnSpanData)
+
+
 def _call_name(span: Span) -> str:
     """Determine the name for a given OpenAI Agent span."""
     if name := getattr(span.span_data, "name", None):
         return name
+    elif _is_turn_span_data(span.span_data):
+        turn = getattr(span.span_data, "turn", None)
+        agent_name = getattr(span.span_data, "agent_name", None)
+        if turn is not None and agent_name:
+            return f"{agent_name} turn {turn}"
+        if turn is not None:
+            return f"Turn {turn}"
+        if agent_name:
+            return f"{agent_name} turn"
+        return "Turn"
     elif isinstance(span.span_data, ResponseSpanData):
         return "Response"
     elif isinstance(span.span_data, HandoffSpanData):
@@ -59,6 +83,23 @@ def _call_name(span: Span) -> str:
         return getattr(span.span_data, "server", None) or "MCP List Tools"
     else:
         return "Unknown"
+
+
+def _usage_to_metrics(usage: dict[str, Any] | None) -> dict[str, Any]:
+    if not usage:
+        return {}
+
+    input_tokens = usage.get("input_tokens")
+    output_tokens = usage.get("output_tokens")
+    total_tokens = usage.get("total_tokens")
+    if total_tokens is None and (input_tokens is not None or output_tokens is not None):
+        total_tokens = (input_tokens or 0) + (output_tokens or 0)
+
+    return {
+        "tokens": total_tokens,
+        "prompt_tokens": input_tokens,
+        "completion_tokens": output_tokens,
+    }
 
 
 class WeaveDataDict(TypedDict):
@@ -148,6 +189,45 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
+    def _task_log_data(self, span: Span) -> WeaveDataDict:
+        """Extract log data from an OpenAI Agents task span."""
+        metadata = {}
+        if isinstance(
+            extra_metadata := getattr(span.span_data, "metadata", None), dict
+        ):
+            metadata.update(extra_metadata)
+        if name := getattr(span.span_data, "name", None):
+            metadata["name"] = name
+
+        return WeaveDataDict(
+            inputs={},
+            outputs={},
+            metadata=metadata,
+            metrics=_usage_to_metrics(getattr(span.span_data, "usage", None)),
+            error=None,
+        )
+
+    def _turn_log_data(self, span: Span) -> WeaveDataDict:
+        """Extract log data from an OpenAI Agents turn span."""
+        metadata = {}
+        turn = getattr(span.span_data, "turn", None)
+        if turn is not None:
+            metadata["turn"] = turn
+        if agent_name := getattr(span.span_data, "agent_name", None):
+            metadata["agent_name"] = agent_name
+        if isinstance(
+            extra_metadata := getattr(span.span_data, "metadata", None), dict
+        ):
+            metadata.update(extra_metadata)
+
+        return WeaveDataDict(
+            inputs={},
+            outputs={},
+            metadata=metadata,
+            metrics=_usage_to_metrics(getattr(span.span_data, "usage", None)),
+            error=None,
+        )
+
     def _response_log_data(self, span: Span[ResponseSpanData]) -> WeaveDataDict:
         """Extract log data from a response span."""
         inputs = {}
@@ -228,7 +308,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         inputs: dict[str, Any] = {}
         outputs: dict[str, Any] = {}
         metadata: dict[str, Any] = {}
-        metrics: dict[str, Any] = {}
 
         if span.span_data.input is not None:
             inputs["input"] = span.span_data.input
@@ -238,22 +317,12 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             metadata["model"] = span.span_data.model
         if span.span_data.model_config is not None:
             metadata["model_config"] = span.span_data.model_config
-        if span.span_data.usage is not None:
-            usage = span.span_data.usage
-            metrics = {
-                "tokens": usage.get("total_tokens")
-                or (
-                    (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
-                ),
-                "prompt_tokens": usage.get("input_tokens"),
-                "completion_tokens": usage.get("output_tokens"),
-            }
 
         return WeaveDataDict(
             inputs=inputs,
             outputs=outputs,
             metadata=metadata,
-            metrics=metrics,
+            metrics=_usage_to_metrics(span.span_data.usage),
             error=None,
         )
 
@@ -378,6 +447,10 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         """Extract the appropriate log data based on the span type."""
         if isinstance(span.span_data, AgentSpanData):
             return self._agent_log_data(span)
+        elif _is_task_span_data(span.span_data):
+            return self._task_log_data(span)
+        elif _is_turn_span_data(span.span_data):
+            return self._turn_log_data(span)
         elif isinstance(span.span_data, ResponseSpanData):
             return self._response_log_data(span)
         elif isinstance(span.span_data, FunctionSpanData):
