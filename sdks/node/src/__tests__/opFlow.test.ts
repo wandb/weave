@@ -1,5 +1,5 @@
 import {InMemoryTraceServer} from '../inMemoryTraceServer';
-import {makeOpenAIChatCompletionsOp} from '../integrations/openai';
+import {wrapOpenAIChatCompletionsCreate} from '../integrations/openai';
 import {op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';
 import {makeMockOpenAIChat} from './openaiMock';
@@ -202,12 +202,12 @@ describe('Op Flow', () => {
       content: messages[0].content.toUpperCase(),
     }));
 
-    const openaiLikeOp = makeOpenAIChatCompletionsOp(
+    const tracedCreate = wrapOpenAIChatCompletionsCreate(
       testOpenAIChat,
       'testOpenAIChat'
     );
 
-    await openaiLikeOp({messages: [{role: 'user', content: 'Hello, AI!'}]});
+    await tracedCreate({messages: [{role: 'user', content: 'Hello, AI!'}]});
 
     // Wait for any pending batch processing
     await new Promise(resolve => setTimeout(resolve, 300));

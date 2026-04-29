@@ -371,6 +371,10 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "anthropic.claude-mythos-preview": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "global.anthropic.claude-opus-4-7": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -3333,6 +3337,10 @@
     "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
     "deprecated_date": "2026-01-29T17:58:16.718606"
   },
+  "gpt-5.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-5.4": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -3947,6 +3955,10 @@
     "api_key_name": "MOONSHOT_API_KEY"
   },
   "moonshot/kimi-k2.5": {
+    "litellm_provider": "moonshot",
+    "api_key_name": "MOONSHOT_API_KEY"
+  },
+  "moonshot/kimi-k2.6": {
     "litellm_provider": "moonshot",
     "api_key_name": "MOONSHOT_API_KEY"
   },
@@ -4584,6 +4596,10 @@
     "api_key_name": "XAI_API_KEY"
   },
   "xai/grok-4.20-beta-0309-reasoning": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-4.20-0309-reasoning": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },

@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Callable
 from functools import wraps
+from io import BytesIO
 from typing import Any
 
 import weave
@@ -16,8 +17,6 @@ logger = logging.getLogger(__name__)
 def google_genai_gemini_postprocess_outputs(
     outputs: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    from io import BytesIO
-
     from PIL import Image  # type: ignore
 
     modified_outputs = []

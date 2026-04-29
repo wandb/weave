@@ -1,15 +1,29 @@
 import os
 from collections.abc import Generator
 
+import httpx
 import pytest
 from openai import AsyncOpenAI, OpenAI
+from openai._legacy_response import LegacyAPIResponse
+from openai._models import FinalRequestOptions
+from openai._response import APIResponse
+from openai.types.chat import ChatCompletion
 
 import weave
 from weave.integrations.integration_utilities import op_name_from_ref
-from weave.integrations.openai.openai_sdk import get_openai_patcher
+from weave.integrations.openai.openai_sdk import (
+    get_openai_patcher,
+    maybe_unwrap_api_response,
+)
 from weave.trace.weave_client import WeaveClient
 
 model = "gpt-4o"
+RawChatCompletionResponse = (
+    LegacyAPIResponse[ChatCompletion] | APIResponse[ChatCompletion]
+)
+RawChatCompletionResponseCls = (
+    type[LegacyAPIResponse[ChatCompletion]] | type[APIResponse[ChatCompletion]]
+)
 
 
 @pytest.fixture(autouse=True)
@@ -19,6 +33,71 @@ def patch_openai() -> Generator[None, None, None]:
     patcher.attempt_patch()
     yield
     patcher.undo_patch()
+
+
+def _unread_chat_completion_response(
+    response_cls: RawChatCompletionResponseCls,
+) -> RawChatCompletionResponse:
+    body = (
+        b'{"id":"chatcmpl-test","object":"chat.completion","created":1,'
+        b'"model":"gpt-4o-mini","choices":[{"index":0,"message":'
+        b'{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}'
+    )
+    response = httpx.Response(
+        200,
+        headers={"content-type": "application/json"},
+        stream=httpx.ByteStream(body),
+        request=httpx.Request(
+            "POST",
+            "https://api.openai.com/v1/chat/completions",
+        ),
+    )
+    return response_cls(
+        raw=response,
+        cast_to=ChatCompletion,
+        client=OpenAI(api_key="sk-test"),
+        stream=False,
+        stream_cls=None,
+        options=FinalRequestOptions.construct(
+            method="post",
+            url="/chat/completions",
+        ),
+        retries_taken=0,
+    )
+
+
+@pytest.mark.parametrize("response_cls", [LegacyAPIResponse, APIResponse])
+def test_maybe_unwrap_api_response_reads_unread_raw_response(
+    response_cls: RawChatCompletionResponseCls,
+) -> None:
+    # LegacyAPIResponse.parse() raises on an unread body — the bug we fix.
+    # APIResponse.parse() self-reads, so it has no equivalent failure mode.
+    if response_cls is LegacyAPIResponse:
+        with pytest.raises(httpx.ResponseNotRead):
+            _unread_chat_completion_response(response_cls).parse()
+
+    raw_response = _unread_chat_completion_response(response_cls)
+    parsed_for_trace = maybe_unwrap_api_response(raw_response)
+
+    assert isinstance(parsed_for_trace, ChatCompletion)
+    assert parsed_for_trace.choices[0].message.content == "hi"
+
+    # The same raw response is returned to raw-response callers after tracing.
+    parsed_for_caller = raw_response.parse()
+    assert parsed_for_caller.choices[0].message.content == "hi"
+
+
+def test_maybe_unwrap_api_response_returns_value_when_parse_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_response = _unread_chat_completion_response(LegacyAPIResponse)
+
+    def boom(self: LegacyAPIResponse) -> None:
+        raise RuntimeError("unexpected parse failure")
+
+    monkeypatch.setattr(LegacyAPIResponse, "parse", boom)
+
+    assert maybe_unwrap_api_response(raw_response) is raw_response
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode

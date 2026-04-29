@@ -447,7 +447,7 @@ async def test_evaluation_data_topology(client):
     }
     # BUG: latency reported includes weave internal latency
     # actual_latency = (predict_call.ended_at - predict_call.started_at).total_seconds()
-    actual_latency = pytest.approx(0, abs=1)
+    actual_latency = pytest.approx(0, abs=LATENCY_TOL)
     model_1_latency = {"mean": actual_latency}
     score_int_score = 1
     score_float_score = 1.0

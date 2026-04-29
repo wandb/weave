@@ -15,6 +15,7 @@ else:
         ResourceSpans = Any
 
 from weave.trace_server import http_service_interface as his
+from weave.trace_server.agents import types as agent_types
 from weave.trace_server.common_interface import (
     WB_USER_ID_DESCRIPTION,
     AnnotationState,
@@ -2867,6 +2868,29 @@ class EvalResultsSummaryRes(BaseModel):
 class TraceServerInterface(Protocol):
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
+
+    # GenAI / Agent Observability API
+    def genai_otel_export(
+        self, req: agent_types.GenAIOTelExportReq
+    ) -> agent_types.GenAIOTelExportRes: ...
+    def agent_spans_query(
+        self, req: agent_types.AgentSpansQueryReq
+    ) -> agent_types.AgentSpansQueryRes: ...
+    def agent_agents_query(
+        self, req: agent_types.AgentsQueryReq
+    ) -> agent_types.AgentsQueryRes: ...
+    def agent_versions_query(
+        self, req: agent_types.AgentVersionsQueryReq
+    ) -> agent_types.AgentVersionsQueryRes: ...
+    def agent_search(
+        self, req: agent_types.AgentSearchReq
+    ) -> agent_types.AgentSearchRes: ...
+    def agent_traces_chat(
+        self, req: agent_types.AgentTraceChatReq
+    ) -> agent_types.AgentTraceChatRes: ...
+    def agent_conversation_chat(
+        self, req: agent_types.AgentConversationChatReq
+    ) -> agent_types.AgentConversationChatRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

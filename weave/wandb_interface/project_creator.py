@@ -22,7 +22,7 @@ from tenacity import (
 )
 
 from weave.compat import wandb
-from weave.compat.wandb import WANDB_AVAILABLE, wandb_logger
+from weave.compat.wandb import wandb_logger
 from weave.trace.settings import retry_max_attempts, retry_max_interval
 
 
@@ -35,14 +35,14 @@ logger = logging.getLogger(__name__)
 @contextmanager
 def wandb_logging_disabled() -> Iterator[None]:
     original_termerror = wandb.termerror
+    original_log_level = wandb_logger.getEffectiveLevel()
     wandb.termerror = lambda *args, **kwargs: None
-    if WANDB_AVAILABLE:
-        original_log_level = wandb_logger.getEffectiveLevel()
-        wandb_logger.setLevel(logging.CRITICAL)
-    yield None
-    if WANDB_AVAILABLE:
+    wandb_logger.setLevel(logging.CRITICAL)
+    try:
+        yield None
+    finally:
         wandb_logger.setLevel(original_log_level)
-    wandb.termerror = original_termerror
+        wandb.termerror = original_termerror
 
 
 def ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]:

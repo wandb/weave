@@ -96,7 +96,10 @@ def ch_keeper_server():
 def ch_client(ch_keeper_server):
     """Create a clickhouse_connect client and track databases for cleanup."""
     host, port = ch_keeper_server
-    client = clickhouse_connect.get_client(host=host, port=port)
+    # Mirror production _mint_client kwargs (cosmetic; migrator is single-threaded).
+    client = clickhouse_connect.get_client(
+        host=host, port=port, autogenerate_session_id=False
+    )
     tracked_dbs: list[str] = []
 
     # Attach a tracking helper directly on the client instance

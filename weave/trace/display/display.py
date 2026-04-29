@@ -23,6 +23,7 @@ from weave.trace.display.protocols import (
     ViewerProtocol,
 )
 from weave.trace.display.types import Style
+from weave.trace.display.viewers.print_viewer import PrintViewer
 
 DEFAULT_PROGRESS_REFRESH_PER_SECOND = 10
 
@@ -59,8 +60,6 @@ def _get_auto_viewer(**kwargs: Any) -> ViewerProtocol:
 
         return RichViewer(**kwargs)
     except ImportError:
-        from weave.trace.display.viewers.print_viewer import PrintViewer
-
         return PrintViewer(**kwargs)
 
 
