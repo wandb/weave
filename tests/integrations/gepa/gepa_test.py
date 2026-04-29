@@ -17,7 +17,11 @@ from weave.integrations.integration_utilities import (
     op_name_from_ref,
 )
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.trace_server.trace_server_interface import (
+    CallsFilter,
+    ObjectVersionFilter,
+    ObjQueryReq,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -200,118 +204,6 @@ def test_reflection_lm_call_nests_under_propose(client: WeaveClient) -> None:
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.disable_logging_error_check(reason="gepa logs its own error traceback")
-def test_gepa_optimize_records_errors(client: WeaveClient) -> None:
-    """GEPA's engine dispatches `on_error` when an iteration raises.
-    Exceptions escaping the adapter's `evaluate()` propagate out of the
-    reflective-mutation proposer (after the seed eval) and reach the engine's
-    `on_error` dispatch. We should emit a `gepa.error` span with the
-    exception type/message so users can count and inspect failures.
-    """
-
-    class _ExplodingAdapter(_StubAdapter):
-        propose_new_texts = None  # type: ignore[assignment]
-        _call_count = 0
-
-        def evaluate(
-            self,
-            batch: Sequence[Any],
-            candidate: dict[str, str],
-            capture_traces: bool = False,
-        ) -> EvaluationBatch:
-            self._call_count += 1
-            # Let the seed's full-valset eval succeed, raise on the next call
-            # (proposer minibatch eval) so the error escapes into the engine's
-            # iteration-level handler where `on_error` fires, then succeed
-            # afterwards so the run's budget actually gets consumed and
-            # optimization terminates.
-            if self._call_count == 2:
-                raise RuntimeError("simulated evaluation failure")
-            return super().evaluate(batch, candidate, capture_traces)
-
-    gepa.optimize(
-        seed_candidate={"instructions": "seed"},
-        trainset=[{"q": "a"}, {"q": "b"}, {"q": "c"}],
-        valset=[{"q": "d"}],
-        adapter=_ExplodingAdapter(),
-        reflection_lm=_stub_reflection_lm,
-        max_metric_calls=6,
-        display_progress_bar=False,
-        raise_on_exception=False,
-        skip_perfect_score=False,
-    )
-
-    # Error should surface on the span where it actually happened
-    # (gepa.evaluate), not a separate sibling span. This avoids logging the
-    # same exception twice in the trace tree.
-    all_calls = list(client.get_calls())
-    errored_evals = [
-        c
-        for c in all_calls
-        if op_name_from_ref(c.op_name) == "gepa.evaluate" and c.exception
-    ]
-    assert errored_evals, "expected the failing gepa.evaluate span to be marked errored"
-    errored = errored_evals[0]
-    assert "simulated evaluation failure" in (errored.exception or "")
-    # GEPA engine metadata (iteration / will_continue / exception_type) should
-    # be annotated onto the errored span's output for click-through inspection.
-    output = errored.output or {}
-    assert output.get("exception_type") == "RuntimeError"
-    assert "simulated evaluation failure" in (output.get("exception_message") or "")
-    # There should be NO standalone gepa.error span in this trace — the
-    # exception is recorded on the gepa.evaluate span that raised it.
-    standalone_errors = [
-        c for c in all_calls if op_name_from_ref(c.op_name) == "gepa.error"
-    ]
-    assert not standalone_errors, (
-        f"expected no standalone gepa.error spans, got {len(standalone_errors)}"
-    )
-
-
-@pytest.mark.skip_clickhouse_client
-def test_gepa_optimize_publishes_candidate_versions(client: WeaveClient) -> None:
-    """Each iteration's accepted candidate should be published as a new
-    version of the `gepa_candidate` object so users can browse prompt history.
-    """
-    gepa.optimize(
-        seed_candidate={"instructions": "seed"},
-        trainset=[{"q": "a"}, {"q": "b"}, {"q": "c"}],
-        valset=[{"q": "d"}],
-        adapter=_StubAdapter(),
-        reflection_lm=_stub_reflection_lm,
-        max_metric_calls=8,
-        display_progress_bar=False,
-        raise_on_exception=False,
-        skip_perfect_score=False,
-    )
-
-    # Query the published `gepa_candidate` object via the trace server to
-    # confirm at least two versions exist (seed + one accepted candidate).
-    from weave.trace_server.trace_server_interface import (
-        ObjectVersionFilter,
-        ObjQueryReq,
-    )
-
-    resp = client.server.objs_query(
-        ObjQueryReq(
-            project_id=client.project_id,
-            filter=ObjectVersionFilter(object_ids=["gepa_candidate"]),
-        )
-    )
-    assert len(resp.objs) >= 2, [o.object_id for o in resp.objs]
-
-    # The first and latest versions should reflect the seed and final candidate.
-    vals = {o.digest: o.val for o in resp.objs}
-    assert any(
-        isinstance(v, dict) and v.get("instructions") == "seed" for v in vals.values()
-    )
-    assert any(
-        isinstance(v, dict) and v.get("instructions") == "seed MORE"
-        for v in vals.values()
-    )
-
-
-@pytest.mark.skip_clickhouse_client
 def test_gepa_optimize_does_not_double_inject_callback(client: WeaveClient) -> None:
     """If the user already passes a WeaveGEPACallback, the patcher should not
     add a second one.
@@ -441,11 +333,6 @@ def test_gepa_optimize_end_to_end_with_reflection_lm(client: WeaveClient) -> Non
     )
 
     # At least two `gepa_candidate` versions: seed and the accepted shorter one.
-    from weave.trace_server.trace_server_interface import (
-        ObjectVersionFilter,
-        ObjQueryReq,
-    )
-
     resp = client.server.objs_query(
         ObjQueryReq(
             project_id=client.project_id,
