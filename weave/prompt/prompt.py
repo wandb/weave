@@ -2,8 +2,10 @@ import copy
 import json
 import os
 import re
+import string
 import textwrap
 from collections import UserList
+from collections.abc import Mapping
 from pathlib import Path
 from typing import IO, Any, SupportsIndex, TypedDict, cast, overload
 
@@ -30,6 +32,9 @@ class IncorrectPromptVarError(Exception):
     """Raised when prompt template variables are incorrect or missing."""
 
     pass
+
+
+TEMPLATE_FORMATTER = string.Formatter()
 
 
 def maybe_dedent(content: str, dedent: bool) -> str:
@@ -80,6 +85,55 @@ def color_content(content: str, values: dict) -> str:
     return content.format(**colored_values)
 
 
+def _missing_template_var_error(
+    content: str, values: Mapping[str, Any], error: KeyError
+) -> str:
+    missing_key = error.args[0] if error.args else str(error).strip("'\"")
+    failed_field = _find_failed_template_field(content, values)
+    available_keys = ", ".join(sorted(values.keys()))
+
+    if failed_field is not None and failed_field != missing_key:
+        msg = (
+            f"Prompt template variable path {failed_field!r} not found "
+            f"(missing key {missing_key!r}). Available variables: {available_keys}"
+        )
+        if missing_key in values:
+            msg += (
+                f". Top-level variable {missing_key!r} is available; "
+                f"use '{{{missing_key}}}' if that was intended"
+            )
+        return msg
+
+    return (
+        f"Prompt template variable {missing_key!r} not found. "
+        f"Available variables: {available_keys}"
+    )
+
+
+def _find_failed_template_field(
+    content: str, values: Mapping[str, Any]
+) -> str | None:
+    for _, field_name, _, _ in TEMPLATE_FORMATTER.parse(content):
+        if field_name is None:
+            continue
+        try:
+            TEMPLATE_FORMATTER.get_field(field_name, (), values)
+        except KeyError:
+            return field_name
+        except Exception:
+            continue
+    return None
+
+
+def format_template_string(content: str, values: Mapping[str, Any]) -> str:
+    try:
+        return content.format(**values)
+    except KeyError as e:
+        raise IncorrectPromptVarError(
+            _missing_template_var_error(content, values, e)
+        ) from e
+
+
 class Prompt(Object):
     def format(self, **kwargs: Any) -> Any:
         raise NotImplementedError("Subclasses must implement format()")
@@ -94,7 +148,7 @@ class StringPrompt(Prompt):
         self.content = content
 
     def format(self, **kwargs: Any) -> str:
-        return self.content.format(**kwargs)
+        return format_template_string(self.content, kwargs)
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -142,15 +196,7 @@ def format_message_with_template_vars(message: dict, **kwargs: Any) -> dict:
     formatted: dict[str, Any] = {}
     for key, value in message.items():
         if isinstance(value, str):
-            try:
-                formatted[key] = value.format(**kwargs)
-            except KeyError as e:
-                missing_key = e.args[0] if e.args else str(e).strip("'\"")
-                available_keys = ", ".join(sorted(kwargs.keys()))
-                raise IncorrectPromptVarError(
-                    f"Prompt template variable '{missing_key}' not found. "
-                    f"Available variables: {available_keys}"
-                ) from e
+            formatted[key] = format_template_string(value, kwargs)
         elif isinstance(value, list) and all(isinstance(d, dict) for d in value):
             # Recursively format nested dicts in lists
             formatted[key] = [
