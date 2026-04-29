@@ -1,4 +1,4 @@
-from typing import Literal, get_args
+from typing import Literal, TypeAlias, get_args
 
 from pydantic import Field
 from typing_extensions import NotRequired, Self, TypedDict
@@ -10,8 +10,11 @@ from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
 
-DebounceAggregationField = Literal["trace_id", "thread_id"]
-DebounceAggregationMethod = Literal["last_message", "all_messages"]
+DebounceAggregationField: TypeAlias = Literal["trace_id", "thread_id"]
+DebounceAggregationMethod: TypeAlias = Literal["last_message", "all_messages"]
+
+AgentSpanOpName: TypeAlias = Literal["weave.genai.turn"]
+_AGENT_SPAN_OP_NAMES: frozenset[AgentSpanOpName] = frozenset(get_args(AgentSpanOpName))
 
 # Runtime-valid sets derived from Literals above
 VALID_DEBOUNCE_AGGREGATION_FIELDS: frozenset[DebounceAggregationField] = frozenset(
@@ -74,7 +77,7 @@ class Monitor(Object):
 
     sampling_rate: float = Field(ge=0, le=1, default=1)
     scorers: list[Scorer]
-    op_names: list[str] = Field(default_factory=list)
+    op_names: list[AgentSpanOpName | str] = Field(default_factory=list)
     query: Query | None = None
     is_traced: bool = Field(
         default=True,
@@ -110,6 +113,81 @@ class Monitor(Object):
         return cls.model_validate(obj.unwrap())
 
 
+_OP_CALL_CLASSIFIER_PROMPT_HEADER = "\n".join(
+    [
+        "You are a multi-classifier evaluation system. Evaluate a traced function call against multiple binary classifiers.",
+        "<trace>",
+        "  <metadata>",
+        "    <operation>{op_name}</operation>",
+        "    <status>{status}</status>",
+        "  </metadata>",
+        "  <input>",
+        "  {inputs}",
+        "  </input>",
+        "  <output>",
+        "  {output}",
+        "  </output>",
+        "  <exception>",
+        "  {exception}",
+        "  </exception>",
+        "  <source_code>",
+        "  {op_source}",
+        "  </source_code>",
+        "</trace>",
+        "Evaluate the trace above against each classifier below. Base your judgment strictly on the evidence in the trace.",
+    ]
+)
+_AGENT_SPAN_CLASSIFIER_PROMPT_HEADER = "\n".join(
+    [
+        "You are a multi-classifier evaluation system. Evaluate a traced function call against multiple binary classifiers.",
+        "<agent>",
+        "<name>{agent_name}</name>",
+        "<version>{agent_version}</version>",
+        "<description>{agent_description}</description>",
+        "<status>",
+        "  <code>{status_code}</code>",
+        "  <message>{status_message}</message>",
+        "</status>",
+        "<messages>",
+        "  <conversation-name>{conversation_name}</conversation_name>",
+        "  <system-instructions>",
+        "  {system_instructions}",
+        "  </system-instructions>",
+        "  <input-messages>",
+        "  {input_messages}",
+        "  </input-messages>",
+        "  <output-messages>",
+        "  {output_messages}",
+        "  </output-messages>",
+        "</messages>",
+        "<usage>",
+        "  <input-tokens>{input_tokens}</input-tokens>",
+        "  <output-tokens>{output_tokens}</output-tokens>",
+        "  <reasoning-tokens>{reasoning_tokens}</reasoning-tokens>",
+        "</usage>",
+        "</agent>",
+        "Evaluate the trace above against each classifier below. Base your judgment strictly on the evidence in the trace.",
+    ]
+)
+_CLASSIFIER_PROMPT_FOOTER = "\n".join(
+    [
+        "Respond with ONLY a JSON object. No markdown fences, no explanation — just the JSON.",
+        "Use the exact classifier name from each <classifier> tag.",
+        '{{"classifiers": {{',
+        '    "ExactName1": {{"is_match": true, "confidence": 0.95, "reason": "one sentence citing specific evidence from the trace"}},',
+        '    "ExactName2": {{"is_match": false, "confidence": 0.80, "reason": "one sentence citing specific evidence from the trace"}},',
+        "  }}",
+        "}}",
+        "Rules:",
+        '- "classifiers": include an entry for EVERY classifier (match or not) with is_match, confidence, and reason.',
+        '- "is_match": true if this classifier applies (the trace exhibits this issue), false otherwise.',
+        '- "confidence": your certainty from 0.0 (uncertain) to 1.0 (certain)',
+        '- "reason": cite specific evidence from the trace (quote error messages, describe output content, reference status). Be concise (one sentence). Do NOT give generic reasons like "no evidence found".',
+        '- If multiple classifiers could apply, choose the MOST SPECIFIC ones. For example, "Request Too Large" is more specific than "Bad Request", and "Ratelimited" is more specific than "Bad Response". Only set is_match to true for the most specific matches.',
+    ]
+)
+
+
 @register_object
 class ClassifierMonitor(Monitor):
     """A monitor that merges multiple scorers into a single classifier.
@@ -118,11 +196,12 @@ class ClassifierMonitor(Monitor):
     targeting the same model into a single scoring call.
     """
 
-    prompt_header: str | None = Field(
-        default=None,
-        description="Text prepended before the merged classifier prompts.",
-    )
-    prompt_footer: str | None = Field(
-        default=None,
-        description="Text appended after the merged classifier prompts.",
-    )
+    def get_prompt_header(self, op_name: str) -> str:
+        """Text to prepend before the merged classifier prompts."""
+        if op_name in _AGENT_SPAN_OP_NAMES:
+            return _AGENT_SPAN_CLASSIFIER_PROMPT_HEADER
+        return _OP_CALL_CLASSIFIER_PROMPT_HEADER
+
+    def get_prompt_footer(self) -> str:
+        """Text to append after the merged classifier prompts."""
+        return _CLASSIFIER_PROMPT_FOOTER

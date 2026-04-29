@@ -13,6 +13,7 @@ from confluent_kafka import (
 )
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.events import AGENT_TURN_ENDED_TOPIC, AgentTurnEndedEvent
 from weave.trace_server.datadog import set_root_span_dd_tags
 from weave.trace_server.environment import (
     kafka_broker_host,
@@ -181,6 +182,54 @@ class KafkaProducer(ConfluentKafkaProducer):
                 key=publish_key,
             )
 
+        if flush_immediately:
+            self.flush(0)
+
+    def produce_agent_turn_ended(
+        self, event: AgentTurnEndedEvent, flush_immediately: bool = False
+    ) -> None:
+        """Produce an agent_turn_ended message to Kafka with buffer back-pressure.
+
+        Drops the message when the producer buffer is full to prevent unbounded
+        memory growth (same policy as ``produce_call_end``).
+        """
+        buffer_size = len(self)
+        if buffer_size >= self.max_buffer_size:
+            logger.error(
+                "Kafka producer buffer full, dropping agent_turn_ended",
+                extra={
+                    "buffer_size": buffer_size,
+                    "max_buffer_size": self.max_buffer_size,
+                    "project_id": event.project_id,
+                    "trace_id": event.trace_id,
+                },
+            )
+            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
+            return
+
+        if buffer_size >= self.max_buffer_size * 0.5:
+            buffer_percentage = (buffer_size / self.max_buffer_size) * 100
+            logger.warning(
+                "Kafka producer buffer at 50%% capacity or higher",
+                extra={
+                    "buffer_size": buffer_size,
+                    "max_buffer_size": self.max_buffer_size,
+                    "buffer_percentage": buffer_percentage,
+                },
+            )
+            set_root_span_dd_tags(
+                {
+                    "kafka.producer.buffer_size": buffer_size,
+                    "kafka.producer.buffer_percentage": buffer_percentage,
+                }
+            )
+
+        publish_key = event.project_id if kafka_partition_by_project_id() else None
+        self.produce(
+            topic=AGENT_TURN_ENDED_TOPIC,
+            value=event.model_dump_json(),
+            key=publish_key,
+        )
         if flush_immediately:
             self.flush(0)
 
