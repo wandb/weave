@@ -67,9 +67,9 @@ def sanitize_invalid_utf8_surrogates(value: T) -> T:
         return cast(
             T,
             {
-                sanitize_invalid_utf8_surrogates(
-                    key
-                ): sanitize_invalid_utf8_surrogates(val)
+                sanitize_invalid_utf8_surrogates(key): sanitize_invalid_utf8_surrogates(
+                    val
+                )
                 for key, val in value.items()
             },
         )
