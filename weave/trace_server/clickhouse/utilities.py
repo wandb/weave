@@ -8,9 +8,10 @@ import datetime
 import hashlib
 import json
 import logging
+import math
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypedDict
 
 import ddtrace
 import sqlparse
@@ -71,6 +72,150 @@ def nullable_any_dump_to_any(
     val: str | None,
 ) -> Any | None:
     return any_dump_to_any(val) if val else None
+
+
+# ---------------------------------------------------------------------------
+# Typed inputs/output map extraction (fast-filter path)
+# ---------------------------------------------------------------------------
+
+
+# Skip strings longer than this many bytes when building the typed maps.
+# Long strings (chat content, completion text, base64 blobs) are the bulk
+# of inputs/output payloads and almost never make sense as exact-match
+# filter targets — keep them out of the maps so column size stays small.
+PAYLOAD_MAP_STRING_MAX_LEN = 256
+
+# Hard cap on entries per row, summed across all four typed maps. Bounds
+# the per-row map width so a pathological payload (deep config dict, very
+# wide list-of-objects flattened by a future iteration, ...) can't blow
+# up the column. Leaves past the cap fall back through JSON_VALUE.
+PAYLOAD_MAP_MAX_ENTRIES = 200
+
+
+def _flatten_payload(obj: Any, prefix: str = "") -> list[tuple[str, Any]]:
+    """Walk a payload and emit ``(dot-joined-path, leaf-value)`` pairs.
+
+    Only descends into dicts. Lists are intentionally skipped: list-index
+    paths (``messages.0.role``, ``messages.1.role``, ...) explode the
+    keyset across calls and quickly dominate column size for chat-style
+    traces. Filters on list-index paths fall back to JSON_VALUE.
+
+    Mirrors the dot-path convention already used by read-side filters
+    (``inputs.usage.total_tokens``), so a caller filtering on that key
+    hits the same map entry the extractor writes.
+    """
+    if not isinstance(obj, dict):
+        return []
+    result: list[tuple[str, Any]] = []
+    for key, val in obj.items():
+        full_key = key if not prefix else f"{prefix}.{key}"
+        if isinstance(val, dict):
+            result.extend(_flatten_payload(val, full_key))
+        else:
+            result.append((full_key, val))
+    return result
+
+
+class TypedInputsMaps(TypedDict):
+    """Typed inputs maps keyed by their CH column name. Spread into a
+    ``CallStartCHInsertable`` / ``CallCompleteCHInsertable`` constructor.
+    """
+
+    inputs_map_str: dict[str, str]
+    inputs_map_int: dict[str, int]
+    inputs_map_float: dict[str, float]
+    inputs_map_bool: dict[str, bool]
+
+
+class TypedOutputMaps(TypedDict):
+    """Typed output maps keyed by their CH column name."""
+
+    output_map_str: dict[str, str]
+    output_map_int: dict[str, int]
+    output_map_float: dict[str, float]
+    output_map_bool: dict[str, bool]
+
+
+def _extract_typed_payload_raw(
+    payload: Any,
+) -> tuple[dict[str, str], dict[str, int], dict[str, float], dict[str, bool]]:
+    """Walk ``payload`` and route scalar leaves into four typed maps.
+
+    Dispatch rules:
+
+    - ``bool`` checked before ``int`` (Python ``bool`` subclasses ``int``).
+    - Non-finite floats (NaN, +/-Inf) dropped — they don't round-trip
+      through JSON/CH.
+    - Strings longer than ``PAYLOAD_MAP_STRING_MAX_LEN`` bytes dropped.
+    - Lists and other non-scalar leaves dropped entirely. List-index
+      paths are filterable through the JSON_VALUE fallback and would
+      otherwise duplicate large structured values into the string map.
+    - Total entries capped at ``PAYLOAD_MAP_MAX_ENTRIES``; additional
+      leaves are dropped, and the JSON_VALUE fallback still answers
+      filters that target the dropped keys.
+
+    Returns four bare dicts; ``extract_typed_inputs`` / ``extract_typed_output``
+    wrap them with the column-prefixed keys insertables expect.
+    """
+    map_str: dict[str, str] = {}
+    map_int: dict[str, int] = {}
+    map_float: dict[str, float] = {}
+    map_bool: dict[str, bool] = {}
+    if not isinstance(payload, dict):
+        return map_str, map_int, map_float, map_bool
+
+    total = 0
+    for key, val in _flatten_payload(payload):
+        if total >= PAYLOAD_MAP_MAX_ENTRIES:
+            break
+        if val is None:
+            continue
+        if isinstance(val, bool):
+            map_bool[key] = val
+        elif isinstance(val, int):
+            map_int[key] = val
+        elif isinstance(val, float):
+            if not math.isfinite(val):
+                continue
+            map_float[key] = val
+        elif isinstance(val, str):
+            if len(val) > PAYLOAD_MAP_STRING_MAX_LEN:
+                continue
+            map_str[key] = val
+        else:
+            # Non-scalar leaf (list, custom object, ...). Skip — JSON_VALUE
+            # fallback can still answer filters against these keys, and we
+            # don't want serialized lists/objects bloating the string map.
+            continue
+        total += 1
+
+    return map_str, map_int, map_float, map_bool
+
+
+def extract_typed_inputs(inputs: Any) -> TypedInputsMaps:
+    """Build the inputs typed-map columns for one call. See
+    ``_extract_typed_payload_raw`` for dispatch rules.
+    """
+    s, i, f, b = _extract_typed_payload_raw(inputs)
+    return {
+        "inputs_map_str": s,
+        "inputs_map_int": i,
+        "inputs_map_float": f,
+        "inputs_map_bool": b,
+    }
+
+
+def extract_typed_output(output: Any) -> TypedOutputMaps:
+    """Build the output typed-map columns for one call. See
+    ``_extract_typed_payload_raw`` for dispatch rules.
+    """
+    s, i, f, b = _extract_typed_payload_raw(output)
+    return {
+        "output_map_str": s,
+        "output_map_int": i,
+        "output_map_float": f,
+        "output_map_bool": b,
+    }
 
 
 # ---------------------------------------------------------------------------

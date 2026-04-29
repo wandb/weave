@@ -16,6 +16,8 @@ from weave.trace_server.clickhouse.utilities import (
     dict_dump_to_dict,
     dict_value_to_dump,
     ensure_datetimes_have_tz,
+    extract_typed_inputs,
+    extract_typed_output,
     nullable_any_dump_to_any,
 )
 from weave.trace_server.clickhouse_schema import (
@@ -97,10 +99,36 @@ def ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     }
 
 
+# call_parts columns for the typed inputs/output Maps. Delete/update
+# insertables don't carry inputs or outputs, so ch_call_to_row must
+# substitute an empty dict — ClickHouse rejects None for non-Nullable
+# Map columns. Start rows populate inputs maps; end rows populate
+# output maps; the materialized view picks the populated half via
+# isNotNull(started_at) / isNotNull(ended_at) gates in migration 031.
+PAYLOAD_MAP_COLUMNS = frozenset(
+    {
+        "inputs_map_str",
+        "inputs_map_int",
+        "inputs_map_float",
+        "inputs_map_bool",
+        "output_map_str",
+        "output_map_int",
+        "output_map_float",
+        "output_map_bool",
+    }
+)
+
+
 def ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
     """Convert a CH insertable call to a row for batch insertion with the correct defaults."""
     call_dict = ch_call.model_dump()
-    return [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+    row: list[Any] = []
+    for col in ALL_CALL_INSERT_COLUMNS:
+        val = call_dict.get(col)
+        if val is None and col in PAYLOAD_MAP_COLUMNS:
+            val = {}
+        row.append(val)
+    return row
 
 
 def start_call_for_insert_to_ch_insertable(
@@ -130,6 +158,7 @@ def start_call_for_insert_to_ch_insertable(
         started_at=start_call.started_at,
         attributes_dump=dict_value_to_dump(start_call.attributes),
         inputs_dump=dict_value_to_dump(inputs),
+        **extract_typed_inputs(inputs),
         input_refs=input_refs,
         otel_dump=otel_dump_str,
         wb_run_id=start_call.wb_run_id,
@@ -165,6 +194,10 @@ def start_call_insertable_to_complete_start(
         exception=None,
         attributes_dump=ch_start.attributes_dump,
         inputs_dump=ch_start.inputs_dump,
+        inputs_map_str=ch_start.inputs_map_str,
+        inputs_map_int=ch_start.inputs_map_int,
+        inputs_map_float=ch_start.inputs_map_float,
+        inputs_map_bool=ch_start.inputs_map_bool,
         input_refs=ch_start.input_refs,
         output_dump=any_value_to_dump(None),
         summary_dump=dict_value_to_dump({}),
@@ -194,6 +227,7 @@ def end_call_for_insert_to_ch_insertable(
         ended_at=end_call.ended_at,
         summary_dump=dict_value_to_dump(dict(end_call.summary)),
         output_dump=any_value_to_dump(output),
+        **extract_typed_output(output),
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
         expire_at=compute_expire_at(retention_days, end_call.ended_at),
@@ -244,8 +278,10 @@ def start_end_calls_to_ch_complete_insertable(
         exception=end_call.exception,
         attributes_dump=dict_value_to_dump(start_call.attributes),
         inputs_dump=dict_value_to_dump(inputs),
+        **extract_typed_inputs(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),
+        **extract_typed_output(output),
         summary_dump=dict_value_to_dump(dict(end_call.summary)),
         otel_dump=otel_dump_str,
         output_refs=output_refs,
@@ -303,8 +339,10 @@ def complete_call_to_ch_insertable(
         exception=complete_call.exception,
         attributes_dump=dict_value_to_dump(complete_call.attributes),
         inputs_dump=dict_value_to_dump(inputs),
+        **extract_typed_inputs(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),
+        **extract_typed_output(output),
         summary_dump=dict_value_to_dump(dict(complete_call.summary)),
         otel_dump=otel_dump_str,
         output_refs=output_refs,
