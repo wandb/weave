@@ -334,7 +334,7 @@ def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
             compile_agent_query,
         )
 
-        conditions.extend(compile_agent_query(req.query, pb))
+        conditions.append(compile_agent_query(req.query, pb))
     return " AND ".join(conditions)
 
 

@@ -8,6 +8,7 @@ against ClickHouse is exercised separately in
 
 import pytest
 
+from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_compiler import (
@@ -17,11 +18,10 @@ from weave.trace_server.query_builder.agent_query_compiler import (
 
 
 def _compile(expr: dict) -> tuple[str, dict]:
-    """Compile ``{"$expr": <op>}`` and return (single_condition, params)."""
+    """Compile ``{"$expr": <op>}`` and return (condition, params)."""
     pb = ParamBuilder("genai")
-    conds = compile_agent_query(Query.model_validate({"$expr": expr}), pb)
-    assert len(conds) == 1
-    return conds[0], pb.get_params()
+    condition = compile_agent_query(Query.model_validate({"$expr": expr}), pb)
+    return condition, pb.get_params()
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +133,24 @@ class TestOperatorShapes:
         sql, _ = _compile({"$eq": [{"$getField": "agent_name"}, {"$literal": None}]})
         assert sql == "(s.agent_name IS NULL)"
 
+    def test_rejects_invalid_table_alias(self) -> None:
+        pb = ParamBuilder("genai")
+        query = Query.model_validate(
+            {"$expr": {"$eq": [{"$getField": "agent_name"}, {"$literal": "bot"}]}}
+        )
+
+        with pytest.raises(ValueError, match="Invalid SQL identifier"):
+            compile_agent_query(query, pb, table_alias="s; DROP TABLE spans")
+
+    def test_rejects_empty_not(self) -> None:
+        pb = ParamBuilder("genai")
+        query = Query.model_construct(
+            expr_=tsi_query.NotOperation.model_construct(not_=())
+        )
+
+        with pytest.raises(ValueError, match="Empty \\$not"):
+            compile_agent_query(query, pb)
+
     def test_not_wraps_in_negation(self) -> None:
         sql, _ = _compile(
             {"$not": [{"$eq": [{"$getField": "agent.name"}, {"$literal": "a"}]}]}
@@ -172,6 +190,32 @@ class TestOperatorShapes:
         )
         assert "s.status_code IN (" in sql
         assert params == {"genai_0": "OK", "genai_1": "ERROR"}
+
+    def test_rejects_null_non_eq_comparison(self) -> None:
+        with pytest.raises(ValueError, match="Null values are not allowed"):
+            _compile({"$gt": [{"$getField": "input_tokens"}, {"$literal": None}]})
+
+    def test_rejects_mixed_in_literal_types(self) -> None:
+        with pytest.raises(ValueError, match="same type"):
+            _compile(
+                {
+                    "$in": [
+                        {"$getField": "agent_name"},
+                        [{"$literal": "bot"}, {"$literal": 1}],
+                    ]
+                }
+            )
+
+    def test_rejects_null_in_literal_list(self) -> None:
+        with pytest.raises(ValueError, match="Null values are not allowed"):
+            _compile(
+                {
+                    "$in": [
+                        {"$getField": "agent_name"},
+                        [{"$literal": "bot"}, {"$literal": None}],
+                    ]
+                }
+            )
 
     def test_contains_emits_position_gt_zero(self) -> None:
         sql, _ = _compile(

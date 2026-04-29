@@ -25,6 +25,8 @@ Field-name resolution understands three sources, checked in order:
 
 from __future__ import annotations
 
+import re
+
 from weave.trace_server.agents.semconv import FILTERABLE_KEY_TO_COLUMN
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
@@ -79,6 +81,8 @@ _LITERAL_TYPE_TO_MAP: dict[type, str] = {
     str: "custom_attrs_string",
 }
 
+_SQL_IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
 
 class InvalidAgentFilterFieldError(ValueError):
     """Raised when a query DSL field can't be resolved to a column or attr."""
@@ -94,14 +98,14 @@ def compile_agent_query(
     pb: ParamBuilder,
     *,
     table_alias: str = "s",
-) -> list[str]:
-    """Compile a `Query` into a list of WHERE conditions.
+) -> str:
+    """Compile a `Query` into a WHERE condition.
 
-    Callers AND the returned conditions with their other filter clauses.
-    A non-empty `Query` compiles to exactly one entry in the list, which
-    may contain internal `AND` / `OR` / `NOT`.
+    Callers AND the returned condition with their other filter clauses.
+    The condition may contain internal `AND` / `OR` / `NOT`.
     """
-    return [_compile_operation(query.expr_, pb, table_alias)]
+    _validate_sql_identifier("table_alias", table_alias)
+    return _compile_operation(query.expr_, pb, table_alias)
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +135,8 @@ def _compile_operation(
         return "(" + " OR ".join(parts) + ")"
 
     if isinstance(op, tsi_query.NotOperation):
+        if not op.not_:
+            raise ValueError("Empty $not")
         inner = _compile_operand(op.not_[0], pb, alias)
         return f"(NOT ({inner}))"
 
@@ -145,36 +151,29 @@ def _compile_operation(
         return f"({lhs_sql} = {rhs_sql})"
 
     if isinstance(op, tsi_query.GtOperation):
-        lhs_sql, rhs_sql = _compile_comparison_operands(*op.gt_, pb=pb, alias=alias)
-        return f"({lhs_sql} > {rhs_sql})"
+        return _compile_non_null_comparison("$gt", op.gt_, ">", pb, alias)
 
     if isinstance(op, tsi_query.LtOperation):
-        lhs_sql, rhs_sql = _compile_comparison_operands(*op.lt_, pb=pb, alias=alias)
-        return f"({lhs_sql} < {rhs_sql})"
+        return _compile_non_null_comparison("$lt", op.lt_, "<", pb, alias)
 
     if isinstance(op, tsi_query.GteOperation):
-        lhs_sql, rhs_sql = _compile_comparison_operands(*op.gte_, pb=pb, alias=alias)
-        return f"({lhs_sql} >= {rhs_sql})"
+        return _compile_non_null_comparison("$gte", op.gte_, ">=", pb, alias)
 
     if isinstance(op, tsi_query.LteOperation):
-        lhs_sql, rhs_sql = _compile_comparison_operands(*op.lte_, pb=pb, alias=alias)
-        return f"({lhs_sql} <= {rhs_sql})"
+        return _compile_non_null_comparison("$lte", op.lte_, "<=", pb, alias)
 
     if isinstance(op, tsi_query.InOperation):
         field_operand, list_operand = op.in_
         if not list_operand:
             raise ValueError("Empty $in RHS list")
-        # Pick sibling type from the first non-null literal in the RHS list.
-        hint = _first_literal_type(list_operand)
-        lhs_sql = _compile_field_operand(field_operand, pb, alias, sibling_hint=hint)
+        hint = _common_literal_type("$in", list_operand)
+        lhs_sql = _compile_operand(field_operand, pb, alias, sibling_hint=hint)
         rhs_parts = [_compile_operand(item, pb, alias) for item in list_operand]
         return f"({lhs_sql} IN ({', '.join(rhs_parts)}))"
 
     if isinstance(op, tsi_query.ContainsOperation):
         # $contains always compares strings — force sibling hint to str.
-        lhs_sql = _compile_field_operand(
-            op.contains_.input, pb, alias, sibling_hint=str
-        )
+        lhs_sql = _compile_operand(op.contains_.input, pb, alias, sibling_hint=str)
         rhs_sql = _compile_operand(op.contains_.substr, pb, alias)
         fn = "positionCaseInsensitive" if op.contains_.case_insensitive else "position"
         return f"{fn}({lhs_sql}, {rhs_sql}) > 0"
@@ -317,15 +316,18 @@ def _compile_comparison_operands(
     return lhs_sql, rhs_sql
 
 
-def _compile_field_operand(
-    operand: tsi_query.Operand,
+def _compile_non_null_comparison(
+    op_name: str,
+    operands: tuple[tsi_query.Operand, tsi_query.Operand],
+    operator: str,
     pb: ParamBuilder,
     alias: str,
-    *,
-    sibling_hint: type | None,
 ) -> str:
-    """Compile an operand that's expected to be a field (or convert(field))."""
-    return _compile_operand(operand, pb, alias, sibling_hint=sibling_hint)
+    lhs, rhs = operands
+    if _is_null_literal(lhs) or _is_null_literal(rhs):
+        raise ValueError(f"Null values are not allowed for {op_name} comparisons")
+    lhs_sql, rhs_sql = _compile_comparison_operands(lhs, rhs, pb, alias)
+    return f"({lhs_sql} {operator} {rhs_sql})"
 
 
 def _literal_python_type(operand: tsi_query.Operand) -> type | None:
@@ -348,12 +350,32 @@ def _literal_python_type(operand: tsi_query.Operand) -> type | None:
     return None
 
 
-def _first_literal_type(operands: list[tsi_query.Operand]) -> type | None:
+def _is_null_literal(operand: tsi_query.Operand) -> bool:
+    return isinstance(operand, tsi_query.LiteralOperation) and operand.literal_ is None
+
+
+def _common_literal_type(
+    op_name: str, operands: list[tsi_query.Operand]
+) -> type | None:
+    literal_types: set[type] = set()
     for op in operands:
+        if _is_null_literal(op):
+            raise ValueError(f"Null values are not allowed in {op_name} lists")
         t = _literal_python_type(op)
         if t is not None:
-            return t
-    return None
+            literal_types.add(t)
+    if len(literal_types) > 1:
+        type_names = ", ".join(sorted(t.__name__ for t in literal_types))
+        raise ValueError(
+            f"All literal values in {op_name} lists must have the same type, "
+            f"got: {type_names}"
+        )
+    return next(iter(literal_types), None)
+
+
+def _validate_sql_identifier(label: str, value: str) -> None:
+    if not _SQL_IDENTIFIER_RE.fullmatch(value):
+        raise ValueError(f"Invalid SQL identifier for {label}: {value!r}")
 
 
 # ---------------------------------------------------------------------------
