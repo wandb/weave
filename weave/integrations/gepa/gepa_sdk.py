@@ -17,9 +17,9 @@ _gepa_patcher: MultiPatcher | None = None
 def _fn_accepts_callbacks(fn: Callable) -> bool:
     """Return True if `fn` accepts a `callbacks` keyword argument.
 
-    gepa < 0.1 (which dspy 3.1.x pins) doesn't have the callback protocol yet,
-    so we must not try to pass `callbacks=` on those versions or we'd break
-    `dspy.GEPA.compile()`.
+    Used once at patch time as a safety net: gepa < 0.1 (which dspy 3.1.x
+    pins) doesn't have the callback protocol yet, so injecting `callbacks=`
+    against those versions would break `dspy.GEPA.compile()`.
     """
     try:
         sig = inspect.signature(fn)
@@ -31,10 +31,8 @@ def _fn_accepts_callbacks(fn: Callable) -> bool:
     return any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
 
 
-def _inject_weave_callback(fn: Callable, kwargs: dict[str, Any]) -> None:
+def _add_weave_callback(kwargs: dict[str, Any]) -> None:
     """Add a WeaveGEPACallback to the `callbacks` kwarg if one is not present."""
-    if not _fn_accepts_callbacks(fn):
-        return
     existing = kwargs.get("callbacks")
     if existing is None:
         kwargs["callbacks"] = [WeaveGEPACallback()]
@@ -85,13 +83,31 @@ def _optimize_postprocess_output(output: Any) -> Any:
     return summary
 
 
-def _wrap_optimize(settings: OpSettings) -> Callable[[Callable], Callable]:
-    """Wrap `gepa.optimize` so it injects a Weave callback and traces as an op."""
+def _wrap_optimize(
+    settings: OpSettings,
+    *,
+    inject_callback: bool,
+) -> Callable[[Callable], Callable]:
+    """Wrap a top-level GEPA entrypoint as a Weave op.
+
+    Args:
+        inject_callback: Whether this entrypoint accepts a `callbacks=` kwarg
+            we should inject our `WeaveGEPACallback` into. True for the
+            `gepa.optimize` family (gepa>=0.1); False for
+            `gepa.optimize_anything` which has a different config and never
+            accepted `callbacks`. We additionally re-check `fn`'s signature
+            once at patch time so a stale gepa<0.1 (e.g. pulled in by dspy
+            3.1.x) silently degrades to span-only tracing instead of
+            TypeError-ing on injection.
+    """
 
     def wrapper(fn: Callable) -> Callable:
+        actually_inject = inject_callback and _fn_accepts_callbacks(fn)
+
         @functools.wraps(fn)
         def _inner(*args: Any, **kwargs: Any) -> Any:
-            _inject_weave_callback(fn, kwargs)
+            if actually_inject:
+                _add_weave_callback(kwargs)
             return fn(*args, **kwargs)
 
         op_kwargs = settings.model_dump()
@@ -128,17 +144,19 @@ def get_gepa_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("gepa.api"),
                 "optimize",
-                _wrap_optimize(optimize_settings),
+                _wrap_optimize(optimize_settings, inject_callback=True),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("gepa"),
                 "optimize",
-                _wrap_optimize(optimize_settings),
+                _wrap_optimize(optimize_settings, inject_callback=True),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("gepa.optimize_anything"),
                 "optimize_anything",
-                _wrap_optimize(optimize_anything_settings),
+                # `optimize_anything` uses a `GEPAConfig` object, not a
+                # `callbacks=` kwarg, so we just trace the call as an op.
+                _wrap_optimize(optimize_anything_settings, inject_callback=False),
             ),
         ]
     )

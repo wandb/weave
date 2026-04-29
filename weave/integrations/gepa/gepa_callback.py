@@ -120,14 +120,21 @@ class WeaveGEPACallback:
     def on_iteration_end(self, event: dict[str, Any]) -> None:
         gc = weave_client_context.require_weave_client()
         if self._iteration_call is not None:
-            gc.finish_call(
-                self._iteration_call,
-                {
-                    "iteration": event.get("iteration"),
-                    "proposal_accepted": event.get("proposal_accepted"),
-                },
-            )
-            self._iteration_call = None
+            # try/finally so a transient `finish_call` failure can't leak the
+            # call reference. GEPA's notify_callbacks swallows exceptions and
+            # only logs a warning; without this, the next iteration_start
+            # would overwrite the still-set reference and the previous span
+            # would stay open in the trace forever.
+            try:
+                gc.finish_call(
+                    self._iteration_call,
+                    {
+                        "iteration": event.get("iteration"),
+                        "proposal_accepted": event.get("proposal_accepted"),
+                    },
+                )
+            finally:
+                self._iteration_call = None
 
     def on_evaluation_start(self, event: dict[str, Any]) -> None:
         gc = weave_client_context.require_weave_client()
@@ -159,8 +166,10 @@ class WeaveGEPACallback:
                 "objective_scores": _safe(event.get("objective_scores")),
                 "num_failures": num_failures,
             }
-            gc.finish_call(self._evaluation_call, outputs)
-            self._evaluation_call = None
+            try:
+                gc.finish_call(self._evaluation_call, outputs)
+            finally:
+                self._evaluation_call = None
 
     def on_reflective_dataset_built(self, event: dict[str, Any]) -> None:
         """Capture the dataset that will be fed to the reflection LM.
@@ -219,8 +228,10 @@ class WeaveGEPACallback:
             outputs = {
                 "new_instructions": _safe(event.get("new_instructions")),
             }
-            gc.finish_call(self._proposal_call, outputs)
-            self._proposal_call = None
+            try:
+                gc.finish_call(self._proposal_call, outputs)
+            finally:
+                self._proposal_call = None
 
     def on_valset_evaluated(self, event: dict[str, Any]) -> None:
         gc = weave_client_context.require_weave_client()
