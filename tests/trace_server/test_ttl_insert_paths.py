@@ -374,15 +374,10 @@ def test_project_ttl_settings_endpoints_round_trip(trace_server):
     trace-server backend the test session is configured for.
     """
     external_project_id, _ = _make_project("settings_endpoints")
-
-    def _read() -> tsi.ProjectTTLSettingsReadRes:
-        # Build fresh: the external adapter mutates req.project_id in place.
-        return trace_server.project_ttl_settings_read(
-            tsi.ProjectTTLSettingsReadReq(project_id=external_project_id)
-        )
+    read_req = tsi.ProjectTTLSettingsReadReq(project_id=external_project_id)
 
     # Unset project: read returns retention_days=None (no row).
-    assert _read().retention_days is None
+    assert trace_server.project_ttl_settings_read(read_req).retention_days is None
 
     # Update to 30 days: response echoes value, subsequent read sees it.
     update_30 = trace_server.project_ttl_settings_update(
@@ -393,7 +388,8 @@ def test_project_ttl_settings_endpoints_round_trip(trace_server):
         )
     )
     assert update_30.retention_days == 30
-    assert _read().retention_days == 30
+    # Reusing read_req must not double-encode project_id (adapter copies req).
+    assert trace_server.project_ttl_settings_read(read_req).retention_days == 30
 
     # Update to None: clears retention; subsequent read returns None again.
     update_none = trace_server.project_ttl_settings_update(
@@ -404,7 +400,7 @@ def test_project_ttl_settings_endpoints_round_trip(trace_server):
         )
     )
     assert update_none.retention_days is None
-    assert _read().retention_days is None
+    assert trace_server.project_ttl_settings_read(read_req).retention_days is None
 
     # retention_days < 1 (other than None) is rejected.
     with pytest.raises(InvalidRequest):
