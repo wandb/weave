@@ -37,6 +37,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# OTel GenAI traces ingestion path on the weave trace server. Appended to
+# ``weave_trace_server_url()`` to form the OTLP HTTP exporter endpoint.
+_OTEL_GENAI_TRACES_PATH = "/otel/v1/genai/traces"
+
 
 class WeaveWandbAuthenticationException(Exception): ...
 
@@ -141,7 +145,7 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
     if not trace_server_url:
         return
 
-    endpoint = f"{trace_server_url.rstrip('/')}/otel/v1/genai/traces"
+    endpoint = f"{trace_server_url.rstrip('/')}{_OTEL_GENAI_TRACES_PATH}"
 
     # Match the auth pattern used by the rest of weave (see
     # init_weave_get_server: res.set_auth(("api", api_key)) and
