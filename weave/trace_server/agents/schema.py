@@ -26,6 +26,7 @@ SpanKindLiteral = Literal[
     "CONSUMER",
 ]
 StatusCodeLiteral = Literal["UNSET", "OK", "ERROR"]
+OutputTypeLiteral = Literal["", "text", "json", "image", "speech"]
 
 
 class NormalizedMessage(BaseModel):
@@ -73,7 +74,9 @@ class AgentSpanCHInsertable(BaseModel):
     started_at: datetime.datetime
     # Mirrors the ClickHouse `DEFAULT toDateTime64(0, 6)` sentinel for open spans.
     ended_at: datetime.datetime = SENTINEL_DATETIME
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    created_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
 
     # [OTel Core] status — matches the ClickHouse Enum8 exactly.
     status_code: StatusCodeLiteral = "UNSET"
@@ -137,7 +140,7 @@ class AgentSpanCHInsertable(BaseModel):
     request_choice_count: int = 0
 
     # [OTel GenAI] output type — gen_ai.output.type (text, json, image, speech)
-    output_type: str = ""
+    output_type: OutputTypeLiteral = ""
 
     # [OTel GenAI] messages — gen_ai.input.messages, gen_ai.output.messages
     input_messages: list[NormalizedMessage] = Field(default_factory=list)

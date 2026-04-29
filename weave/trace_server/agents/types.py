@@ -339,16 +339,15 @@ class AgentChatMessage(BaseModel):
 
     @model_validator(mode="after")
     def validate_single_payload(self) -> AgentChatMessage:
-        payload_field_by_type: dict[AgentChatMessageType, str] = {
-            "user_message": "user_message",
-            "assistant_message": "assistant_message",
-            "tool_call": "tool_call",
-            "agent_handoff": "agent_handoff",
-            "agent_start": "agent_start",
-            "context_compacted": "context_compacted",
-        }
-        expected_field = payload_field_by_type[self.type]
-        payload_fields = payload_field_by_type.values()
+        expected_field = self.type
+        payload_fields = (
+            "user_message",
+            "assistant_message",
+            "tool_call",
+            "agent_handoff",
+            "agent_start",
+            "context_compacted",
+        )
         missing_expected = getattr(self, expected_field) is None
         unexpected_fields = [
             field

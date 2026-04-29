@@ -21,6 +21,9 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+AttributeType = Literal["string", "int", "float", "string[]", "json"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,7 +31,7 @@ class Attribute:
     """A single semantic convention attribute."""
 
     key: str  # canonical weave.* key
-    type: str  # "string", "int", "float", "string[]", "json"
+    type: AttributeType
     description: str
     gen_ai_alias: str = ""  # OTel gen_ai.* equivalent, if any
 

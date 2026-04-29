@@ -315,11 +315,12 @@ def _normalize_system_instructions(raw: Any) -> list[str]:
 
 def _extract_raw_input(attrs: dict[str, Any]) -> Any:
     """Return raw input messages from attrs."""
-    val = _get(attrs, *semconv.INPUT_MESSAGES.lookup_keys)
-    if val is not None:
-        return val
-
-    return None
+    return _get(
+        attrs,
+        *semconv.INPUT_MESSAGES.lookup_keys,
+        "weave.prompt",
+        "gen_ai.prompt",
+    )
 
 
 def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:

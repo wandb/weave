@@ -6545,15 +6545,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return AgentQueryHandler(self._query).search_messages(req)
 
     def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
-        return AgentWriteHandler(self.ch_client, self._query).traces_chat(req)
+        return AgentQueryHandler(self._query).traces_chat(req)
 
     def agent_conversation_chat(
         self, req: AgentConversationChatReq
     ) -> AgentConversationChatRes:
-        return AgentWriteHandler(self.ch_client, self._query).conversation_chat(req)
+        return AgentQueryHandler(self._query).conversation_chat(req)
 
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        return AgentWriteHandler(self.ch_client, self._query).insert_otel_spans(req)
+        return AgentWriteHandler(self.ch_client).insert_otel_spans(req)
 
     # Private Methods
     @property

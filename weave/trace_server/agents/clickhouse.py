@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 from weave.trace_server.agents.chat_view import build_trace_chat
@@ -81,6 +81,7 @@ PaginatedReqT = TypeVar(
     AgentSpansQueryReq,
     AgentsQueryReq,
     AgentVersionsQueryReq,
+    AgentConversationChatReq,
 )
 PARAM_NAMESPACE = "genai"
 
@@ -228,6 +229,55 @@ class AgentQueryHandler:
         rows = self._run_trace_detail_query(project_id, trace_id)
         return [AgentSpanSchema.model_validate(normalize_span_row(r)) for r in rows]
 
+    def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
+        """Build chat trajectory for a single trace."""
+        spans = self.trace_detail_spans(req.project_id, req.trace_id)
+        return build_trace_chat(spans, req.trace_id)
+
+    def conversation_chat(
+        self, req: AgentConversationChatReq
+    ) -> AgentConversationChatRes:
+        """Build multi-turn chat view for a conversation."""
+        total_turns, rows = self._run_paginated(
+            make_conversation_chat_turns_count_query,
+            make_conversation_chat_spans_query,
+            req,
+        )
+
+        if not rows:
+            return AgentConversationChatRes(
+                conversation_id=req.conversation_id,
+                turns=[],
+                total_turns=total_turns,
+                has_more=False,
+                limit=req.limit,
+                offset=req.offset,
+            )
+
+        # Group spans by trace_id, preserving insertion order. Weave treats
+        # one trace_id as one conversation turn as a product convention based
+        # on current agent SDK behavior; OTel GenAI semconv does not define a
+        # formal turn id today.
+        spans_by_trace: dict[str, list[AgentSpanSchema]] = {}
+        for r in rows:
+            span = AgentSpanSchema.model_validate(normalize_span_row(r))
+            spans_by_trace.setdefault(span.trace_id, []).append(span)
+
+        turns = [
+            build_trace_chat(trace_spans, tid)
+            for tid, trace_spans in spans_by_trace.items()
+            if trace_spans
+        ]
+
+        return AgentConversationChatRes(
+            conversation_id=req.conversation_id,
+            turns=turns,
+            total_turns=total_turns,
+            has_more=req.offset + len(turns) < total_turns,
+            limit=req.limit,
+            offset=req.offset,
+        )
+
     # ------------------------------------------------------------------
     # Query plumbing
     # ------------------------------------------------------------------
@@ -273,18 +323,12 @@ class AgentQueryHandler:
 
 @dataclass(frozen=True)
 class AgentWriteHandler:
-    """Write-side operations for agent data (inserts + chat projection).
+    """Write-side operations for agent data.
 
-    Takes both a `ch_client` (for `insert` calls, which have no wrapper)
-    and a `query_fn` (for read queries that feed the chat projection).
+    Takes a `ch_client` for `insert` calls, which have no query wrapper.
     """
 
     _ch_client: CHClient
-    _query: QueryFn
-    _reader: AgentQueryHandler = field(init=False)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "_reader", AgentQueryHandler(self._query))
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -350,64 +394,6 @@ class AgentWriteHandler:
             accepted_spans=accepted,
             rejected_spans=rejected,
             error_message=error_msg,
-        )
-
-    # ------------------------------------------------------------------
-    # Chat projection
-    # ------------------------------------------------------------------
-
-    def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
-        """Build chat trajectory for a single trace."""
-        spans = self._reader.trace_detail_spans(req.project_id, req.trace_id)
-        return build_trace_chat(spans, req.trace_id)
-
-    def conversation_chat(
-        self, req: AgentConversationChatReq
-    ) -> AgentConversationChatRes:
-        """Build multi-turn chat view for a conversation."""
-        pb = ParamBuilder(PARAM_NAMESPACE)
-        count_sql = make_conversation_chat_turns_count_query(pb, req)
-        sql = make_conversation_chat_spans_query(pb, req)
-        params = pb.get_params()
-        total_turns = _first_cell_int(self._query(count_sql, params))
-        result = self._query(sql, params)
-
-        if not result.result_rows:
-            return AgentConversationChatRes(
-                conversation_id=req.conversation_id,
-                turns=[],
-                total_turns=total_turns,
-                has_more=req.offset < total_turns,
-                limit=req.limit,
-                offset=req.offset,
-            )
-
-        # Group spans by trace_id, preserving insertion order. Weave treats
-        # one trace_id as one conversation turn as a product convention based
-        # on current agent SDK behavior; OTel GenAI semconv does not define a
-        # formal turn id today.
-        spans_by_trace: dict[str, list[AgentSpanSchema]] = {}
-        for r in _rows_as_dicts(result):
-            span = AgentSpanSchema.model_validate(normalize_span_row(r))
-            spans_by_trace.setdefault(span.trace_id, []).append(span)
-
-        trace_ids = list(spans_by_trace.keys())
-
-        # Build chat for each trace (turn)
-        turns = []
-        for tid in trace_ids:
-            trace_spans = spans_by_trace.get(tid, [])
-            if trace_spans:
-                turn = build_trace_chat(trace_spans, tid)
-                turns.append(turn)
-
-        return AgentConversationChatRes(
-            conversation_id=req.conversation_id,
-            turns=turns,
-            total_turns=total_turns,
-            has_more=req.offset + len(turns) < total_turns,
-            limit=req.limit,
-            offset=req.offset,
         )
 
 

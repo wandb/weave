@@ -42,10 +42,6 @@ MAX_CUSTOM_ATTR_VALUE_CHARS = 256 * 1024
 # tell that truncation happened. Formatted lazily via `.format(n=...)`.
 CUSTOM_ATTR_TRUNCATION_MARKER = "...[truncated from {n} chars]"
 
-# OTel span.kind default when the ingested span omits it. Matches the
-# ClickHouse Enum8 default in migration 030.
-SPAN_KIND_UNSPECIFIED = "UNSPECIFIED"
-
 # ---------------------------------------------------------------------------
 # Search
 # ---------------------------------------------------------------------------
@@ -70,5 +66,7 @@ MAX_INGEST_ERRORS_REPORTED = 20
 # Operation names (`gen_ai.operation.name`)
 # ---------------------------------------------------------------------------
 
+# These are the operation names with product-specific chat-view behavior.
+# Other operation names are treated as regular content spans.
 OP_INVOKE_AGENT = "invoke_agent"
 OP_EXECUTE_TOOL = "execute_tool"
