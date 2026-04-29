@@ -6857,11 +6857,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        # ch_call_to_row substitutes empty dicts for typed-map columns the
+        # current insertable doesn't carry — non-Nullable Map(...) columns
+        # in call_parts reject None, so a raw model_dump fanout would
+        # surface as the cryptic "x.keys() on NoneType" from clickhouse-
+        # connect's data_size sampler.
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 
