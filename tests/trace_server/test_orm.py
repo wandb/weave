@@ -566,6 +566,70 @@ def test_feedback_query_in_homogeneous_literal_list_casts_field() -> None:
     )
 
 
+def test_feedback_query_inference_threads_through_and_or_not() -> None:
+    """Inference is per-binary-op, so each leaf inside AND/OR/NOT must
+    independently resolve its own cast. This pins that nested combinators
+    don't drop the inference (e.g. by accidentally short-circuiting in
+    process_operation before reaching the leaf).
+    """
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": "payload.is_positive"},
+                                    {"$literal": False},
+                                ]
+                            },
+                            {
+                                "$or": [
+                                    {
+                                        "$gt": [
+                                            {"$getField": "payload.score"},
+                                            {"$literal": 0.5},
+                                        ]
+                                    },
+                                    {
+                                        "$not": [
+                                            {
+                                                "$eq": [
+                                                    {"$getField": "payload.rank"},
+                                                    {"$literal": 1},
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                }
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    bool_field = (
+        "multiIf(JSON_VALUE(payload_dump, {pb_0:String}) = 'true', 1, "
+        "JSON_VALUE(payload_dump, {pb_0:String}) = 'false', 0, "
+        "toUInt8OrNull(JSON_VALUE(payload_dump, {pb_0:String})))"
+    )
+    score_field = "toFloat64OrNull(JSON_VALUE(payload_dump, {pb_2:String}))"
+    rank_field = "toInt64OrNull(JSON_VALUE(payload_dump, {pb_4:String}))"
+    assert prepared.sql == (
+        "SELECT id\n"
+        "FROM feedback\n"
+        f"WHERE (({bool_field} = {{pb_1:Bool}}) "
+        f"AND (({score_field} > {{pb_3:Float64}}) "
+        f"OR (NOT (({rank_field} = {{pb_5:Int64}})))))"
+    )
+
+
 def test_feedback_query_in_mixed_literal_list_keeps_uncast_path() -> None:
     """A heterogeneous $in list cannot share a single cast and falls back."""
     select = (
