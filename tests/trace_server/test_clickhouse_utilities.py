@@ -10,6 +10,8 @@ from weave.trace_server.clickhouse.utilities import (
 
 
 def test_sanitize_invalid_utf8_surrogates_replaces_lone_surrogates() -> None:
+    # Covers malformed strings exactly as Python receives them after JSON
+    # decoding, while ensuring valid surrogate pairs and real emoji survive.
     value = {
         "bad": "broken \ud83d",
         "pair": "\ud83d\ude00",
@@ -29,6 +31,8 @@ def test_sanitize_invalid_utf8_surrogates_replaces_lone_surrogates() -> None:
 
 
 def test_dump_helpers_sanitize_invalid_utf8_surrogates() -> None:
+    # JSON dump columns are usually safe because `json.dumps` escapes strings,
+    # but sanitizing here prevents invalid Unicode from round-tripping back out.
     dumped_dict = dict_value_to_dump({"bad": "broken \ud83d"})
     dumped_any = any_value_to_dump(["nested \udc00"])
 
@@ -39,6 +43,8 @@ def test_dump_helpers_sanitize_invalid_utf8_surrogates() -> None:
 
 
 def test_insert_sanitizes_invalid_utf8_surrogates_before_clickhouse() -> None:
+    # Direct string columns like `exception` or `display_name` bypass JSON dumps,
+    # so the final insert path must normalize rows before clickhouse_connect.
     mock_ch_client = MagicMock()
     mock_ch_client.insert.return_value = MagicMock()
 

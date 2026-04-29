@@ -45,6 +45,13 @@ def num_bytes(data: Any) -> int:
 
 
 def sanitize_invalid_utf8_surrogates(value: T) -> T:
+    r"""Normalize malformed client Unicode before ClickHouse UTF-8 encoding.
+
+    Python can deserialize JSON strings containing lone UTF-16 surrogate escapes
+    such as "\\ud83d", but `clickhouse_connect` later rejects those strings when
+    encoding column data as UTF-8. Decoding through UTF-16 preserves valid
+    surrogate pairs as their real code point and replaces unpaired surrogates.
+    """
     if isinstance(value, str):
         return cast(
             T,
