@@ -981,10 +981,10 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
 def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     """Regression for WB-33832: /feedback/query 500s on typed payload literals.
 
-    Without inferred field-side casts, ClickHouse refuses ``JSON_VALUE(...)``
+    Without inferred field-side casts, ClickHouse refuses `JSON_VALUE(...)`
     (String) compared against a typed param (Bool / Int64 / Float64) with
-    ``Code: 386 NO_COMMON_TYPE``. JSON_VALUE on a JSON boolean emits the
-    literal string ``'true'`` / ``'false'``, so the bool path must coerce
+    `Code: 386 NO_COMMON_TYPE`. JSON_VALUE on a JSON boolean emits the
+    literal string `'true'` / `'false'`, so the bool path must coerce
     those before any numeric fallback.
 
     Asserts on both backends so the same query shape works through sqlite

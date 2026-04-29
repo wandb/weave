@@ -535,9 +535,9 @@ def clickhouse_cast_json_value(
 ) -> str:
     """Apply a cast to a JSON_VALUE result.
 
-    Identical to ``clickhouse_cast`` except for ``bool``: JSON_VALUE returns the
-    literal strings ``'true'`` / ``'false'`` for JSON booleans, and
-    ``toUInt8OrNull`` would map both to NULL. The multiIf handles those first
+    Identical to `clickhouse_cast` except for `bool`: JSON_VALUE returns the
+    literal strings `'true'` / `'false'` for JSON booleans, and
+    `toUInt8OrNull` would map both to NULL. The multiIf handles those first
     and falls back to numeric coercion for legacy rows storing 1/0.
     """
     if cast == "bool":
