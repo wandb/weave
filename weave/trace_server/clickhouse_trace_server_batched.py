@@ -6208,11 +6208,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 start_call,
                 end_call,
             ]
-            batch_data = []
-            for call in calls:
-                call_dict = call.model_dump()
-                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-                batch_data.append(values)
+            batch_data = [ch_call_to_row(call) for call in calls]
 
             self._insert_call_batch(batch_data)
 
@@ -6464,11 +6460,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             start_call,
             end_call,
         ]
-        batch_data = []
-        for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
+        batch_data = [ch_call_to_row(call) for call in calls]
 
         try:
             self._insert_call_batch(batch_data)
