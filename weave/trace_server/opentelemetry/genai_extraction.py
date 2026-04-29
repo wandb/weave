@@ -245,9 +245,11 @@ def _text_from_parts(parts: list[Any]) -> str:
     return "\n".join(texts)
 
 
-def _normalize_single_message(msg: dict[str, Any]) -> NormalizedMessage:
+def _normalize_single_message(
+    msg: dict[str, Any], *, default_role: str = ""
+) -> NormalizedMessage:
     """Normalize a single message dict into a NormalizedMessage."""
-    role = str(msg.get("role") or "")
+    role = str(msg.get("role") or default_role)
 
     content = ""
     raw_parts = msg.get("parts")
@@ -265,7 +267,9 @@ def _normalize_single_message(msg: dict[str, Any]) -> NormalizedMessage:
     )
 
 
-def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
+def _normalize_raw_messages(
+    raw: Any, *, default_role: str = ""
+) -> list[NormalizedMessage]:
     """Normalize message data into NormalizedMessage list.
 
     Handles structured message arrays, plain strings, and JSON-encoded strings.
@@ -274,27 +278,32 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
         try:
             raw = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
-            return [NormalizedMessage(content=raw)]
+            return [NormalizedMessage(role=default_role, content=raw)]
 
     if isinstance(raw, dict):
         if "role" in raw:
-            return [_normalize_single_message(raw)]
+            return [_normalize_single_message(raw, default_role=default_role)]
         return []
 
     if isinstance(raw, list):
         result: list[NormalizedMessage] = []
         for item in raw:
             if isinstance(item, str):
-                result.append(NormalizedMessage(content=item))
+                result.append(NormalizedMessage(role=default_role, content=item))
             elif isinstance(item, dict):
-                result.append(_normalize_single_message(item))
+                result.append(_normalize_single_message(item, default_role=default_role))
         return result
 
     return []
 
 
 def _normalize_system_instructions(raw: Any) -> list[str]:
-    """Normalize system instructions into a plain text list."""
+    """Normalize system instructions into a plain text list.
+
+    This intentionally differs from `_str_list`: providers may emit
+    instruction blocks as dicts with `content` or `text`, and those should be
+    flattened into human-readable instructions rather than stringified.
+    """
     if raw and isinstance(raw, str):
         try:
             raw = json.loads(raw)
@@ -455,7 +464,7 @@ def extract_genai_span(
     status_code = span.status.code.name
 
     raw_output = _extract_raw_output(attrs, events_dicts)
-    output_msgs = _normalize_raw_messages(raw_output)
+    output_msgs = _normalize_raw_messages(raw_output, default_role="assistant")
     reasoning_content = extract_reasoning_content(raw_output)
 
     custom_attrs = _extract_custom_attrs(attrs)
@@ -520,7 +529,9 @@ def extract_genai_span(
             _get(attrs, *semconv.REQUEST_CHOICE_COUNT.lookup_keys)
         ),
         output_type=_get_str(attrs, *semconv.OUTPUT_TYPE.lookup_keys),
-        input_messages=_normalize_raw_messages(_extract_raw_input(attrs)),
+        input_messages=_normalize_raw_messages(
+            _extract_raw_input(attrs), default_role="user"
+        ),
         output_messages=output_msgs,
         system_instructions=_normalize_system_instructions(
             _get(attrs, *semconv.SYSTEM_INSTRUCTIONS.lookup_keys)

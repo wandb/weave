@@ -207,11 +207,11 @@ def test_normalize_message_missing_role_and_finish_reason() -> None:
     )
     result = extract_genai_span(span, project_id="p1")
 
-    assert result.output_messages[0].role == ""
+    assert result.output_messages[0].role == "assistant"
     assert result.output_messages[0].finish_reason == ""
 
 
-def test_normalize_input_messages_without_role_uses_empty_role() -> None:
+def test_normalize_input_messages_without_role_uses_user_role() -> None:
     result = extract_genai_span(
         _make_span(
             attrs={
@@ -225,19 +225,40 @@ def test_normalize_input_messages_without_role_uses_empty_role() -> None:
     )
 
     assert [(m.role, m.content) for m in result.input_messages] == [
-        ("", "plain prompt"),
-        ("", "structured prompt"),
+        ("user", "plain prompt"),
+        ("user", "structured prompt"),
     ]
 
 
-def test_genai_prompt_attr_stays_custom_attr() -> None:
+def test_genai_prompt_attr_becomes_user_message() -> None:
     result = extract_genai_span(
         _make_span(attrs={"gen_ai.prompt": "hello"}),
         project_id="p1",
     )
 
-    assert result.input_messages == []
+    assert [(m.role, m.content) for m in result.input_messages] == [("user", "hello")]
     assert result.custom_attrs_string["gen_ai.prompt"] == "hello"
+
+
+def test_system_instructions_support_json_blocks() -> None:
+    result = extract_genai_span(
+        _make_span(
+            attrs={
+                "gen_ai.system_instructions": [
+                    {"content": "content instruction"},
+                    {"text": "text instruction"},
+                    "plain instruction",
+                ],
+            }
+        ),
+        project_id="p1",
+    )
+
+    assert result.system_instructions == [
+        "content instruction",
+        "text instruction",
+        "plain instruction",
+    ]
 
 
 def test_extract_custom_attrs_caps_total_entries() -> None:

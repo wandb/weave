@@ -236,6 +236,9 @@ class ChatTraversal:
         subtree_agent = _invoke_agent_label(span, nearest_agent)
 
         if _has_agent_start_payload(span, agent_start_label):
+            # TODO: Move type-specific payload construction into AgentChat*
+            # constructors once this projection stabilizes, so traversal
+            # methods only encode ordering/suppression policy.
             self.messages.append(
                 AgentChatMessage(
                     type="agent_start",

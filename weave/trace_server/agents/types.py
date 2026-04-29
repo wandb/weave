@@ -49,6 +49,8 @@ class AgentSpanSchema(BaseModel):
     trace_id: str
     span_id: str
     parent_span_id: str | None = None
+    # TODO: Audit partial-row callers and make this required if every API path
+    # can rely on ClickHouse's non-null span_name column.
     span_name: str | None = None
     span_kind: SpanKindLiteral | None = None
     started_at: datetime.datetime | None = None
@@ -181,8 +183,8 @@ class AgentSpansQueryReq(BaseModel):
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
     )
     offset: int = Field(default=0, ge=0)
-    start: datetime.datetime | None = None  # filter started_at >= start
-    end: datetime.datetime | None = None  # filter started_at < end
+    started_after: datetime.datetime | None = None  # filter started_at >= start
+    started_before: datetime.datetime | None = None  # filter started_at < end
 
 
 class AgentSpansQueryRes(BaseModel):

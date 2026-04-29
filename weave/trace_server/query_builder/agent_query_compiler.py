@@ -254,6 +254,8 @@ def _resolve_field(
     sibling_hint: type | None,
 ) -> str:
     """Resolve a dotted field name to a SQL expression over the spans row."""
+    _validate_sql_identifier("table alias", alias)
+
     # (1) Semconv key / alias / short-form
     col = FILTERABLE_KEY_TO_COLUMN.get(name)
     if col is not None:

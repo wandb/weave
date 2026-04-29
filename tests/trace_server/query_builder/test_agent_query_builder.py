@@ -98,8 +98,8 @@ class TestMakeSpansCountQuery:
                         }
                     }
                 ),
-                start=start,
-                end=end,
+                started_after=start,
+                started_before=end,
             ),
         )
 
@@ -283,8 +283,8 @@ class TestMakeGroupedSpansListQuery:
                 group_by=[
                     AgentGroupByRef(source="column", key="conversation_id"),
                 ],
-                start=start,
-                end=end,
+                started_after=start,
+                started_before=end,
             ),
         )
 

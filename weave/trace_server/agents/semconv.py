@@ -278,6 +278,9 @@ ARTIFACT_REFS = Attribute("weave.artifact_refs", "string[]", "W&B artifact refer
 OBJECT_REFS = Attribute("weave.object_refs", "string[]", "W&B object references")
 
 _DEFS: list[Attribute] = [
+    # Keep this registry in sync with Attribute constants. The unit tests
+    # assert every module-level Attribute appears here and every filterable
+    # column points at a registered canonical key.
     OPERATION_NAME,
     PROVIDER_NAME,
     SYSTEM,

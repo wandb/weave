@@ -6531,6 +6531,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallsScoreRes()
 
     # ---- GenAI / Agent Observability ------------------------------------
+    # TODO: Normalize method names across this interface before the agent
+    # observability API is considered stable.
 
     def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
         return AgentQueryHandler(self._query).spans_query(req)

@@ -250,17 +250,17 @@ def add_time_filters(
     conditions: list[str],
     pb: ParamBuilder,
     *,
-    start: datetime.datetime | None,
-    end: datetime.datetime | None,
+    started_after: datetime.datetime | None,
+    started_before: datetime.datetime | None,
     column: str = "s.started_at",
 ) -> None:
-    """Add start/end time range conditions."""
-    if start:
-        start_slot = pb.add(start, param_type="DateTime64(6)")
-        conditions.append(f"{column} >= {start_slot}")
-    if end:
-        end_slot = pb.add(end, param_type="DateTime64(6)")
-        conditions.append(f"{column} < {end_slot}")
+    """Add started_at time range conditions."""
+    if started_after:
+        after_slot = pb.add(started_after, param_type="DateTime64(6)")
+        conditions.append(f"{column} >= {after_slot}")
+    if started_before:
+        before_slot = pb.add(started_before, param_type="DateTime64(6)")
+        conditions.append(f"{column} < {before_slot}")
 
 
 def _pagination_slots(pb: ParamBuilder, limit: int, offset: int) -> tuple[str, str]:
@@ -327,7 +327,12 @@ def resolve_group_by(
 def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     pid_slot = pb.add(req.project_id, param_type="String")
     conditions = [f"s.project_id = {pid_slot}"]
-    add_time_filters(conditions, pb, start=req.start, end=req.end)
+    add_time_filters(
+        conditions,
+        pb,
+        started_after=req.started_after,
+        started_before=req.started_before,
+    )
     if req.query is not None:
         # Imported lazily to avoid a circular import between this module
         # (used by agent_query_compiler) and the compiler itself.

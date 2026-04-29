@@ -134,14 +134,7 @@ class AgentQueryHandler:
             AgentSchema(
                 project_id=req.project_id,
                 agent_name=safe_str(r.get("agent_name")),
-                invocation_count=safe_int(r.get("invocation_count")),
-                span_count=safe_int(r.get("span_count")),
-                total_input_tokens=safe_int(r.get("total_input_tokens")),
-                total_output_tokens=safe_int(r.get("total_output_tokens")),
-                total_duration_ms=safe_int(r.get("total_duration_ms")),
-                error_count=safe_int(r.get("error_count")),
-                first_seen=_datetime_or_none(r.get("first_seen")),
-                last_seen=_datetime_or_none(r.get("last_seen")),
+                **_agent_aggregate_fields(r),
             )
             for r in rows
         ]
@@ -157,14 +150,7 @@ class AgentQueryHandler:
                 project_id=req.project_id,
                 agent_name=req.agent_name,
                 agent_version=safe_str(r.get("agent_version")),
-                invocation_count=safe_int(r.get("invocation_count")),
-                span_count=safe_int(r.get("span_count")),
-                total_input_tokens=safe_int(r.get("total_input_tokens")),
-                total_output_tokens=safe_int(r.get("total_output_tokens")),
-                total_duration_ms=safe_int(r.get("total_duration_ms")),
-                error_count=safe_int(r.get("error_count")),
-                first_seen=_datetime_or_none(r.get("first_seen")),
-                last_seen=_datetime_or_none(r.get("last_seen")),
+                **_agent_aggregate_fields(r),
             )
             for r in rows
         ]
@@ -344,6 +330,8 @@ class AgentWriteHandler:
         accepted = 0
         rejected = 0
         errors: list[str] = []
+        failure_counts: dict[str, int] = {}
+        failure_examples: list[str] = []
 
         for processed_span in req.processed_spans:
             resource = Resource.from_proto(processed_span.resource_spans.resource)
@@ -353,6 +341,11 @@ class AgentWriteHandler:
                     try:
                         span = Span.from_proto(protobuf_span, resource)
                     except AttributePathConflictError as e:
+                        _record_ingest_failure(
+                            failure_counts,
+                            failure_examples,
+                            type(e).__name__,
+                        )
                         rejected += 1
                         errors.append(str(e))
                         continue
@@ -365,9 +358,12 @@ class AgentWriteHandler:
                             wb_run_id=processed_span.run_id or "",
                         )
                     except Exception as e:
-                        logger.exception(
-                            "GenAI span extraction failed for span_id=%s",
-                            span.span_id,
+                        error_type = type(e).__name__
+                        _record_ingest_failure(
+                            failure_counts,
+                            failure_examples,
+                            error_type,
+                            span_id=span.span_id,
                         )
                         rejected += 1
                         # Don't leak raw `str(e)` to the client — it can
@@ -375,7 +371,7 @@ class AgentWriteHandler:
                         # safe and enough for a caller to triage.
                         errors.append(
                             f"Extraction failed for span {span.span_id}: "
-                            f"{type(e).__name__}"
+                            f"{error_type}"
                         )
                         continue
 
@@ -385,6 +381,14 @@ class AgentWriteHandler:
         if span_rows:
             self._ch_client.insert(
                 "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
+            )
+
+        if failure_counts:
+            logger.warning(
+                "GenAI OTel ingest rejected %d spans (failure_counts=%r, examples=%r)",
+                rejected,
+                failure_counts,
+                failure_examples,
             )
 
         error_msg = "; ".join(errors[:MAX_INGEST_ERRORS_REPORTED])
@@ -418,6 +422,37 @@ def _rows_as_dicts(result: QueryResult) -> list[ClickHouseRow]:
 def _first_cell_int(result: QueryResult) -> int:
     """Read a scalar count-style query result as an int, defaulting to 0."""
     return safe_int(result.result_rows[0][0]) if result.result_rows else 0
+
+
+def _agent_aggregate_fields(row: ClickHouseRow) -> dict[str, Any]:
+    """Hydrate the aggregate fields shared by agent and version rows."""
+    return {
+        "invocation_count": safe_int(row.get("invocation_count")),
+        "span_count": safe_int(row.get("span_count")),
+        "total_input_tokens": safe_int(row.get("total_input_tokens")),
+        "total_output_tokens": safe_int(row.get("total_output_tokens")),
+        "total_duration_ms": safe_int(row.get("total_duration_ms")),
+        "error_count": safe_int(row.get("error_count")),
+        "first_seen": _datetime_or_none(row.get("first_seen")),
+        "last_seen": _datetime_or_none(row.get("last_seen")),
+    }
+
+
+def _record_ingest_failure(
+    failure_counts: dict[str, int],
+    failure_examples: list[str],
+    error_type: str,
+    *,
+    span_id: str | None = None,
+) -> None:
+    """Track ingest failures for one aggregate warning after processing."""
+    failure_counts[error_type] = failure_counts.get(error_type, 0) + 1
+    if len(failure_examples) >= MAX_INGEST_ERRORS_REPORTED:
+        return
+    if span_id:
+        failure_examples.append(f"{span_id}: {error_type}")
+    else:
+        failure_examples.append(error_type)
 
 
 def _hydrate_group_row(

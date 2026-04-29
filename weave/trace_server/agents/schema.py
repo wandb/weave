@@ -26,6 +26,8 @@ SpanKindLiteral = Literal[
     "CONSUMER",
 ]
 StatusCodeLiteral = Literal["UNSET", "OK", "ERROR"]
+# Empty string means the provider did not specify an output modality; it
+# mirrors the ClickHouse string-column default for newly inserted spans.
 OutputTypeLiteral = Literal["", "text", "json", "image", "speech"]
 
 
@@ -81,6 +83,8 @@ class AgentSpanCHInsertable(BaseModel):
     # [OTel Core] status — matches the ClickHouse Enum8 exactly.
     status_code: StatusCodeLiteral = "UNSET"
     status_message: str = ""
+    # [OTel Core] error type — error.type (conditionally required on failure)
+    error_type: str = ""
 
     # [OTel GenAI] classification — gen_ai.operation.name, gen_ai.provider.name
     operation_name: str = ""
@@ -125,9 +129,6 @@ class AgentSpanCHInsertable(BaseModel):
 
     # [OTel GenAI] response — gen_ai.response.finish_reasons
     finish_reasons: list[str] = Field(default_factory=list)
-
-    # [OTel Core] error type — error.type (conditionally required on failure)
-    error_type: str = ""
 
     # [OTel GenAI] request params — gen_ai.request.*
     request_temperature: float = 0.0
