@@ -5356,7 +5356,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.FileContentReadRes:
         """Read file content with retry for ClickHouse eventual consistency."""
         return self._read_with_retry(
-            lambda: self.file_content_read(req), max_attempts=max_attempts
+            lambda: self._file_content_read_once(req), max_attempts=max_attempts
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
@@ -5766,6 +5766,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        return self._file_content_read_with_retry(req)
+
+    def _file_content_read_once(
+        self, req: tsi.FileContentReadReq
+    ) -> tsi.FileContentReadRes:
         pb = ParamBuilder()
         query = make_file_content_read_query(
             project_id=req.project_id,
@@ -6621,9 +6626,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             (object_id, digest, val_dump) = row
             object_values[object_id, digest] = val_dump
 
-        # update the val_dump for each object
+        # All-or-nothing: if any metadata row is missing its value row (e.g. due
+        # to ClickHouse replication lag), return empty so callers raise
+        # NotFoundError and retry, instead of silently filling with "{}".
+        all_value_rows_found = all(
+            (obj.object_id, obj.digest) in object_values for obj in metadata_result
+        )
+        if not all_value_rows_found:
+            return []
         for obj in metadata_result:
-            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
+            obj.val_dump = object_values[obj.object_id, obj.digest]
         return metadata_result
 
     def _run_migrations(self) -> None:
@@ -6748,7 +6760,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters: Optional dictionary of query parameters.
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        merged = ch_settings.merge_default_query_settings(settings)
+        merged = ch_settings.merge_default_command_settings(settings)
 
         processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()

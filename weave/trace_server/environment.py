@@ -231,6 +231,16 @@ def wf_clickhouse_max_execution_time() -> int | None:
         return None
 
 
+def wf_clickhouse_disable_query_failure_prediction() -> bool:
+    """Whether to disable ClickHouse estimated-time query failure prediction."""
+    return (
+        os.environ.get(
+            "WF_CLICKHOUSE_DISABLE_QUERY_FAILURE_PREDICTION", "false"
+        ).lower()
+        == "true"
+    )
+
+
 def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
     """The minimum async insert busy timeout in milliseconds for ClickHouse.
 
