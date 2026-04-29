@@ -80,6 +80,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "cohere",
         "crewai",
         "dspy",
+        "gepa",
         "google_genai",
         "groq",
         "instructor",

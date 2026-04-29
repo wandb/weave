@@ -901,6 +901,9 @@ def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
         assert len(inner_res.calls) == exp_count
 
 
+# Flaky against ClickHouse in CI: read-after-write visibility lag means a
+# calls_query right after flush can miss just-written rows. Rerun to absorb it.
+@pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
@@ -946,6 +949,9 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
         assert len(inner_res.calls) == exp_count
 
 
+# Flaky against ClickHouse in CI: read-after-write visibility lag means a
+# calls_query right after flush can miss just-written rows. Rerun to absorb it.
+@pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
     call_spec_1 = simple_line_call_bootstrap()
     client.flush()

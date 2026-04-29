@@ -280,6 +280,10 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     read operation(s) are performed.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.server = TestOnlyFlushingTraceServer(self, self.server)
+
     def set_autoflush(self, value: bool):
         self._autoflush = value
 
@@ -290,14 +294,116 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         if callable(attr) and name != "flush":
 
             def wrapper(*args, **kwargs):
-                res = attr(*args, **kwargs)
-                if self.__dict__.get("_autoflush", True):
-                    self_super._flush()
-                return res
+                try:
+                    return attr(*args, **kwargs)
+                finally:
+                    # Failed test-client methods can still enqueue background
+                    # writes before raising. Drain them so the next test's
+                    # ClickHouse reset cannot race leaked work from this test.
+                    if self.__dict__.get("_autoflush", True):
+                        self_super._flush()
 
             return wrapper
 
         return attr
+
+    def _flush_for_teardown(self) -> None:
+        """Flush without going through __getattribute__'s autoflush wrapper."""
+        super()._flush()
+
+
+def _flush_test_client_for_teardown(client: weave_client.WeaveClient) -> None:
+    if isinstance(client, TestOnlyFlushingWeaveClient):
+        TestOnlyFlushingWeaveClient._flush_for_teardown(client)
+    else:
+        client._flush()
+
+
+class TestOnlyFlushingTraceServer:
+    """Flushes the test client around direct `client.server.*` calls.
+
+    `TestOnlyFlushingWeaveClient` already flushes around `client.X()` calls.
+    But many tests bypass the client and read state through `client.server.*`
+    directly (recorder/access-log assertions, caching-layer tests, APIs the
+    client doesn't expose). The race those calls hit is:
+
+        client.create_call(...)               # queues server.call_start on future_executor
+        client.server.calls_query_stats(...)  # may run before the queued write lands
+
+    Raw `TraceServerInterface` methods are synchronous, but the *client*
+    enqueues work on `future_executor` before it ever reaches the server, so
+    direct server calls have no flush barrier without this proxy. The proxy
+    flushes before AND after each method — the post-call flush covers server
+    methods that themselves trigger callbacks that enqueue more work.
+
+    `_flush_client_if_safe` skips the flush when called from inside a
+    `future_executor` worker. Otherwise an `@op` running on the executor that
+    calls back into `client.server.*` would wait for itself to finish.
+
+    Note: this is a test-harness concern, not a client correctness concern.
+    `client.server` is private; real users go through `WeaveClient` public
+    methods, which manage their own read-after-write semantics.
+
+    Dispatch rules:
+    - `__init__` uses `object.__setattr__` to bootstrap `_client`/`_server`,
+      because our own `__setattr__` would forward to `_server` — which doesn't
+      exist yet.
+    - `__getattr__` intercepts method calls and adds the flush barrier.
+    - `__setattr__` forwards writes to the underlying server. Tests *do* write
+      through the proxy (e.g. `client.server.attribute_access_log = []` to
+      reset the recorder); without forwarding, those writes would silently
+      land on the proxy and the recorder underneath would never see them.
+    - `__delattr__` mirrors `__setattr__`.
+    """
+
+    def __init__(
+        self,
+        client: TestOnlyFlushingWeaveClient,
+        server: tsi.TraceServerInterface,
+    ) -> None:
+        object.__setattr__(self, "_client", client)
+        object.__setattr__(self, "_server", server)
+
+    def __setattr__(self, name, value):
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._server, name, value)
+
+    def __delattr__(self, name):
+        if name.startswith("_"):
+            object.__delattr__(self, name)
+        else:
+            delattr(self._server, name)
+
+    def __getattr__(self, name):
+        attr = getattr(self._server, name)
+        if name.startswith("_") or not callable(attr):
+            return attr
+
+        def wrapper(*args, **kwargs):
+            self._flush_client_if_safe()
+            try:
+                return attr(*args, **kwargs)
+            finally:
+                self._flush_client_if_safe()
+
+        return wrapper
+
+    def _flush_client_if_safe(self) -> None:
+        client = self._client
+        if not client.__dict__.get("_autoflush", True):
+            return
+        # Skip when we're already running inside a future_executor worker:
+        # client._flush() waits for the executor to drain, so flushing from
+        # within a worker would deadlock waiting for our own thread to finish.
+        # Common path: an @op running on the executor calls back into
+        # client.server.* and trips this proxy.
+        for executor_name in ("future_executor", "future_executor_fastlane"):
+            executor = client.__dict__.get(executor_name)
+            if executor is not None and executor._in_thread_context.get():
+                return
+        weave_client.WeaveClient._flush(client)
 
 
 def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
@@ -380,6 +486,51 @@ def zero_stack():
         yield
 
 
+def _teardown_test_client(
+    client: weave_client.WeaveClient,
+    *,
+    reset_settings: bool,
+    close_cache_only: bool,
+) -> None:
+    """Drain queued writes, clear the global client, and close the server.
+
+    Step order matters:
+    1. Flush — pending background writes must land before the next test's
+       ClickHouse reset, otherwise leaked work races the truncate and shows
+       up as `NotFoundError` in unrelated tests.
+    2. Clear the global client so the next test builds its own.
+    3. (`reset_settings=True`) Reset user settings. Only `client_creator`
+       lets callers pass `settings=...`, and a single test may enter that
+       context manager multiple times. The autouse `reset_digest_settings`
+       fires once per test, which is too coarse — we need a reset per
+       CM-exit so settings don't leak across nested usages.
+    4. Close the server. `client_creator` shares one trace_server across
+       multiple clients in a single test, so `close_cache_only=True`
+       closes only the caching middleware; the outer `trace_server`
+       fixture handles full teardown.
+
+    The server may already be partially torn down by the time we get here
+    (sqlite file removed, HTTP connection closed, etc). Teardown shouldn't
+    be allowed to flip a green test red, so we swallow whatever close()
+    raises.
+    """
+    try:
+        _flush_test_client_for_teardown(client)
+    finally:
+        weave_client_context.set_weave_client_global(None)
+        if reset_settings:
+            weave.trace.settings.parse_and_apply_settings(
+                weave.trace.settings.UserSettings()
+            )
+        try:
+            if close_cache_only:
+                client.server._cache.close()
+            else:
+                client.server.close()
+        except Exception:
+            pass
+
+
 @pytest.fixture
 def client(zero_stack, request, trace_server, caching_client_isolation):
     """This is the standard fixture used everywhere in tests to test end to end
@@ -393,11 +544,7 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
     try:
         yield client
     finally:
-        weave_client_context.set_weave_client_global(None)
-        try:
-            client.server.close()
-        except Exception:
-            pass
+        _teardown_test_client(client, reset_settings=False, close_cache_only=False)
 
 
 @pytest.fixture
@@ -431,17 +578,7 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
         try:
             yield client
         finally:
-            weave_client_context.set_weave_client_global(None)
-            weave.trace.settings.parse_and_apply_settings(
-                weave.trace.settings.UserSettings()
-            )
-            # Only close the caching layer, not the underlying trace_server.
-            # The trace_server is shared across multiple clients within this
-            # fixture and will be cleaned up by its own fixture teardown.
-            try:
-                client.server._cache.close()
-            except Exception:
-                pass
+            _teardown_test_client(client, reset_settings=True, close_cache_only=True)
 
     return client
 

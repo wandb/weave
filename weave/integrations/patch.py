@@ -181,6 +181,16 @@ def patch_dspy(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_gepa(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for GEPA."""
+    _patch_integration(
+        module_path="weave.integrations.gepa.gepa_sdk",
+        patcher_func_getter_name="get_gepa_patcher",
+        triggering_symbols=["gepa"],
+        settings=settings,
+    )
+
+
 def patch_crewai(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for CrewAI."""
     _patch_integration(
@@ -327,6 +337,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "huggingface_hub": patch_huggingface,
     "instructor": patch_instructor,
     "dspy": patch_dspy,
+    "gepa": patch_gepa,
     "crewai": patch_crewai,
     "crewai_tools": patch_crewai,
     "notdiamond": patch_notdiamond,
