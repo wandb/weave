@@ -290,16 +290,13 @@ class LLM(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
-        # TODO: media_attachments not yet serialized to OTel attributes.
-        # OTel GenAI semconv defines BlobPart/UriPart/FilePart as parts of
-        # gen_ai.input.messages, not as a separate attribute. Will land
-        # alongside the message-parts format fix in a follow-up PR.
         attrs = llm_attributes(
             model=self.model,
             provider_name=self.provider_name,
             conversation_id=session.session_id if session else "",
             input_messages=self.input_messages if include else None,
             output_messages=self.output_messages if include else None,
+            media_attachments=self.media_attachments if include else None,
             system_instructions=self.system_instructions if include else None,
             usage=self.usage,
             reasoning=self.reasoning,
@@ -824,6 +821,7 @@ def _attrs_for_span(
             conversation_id=session_id,
             input_messages=span.input_messages if include_content else None,
             output_messages=span.output_messages if include_content else None,
+            media_attachments=span.media_attachments if include_content else None,
             system_instructions=span.system_instructions if include_content else None,
             usage=span.usage,
             reasoning=span.reasoning,

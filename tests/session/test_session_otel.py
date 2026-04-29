@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import time
 from datetime import datetime, timedelta, timezone
@@ -16,6 +17,7 @@ from opentelemetry.trace import NoOpTracerProvider, StatusCode
 from weave.session.session import (
     LLM,
     LogResult,
+    MediaAttachment,
     Message,
     Reasoning,
     Session,
@@ -112,17 +114,17 @@ class TestInvokeAgentAttributes:
         msgs = [Message(role="user", content="Hello")]
         attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
         raw = json.loads(attrs["gen_ai.input.messages"])
-        assert len(raw) == 1
-        assert raw[0]["role"] == "user"
-        assert raw[0]["content"] == "Hello"
+        assert raw == [
+            {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+        ]
 
     def test_output_messages_serialized(self) -> None:
         msgs = [Message(role="assistant", content="Hi there!")]
         attrs = invoke_agent_attributes(agent_name="bot", output_messages=msgs)
         raw = json.loads(attrs["gen_ai.output.messages"])
-        assert len(raw) == 1
-        assert raw[0]["role"] == "assistant"
-        assert raw[0]["content"] == "Hi there!"
+        assert raw == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi there!"}]}
+        ]
 
     def test_empty_message_list_omitted(self) -> None:
         attrs = invoke_agent_attributes(
@@ -142,14 +144,12 @@ class TestInvokeAgentAttributes:
         assert "gen_ai.input.messages" not in attrs
         assert "gen_ai.output.messages" not in attrs
 
-    def test_messages_exclude_defaults(self) -> None:
-        """Messages with default fields should omit those in serialization."""
+    def test_message_shape_is_role_plus_parts(self) -> None:
+        """A serialized message has only 'role' and 'parts' at the top level."""
         msgs = [Message(role="user", content="hi")]
         attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
         raw = json.loads(attrs["gen_ai.input.messages"])
-        # tool_call_id and tool_name are defaults ("") so should be excluded
-        assert "tool_call_id" not in raw[0]
-        assert "tool_name" not in raw[0]
+        assert set(raw[0].keys()) == {"role", "parts"}
 
     def test_multiple_messages(self) -> None:
         msgs = [
@@ -158,11 +158,12 @@ class TestInvokeAgentAttributes:
         ]
         attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
         raw = json.loads(attrs["gen_ai.input.messages"])
-        assert len(raw) == 2
-        assert raw[0]["role"] == "user"
-        assert raw[1]["role"] == "assistant"
+        assert raw == [
+            {"role": "user", "parts": [{"type": "text", "content": "Hi"}]},
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hello!"}]},
+        ]
 
-    def test_tool_message_preserves_tool_fields(self) -> None:
+    def test_tool_message_serializes_to_tool_call_response_part(self) -> None:
         msgs = [
             Message(
                 role="tool",
@@ -173,8 +174,28 @@ class TestInvokeAgentAttributes:
         ]
         attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
         raw = json.loads(attrs["gen_ai.input.messages"])
-        assert raw[0]["tool_call_id"] == "tc_1"
-        assert raw[0]["tool_name"] == "get_weather"
+        # Per semconv, role:tool messages carry a single ToolCallResponsePart.
+        # tool_name has no field on ToolCallResponsePart and is intentionally dropped.
+        assert raw == [
+            {
+                "role": "tool",
+                "parts": [
+                    {"type": "tool_call_response", "response": "result", "id": "tc_1"}
+                ],
+            }
+        ]
+
+    def test_tool_message_without_id_omits_id(self) -> None:
+        msgs = [Message(role="tool", content="ok")]
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw[0]["parts"] == [{"type": "tool_call_response", "response": "ok"}]
+
+    def test_message_with_empty_content_emits_empty_parts(self) -> None:
+        msgs = [Message(role="assistant")]
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=msgs)
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [{"role": "assistant", "parts": []}]
 
 
 # ---------------------------------------------------------------------------
@@ -211,14 +232,23 @@ class TestLLMAttributes:
         assert attrs["gen_ai.usage.input_tokens"] == 100
         assert attrs["gen_ai.usage.output_tokens"] == 50
         assert attrs["gen_ai.usage.reasoning_tokens"] == 20
-        # system_instructions serialized as JSON list
-        raw_si = json.loads(attrs["gen_ai.system_instructions"])
-        assert raw_si == ["Be helpful", "Be concise"]
-        # messages serialized as JSON
-        raw_in = json.loads(attrs["gen_ai.input.messages"])
-        assert raw_in[0]["role"] == "user"
-        raw_out = json.loads(attrs["gen_ai.output.messages"])
-        assert raw_out[0]["role"] == "assistant"
+        # system_instructions: array of TextParts per semconv
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "Be helpful"},
+            {"type": "text", "content": "Be concise"},
+        ]
+        # input messages: parts model
+        assert json.loads(attrs["gen_ai.input.messages"]) == [
+            {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+        ]
+        # output messages: parts model + finish_reason on the last message
+        assert json.loads(attrs["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "Hi!"}],
+                "finish_reason": "stop",
+            }
+        ]
 
     def test_conversation_id(self) -> None:
         attrs = llm_attributes(model="gpt-4o", conversation_id="sess-abc")
@@ -282,14 +312,201 @@ class TestLLMAttributes:
         assert "gen_ai.input.messages" not in attrs
         assert "gen_ai.output.messages" not in attrs
 
-    def test_reasoning_is_not_an_attribute(self) -> None:
-        """Reasoning is accepted by the function but does not produce an attribute."""
+    def test_reasoning_prepended_to_last_assistant_message(self) -> None:
+        """Reasoning becomes a ReasoningPart on the last assistant output message."""
         attrs = llm_attributes(
-            model="gpt-4o", reasoning=Reasoning(content="thinking...")
+            model="gpt-4o",
+            reasoning=Reasoning(content="thinking..."),
+            output_messages=[
+                Message(role="assistant", content="answer"),
+            ],
         )
-        # reasoning is not part of the OTel GenAI attributes
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "reasoning", "content": "thinking..."},
+                    {"type": "text", "content": "answer"},
+                ],
+            }
+        ]
+        # reasoning must NOT be a separate top-level attribute
         assert "gen_ai.reasoning" not in attrs
         assert "gen_ai.reasoning.content" not in attrs
+
+    def test_reasoning_creates_synthetic_assistant_when_no_output_messages(
+        self,
+    ) -> None:
+        """With reasoning but no output messages, a synthetic assistant message
+        is created to carry the ReasoningPart.
+        """
+        attrs = llm_attributes(
+            model="gpt-4o", reasoning=Reasoning(content="just thinking")
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "reasoning", "content": "just thinking"}],
+            }
+        ]
+
+    def test_empty_reasoning_does_not_emit_output_messages(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", reasoning=Reasoning(content=""))
+        assert "gen_ai.output.messages" not in attrs
+
+    def test_finish_reason_attached_to_last_output_message(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            output_messages=[
+                Message(role="assistant", content="first"),
+                Message(role="assistant", content="last"),
+            ],
+            finish_reasons=["length"],
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert "finish_reason" not in raw[0]
+        assert raw[1]["finish_reason"] == "length"
+
+    def test_attach_media_blob_serialized_as_blob_part(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[Message(role="user", content="what is this?")],
+            media_attachments=[
+                MediaAttachment(
+                    kind="blob",
+                    modality="image",
+                    mime_type="image/png",
+                    content=b"\x89PNG",
+                )
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {
+                "role": "user",
+                "parts": [
+                    {"type": "text", "content": "what is this?"},
+                    {
+                        "type": "blob",
+                        "mime_type": "image/png",
+                        "modality": "image",
+                        "content": base64.b64encode(b"\x89PNG").decode("ascii"),
+                    },
+                ],
+            }
+        ]
+
+    def test_attach_media_uri_serialized_as_uri_part(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[Message(role="user", content="describe")],
+            media_attachments=[
+                MediaAttachment(
+                    kind="uri",
+                    modality="image",
+                    mime_type="image/jpeg",
+                    uri="https://example.com/photo.jpg",
+                )
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw[0]["parts"][1] == {
+            "type": "uri",
+            "mime_type": "image/jpeg",
+            "modality": "image",
+            "uri": "https://example.com/photo.jpg",
+        }
+
+    def test_attach_media_file_serialized_as_file_part(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[Message(role="user", content="transcribe")],
+            media_attachments=[
+                MediaAttachment(
+                    kind="file",
+                    modality="audio",
+                    mime_type="audio/wav",
+                    file_id="file-abc",
+                )
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw[0]["parts"][1] == {
+            "type": "file",
+            "mime_type": "audio/wav",
+            "modality": "audio",
+            "file_id": "file-abc",
+        }
+
+    def test_media_attached_to_last_user_message(self) -> None:
+        """When multiple user messages exist, media goes on the most recent one."""
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[
+                Message(role="user", content="first"),
+                Message(role="assistant", content="ok"),
+                Message(role="user", content="last"),
+            ],
+            media_attachments=[
+                MediaAttachment(
+                    kind="uri", modality="image", mime_type="image/png", uri="u"
+                )
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        # First user has no media
+        assert raw[0]["parts"] == [{"type": "text", "content": "first"}]
+        # Assistant in middle has no media
+        assert raw[1]["parts"] == [{"type": "text", "content": "ok"}]
+        # Last user has the media part appended
+        assert any(p["type"] == "uri" for p in raw[2]["parts"])
+
+    def test_media_with_no_input_messages_omits_messages(self) -> None:
+        """Media without any input messages produces no input.messages attr.
+
+        We don't synthesize a user message just to carry orphan media — the
+        SDK's contract is that media decorates a user message, and a
+        media-only LLM call is degenerate.
+        """
+        attrs = llm_attributes(
+            model="gpt-4o",
+            media_attachments=[
+                MediaAttachment(
+                    kind="uri", modality="image", mime_type="image/png", uri="u"
+                )
+            ],
+        )
+        assert "gen_ai.input.messages" not in attrs
+
+    def test_multiple_media_all_on_last_user_message(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[Message(role="user", content="hi")],
+            media_attachments=[
+                MediaAttachment(
+                    kind="uri", modality="image", mime_type="image/png", uri="u1"
+                ),
+                MediaAttachment(
+                    kind="uri", modality="image", mime_type="image/png", uri="u2"
+                ),
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert len(raw[0]["parts"]) == 3  # text + 2 media
+        assert raw[0]["parts"][1]["uri"] == "u1"
+        assert raw[0]["parts"][2]["uri"] == "u2"
+
+    def test_system_instructions_serialized_as_text_parts(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o", system_instructions=["Be helpful", "Be brief"]
+        )
+        raw = json.loads(attrs["gen_ai.system_instructions"])
+        assert raw == [
+            {"type": "text", "content": "Be helpful"},
+            {"type": "text", "content": "Be brief"},
+        ]
 
     def test_multiple_finish_reasons(self) -> None:
         attrs = llm_attributes(model="gpt-4o", finish_reasons=["stop", "length"])
