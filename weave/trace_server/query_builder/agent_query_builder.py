@@ -16,6 +16,7 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
+from weave.trace_server.agents.constants import SEARCH_CONTENT_PREVIEW_CHARS
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentGroupByRef,
@@ -367,6 +368,11 @@ def _normalize_search_roles(roles: Sequence[str]) -> list[str]:
     return list(dict.fromkeys(normalized))
 
 
+def _escape_like_pattern(value: str) -> str:
+    """Escape LIKE wildcards while keeping the surrounding substring match."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
     """Build the WHERE clause for a search against the messages table."""
     pid_slot = pb.add(req.project_id, param_type="String")
@@ -399,10 +405,6 @@ def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
         before_slot = pb.add(req.started_before, param_type="DateTime64(6)")
         conditions.append(f"started_at < {before_slot}")
     return " AND ".join(conditions)
-
-
-def _escape_like_pattern(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 # ---------------------------------------------------------------------------
@@ -591,7 +593,7 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     return f"""
         SELECT conversation_id, conversation_name, agent_name,
                span_id, trace_id, role,
-               substring(content, 1, 500) AS content,
+               substring(content, 1, {SEARCH_CONTENT_PREVIEW_CHARS}) AS content,
                lower(hex(content_digest)) AS content_digest, started_at
         FROM messages
         WHERE {where}

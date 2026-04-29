@@ -19,6 +19,9 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSpansQueryReq,
+    AgentSpanStatsFieldRef,
+    AgentSpanStatsMetricSpec,
+    AgentSpanStatsReq,
     AgentsQueryReq,
 )
 from weave.trace_server.interface.query import Query
@@ -286,6 +289,162 @@ def test_group_by_custom_attrs(ch_server):
     assert by_env["prod"].total_input_tokens == 300
     assert by_env["staging"].span_count == 1
     assert by_env["staging"].total_input_tokens == 50
+
+
+# ---------------------------------------------------------------------------
+# Test: Agent span stats
+# ---------------------------------------------------------------------------
+
+
+def test_agent_span_stats_ungrouped_metrics(ch_server):
+    """Stats API returns requested token, duration, error, and invocation metrics."""
+    project_id = _make_project_id("stats")
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            input_tokens=100,
+            output_tokens=25,
+            operation_name="invoke_agent",
+            status_code="OK",
+            started_at=start + datetime.timedelta(seconds=10),
+            ended_at=start + datetime.timedelta(seconds=10, milliseconds=100),
+        ),
+        _make_span(
+            project_id,
+            input_tokens=200,
+            output_tokens=50,
+            operation_name="chat",
+            status_code="ERROR",
+            started_at=start + datetime.timedelta(seconds=20),
+            ended_at=start + datetime.timedelta(seconds=20, milliseconds=300),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=1),
+            granularity=3600,
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="input_tokens",
+                    value_type="number",
+                    field=AgentSpanStatsFieldRef(
+                        source="field",
+                        key="usage.input_tokens",
+                    ),
+                    aggregations=["sum"],
+                ),
+                AgentSpanStatsMetricSpec(
+                    alias="duration_ms",
+                    value_type="number",
+                    derived="duration_ms",
+                    aggregations=["avg"],
+                    percentiles=[95],
+                ),
+                AgentSpanStatsMetricSpec(
+                    alias="errors",
+                    value_type="boolean",
+                    derived="is_error",
+                    aggregations=["count_true"],
+                ),
+                AgentSpanStatsMetricSpec(
+                    alias="invocations",
+                    value_type="boolean",
+                    derived="is_invocation",
+                    aggregations=["count_true"],
+                ),
+            ],
+        )
+    )
+
+    assert res.granularity == 3600
+    assert len(res.rows) == 1
+    row = res.rows[0]
+    assert row["sum_input_tokens"] == 300
+    assert row["avg_duration_ms"] == 200
+    assert row["p95_duration_ms"] is not None
+    assert row["count_true_errors"] == 1
+    assert row["count_true_invocations"] == 1
+
+
+def test_agent_span_stats_groups_by_custom_attrs(ch_server):
+    """Stats API can group chart rows by typed custom attribute map keys."""
+    project_id = _make_project_id("stats_cattr")
+    start = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_float={"score": 0.8},
+            input_tokens=100,
+            output_tokens=10,
+            started_at=start + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_float={"score": 0.6},
+            input_tokens=200,
+            output_tokens=20,
+            started_at=start + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            custom_attrs_string={"env": "staging"},
+            custom_attrs_float={"score": 0.4},
+            input_tokens=50,
+            output_tokens=5,
+            started_at=start + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=1),
+            granularity=3600,
+            group_by=[
+                AgentGroupByRef(
+                    source="custom_attrs_string",
+                    key="env",
+                    alias="env",
+                )
+            ],
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="tokens",
+                    value_type="number",
+                    derived="total_tokens",
+                    aggregations=["sum"],
+                ),
+                AgentSpanStatsMetricSpec(
+                    alias="score",
+                    value_type="number",
+                    field=AgentSpanStatsFieldRef(
+                        source="custom_attrs_float",
+                        key="score",
+                    ),
+                    aggregations=["avg", "count"],
+                ),
+            ],
+        )
+    )
+
+    by_env = {row["env"]: row for row in res.rows}
+    assert by_env["prod"]["sum_tokens"] == 330
+    assert abs(by_env["prod"]["avg_score"] - 0.7) < 1e-9
+    assert by_env["prod"]["count_score"] == 2
+    assert by_env["staging"]["sum_tokens"] == 55
+    assert abs(by_env["staging"]["avg_score"] - 0.4) < 1e-9
+    assert by_env["staging"]["count_score"] == 1
 
 
 # ---------------------------------------------------------------------------

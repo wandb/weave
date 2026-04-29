@@ -22,6 +22,7 @@ from weave.trace_server.agents.types import (
     AgentsQueryReq,
     AgentVersionsQueryReq,
 )
+from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
@@ -119,6 +120,47 @@ class TestMakeSpansCountQuery:
             "genai_5": "prod",
         }
         assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_rejects_empty_not(self) -> None:
+        pb = ParamBuilder("genai")
+        query = Query.model_construct(
+            expr_=tsi_query.NotOperation.model_construct(not_=())
+        )
+
+        with pytest.raises(ValueError, match="Empty \\$not"):
+            make_spans_count_query(pb, AgentSpansQueryReq(project_id="p1", query=query))
+
+    def test_rejects_null_non_eq_comparison(self) -> None:
+        pb = ParamBuilder("genai")
+        query = Query.model_validate(
+            {
+                "$expr": {
+                    "$gt": [
+                        {"$getField": "input_tokens"},
+                        {"$literal": None},
+                    ]
+                }
+            }
+        )
+
+        with pytest.raises(ValueError, match="Null values are not allowed"):
+            make_spans_count_query(pb, AgentSpansQueryReq(project_id="p1", query=query))
+
+    def test_rejects_mixed_in_literal_types(self) -> None:
+        pb = ParamBuilder("genai")
+        query = Query.model_validate(
+            {
+                "$expr": {
+                    "$in": [
+                        {"$getField": "agent_name"},
+                        [{"$literal": "bot"}, {"$literal": 1}],
+                    ]
+                }
+            }
+        )
+
+        with pytest.raises(ValueError, match="same type"):
+            make_spans_count_query(pb, AgentSpansQueryReq(project_id="p1", query=query))
 
 
 # ============================================================================
