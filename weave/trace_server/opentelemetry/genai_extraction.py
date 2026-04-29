@@ -128,8 +128,9 @@ def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
     val = _get(attrs, *semconv.AGENT_NAME.lookup_keys)
     if val:
         return str(val)
-    if span_name.lower().startswith("invoke_agent "):
-        return span_name[13:].strip()
+    prefix = "invoke_agent "
+    if span_name.lower().startswith(prefix):
+        return span_name[len(prefix) :].strip()
     return ""
 
 

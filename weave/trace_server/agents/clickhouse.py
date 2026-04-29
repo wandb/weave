@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 from weave.trace_server.agents.chat_view import build_trace_chat
@@ -281,6 +281,10 @@ class AgentWriteHandler:
 
     _ch_client: CHClient
     _query: QueryFn
+    _reader: AgentQueryHandler = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_reader", AgentQueryHandler(self._query))
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -354,8 +358,7 @@ class AgentWriteHandler:
 
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
-        reader = AgentQueryHandler(self._query)
-        spans = reader.trace_detail_spans(req.project_id, req.trace_id)
+        spans = self._reader.trace_detail_spans(req.project_id, req.trace_id)
         return build_trace_chat(spans, req.trace_id)
 
     def conversation_chat(

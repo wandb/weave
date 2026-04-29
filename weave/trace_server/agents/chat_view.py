@@ -94,9 +94,9 @@ def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, float, bool, float, str
     )
 
 
-def _root_sort_key(span: AgentSpanSchema) -> tuple[bool, datetime | None, str]:
+def _root_sort_key(span: AgentSpanSchema) -> tuple[float, str]:
     """Prefer spans that ended latest when a trace has no single root."""
-    return (span.ended_at is not None, span.ended_at, span.span_id)
+    return (_datetime_sort_seconds(span.ended_at), span.span_id)
 
 
 def _own_agent_label(span: AgentSpanSchema) -> str | None:

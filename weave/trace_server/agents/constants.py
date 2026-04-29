@@ -5,8 +5,6 @@ the agent query builder. Keeping them here avoids duplication and makes it
 easy to see all tunable values at a glance.
 """
 
-from __future__ import annotations
-
 # ---------------------------------------------------------------------------
 # Query limits
 # ---------------------------------------------------------------------------
@@ -57,7 +55,7 @@ SPAN_KIND_UNSPECIFIED = "UNSPECIFIED"
 SEARCH_CONTENT_PREVIEW_CHARS = 500
 
 # Displayed conversation_id bucket for spans with no `gen_ai.conversation.id`.
-NO_CONVERSATION_LABEL = "(no conversation)"
+NO_CONVERSATION_LABEL = "__NO_CONVERSATION__"
 
 # ---------------------------------------------------------------------------
 # Ingest

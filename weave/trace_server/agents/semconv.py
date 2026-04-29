@@ -32,6 +32,13 @@ class Attribute:
     description: str
     gen_ai_alias: str = ""  # OTel gen_ai.* equivalent, if any
 
+    def __post_init__(self) -> None:
+        """Validate that canonical attributes stay in the Weave namespace."""
+        if not self.key.startswith("weave."):
+            raise ValueError(
+                f"Semantic convention key must start with 'weave.': {self.key}"
+            )
+
     @property
     def lookup_keys(self) -> tuple[str, ...]:
         """Return (weave_key, gen_ai_alias) for use in attribute extraction.

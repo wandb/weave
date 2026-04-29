@@ -115,7 +115,10 @@ class AgentSpanCHInsertable(BaseModel):
     tool_type: str = ""
     tool_call_id: str = ""
     tool_description: str = ""
-    tool_definitions: str = ""
+    tool_definitions: str = Field(
+        default="",
+        description="Serialized JSON tool definition payload captured from GenAI attributes.",
+    )
 
     # [OTel GenAI] response — gen_ai.response.finish_reasons
     finish_reasons: list[str] = Field(default_factory=list)
@@ -144,8 +147,14 @@ class AgentSpanCHInsertable(BaseModel):
     system_instructions: list[str] = Field(default_factory=list)
 
     # [OTel GenAI] tool call data — gen_ai.tool.call.arguments/result
-    tool_call_arguments: str = ""
-    tool_call_result: str = ""
+    tool_call_arguments: str = Field(
+        default="",
+        description="Serialized JSON tool call arguments captured from GenAI attributes.",
+    )
+    tool_call_result: str = Field(
+        default="",
+        description="Serialized JSON tool call result captured from GenAI attributes.",
+    )
 
     # [Weave] compaction tracking — weave.compaction.*
     compaction_summary: str = ""
