@@ -291,7 +291,9 @@ def _normalize_raw_messages(
             if isinstance(item, str):
                 result.append(NormalizedMessage(role=default_role, content=item))
             elif isinstance(item, dict):
-                result.append(_normalize_single_message(item, default_role=default_role))
+                result.append(
+                    _normalize_single_message(item, default_role=default_role)
+                )
         return result
 
     return []

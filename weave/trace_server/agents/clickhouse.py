@@ -370,8 +370,7 @@ class AgentWriteHandler:
                         # contain server-side state. Exception type is
                         # safe and enough for a caller to triage.
                         errors.append(
-                            f"Extraction failed for span {span.span_id}: "
-                            f"{error_type}"
+                            f"Extraction failed for span {span.span_id}: {error_type}"
                         )
                         continue
 
