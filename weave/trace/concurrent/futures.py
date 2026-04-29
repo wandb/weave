@@ -118,6 +118,11 @@ class FutureExecutor:
             Future[U]: A new Future object representing the result of applying g to the results of the futures.
         """
         result_future: Future[U] = self._track_future(Future(), log_exception=False)
+        # `on_done_callback` is registered on every input future, so when more
+        # than one input completes concurrently, multiple threads can pass the
+        # `all(fut.done())` gate below and try to schedule `callback`. The lock
+        # + flag ensure `callback` (and therefore `g`) is submitted exactly
+        # once even under that race.
         callback_submit_lock = Lock()
         callback_submitted = False
 
@@ -181,6 +186,14 @@ class FutureExecutor:
         if self._in_thread_context.get():
             raise RuntimeError("Cannot flush from within a thread")
 
+        # Drain iteratively. A `then(...)` chain only schedules its inner
+        # `callback` / `g_future` once its inputs complete, so chained work
+        # can be added to `_active_futures` *after* we snapshot it. Each pass:
+        #   1. snapshot the tracked futures
+        #   2. wait for that snapshot to drain (sharing the overall timeout)
+        #   3. re-check the set; if it grew while we waited, repeat
+        # The loop returns once the set is empty, which is the point at which
+        # all logical work the caller submitted has actually finished.
         start = time.monotonic()
         while True:
             with self._active_futures_lock:
