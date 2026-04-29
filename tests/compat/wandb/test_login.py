@@ -135,6 +135,15 @@ def test_get_default_host_fallback():
             assert _get_default_host() == "api.wandb.ai"
 
 
+def test_resolve_config_dir_falls_back_to_home(tmp_path):
+    """When WANDB_CONFIG_DIR is unset, fall back to ~/.config/wandb."""
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch.object(_login_module.Path, "home", return_value=tmp_path),
+    ):
+        assert _login_module._resolve_config_dir() == tmp_path / ".config" / "wandb"
+
+
 def test_get_host_from_settings_missing_file(tmp_path):
     """If there is no settings file, it should return None."""
     with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):
