@@ -1,18 +1,18 @@
 import queue
 import threading
-import time
+from collections.abc import Generator
 
 import httpx
 import pytest
 from flask import Flask
+from werkzeug.serving import make_server
 
 import weave
 
 
 @pytest.fixture
-def flask_server(client):
+def flask_server(client) -> Generator[str, None, None]:
     app = Flask(__name__)
-    server_port = 6789
     host = "127.0.0.1"
 
     @app.route("/")
@@ -21,16 +21,15 @@ def flask_server(client):
         ref = weave.publish(d)
         return ref.digest
 
-    def run_server():
-        # Using Flask's built-in development server
-        app.run(host=host, port=server_port, threaded=True, use_reloader=False)
-
-    thread = threading.Thread(target=run_server, daemon=True)
+    server = make_server(host, 0, app, threaded=True)
+    thread = threading.Thread(target=server.serve_forever)
     thread.start()
-    time.sleep(2)
 
-    url = f"http://{host}:{server_port}/"
-    return url
+    try:
+        yield f"http://{host}:{server.server_port}/"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
 
 
 def test_flask_server(flask_server):

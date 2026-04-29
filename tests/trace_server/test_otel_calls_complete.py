@@ -40,6 +40,8 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
+pytestmark = pytest.mark.requires_clickhouse
+
 # =============================================================================
 # Fixtures
 # =============================================================================

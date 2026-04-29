@@ -24,6 +24,8 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.validation_util import CHValidationError
 
+pytestmark = pytest.mark.requires_clickhouse
+
 
 def make_base_64_content(content: str) -> str:
     """Helper function to create base64 encoded content.

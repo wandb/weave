@@ -334,7 +334,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
             if name == "attribute_access_log":
                 return access_log
             attr = self_server.__getattribute__(name)
-            if name != "attribute_access_log":
+            if name not in {"attribute_access_log", "remote_request_bytes_limit"}:
                 access_log.append(name)
             return attr
 

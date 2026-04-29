@@ -53,6 +53,8 @@ from weave.trace_server.opentelemetry.python_spans import (
 )
 from weave.trace_server.opentelemetry.python_spans import TracesData as PyTracesData
 
+pytestmark = pytest.mark.requires_clickhouse
+
 
 def create_test_span():
     """Create a test OpenTelemetry Span."""

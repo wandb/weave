@@ -17,6 +17,8 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
+pytestmark = pytest.mark.requires_clickhouse
+
 
 def test_filter_calls_by_queue_inner_join_behavior(client):
     """Test that INNER JOIN correctly filters calls by queue membership.

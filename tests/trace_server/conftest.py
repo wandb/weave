@@ -7,7 +7,8 @@ from dataclasses import dataclass
 import pytest
 
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import client_is_fake, client_is_sqlite
+from tests.trace_server.conftest_lib.fake_trace_server import FakeTraceServer
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     UserInjectingExternalTraceServer,
@@ -42,8 +43,8 @@ def pytest_addoption(parser):
         parser.addoption(
             "--trace-server",
             action="store",
-            default="clickhouse",
-            help="Specify the backend to use: sqlite or clickhouse",
+            default="fake",
+            help="Specify the backend to use: sqlite, clickhouse, or fake",
         )
         parser.addoption(
             "--ch",
@@ -78,6 +79,15 @@ def pytest_collection_modifyitems(config, items):
     # 1. All tests in the trace_server directory (regardless of fixture usage)
     # 2. All tests that use the trace_server fixture (for tests outside this directory)
     # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py
+    if config.getoption("--clickhouse"):
+        selected_trace_server = "clickhouse"
+    elif config.getoption("--sqlite"):
+        selected_trace_server = "sqlite"
+    else:
+        selected_trace_server = config.getoption("--trace-server", default="fake")
+    skip_non_clickhouse = pytest.mark.skip(
+        reason="ClickHouse-only test; run with --trace-server=clickhouse"
+    )
     for item in items:
         # Check if the test is in the trace_server directory by checking parent directories
         if "trace_server" in item.path.parts:
@@ -85,6 +95,11 @@ def pytest_collection_modifyitems(config, items):
         # Also mark tests that use the trace_server fixture (for tests outside this dir)
         elif "trace_server" in item.fixturenames:
             item.add_marker(pytest.mark.trace_server)
+        if (
+            item.get_closest_marker("requires_clickhouse") is not None
+            and selected_trace_server != "clickhouse"
+        ):
+            item.add_marker(skip_non_clickhouse)
 
 
 def get_trace_server_flag(request):
@@ -190,9 +205,10 @@ def _ch_session_server(
     function-scoped fixtures can fall through to the old path if needed.
     """
     # Only set up if we'll actually use clickhouse
-    trace_server_flag = request.config.getoption("--trace-server", default="clickhouse")
+    trace_server_flag = request.config.getoption("--trace-server", default="fake")
+    use_clickhouse = request.config.getoption("--clickhouse", default=False)
     use_sqlite = request.config.getoption("--sqlite", default=False)
-    if use_sqlite or trace_server_flag == "sqlite":
+    if use_sqlite or (not use_clickhouse and trace_server_flag in {"sqlite", "fake"}):
         yield None
         return
 
@@ -342,6 +358,23 @@ def get_sqlite_trace_server(
             pass  # Best effort cleanup
 
 
+@pytest.fixture
+def get_fake_trace_server() -> Callable[[], UserInjectingExternalTraceServer]:
+    def fake_trace_server_inner() -> UserInjectingExternalTraceServer:
+        id_converter = DummyIdConverter()
+        return externalize_trace_server(
+            FakeTraceServer(
+                evaluate_model_dispatcher=EvaluateModelTestDispatcher(
+                    id_converter=id_converter
+                )
+            ),
+            TEST_ENTITY,
+            id_converter=id_converter,
+        )
+
+    return fake_trace_server_inner
+
+
 class LocalSecretFetcher:
     def fetch(self, secret_name: str) -> dict:
         return {"secrets": {secret_name: os.getenv(secret_name)}}
@@ -355,18 +388,21 @@ def local_secret_fetcher():
 
 @pytest.fixture
 def trace_server(
-    request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
+    request,
+    local_secret_fetcher,
+    get_ch_trace_server,
+    get_sqlite_trace_server,
+    get_fake_trace_server,
 ) -> UserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
         return get_ch_trace_server()
     elif trace_server_flag == "sqlite":
         return get_sqlite_trace_server()
+    elif trace_server_flag == "fake":
+        return get_fake_trace_server()
     else:
-        # Once we split the trace server and client code, we can raise here.
-        # For now, just return the sqlite trace server so we don't break existing tests.
-        # raise ValueError(f"Invalid trace server: {trace_server_flag}")
-        return get_sqlite_trace_server()
+        raise ValueError(f"Invalid trace server: {trace_server_flag}")
 
 
 @pytest.fixture
@@ -380,7 +416,9 @@ def ch_server(trace_server):
 
 @pytest.fixture
 def internal_server(client):
-    """Return the underlying SQLite or ClickHouse server from the middleware chain."""
+    """Return the underlying fake, SQLite, or ClickHouse server from the middleware chain."""
+    if client_is_fake(client):
+        return find_server_layer(client.server, FakeTraceServer)
     if client_is_sqlite(client):
         return find_server_layer(client.server, SqliteTraceServer)
     return find_server_layer(client.server, ClickHouseTraceServer)

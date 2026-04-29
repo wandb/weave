@@ -1,6 +1,7 @@
 import pytest
 
 from tests.trace_server.conftest import get_trace_server_flag
+from tests.trace_server.conftest_lib.fake_trace_server import FakeTraceServer
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     UserInjectingExternalTraceServer,
 )
@@ -12,6 +13,8 @@ def test_trace_server_fixture(request, trace_server: UserInjectingExternalTraceS
     assert isinstance(trace_server, UserInjectingExternalTraceServer)
     if get_trace_server_flag(request) == "clickhouse":
         assert isinstance(trace_server._internal_trace_server, ClickHouseTraceServer)
+    elif get_trace_server_flag(request) == "fake":
+        assert isinstance(trace_server._internal_trace_server, FakeTraceServer)
     else:
         assert isinstance(trace_server._internal_trace_server, SqliteTraceServer)
 

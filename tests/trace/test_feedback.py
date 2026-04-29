@@ -4,7 +4,7 @@ import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import client_is_fake, client_is_sqlite
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
@@ -903,7 +903,7 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     # Query for feedback where dataset_id contains the numeric literal 94
     # This should work but currently fails with:
     # "Illegal type Int64 of argument of function position"
-    if not client_is_sqlite(client):
+    if not (client_is_sqlite(client) or client_is_fake(client)):
         with pytest.raises(
             DatabaseError,
             match="Illegal type Int64 of argument of function position",
@@ -947,7 +947,7 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
 
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
-    if client_is_sqlite(client):
+    if client_is_sqlite(client) or client_is_fake(client):
         # Skip for SQLite - annotation queues not implemented
         return pytest.skip()
 
@@ -1002,7 +1002,7 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
 
 def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with invalid queue_id."""
-    if client_is_sqlite(client):
+    if client_is_sqlite(client) or client_is_fake(client):
         # Skip for SQLite - annotation queues not implemented
         return pytest.skip()
 
@@ -1025,7 +1025,7 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
 
 def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
     """Test feedback creation with queue_id from a different project."""
-    if client_is_sqlite(client):
+    if client_is_sqlite(client) or client_is_fake(client):
         # Skip for SQLite - annotation queues not implemented
         return pytest.skip()
 
@@ -1059,7 +1059,7 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
 
 def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     """Test querying feedback filtered by queue_id."""
-    if client_is_sqlite(client):
+    if client_is_sqlite(client) or client_is_fake(client):
         # Skip for SQLite - annotation queues not implemented
         return pytest.skip()
 

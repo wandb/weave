@@ -8,12 +8,21 @@ import time
 from contextlib import contextmanager
 
 from tests.trace.server_utils import find_server_layer
+from tests.trace_server.conftest_lib.fake_trace_server import FakeTraceServer
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 def client_is_sqlite(client):
     try:
         find_server_layer(client.server, SqliteTraceServer)
+    except TypeError:
+        return False
+    return True
+
+
+def client_is_fake(client):
+    try:
+        find_server_layer(client.server, FakeTraceServer)
     except TypeError:
         return False
     return True

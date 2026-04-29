@@ -20,6 +20,8 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
+pytestmark = pytest.mark.requires_clickhouse
+
 # Test Data Constants
 TEST_CONTENT = b"Hello, world!"
 TEST_BUCKET = "test-bucket"

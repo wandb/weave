@@ -17,6 +17,8 @@ from weave.trace_server.project_version.types import (
     WriteTarget,
 )
 
+pytestmark = pytest.mark.requires_clickhouse
+
 
 def make_project_id(name: str) -> str:
     return base64.b64encode(f"test_entity/{name}".encode()).decode()

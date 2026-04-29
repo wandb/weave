@@ -25,6 +25,8 @@ from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer, get_conn_cursor
 from weave.trace_server.ttl_settings import reset_ttl_cache
 
+pytestmark = pytest.mark.requires_clickhouse
+
 TEST_ENTITY = "ttl_entity"
 
 # Retention policy → expected timedelta applied to the anchor.

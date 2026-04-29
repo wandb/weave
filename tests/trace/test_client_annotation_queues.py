@@ -21,6 +21,8 @@ from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
+pytestmark = pytest.mark.requires_clickhouse
+
 
 class CallsFixture(NamedTuple):
     """Container for test calls data."""

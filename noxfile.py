@@ -233,6 +233,13 @@ def tests(session: nox.Session, shard: str):
             "git+https://github.com/willccbb/verifiers.git@b4d851db42cebbab2358b827fd0ed19773631937#subdirectory=environments/gsm8k"
         )
 
+    session.posargs[:] = [
+        f"--trace-server={arg.split('=', 1)[1]}"
+        if arg.startswith("trace-server=")
+        else arg
+        for arg in session.posargs
+    ]
+
     # Check if posargs contains test files (ending with .py or containing :: for specific tests)
     has_test_files = any(
         arg.endswith(".py") or "::" in arg

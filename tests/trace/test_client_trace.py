@@ -4197,6 +4197,7 @@ def test_calls_len(client):
     assert len(client.get_calls()) == 2
 
 
+@pytest.mark.requires_clickhouse
 def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
     @weave.op
     def test():
@@ -4416,6 +4417,7 @@ def clickhouse_client(client):
     return ch_server.ch_client
 
 
+@pytest.mark.requires_clickhouse
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with storage size information."""
     if client_is_sqlite(client):
@@ -4453,6 +4455,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     assert call.storage_size_bytes is not None
 
 
+@pytest.mark.requires_clickhouse
 def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
     if client_is_sqlite(client):
@@ -4508,6 +4511,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     )  # Child should not have total size
 
 
+@pytest.mark.requires_clickhouse
 def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
     if client_is_sqlite(client):
@@ -4603,6 +4607,7 @@ def test_calls_hydrated(client):
     assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
 
 
+@pytest.mark.requires_clickhouse
 def test_obj_query_with_storage_size_clickhouse(client):
     """Test querying objects with storage size information."""
     if client_is_sqlite(client):
@@ -4655,6 +4660,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
     assert queried_obj_without_size.size_bytes is None
 
 
+@pytest.mark.requires_clickhouse
 def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
     @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
@@ -4712,6 +4718,7 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
     assert child_call.storage_size_bytes is None
 
 
+@pytest.mark.requires_clickhouse
 def test_call_query_stream_with_invalid_filter_field(client):
     if client_is_sqlite(client):
         # dont run this test for sqlite
@@ -4990,6 +4997,7 @@ def test_calls_query_thread_ids_filter_returns_matching_thread(client):
     assert res.calls[0].thread_id == thread_2
 
 
+@pytest.mark.requires_clickhouse
 def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
     if client_is_sqlite(client):
@@ -5030,6 +5038,7 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     assert result.total_storage_size_bytes is not None
 
 
+@pytest.mark.requires_clickhouse
 def test_project_stats_clickhouse(client, clickhouse_client):
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")

@@ -6,7 +6,7 @@ import pytest
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import client_is_fake, client_is_sqlite
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
@@ -43,8 +43,10 @@ from weave.utils.project_id import from_project_id, to_project_id
 
 
 @pytest.mark.asyncio
+@pytest.mark.requires_clickhouse
 async def test_evaluation_status(client):
     is_sqlite = client_is_sqlite(client)
+    is_fake = client_is_fake(client)
     if is_sqlite:
         # TODO: FIX ME, should work in sqlite, but get database lock error:
         # https://github.com/wandb/weave/actions/runs/16228542054/job/45826073140?pr=5069
@@ -293,6 +295,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     the evaluation through the evaluate_model API.
     """
     is_sqlite = client_is_sqlite(client)
+    is_fake = client_is_fake(client)
     project_id = client.project_id
     entity, project = from_project_id(project_id)
 
@@ -359,7 +362,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     # Note: SQLite does not support calling the LLM, so it is not correct.
     # I want to keep the sqlite tests here however as we are more interested
     # in testing the overal flow, not LLMs in particular.
-    if is_sqlite:
+    if is_sqlite or is_fake:
         assert len(calls_res.calls) == 5
     else:
         assert len(calls_res.calls) == 9
@@ -382,7 +385,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         f"weave:///{project_id}/op/Evaluation.evaluate:"
     )
     assert isinstance(eval_call.summary, dict)
-    if is_sqlite:
+    if is_sqlite or is_fake:
         assert eval_call.summary["status_counts"] == {
             TraceStatus.SUCCESS: 4,
             TraceStatus.ERROR: 1,
@@ -897,6 +900,7 @@ def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
     return run.evaluation_run_id, predict_and_score_ids
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_row_order_is_stable(client):
     """Row order should be stable across repeated requests (default sort by row_digest)."""
     if client_is_sqlite(client):
@@ -953,6 +957,7 @@ def test_eval_results_excludes_deleted_calls(client):
     assert res.total_rows == 2
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_sort_by_score_desc(client):
     """Sort by scores.accuracy DESC should return highest-scoring row first."""
     if client_is_sqlite(client):
@@ -975,6 +980,7 @@ def test_eval_results_sort_by_score_desc(client):
     assert accuracies == [0.9, 0.6, 0.3]
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_sort_by_score_asc(client):
     """Sort by scores.accuracy ASC should return lowest-scoring row first."""
     if client_is_sqlite(client):
@@ -996,6 +1002,7 @@ def test_eval_results_sort_by_score_asc(client):
     assert accuracies == [0.3, 0.6, 0.9]
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_filter_score_gte(client):
     """Filter scores.accuracy >= 0.5 should exclude rows below threshold."""
     if client_is_sqlite(client):
@@ -1038,6 +1045,7 @@ def test_eval_results_filter_score_gte(client):
     assert accuracies == [0.6, 0.9]
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_sort_and_filter_combined(client):
     """Sort + filter together: filter first, then sort the remaining rows."""
     if client_is_sqlite(client):
@@ -1079,6 +1087,7 @@ def test_eval_results_sort_and_filter_combined(client):
     assert accuracies == [0.9, 0.7, 0.5]
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_filter_with_evaluation_call_id_scope(client):
     """Filter scoped to evaluation_call_id only tests that eval's scores."""
     if client_is_sqlite(client):
@@ -1131,6 +1140,7 @@ def test_eval_results_filter_with_evaluation_call_id_scope(client):
     assert accuracies == [0.7, 0.9]
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
     """Sorting on an unsupported field prefix returns InvalidRequest."""
     eval_id, _ = _create_eval_with_scores(
@@ -1146,6 +1156,7 @@ def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
         )
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_sort_by_output(client):
     """Sort by output.label orders rows by nested model output field."""
     if client_is_sqlite(client):
@@ -1208,6 +1219,7 @@ def test_eval_results_sort_by_output(client):
     assert sorted_labels == ["apple", "banana", "cherry"]
 
 
+@pytest.mark.requires_clickhouse
 def test_eval_results_summary_with_filter(client):
     """Summary reflects filtered rows, not all rows."""
     if client_is_sqlite(client):

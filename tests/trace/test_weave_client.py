@@ -1799,6 +1799,7 @@ def clickhouse_client(client):
     return ch_server.ch_client
 
 
+@pytest.mark.requires_clickhouse
 def test_get_calls_storage_size_values(client, clickhouse_client):
     """Test that storage size values are correctly included when parameters are set."""
     if client_is_sqlite(client):

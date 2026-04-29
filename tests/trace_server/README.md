@@ -9,7 +9,7 @@ The `trace_server` fixture provides direct access to the trace server implementa
 ### Key Benefits:
 
 1. **Direct Server Testing**: Test server functionality without the overhead of client abstractions
-2. **Backend Isolation**: Separate server concerns from client concerns 
+2. **Backend Isolation**: Separate server concerns from client concerns
 3. **Type Safety**: Proper typing for server operations without `client.server` hacks
 4. **Future Code Split**: Facilitates eventual separation of client and server codebases
 
@@ -25,14 +25,15 @@ def test_server_functionality(trace_server: TestOnlyUserInjectingExternalTraceSe
 ### Configuration:
 
 The trace server backend can be configured via pytest flags:
+- `--trace-server=fake`: Use fake in-memory backend (default)
 - `--trace-server=sqlite`: Use SQLite backend (in-memory)
-- `--trace-server=clickhouse`: Use ClickHouse backend (default)
+- `--trace-server=clickhouse`: Use ClickHouse backend
 - `--ch` or `--clickhouse`: Shorthand for ClickHouse backend
 
 ### Architecture:
 
 The fixture automatically:
-- Sets up the appropriate backend (SQLite or ClickHouse)
+- Sets up the appropriate backend (fake, SQLite, or ClickHouse)
 - Injects a test user entity (`shawn`) for all operations
 - Handles database setup/teardown
 - Provides ID conversion between external and internal formats
@@ -45,7 +46,7 @@ Tests in this directory should focus on trace server functionality only. Client-
 
 The CI pipeline runs tests in three segments:
 1. **Non Trace Server**: Tests that don't depend on a trace server
-2. **ClickHouse Trace Server**: Trace server tests with ClickHouse backend  
+2. **ClickHouse Trace Server**: Trace server tests with ClickHouse backend
 3. **SQLite Trace Server**: Trace server tests with SQLite backend
 
-This ensures comprehensive coverage across both backend implementations. 
+This ensures comprehensive coverage across the configured backend implementations.

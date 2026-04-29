@@ -24,6 +24,8 @@ from weave.trace_server.project_version.types import (
 )
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
+pytestmark = pytest.mark.requires_clickhouse
+
 
 @pytest.fixture
 def clickhouse_trace_server(trace_server):
