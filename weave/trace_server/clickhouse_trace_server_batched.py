@@ -353,9 +353,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
-        # CPython's GIL makes set.add/__contains__/clear atomic, so no lock is
-        # required. Concurrent threads racing on the same op may both insert,
-        # but RMT collapses them — duplicates are harmless.
         self._inserted_ops: set[tuple[str, str]] = set()
         self._placeholder_file_projects: set[str] = set()
         self._database_ensured = False
