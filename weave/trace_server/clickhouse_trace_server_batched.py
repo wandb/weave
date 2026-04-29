@@ -107,6 +107,7 @@ from weave.trace_server.clickhouse.utilities import (
     maybe_enqueue_minimal_call_end,
     num_bytes,
     process_parameters,
+    sanitize_invalid_utf8_surrogates,
     should_retry_empty_query,
     string_to_int_in_range,
 )
@@ -6820,6 +6821,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         start = time.monotonic()
+        data = sanitize_invalid_utf8_surrogates(data)
         for attempt in range(ch_settings.INSERT_MAX_RETRIES):
             try:
                 result = self.ch_client.insert(

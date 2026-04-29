@@ -10,7 +10,7 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypeVar, cast
 
 import ddtrace
 import sqlparse
@@ -23,6 +23,8 @@ from weave.trace_server.errors import InsertTooLarge
 from weave.trace_server.kafka import KafkaProducer
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 # ---------------------------------------------------------------------------
@@ -42,18 +44,43 @@ def num_bytes(data: Any) -> int:
         return 0
 
 
+def sanitize_invalid_utf8_surrogates(value: T) -> T:
+    if isinstance(value, str):
+        return cast(
+            T,
+            value.encode("utf-16", errors="surrogatepass").decode(
+                "utf-16", errors="replace"
+            ),
+        )
+    if isinstance(value, list):
+        return cast(T, [sanitize_invalid_utf8_surrogates(item) for item in value])
+    if isinstance(value, tuple):
+        return cast(T, tuple(sanitize_invalid_utf8_surrogates(item) for item in value))
+    if isinstance(value, dict):
+        return cast(
+            T,
+            {
+                sanitize_invalid_utf8_surrogates(
+                    key
+                ): sanitize_invalid_utf8_surrogates(val)
+                for key, val in value.items()
+            },
+        )
+    return value
+
+
 def dict_value_to_dump(
     value: dict,
 ) -> str:
     if not isinstance(value, dict):
         raise TypeError(f"Value is not a dict: {value}")
-    return json.dumps(value)
+    return json.dumps(sanitize_invalid_utf8_surrogates(value))
 
 
 def any_value_to_dump(
     value: Any,
 ) -> str:
-    return json.dumps(value)
+    return json.dumps(sanitize_invalid_utf8_surrogates(value))
 
 
 def dict_dump_to_dict(val: str) -> dict[str, Any]:
