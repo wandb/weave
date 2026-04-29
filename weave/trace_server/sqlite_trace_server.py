@@ -33,7 +33,7 @@ from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
-from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -85,7 +85,7 @@ from weave.trace_server.trace_server_common import (
     scorer_read_res_from_obj,
     set_nested_key,
 )
-from weave.trace_server.ttl_settings import compute_expire_at
+from weave.trace_server.ttl_settings import compute_expire_at, invalidate_ttl_cache
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -2880,6 +2880,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             (req.project_id, stored_days, updated_at, req.wb_user_id),
         )
         conn.commit()
+        invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
     def threads_query_stream(

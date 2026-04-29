@@ -1804,7 +1804,9 @@ ALLOWED_CALL_FIELDS = {
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
     "otel_dump": CallsMergedAggField(field="otel_dump", agg_fn="any"),
-    "expire_at": CallsMergedAggField(field="expire_at", agg_fn="max"),
+    # calls_merged.expire_at is SimpleAggregateFunction(min, DateTime64(3))
+    # (migration 029); use the matching agg_fn so reads agree with storage.
+    "expire_at": CallsMergedAggField(field="expire_at", agg_fn="min"),
 }
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}

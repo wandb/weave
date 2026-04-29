@@ -1,6 +1,6 @@
 from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.constants import (
     EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
     EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
@@ -196,7 +196,7 @@ def test_cte_chain_calls_complete() -> None:
             "pb_1": ["eval-1"],
             "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
             "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": SENTINEL_DATETIME,
+            "pb_4": SENTINEL_EPOCH,
         },
     )
 
@@ -334,7 +334,7 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
             "pb_1": ["eval-1", "eval-2"],
             "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
             "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": SENTINEL_DATETIME,
+            "pb_4": SENTINEL_EPOCH,
             "pb_5": '$."scores"."accuracy"',
             "pb_6": "eval-1",
             "pb_7": 2,
@@ -594,7 +594,7 @@ def test_full_query_calls_complete() -> None:
             "pb_1": ["eval-1"],
             "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
             "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": SENTINEL_DATETIME,
+            "pb_4": SENTINEL_EPOCH,
             "pb_5": "proj-1",
         },
     )

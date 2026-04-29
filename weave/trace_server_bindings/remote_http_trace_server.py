@@ -1012,7 +1012,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self, req: tsi.ProjectTTLSettingsReadReq
     ) -> tsi.ProjectTTLSettingsReadRes:
         return self._generic_request(
-            "/project/ttl_settings",
+            "/project/ttl_settings/read",
             req,
             tsi.ProjectTTLSettingsReadReq,
             tsi.ProjectTTLSettingsReadRes,

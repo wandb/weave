@@ -19,7 +19,7 @@ import pytest
 
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.project_version.types import CallsStorageServerMode

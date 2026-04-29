@@ -19,7 +19,8 @@ which generates the correct comparison for the active ``ReadTable``:
 Sentinel string fields: parent_id, display_name, exception, otel_dump,
     wb_user_id, wb_run_id, thread_id, turn_id  (sentinel = '')
 Sentinel datetime fields: ended_at, updated_at, deleted_at
-    (sentinel = epoch zero), expire_at (sentinel = 2100-01-01)
+    (sentinel = SENTINEL_EPOCH, 1970-01-01),
+    expire_at (sentinel = EXPIRE_AT_NEVER, 2100-01-01)
 Sentinel int fields: wb_run_step, wb_run_step_end  (sentinel = 0)
 """
 
@@ -33,7 +34,9 @@ from weave.trace_server.project_version.types import ReadTable
 if TYPE_CHECKING:
     from weave.trace_server.orm import ParamBuilder
 
-SENTINEL_DATETIME = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+SENTINEL_EPOCH = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+# expire_at uses a far-future sentinel so that ClickHouse's TTL DELETE clause
+# (toDateTime(expire_at) DELETE) does not see "no TTL" rows as already expired.
 EXPIRE_AT_NEVER = datetime.datetime(2100, 1, 1, tzinfo=datetime.timezone.utc)
 SENTINEL_STRING = ""
 SENTINEL_INT = 0
@@ -52,9 +55,9 @@ SENTINEL_STRING_FIELDS = frozenset(
 )
 
 SENTINEL_DATETIME_VALUES: dict[str, datetime.datetime] = {
-    "ended_at": SENTINEL_DATETIME,
-    "updated_at": SENTINEL_DATETIME,
-    "deleted_at": SENTINEL_DATETIME,
+    "ended_at": SENTINEL_EPOCH,
+    "updated_at": SENTINEL_EPOCH,
+    "deleted_at": SENTINEL_EPOCH,
     "expire_at": EXPIRE_AT_NEVER,
 }
 
@@ -71,6 +74,11 @@ ALL_SENTINEL_FIELDS = (
     SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS | SENTINEL_INT_FIELDS
 )
 
+# These sentinel fields apply to calls_complete (everything in ALL_SENTINEL_FIELDS
+# is non-nullable there). The legacy calls_merged/call_parts schema stores every
+# column as Nullable except expire_at, which was added as a non-nullable column
+# with a far-future default in migration 029. So calls_merged only needs sentinel
+# handling for expire_at; see _uses_sentinel_for_read_table() below.
 SENTINEL_IN_CALLS_MERGED_FIELDS = frozenset({"expire_at"})
 
 # Single source of truth for ClickHouse DateTime64 precision per column.
@@ -128,15 +136,15 @@ def sentinel_ch_literal(field: str) -> str:
         field: The column name (must be a sentinel field).
 
     Returns:
-        SQL expression: ``toDateTime64(0, N)`` or a custom datetime sentinel
-        for datetime fields, ``''`` for string fields.
+        SQL expression: ``toDateTime64('YYYY-MM-DD HH:MM:SS', N)`` for datetime
+        fields, ``''`` for string fields, ``0`` for int fields.
 
     Raises:
         ValueError: If the field is not a sentinel field.
 
     Examples:
         >>> sentinel_ch_literal("deleted_at")
-        'toDateTime64(0, 3)'
+        "toDateTime64('1970-01-01 00:00:00', 3)"
         >>> sentinel_ch_literal("parent_id")
         "''"
         >>> sentinel_ch_literal("wb_run_step")
@@ -147,8 +155,6 @@ def sentinel_ch_literal(field: str) -> str:
     if field in SENTINEL_DATETIME_FIELDS:
         precision = DATETIME_PRECISION[field]
         sentinel = SENTINEL_DATETIME_VALUES[field]
-        if sentinel == SENTINEL_DATETIME:
-            return f"toDateTime64(0, {precision})"
         sentinel_str = sentinel.replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
         return f"toDateTime64('{sentinel_str}', {precision})"
     if field in SENTINEL_INT_FIELDS:
@@ -176,11 +182,11 @@ def null_check_literal_sql(
 
     Returns:
         A SQL fragment like ``t.deleted_at IS NULL`` or
-        ``t.deleted_at = toDateTime64(0, 3)``.
+        ``t.deleted_at = toDateTime64('1970-01-01 00:00:00', 3)``.
 
     Examples:
         >>> null_check_literal_sql("deleted_at", "cm.deleted_at", ReadTable.CALLS_COMPLETE)
-        "cm.deleted_at = toDateTime64(0, 3)"
+        "cm.deleted_at = toDateTime64('1970-01-01 00:00:00', 3)"
         >>> null_check_literal_sql("parent_id", "t.parent_id", ReadTable.CALLS_MERGED)
         "t.parent_id IS NULL"
     """

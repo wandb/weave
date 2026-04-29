@@ -3,9 +3,7 @@ import datetime
 from pydantic import BaseModel, Field, field_validator
 
 from weave.shared import refs_internal as ri
-from weave.trace_server import ch_sentinel_values, validation
-
-EXPIRE_AT_NEVER = ch_sentinel_values.EXPIRE_AT_NEVER
+from weave.trace_server import validation
 
 # =============================================================================
 # Base Classes for ClickHouse Call Schemas
@@ -19,6 +17,7 @@ class CallBaseCHInsertable(BaseModel):
     id: str
     input_refs: list[str] = Field(default_factory=list)
     output_refs: list[str] = Field(default_factory=list)
+    expire_at: datetime.datetime | None = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -68,7 +67,6 @@ class CallStartCHInsertable(
     attributes_dump: str
     inputs_dump: str
     otel_dump: str | None = None
-    expire_at: datetime.datetime | None = None
 
 
 class CallEndCHInsertable(CallBaseCHInsertable):
@@ -82,7 +80,6 @@ class CallEndCHInsertable(CallBaseCHInsertable):
     summary_dump: str
     output_dump: str
     wb_run_step_end: int | None = None
-    expire_at: datetime.datetime | None = None
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator
@@ -94,7 +91,6 @@ class CallDeleteCHInsertable(CallBaseCHInsertable):
 
     wb_user_id: str
     deleted_at: datetime.datetime
-    expire_at: datetime.datetime | None = None
 
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
 
@@ -104,7 +100,6 @@ class CallUpdateCHInsertable(CallBaseCHInsertable):
 
     wb_user_id: str
     display_name: str | None = None
-    expire_at: datetime.datetime | None = None
 
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _display_name_v = field_validator("display_name")(validation.display_name_validator)
@@ -132,7 +127,6 @@ class CallCompleteCHInsertable(
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
-    expire_at: datetime.datetime | None = None
     source: str = "direct"
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(

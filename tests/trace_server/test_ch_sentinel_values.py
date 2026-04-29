@@ -12,9 +12,9 @@ from weave.trace_server.ch_sentinel_values import (
     ALL_SENTINEL_FIELDS,
     DATETIME_PRECISION,
     EXPIRE_AT_NEVER,
-    SENTINEL_DATETIME,
     SENTINEL_DATETIME_FIELDS,
     SENTINEL_DATETIME_VALUES,
+    SENTINEL_EPOCH,
     SENTINEL_INT,
     SENTINEL_INT_FIELDS,
     SENTINEL_STRING,
@@ -37,9 +37,7 @@ NON_SENTINEL_FIELDS = ["op_name", "id", "inputs_dump", "trace_id"]
 def test_constants() -> None:
     """Sentinel constants and field sets are internally consistent."""
     assert SENTINEL_STRING == ""
-    assert SENTINEL_DATETIME == datetime.datetime(
-        1970, 1, 1, tzinfo=datetime.timezone.utc
-    )
+    assert SENTINEL_EPOCH == datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
     assert EXPIRE_AT_NEVER == datetime.datetime(
         2100, 1, 1, tzinfo=datetime.timezone.utc
     )
@@ -53,6 +51,9 @@ def test_constants() -> None:
     assert SENTINEL_STRING_FIELDS.isdisjoint(SENTINEL_DATETIME_FIELDS)
     assert SENTINEL_STRING_FIELDS.isdisjoint(SENTINEL_INT_FIELDS)
     assert SENTINEL_DATETIME_FIELDS.isdisjoint(SENTINEL_INT_FIELDS)
+    # Every datetime sentinel field must declare both a value and a precision;
+    # a mismatch breaks sentinel_ch_literal/sentinel_ch_type for that field.
+    assert set(SENTINEL_DATETIME_VALUES) == set(DATETIME_PRECISION)
 
 
 def test_is_sentinel_field() -> None:
@@ -114,9 +115,13 @@ def test_sentinel_ch_literal() -> None:
         assert sentinel_ch_literal(field) == "''"
 
     # Datetime sentinel fields return their field-specific sentinel literal.
-    assert sentinel_ch_literal("ended_at") == "toDateTime64(0, 6)"
-    assert sentinel_ch_literal("updated_at") == "toDateTime64(0, 3)"
-    assert sentinel_ch_literal("deleted_at") == "toDateTime64(0, 3)"
+    assert sentinel_ch_literal("ended_at") == ("toDateTime64('1970-01-01 00:00:00', 6)")
+    assert sentinel_ch_literal("updated_at") == (
+        "toDateTime64('1970-01-01 00:00:00', 3)"
+    )
+    assert sentinel_ch_literal("deleted_at") == (
+        "toDateTime64('1970-01-01 00:00:00', 3)"
+    )
     assert sentinel_ch_literal("expire_at") == (
         "toDateTime64('2100-01-01 00:00:00', 3)"
     )
@@ -275,14 +280,14 @@ def test_null_check_literal_sql() -> None:
     )
     assert result == "t.parent_id != ''"
 
-    # calls_complete sentinel datetime field: uses = toDateTime64(0, N) or !=.
+    # calls_complete sentinel datetime field: uses = toDateTime64(...) or !=.
     result = null_check_literal_sql("ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE)
-    assert result == "t.ended_at = toDateTime64(0, 6)"
+    assert result == "t.ended_at = toDateTime64('1970-01-01 00:00:00', 6)"
 
     result = null_check_literal_sql(
         "ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE, negate=True
     )
-    assert result == "t.ended_at != toDateTime64(0, 6)"
+    assert result == "t.ended_at != toDateTime64('1970-01-01 00:00:00', 6)"
 
     # calls_merged expire_at uses the non-null far-future sentinel.
     result = null_check_literal_sql("expire_at", "t.expire_at", ReadTable.CALLS_MERGED)
