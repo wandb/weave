@@ -237,10 +237,13 @@ def build_order_by(
         return default
     parts: list[str] = []
     for s in sort_by:
-        if s.field in allowed and s.direction in {"asc", "desc"}:
-            expr = column_exprs.get(s.field, s.field) if column_exprs else s.field
-            parts.append(f"{expr} {s.direction}")
-    return ", ".join(parts) if parts else default
+        if s.field not in allowed:
+            raise ValueError(f"Invalid sort field: {s.field!r}")
+        if s.direction not in {"asc", "desc"}:
+            raise ValueError(f"Invalid sort direction: {s.direction!r}")
+        expr = column_exprs.get(s.field, s.field) if column_exprs else s.field
+        parts.append(f"{expr} {s.direction}")
+    return ", ".join(parts)
 
 
 def add_time_filters(
@@ -260,10 +263,8 @@ def add_time_filters(
         conditions.append(f"{column} < {end_slot}")
 
 
-def _pagination_slots(
-    pb: ParamBuilder, limit: int, offset: int
-) -> tuple[str, str, int]:
-    """Add limit/offset params and return (limit_slot, offset_slot, limit).
+def _pagination_slots(pb: ParamBuilder, limit: int, offset: int) -> tuple[str, str]:
+    """Add limit/offset params and return (limit_slot, offset_slot).
 
     Bounds (`0 <= limit <= MAX_AGENT_QUERY_LIMIT`, `offset >= 0`) are
     enforced by Pydantic on the request models; this function trusts those
@@ -271,7 +272,7 @@ def _pagination_slots(
     """
     limit_slot = pb.add(limit, param_type="UInt64")
     offset_slot = pb.add(offset, param_type="UInt64")
-    return limit_slot, offset_slot, limit
+    return limit_slot, offset_slot
 
 
 # ---------------------------------------------------------------------------
@@ -330,11 +331,9 @@ def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     if req.query is not None:
         # Imported lazily to avoid a circular import between this module
         # (used by agent_query_compiler) and the compiler itself.
-        from weave.trace_server.query_builder.agent_query_compiler import (
-            compile_agent_query,
-        )
+        from weave.trace_server.query_builder import agent_query_compiler
 
-        conditions.append(compile_agent_query(req.query, pb))
+        conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
     return " AND ".join(conditions)
 
 
@@ -366,7 +365,7 @@ def _normalize_search_roles(roles: Sequence[str]) -> list[str]:
 def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
     """Build the WHERE clause for a search against the messages table."""
     pid_slot = pb.add(req.project_id, param_type="String")
-    content_slot = pb.add(f"%{req.query}%", param_type="String")
+    content_slot = pb.add(f"%{_escape_like_pattern(req.query)}%", param_type="String")
     conditions = [
         f"project_id = {pid_slot}",
         f"content LIKE {content_slot}",
@@ -395,6 +394,10 @@ def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
         before_slot = pb.add(req.started_before, param_type="DateTime64(6)")
         conditions.append(f"started_at < {before_slot}")
     return " AND ".join(conditions)
+
+
+def _escape_like_pattern(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 # ---------------------------------------------------------------------------
@@ -440,7 +443,7 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
 def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """List spans (ungrouped) or aggregate groups (grouped)."""
     where = _spans_where(pb, req)
-    limit_slot, offset_slot, _ = _pagination_slots(pb, req.limit, req.offset)
+    limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
 
     if not req.group_by:
         order_by = build_order_by(req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC")
@@ -507,7 +510,7 @@ def make_agents_list_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
     order_by = build_order_by(
         req.sort_by, AGENT_SORTABLE_COLS, "last_seen DESC, agent_name"
     )
-    limit_slot, offset_slot, _ = _pagination_slots(pb, req.limit, req.offset)
+    limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
     return f"""
         SELECT agent_name,
                sum(invocation_count) AS invocation_count,
@@ -539,7 +542,7 @@ def make_agent_versions_count_query(
 
 def make_agent_versions_list_query(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
     where = _agent_versions_where(pb, req)
-    limit_slot, offset_slot, _ = _pagination_slots(pb, req.limit, req.offset)
+    limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
     return f"""
         SELECT agent_version,
                sum(invocation_count) AS invocation_count,
@@ -582,7 +585,8 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     # keeps a portable text representation.
     return f"""
         SELECT conversation_id, conversation_name, agent_name,
-               span_id, trace_id, role, content,
+               span_id, trace_id, role,
+               substring(content, 1, 500) AS content,
                lower(hex(content_digest)) AS content_digest, started_at
         FROM messages
         WHERE {where}

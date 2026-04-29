@@ -600,7 +600,8 @@ class TestMakeMessageSearchQuery:
 
         expected = """
             SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role, content,
+                   span_id, trace_id, role,
+                   substring(content, 1, 500) AS content,
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
             WHERE project_id = {genai_0:String}
@@ -631,7 +632,8 @@ class TestMakeMessageSearchQuery:
 
         expected = """
             SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role, content,
+                   span_id, trace_id, role,
+                   substring(content, 1, 500) AS content,
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
             WHERE project_id = {genai_0:String}
@@ -662,7 +664,8 @@ class TestMakeMessageSearchQuery:
 
         expected = """
             SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role, content,
+                   span_id, trace_id, role,
+                   substring(content, 1, 500) AS content,
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
             WHERE project_id = {genai_0:String}
@@ -679,6 +682,14 @@ class TestMakeMessageSearchQuery:
             "genai_4": 0,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_escapes_like_wildcards(self) -> None:
+        pb = ParamBuilder("genai")
+        make_message_search_query(
+            pb, AgentSearchReq(project_id="p1", query=r"88%_off\sale")
+        )
+
+        assert pb.get_params()["genai_1"] == r"%88\%\_off\\sale%"
 
     def test_limit_rejected_when_above_max(self) -> None:
         with pytest.raises(ValidationError):
@@ -799,10 +810,13 @@ class TestBuildOrderBy:
 
     def test_rejects_invalid_field(self) -> None:
         sort = [AgentSortBy(field="'; DROP TABLE--", direction="asc")]
-        assert (
+        with pytest.raises(ValueError, match="Invalid sort field"):
             build_order_by(sort, SPAN_SORTABLE_COLS, "started_at DESC")
-            == "started_at DESC"
-        )
+
+    def test_rejects_invalid_direction(self) -> None:
+        sort = [AgentSortBy.model_construct(field="input_tokens", direction="sideways")]
+        with pytest.raises(ValueError, match="Invalid sort direction"):
+            build_order_by(sort, SPAN_SORTABLE_COLS, "started_at DESC")
 
     def test_valid_multiple(self) -> None:
         sort = [
