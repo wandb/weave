@@ -14,8 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
-from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
 
 SpanKindLiteral = Literal[
     "UNSPECIFIED",
@@ -75,7 +74,7 @@ class AgentSpanCHInsertable(BaseModel):
     # [OTel Core] timestamps
     started_at: datetime.datetime
     # Mirrors the ClickHouse `DEFAULT toDateTime64(0, 6)` sentinel for open spans.
-    ended_at: datetime.datetime = SENTINEL_DATETIME
+    ended_at: datetime.datetime = SENTINEL_EPOCH
     created_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
     )
