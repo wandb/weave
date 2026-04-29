@@ -270,6 +270,7 @@ from weave.trace_server.trace_server_common import (
     try_parse_json,
 )
 from weave.trace_server.ttl_settings import (
+    RETENTION_DAYS_NO_TTL,
     get_project_retention_days,
     invalidate_ttl_cache,
 )
@@ -2614,7 +2615,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.ProjectTTLSettingsReadRes:
         stored_days = get_project_retention_days(req.project_id, self.ch_client)
         return tsi.ProjectTTLSettingsReadRes(
-            retention_days=stored_days if stored_days > 0 else None
+            retention_days=stored_days if stored_days != RETENTION_DAYS_NO_TTL else None
         )
 
     @ddtrace.tracer.wrap(
@@ -2630,7 +2631,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.wb_user_id:
             raise InvalidRequest("wb_user_id is required for audit trail")
 
-        stored_days = req.retention_days or 0
+        stored_days = (
+            RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
+        )
         self.ch_client.insert(
             "project_ttl_settings",
             data=[

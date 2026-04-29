@@ -35,8 +35,12 @@ PROJECT_TTL_CACHE_TTL_SECS = 300
 REDIS_TTL_KEY_PREFIX = "weave:project_ttl:"
 REDIS_TTL_EXPIRY_SECS = 300
 
+# Stored retention_days value meaning "no TTL configured for this project".
+# Used as the on-disk encoding for "unset" since the column is non-null.
+RETENTION_DAYS_NO_TTL = 0
+
 # Global cache shared across all threads. Keyed by project_id.
-# Value is retention_days (int). 0 means no TTL.
+# Value is retention_days (int). RETENTION_DAYS_NO_TTL means no TTL.
 _project_ttl_cache: TTLCache[str, int] = TTLCache(
     maxsize=PROJECT_TTL_CACHE_SIZE, ttl=PROJECT_TTL_CACHE_TTL_SECS
 )
@@ -48,11 +52,11 @@ def get_project_retention_days(
     project_id: str,
     ch_client: CHClient,
 ) -> int:
-    """Return retention_days for a project (0 = no TTL / infinite). Cached.
+    """Return retention_days for a project (RETENTION_DAYS_NO_TTL = no TTL). Cached.
 
     Read path: L1 (in-process) -> L2 (Redis, if REDIS_URL is set) -> ClickHouse
     (argMax). A fall-through to ClickHouse is a full cache miss; if ClickHouse
-    has no row for the project, returns 0 (no TTL configured).
+    has no row for the project, returns RETENTION_DAYS_NO_TTL.
 
     Redis client is resolved lazily via get_redis_client() (lru_cached
     process singleton). ch_client must come from the calling thread — it is
@@ -88,11 +92,11 @@ def compute_expire_at(
 ) -> datetime.datetime | None:
     """Compute the expire_at timestamp for a call.
 
-    If retention_days == 0, returns None, meaning no TTL. Otherwise returns
-    started_at + timedelta(days=retention_days). DB adapters convert None to
-    their non-null storage sentinel at the write boundary.
+    If retention_days is RETENTION_DAYS_NO_TTL, returns None, meaning no TTL.
+    Otherwise returns started_at + timedelta(days=retention_days). DB adapters
+    convert None to their non-null storage sentinel at the write boundary.
     """
-    if retention_days == 0:
+    if retention_days == RETENTION_DAYS_NO_TTL:
         return None
 
     anchor = started_at
@@ -177,7 +181,10 @@ def _l2_delete(redis_client: redis.Redis, project_id: str) -> None:
 
 
 def _query_clickhouse(ch_client: CHClient, project_id: str) -> int:
-    """Query ClickHouse for the latest retention_days via argMax. Returns 0 on miss."""
+    """Query ClickHouse for the latest retention_days via argMax.
+
+    Returns RETENTION_DAYS_NO_TTL on miss.
+    """
     result = ch_client.query(
         "SELECT argMax(retention_days, updated_at) "
         "FROM project_ttl_settings "
@@ -185,5 +192,5 @@ def _query_clickhouse(ch_client: CHClient, project_id: str) -> int:
         parameters={"project_id": project_id},
     )
     if result.row_count == 0:
-        return 0
+        return RETENTION_DAYS_NO_TTL
     return int(result.first_row[0])

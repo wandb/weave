@@ -85,7 +85,11 @@ from weave.trace_server.trace_server_common import (
     scorer_read_res_from_obj,
     set_nested_key,
 )
-from weave.trace_server.ttl_settings import compute_expire_at, invalidate_ttl_cache
+from weave.trace_server.ttl_settings import (
+    RETENTION_DAYS_NO_TTL,
+    compute_expire_at,
+    invalidate_ttl_cache,
+)
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -484,7 +488,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         cursor.execute(TABLE_FEEDBACK.create_sql())
 
     def _get_project_retention_days(self, project_id: str) -> int:
-        """Return retention_days for a project (0 = no TTL). SQLite-local, uncached."""
+        """Return retention_days for a project (RETENTION_DAYS_NO_TTL = no TTL).
+
+        SQLite-local, uncached.
+        """
         _, cursor = get_conn_cursor(self.db_path)
         cursor.execute(
             "SELECT retention_days FROM project_ttl_settings "
@@ -492,7 +499,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             (project_id,),
         )
         row = cursor.fetchone()
-        return int(row[0]) if row is not None else 0
+        return int(row[0]) if row is not None else RETENTION_DAYS_NO_TTL
 
     def _compute_call_expire_at(
         self, project_id: str, anchor: datetime.datetime
@@ -2852,7 +2859,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.ProjectTTLSettingsReadRes:
         stored_days = self._get_project_retention_days(req.project_id)
         return tsi.ProjectTTLSettingsReadRes(
-            retention_days=stored_days if stored_days > 0 else None
+            retention_days=stored_days if stored_days != RETENTION_DAYS_NO_TTL else None
         )
 
     def project_ttl_settings_update(
@@ -2865,7 +2872,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if not req.wb_user_id:
             raise InvalidRequest("wb_user_id is required for audit trail")
 
-        stored_days = req.retention_days or 0
+        stored_days = (
+            RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
+        )
         conn, cursor = get_conn_cursor(self.db_path)
         # Pad microseconds so updated_at strings sort lexicographically by time.
         # isoformat() drops microseconds when they're 0, which would make
