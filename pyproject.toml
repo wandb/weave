@@ -97,6 +97,7 @@ crewai = [
   "openai>=1.99.9,<1.100.0",
 ]
 dspy = ["dspy>=3.0.0; python_version >= '3.10'"]
+gepa = ["gepa>=0.1.0; python_version >= '3.10'"]
 google_genai = [
   "google-genai>=1.0.0,<=1.23.0; python_version >= '3.10'",
   "pillow>=11.1.0",
@@ -356,7 +357,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.38-dev0"
+current_version = "0.52.39-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -520,6 +521,11 @@ conflicts = [
   [
     { extra = "crewai" },
     { extra = "scorers" },
+  ],
+  # dspy pins gepa to 0.0.x versions that predate the callback protocol
+  [
+    { extra = "dspy" },
+    { extra = "gepa" },
   ],
 ]
 

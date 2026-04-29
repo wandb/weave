@@ -36,21 +36,61 @@ LOCAL_TABLE_SUFFIX = "_local"
 # https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
 
+# Hard ceiling on actual query runtime — ClickHouse aborts queries that run
+# longer than this.
 # https://clickhouse.com/docs/operations/settings/settings#max_execution_time
 DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
+
+# Projection-based ceiling — ClickHouse extrapolates from rows already scanned
+# and aborts early if the projected total runtime would exceed this. Lets us
+# fail fast on doomed queries without waiting for max_execution_time.
+# Available in ClickHouse 24.1+.
+# https://clickhouse.com/docs/operations/settings/settings#max_estimated_execution_time
+DEFAULT_MAX_ESTIMATED_EXECUTION_TIME = DEFAULT_MAX_EXECUTION_TIME
+
+# We don't bother projecting execution time for queries that finish quickly —
+# ClickHouse waits this long before doing the projection check, avoiding the
+# overhead on short queries.
+# https://clickhouse.com/docs/operations/settings/settings#timeout_before_checking_execution_speed
+DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED = 5
 
 # https://clickhouse.com/docs/sql-reference/functions/json-functions#json_value
 RETURN_TYPE_ALLOW_COMPLEX = "1"
 
-CLICKHOUSE_DEFAULT_QUERY_SETTINGS: dict[str, int | str] = {
+_env_max_execution_time = wf_env.wf_clickhouse_max_execution_time()
+# Treat 0 as unset; a zero-second timeout is not a useful service default.
+_max_execution_time = _env_max_execution_time or DEFAULT_MAX_EXECUTION_TIME
+_disable_query_failure_prediction = (
+    wf_env.wf_clickhouse_disable_query_failure_prediction()
+)
+
+CLICKHOUSE_BASE_QUERY_SETTINGS: dict[str, int | str] = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
     or DEFAULT_MAX_MEMORY_USAGE,
-    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
-    or DEFAULT_MAX_EXECUTION_TIME,
+    "max_execution_time": _max_execution_time,
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
     # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
     "distributed_product_mode": "global",
 }
+
+CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS: dict[str, int | str] = {}
+
+if not _disable_query_failure_prediction:
+    CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS.update(
+        {
+            "max_estimated_execution_time": _max_execution_time,
+            "timeout_before_checking_execution_speed": DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED,
+            "timeout_overflow_mode": "throw",
+        }
+    )
+
+# Read paths get query failure prediction. Command paths use the base settings
+# because the prediction guard is intended for read-query scans, not mutations.
+CLICKHOUSE_DEFAULT_QUERY_SETTINGS: dict[str, int | str] = {
+    **CLICKHOUSE_BASE_QUERY_SETTINGS,
+    **CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS,
+}
+CLICKHOUSE_DEFAULT_COMMAND_SETTINGS = CLICKHOUSE_BASE_QUERY_SETTINGS
 
 # Settings required for lightweight UPDATE/DELETE queries (ClickHouse 23.12+).
 # Only applied to endpoints that use lightweight updates: calls_complete updates,
@@ -100,6 +140,15 @@ def merge_default_query_settings(
     if not overrides:
         return CLICKHOUSE_DEFAULT_QUERY_SETTINGS
     return {**CLICKHOUSE_DEFAULT_QUERY_SETTINGS, **overrides}
+
+
+def merge_default_command_settings(
+    overrides: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
+    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_COMMAND_SETTINGS."""
+    if not overrides:
+        return CLICKHOUSE_DEFAULT_COMMAND_SETTINGS
+    return {**CLICKHOUSE_DEFAULT_COMMAND_SETTINGS, **overrides}
 
 
 def update_settings_for_async_insert(

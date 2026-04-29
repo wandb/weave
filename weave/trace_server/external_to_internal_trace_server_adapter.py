@@ -1138,6 +1138,82 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.call_end_v2, req, req.end.project_id
         )
 
+    def genai_otel_export(
+        self, req: tsi.agent_types.GenAIOTelExportReq
+    ) -> tsi.agent_types.GenAIOTelExportRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._internal_trace_server.genai_otel_export(req)
+
+    def agent_spans_query(
+        self, req: tsi.agent_types.AgentSpansQueryReq
+    ) -> tsi.agent_types.AgentSpansQueryRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        res = self._ref_apply(
+            self._internal_trace_server.agent_spans_query, req, req.project_id
+        )
+        for span in res.spans:
+            if span.project_id != req.project_id:
+                raise ValueError("Internal Error - Project Mismatch")
+            span.project_id = original_project_id
+        return res
+
+    def agent_agents_query(
+        self, req: tsi.agent_types.AgentsQueryReq
+    ) -> tsi.agent_types.AgentsQueryRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        res = self._ref_apply(
+            self._internal_trace_server.agent_agents_query, req, req.project_id
+        )
+        for agent in res.agents:
+            if agent.project_id != req.project_id:
+                raise ValueError("Internal Error - Project Mismatch")
+            agent.project_id = original_project_id
+        return res
+
+    def agent_versions_query(
+        self, req: tsi.agent_types.AgentVersionsQueryReq
+    ) -> tsi.agent_types.AgentVersionsQueryRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        res = self._ref_apply(
+            self._internal_trace_server.agent_versions_query, req, req.project_id
+        )
+        for version in res.versions:
+            if version.project_id != req.project_id:
+                raise ValueError("Internal Error - Project Mismatch")
+            version.project_id = original_project_id
+        return res
+
+    def agent_search(
+        self, req: tsi.agent_types.AgentSearchReq
+    ) -> tsi.agent_types.AgentSearchRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_search, req, req.project_id
+        )
+
+    def agent_traces_chat(
+        self, req: tsi.agent_types.AgentTraceChatReq
+    ) -> tsi.agent_types.AgentTraceChatRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_traces_chat, req, req.project_id
+        )
+
+    def agent_conversation_chat(
+        self, req: tsi.agent_types.AgentConversationChatReq
+    ) -> tsi.agent_types.AgentConversationChatRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_conversation_chat,
+            req,
+            req.project_id,
+        )
+
     def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
         req = req.model_copy(deep=True)
         """Resolve external project IDs to internal project IDs."""
