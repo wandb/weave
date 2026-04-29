@@ -95,7 +95,7 @@ def test_validate_api_key_success(api_key):
 @pytest.mark.parametrize("api_key", all_invalid_keys, indirect=True)
 def test_validate_api_key_failure(api_key):
     """All invalid API keys should raise ValueError."""
-    with pytest.raises(ValueError, match="API key must be 40 characters long"):
+    with pytest.raises(ValueError, match="API key must be at least 40 characters long"):
         _validate_api_key(api_key)
 
 
