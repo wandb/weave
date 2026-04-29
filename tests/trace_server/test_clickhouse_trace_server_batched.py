@@ -969,6 +969,60 @@ def test_ensure_obj_version_exists_retries_eventual_consistency():
         assert mock_query.call_count == chts.OBJ_READ_RETRY_ATTEMPTS
 
 
+def test_select_objs_query_partial_value_miss_returns_empty():
+    """If metadata rows exist but their value rows haven't replicated yet,
+    return empty so obj_read raises NotFoundError and the retry wrapper kicks
+    in. Without this, the missing val_dump would silently default to "{}" and
+    the caller would decode a corrupted empty object.
+    """
+    server = chts.ClickHouseTraceServer(host="test_host")
+
+    metadata_row = (
+        "test_project",  # project_id
+        "obj-id-1",  # object_id
+        datetime(2024, 1, 1, tzinfo=timezone.utc),  # created_at
+        [],  # refs
+        "object",  # kind
+        None,  # base_object_class
+        None,  # leaf_object_class
+        "digest-abc",  # digest
+        0,  # version_index
+        1,  # is_latest
+        None,  # deleted_at
+        None,  # wb_user_id
+        1,  # version_count
+        0,  # is_op
+    )
+
+    builder = chts.ObjectMetadataQueryBuilder("test_project")
+    builder.add_digests_conditions("digest-abc")
+    builder.add_object_ids_condition(["obj-id-1"])
+
+    # Metadata SELECT finds the row; value SELECT returns nothing.
+    with patch.object(
+        chts.ClickHouseTraceServer,
+        "_query_stream",
+        side_effect=[iter([metadata_row]), iter([])],
+    ):
+        result = server._select_objs_query(builder, metadata_only=False)
+
+    assert result == []
+
+    # Sanity: when the value row is present, we get a populated result.
+    with patch.object(
+        chts.ClickHouseTraceServer,
+        "_query_stream",
+        side_effect=[
+            iter([metadata_row]),
+            iter([("obj-id-1", "digest-abc", '{"x": 1}')]),
+        ],
+    ):
+        result = server._select_objs_query(builder, metadata_only=False)
+
+    assert len(result) == 1
+    assert result[0].val_dump == '{"x": 1}'
+
+
 def test_file_content_read_retries_eventual_consistency():
     """File reads should tolerate transient read-after-write misses."""
     server = chts.ClickHouseTraceServer(host="test_host")
