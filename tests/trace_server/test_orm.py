@@ -353,3 +353,242 @@ def test_split_escaped_field_path() -> None:
 
     # Edge case: leading dot (unescaped)
     assert split_escaped_field_path(".output") == ["", "output"]
+
+
+def _feedback_table() -> Table:
+    return Table(
+        "feedback",
+        [
+            Column("id", "string"),
+            Column("payload", "json", db_name="payload_dump"),
+        ],
+    )
+
+
+def _prepare_clickhouse(select):
+    return select.prepare(
+        database_type="clickhouse",
+        param_builder=ParamBuilder(prefix="pb", database_type="clickhouse"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("literal", "expected_field_sql", "expected_param_value", "expected_param_type"),
+    [
+        # Bool literals: JSON_VALUE returns 'true'/'false' strings, so
+        # multiIf must coerce both before falling back to numeric coercion.
+        (
+            False,
+            "multiIf(JSON_VALUE(payload_dump, {pb_0:String}) = 'true', 1, "
+            "JSON_VALUE(payload_dump, {pb_0:String}) = 'false', 0, "
+            "toUInt8OrNull(JSON_VALUE(payload_dump, {pb_0:String})))",
+            False,
+            "Bool",
+        ),
+        (
+            True,
+            "multiIf(JSON_VALUE(payload_dump, {pb_0:String}) = 'true', 1, "
+            "JSON_VALUE(payload_dump, {pb_0:String}) = 'false', 0, "
+            "toUInt8OrNull(JSON_VALUE(payload_dump, {pb_0:String})))",
+            True,
+            "Bool",
+        ),
+        (
+            5,
+            "toInt64OrNull(JSON_VALUE(payload_dump, {pb_0:String}))",
+            5,
+            "Int64",
+        ),
+        (
+            2.5,
+            "toFloat64OrNull(JSON_VALUE(payload_dump, {pb_0:String}))",
+            2.5,
+            "Float64",
+        ),
+    ],
+)
+def test_feedback_query_infers_cast_from_literal(
+    literal, expected_field_sql, expected_param_value, expected_param_type
+) -> None:
+    """Regression for WB-33832: /feedback/query 500s with NO_COMMON_TYPE.
+
+    JSON_VALUE returns a string and the literal is bound with its native CH
+    type, so without inference ClickHouse refuses the comparison. The peer
+    literal's type now drives the field-side cast.
+    """
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "payload.is_positive"},
+                            {"$literal": literal},
+                        ]
+                    }
+                }
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    assert prepared.sql == (
+        "SELECT id\n"
+        "FROM feedback\n"
+        f"WHERE ({expected_field_sql} = {{pb_1:{expected_param_type}}})"
+    )
+    assert prepared.parameters == {
+        "pb_0": '$."is_positive"',
+        "pb_1": expected_param_value,
+    }
+
+
+def test_feedback_query_string_literal_keeps_uncast_path() -> None:
+    """String literals must keep the existing toString(JSON_VALUE(...)) path.
+
+    Inferring a cast for strings would break legitimate JSON-string
+    comparisons (e.g. category fields).
+    """
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "payload.label"},
+                            {"$literal": "ok"},
+                        ]
+                    }
+                }
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    assert prepared.sql == (
+        "SELECT id\n"
+        "FROM feedback\n"
+        "WHERE (toString(JSON_VALUE(payload_dump, {pb_0:String})) = {pb_1:String})"
+    )
+
+
+def test_feedback_query_explicit_convert_overrides_inference() -> None:
+    """An explicit $convert wins over inference and is not double-cast."""
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "payload.is_positive"},
+                                    "to": "bool",
+                                },
+                            },
+                            {"$literal": True},
+                        ]
+                    }
+                }
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    # ConvertOperation runs after process_operand for the field, so the cast
+    # we infer for the field side has no effect (the inner JSON_VALUE
+    # already wears toString from the default), and the outer cast wins.
+    assert prepared.sql == (
+        "SELECT id\n"
+        "FROM feedback\n"
+        "WHERE (toUInt8OrNull(toString(JSON_VALUE(payload_dump, {pb_0:String}))) = {pb_1:Bool})"
+    )
+
+
+def test_feedback_query_literal_on_lhs_casts_field_on_rhs() -> None:
+    """Inference works regardless of which side carries the literal."""
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$gt": [
+                            {"$literal": 3},
+                            {"$getField": "payload.score"},
+                        ]
+                    }
+                }
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    assert prepared.sql == (
+        "SELECT id\n"
+        "FROM feedback\n"
+        "WHERE ({pb_0:Int64} > toInt64OrNull(JSON_VALUE(payload_dump, {pb_1:String})))"
+    )
+
+
+def test_feedback_query_in_homogeneous_literal_list_casts_field() -> None:
+    """$in with a homogeneous numeric list infers a single cast for the field."""
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$in": [
+                            {"$getField": "payload.score"},
+                            [{"$literal": 1}, {"$literal": 2}, {"$literal": 3}],
+                        ]
+                    }
+                }
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    assert prepared.sql == (
+        "SELECT id\n"
+        "FROM feedback\n"
+        "WHERE (toInt64OrNull(JSON_VALUE(payload_dump, {pb_0:String})) "
+        "IN ({pb_1:Int64},{pb_2:Int64},{pb_3:Int64}))"
+    )
+
+
+def test_feedback_query_in_mixed_literal_list_keeps_uncast_path() -> None:
+    """A heterogeneous $in list cannot share a single cast and falls back."""
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$in": [
+                            {"$getField": "payload.value"},
+                            [{"$literal": 1}, {"$literal": "two"}],
+                        ]
+                    }
+                }
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    assert prepared.sql == (
+        "SELECT id\n"
+        "FROM feedback\n"
+        "WHERE (toString(JSON_VALUE(payload_dump, {pb_0:String})) "
+        "IN ({pb_1:Int64},{pb_2:String}))"
+    )
