@@ -1373,26 +1373,26 @@ def op(
             # makes all callers hit the cached signature for the wrapper.
             try:
                 cached_sig = inspect.signature(func)
-                wrapper.__signature__ = cached_sig  # type: ignore
-                wrapper._weave_cached_parsed_input_annotations = parse_from_signature(
-                    cached_sig
-                )  # type: ignore
+                wrapper_any = cast(Any, wrapper)
+                wrapper_any.__signature__ = cached_sig
+                wrapper_any._weave_cached_parsed_input_annotations = (
+                    parse_from_signature(cached_sig)
+                )
 
                 return_annotation = cached_sig.return_annotation
                 if (
                     return_annotation is not inspect.Signature.empty
                     and return_annotation
                 ):
-                    wrapper._weave_cached_parsed_return_annotation = (
-                        parse_content_annotation(  # type: ignore
-                            str(return_annotation)
-                        )
+                    wrapper_any._weave_cached_parsed_return_annotation = (
+                        parse_content_annotation(str(return_annotation))
                     )
                 else:
-                    wrapper._weave_cached_parsed_return_annotation = None  # type: ignore
+                    wrapper_any._weave_cached_parsed_return_annotation = None
             except (TypeError, ValueError):
-                wrapper._weave_cached_parsed_input_annotations = None  # type: ignore
-                wrapper._weave_cached_parsed_return_annotation = None  # type: ignore
+                wrapper_any = cast(Any, wrapper)
+                wrapper_any._weave_cached_parsed_input_annotations = None
+                wrapper_any._weave_cached_parsed_return_annotation = None
 
             return cast(Op[P, R], wrapper)
 
