@@ -224,6 +224,7 @@ def init_weave(
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
         attributes=attributes,
+        api_key=api_key,
     )
 
     # If the project name was formatted by init, update the project name
