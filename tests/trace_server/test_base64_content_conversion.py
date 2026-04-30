@@ -405,8 +405,12 @@ class TestRestoreContentObjectsToBase64:
         # metadata first (to get the mimetype), then the actual content bytes.
         calls = trace_server.file_content_read.call_args_list
         assert len(calls) == 2
-        assert calls[0] == call(FileContentReadReq(project_id="proj", digest="metadata_digest"))
-        assert calls[1] == call(FileContentReadReq(project_id="proj", digest="content_digest"))
+        assert calls[0] == call(
+            FileContentReadReq(project_id="proj", digest="metadata_digest")
+        )
+        assert calls[1] == call(
+            FileContentReadReq(project_id="proj", digest="content_digest")
+        )
 
     def test_restores_content_object_nested_in_dict(self):
         """Content objects nested inside a dict are restored; other values are unchanged."""
@@ -430,11 +434,15 @@ class TestRestoreContentObjectsToBase64:
         trace_server.file_content_read = MagicMock(
             side_effect=[
                 FileContentReadRes(
-                    content=json.dumps({"mimetype": "image/png", "size": len(raw1)}).encode()
+                    content=json.dumps(
+                        {"mimetype": "image/png", "size": len(raw1)}
+                    ).encode()
                 ),
                 FileContentReadRes(content=raw1),
                 FileContentReadRes(
-                    content=json.dumps({"mimetype": "image/gif", "size": len(raw2)}).encode()
+                    content=json.dumps(
+                        {"mimetype": "image/gif", "size": len(raw2)}
+                    ).encode()
                 ),
                 FileContentReadRes(content=raw2),
             ]
@@ -475,7 +483,10 @@ class TestRestoreContentObjectsToBase64:
         trace_server = _make_trace_server(raw, "image/png")
 
         messages = [
-            {"role": "user", "content": [{"type": "image", "image": _make_content_object()}]},
+            {
+                "role": "user",
+                "content": [{"type": "image", "image": _make_content_object()}],
+            },
         ]
         result = restore_content_objects_to_base64(messages, "proj", trace_server)
 
@@ -497,14 +508,18 @@ class TestRestoreContentObjectsToBase64:
         assert result is incomplete
         trace_server.file_content_read.assert_not_called()
 
-    def test_read_failure_returns_original_object(self, caplog: pytest.LogCaptureFixture):
+    def test_read_failure_returns_original_object(
+        self, caplog: pytest.LogCaptureFixture
+    ):
         """When file_content_read raises, the original Content object is returned and a warning is logged."""
         trace_server = MagicMock()
         trace_server.file_content_read.side_effect = RuntimeError("storage unavailable")
 
         content_obj = _make_content_object()
         with caplog.at_level(logging.WARNING):
-            result = restore_content_objects_to_base64(content_obj, "proj", trace_server)
+            result = restore_content_objects_to_base64(
+                content_obj, "proj", trace_server
+            )
 
         assert result == content_obj
         assert "Failed to restore Content object to data URL" in caplog.text
@@ -542,7 +557,9 @@ class TestRestoreContentObjectsToBase64:
         server.file_create.side_effect = _file_create
         server.file_content_read.side_effect = _file_content_read
 
-        replaced = replace_base64_with_content_objects({"url": data_url}, "proj", server)
+        replaced = replace_base64_with_content_objects(
+            {"url": data_url}, "proj", server
+        )
         assert isinstance(replaced["url"], dict), "Data URL should have been replaced"
 
         # Restore reads from the same storage that replace wrote to
