@@ -2531,14 +2531,17 @@ class WeaveClient:
             # `_collect_pending_digests` for context.
             rows_list = list(table.rows)
             pending = _collect_pending_digests(rows_list)
-            send = lambda: self._send_table_create(rows_list)  # noqa: E731
+
+            def send_simple_table() -> TableCreateRes:
+                return self._send_table_create(rows_list)
+
             res_future: Future[TableCreateRes]
             if pending:
                 res_future = self.future_executor.then(
-                    pending, lambda _resolved: send()
+                    pending, lambda _resolved: send_simple_table()
                 )
             else:
-                res_future = self.future_executor.defer(send)
+                res_future = self.future_executor.defer(send_simple_table)
         elif chunking_config.use_parallel_chunks:
             # Need to chunk up, use parallelism
             res_future = self._create_table_with_parallel_chunks(table)

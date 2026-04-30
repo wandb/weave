@@ -59,9 +59,7 @@ class TestCollectPendingDigests:
         assert _collect_pending_digests({"nested": {"deep": {"value": 1}}}) == []
 
     def test_object_ref_with_resolved_digest_returns_empty(self) -> None:
-        ref = ObjectRef(
-            entity="e", project="p", name="obj", _digest="resolved-digest"
-        )
+        ref = ObjectRef(entity="e", project="p", name="obj", _digest="resolved-digest")
         assert _collect_pending_digests(ref) == []
 
     def test_object_ref_with_pending_digest_is_collected(self) -> None:
