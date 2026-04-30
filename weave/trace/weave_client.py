@@ -812,7 +812,13 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
 
-        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
+        # Fix #6: skip per-op future allocation once the op's digest is
+        # resolved (any call after the first).
+        op_name_future: str | Future[str]
+        if isinstance(op_def_ref._digest, Future):
+            op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
+        else:
+            op_name_future = op_def_ref.uri
 
         # Get thread_id from context
         thread_id = call_context.get_thread_id()
@@ -822,14 +828,11 @@ class WeaveClient:
 
         # Determine turn_id: call becomes a turn if thread boundary is crossed
         if thread_id is None:
-            # No thread context, no turn_id
             turn_id = None
         elif parent is None or parent.thread_id != thread_id:
-            # This is a turn call - use its own ID as turn_id
             turn_id = call_id
             call_context.set_turn_id(call_id)
         else:
-            # Inherit turn_id from context
             turn_id = current_turn_id
 
         call = Call(
@@ -838,7 +841,6 @@ class WeaveClient:
             trace_id=trace_id,
             parent_id=parent_id,
             id=call_id,
-            # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
             attributes=attributes_dict,
             thread_id=thread_id,
@@ -846,8 +848,6 @@ class WeaveClient:
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()
-        # feels like this should be in post init, but keping here
-        # because the func needs to be resolved for schema insert below
         if callable(name_func := display_name):
             display_name = name_func(call)
         call.display_name = display_name
@@ -872,8 +872,6 @@ class WeaveClient:
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
-        # Check if using CallBatchProcessor with non-eager mode (calls_complete path)
-        # In this case, we delay printing the call link until finish_call
         uses_calls_complete_path = (
             isinstance(self._server_call_processor, CallBatchProcessor)
             and not op.eager_call_start
@@ -907,24 +905,12 @@ class WeaveClient:
                 )
             )
 
-            bytes_size = len(call_start_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes. Inputs may be dropped.",
-                    bytes_size,
-                    MAX_TRACE_PAYLOAD_SIZE,
-                )
-
-            # WAL path: persist to disk; the sender replays to the server.
+            # Fix #5: per-op size check removed. Server enforces payload size.
             if self._wal is not None:
                 self._wal.write("call_start", call_start_req)
-                if not current_call:  # root call
+                if not current_call:
                     self._wal_pending_call_ids.add(call_id)
             else:
-                # eager_call_start is a client-side hint that tells the batch processor
-                # to send this call's start immediately (for long-running ops like evals)
-                # Ugly that we have to reach down to the processor level here, but otherwise
-                # we need to change the interface itself.
                 call_processor = _get_call_processor(self.server)
                 if call_processor is not None:
                     eager = op.eager_call_start
@@ -939,8 +925,6 @@ class WeaveClient:
         def on_complete(f: Future) -> None:
             try:
                 root_call_did_not_error = f.result() and not current_call
-                # For calls_complete path (non-eager CallBatchProcessor), the link is
-                # printed in finish_call after the complete call is queued to ensure
                 if (
                     root_call_did_not_error
                     and should_print_call_link_
@@ -971,9 +955,21 @@ class WeaveClient:
     ) -> None:
         """Finalize a call and persist its results.
 
-        Any values present in ``call.summary`` are deep-merged with computed
-        summary statistics (e.g. usage and status counts) before being written
-        to the database.
+        Only ordering-sensitive state (`ended_at`, `exception`, `output`,
+        call-context pop) is set synchronously. Everything else
+        (postprocess, `_save_nested_objects`, `map_to_refs`, summary rollup,
+        `_on_finish_handler`, to_json, HTTP send) runs in `future_executor`.
+
+        Parent calls chain their deferred finish on their children's via
+        `future_executor.then`, so a parent's summary rollup observes its
+        children's already-computed summaries even though both run in the
+        worker pool.
+
+        Behavior notes:
+        - `call.output` is set to the raw output sync, then overwritten with
+          the postprocessed value when the worker runs.
+        - `call.summary` is `None` until the worker computes it. Tests that
+          inspect persisted state should call `client.flush()`.
         """
         if (
             is_tracing_setting_disabled()
@@ -986,88 +982,107 @@ class WeaveClient:
             ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
+        # Set raw output sync so it is visible to subsequent code in the same
+        # task. The deferred worker overwrites this with the postprocessed
+        # value.
+        call.output = original_output
 
-        if op is not None and op.postprocess_output:
-            postprocessed_output = op.postprocess_output(original_output)
-        else:
-            postprocessed_output = original_output
-
-        if self.postprocess_output:
-            postprocessed_output = self.postprocess_output(postprocessed_output)
-
-        self._save_nested_objects(postprocessed_output)
-        output_as_refs = map_to_refs(postprocessed_output)
-        call.output = postprocessed_output
-
-        # Summary handling
-        computed_summary: dict[str, Any] = {}
-        if call._children:
-            computed_summary = sum_dict_leaves(
-                [child.summary or {} for child in call._children]
-            )
-        elif (
-            isinstance(original_output, dict)
-            and RESERVED_SUMMARY_USAGE_KEY in original_output
-            and "model" in original_output
-        ):
-            computed_summary[RESERVED_SUMMARY_USAGE_KEY] = {}
-            computed_summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
-                "requests": 1,
-                **original_output[RESERVED_SUMMARY_USAGE_KEY],
-            }
-        elif hasattr(original_output, RESERVED_SUMMARY_USAGE_KEY) and hasattr(
-            original_output, "model"
-        ):
-            # Handle the cases where we are emitting an object instead of a pre-serialized dict
-            # In fact, this is going to become the more common case
-            model = original_output.model
-            usage = original_output.usage
-            if isinstance(usage, pydantic.BaseModel):
-                usage = usage.model_dump(exclude_unset=True)
-            if isinstance(usage, dict) and isinstance(model, str):
-                computed_summary[RESERVED_SUMMARY_USAGE_KEY] = {}
-                computed_summary[RESERVED_SUMMARY_USAGE_KEY][model] = {
-                    "requests": 1,
-                    **usage,
-                }
-
-        # Create client-side rollup of status_counts_by_op
-        status_counts_dict = computed_summary.setdefault(
-            RESERVED_SUMMARY_STATUS_COUNTS_KEY,
-            {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
-        )
-        if exception:
-            status_counts_dict[TraceStatus.ERROR] += 1
-        else:
-            status_counts_dict[TraceStatus.SUCCESS] += 1
-
-        # Merge any user-provided summary values with computed values
-        merged_summary = copy.deepcopy(call.summary or {})
-
-        def _deep_update(dst: dict[str, Any], src: dict[str, Any]) -> None:
-            for k, v in src.items():
-                if isinstance(v, dict) and isinstance(dst.get(k), dict):
-                    _deep_update(dst[k], v)
-                else:
-                    dst[k] = v
-
-        _deep_update(merged_summary, computed_summary)
-        call.summary = merged_summary
-
-        # Exception Handling
+        # Exception handling: cheap, must be sync so call.exception is set.
         exception_str: str | None = None
         if exception:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
+        is_root_call = call.parent_id is None
+        uses_calls_complete_path = isinstance(
+            self._server_call_processor, CallBatchProcessor
+        ) and not (op is not None and op.eager_call_start)
+
         project_id = self.project_id
 
-        # The finish handler serves as a last chance for integrations
-        # to customize what gets logged for a call.
-        if op is not None and op._on_finish_handler:
-            op._on_finish_handler(call, original_output, exception)
+        # Capture child deferred-finish futures so the parent's deferred
+        # finish runs only after all children have written their summaries.
+        child_futures = [
+            c._deferred_finish_future
+            for c in call._children
+            if c._deferred_finish_future is not None
+        ]
 
-        def send_end_call() -> None:
+        def deferred_finish() -> None:
+            # Postprocess (user-supplied; documented as side-effect-free).
+            if op is not None and op.postprocess_output:
+                postprocessed_output = op.postprocess_output(original_output)
+            else:
+                postprocessed_output = original_output
+
+            if self.postprocess_output:
+                postprocessed_output = self.postprocess_output(postprocessed_output)
+
+            # `_save_nested_objects` mutates the tree in-place to attach refs;
+            # `map_to_refs` builds the refed copy used for the wire payload.
+            self._save_nested_objects(postprocessed_output)
+            output_as_refs = map_to_refs(postprocessed_output)
+            call.output = postprocessed_output
+
+            # Summary rollup. Runs after all children's deferred_finish has
+            # completed (via the chained future), so child.summary is set.
+            computed_summary: dict[str, Any] = {}
+            if call._children:
+                computed_summary = sum_dict_leaves(
+                    [child.summary or {} for child in call._children]
+                )
+            elif (
+                isinstance(original_output, dict)
+                and RESERVED_SUMMARY_USAGE_KEY in original_output
+                and "model" in original_output
+            ):
+                computed_summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+                computed_summary[RESERVED_SUMMARY_USAGE_KEY][
+                    original_output["model"]
+                ] = {
+                    "requests": 1,
+                    **original_output[RESERVED_SUMMARY_USAGE_KEY],
+                }
+            elif hasattr(original_output, RESERVED_SUMMARY_USAGE_KEY) and hasattr(
+                original_output, "model"
+            ):
+                model = original_output.model
+                usage = original_output.usage
+                if isinstance(usage, pydantic.BaseModel):
+                    usage = usage.model_dump(exclude_unset=True)
+                if isinstance(usage, dict) and isinstance(model, str):
+                    computed_summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+                    computed_summary[RESERVED_SUMMARY_USAGE_KEY][model] = {
+                        "requests": 1,
+                        **usage,
+                    }
+
+            status_counts_dict = computed_summary.setdefault(
+                RESERVED_SUMMARY_STATUS_COUNTS_KEY,
+                {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
+            )
+            if exception:
+                status_counts_dict[TraceStatus.ERROR] += 1
+            else:
+                status_counts_dict[TraceStatus.SUCCESS] += 1
+
+            merged_summary = copy.deepcopy(call.summary or {})
+
+            def _deep_update(dst: dict[str, Any], src: dict[str, Any]) -> None:
+                for k, v in src.items():
+                    if isinstance(v, dict) and isinstance(dst.get(k), dict):
+                        _deep_update(dst[k], v)
+                    else:
+                        dst[k] = v
+
+            _deep_update(merged_summary, computed_summary)
+            call.summary = merged_summary
+
+            # The finish handler is the last chance for integrations to
+            # customize what gets logged for a call.
+            if op is not None and op._on_finish_handler:
+                op._on_finish_handler(call, original_output, exception)
+
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -1078,7 +1093,6 @@ class WeaveClient:
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
 
-            # Capture wb_run_step_end at call end time
             wb_run_context_end = self._get_current_wb_run_context()
             current_wb_run_step_end = (
                 wb_run_context_end.step if wb_run_context_end else None
@@ -1096,29 +1110,14 @@ class WeaveClient:
                     wb_run_step_end=current_wb_run_step_end,
                 )
             )
-            bytes_size = len(call_end_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    "Trace output size (%s bytes) exceeds the maximum allowed size of %s bytes. Output may be dropped.",
-                    bytes_size,
-                    MAX_TRACE_PAYLOAD_SIZE,
-                )
-            # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_end", call_end_req)
             else:
                 self.server.call_end(call_end_req)
 
-        # For calls_complete path (non-eager CallBatchProcessor), print the call link
-        # after finish_call, when the complete call is queued to the batch processor.
-        is_root_call = call.parent_id is None
-        uses_calls_complete_path = isinstance(
-            self._server_call_processor, CallBatchProcessor
-        ) and not (op is not None and op.eager_call_start)
-
         def on_end_complete(f: Future) -> None:
             try:
-                f.result()  # Check for errors
+                f.result()
                 if (
                     is_root_call
                     and uses_calls_complete_path
@@ -1129,8 +1128,16 @@ class WeaveClient:
             except Exception:
                 pass
 
-        fut = self.future_executor.defer(send_end_call)
+        # Chain on children's deferred_finish futures so child summaries are
+        # written before the parent reads them. With no children, just defer.
+        if child_futures:
+            fut = self.future_executor.then(
+                child_futures, lambda _results: deferred_finish()
+            )
+        else:
+            fut = self.future_executor.defer(deferred_finish)
         fut.add_done_callback(on_end_complete)
+        call._deferred_finish_future = fut
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:

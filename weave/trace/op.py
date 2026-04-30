@@ -284,8 +284,18 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     )
     from weave.type_wrappers import Content
 
+    # Use cached signature + parsed annotations from op_deco when available.
+    # This avoids re-running inspect.signature and parse_from_signature on
+    # every call, which was the dominant per-op overhead for high-throughput
+    # async ops (see WB-33844).
+    sig = getattr(func, "_cached_signature", None)
+    if sig is None:
+        try:
+            sig = inspect.signature(func)
+        except (TypeError, ValueError) as e:
+            raise OpCallError(f"Error calling {func.name}: {e}") from e
+
     try:
-        sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}") from e
@@ -296,7 +306,9 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # If user defines postprocess_inputs manually, trust it instead of running this
     to_weave_inputs = {}
     if not func.postprocess_inputs:
-        parsed_annotations = parse_from_signature(sig)
+        parsed_annotations = getattr(func, "_cached_parsed_annotations", None)
+        if parsed_annotations is None:
+            parsed_annotations = parse_from_signature(sig)
         for param_name, value in inputs_with_defaults.items():
             # Check if we found an annotation which requires substitution
             parsed = parsed_annotations.get(param_name)
@@ -1354,6 +1366,19 @@ def op(
 
             wrapper.kind = kind  # type: ignore
             wrapper.color = color  # type: ignore
+
+            # Cache signature + parsed annotations at decoration time. These
+            # are otherwise recomputed in `_default_on_input_handler` on every
+            # call, which is the hot path for high-throughput async ops.
+            from weave.trace.annotation_parser import parse_from_signature  # circular
+
+            try:
+                cached_sig = inspect.signature(func)
+                wrapper._cached_signature = cached_sig  # type: ignore
+                wrapper._cached_parsed_annotations = parse_from_signature(cached_sig)  # type: ignore
+            except (TypeError, ValueError):
+                wrapper._cached_signature = None  # type: ignore
+                wrapper._cached_parsed_annotations = None  # type: ignore
 
             return cast(Op[P, R], wrapper)
 

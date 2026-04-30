@@ -80,6 +80,12 @@ class Call:
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
+    # Future representing the deferred portion of this call's finish_call
+    # body (postprocess + save + summary rollup + send). Populated by
+    # WeaveClient.finish_call so that a parent's deferred_finish can chain
+    # on its children's via future_executor.then, ensuring child summaries
+    # are written before the parent rolls them up.
+    _deferred_finish_future: Future | None = dataclasses.field(default=None, repr=False)
 
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
