@@ -1,22 +1,27 @@
-"""Producer-level tests for the agent_turn_ended Kafka event."""
+"""Producer-level tests for the ScoreAgentSpansEvent Kafka event."""
+
 from __future__ import annotations
 
+import datetime
 from unittest.mock import MagicMock
 
 import pytest
 
-from weave.trace_server.agents.events import (
-    AGENT_TURN_ENDED_TOPIC,
-    AgentTurnEndedEvent,
+from weave.trace_server.agents.kafka_events import (
+    SCORE_AGENT_SPANS_TOPIC,
+    ScoreAgentSpansEvent,
 )
+
+_ENDED_AT = datetime.datetime(2024, 1, 1, 12, 0, 0)
 
 
 def test_topic_constant_value() -> None:
-    assert AGENT_TURN_ENDED_TOPIC == "weave.agent_turn_ended"
+    assert SCORE_AGENT_SPANS_TOPIC == "weave.score_agent_spans"
 
 
 def test_event_round_trip() -> None:
-    event = AgentTurnEndedEvent(
+    event = ScoreAgentSpansEvent(
+        event_type="turn_ended",
         project_id="proj-1",
         trace_id="trace-1",
         root_span_id="span-root",
@@ -24,24 +29,25 @@ def test_event_round_trip() -> None:
         agent_name="research_agent",
         operation_name="invoke_agent",
         request_model="gpt-5",
-        ended_at_ns=1_700_000_000_000_000_000,
+        ended_at=_ENDED_AT,
     )
     payload = event.model_dump_json()
-    parsed = AgentTurnEndedEvent.model_validate_json(payload)
+    parsed = ScoreAgentSpansEvent.model_validate_json(payload)
     assert parsed == event
 
 
 def test_event_defaults() -> None:
-    event = AgentTurnEndedEvent(
+    event = ScoreAgentSpansEvent(
+        event_type="turn_ended",
         project_id="p",
         trace_id="t",
         root_span_id="r",
+        ended_at=_ENDED_AT,
     )
     assert event.conversation_id == ""
     assert event.agent_name == ""
     assert event.operation_name == ""
     assert event.request_model == ""
-    assert event.ended_at_ns == 0
 
 
 @pytest.mark.disable_logging_error_check
@@ -51,12 +57,18 @@ def test_producer_drops_when_buffer_full() -> None:
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 2
     producer.__len__ = MagicMock(return_value=5)  # buffer full
-    producer.produce_agent_turn_ended = (
-        KafkaProducer.produce_agent_turn_ended.__get__(producer)
+    producer.produce_agent_scorer_event = (
+        KafkaProducer.produce_agent_scorer_event.__get__(producer)
     )
 
-    event = AgentTurnEndedEvent(project_id="p", trace_id="t", root_span_id="r")
-    producer.produce_agent_turn_ended(event)
+    event = ScoreAgentSpansEvent(
+        event_type="turn_ended",
+        project_id="p",
+        trace_id="t",
+        root_span_id="r",
+        ended_at=_ENDED_AT,
+    )
+    producer.produce_agent_scorer_event(event)
 
     producer.produce.assert_not_called()
 
@@ -67,14 +79,20 @@ def test_producer_flushes_when_requested() -> None:
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 100
     producer.__len__ = MagicMock(return_value=0)
-    producer.produce_agent_turn_ended = (
-        KafkaProducer.produce_agent_turn_ended.__get__(producer)
+    producer.produce_agent_scorer_event = (
+        KafkaProducer.produce_agent_scorer_event.__get__(producer)
     )
 
-    event = AgentTurnEndedEvent(project_id="p", trace_id="t", root_span_id="r")
-    producer.produce_agent_turn_ended(event, flush_immediately=True)
+    event = ScoreAgentSpansEvent(
+        event_type="turn_ended",
+        project_id="p",
+        trace_id="t",
+        root_span_id="r",
+        ended_at=_ENDED_AT,
+    )
+    producer.produce_agent_scorer_event(event, flush_immediately=True)
 
     producer.produce.assert_called_once()
     call_kwargs = producer.produce.call_args.kwargs
-    assert call_kwargs["topic"] == "weave.agent_turn_ended"
+    assert call_kwargs["topic"] == "weave.score_agent_spans"
     producer.flush.assert_called_once_with(0)

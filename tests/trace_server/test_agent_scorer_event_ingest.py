@@ -1,4 +1,5 @@
-"""Integration: AgentWriteHandler.otel_export emits agent_turn_ended events."""
+"""Integration: AgentWriteHandler.insert_otel_spans emits ScoreAgentSpansEvent on root span end."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -8,11 +9,11 @@ from unittest.mock import MagicMock
 # the real OTel protobuf path.
 
 
-def test_otel_export_emits_for_completed_root_span(monkeypatch):
+def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
     import datetime
 
     from weave.trace_server.agents.clickhouse import AgentWriteHandler
-    from weave.trace_server.agents.events import AgentTurnEndedEvent
+    from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
     from weave.trace_server.agents.schema import AgentSpanCHInsertable
     from weave.trace_server.agents.types import GenAIOTelExportReq
 
@@ -41,10 +42,9 @@ def test_otel_export_emits_for_completed_root_span(monkeypatch):
     ]
 
     ch = MagicMock()
-    query_fn = MagicMock()
     kafka_producer = MagicMock()
 
-    handler = AgentWriteHandler(ch, query_fn, kafka_producer=kafka_producer)
+    handler = AgentWriteHandler(ch, kafka_producer)
 
     # Build a fake processed_span with one scope_spans containing two proto_spans.
     # We stub Span.from_proto + extract_genai_span to return our stub rows in
@@ -71,28 +71,16 @@ def test_otel_export_emits_for_completed_root_span(monkeypatch):
     extractor = MagicMock(side_effect=stub_rows)
     monkeypatch.setattr(ch_module, "extract_genai_span", extractor)
 
-    # Stub row-conversion helpers so we don't depend on their internals.
+    # Stub row-conversion helper so we don't depend on its internals.
     monkeypatch.setattr(ch_module, "genai_span_to_row", lambda r: [])
-    monkeypatch.setattr(ch_module, "extract_search_rows", lambda r: [])
 
-    req = GenAIOTelExportReq(
-        processed_spans=[processed], project_id="p", wb_user_id=""
-    )
-    res = handler.otel_export(req)
+    req = GenAIOTelExportReq(processed_spans=[processed], project_id="p", wb_user_id="")
+    res = handler.insert_otel_spans(req)
 
     assert res.accepted_spans == 2
-    assert kafka_producer.produce_agent_turn_ended.call_count == 1
-    event = kafka_producer.produce_agent_turn_ended.call_args.args[0]
-    assert isinstance(event, AgentTurnEndedEvent)
+    assert kafka_producer.produce_agent_scorer_event.call_count == 1
+    event = kafka_producer.produce_agent_scorer_event.call_args.args[0]
+    assert isinstance(event, ScoreAgentSpansEvent)
+    assert event.event_type == "turn_ended"
     assert event.trace_id == "tr"
     assert event.root_span_id == "root"
-
-
-def test_otel_export_no_emit_when_no_kafka_producer():
-    """When kafka_producer is None, otel_export should not attempt to emit."""
-    from weave.trace_server.agents.clickhouse import AgentWriteHandler
-
-    ch = MagicMock()
-    query_fn = MagicMock()
-    handler = AgentWriteHandler(ch, query_fn)  # no kafka_producer
-    assert handler._kafka_producer is None

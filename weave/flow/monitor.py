@@ -14,7 +14,7 @@ DebounceAggregationField: TypeAlias = Literal["trace_id", "thread_id"]
 DebounceAggregationMethod: TypeAlias = Literal["last_message", "all_messages"]
 
 AgentSpanOpName: TypeAlias = Literal["weave.genai.turn"]
-_AGENT_SPAN_OP_NAMES: frozenset[AgentSpanOpName] = frozenset(get_args(AgentSpanOpName))
+AGENT_SPAN_OP_NAMES: frozenset[AgentSpanOpName] = frozenset(get_args(AgentSpanOpName))
 
 # Runtime-valid sets derived from Literals above
 VALID_DEBOUNCE_AGGREGATION_FIELDS: frozenset[DebounceAggregationField] = frozenset(
@@ -198,7 +198,7 @@ class ClassifierMonitor(Monitor):
 
     def get_prompt_header(self, op_name: str) -> str:
         """Text to prepend before the merged classifier prompts."""
-        if op_name in _AGENT_SPAN_OP_NAMES:
+        if op_name in AGENT_SPAN_OP_NAMES:
             return _AGENT_SPAN_CLASSIFIER_PROMPT_HEADER
         return _OP_CALL_CLASSIFIER_PROMPT_HEADER
 
