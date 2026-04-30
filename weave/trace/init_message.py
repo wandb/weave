@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 
 import packaging.version
 from packaging.version import parse as parse_version
@@ -29,6 +30,13 @@ def _print_version_check() -> None:
     )
     if use_message:
         logger.info(use_message)
+
+
+def _safe_print_version_check() -> None:
+    try:
+        _print_version_check()
+    except Exception:
+        pass
 
 
 def check_min_weave_version(
@@ -107,10 +115,10 @@ def check_min_trace_server_version(
 def print_init_message(
     username: str | None, entity_name: str, project_name: str, read_only: bool
 ) -> None:
-    try:
-        _print_version_check()
-    except Exception as e:
-        pass
+    # Run the PyPI version check in a daemon thread so it does not block
+    # weave.init(). The upgrade message will print whenever the network
+    # roundtrip completes; short-lived scripts may exit before it does.
+    threading.Thread(target=_safe_print_version_check, daemon=True).start()
 
     message = ""
     if username is not None:
