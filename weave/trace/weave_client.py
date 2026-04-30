@@ -812,7 +812,14 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
 
-        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
+        # Skip the future allocation once the op's digest is resolved (any
+        # call after the first). Reading `.uri` directly is a no-op string
+        # build for an already-resolved ref.
+        op_name_future: str | Future[str]
+        if isinstance(op_def_ref._digest, Future):
+            op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
+        else:
+            op_name_future = op_def_ref.uri
 
         # Get thread_id from context
         thread_id = call_context.get_thread_id()
@@ -907,14 +914,6 @@ class WeaveClient:
                 )
             )
 
-            bytes_size = len(call_start_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes. Inputs may be dropped.",
-                    bytes_size,
-                    MAX_TRACE_PAYLOAD_SIZE,
-                )
-
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_start", call_start_req)
@@ -995,8 +994,11 @@ class WeaveClient:
         if self.postprocess_output:
             postprocessed_output = self.postprocess_output(postprocessed_output)
 
-        self._save_nested_objects(postprocessed_output)
-        output_as_refs = map_to_refs(postprocessed_output)
+        # Deferred to send_end_call: _save_nested_objects + map_to_refs walk
+        # the output tree twice and dominate per-op CPU. Running them in the
+        # worker keeps the calling thread (and the asyncio event loop) free.
+        # `call.output` is set sync so user code reading it after finish_call
+        # returns gets the postprocessed value as before.
         call.output = postprocessed_output
 
         # Summary handling
@@ -1068,6 +1070,12 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
+            # Deferred heavy tree walks. _save_nested_objects mutates
+            # `postprocessed_output` to attach refs; map_to_refs builds
+            # the refed copy used for the wire payload.
+            self._save_nested_objects(postprocessed_output)
+            output_as_refs = map_to_refs(postprocessed_output)
+
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -1096,13 +1104,6 @@ class WeaveClient:
                     wb_run_step_end=current_wb_run_step_end,
                 )
             )
-            bytes_size = len(call_end_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    "Trace output size (%s bytes) exceeds the maximum allowed size of %s bytes. Output may be dropped.",
-                    bytes_size,
-                    MAX_TRACE_PAYLOAD_SIZE,
-                )
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_end", call_end_req)
