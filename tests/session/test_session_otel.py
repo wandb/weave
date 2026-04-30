@@ -1,0 +1,1313 @@
+"""Tests for OTel GenAI attribute builders and span emission in session_otel.py."""
+
+from __future__ import annotations
+
+import base64
+import json
+import time
+from datetime import datetime, timedelta, timezone
+
+import pytest
+from opentelemetry import trace as otel_trace
+from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import NoOpTracerProvider, StatusCode
+
+from weave.session.session import (
+    LLM,
+    LogResult,
+    MediaAttachment,
+    Message,
+    Reasoning,
+    Session,
+    SubAgent,
+    Tool,
+    Turn,
+    Usage,
+    get_current_llm,
+    get_current_session,
+    get_current_turn,
+    log_session,
+    log_turn,
+    start_session,
+    start_tool,
+)
+from weave.session.session_otel import (
+    execute_tool_attributes,
+    invoke_agent_attributes,
+    llm_attributes,
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_contextvars():
+    """Reset contextvar state after each test to prevent leakage."""
+    yield
+    if (llm := get_current_llm()) is not None:
+        llm.end()
+    if (turn := get_current_turn()) is not None:
+        turn.end()
+    if (session := get_current_session()) is not None:
+        session.end()
+
+
+@pytest.fixture
+def otel_spans(monkeypatch: pytest.MonkeyPatch):
+    """Provide an in-memory span exporter for capturing OTel spans.
+
+    Overrides the global OTel tracer provider for the duration of the test.
+    Uses ``monkeypatch.setattr`` on the private ``_TRACER_PROVIDER`` symbol
+    rather than ``set_tracer_provider`` to avoid the "set once" warning
+    and to guarantee restoration of the prior value.
+    """
+    exporter = InMemorySpanExporter()
+    provider = SDKTracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
+    yield exporter
+    provider.shutdown()
+
+
+# ---------------------------------------------------------------------------
+# invoke_agent_attributes
+# ---------------------------------------------------------------------------
+
+
+class TestInvokeAgentAttributes:
+    def test_minimal_required_only(self) -> None:
+        attrs = invoke_agent_attributes(agent_name="weather-bot")
+        assert attrs == {
+            "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.agent.name": "weather-bot",
+        }
+
+    def test_all_scalar_fields(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="weather-bot",
+            conversation_id="conv-123",
+            conversation_name="Weather Chat",
+            provider_name="openai",
+            model="gpt-4o",
+        )
+        assert attrs["gen_ai.operation.name"] == "invoke_agent"
+        assert attrs["gen_ai.agent.name"] == "weather-bot"
+        assert attrs["gen_ai.conversation.id"] == "conv-123"
+        assert attrs["gen_ai.conversation.name"] == "Weather Chat"
+        assert attrs["gen_ai.provider.name"] == "openai"
+        assert attrs["gen_ai.request.model"] == "gpt-4o"
+
+    def test_empty_optional_strings_omitted(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot",
+            conversation_id="",
+            conversation_name="",
+            provider_name="",
+            model="",
+        )
+        assert "gen_ai.conversation.id" not in attrs
+        assert "gen_ai.conversation.name" not in attrs
+        assert "gen_ai.provider.name" not in attrs
+        assert "gen_ai.request.model" not in attrs
+
+    def test_input_messages_serialized(self) -> None:
+        msgs = [Message(role="user", content="Hello")]
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+        ]
+
+    def test_output_messages_serialized(self) -> None:
+        msgs = [Message(role="assistant", content="Hi there!")]
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=msgs)
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi there!"}]}
+        ]
+
+    def test_empty_message_list_omitted(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot",
+            input_messages=[],
+            output_messages=[],
+        )
+        assert "gen_ai.input.messages" not in attrs
+        assert "gen_ai.output.messages" not in attrs
+
+    def test_none_message_list_omitted(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot",
+            input_messages=None,
+            output_messages=None,
+        )
+        assert "gen_ai.input.messages" not in attrs
+        assert "gen_ai.output.messages" not in attrs
+
+    def test_message_shape_is_role_plus_parts(self) -> None:
+        """A serialized message has only 'role' and 'parts' at the top level."""
+        msgs = [Message(role="user", content="hi")]
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert set(raw[0].keys()) == {"role", "parts"}
+
+    def test_multiple_messages(self) -> None:
+        msgs = [
+            Message(role="user", content="Hi"),
+            Message(role="assistant", content="Hello!"),
+        ]
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {"role": "user", "parts": [{"type": "text", "content": "Hi"}]},
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hello!"}]},
+        ]
+
+    def test_tool_message_serializes_to_tool_call_response_part(self) -> None:
+        msgs = [
+            Message(
+                role="tool",
+                content="result",
+                tool_call_id="tc_1",
+                tool_name="get_weather",
+            )
+        ]
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        # Per semconv, role:tool messages carry a single ToolCallResponsePart.
+        # tool_name has no field on ToolCallResponsePart and is intentionally dropped.
+        assert raw == [
+            {
+                "role": "tool",
+                "parts": [
+                    {"type": "tool_call_response", "response": "result", "id": "tc_1"}
+                ],
+            }
+        ]
+
+    def test_tool_message_without_id_omits_id(self) -> None:
+        msgs = [Message(role="tool", content="ok")]
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw[0]["parts"] == [{"type": "tool_call_response", "response": "ok"}]
+
+    def test_message_with_empty_content_emits_empty_parts(self) -> None:
+        msgs = [Message(role="assistant")]
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=msgs)
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [{"role": "assistant", "parts": []}]
+
+
+# ---------------------------------------------------------------------------
+# llm_attributes
+# ---------------------------------------------------------------------------
+
+
+class TestLLMAttributes:
+    def test_minimal_required_only(self) -> None:
+        attrs = llm_attributes(model="gpt-4o")
+        assert attrs == {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4o",
+        }
+
+    def test_all_fields_populated(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            provider_name="openai",
+            conversation_id="conv-123",
+            response_id="resp-abc",
+            finish_reasons=["stop"],
+            system_instructions=["Be helpful", "Be concise"],
+            usage=Usage(input_tokens=100, output_tokens=50, reasoning_tokens=20),
+            input_messages=[Message(role="user", content="Hello")],
+            output_messages=[Message(role="assistant", content="Hi!")],
+        )
+        assert attrs["gen_ai.operation.name"] == "chat"
+        assert attrs["gen_ai.request.model"] == "gpt-4o"
+        assert attrs["gen_ai.provider.name"] == "openai"
+        assert attrs["gen_ai.conversation.id"] == "conv-123"
+        assert attrs["gen_ai.response.id"] == "resp-abc"
+        assert attrs["gen_ai.response.finish_reasons"] == ["stop"]
+        assert attrs["gen_ai.usage.input_tokens"] == 100
+        assert attrs["gen_ai.usage.output_tokens"] == 50
+        assert attrs["gen_ai.usage.reasoning_tokens"] == 20
+        # system_instructions: array of TextParts per semconv
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "Be helpful"},
+            {"type": "text", "content": "Be concise"},
+        ]
+        # input messages: parts model
+        assert json.loads(attrs["gen_ai.input.messages"]) == [
+            {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+        ]
+        # output messages: parts model + finish_reason on the last message
+        assert json.loads(attrs["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "Hi!"}],
+                "finish_reason": "stop",
+            }
+        ]
+
+    def test_conversation_id(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", conversation_id="sess-abc")
+        assert attrs["gen_ai.conversation.id"] == "sess-abc"
+
+    def test_empty_conversation_id_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", conversation_id="")
+        assert "gen_ai.conversation.id" not in attrs
+
+    def test_empty_optional_strings_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", provider_name="", response_id="")
+        assert "gen_ai.provider.name" not in attrs
+        assert "gen_ai.response.id" not in attrs
+
+    def test_empty_finish_reasons_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", finish_reasons=[])
+        assert "gen_ai.response.finish_reasons" not in attrs
+
+    def test_none_finish_reasons_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", finish_reasons=None)
+        assert "gen_ai.response.finish_reasons" not in attrs
+
+    def test_zero_usage_tokens_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", usage=Usage())
+        assert "gen_ai.usage.input_tokens" not in attrs
+        assert "gen_ai.usage.output_tokens" not in attrs
+        assert "gen_ai.usage.reasoning_tokens" not in attrs
+
+    def test_none_usage_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", usage=None)
+        assert "gen_ai.usage.input_tokens" not in attrs
+        assert "gen_ai.usage.output_tokens" not in attrs
+        assert "gen_ai.usage.reasoning_tokens" not in attrs
+
+    def test_partial_usage_only_includes_nonzero(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            usage=Usage(input_tokens=100, output_tokens=0, reasoning_tokens=0),
+        )
+        assert attrs["gen_ai.usage.input_tokens"] == 100
+        assert "gen_ai.usage.output_tokens" not in attrs
+        assert "gen_ai.usage.reasoning_tokens" not in attrs
+
+    def test_empty_system_instructions_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", system_instructions=[])
+        assert "gen_ai.system_instructions" not in attrs
+
+    def test_none_system_instructions_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", system_instructions=None)
+        assert "gen_ai.system_instructions" not in attrs
+
+    def test_empty_messages_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", input_messages=[], output_messages=[])
+        assert "gen_ai.input.messages" not in attrs
+        assert "gen_ai.output.messages" not in attrs
+
+    def test_none_messages_omitted(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o", input_messages=None, output_messages=None
+        )
+        assert "gen_ai.input.messages" not in attrs
+        assert "gen_ai.output.messages" not in attrs
+
+    def test_reasoning_prepended_to_last_assistant_message(self) -> None:
+        """Reasoning becomes a ReasoningPart on the last assistant output message."""
+        attrs = llm_attributes(
+            model="gpt-4o",
+            reasoning=Reasoning(content="thinking..."),
+            output_messages=[
+                Message(role="assistant", content="answer"),
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "reasoning", "content": "thinking..."},
+                    {"type": "text", "content": "answer"},
+                ],
+            }
+        ]
+        # reasoning must NOT be a separate top-level attribute
+        assert "gen_ai.reasoning" not in attrs
+        assert "gen_ai.reasoning.content" not in attrs
+
+    def test_reasoning_creates_synthetic_assistant_when_no_output_messages(
+        self,
+    ) -> None:
+        """With reasoning but no output messages, a synthetic assistant message
+        is created to carry the ReasoningPart.
+        """
+        attrs = llm_attributes(
+            model="gpt-4o", reasoning=Reasoning(content="just thinking")
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "reasoning", "content": "just thinking"}],
+            }
+        ]
+
+    def test_empty_reasoning_does_not_emit_output_messages(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", reasoning=Reasoning(content=""))
+        assert "gen_ai.output.messages" not in attrs
+
+    def test_finish_reason_attached_to_last_output_message(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            output_messages=[
+                Message(role="assistant", content="first"),
+                Message(role="assistant", content="last"),
+            ],
+            finish_reasons=["length"],
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert "finish_reason" not in raw[0]
+        assert raw[1]["finish_reason"] == "length"
+
+    def test_attach_media_blob_serialized_as_blob_part(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[Message(role="user", content="what is this?")],
+            media_attachments=[
+                MediaAttachment(
+                    kind="blob",
+                    modality="image",
+                    mime_type="image/png",
+                    content=b"\x89PNG",
+                )
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {
+                "role": "user",
+                "parts": [
+                    {"type": "text", "content": "what is this?"},
+                    {
+                        "type": "blob",
+                        "mime_type": "image/png",
+                        "modality": "image",
+                        "content": base64.b64encode(b"\x89PNG").decode("ascii"),
+                    },
+                ],
+            }
+        ]
+
+    def test_attach_media_uri_serialized_as_uri_part(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[Message(role="user", content="describe")],
+            media_attachments=[
+                MediaAttachment(
+                    kind="uri",
+                    modality="image",
+                    mime_type="image/jpeg",
+                    uri="https://example.com/photo.jpg",
+                )
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw[0]["parts"][1] == {
+            "type": "uri",
+            "mime_type": "image/jpeg",
+            "modality": "image",
+            "uri": "https://example.com/photo.jpg",
+        }
+
+    def test_attach_media_file_serialized_as_file_part(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[Message(role="user", content="transcribe")],
+            media_attachments=[
+                MediaAttachment(
+                    kind="file",
+                    modality="audio",
+                    mime_type="audio/wav",
+                    file_id="file-abc",
+                )
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw[0]["parts"][1] == {
+            "type": "file",
+            "mime_type": "audio/wav",
+            "modality": "audio",
+            "file_id": "file-abc",
+        }
+
+    def test_media_attached_to_last_user_message(self) -> None:
+        """When multiple user messages exist, media goes on the most recent one."""
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[
+                Message(role="user", content="first"),
+                Message(role="assistant", content="ok"),
+                Message(role="user", content="last"),
+            ],
+            media_attachments=[
+                MediaAttachment(
+                    kind="uri", modality="image", mime_type="image/png", uri="u"
+                )
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        # First user has no media
+        assert raw[0]["parts"] == [{"type": "text", "content": "first"}]
+        # Assistant in middle has no media
+        assert raw[1]["parts"] == [{"type": "text", "content": "ok"}]
+        # Last user has the media part appended
+        assert any(p["type"] == "uri" for p in raw[2]["parts"])
+
+    def test_media_with_no_input_messages_omits_messages(self) -> None:
+        """Media without any input messages produces no input.messages attr.
+
+        We don't synthesize a user message just to carry orphan media — the
+        SDK's contract is that media decorates a user message, and a
+        media-only LLM call is degenerate.
+        """
+        attrs = llm_attributes(
+            model="gpt-4o",
+            media_attachments=[
+                MediaAttachment(
+                    kind="uri", modality="image", mime_type="image/png", uri="u"
+                )
+            ],
+        )
+        assert "gen_ai.input.messages" not in attrs
+
+    def test_multiple_media_all_on_last_user_message(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            input_messages=[Message(role="user", content="hi")],
+            media_attachments=[
+                MediaAttachment(
+                    kind="uri", modality="image", mime_type="image/png", uri="u1"
+                ),
+                MediaAttachment(
+                    kind="uri", modality="image", mime_type="image/png", uri="u2"
+                ),
+            ],
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert len(raw[0]["parts"]) == 3  # text + 2 media
+        assert raw[0]["parts"][1]["uri"] == "u1"
+        assert raw[0]["parts"][2]["uri"] == "u2"
+
+    def test_system_instructions_serialized_as_text_parts(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o", system_instructions=["Be helpful", "Be brief"]
+        )
+        raw = json.loads(attrs["gen_ai.system_instructions"])
+        assert raw == [
+            {"type": "text", "content": "Be helpful"},
+            {"type": "text", "content": "Be brief"},
+        ]
+
+    def test_multiple_finish_reasons(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", finish_reasons=["stop", "length"])
+        assert attrs["gen_ai.response.finish_reasons"] == ["stop", "length"]
+
+
+# ---------------------------------------------------------------------------
+# execute_tool_attributes
+# ---------------------------------------------------------------------------
+
+
+class TestExecuteToolAttributes:
+    def test_minimal_required_only(self) -> None:
+        attrs = execute_tool_attributes(tool_name="get_weather")
+        assert attrs == {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "get_weather",
+        }
+
+    def test_all_fields_populated(self) -> None:
+        attrs = execute_tool_attributes(
+            tool_name="get_weather",
+            conversation_id="conv-123",
+            tool_call_id="tc_1",
+            tool_call_arguments='{"city": "Tokyo"}',
+            tool_call_result='{"temp": "75F"}',
+        )
+        assert attrs["gen_ai.operation.name"] == "execute_tool"
+        assert attrs["gen_ai.tool.name"] == "get_weather"
+        assert attrs["gen_ai.conversation.id"] == "conv-123"
+        assert attrs["gen_ai.tool.call.id"] == "tc_1"
+        assert attrs["gen_ai.tool.call.arguments"] == '{"city": "Tokyo"}'
+        assert attrs["gen_ai.tool.call.result"] == '{"temp": "75F"}'
+
+    def test_conversation_id(self) -> None:
+        attrs = execute_tool_attributes(tool_name="search", conversation_id="sess-abc")
+        assert attrs["gen_ai.conversation.id"] == "sess-abc"
+
+    def test_empty_conversation_id_omitted(self) -> None:
+        attrs = execute_tool_attributes(tool_name="search", conversation_id="")
+        assert "gen_ai.conversation.id" not in attrs
+
+    def test_empty_optional_strings_omitted(self) -> None:
+        attrs = execute_tool_attributes(
+            tool_name="search",
+            tool_call_id="",
+            tool_call_arguments="",
+            tool_call_result="",
+        )
+        assert "gen_ai.tool.call.id" not in attrs
+        assert "gen_ai.tool.call.arguments" not in attrs
+        assert "gen_ai.tool.call.result" not in attrs
+
+    def test_partial_optional_fields(self) -> None:
+        attrs = execute_tool_attributes(
+            tool_name="search",
+            tool_call_id="tc_2",
+        )
+        assert attrs["gen_ai.tool.call.id"] == "tc_2"
+        assert "gen_ai.tool.call.arguments" not in attrs
+        assert "gen_ai.tool.call.result" not in attrs
+
+
+# ---------------------------------------------------------------------------
+# Cross-cutting
+# ---------------------------------------------------------------------------
+
+
+class TestCrossCutting:
+    def test_return_type_is_plain_dict(self) -> None:
+        """All builders return plain dicts, not special types."""
+        a = invoke_agent_attributes(agent_name="bot")
+        b = llm_attributes(model="gpt-4o")
+        c = execute_tool_attributes(tool_name="search")
+        assert type(a) is dict
+        assert type(b) is dict
+        assert type(c) is dict
+
+
+# ---------------------------------------------------------------------------
+# OTel span emission
+# ---------------------------------------------------------------------------
+
+
+class TestOTelSpanEmission:
+    def test_turn_creates_invoke_agent_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(
+            agent_name="weather-bot", session_id="sess-1", session_name="Weather Chat"
+        ) as s:
+            with s.start_turn(user_message="What's the weather?") as turn:
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.name == "invoke_agent weather-bot"
+        attrs = dict(span.attributes or {})
+        assert attrs["gen_ai.operation.name"] == "invoke_agent"
+        assert attrs["gen_ai.agent.name"] == "weather-bot"
+        assert attrs["gen_ai.conversation.id"] == "sess-1"
+        assert attrs["gen_ai.conversation.name"] == "Weather Chat"
+
+    def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
+        with Session(agent_name="bot", session_id="sess-llm") as s:
+            with s.start_turn() as turn:
+                with turn.llm(model="gpt-4o", provider_name="openai") as llm:
+                    llm.usage = Usage(input_tokens=100, output_tokens=50)
+                    llm.output("Hello!")
+
+        spans = otel_spans.get_finished_spans()
+        # LLM span ends first, then Turn span
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        assert len(llm_spans) == 1
+        attrs = dict(llm_spans[0].attributes or {})
+        assert attrs["gen_ai.operation.name"] == "chat"
+        assert attrs["gen_ai.request.model"] == "gpt-4o"
+        assert attrs["gen_ai.provider.name"] == "openai"
+        assert attrs["gen_ai.conversation.id"] == "sess-llm"
+        assert attrs["gen_ai.usage.input_tokens"] == 100
+        assert attrs["gen_ai.usage.output_tokens"] == 50
+
+    def test_tool_creates_execute_tool_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="bot", session_id="sess-tool") as s:
+            with s.start_turn() as turn:
+                with turn.tool(
+                    name="get_weather",
+                    arguments='{"city":"Tokyo"}',
+                    tool_call_id="tc_1",
+                ) as tool:
+                    tool.result = "75F"
+
+        spans = otel_spans.get_finished_spans()
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool get_weather"]
+        assert len(tool_spans) == 1
+        attrs = dict(tool_spans[0].attributes or {})
+        assert attrs["gen_ai.operation.name"] == "execute_tool"
+        assert attrs["gen_ai.tool.name"] == "get_weather"
+        assert attrs["gen_ai.conversation.id"] == "sess-tool"
+        assert attrs["gen_ai.tool.call.id"] == "tc_1"
+        assert attrs["gen_ai.tool.call.arguments"] == '{"city":"Tokyo"}'
+        assert attrs["gen_ai.tool.call.result"] == "75F"
+
+    def test_subagent_creates_nested_invoke_agent_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="orchestrator") as s:
+            with s.start_turn() as turn:
+                with turn.subagent(name="research-bot", model="gpt-4o-mini") as sa:
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent orchestrator"]
+        assert len(sa_spans) == 1
+        assert len(turn_spans) == 1
+        # SubAgent and Turn should share the same trace_id
+        assert sa_spans[0].context.trace_id == turn_spans[0].context.trace_id
+        # SubAgent's parent should be the Turn span
+        assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
+
+    def test_parent_child_hierarchy(self, otel_spans: InMemorySpanExporter) -> None:
+        """LLM and Tool are both children of Turn (flat model)."""
+        with Session(agent_name="bot") as s:
+            with s.start_turn() as turn:
+                with turn.llm(model="gpt-4o") as llm:
+                    llm.output("checking...")
+                with turn.tool(name="search", arguments='{"q":"X"}') as tool:
+                    tool.result = "found"
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool search"]
+
+        assert len(turn_spans) == 1
+        assert len(llm_spans) == 1
+        assert len(tool_spans) == 1
+
+        turn_span = turn_spans[0]
+        llm_span = llm_spans[0]
+        tool_span = tool_spans[0]
+
+        # Both LLM and Tool share the same trace
+        assert llm_span.context.trace_id == turn_span.context.trace_id
+        assert tool_span.context.trace_id == turn_span.context.trace_id
+
+        # Both are children of the Turn span
+        assert llm_span.parent.span_id == turn_span.context.span_id
+        assert tool_span.parent.span_id == turn_span.context.span_id
+
+    def test_no_spans_without_setup(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """No errors when no provider configured (no-op spans)."""
+        # Install a NoOpTracerProvider as the global provider. This produces
+        # non-recording spans (no exporter, no recording overhead) and is the
+        # canonical OTel pattern for "tracing not configured".
+        monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", NoOpTracerProvider())
+        with Session(agent_name="bot") as s:
+            with s.start_turn() as turn:
+                with turn.llm(model="gpt-4o") as llm:
+                    llm.output("Hello")
+                with turn.tool(name="search") as tool:
+                    tool.result = "done"
+        # Should not raise — just silently use no-op spans
+
+    def test_include_content_false_omits_messages(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="bot", include_content=False) as s:
+            with s.start_turn(user_message="secret input") as turn:
+                with turn.llm(model="gpt-4o") as llm:
+                    llm.input_messages.append(Message(role="user", content="secret"))
+                    llm.output("secret output")
+                    llm.system_instructions = ["be helpful"]
+                with turn.tool(name="search", arguments='{"q":"secret"}') as tool:
+                    tool.result = "secret result"
+
+        spans = otel_spans.get_finished_spans()
+
+        # Check Turn span — no input messages
+        turn_spans = [sp for sp in spans if sp.name.startswith("invoke_agent")]
+        assert len(turn_spans) == 1
+        turn_attrs = dict(turn_spans[0].attributes or {})
+        assert "gen_ai.input.messages" not in turn_attrs
+
+        # Check LLM span — no messages or system instructions
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        assert len(llm_spans) == 1
+        llm_attrs = dict(llm_spans[0].attributes or {})
+        assert "gen_ai.input.messages" not in llm_attrs
+        assert "gen_ai.output.messages" not in llm_attrs
+        assert "gen_ai.system_instructions" not in llm_attrs
+
+        # Check Tool span — no arguments or result
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool search"]
+        assert len(tool_spans) == 1
+        tool_attrs = dict(tool_spans[0].attributes or {})
+        assert "gen_ai.tool.call.arguments" not in tool_attrs
+        assert "gen_ai.tool.call.result" not in tool_attrs
+
+    def test_start_tool_creates_child_of_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot", session_id="sess-st") as s:
+            with s.start_turn() as turn:
+                with start_tool(
+                    name="get_weather",
+                    arguments='{"city":"Tokyo"}',
+                    tool_call_id="tc_1",
+                ) as t:
+                    t.result = "75F"
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name.startswith("invoke_agent")]
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool get_weather"]
+        assert len(tool_spans) == 1
+        assert len(turn_spans) == 1
+        # Tool is child of Turn
+        assert tool_spans[0].parent.span_id == turn_spans[0].context.span_id
+        # Same trace
+        assert tool_spans[0].context.trace_id == turn_spans[0].context.trace_id
+        # Attributes correct
+        attrs = dict(tool_spans[0].attributes or {})
+        assert attrs["gen_ai.operation.name"] == "execute_tool"
+        assert attrs["gen_ai.tool.name"] == "get_weather"
+        assert attrs["gen_ai.conversation.id"] == "sess-st"
+        assert attrs["gen_ai.tool.call.id"] == "tc_1"
+
+    def test_two_turns_have_different_trace_ids(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot") as s:
+            with s.start_turn(user_message="first") as t1:
+                pass
+            with s.start_turn(user_message="second") as t2:
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 2
+        trace_ids = {sp.context.trace_id for sp in spans}
+        assert len(trace_ids) == 2, "Each turn should have a distinct trace_id"
+
+
+# ---------------------------------------------------------------------------
+# Error recording
+# ---------------------------------------------------------------------------
+
+
+class TestErrorRecording:
+    def test_llm_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.llm(model="gpt-4o") as llm:
+                        raise ValueError("LLM call failed")
+                except ValueError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        chat_span = next(
+            s for s in spans if s.attributes.get("gen_ai.operation.name") == "chat"
+        )
+        assert chat_span.status.status_code == StatusCode.ERROR
+        assert "LLM call failed" in chat_span.status.description
+        assert len(chat_span.events) >= 1
+        assert chat_span.events[0].name == "exception"
+
+    def test_tool_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.tool(name="search") as tool:
+                        raise RuntimeError("tool broke")
+                except RuntimeError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        tool_span = next(
+            s
+            for s in spans
+            if s.attributes.get("gen_ai.operation.name") == "execute_tool"
+        )
+        assert tool_span.status.status_code == StatusCode.ERROR
+
+    def test_turn_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            try:
+                with session.start_turn() as turn:
+                    raise RuntimeError("turn broke")
+            except RuntimeError:
+                pass
+        spans = otel_spans.get_finished_spans()
+        turn_span = next(
+            s
+            for s in spans
+            if s.attributes.get("gen_ai.operation.name") == "invoke_agent"
+        )
+        assert turn_span.status.status_code == StatusCode.ERROR
+
+    def test_subagent_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.subagent(name="sub") as sa:
+                        raise RuntimeError("sub broke")
+                except RuntimeError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [s for s in spans if s.attributes.get("gen_ai.agent.name") == "sub"]
+        assert len(sa_spans) == 1
+        assert sa_spans[0].status.status_code == StatusCode.ERROR
+
+
+class TestContinueParentTrace:
+    """Verifies the ``continue_parent_trace`` knob nests turns inside an
+    outer trace instead of starting a fresh one. Mirrors the case where the
+    application is already instrumented (e.g. fastapi/django) and weave is
+    invoked inside an existing request span.
+    """
+
+    def test_default_starts_new_trace_even_under_outer_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # Default behavior: turn ignores the ambient trace.
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            with start_session(agent_name="bot") as s:
+                with s.start_turn() as turn:
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        assert turn_spans[0].context.trace_id != outer_trace_id
+
+    def test_continue_parent_trace_nests_turn_under_outer_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            outer_span_id = outer.get_span_context().span_id
+            with start_session(agent_name="bot", continue_parent_trace=True) as s:
+                with s.start_turn() as turn:
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        # Same trace and Turn parents under the outer request span
+        assert turn_spans[0].context.trace_id == outer_trace_id
+        assert turn_spans[0].parent is not None
+        assert turn_spans[0].parent.span_id == outer_span_id
+
+
+class TestStartTimeFromLogicalConstruction:
+    """Verifies that the OTel span ``start_time`` reflects when the SDK
+    object was constructed (``started_at``), not when ``__enter__`` ran.
+    Addresses prior-PR review feedback about start-time drift on Turn/LLM.
+    """
+
+    def test_turn_span_start_time_matches_started_at(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot") as s:
+            turn = s.start_turn()  # constructed here, started_at set
+            assert turn.started_at is not None
+            expected_ns = int(turn.started_at.timestamp() * 1_000_000_000)
+            # Sleep so __enter__ runs measurably later than construction.
+            time.sleep(0.05)
+            with turn:
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        # Allow up to 1ms of drift from int conversion / pydantic timing.
+        assert abs(turn_spans[0].start_time - expected_ns) <= 1_000_000
+
+    def test_llm_span_start_time_matches_started_at(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot") as s:
+            with s.start_turn() as turn:
+                llm = turn.llm(model="gpt-4o")
+                assert llm.started_at is not None
+                expected_ns = int(llm.started_at.timestamp() * 1_000_000_000)
+                time.sleep(0.05)
+                with llm:
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        assert len(llm_spans) == 1
+        assert abs(llm_spans[0].start_time - expected_ns) <= 1_000_000
+
+
+# ---------------------------------------------------------------------------
+# log_turn
+# ---------------------------------------------------------------------------
+
+
+def _ts(seconds_offset: float) -> datetime:
+    """Helper for fixed-base test timestamps."""
+    base = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    return base + timedelta(seconds=seconds_offset)
+
+
+class TestLogTurn:
+    def test_emits_turn_span_with_correct_timestamps(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        result = log_turn(
+            session_id="sess-1",
+            agent_name="weather-bot",
+            session_name="Weather Chat",
+            messages=[Message(role="user", content="What's the weather?")],
+            started_at=_ts(0),
+            ended_at=_ts(3),
+        )
+
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 1
+        sp = spans[0]
+        assert sp.name == "invoke_agent weather-bot"
+        attrs = dict(sp.attributes or {})
+        assert attrs["gen_ai.operation.name"] == "invoke_agent"
+        assert attrs["gen_ai.agent.name"] == "weather-bot"
+        assert attrs["gen_ai.conversation.id"] == "sess-1"
+        assert attrs["gen_ai.conversation.name"] == "Weather Chat"
+        assert sp.start_time == int(_ts(0).timestamp() * 1_000_000_000)
+        assert sp.end_time == int(_ts(3).timestamp() * 1_000_000_000)
+
+        assert isinstance(result, LogResult)
+        assert result.session_id == "sess-1"
+        assert len(result.trace_ids) == 1
+        assert len(result.root_span_ids) == 1
+        assert result.span_count == 1
+        # IDs are W3C Trace Context lowercase hex
+        assert len(result.trace_ids[0]) == 32
+        assert len(result.root_span_ids[0]) == 16
+
+    def test_with_llm_and_tool_children(self, otel_spans: InMemorySpanExporter) -> None:
+        result = log_turn(
+            session_id="sess-2",
+            agent_name="bot",
+            messages=[Message(role="user", content="Search for X")],
+            spans=[
+                LLM(
+                    model="gpt-4o",
+                    input_messages=[Message(role="user", content="Search for X")],
+                    output_messages=[Message(role="assistant", content="Searching...")],
+                    usage=Usage(input_tokens=10, output_tokens=5),
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+                Tool(
+                    name="search",
+                    arguments='{"q":"X"}',
+                    result="found",
+                    tool_call_id="tc_1",
+                    started_at=_ts(1),
+                    ended_at=_ts(2),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(3),
+        )
+
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 3
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool search"]
+        assert len(turn_spans) == 1
+        assert len(llm_spans) == 1
+        assert len(tool_spans) == 1
+
+        turn_span = turn_spans[0]
+        # Children share the turn's trace_id and have it as parent
+        assert llm_spans[0].context.trace_id == turn_span.context.trace_id
+        assert tool_spans[0].context.trace_id == turn_span.context.trace_id
+        assert llm_spans[0].parent.span_id == turn_span.context.span_id
+        assert tool_spans[0].parent.span_id == turn_span.context.span_id
+
+        # Children have explicit timestamps
+        assert llm_spans[0].start_time == int(_ts(0).timestamp() * 1_000_000_000)
+        assert llm_spans[0].end_time == int(_ts(1).timestamp() * 1_000_000_000)
+        assert tool_spans[0].start_time == int(_ts(1).timestamp() * 1_000_000_000)
+        assert tool_spans[0].end_time == int(_ts(2).timestamp() * 1_000_000_000)
+
+        assert result.span_count == 3
+
+    def test_with_subagent_child(self, otel_spans: InMemorySpanExporter) -> None:
+        log_turn(
+            session_id="sess-3",
+            agent_name="orchestrator",
+            spans=[
+                SubAgent(
+                    name="research-bot",
+                    model="gpt-4o-mini",
+                    started_at=_ts(0),
+                    ended_at=_ts(2),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(3),
+        )
+
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent orchestrator"]
+        assert len(sa_spans) == 1
+        assert len(turn_spans) == 1
+        assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
+
+    def test_continue_parent_trace_nests_under_outer_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            outer_span_id = outer.get_span_context().span_id
+            log_turn(
+                session_id="sess-4",
+                agent_name="bot",
+                started_at=_ts(0),
+                ended_at=_ts(1),
+                continue_parent_trace=True,
+            )
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        assert turn_spans[0].context.trace_id == outer_trace_id
+        assert turn_spans[0].parent.span_id == outer_span_id
+
+    def test_default_starts_new_trace_under_outer_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            log_turn(
+                session_id="sess-5",
+                agent_name="bot",
+                started_at=_ts(0),
+                ended_at=_ts(1),
+            )
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert turn_spans[0].context.trace_id != outer_trace_id
+
+    def test_include_content_false_suppresses_messages(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-6",
+            agent_name="bot",
+            messages=[Message(role="user", content="secret")],
+            spans=[
+                LLM(
+                    model="gpt-4o",
+                    input_messages=[Message(role="user", content="secret")],
+                    output_messages=[
+                        Message(role="assistant", content="secret response")
+                    ],
+                    system_instructions=["be helpful"],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+                Tool(
+                    name="search",
+                    arguments='{"q":"secret"}',
+                    result="secret result",
+                    started_at=_ts(1),
+                    ended_at=_ts(2),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(3),
+            include_content=False,
+        )
+
+        spans = otel_spans.get_finished_spans()
+        for sp in spans:
+            attrs = dict(sp.attributes or {})
+            assert "gen_ai.input.messages" not in attrs
+            assert "gen_ai.output.messages" not in attrs
+            assert "gen_ai.system_instructions" not in attrs
+            assert "gen_ai.tool.call.arguments" not in attrs
+            assert "gen_ai.tool.call.result" not in attrs
+
+    def test_no_spans_just_emits_turn(self, otel_spans: InMemorySpanExporter) -> None:
+        result = log_turn(
+            session_id="sess-7",
+            agent_name="bot",
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 1
+        assert result.span_count == 1
+
+    def test_falls_back_to_child_timestamps(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # Turn timestamps not provided — should derive from children
+        log_turn(
+            session_id="sess-8",
+            agent_name="bot",
+            spans=[
+                LLM(model="gpt-4o", started_at=_ts(0), ended_at=_ts(1)),
+                Tool(name="search", started_at=_ts(2), ended_at=_ts(3)),
+            ],
+        )
+        spans = otel_spans.get_finished_spans()
+        turn_span = next(sp for sp in spans if sp.name == "invoke_agent bot")
+        # Earliest child start, latest child end
+        assert turn_span.start_time == int(_ts(0).timestamp() * 1_000_000_000)
+        assert turn_span.end_time == int(_ts(3).timestamp() * 1_000_000_000)
+
+    def test_returns_log_result_with_correctly_formatted_ids(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        result = log_turn(
+            session_id="sess-9",
+            agent_name="bot",
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+        # W3C Trace Context: trace_id is 32 hex, span_id is 16 hex, lowercase.
+        assert all(c in "0123456789abcdef" for c in result.trace_ids[0])
+        assert all(c in "0123456789abcdef" for c in result.root_span_ids[0])
+
+
+class TestLogTurnNoOtel:
+    def test_returns_log_result_when_otel_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Simulate OTel not installed.
+        import weave.session.session as session_mod
+
+        monkeypatch.setattr(session_mod, "_OTEL_AVAILABLE", False)
+        result = log_turn(
+            session_id="sess-noop",
+            agent_name="bot",
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+        assert isinstance(result, LogResult)
+        assert result.session_id == "sess-noop"
+        assert result.trace_ids == []
+        assert result.root_span_ids == []
+        assert result.span_count == 0
+
+
+# ---------------------------------------------------------------------------
+# log_session
+# ---------------------------------------------------------------------------
+
+
+class TestLogSession:
+    def test_emits_one_trace_per_turn(self, otel_spans: InMemorySpanExporter) -> None:
+        result = log_session(
+            session_id="sess-multi",
+            agent_name="bot",
+            turns=[
+                Turn(
+                    agent_name="bot",
+                    messages=[Message(role="user", content="first")],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+                Turn(
+                    agent_name="bot",
+                    messages=[Message(role="user", content="second")],
+                    started_at=_ts(2),
+                    ended_at=_ts(3),
+                ),
+            ],
+        )
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 2
+        # Distinct trace IDs for the two turns
+        assert turn_spans[0].context.trace_id != turn_spans[1].context.trace_id
+
+        assert len(result.trace_ids) == 2
+        assert len(result.root_span_ids) == 2
+        assert result.span_count == 2
+        assert result.session_id == "sess-multi"
+
+    def test_auto_generates_session_id_when_empty(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        result = log_session(
+            turns=[
+                Turn(agent_name="bot", started_at=_ts(0), ended_at=_ts(1)),
+            ],
+        )
+        # Session ID is a UUID4 string when auto-generated
+        assert result.session_id != ""
+        assert len(result.session_id) == 36
+
+    def test_continue_parent_trace_keeps_all_under_outer(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            log_session(
+                session_id="sess-nested",
+                turns=[
+                    Turn(agent_name="bot", started_at=_ts(0), ended_at=_ts(1)),
+                    Turn(agent_name="bot", started_at=_ts(2), ended_at=_ts(3)),
+                ],
+                continue_parent_trace=True,
+            )
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 2
+        for sp in turn_spans:
+            assert sp.context.trace_id == outer_trace_id
+
+    def test_propagates_children_from_each_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_session(
+            session_id="sess-children",
+            turns=[
+                Turn(
+                    agent_name="bot",
+                    started_at=_ts(0),
+                    ended_at=_ts(2),
+                    spans=[
+                        LLM(model="gpt-4o", started_at=_ts(0), ended_at=_ts(1)),
+                        Tool(name="search", started_at=_ts(1), ended_at=_ts(2)),
+                    ],
+                ),
+                Turn(
+                    agent_name="bot",
+                    started_at=_ts(3),
+                    ended_at=_ts(4),
+                    spans=[LLM(model="gpt-4o", started_at=_ts(3), ended_at=_ts(4))],
+                ),
+            ],
+        )
+        spans = otel_spans.get_finished_spans()
+        # 2 turns + 2 LLMs + 1 tool = 5
+        assert len(spans) == 5
+
+    def test_empty_turns_returns_empty_log_result(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        result = log_session(turns=[], session_id="sess-empty")
+        assert result.session_id == "sess-empty"
+        assert result.trace_ids == []
+        assert result.root_span_ids == []
+        assert result.span_count == 0
+        assert otel_spans.get_finished_spans() == ()
