@@ -1022,6 +1022,75 @@ def test_insert_retries_empty_query_error():
         assert mock_ch_client.insert.call_count == 2  # Retried once
 
 
+@pytest.mark.disable_logging_error_check
+def test_insert_falls_back_to_sync_when_async_setting_rejected():
+    """Async insert against a server that rejects `async_insert` settings as
+    unknown/readonly should disable async, retry sync, and stay sync going forward.
+
+    Regression for the production traceback where `clickhouse-connect` raised
+    `ProgrammingError: Setting async_insert is unknown or readonly` and the
+    insert never recovered, dropping the entire batch.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_summary_1, mock_summary_2 = MagicMock(), MagicMock()
+    # First call: async settings rejected. Second: sync retry succeeds.
+    # Third: a follow-up insert should also be sync (no further rejections).
+    mock_ch_client.insert.side_effect = [
+        ProgrammingError("Setting async_insert is unknown or readonly"),
+        mock_summary_1,
+        mock_summary_2,
+    ]
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host", use_async_insert=True)
+
+        result = server._insert("t", data=[[1]], column_names=["a"])
+        assert result is mock_summary_1
+        assert mock_ch_client.insert.call_count == 2
+
+        # Async should have been disabled on the server after the rejection.
+        assert server._use_async_insert is False
+
+        # The retry after the rejection must not re-send the async settings,
+        # otherwise we'd hit the same ProgrammingError forever.
+        retry_settings = mock_ch_client.insert.call_args_list[1].kwargs.get("settings")
+        assert not retry_settings or "async_insert" not in retry_settings
+
+        # Subsequent inserts go straight to sync, no async settings sent.
+        result = server._insert("t", data=[[2]], column_names=["a"])
+        assert result is mock_summary_2
+        assert mock_ch_client.insert.call_count == 3
+        followup_settings = mock_ch_client.insert.call_args_list[2].kwargs.get(
+            "settings"
+        )
+        assert not followup_settings or "async_insert" not in followup_settings
+
+
+@pytest.mark.disable_logging_error_check
+def test_insert_does_not_swallow_unrelated_programming_errors():
+    """Only the async-settings rejection triggers the sync fallback. Other
+    ProgrammingErrors (e.g. table not found) must surface immediately.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.side_effect = ProgrammingError("Table x does not exist")
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host", use_async_insert=True)
+
+        with pytest.raises(ProgrammingError, match="Table x does not exist"):
+            server._insert("t", data=[[1]], column_names=["a"])
+
+        # No retry, async stays enabled. This isn't an async-setting issue.
+        assert mock_ch_client.insert.call_count == 1
+        assert server._use_async_insert is True
+
+
 def test_ensure_obj_version_exists_retries_eventual_consistency():
     """Object-version existence checks should tolerate transient read-after-write misses."""
     server = chts.ClickHouseTraceServer(host="test_host")
