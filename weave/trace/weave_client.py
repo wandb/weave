@@ -905,7 +905,13 @@ class WeaveClient:
                 )
             )
 
-            # Fix #5: per-op size check removed. Server enforces payload size.
+            # CONCESSION (perf): the per-op `model_dump_json()` size check
+            # used to log a warning when an individual call's payload
+            # exceeded `MAX_TRACE_PAYLOAD_SIZE` (3.5 MiB). It was removed
+            # because the encoding ran on every op just for `len()` and
+            # was redundant with the downstream batch encode. Users with
+            # too-large payloads will now learn from a server rejection
+            # rather than a client-side warning.
             if self._wal is not None:
                 self._wal.write("call_start", call_start_req)
                 if not current_call:
@@ -965,11 +971,28 @@ class WeaveClient:
         children's already-computed summaries even though both run in the
         worker pool.
 
-        Behavior notes:
-        - `call.output` is set to the raw output sync, then overwritten with
-          the postprocessed value when the worker runs.
-        - `call.summary` is `None` until the worker computes it. Tests that
-          inspect persisted state should call `client.flush()`.
+        ## Concessions made for throughput (WB-33844)
+
+        These are real user-visible regressions vs. the previous sync
+        contract. They are accepted as the cost of moving the heavy work
+        off the event loop:
+
+        - Errors raised by user-supplied `postprocess_output` and
+          `_on_finish_handler` no longer propagate on the caller's stack.
+          They are captured on the deferred future and (under
+          `raise_on_captured_errors`) only surface when something awaits
+          the future, e.g. via `client.flush()`. Tracebacks point into
+          the worker thread, not the user's call site.
+        - `call.output` is the raw output until the worker runs the
+          postprocess + ref pass; then it's overwritten with the
+          postprocessed value. Code reading `call.output` between
+          `finish_call` returning and the worker completing sees raw.
+        - `call.summary` is `None` until the worker writes it (after its
+          children's deferred finishes). Sync `_on_finish_handler`
+          contracts that read `call.summary` see `None`.
+        - Tests that inspect persisted state should call `client.flush()`
+          first. Resilience tests that asserted sync raises will not
+          catch deferred errors without an explicit flush.
         """
         if (
             is_tracing_setting_disabled()
@@ -982,9 +1005,11 @@ class WeaveClient:
             ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
-        # Set raw output sync so it is visible to subsequent code in the same
-        # task. The deferred worker overwrites this with the postprocessed
-        # value.
+        # CONCESSION: `call.output` here is the raw output. The worker
+        # overwrites it with the postprocessed value once it runs. Anything
+        # reading `call.output` synchronously after `finish_call` returns
+        # sees the un-postprocessed value, not the trace payload that gets
+        # uploaded.
         call.output = original_output
 
         # Exception handling: cheap, must be sync so call.exception is set.
@@ -1009,7 +1034,12 @@ class WeaveClient:
         ]
 
         def deferred_finish() -> None:
-            # Postprocess (user-supplied; documented as side-effect-free).
+            # CONCESSION: user-supplied `postprocess_output` runs in the
+            # worker. If it raises, the exception is captured on the
+            # future, not on the user's call stack. Stack traces lose the
+            # caller frame. The error is logged via the future's
+            # done-callback; under `raise_on_captured_errors` it surfaces
+            # only on the next `client.flush()`.
             if op is not None and op.postprocess_output:
                 postprocessed_output = op.postprocess_output(original_output)
             else:
@@ -1022,10 +1052,18 @@ class WeaveClient:
             # `map_to_refs` builds the refed copy used for the wire payload.
             self._save_nested_objects(postprocessed_output)
             output_as_refs = map_to_refs(postprocessed_output)
+            # CONCESSION: `call.output` was the raw output (set sync above)
+            # and is now overwritten with the postprocessed value. There is
+            # a window between `finish_call` returning and this line running
+            # where readers see raw, not postprocessed.
             call.output = postprocessed_output
 
-            # Summary rollup. Runs after all children's deferred_finish has
-            # completed (via the chained future), so child.summary is set.
+            # CONCESSION: summary rollup is deferred. `call.summary` is None
+            # in user-visible state until this block runs. Anything that
+            # synchronously reads `call.summary` after `finish_call` returns
+            # gets None (e.g. a callback that reports usage at op-end time).
+            # The `future_executor.then` chain on children's deferred-finish
+            # futures guarantees `child.summary` is set before this reads it.
             computed_summary: dict[str, Any] = {}
             if call._children:
                 computed_summary = sum_dict_leaves(
@@ -1078,8 +1116,13 @@ class WeaveClient:
             _deep_update(merged_summary, computed_summary)
             call.summary = merged_summary
 
-            # The finish handler is the last chance for integrations to
-            # customize what gets logged for a call.
+            # CONCESSION: `_on_finish_handler` (used by integrations like
+            # OpenAI cost tracking) runs in the worker. If it raises, the
+            # error is captured on the future, not on the caller's stack.
+            # Anything in the handler that mutates `call.attributes` or
+            # `call.summary` lands after the call has already "finished"
+            # from the user's perspective. Integrations that expected to
+            # fire before the next op begins will see ordering changes.
             if op is not None and op._on_finish_handler:
                 op._on_finish_handler(call, original_output, exception)
 
@@ -1130,6 +1173,12 @@ class WeaveClient:
 
         # Chain on children's deferred_finish futures so child summaries are
         # written before the parent reads them. With no children, just defer.
+        # CONCESSION: if a child's deferred_finish raises, `then` propagates
+        # the exception to its result-future and skips invoking the
+        # parent's `deferred_finish` entirely. Net effect: the parent's
+        # call_end is dropped when any direct child errored. A
+        # production-grade fix would use an error-tolerant chainer that
+        # runs `deferred_finish` regardless of child outcomes.
         if child_futures:
             fut = self.future_executor.then(
                 child_futures, lambda _results: deferred_finish()

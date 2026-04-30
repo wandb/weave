@@ -85,6 +85,11 @@ class Call:
     # WeaveClient.finish_call so that a parent's deferred_finish can chain
     # on its children's via future_executor.then, ensuring child summaries
     # are written before the parent rolls them up.
+    #
+    # CONCESSION (WB-33844): exposing this field is part of the new contract
+    # where finish work runs out-of-band. Code that wants synchronous-feeling
+    # state (e.g. waits for `call.summary` to be populated) can `.result()`
+    # on this future. None for placeholder calls and disabled tracing.
     _deferred_finish_future: Future | None = dataclasses.field(default=None, repr=False)
 
     # Size of metadata storage for this call
