@@ -2645,9 +2645,13 @@ class WeaveClient:
             task = make_chunk_task(raw_chunk)
             pending = _collect_pending_digests(raw_chunk)
             if pending:
-                chunk_future = self.future_executor.then(
-                    pending, lambda _resolved, t=task: t()
-                )
+
+                def chunk_after_pending(
+                    _resolved: list[Any], t: Callable[[], TableCreateRes] = task
+                ) -> TableCreateRes:
+                    return t()
+
+                chunk_future = self.future_executor.then(pending, chunk_after_pending)
             else:
                 chunk_future = self.future_executor.defer(task)
             chunk_futures.append(chunk_future)
