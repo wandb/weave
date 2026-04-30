@@ -63,8 +63,7 @@ def sanitize_invalid_utf8_surrogates(value: T) -> T:
             if sanitized is not item:
                 sanitized_items = [*value[:idx], sanitized]
                 sanitized_items.extend(
-                    sanitize_invalid_utf8_surrogates(rest)
-                    for rest in value[idx + 1 :]
+                    sanitize_invalid_utf8_surrogates(rest) for rest in value[idx + 1 :]
                 )
                 return cast(T, sanitized_items)
         return value
