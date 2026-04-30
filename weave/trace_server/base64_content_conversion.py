@@ -286,10 +286,11 @@ def restore_content_objects_to_base64(
                 FileContentReadReq(project_id=project_id, digest=content_digest)
             )
             b64_data = base64.b64encode(content_res.content).decode("ascii")
-            return f"data:{mimetype};base64,{b64_data}"
         except Exception as e:
             logger.warning("Failed to restore Content object to data URL: %s", e)
             return val
+        else:
+            return f"data:{mimetype};base64,{b64_data}"
 
     def _visit(v: Any) -> Any:
         if _is_content_object(v):
