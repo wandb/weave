@@ -134,7 +134,7 @@ class Audio(Generic[T]):
         """
         data = try_decode(data)
         if format not in list(map(str, SUPPORTED_FORMATS)):
-            raise ValueError("Unknown format {format}, must be one of: mp3 or wav")
+            raise ValueError(f"Unknown format {format}, must be one of: mp3 or wav")
 
         # We already attempted to decode it as base64 and coerced to bytes so we can skip that step
         return cls(

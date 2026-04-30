@@ -117,15 +117,13 @@ class TestWeaveAudio:
 
     def test_audio_fails_on_unsupported_format(self, client: WeaveClient) -> None:
         client.project = "test_audio_fails_on_unsupported_format"
-        assert pytest.raises(
-            ValueError, lambda: Audio.from_data(data=b"example", format="invalid")
-        )
+        with pytest.raises(ValueError, match="Unknown format"):
+            Audio.from_data(data=b"example", format="invalid")
 
     def test_audio_fails_on_empty_data(self, client: WeaveClient) -> None:
         client.project = "test_audio_fails_on_empty_data"
-        assert pytest.raises(
-            ValueError, lambda: Audio.from_data(data=b"", format="mp3")
-        )
+        with pytest.raises(ValueError, match="data"):
+            Audio.from_data(data=b"", format="mp3")
 
     @pytest.mark.parametrize("audio_file", [TEST_MP3_FILE, TEST_WAV_FILE])
     def test_audio_as_dataset_cell(self, client: WeaveClient, audio_file: str) -> None:

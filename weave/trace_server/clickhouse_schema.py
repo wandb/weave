@@ -17,6 +17,7 @@ class CallBaseCHInsertable(BaseModel):
     id: str
     input_refs: list[str] = Field(default_factory=list)
     output_refs: list[str] = Field(default_factory=list)
+    expire_at: datetime.datetime | None = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -113,8 +114,8 @@ class CallCompleteCHInsertable(
     start and end information provided together.
 
     Note: The pydantic model uses None for "not set" values. Conversion to
-    ClickHouse sentinel values (empty string, epoch zero) happens at insert time
-    via ch_sentinel_values.to_ch_value().
+    ClickHouse sentinel values (empty string, epoch zero, expire_at far-future)
+    happens at insert time via ch_sentinel_values.to_ch_value().
     """
 
     started_at: datetime.datetime
@@ -126,7 +127,6 @@ class CallCompleteCHInsertable(
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
-    ttl_at: datetime.datetime = datetime.datetime(2100, 1, 1)
     source: str = "direct"
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
@@ -171,6 +171,8 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_step_end: int | None = None
 
     deleted_at: datetime.datetime | None = None
+
+    expire_at: datetime.datetime | None = None
 
 
 class ObjCHInsertable(BaseModel):

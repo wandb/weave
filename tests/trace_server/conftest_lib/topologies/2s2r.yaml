@@ -1,0 +1,116 @@
+# 2 shards × 2 replicas topology for pre-merge migrator CI.
+#
+# Four CH nodes arranged as:
+#   shard1: ch-s1-r1 (entrypoint + keeper), ch-s1-r2
+#   shard2: ch-s2-r1, ch-s2-r2
+#
+# Keeper is embedded in ch-s1-r1 (same pattern as 1s3r). All four CH
+# nodes join the same Keeper instance. Only ch-s1-r1 exposes the HTTP
+# port to the host — tests drive the cluster via that entrypoint, and
+# distributed-engine tables route queries across both shards via the
+# compose network.
+#
+# Design decision: 2s2r instead of 2s3r.
+#   Prod runs 2 shards × 3 replicas. 2 replicas per shard is sufficient
+#   to exercise every bug class in our incident history (ReplicatedMergeTree
+#   path templating, ON CLUSTER DDL propagation, distributed-table _local
+#   suffix logic, sharding-key regressions). The 3rd replica per shard
+#   only exercises quorum edge cases, which have not been in our incident
+#   surface. Dropping to 2 replicas saves ~25% memory/CPU on a GH Actions
+#   runner, where capacity is the actual limiting factor.
+#
+# Design decision: 1 Keeper, not 3.
+#   Keeper replica count and CH replica count are independent. The
+#   production bugs we're catching live in the CH protocol surface
+#   (replication, DDL, distributed routing), not in Keeper quorum
+#   behavior. Revisit only if an incident proves Keeper HA is in our
+#   bug surface.
+#
+# Resource limits target the GH Actions ubuntu-latest runner (7 GB RAM,
+# 2 vCPU). Each CH node caps at 1.5 GB; total committed memory across
+# 4 CH nodes is 6 GB — tighter than 1s3r's 4.5 GB, but observed actual
+# usage is ~800 MB per node (~3.2 GB total) so real headroom is
+# comfortable. If CI OOMs, first lever is lowering per-node cap to 1 GB.
+#
+# Host port 8131 is used (1s3r uses 8130) to avoid collision when both
+# topologies are up simultaneously for local dev. CI runs them in
+# separate jobs on separate runners, so the port choice there is
+# cosmetic.
+#
+# Usage (local):
+#   docker compose -f 2s2r.yaml up -d --wait
+#   docker compose -f 2s2r.yaml exec -T ch-s1-r1 \
+#     clickhouse-client -q "SELECT host_name, shard_num, replica_num, errors_count FROM system.clusters WHERE cluster='weave_cluster'"
+#   docker compose -f 2s2r.yaml down -v
+
+x-ch-node: &ch-node
+  image: clickhouse/clickhouse-server:25.11.2.24
+  environment:
+    CLICKHOUSE_DB: default
+    CLICKHOUSE_USER: default
+    CLICKHOUSE_PASSWORD: ""
+    CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+  ulimits:
+    nofile:
+      soft: 262144
+      hard: 262144
+  deploy:
+    resources:
+      limits:
+        memory: 1536M
+  healthcheck:
+    test: ["CMD-SHELL", "wget -q -O- http://localhost:8123/ping || exit 1"]
+    interval: 3s
+    timeout: 2s
+    retries: 20
+    start_period: 10s
+
+services:
+  ch-s1-r1:
+    <<: *ch-node
+    container_name: weave-ci-ch-2s2r-s1-r1
+    hostname: ch-s1-r1
+    ports:
+      # Host port 8131 → container 8123. 1s3r uses 8130.
+      - "8131:8123"
+      - "9001:9000"
+    volumes:
+      - ../keeper_2s2r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./macros_s1_r1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+
+  ch-s1-r2:
+    <<: *ch-node
+    container_name: weave-ci-ch-2s2r-s1-r2
+    hostname: ch-s1-r2
+    volumes:
+      - ../keeper_2s2r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./macros_s1_r2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+    depends_on:
+      ch-s1-r1:
+        condition: service_healthy
+
+  ch-s2-r1:
+    <<: *ch-node
+    container_name: weave-ci-ch-2s2r-s2-r1
+    hostname: ch-s2-r1
+    volumes:
+      - ../keeper_2s2r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./macros_s2_r1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+    depends_on:
+      ch-s1-r1:
+        condition: service_healthy
+
+  ch-s2-r2:
+    <<: *ch-node
+    container_name: weave-ci-ch-2s2r-s2-r2
+    hostname: ch-s2-r2
+    volumes:
+      - ../keeper_2s2r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./macros_s2_r2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+    depends_on:
+      ch-s1-r1:
+        condition: service_healthy
+
+networks:
+  default:
+    name: weave-ci-2s2r

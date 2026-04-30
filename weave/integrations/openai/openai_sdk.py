@@ -8,6 +8,8 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+import httpx
+
 # Do not import this module directly, it should only be invoked
 from openai._legacy_response import LegacyAPIResponse
 from openai._response import APIResponse
@@ -47,6 +49,14 @@ _openai_patcher: MultiPatcher | None = None
 logger = logging.getLogger(__name__)
 
 
+def _parse_api_response(value: LegacyAPIResponse | APIResponse) -> Any:
+    try:
+        return value.parse()
+    except httpx.ResponseNotRead:
+        value.http_response.read()
+        return value.parse()
+
+
 def maybe_unwrap_api_response(value: Any) -> Any:
     """If the caller requests a raw response, we unwrap the APIResponse object.
     We take a very conservative approach to only unwrap the types we know about.
@@ -55,14 +65,13 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
     try:
         if isinstance(value, LegacyAPIResponse):
-            maybe_value = value.parse()
+            maybe_value = _parse_api_response(value)
 
         if isinstance(value, APIResponse):
-            maybe_value = value.parse()
+            maybe_value = _parse_api_response(value)
     except Exception:
-        # LegacyAPIResponse.parse() can fail in streaming contexts due to
-        # async race conditions (e.g. httpx.ResponseNotRead on Windows CI).
-        # Since this is best-effort unwrapping, fall back to the original response.
+        # This is best-effort unwrapping. If parsing still fails, fall back to the
+        # original response so tracing does not alter the caller-visible behavior.
         return value
 
     if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
@@ -392,6 +401,35 @@ def openai_on_input_handler(
     )
 
 
+def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
+    """Flatten OpenAI's nested cache token fields to canonical names.
+
+    OpenAI Chat Completions nests cached tokens under prompt_tokens_details,
+    and the Responses API nests them under input_tokens_details. This extracts
+    them to the top-level canonical field `cache_read_input_tokens`.
+    """
+    ptd = usage.get("prompt_tokens_details")
+    if isinstance(ptd, dict) and ptd.get("cached_tokens") is not None:
+        usage.setdefault("cache_read_input_tokens", ptd["cached_tokens"])
+    itd = usage.get("input_tokens_details")
+    if isinstance(itd, dict) and itd.get("cached_tokens") is not None:
+        usage.setdefault("cache_read_input_tokens", itd["cached_tokens"])
+
+
+def openai_on_finish(
+    call: Any, output: Any, exception: BaseException | None = None
+) -> None:
+    """Normalize cache token fields in the usage summary."""
+    if call.summary is None:
+        return
+    usage_map = call.summary.get("usage")
+    if not isinstance(usage_map, dict):
+        return
+    for model_usage in usage_map.values():
+        if isinstance(model_usage, dict):
+            _normalize_openai_cache_tokens(model_usage)
+
+
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         """We need to do this so we can check if `stream` is used."""
@@ -419,6 +457,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         op = weave.op(_add_stream_options(fn), **op_kwargs)
 
         op._set_on_input_handler(openai_on_input_handler)
+        op._set_on_finish_handler(openai_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: (
@@ -465,6 +504,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
+        op._set_on_finish_handler(openai_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: (
@@ -699,6 +739,7 @@ def create_wrapper_responses_sync(
 
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
+        op._set_on_finish_handler(openai_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: responses_accumulator,
@@ -721,6 +762,7 @@ def create_wrapper_responses_async(
 
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
+        op._set_on_finish_handler(openai_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: responses_accumulator,

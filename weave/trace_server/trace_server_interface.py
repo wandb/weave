@@ -15,6 +15,7 @@ else:
         ResourceSpans = Any
 
 from weave.trace_server import http_service_interface as his
+from weave.trace_server.agents import types as agent_types
 from weave.trace_server.common_interface import (
     WB_USER_ID_DESCRIPTION,
     AnnotationState,
@@ -50,6 +51,8 @@ class LLMUsageSchema(TypedDict, total=False):
     output_tokens: int | None
     requests: int | None
     total_tokens: int | None
+    cache_creation_input_tokens: int | None
+    cache_read_input_tokens: int | None
 
 
 class LLMCostSchema(LLMUsageSchema, total=False):
@@ -152,6 +155,14 @@ class CallSchema(BaseModel):
     wb_run_step_end: int | None = None
 
     deleted_at: datetime.datetime | None = None
+
+    expire_at: datetime.datetime | None = Field(
+        default=None,
+        description=(
+            "Expiration timestamp for this call. None = no TTL configured for "
+            "the project (the row will not be expired)."
+        ),
+    )
 
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
@@ -1446,6 +1457,8 @@ class FilesStatsRes(BaseModel):
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
+    cache_read_input_token_cost: float = 0
+    cache_creation_input_token_cost: float = 0
     prompt_token_cost_unit: str | None = Field(
         "USD", description="The unit of the cost for the prompt tokens"
     )
@@ -1549,6 +1562,32 @@ class ProjectStatsRes(BaseModel):
     objects_storage_size_bytes: int
     tables_storage_size_bytes: int
     files_storage_size_bytes: int
+
+
+# TTL Settings API
+# ================
+
+
+class ProjectTTLSettingsReadReq(BaseModelStrict):
+    project_id: str
+
+
+class ProjectTTLSettingsReadRes(BaseModel):
+    retention_days: int | None = Field(
+        default=None, description="None = no TTL (infinite retention)"
+    )
+
+
+class ProjectTTLSettingsUpdateReq(BaseModelStrict):
+    project_id: str
+    retention_days: int | None = Field(
+        default=None, description="None disables TTL; must be None or >= 1"
+    )
+    wb_user_id: str | None = None
+
+
+class ProjectTTLSettingsUpdateRes(BaseModel):
+    retention_days: int | None
 
 
 # Annotation Queue API
@@ -2663,6 +2702,36 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
+class EvalResultsSortBy(SortBy):
+    """Sort specification for evaluation results, extending SortBy"""
+
+    evaluation_call_id: str | None = Field(
+        default=None,
+        description=("Scope the sort to a specific evaluation's scores."),
+    )
+    mode: Literal["value", "difference"] = Field(
+        default="value",
+        description=(
+            "When 'value', sort by the field value for the specified evaluation. "
+            "When 'difference', sort by max-min spread of the field across all "
+            "evaluations (evaluation_call_id is ignored)."
+        ),
+    )
+
+
+class EvalResultsFilter(BaseModelStrict):
+    """A filter scoped to an optional evaluation."""
+
+    evaluation_call_id: str | None = Field(
+        default=None,
+        description="When set, filter fields are scoped to this evaluation's data.",
+    )
+    query: Query = Field(
+        description="Filter expression. Supported field prefixes: "
+        "scores.<name>, inputs.<path>, outputs.<path>.",
+    )
+
+
 class EvalResultsQueryBody(BaseModelStrict):
     evaluation_call_ids: list[str] | None = Field(
         default=None,
@@ -2711,6 +2780,28 @@ class EvalResultsQueryBody(BaseModelStrict):
             "Optional intersection behavior for the summary section. When null, "
             "the value of `require_intersection` is used."
         ),
+    )
+    include_predict_and_score_children: bool = Field(
+        default=True,
+        description=(
+            "When true (default), fetch child calls (predict/score) of each "
+            "predict_and_score call to populate predict_call_id, scorer_call_ids, "
+            "and more precise latency/token data. When false, these fields are "
+            "derived from the predict_and_score call itself (predict_call_id and "
+            "scorer_call_ids will be null/empty)."
+        ),
+    )
+    sort_by: list[EvalResultsSortBy] | None = Field(
+        default=None,
+        description=(
+            "Sort specification for result rows. Supported field prefixes: "
+            "scores.<name>, inputs.<path>, outputs.<path>. "
+            "When null, rows are sorted by row_digest ASC."
+        ),
+    )
+    filters: list[EvalResultsFilter] | None = Field(
+        default=None,
+        description="Filters applied to grouped rows. Multiple filters are AND'd together.",
     )
     limit: int | None = Field(
         default=None,
@@ -2812,6 +2903,29 @@ class TraceServerInterface(Protocol):
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
+    # GenAI / Agent Observability API
+    def genai_otel_export(
+        self, req: agent_types.GenAIOTelExportReq
+    ) -> agent_types.GenAIOTelExportRes: ...
+    def agent_spans_query(
+        self, req: agent_types.AgentSpansQueryReq
+    ) -> agent_types.AgentSpansQueryRes: ...
+    def agent_agents_query(
+        self, req: agent_types.AgentsQueryReq
+    ) -> agent_types.AgentsQueryRes: ...
+    def agent_versions_query(
+        self, req: agent_types.AgentVersionsQueryReq
+    ) -> agent_types.AgentVersionsQueryRes: ...
+    def agent_search(
+        self, req: agent_types.AgentSearchReq
+    ) -> agent_types.AgentSearchRes: ...
+    def agent_traces_chat(
+        self, req: agent_types.AgentTraceChatReq
+    ) -> agent_types.AgentTraceChatRes: ...
+    def agent_conversation_chat(
+        self, req: agent_types.AgentConversationChatReq
+    ) -> agent_types.AgentConversationChatRes: ...
+
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
     def call_end(self, req: CallEndReq) -> CallEndRes: ...
@@ -2904,6 +3018,15 @@ class TraceServerInterface(Protocol):
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
+
+    # TTL settings API
+    def project_ttl_settings_read(
+        self, req: ProjectTTLSettingsReadReq
+    ) -> ProjectTTLSettingsReadRes: ...
+
+    def project_ttl_settings_update(
+        self, req: ProjectTTLSettingsUpdateReq
+    ) -> ProjectTTLSettingsUpdateRes: ...
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...
@@ -3047,6 +3170,8 @@ UsageMetric = Literal[
     "input_tokens",
     "output_tokens",
     "total_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
     "input_cost",
     "output_cost",
     "total_cost",
@@ -3057,11 +3182,15 @@ Token metrics are extracted from summary.usage[model]:
 - input_tokens: Sum of prompt_tokens (OpenAI) and input_tokens (Anthropic/others)
 - output_tokens: Sum of completion_tokens (OpenAI) and output_tokens (Anthropic/others)
 - total_tokens: Total tokens (input + output)
+- cache_read_input_tokens: Tokens read from prompt cache (all providers)
+- cache_creation_input_tokens: Tokens used to create prompt cache (Anthropic)
 
-Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices:
-- input_cost: input_tokens * prompt_token_cost
+Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices.
+Cache tokens are subtracted from input before applying the prompt rate (they are billed
+at their own cache rates instead):
+- input_cost: (input_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost
 - output_cost: output_tokens * completion_token_cost
-- total_cost: input_cost + output_cost
+- total_cost: input_cost + output_cost + cache_read_cost + cache_creation_cost
 """
 
 
@@ -3179,9 +3308,13 @@ class LLMAggregatedUsage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
     # Cost fields - only populated when include_costs=True
     prompt_tokens_total_cost: float | None = None
     completion_tokens_total_cost: float | None = None
+    cache_read_input_tokens_total_cost: float | None = None
+    cache_creation_input_tokens_total_cost: float | None = None
 
 
 # --- /trace/usage endpoint (per-call usage with descendant rollup) ---

@@ -17,7 +17,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
 )
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
@@ -67,7 +67,7 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
         assert_sql(
             cq,
             expected_query,
-            {"pb_0": SENTINEL_DATETIME, "pb_1": "project"},
+            {"pb_0": SENTINEL_EPOCH, "pb_1": "project"},
         )
 
 
@@ -731,7 +731,7 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
     assert_sql(
         cq,
         """
-        SELECT
+        SELECT DISTINCT
             calls_complete.id AS id
         FROM
             calls_complete
@@ -755,7 +755,7 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
             "pb_0": "wandb.runnable.my_op",
             "pb_1": '$."output"."expected"',
             "pb_2": '$."output"."found"',
-            "pb_3": SENTINEL_DATETIME,
+            "pb_3": SENTINEL_EPOCH,
             "pb_4": "project",
         },
     )
@@ -1349,7 +1349,7 @@ def test_calls_query_with_like_optimization_calls_complete() -> None:
         {
             "pb_0": '$."param"',
             "pb_1": "hello",
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": '%"hello"%',
             "pb_4": "project",
         },
@@ -1387,7 +1387,7 @@ def test_calls_query_with_like_optimization_contains_calls_complete() -> None:
         {
             "pb_0": '$."param"',
             "pb_1": "hello",
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": '%"%hello%"%',
             "pb_4": "project",
         },
@@ -1425,7 +1425,7 @@ def test_calls_query_with_like_optimization_in_calls_complete() -> None:
             "pb_0": '$."param"',
             "pb_1": "hello",
             "pb_2": "world",
-            "pb_3": SENTINEL_DATETIME,
+            "pb_3": SENTINEL_EPOCH,
             "pb_4": '%"hello"%',
             "pb_5": '%"world"%',
             "pb_6": "project",
@@ -1782,9 +1782,9 @@ def test_summary_weave_field_select_backtick_quoting(
                 "pb_4": "success",
                 "pb_5": "descendant_error",
                 "pb_6": "",
-                "pb_7": SENTINEL_DATETIME,
-                "pb_8": SENTINEL_DATETIME,
-                "pb_9": SENTINEL_DATETIME,
+                "pb_7": SENTINEL_EPOCH,
+                "pb_8": SENTINEL_EPOCH,
+                "pb_9": SENTINEL_EPOCH,
                 "pb_10": "project",
             },
         )
@@ -2338,15 +2338,6 @@ def test_maybe_convert_datetime_operands() -> None:
     )
     assert ops[1].literal_ == 1709251200
 
-    # Test: string literal compared to started_at → should NOT convert (already a string)
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-            tsi_query.LiteralOperation(**{"$literal": "2024-03-01 00:00:00"}),
-        ]
-    )
-    assert ops[1].literal_ == "2024-03-01 00:00:00"
-
     # Test: None literal compared to deleted_at → should NOT convert
     ops = _maybe_convert_datetime_operands(
         [
@@ -2365,6 +2356,75 @@ def test_maybe_convert_datetime_operands() -> None:
         ]
     )
     assert original_lit.literal_ == 1709251200
+
+
+@pytest.mark.parametrize(
+    ("literal_in", "expected_literal"),
+    [
+        (
+            "2024-03-01 00:00:00.000000",
+            "2024-03-01 00:00:00.000000",
+        ),
+        (
+            "2024-03-01 00:00:00",
+            "2024-03-01 00:00:00.000000",
+        ),
+        (
+            "2024-03-01T00:00:00Z",
+            "2024-03-01 00:00:00.000000",
+        ),
+    ],
+)
+def test_maybe_convert_string_literal_to_ch_format(
+    literal_in: str, expected_literal: str
+) -> None:
+    """CH-shaped literals are unchanged; ISO 8601 literals map to canonical CH format."""
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+            tsi_query.LiteralOperation(**{"$literal": literal_in}),
+        ]
+    )
+    assert ops[1].literal_ == expected_literal
+
+
+@pytest.mark.parametrize("field", ["started_at", "ended_at", "deleted_at"])
+def test_maybe_convert_string_date_for_datetime_columns(field: str) -> None:
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": field}),
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
+        ]
+    )
+    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
+
+
+def test_maybe_convert_literal_before_field() -> None:
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01T12:00:00Z"}),
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        ]
+    )
+    assert ops[0].literal_ == "2024-03-01 12:00:00.000000"
+
+
+def test_maybe_convert_skips_non_datetime_string_field() -> None:
+    original = [
+        tsi_query.GetFieldOperator(**{"$getField": "display_name"}),
+        tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
+    ]
+    ops = _maybe_convert_datetime_operands(original)
+    assert ops == original
+
+
+def test_maybe_convert_skips_unparseable_string() -> None:
+    original = [
+        tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        tsi_query.LiteralOperation(**{"$literal": "not-a-timestamp"}),
+    ]
+    ops = _maybe_convert_datetime_operands(original)
+    assert ops == original
 
 
 def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
@@ -3177,7 +3237,7 @@ def test_calls_complete_with_light_filter_and_order() -> None:
         {
             "pb_0": "2024-03-01 00:00:00.000000",
             "pb_1": "user_123",
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": "project",
         },
     )
@@ -3255,7 +3315,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         {
             "pb_0": '$."latency"',
             "pb_1": 1000,
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": ["my_op"],
             "pb_4": "trace_abc",
             "pb_5": '$."status_counts"."error"',
@@ -3264,7 +3324,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_8": "success",
             "pb_9": "descendant_error",
             "pb_10": "",
-            "pb_11": SENTINEL_DATETIME,
+            "pb_11": SENTINEL_EPOCH,
             "pb_12": "project",
         },
     )
@@ -3278,7 +3338,7 @@ def test_query_with_simple_feedback_sort_calls_complete() -> None:
     assert_sql(
         cq,
         """
-            SELECT
+            SELECT DISTINCT
                 calls_complete.id AS id
             FROM
                 calls_complete
@@ -3310,7 +3370,7 @@ def test_query_with_simple_feedback_sort_calls_complete() -> None:
                 {pb_4:String}), 'null'), '')) DESC
             """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "wandb.runnable.my_op",
             "pb_2": "output",
             "pb_3": "expected",
@@ -3359,7 +3419,7 @@ def test_calls_complete_with_refs_filter() -> None:
                 AND (hasAny(calls_complete.output_refs, {pb_3:Array(String)})))))
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": ["weave-trace-internal:///project/object/my_input:abc"],
             "pb_2": "weave-trace-internal:///project/object/my_input:",
             "pb_3": ["weave-trace-internal:///project/object/my_output:xyz"],
@@ -3395,7 +3455,7 @@ def test_calls_complete_with_feedback_filter() -> None:
     assert_sql(
         cq,
         """
-        SELECT
+        SELECT DISTINCT
             calls_complete.id AS id
         FROM
             calls_complete
@@ -3418,7 +3478,7 @@ def test_calls_complete_with_feedback_filter() -> None:
             "pb_0": "wandb.runnable.my_op",
             "pb_1": '$."output"."score"',
             "pb_2": 0.5,
-            "pb_3": SENTINEL_DATETIME,
+            "pb_3": SENTINEL_EPOCH,
             "pb_4": "project",
         },
     )
@@ -3485,10 +3545,10 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             "pb_3": "success",
             "pb_4": "descendant_error",
             "pb_5": "",
-            "pb_6": SENTINEL_DATETIME,
+            "pb_6": SENTINEL_EPOCH,
             "pb_7": "",
-            "pb_8": SENTINEL_DATETIME,
-            "pb_9": SENTINEL_DATETIME,
+            "pb_8": SENTINEL_EPOCH,
+            "pb_9": SENTINEL_EPOCH,
             "pb_10": "project",
         },
     )
@@ -3516,7 +3576,9 @@ def test_build_calls_complete_delete_query() -> None:
 def test_build_calls_complete_delete_query_with_cluster() -> None:
     """Ensure the delete helper builds the expected query with cluster name.
 
-    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
+    responsible for passing the correct table name (e.g. calls_complete_local
+    in distributed mode via _get_calls_complete_table_name).
     """
     query = build_calls_complete_delete_query(
         table_name="calls_complete",
@@ -3527,7 +3589,7 @@ def test_build_calls_complete_delete_query_with_cluster() -> None:
 
     expected = sqlparse.format(
         """
-        DELETE FROM calls_complete_local ON CLUSTER my_cluster
+        DELETE FROM calls_complete ON CLUSTER my_cluster
         WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
         """,
         reindent=True,
@@ -3560,7 +3622,9 @@ def test_build_calls_complete_update_query() -> None:
 def test_build_calls_complete_update_query_with_cluster() -> None:
     """Ensure the update helper builds the expected query with cluster name.
 
-    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
+    responsible for passing the correct table name (e.g. calls_complete_local
+    in distributed mode via _get_calls_complete_table_name).
     """
     query = build_calls_complete_update_query(
         table_name="calls_complete",
@@ -3572,7 +3636,7 @@ def test_build_calls_complete_update_query_with_cluster() -> None:
 
     expected = sqlparse.format(
         """
-        UPDATE calls_complete_local ON CLUSTER my_cluster
+        UPDATE calls_complete ON CLUSTER my_cluster
         SET display_name = {display_name:String}
         WHERE project_id = {project_id:String} AND id = {id:String}
         """,
@@ -3665,7 +3729,7 @@ def test_query_with_queue_filter_calls_complete() -> None:
         """,
         {
             "pb_0": "test_queue_id",
-            "pb_1": SENTINEL_DATETIME,
+            "pb_1": SENTINEL_EPOCH,
             "pb_2": "project",
         },
     )
@@ -3767,7 +3831,7 @@ def test_stats_query_calls_complete_flat_count() -> None:
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "project",
         },
         read_table=ReadTable.CALLS_COMPLETE,
@@ -3791,7 +3855,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": ["my_op"],
             "pb_2": "project",
         },
@@ -3827,9 +3891,61 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "project",
             "pb_2": "",
+        },
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+
+def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -> None:
+    """Stats query on calls_complete with feedback filter uses COUNT(DISTINCT id).
+
+    Feedback LEFT JOIN can multiply rows on calls_complete. The data query uses
+    SELECT DISTINCT to deduplicate; the stats query must use COUNT(DISTINCT id)
+    so the count matches the actual number of rows returned.
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=tsi.Query.model_validate(
+            {
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$getField": "feedback.[wandb.annotation.rating].payload.value"
+                        },
+                        {"$literal": "good"},
+                    ]
+                }
+            }
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count(DISTINCT calls_complete.id) AS count
+        FROM calls_complete
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_4:String},
+            '/call/',
+            calls_complete.id))
+        PREWHERE calls_complete.project_id = {pb_4:String}
+        WHERE 1
+          AND (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+            THEN feedback.payload_dump END,
+            {pb_1:String}), 'null'), '') = {pb_2:String}))
+       AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
+        """,
+        {
+            "pb_0": "wandb.annotation.rating",
+            "pb_1": '$."value"',
+            "pb_2": "good",
+            "pb_3": SENTINEL_EPOCH,
+            "pb_4": "project",
         },
         read_table=ReadTable.CALLS_COMPLETE,
     )
@@ -3894,8 +4010,8 @@ def test_latency_ms_sort_calls_complete_uses_sentinel_for_ended_at() -> None:
         END DESC
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
-            "pb_1": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
+            "pb_1": SENTINEL_EPOCH,
             "pb_2": "project",
         },
     )
@@ -3930,9 +4046,9 @@ def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
        AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": 1000,
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": "project",
         },
     )
@@ -3952,7 +4068,7 @@ def test_trace_roots_only_filter_calls_complete() -> None:
               AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "",
             "pb_2": "project",
         },
@@ -3992,7 +4108,7 @@ def test_trace_name_filter_calls_complete_uses_sentinel() -> None:
         {
             "pb_0": "",
             "pb_1": "my_model",
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": "project",
         },
     )
@@ -4029,18 +4145,21 @@ def test_not_eq_none_display_name_calls_complete() -> None:
         """,
         {
             "pb_0": "",
-            "pb_1": SENTINEL_DATETIME,
+            "pb_1": SENTINEL_EPOCH,
             "pb_2": "project",
         },
     )
 
 
 def test_hardcoded_filters_calls_complete() -> None:
-    """Verify thread_ids, turn_ids, parent_ids, wb_run_ids use sentinel null checks on calls_complete."""
+    """Verify hardcoded filters on calls_complete: sentinel null checks and
+    call_ids appears exactly once (in WHERE, not duplicated in filter conditions).
+    """
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
         filter={
+            "call_ids": ["call_aaa"],
             "thread_ids": ["thread_123"],
             "turn_ids": ["turn_456"],
             "parent_ids": ["parent_aaa", "parent_bbb"],
@@ -4051,8 +4170,9 @@ def test_hardcoded_filters_calls_complete() -> None:
         cq,
         """
         SELECT calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_13:String}
-        WHERE (calls_complete.wb_run_id IN {pb_9:Array(String)}
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_14:String}
+        WHERE (calls_complete.id IN {pb_13:Array(String)})
+          AND (calls_complete.wb_run_id IN {pb_9:Array(String)}
                OR calls_complete.wb_run_id = {pb_10:String})
           AND (calls_complete.parent_id IN {pb_11:Array(String)}
                OR calls_complete.parent_id = {pb_12:String})
@@ -4067,7 +4187,7 @@ def test_hardcoded_filters_calls_complete() -> None:
                      AND (calls_complete.wb_run_id IN {pb_4:Array(String)}))))
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": ["parent_aaa", "parent_bbb"],
             "pb_2": ["thread_123"],
             "pb_3": ["turn_456"],
@@ -4080,7 +4200,8 @@ def test_hardcoded_filters_calls_complete() -> None:
             "pb_10": "",
             "pb_11": ["parent_aaa", "parent_bbb"],
             "pb_12": "",
-            "pb_13": "project",
+            "pb_13": ["call_aaa"],
+            "pb_14": "project",
         },
     )
 
@@ -4105,14 +4226,167 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
                  END ASC
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": '$."status_counts"."error"',
             "pb_2": "error",
             "pb_3": "running",
             "pb_4": "success",
             "pb_5": "descendant_error",
             "pb_6": "",
-            "pb_7": SENTINEL_DATETIME,
+            "pb_7": SENTINEL_EPOCH,
             "pb_8": "project",
+        },
+    )
+
+
+def test_query_with_reaction_eq_filter_calls_merged() -> None:
+    """Test that reaction emoji filter uses groupArrayIf + has() instead of anyIf."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[wandb.reaction.1].payload.emoji"},
+                    {"$literal": "👎"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_3:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            ((has(groupArrayIf(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_1:String}), 'null'), ''),
+            feedback.feedback_type = {pb_0:String}
+            AND coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_1:String}), 'null'), '') != ''), {pb_2:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.reaction.1",
+            "pb_1": '$."emoji"',
+            "pb_2": "👎",
+            "pb_3": "project",
+        },
+    )
+
+
+def test_query_with_note_contains_filter_calls_merged() -> None:
+    """Test that note text filter uses arrayExists instead of position on anyIf."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.ContainsOperation.model_validate(
+            {
+                "$contains": {
+                    "input": {"$getField": "feedback.[wandb.note.1].payload.note"},
+                    "substr": {"$literal": "bad output"},
+                    "case_insensitive": False,
+                }
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_3:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            ((arrayExists(x -> position(x, {pb_2:String}) > 0,
+            groupArrayIf(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_1:String}), 'null'), ''),
+            feedback.feedback_type = {pb_0:String}
+            AND coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_1:String}), 'null'), '') != '')))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.note.1",
+            "pb_1": '$."note"',
+            "pb_2": "bad output",
+            "pb_3": "project",
+        },
+    )
+
+
+def test_query_with_annotation_filter_still_uses_anyif() -> None:
+    """Regression test: annotation feedback (single-value) still uses anyIf, not groupArrayIf."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[wandb.annotation.rating].payload.value"},
+                    {"$literal": "good"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_3:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String}), 'null'), '') = {pb_2:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.annotation.rating",
+            "pb_1": '$."value"',
+            "pb_2": "good",
+            "pb_3": "project",
         },
     )

@@ -23,11 +23,19 @@ def bedrock_on_finish_converse(
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output:
+        output_usage = output["usage"]
         tokens_metrics = {
-            "prompt_tokens": output["usage"]["inputTokens"],
-            "completion_tokens": output["usage"]["outputTokens"],
-            "total_tokens": output["usage"]["totalTokens"],
+            "prompt_tokens": output_usage["inputTokens"],
+            "completion_tokens": output_usage["outputTokens"],
+            "total_tokens": output_usage["totalTokens"],
         }
+        # Bedrock Converse API returns cache tokens when prompt caching is used
+        cache_read = output_usage.get("cacheReadInputTokenCount")
+        if cache_read is not None:
+            tokens_metrics["cache_read_input_tokens"] = cache_read
+        cache_write = output_usage.get("cacheWriteInputTokenCount")
+        if cache_write is not None:
+            tokens_metrics["cache_creation_input_tokens"] = cache_write
         usage[model_name].update(tokens_metrics)
     if call.summary is not None:
         call.summary.update(summary_update)

@@ -33,6 +33,7 @@ from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -50,7 +51,10 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.interface.feedback_types import (
+    MULTI_VALUE_FEEDBACK_TYPES,
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+)
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.methods.sqlite_feedback_stats import (
     sqlite_feedback_payload_schema,
@@ -81,11 +85,22 @@ from weave.trace_server.trace_server_common import (
     scorer_read_res_from_obj,
     set_nested_key,
 )
+from weave.trace_server.ttl_settings import (
+    RETENTION_DAYS_NO_TTL,
+    compute_expire_at,
+    invalidate_ttl_cache,
+)
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
+
+# Python 3.12 deprecated the default datetime adapters/converters in sqlite3.
+# See: https://docs.python.org/3.12/library/sqlite3.html#default-adapters-and-converters-deprecated
+# Register explicit adapters to suppress DeprecationWarning.
+sqlite3.register_adapter(datetime.date, lambda d: d.isoformat())
+sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat(sep=" "))
 
 MAX_REFS_BATCH_SIZE = 1000
 MAX_OTEL_ERROR_MESSAGES = 20
@@ -239,6 +254,12 @@ def _cost_usage_from_summary(
             "requests": _safe_int_for_costs(usage.get("requests")),
             # Match ClickHouse: keep total_tokens as-reported rather than deriving it.
             "total_tokens": _safe_int_for_costs(usage.get("total_tokens")),
+            "cache_read_input_tokens": _safe_int_for_costs(
+                usage.get("cache_read_input_tokens")
+            ),
+            "cache_creation_input_tokens": _safe_int_for_costs(
+                usage.get("cache_creation_input_tokens")
+            ),
         }
     return normalized_usage
 
@@ -315,6 +336,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(TABLE_FEEDBACK.drop_sql())
         cursor.execute("DROP TABLE IF EXISTS calls")
+        cursor.execute("DROP TABLE IF EXISTS project_ttl_settings")
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
         cursor.execute("DROP TABLE IF EXISTS table_rows")
@@ -350,9 +372,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 deleted_at TEXT,
                 display_name TEXT,
                 otel_dump TEXT,
-                storage_size_bytes INTEGER
+                storage_size_bytes INTEGER,
+                expire_at TEXT NOT NULL DEFAULT '2100-01-01 00:00:00'
             )
         """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS project_ttl_settings (
+                project_id TEXT NOT NULL,
+                retention_days INTEGER NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_by TEXT NOT NULL DEFAULT ''
+            )
+            """
         )
         cursor.execute(
             """
@@ -437,6 +470,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date TEXT NOT NULL,
                 prompt_token_cost REAL NOT NULL,
                 completion_token_cost REAL NOT NULL,
+                cache_read_input_token_cost REAL NOT NULL DEFAULT 0,
+                cache_creation_input_token_cost REAL NOT NULL DEFAULT 0,
                 prompt_token_cost_unit TEXT NOT NULL,
                 completion_token_cost_unit TEXT NOT NULL,
                 created_by TEXT NOT NULL,
@@ -451,6 +486,30 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             """
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
+
+    def _get_project_retention_days(self, project_id: str) -> int:
+        """Return retention_days for a project (RETENTION_DAYS_NO_TTL = no TTL).
+
+        SQLite-local, uncached.
+        """
+        _, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT retention_days FROM project_ttl_settings "
+            "WHERE project_id = ? ORDER BY updated_at DESC, rowid DESC LIMIT 1",
+            (project_id,),
+        )
+        row = cursor.fetchone()
+        return int(row[0]) if row is not None else RETENTION_DAYS_NO_TTL
+
+    def _compute_call_expire_at(
+        self, project_id: str, anchor: datetime.datetime
+    ) -> str:
+        """Compute the ISO-formatted expire_at for a call row."""
+        retention_days = self._get_project_retention_days(project_id)
+        expire_at = compute_expire_at(retention_days, anchor)
+        if expire_at is None:
+            return EXPIRE_AT_NEVER.isoformat(sep=" ")
+        return expire_at.isoformat(sep=" ")
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
@@ -488,14 +547,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     + len(summary_json)
                 )
 
+                expire_at = self._compute_call_expire_at(
+                    call.project_id, call.started_at
+                )
+
                 cursor.execute(
                     """INSERT INTO calls (
                         project_id, id, trace_id, parent_id, thread_id, turn_id,
                         op_name, display_name, started_at, ended_at, exception,
                         attributes, inputs, input_refs, output, output_refs,
                         summary, wb_user_id, wb_run_id, wb_run_step, wb_run_step_end,
-                        otel_dump, storage_size_bytes
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        otel_dump, storage_size_bytes, expire_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         call.project_id,
                         call.id,
@@ -524,6 +587,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         call.wb_run_step_end,
                         otel_dump_str,
                         storage_size,
+                        expire_at,
                     ),
                 )
             conn.commit()
@@ -564,6 +628,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if hasattr(req.start, "otel_dump") and req.start.otel_dump is not None:
                 otel_dump_str = json.dumps(req.start.otel_dump)
 
+            expire_at = self._compute_call_expire_at(
+                req.start.project_id, req.start.started_at
+            )
             cursor.execute(
                 """INSERT INTO calls (
                     project_id,
@@ -581,8 +648,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     wb_user_id,
                     wb_run_id,
                     wb_run_step,
-                    otel_dump
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    otel_dump,
+                    expire_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
@@ -602,6 +670,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     req.start.wb_run_id,
                     req.start.wb_run_step,
                     otel_dump_str,
+                    expire_at,
                 ),
             )
             conn.commit()
@@ -671,6 +740,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 row["effective_date"],
                 row["prompt_token_cost"],
                 row["completion_token_cost"],
+                row.get("cache_read_input_token_cost", 0),
+                row.get("cache_creation_input_token_cost", 0),
                 row["prompt_token_cost_unit"],
                 row["completion_token_cost_unit"],
                 row["created_by"],
@@ -689,11 +760,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date,
                 prompt_token_cost,
                 completion_token_cost,
+                cache_read_input_token_cost,
+                cache_creation_input_token_cost,
                 prompt_token_cost_unit,
                 completion_token_cost_unit,
                 created_by,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             default_rows,
         )
@@ -767,6 +840,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date,
                 prompt_token_cost,
                 completion_token_cost,
+                cache_read_input_token_cost,
+                cache_creation_input_token_cost,
                 prompt_token_cost_unit,
                 completion_token_cost_unit,
                 created_by,
@@ -800,6 +875,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         "effective_date",
                         "prompt_token_cost",
                         "completion_token_cost",
+                        "cache_read_input_token_cost",
+                        "cache_creation_input_token_cost",
                         "prompt_token_cost_unit",
                         "completion_token_cost_unit",
                         "created_by",
@@ -836,18 +913,43 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
                 prompt_cost = float(best_row["prompt_token_cost"] or 0.0)
                 completion_cost = float(best_row["completion_token_cost"] or 0.0)
+                cache_read_cost = float(
+                    best_row.get("cache_read_input_token_cost") or 0.0
+                )
+                cache_creation_cost = float(
+                    best_row.get("cache_creation_input_token_cost") or 0.0
+                )
                 prompt_tokens = usage["prompt_tokens"]
                 completion_tokens = usage["completion_tokens"]
+                cache_read_input_tokens = usage.get("cache_read_input_tokens", 0)
+                cache_creation_input_tokens = usage.get(
+                    "cache_creation_input_tokens", 0
+                )
 
                 call_costs[llm_id] = {
                     "prompt_tokens": prompt_tokens,
                     "completion_tokens": completion_tokens,
+                    "cache_read_input_tokens": cache_read_input_tokens,
+                    "cache_creation_input_tokens": cache_creation_input_tokens,
                     "requests": usage["requests"],
                     "total_tokens": usage["total_tokens"],
-                    "prompt_tokens_total_cost": prompt_tokens * prompt_cost,
+                    # Subtract cached tokens: they are billed at the cache
+                    # rate, not the regular input rate.
+                    "prompt_tokens_total_cost": (
+                        prompt_tokens
+                        - cache_read_input_tokens
+                        - cache_creation_input_tokens
+                    )
+                    * prompt_cost,
                     "completion_tokens_total_cost": completion_tokens * completion_cost,
+                    "cache_read_input_tokens_total_cost": cache_read_input_tokens
+                    * cache_read_cost,
+                    "cache_creation_input_tokens_total_cost": cache_creation_input_tokens
+                    * cache_creation_cost,
                     "prompt_token_cost": prompt_cost,
                     "completion_token_cost": completion_cost,
+                    "cache_read_input_token_cost": cache_read_cost,
+                    "cache_creation_input_token_cost": cache_creation_cost,
                     "prompt_token_cost_unit": best_row["prompt_token_cost_unit"],
                     "completion_token_cost_unit": best_row[
                         "completion_token_cost_unit"
@@ -975,11 +1077,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     cond = f"(NOT ({operand_part}))"
                 elif isinstance(operation, tsi_query.EqOperation):
                     lhs_part = process_operand(operation.eq_[0])
+                    is_multi_value_feedback = _is_multi_value_feedback_operand(
+                        operation.eq_[0]
+                    )
                     if (
                         isinstance(operation.eq_[1], tsi_query.LiteralOperation)
                         and operation.eq_[1].literal_ is None
                     ):
                         cond = f"({lhs_part} IS NULL)"
+                    elif is_multi_value_feedback:
+                        # Multi-value: GROUP_CONCAT result, use INSTR to find value
+                        rhs_part = process_operand(operation.eq_[1])
+                        cond = f"instr({lhs_part}, {rhs_part})"
                     else:
                         rhs_part = process_operand(operation.eq_[1])
                         cond = f"({lhs_part} = {rhs_part})"
@@ -1017,6 +1126,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
             def process_operand(operand: tsi_query.Operand) -> str:
                 if isinstance(operand, tsi_query.LiteralOperation):
+                    # Use SQL string literals instead of json.dumps, which wraps strings in
+                    # double quotes that don't match json_extract() output.
+                    if isinstance(operand.literal_, str):
+                        escaped = operand.literal_.replace("'", "''")
+                        return f"'{escaped}'"
                     return json.dumps(operand.literal_)
                 elif isinstance(operand, tsi_query.GetFieldOperator):
                     if operand.get_field_.startswith("feedback."):
@@ -1298,6 +1412,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 exception=call_dict.get("exception"),
                 display_name=call_dict.get("display_name"),
             )
+            # Normalize expire_at: the 2100-01-01 sentinel means "no TTL".
+            raw_expire_at = call_dict.get("expire_at")
+            if raw_expire_at:
+                expire_at_dt = datetime.datetime.fromisoformat(raw_expire_at)
+                if expire_at_dt.tzinfo is None:
+                    expire_at_dt = expire_at_dt.replace(tzinfo=datetime.timezone.utc)
+                call_dict["expire_at"] = (
+                    None if expire_at_dt == EXPIRE_AT_NEVER else expire_at_dt
+                )
+
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:
@@ -1352,7 +1476,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return iter(self.calls_query(req).calls)
 
     def _calls_query_stream_for_eval_subtree(
-        self, project_id: str, eval_root_ids: list[str]
+        self,
+        project_id: str,
+        eval_root_ids: list[str],
+        include_children: bool = True,
     ) -> Iterator[tsi.CallSchema]:
         columns = [
             "id",
@@ -1376,16 +1503,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
         )
         yield from eval_root_children
-        eval_root_children_ids = [c.id for c in eval_root_children]
-        if eval_root_children_ids:
-            yield from self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=project_id,
-                    filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
-                    columns=columns,
-                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+        if include_children:
+            eval_root_children_ids = [c.id for c in eval_root_children]
+            if eval_root_children_ids:
+                yield from self.calls_query_stream(
+                    tsi.CallsQueryReq(
+                        project_id=project_id,
+                        filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
+                        columns=columns,
+                        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    )
                 )
-            )
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
@@ -2725,6 +2853,44 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"
         )
+
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
+        stored_days = self._get_project_retention_days(req.project_id)
+        return tsi.ProjectTTLSettingsReadRes(
+            retention_days=stored_days if stored_days != RETENTION_DAYS_NO_TTL else None
+        )
+
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
+        if req.retention_days is not None and req.retention_days < 1:
+            raise InvalidRequest(
+                "retention_days must be None (no TTL) or >= 1 (days of retention)"
+            )
+        if not req.wb_user_id:
+            raise InvalidRequest("wb_user_id is required for audit trail")
+
+        stored_days = (
+            RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
+        )
+        conn, cursor = get_conn_cursor(self.db_path)
+        # Pad microseconds so updated_at strings sort lexicographically by time.
+        # isoformat() drops microseconds when they're 0, which would make
+        # "...:52+00:00" sort before "...:51.999999+00:00".
+        updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat(
+            timespec="microseconds"
+        )
+        cursor.execute(
+            "INSERT INTO project_ttl_settings "
+            "(project_id, retention_days, updated_at, updated_by) "
+            "VALUES (?, ?, ?, ?)",
+            (req.project_id, stored_days, updated_at, req.wb_user_id),
+        )
+        conn.commit()
+        invalidate_ttl_cache(req.project_id)
+        return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
@@ -4632,6 +4798,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
+        eval_helpers.validate_eval_results_request(req)
         eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
         if not eval_root_ids:
             empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
@@ -4639,9 +4806,32 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
         all_calls = list(
-            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+            self._calls_query_stream_for_eval_subtree(
+                req.project_id,
+                eval_root_ids,
+                include_children=req.include_predict_and_score_children,
+            )
         )
+        if req.resolve_row_refs:
+            reader = lambda digests: self._table_rows_read_batch(
+                req.project_id, digests
+            )
+            eval_helpers.resolve_eval_inputs(all_calls, eval_root_ids, reader)
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
+
+    def _table_rows_read_batch(
+        self, project_id: str, digests: list[str]
+    ) -> dict[str, Any]:
+        """Batch read table_rows by digest. Returns {digest: parsed_val}."""
+        if not digests:
+            return {}
+        conn, cursor = get_conn_cursor(self.db_path)
+        placeholders = ", ".join("?" for _ in digests)
+        cursor.execute(
+            f"SELECT digest, val FROM table_rows WHERE project_id = ? AND digest IN ({placeholders})",
+            [project_id, *digests],
+        )
+        return {row[0]: json.loads(row[1]) for row in cursor.fetchall()}
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -4991,8 +5181,8 @@ def _build_feedback_subquery(field: str) -> str:
         escaped = feedback_type.replace("'", "''")
         type_filter = f" AND feedback_type = '{escaped}'"
 
-    if feedback_type == "*":
-        # For wildcard, concatenate values from all feedback rows so filters
+    if feedback_type == "*" or feedback_type in MULTI_VALUE_FEEDBACK_TYPES:
+        # Concatenate values from all matching feedback rows so filters
         # can search across every entry.
         return (
             f"(SELECT GROUP_CONCAT({value_expr}, ',') FROM feedback"
@@ -5005,3 +5195,12 @@ def _build_feedback_subquery(field: str) -> str:
             f" WHERE feedback.weave_ref = 'weave-trace-internal:///' || calls.project_id || '/call/' || calls.id"
             f"{type_filter} LIMIT 1)"
         )
+
+
+def _is_multi_value_feedback_operand(operand: tsi_query.Operand) -> bool:
+    """Check if an operand references a multi-value feedback field."""
+    if not isinstance(operand, tsi_query.GetFieldOperator):
+        return False
+    return any(
+        f"feedback.[{ft}]" in operand.get_field_ for ft in MULTI_VALUE_FEEDBACK_TYPES
+    )

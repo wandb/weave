@@ -1,3 +1,4 @@
+import threading
 import time
 from concurrent.futures import Future
 from typing import Any
@@ -5,6 +6,14 @@ from typing import Any
 import pytest
 
 from weave.trace.concurrent.futures import FutureExecutor
+
+# Wait budget for events/threads in flush race tests; generous so slow CI
+# runners don't false-fail, tight enough that a real hang surfaces fast.
+EVENT_TIMEOUT_S = 5
+# Window we let an incorrect flush() implementation use to (wrongly) return
+# before chained callback work completes. Long enough to observe the bug,
+# short enough to keep the suite snappy.
+RACE_WINDOW_S = 0.05
 
 
 def test_defer_simple() -> None:
@@ -234,6 +243,142 @@ def test_empty_futures_list() -> None:
 
     future_result: Future[int] = executor.then([], process_data)
     assert future_result.result() == 0
+
+
+def test_flush_waits_for_then_callback_work() -> None:
+    executor: FutureExecutor = FutureExecutor(max_workers=1)
+    release_root = threading.Event()
+    callback_started = threading.Event()
+    release_callback = threading.Event()
+    flush_finished = threading.Event()
+
+    def root_task() -> int:
+        assert release_root.wait(timeout=EVENT_TIMEOUT_S)
+        return 1
+
+    def blocking_callback(data_list: list[int]) -> int:
+        callback_started.set()
+        assert release_callback.wait(timeout=EVENT_TIMEOUT_S)
+        return data_list[0] + 1
+
+    root_future: Future[int] = executor.defer(root_task)
+    result_future: Future[int] = executor.then([root_future], blocking_callback)
+
+    release_root.set()
+    assert callback_started.wait(timeout=EVENT_TIMEOUT_S)
+    # The logical then-future remains tracked while callback work is running.
+    assert executor.num_outstanding_futures == 1
+
+    flush_thread = threading.Thread(
+        target=lambda: (executor.flush(), flush_finished.set())
+    )
+    flush_thread.start()
+
+    try:
+        time.sleep(RACE_WINDOW_S)
+        early_finished = flush_finished.is_set()
+    finally:
+        release_callback.set()
+        flush_thread.join(timeout=EVENT_TIMEOUT_S)
+
+    assert not early_finished
+    assert flush_finished.is_set()
+    assert result_future.result() == 2
+
+
+def test_then_callback_runs_once_under_concurrent_input_completion() -> None:
+    """Two inputs completing simultaneously must not double-submit `g`.
+
+    Both `on_done_callback` invocations can observe `all(fut.done())` as True
+    in the racy interleaving; the dedup lock is what keeps `g` running once.
+    """
+    executor: FutureExecutor = FutureExecutor(max_workers=2)
+    callback_count = 0
+    count_lock = threading.Lock()
+
+    def count_callback(data_list: list[int]) -> int:
+        nonlocal callback_count
+        with count_lock:
+            callback_count += 1
+        return sum(data_list)
+
+    f1: Future[int] = Future()
+    f2: Future[int] = Future()
+    result_future: Future[int] = executor.then([f1, f2], count_callback)
+
+    barrier = threading.Barrier(2)
+
+    def fire(f: Future[int], v: int) -> None:
+        barrier.wait(timeout=EVENT_TIMEOUT_S)
+        f.set_result(v)
+
+    threads = [
+        threading.Thread(target=fire, args=(f1, 1)),
+        threading.Thread(target=fire, args=(f2, 2)),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=EVENT_TIMEOUT_S)
+
+    assert result_future.result(timeout=EVENT_TIMEOUT_S) == 3
+    assert executor.flush(timeout=EVENT_TIMEOUT_S)
+    assert callback_count == 1
+
+
+def test_flush_drains_work_added_after_snapshot() -> None:
+    """Work submitted after flush() snapshots must still be drained.
+
+    flush() snapshots `_active_futures`, waits, then re-checks. A submission
+    that lands between the snapshot and the original future completing is
+    the canonical case: a single-pass flush would return early and leave
+    real work pending.
+    """
+    executor: FutureExecutor = FutureExecutor(max_workers=2)
+    release_root = threading.Event()
+    release_chained = threading.Event()
+    chained_started = threading.Event()
+    chained_finished = threading.Event()
+    flush_finished = threading.Event()
+
+    def root_task() -> int:
+        assert release_root.wait(timeout=EVENT_TIMEOUT_S)
+        return 1
+
+    def chained_task() -> int:
+        chained_started.set()
+        assert release_chained.wait(timeout=EVENT_TIMEOUT_S)
+        chained_finished.set()
+        return 99
+
+    executor.defer(root_task)
+
+    flush_thread = threading.Thread(
+        target=lambda: (executor.flush(), flush_finished.set())
+    )
+    flush_thread.start()
+
+    # Let flush() snapshot _active_futures = {root_future} before the
+    # chained work exists.
+    time.sleep(RACE_WINDOW_S)
+    # Submit additional work *after* the snapshot. This future is tracked
+    # but invisible to flush()'s in-flight `as_completed` call.
+    executor.defer(chained_task)
+    assert chained_started.wait(timeout=EVENT_TIMEOUT_S)
+    # Release root_task so the snapshot drains; flush() must outer-loop to
+    # discover chained_task_future.
+    release_root.set()
+    # Give a single-pass flush() enough headroom to (incorrectly) return
+    # after the snapshot drains but before chained_task_future completes.
+    time.sleep(RACE_WINDOW_S)
+    early_finished = flush_finished.is_set()
+
+    release_chained.set()
+    flush_thread.join(timeout=EVENT_TIMEOUT_S)
+
+    assert not early_finished
+    assert chained_finished.is_set()
+    assert flush_finished.is_set()
 
 
 def test_nested_futures_with_1_max_worker_classic_deadlock_case() -> None:

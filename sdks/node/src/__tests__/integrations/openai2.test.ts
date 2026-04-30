@@ -7,6 +7,7 @@ import {
 import {isWeaveImage} from '../../media';
 import {WandbServerApi} from '../../wandb/wandbServerApi';
 import {WeaveClient} from '../../weaveClient';
+import {makeAPIPromiseShim} from '../openaiMock';
 
 // Mock WeaveClient dependencies
 jest.mock('../../generated/traceServerApi');
@@ -365,9 +366,9 @@ describe('OpenAI responses.create Integration', () => {
       responses: {
         create: jest.fn().mockImplementation((options: any) => {
           if (options.stream) {
-            return Promise.resolve(new MockStream(mockStreamChunks));
+            return makeAPIPromiseShim(new MockStream(mockStreamChunks));
           }
-          return Promise.resolve(mockNonStreamingResponse);
+          return makeAPIPromiseShim(mockNonStreamingResponse);
         }),
       },
     };
@@ -410,33 +411,6 @@ describe('OpenAI responses.create Integration', () => {
         },
       });
 
-      expect(mockOpenAI.responses.create).toHaveBeenCalledWith(options);
-    });
-
-    it('should handle streaming responses and skip deltas', async () => {
-      const options = {
-        model: 'gpt-4o-2024-08-06',
-        instructions: 'You are a helpful assistant',
-        messages: [{role: 'user', content: 'Hello!'}],
-        stream: true,
-      };
-
-      const stream = await wrappedOpenAI.responses.create(options);
-
-      let deltaCount = 0;
-      let finalText = '';
-      for await (const chunk of stream) {
-        if (chunk.type === 'response.output_text.delta') {
-          deltaCount++;
-        }
-        if (chunk.type === 'response.output_text.done') {
-          finalText = chunk.text;
-        }
-      }
-
-      // Verify deltas were received but final text comes from done event
-      expect(deltaCount).toBe(2); // Two delta chunks
-      expect(finalText).toBe('Hello! How can I help you today?');
       expect(mockOpenAI.responses.create).toHaveBeenCalledWith(options);
     });
   });

@@ -53,6 +53,7 @@ class AutopatchSettings(BaseModel):
     huggingface: IntegrationSettings | None = None
     instructor: IntegrationSettings | None = None
     dspy: IntegrationSettings | None = None
+    gepa: IntegrationSettings | None = None
     crewai: IntegrationSettings | None = None
     notdiamond: IntegrationSettings | None = None
     mcp: IntegrationSettings | None = None

@@ -10,11 +10,25 @@ def wandb_init_hook() -> None:
     if os.environ.get("WANDB_DISABLE_WEAVE"):
         return
 
-    # Try to get the active run path from wandb if we can
+    # If wandb isn't installed at all, there's nothing to auto-link; stay silent.
+    try:
+        import wandb  # noqa: F401
+    except (ImportError, ModuleNotFoundError):
+        return
+
+    # wandb is installed — if the integration surface is missing, the user is
+    # on a version that predates wandb<>weave auto-linking.  Log an actionable
+    # warning so they know how to re-enable the feature.
     try:
         from wandb.integration.weave import active_run_path
     except (ImportError, ModuleNotFoundError):
-        return  # wandb not available
+        logger.warning(
+            "wandb is installed but `wandb.integration.weave` is missing. "
+            "Automatic wandb<>weave run linking is disabled. "
+            "To enable it, upgrade wandb:\n"
+            "    pip install --upgrade 'weave[wandb]'"
+        )
+        return
     except Exception as e:
         logger.debug("Unexpected wandb error: %s", e)
         return

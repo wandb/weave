@@ -1,7 +1,7 @@
-import asyncio
 from dataclasses import dataclass
 
 import numpy as np
+import pytest
 from pydantic import Field
 
 import weave
@@ -51,7 +51,8 @@ def test_weaveflow_nested_op(client):
     assert res == 6
 
 
-def test_async_ops(client):
+@pytest.mark.asyncio
+async def test_async_ops(client):
     @weave.op
     async def async_op_add1(v: int) -> int:
         return v + 1
@@ -62,9 +63,7 @@ def test_async_ops(client):
             v = await async_op_add1(v)
         return v
 
-    called = async_op_add5(10)
-
-    result = asyncio.run(called)
+    result = await async_op_add5(10)
     assert result == 15
 
     assert len(list(async_op_add5.calls())) == 1

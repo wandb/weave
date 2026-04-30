@@ -1,4 +1,5 @@
 import base64
+import json
 from typing import TypedDict
 
 from google.oauth2.credentials import Credentials as GCPCredentials
@@ -76,8 +77,6 @@ def get_gcp_credentials() -> GCPCredentials | None:
     Raises:
         ValueError: If credentials are missing or invalid JSON format
     """
-    import json
-
     from google.oauth2 import service_account
 
     creds_json_b64 = environment.wf_storage_bucket_gcp_credentials_json_b64()

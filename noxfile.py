@@ -8,17 +8,6 @@ nox.options.stop_on_first_error = True
 
 
 SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
-INCOMPATIBLE_SHARDS = {
-    "3.10": [
-        "notdiamond",
-        "verifiers_test",
-    ],
-    "3.13": [
-        "cohere",
-        "notdiamond",
-        "verifiers_test",
-    ],
-}
 NUM_TRACE_SERVER_SHARDS = 4
 
 
@@ -68,6 +57,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "autogen_tests",
     "verifiers_test",
     "pandas_test",
+    "scorers",
 }
 
 
@@ -90,6 +80,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "cohere",
         "crewai",
         "dspy",
+        "gepa",
         "google_genai",
         "groq",
         "instructor",
@@ -120,13 +111,6 @@ SHARDS_WITHOUT_EXTRAS = {
     ],
 )
 def tests(session: nox.Session, shard: str):
-    python_version = session.python[:4]  # e.g., "3.10"
-    if shard in INCOMPATIBLE_SHARDS.get(python_version, []):
-        session.skip(
-            f"Skipping {shard=} as it is not compatible with Python {python_version}"
-        )
-        return
-
     # Only add --extra shard if the shard has a corresponding optional dependency
     # Use --active to sync to the active nox virtual environment
     # Test-related shards (ending in _test/_tests) are dependency groups, not extras
@@ -139,8 +123,17 @@ def tests(session: nox.Session, shard: str):
     elif shard in {"trace_server", "trace_server_migrator"}:
         # trace_server shards need both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
+    elif shard == "scorers":
+        # scorer tests include a few that hit W&B Artifacts directly, so install
+        # both extras to cover the full suite.
+        sync_args.extend(["--extra", "scorers", "--extra", "wandb"])
 
     session.run(*sync_args)
+
+    if shard == "openai_agents":
+        # Keep the public extra broad for runtime compatibility, but exercise the
+        # newer SDK span classes in CI.
+        session.run("uv", "pip", "install", "--upgrade", "openai-agents>=0.14.7")
 
     env = {
         k: session.env.get(k) or os.getenv(k)
@@ -169,6 +162,8 @@ def tests(session: nox.Session, shard: str):
         env["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY", "MISSING")
         env["MISTRAL_API_KEY"] = os.getenv("MISTRAL_API_KEY", "MISSING")
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
+        # A few scorer tests download tiny models from W&B Artifacts.
+        env["WANDB_API_KEY"] = os.getenv("WANDB_API_KEY", "MISSING")
 
     if shard == "openai_agents":
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
@@ -189,14 +184,23 @@ def tests(session: nox.Session, shard: str):
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
+            "tests/session/",
         ],
         "trace_calls_complete_only": [
             "tests/trace/",
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
+            "tests/session/",
         ],
-        "trace_no_server": ["tests/trace/", "tests/durability/"],
+        "trace_no_server": [
+            "tests/trace/",
+            "tests/durability/",
+            "tests/utils/",
+            "tests/compat/",
+            "tests/wandb_interface/",
+            "tests/session/",
+        ],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)

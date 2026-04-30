@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import textwrap
+import traceback
 import types as py_types
 from _ast import AsyncFunctionDef, ExceptHandler
 from collections.abc import Callable
@@ -634,8 +635,6 @@ def load_instance(
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
         logger.info("Op loading exception. This might be fine! %s", e)
-        import traceback
-
         traceback.print_exc()
         return None
     sys.path.pop(0)

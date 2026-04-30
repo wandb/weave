@@ -32,7 +32,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - uses: pnpm/action-setup@v4
@@ -63,6 +63,8 @@ jobs:
 
       - name: Run tests
         working-directory: sdks/node
+        env:
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
         run: pnpm test
 
       - name: Run prettier check
@@ -71,7 +73,4 @@ jobs:
 
       - name: Publish to npm
         working-directory: sdks/node
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm publish --access public --tag "${{ inputs.npm_tag }}"
+        run: npm publish --access public --provenance --tag "${{ inputs.npm_tag }}"

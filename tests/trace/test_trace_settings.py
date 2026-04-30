@@ -8,11 +8,18 @@ import pytest
 import tenacity
 
 import weave
-from tests.trace.util import capture_output, flushing_callback
+from tests.trace.util import (
+    capture_output,
+    flush_and_wait_for_output,
+    flush_output,
+)
 from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
+from weave.trace.display.term import configure_logger
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
+
+configure_logger()
 
 
 @weave.op
@@ -123,30 +130,30 @@ def test_publish_when_disabled_ignores_tags_aliases(client, monkeypatch):
 
 def test_print_call_link_setting(client_creator):
     with client_creator(settings=UserSettings(print_call_link=False)) as client:
-        callbacks = [flushing_callback(client)]
-        with capture_output(callbacks) as captured:
+        with capture_output() as captured:
             func()
+            flush_output(client)
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
     with client_creator(settings=UserSettings(print_call_link=True)) as client:
-        callbacks = [flushing_callback(client)]
-        with capture_output(callbacks) as captured:
+        with capture_output() as captured:
             func()
+            assert flush_and_wait_for_output(client, captured, TRACE_CALL_EMOJI)
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
 def test_print_call_link_env(client):
     os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
-    callbacks = [flushing_callback(client)]
-    with capture_output(callbacks) as captured:
+    with capture_output() as captured:
         func()
+        flush_output(client)
 
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
     os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
-    callbacks = [flushing_callback(client)]
-    with capture_output(callbacks) as captured:
+    with capture_output() as captured:
         func()
+        assert flush_and_wait_for_output(client, captured, TRACE_CALL_EMOJI)
 
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
@@ -347,12 +354,11 @@ def test_retry_max_attempts_env(caplog) -> None:
 def test_retry_max_interval_settings(client_creator, caplog, monkeypatch) -> None:
     caplog.set_level(logging.INFO, logger="weave.utils.retry")
 
-    original_wait = tenacity.wait_exponential_jitter
     call_args = []
 
     def mock_wait_exponential_jitter(initial=0, max=None):
         call_args.append(max)
-        return original_wait(initial=initial, max=max)
+        return tenacity.wait_none()
 
     monkeypatch.setattr(
         tenacity, "wait_exponential_jitter", mock_wait_exponential_jitter
@@ -406,8 +412,7 @@ def test_log_level_setting(client_creator):
 
     # Test with ERROR level - should NOT see publish messages
     with client_creator(settings=UserSettings(log_level="ERROR")) as client:
-        callbacks = [flushing_callback(client)]
-        with capture_output(callbacks) as captured:
+        with capture_output() as captured:
             weave.publish(test_func, name="test_func_error")
     output = captured.getvalue()
     assert TRACE_OBJECT_EMOJI not in output
@@ -415,8 +420,7 @@ def test_log_level_setting(client_creator):
 
     # Test with INFO level - should see publish messages
     with client_creator(settings=UserSettings(log_level="INFO")) as client:
-        callbacks = [flushing_callback(client)]
-        with capture_output(callbacks) as captured:
+        with capture_output() as captured:
             weave.publish(test_func, name="test_func_info")
     output = captured.getvalue()
     assert TRACE_OBJECT_EMOJI in output
@@ -433,8 +437,7 @@ def test_log_level_env(client_creator):
     # Test with ERROR level - should NOT see publish messages
     os.environ["WEAVE_LOG_LEVEL"] = "ERROR"
     with client_creator() as client:
-        callbacks = [flushing_callback(client)]
-        with capture_output(callbacks) as captured:
+        with capture_output() as captured:
             weave.publish(test_func, name="test_func_error_env")
     output = captured.getvalue()
     assert TRACE_OBJECT_EMOJI not in output
@@ -443,8 +446,7 @@ def test_log_level_env(client_creator):
     # Test with INFO level - should see publish messages
     os.environ["WEAVE_LOG_LEVEL"] = "INFO"
     with client_creator() as client:
-        callbacks = [flushing_callback(client)]
-        with capture_output(callbacks) as captured:
+        with capture_output() as captured:
             weave.publish(test_func, name="test_func_info_env")
     output = captured.getvalue()
     assert TRACE_OBJECT_EMOJI in output

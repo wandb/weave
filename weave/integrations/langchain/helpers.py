@@ -17,7 +17,7 @@ from weave.trace.call import Call
 from weave.utils.dict_utils import convert_defaultdict_to_dict, flatten_attributes
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class TokenUsage:
     prompt_tokens: int
     completion_tokens: int

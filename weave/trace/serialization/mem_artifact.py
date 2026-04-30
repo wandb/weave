@@ -16,6 +16,36 @@ from weave.trace.serialization import (
 # to use this interface.
 
 
+def _safe_join(base: str, untrusted_path: str) -> str:
+    """Join base and untrusted_path, ensuring the result stays within base.
+
+    Rejects absolute paths, '..' components, and any path that would resolve
+    outside of base after symlink resolution.
+    """
+    if os.path.isabs(untrusted_path):
+        raise ValueError(
+            f"Path must be relative, got absolute path: {untrusted_path!r}"
+        )
+
+    # Normalize to collapse '..' and '.' but don't resolve symlinks yet
+    normed = os.path.normpath(untrusted_path)
+    if normed.startswith(os.sep):
+        raise ValueError(
+            f"Path must be relative, got absolute path: {untrusted_path!r}"
+        )
+    if normed.startswith(".."):
+        raise ValueError(f"Path escapes base directory: {untrusted_path!r}")
+
+    joined = os.path.join(base, normed)
+    # realpath resolves symlinks; the result must still be under base
+    resolved = os.path.realpath(joined)
+    real_base = os.path.realpath(base)
+    if not resolved.startswith(real_base + os.sep) and resolved != real_base:
+        raise ValueError(f"Path escapes base directory: {untrusted_path!r}")
+
+    return joined
+
+
 class MemTraceFilesArtifact:
     temp_read_dir: tempfile.TemporaryDirectory | None
     path_contents: dict[str, bytes]
@@ -81,8 +111,16 @@ class MemTraceFilesArtifact:
         if path not in self.path_contents:
             raise FileNotFoundError(path)
 
-        self.temp_read_dir = tempfile.TemporaryDirectory()
-        write_path = os.path.join(self.temp_read_dir.name, filename or path)
+        # Reuse a single tempdir per artifact so repeat `path()` calls don't
+        # orphan a prior TemporaryDirectory whose finalizer fires via GC.
+        # `ignore_cleanup_errors` (Python 3.10+) swallows Windows
+        # PermissionError when a consumer still holds the file open
+        # (e.g. PIL.Image.open, wave.open, VideoFileClip), which otherwise
+        # surfaces as PytestUnraisableExceptionWarning during finalization.
+        if self.temp_read_dir is None:
+            self.temp_read_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        write_path = _safe_join(self.temp_read_dir.name, filename or path)
+        os.makedirs(os.path.dirname(write_path), exist_ok=True)
         with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
             f.flush()
@@ -95,8 +133,8 @@ class MemTraceFilesArtifact:
 
     @contextlib.contextmanager
     def writeable_file_path(self, path: str) -> Generator[str]:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            full_path = os.path.join(tmpdir, path)
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            full_path = _safe_join(tmpdir, path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             yield full_path
             with open(full_path, "rb") as fp:

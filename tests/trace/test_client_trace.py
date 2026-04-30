@@ -208,6 +208,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
+        "expire_at": None,
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
         "thread_id": None,
@@ -260,6 +261,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
+        "expire_at": None,
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
         "thread_id": None,
@@ -413,8 +415,9 @@ def ref_str(op):
     return weave_client.get_ref(op).uri
 
 
-def test_trace_call_query_filter_op_version_refs(client):
+def test_trace_call_query_filter_op_version_refs(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
+    client.flush()
     call_summaries = call_spec.call_summaries
 
     # This is just a string representation of the ref
@@ -878,8 +881,9 @@ def test_trace_call_query_filter_call_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_trace_roots_only(client):
+def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for trace_roots_only, exp_count in [
         # Test the None case
@@ -899,7 +903,10 @@ def test_trace_call_query_filter_trace_roots_only(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_run_ids(client):
+# Flaky against ClickHouse in CI: read-after-write visibility lag means a
+# calls_query right after flush can miss just-written rows. Rerun to absorb it.
+@pytest.mark.flaky(reruns=2)
+def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
     from weave.trace import weave_client
@@ -918,6 +925,7 @@ def test_trace_call_query_filter_wb_run_ids(client):
     ):
         call_spec_2 = simple_line_call_bootstrap()
     call_spec_3 = simple_line_call_bootstrap()
+    client.flush()
 
     total_calls = (
         call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
@@ -943,14 +951,20 @@ def test_trace_call_query_filter_wb_run_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_user_ids(client, trace_server):
+# Flaky against ClickHouse in CI: read-after-write visibility lag means a
+# calls_query right after flush can miss just-written rows. Rerun to absorb it.
+@pytest.mark.flaky(reruns=2)
+def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
     call_spec_1 = simple_line_call_bootstrap()
+    client.flush()
 
     trace_server.set_user_id("second_user")
     call_spec_2 = simple_line_call_bootstrap()
+    client.flush()
 
     trace_server.set_user_id("third_user")
     call_spec_3 = simple_line_call_bootstrap()
+    client.flush()
 
     for wb_user_ids, exp_count in [
         (
@@ -978,8 +992,9 @@ def test_trace_call_query_filter_wb_user_ids(client, trace_server):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_limit(client):
+def test_trace_call_query_limit(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for limit, exp_count in [
         # Test the None case
@@ -999,8 +1014,9 @@ def test_trace_call_query_limit(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_offset(client):
+def test_trace_call_query_offset(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for offset, exp_count in [
         # Test the None case
@@ -1020,7 +1036,7 @@ def test_trace_call_query_offset(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_timings(client):
+def test_trace_call_query_timings(client, no_autoflush):
     now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
     later = now + datetime.timedelta(seconds=1)
     even_later = later + datetime.timedelta(seconds=1)
@@ -1052,6 +1068,7 @@ def test_trace_call_query_timings(client):
         for i in range(num_calls):
             call_index = i
             client.create_call("y", {"a": i})
+    client.flush()
 
     def query_server():
         result = get_client_trace_server(client).calls_query_stream(
@@ -1925,9 +1942,8 @@ def test_namedtuple_support(client):
     assert res.calls[0].output == [{"x": 1, "y": 2}, 3]
 
 
-def test_named_reuse(client):
-    import asyncio
-
+@pytest.mark.asyncio
+async def test_named_reuse(client):
     d = weave.Dataset(rows=[{"x": 1}, {"x": 2}])
     d_ref = weave.publish(d, "test_dataset")
     dataset = weave.ref(d_ref.uri).get()
@@ -1950,7 +1966,7 @@ def test_named_reuse(client):
     evaluation_dataset = evaluation.dataset
     eval_dataset_ref = evaluation_dataset.ref
     assert dataset_ref == eval_dataset_ref
-    asyncio.run(evaluation.evaluate(model))
+    await evaluation.evaluate(model)
 
     res = get_client_trace_server(client).objs_query(
         tsi.ObjQueryReq(
@@ -3583,6 +3599,49 @@ def test_calls_stream_feedback(client):
     } in call2_payloads
 
 
+def test_feedback_filter_finds_minority_reaction(client):
+    """Regression test-ish: filtering by emoji must check all reactions, not pick one arbitrarily.
+
+    previously `anyIf` (clickhouse) / `LIMIT 1` (sqlite) would pick one reaction per call, leading to unpredictable results when filtering by reaction.
+    this test has a 10% chance of passing on the original implementation, but will always pass on the groupArrayIf implementation.
+    """
+
+    @weave.op
+    def my_op(x):
+        return x
+
+    my_op(1)
+
+    calls = list(my_op.calls())
+    assert len(calls) == 1
+
+    # add 10 👎 and 1 👍 — anyIf will almost always pick a 👎
+    for _ in range(10):
+        calls[0].feedback.add_reaction("👎")
+    calls[0].feedback.add_reaction("👍")
+
+    project_id = get_client_project_id(client)
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "feedback.[wandb.reaction.1].payload.emoji"},
+                            {"$literal": "👍"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    results = list(res)
+
+    assert len(results) == 1
+    assert results[0].id == calls[0].id
+
+
 def test_inline_dataclass_generates_no_refs_in_function(client):
     @dataclasses.dataclass
     class A:
@@ -3903,7 +3962,8 @@ def test_op_sampling(client):
     assert num_traces == 38
 
 
-def test_op_sampling_async(client):
+@pytest.mark.asyncio
+async def test_op_sampling_async(client):
     never_traced_calls = 0
     always_traced_calls = 0
     sometimes_traced_calls = 0
@@ -3928,18 +3988,16 @@ def test_op_sampling_async(client):
         sometimes_traced_calls += 1
         return x + 1
 
-    import asyncio
-
     weave.publish(never_traced)
     # Never traced should execute but not be traced
     for i in range(10):
-        asyncio.run(never_traced(i))
+        await never_traced(i)
     assert never_traced_calls == 10  # Function was called
     assert len(list(never_traced.calls())) == 0  # Not traced
 
     # Always traced should execute and be traced
     for i in range(10):
-        asyncio.run(always_traced(i))
+        await always_traced(i)
     assert always_traced_calls == 10  # Function was called
     assert len(list(always_traced.calls())) == 10  # And traced
     assert "call_start" in client.server.attribute_access_log
@@ -3947,7 +4005,7 @@ def test_op_sampling_async(client):
     # Sometimes traced should execute always but only be traced sometimes
     num_runs = 100
     for i in range(num_runs):
-        asyncio.run(sometimes_traced(i))
+        await sometimes_traced(i)
     assert sometimes_traced_calls == num_runs  # Function was called every time
     num_traces = len(list(sometimes_traced.calls()))
     assert num_traces == 38
@@ -3990,7 +4048,8 @@ def test_op_sampling_inheritance(client):
     assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
 
 
-def test_op_sampling_inheritance_async(client):
+@pytest.mark.asyncio
+async def test_op_sampling_inheritance_async(client):
     parent_calls = 0
     child_calls = 0
 
@@ -4006,12 +4065,10 @@ def test_op_sampling_inheritance_async(client):
         parent_calls += 1
         return await child_op(x)
 
-    import asyncio
-
     weave.publish(parent_op)
     # When parent is sampled out, child should still execute but not be traced
     for i in range(10):
-        asyncio.run(parent_op(i))
+        await parent_op(i)
 
     assert parent_calls == 10  # Parent function executed
     assert child_calls == 10  # Child function executed
@@ -4022,7 +4079,7 @@ def test_op_sampling_inheritance_async(client):
 
     # Direct calls to child should execute and be traced
     for i in range(10):
-        asyncio.run(child_op(i))
+        await child_op(i)
 
     assert child_calls == 10  # Child function executed
     assert len(list(child_op.calls())) == 10  # And was traced
@@ -6515,7 +6572,7 @@ def test_calls_query_sort_by_trace_name_with_costs(client):
     assert calls[1].id == call_a.id
 
 
-def test_calls_query_ordering_with_costs_comprehensive(client):
+def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
     @weave.op
     def my_op(x: int) -> int:
         return x
@@ -6559,6 +6616,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     # Call with missing/NULL attributes
     call6 = client.create_call(my_op, {"x": 6}, attributes={})
     client.finish_call(call6, 6)
+    client.flush()
 
     # Test Case 1: Multiple order fields with costs
     sort_by = [

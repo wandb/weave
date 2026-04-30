@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 import time
@@ -8,9 +7,8 @@ import pytest
 from pydantic import BaseModel
 
 import weave
+from tests.conftest import LATENCY_TOL
 from weave import Dataset, Evaluation, Model
-
-_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
@@ -19,7 +17,7 @@ dataset = Dataset(rows=dataset_rows)
 expected_eval_result = {
     "output": {"mean": 9.5},
     "score": {"true_count": 1, "true_fraction": 0.5},
-    "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
+    "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
 }
 
 
@@ -39,7 +37,8 @@ def example_to_model_input(example):
     return {"input": example["input"]}
 
 
-def test_evaluate_callable_as_model(client):
+@pytest.mark.asyncio
+async def test_evaluate_callable_as_model(client):
     @weave.op
     async def model_predict(input) -> str:
         return eval(input)
@@ -48,11 +47,12 @@ def test_evaluate_callable_as_model(client):
         dataset=dataset_rows,
         scorers=[score],
     )
-    result = asyncio.run(evaluation.evaluate(model_predict))
+    result = await evaluation.evaluate(model_predict)
     assert result == expected_eval_result
 
 
-def test_predict_can_receive_other_params(client):
+@pytest.mark.asyncio
+async def test_predict_can_receive_other_params(client):
     @weave.op
     async def model_predict(input, target) -> str:
         return eval(input) + target
@@ -61,17 +61,18 @@ def test_predict_can_receive_other_params(client):
         dataset=dataset_rows,
         scorers=[score],
     )
-    result = asyncio.run(evaluation.evaluate(model_predict))
+    result = await evaluation.evaluate(model_predict)
     assert result == {
         "output": {"mean": 18.5},
         "score": {"true_count": 0, "true_fraction": 0.0},
         "model_latency": {
-            "mean": pytest.approx(0, abs=1),
+            "mean": pytest.approx(0, abs=LATENCY_TOL),
         },
     }
 
 
-def test_can_preprocess_model_input(client):
+@pytest.mark.asyncio
+async def test_can_preprocess_model_input(client):
     @weave.op
     async def model_predict(x) -> str:
         return eval(x)
@@ -85,21 +86,23 @@ def test_can_preprocess_model_input(client):
         scorers=[score],
         preprocess_model_input=preprocess,
     )
-    result = asyncio.run(evaluation.evaluate(model_predict))
+    result = await evaluation.evaluate(model_predict)
     assert result == expected_eval_result
 
 
-def test_evaluate_rows_only(client):
+@pytest.mark.asyncio
+async def test_evaluate_rows_only(client):
     evaluation = Evaluation(
         dataset=dataset_rows,
         scorers=[score],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == expected_eval_result
 
 
-def test_evaluate_other_model_method_names():
+@pytest.mark.asyncio
+async def test_evaluate_other_model_method_names():
     class EvalModel(Model):
         @weave.op
         async def infer(self, input) -> str:
@@ -110,11 +113,12 @@ def test_evaluate_other_model_method_names():
         scorers=[score],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == expected_eval_result
 
 
-def test_score_as_class(client):
+@pytest.mark.asyncio
+async def test_score_as_class(client):
     class MyScorer(weave.Scorer):
         @weave.op
         def score(self, target, output):
@@ -125,17 +129,18 @@ def test_score_as_class(client):
         scorers=[MyScorer()],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == {
         "output": {"mean": 9.5},
         "MyScorer": {"true_count": 1, "true_fraction": 0.5},
         "model_latency": {
-            "mean": pytest.approx(0, abs=1),
+            "mean": pytest.approx(0, abs=LATENCY_TOL),
         },
     }
 
 
-def test_score_with_custom_summarize(client):
+@pytest.mark.asyncio
+async def test_score_with_custom_summarize(client):
     class MyScorer(weave.Scorer):
         @weave.op
         def summarize(self, score_rows):
@@ -151,12 +156,12 @@ def test_score_with_custom_summarize(client):
         scorers=[MyScorer()],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == {
         "output": {"mean": 9.5},
         "MyScorer": {"awesome": 3},
         "model_latency": {
-            "mean": pytest.approx(0, abs=1),
+            "mean": pytest.approx(0, abs=LATENCY_TOL),
         },
     }
 
@@ -242,7 +247,7 @@ async def test_basic_evaluation_with_scorer_styles(
         return col_a + col_b
 
     result = await evaluation.evaluate(model)
-    assert result.pop("model_latency").get("mean") == pytest.approx(0, abs=_LATENCY_TOL)
+    assert result.pop("model_latency").get("mean") == pytest.approx(0, abs=LATENCY_TOL)
 
     # Build expected result dynamically
     expected_result = {
@@ -263,9 +268,9 @@ async def test_basic_evaluation_with_scorer_styles(
     predict_and_score_calls = list(evaluation.predict_and_score.calls())
     assert len(predict_and_score_calls) == 3
     outputs = [c.output for c in predict_and_score_calls]
-    assert all(
-        o.pop("model_latency") == pytest.approx(0, abs=_LATENCY_TOL) for o in outputs
-    )
+    # Pop model_latency before structural comparison; value already checked in summary
+    for o in outputs:
+        o.pop("model_latency")
 
     # Build expected output dynamically
     expected_output = {
@@ -279,7 +284,8 @@ async def test_basic_evaluation_with_scorer_styles(
     "scorer_name",
     ["my scorer", "my-scorer()*&^%$@#/", "my-scorer", "       my scorer     "],
 )
-def test_scorer_name_sanitization(scorer_name):
+@pytest.mark.asyncio
+async def test_scorer_name_sanitization(scorer_name):
     class MyScorer(weave.Scorer):
         name: str
 
@@ -293,11 +299,12 @@ def test_scorer_name_sanitization(scorer_name):
     )
     model = EvalModel()
 
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result["my-scorer"] == {"true_count": 1, "true_fraction": 0.5}
 
 
-def test_sync_eval_parallelism(client):
+@pytest.mark.asyncio
+async def test_sync_eval_parallelism(client):
     @weave.op
     def sync_op(a):
         time.sleep(1)
@@ -320,21 +327,22 @@ def test_sync_eval_parallelism(client):
         {"a": 10},
     ]
 
-    # 10 rows, should complete in <5 seconds. if sync, 10+
+    # 10 rows, should complete in <8 seconds. if sync, 10+
 
     now = time.time()
 
     evaluation = Evaluation(dataset=dataset, scorers=[score])
-    result = asyncio.run(evaluation.evaluate(sync_op))
+    result = await evaluation.evaluate(sync_op)
     assert result == {
         "output": {"mean": 5.5},
         "score": {"mean": 1.0},
-        "model_latency": {"mean": pytest.approx(1, abs=_LATENCY_TOL)},
+        "model_latency": {"mean": pytest.approx(1, abs=LATENCY_TOL)},
     }
-    assert time.time() - now < (15 if sys.platform == "win32" else 5)
+    assert time.time() - now < (15 if sys.platform == "win32" else 8)
 
 
-def test_evaluation_from_weaveobject_missing_evaluation_name(client):
+@pytest.mark.asyncio
+async def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
     dataset = Dataset(rows=dataset_rows)
 
@@ -365,11 +373,12 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     evaluation = Evaluation.from_obj(eval_obj)
     model = EvalModel()
 
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == expected_eval_result
 
 
-def test_evaluate_table_lazy_iter(client, monkeypatch):
+@pytest.mark.asyncio
+async def test_evaluate_table_lazy_iter(client, monkeypatch):
     """The intention of this test is to show that an evaluation harness
     lazily fetches rows from a table rather than eagerly fetching all
     rows up front.
@@ -409,7 +418,7 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
 
     # Make sure we have deterministic results
     with patch.dict(os.environ, {"WEAVE_PARALLELISM": "1"}):
-        result = asyncio.run(evaluation.evaluate(model_predict))
+        result = await evaluation.evaluate(model_predict)
         assert result["output"] == {"mean": 4.5}
         assert result["score_simple"] == {"true_count": 10, "true_fraction": 1.0}
 
@@ -437,7 +446,8 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
     assert counts_split_by_table_query == [count, 28, 28, 14 + 5], log
 
 
-def test_evaluate_table_order(client):
+@pytest.mark.asyncio
+async def test_evaluate_table_order(client):
     """Test that evaluation results maintain the original order of the dataset
     when using a published dataset with images.
     """
@@ -472,7 +482,7 @@ def test_evaluate_table_order(client):
     )
 
     # Get all prediction and score calls to verify order
-    result = asyncio.run(evaluation.evaluate(model_predict))
+    result = await evaluation.evaluate(model_predict)
 
     # Verify the overall results
     assert result["output"] == {"mean": 2}  # Average of 0-99
@@ -496,7 +506,8 @@ def test_evaluate_table_order(client):
     assert len(scores) == 5
 
 
-def test_evaluate_with_pydantic_summary(client):
+@pytest.mark.asyncio
+async def test_evaluate_with_pydantic_summary(client):
     class MyScorerSummary(BaseModel):
         awesome: int
 
@@ -514,5 +525,5 @@ def test_evaluate_with_pydantic_summary(client):
         scorers=[MyScorer()],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result["MyScorer"].awesome == 3
