@@ -994,8 +994,11 @@ class WeaveClient:
         if self.postprocess_output:
             postprocessed_output = self.postprocess_output(postprocessed_output)
 
-        self._save_nested_objects(postprocessed_output)
-        output_as_refs = map_to_refs(postprocessed_output)
+        # Deferred to send_end_call: _save_nested_objects + map_to_refs walk
+        # the output tree twice and dominate per-op CPU. Running them in the
+        # worker keeps the calling thread (and the asyncio event loop) free.
+        # `call.output` is set sync so user code reading it after finish_call
+        # returns gets the postprocessed value as before.
         call.output = postprocessed_output
 
         # Summary handling
@@ -1067,6 +1070,12 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
+            # Deferred heavy tree walks. _save_nested_objects mutates
+            # `postprocessed_output` to attach refs; map_to_refs builds
+            # the refed copy used for the wire payload.
+            self._save_nested_objects(postprocessed_output)
+            output_as_refs = map_to_refs(postprocessed_output)
+
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii

@@ -10,6 +10,7 @@ import pytest
 import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context.tests_context import raise_on_captured_errors
+from weave.trace.settings import UserSettings
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -105,7 +106,17 @@ def build_evaluation():
 
 
 @pytest.mark.asyncio
-async def test_evaluation_performance(client: WeaveClient):
+async def test_evaluation_performance(client_creator):
+    # Bump worker pool so the post-resume flush has enough threads to drain
+    # the chain of (input obj_create -> child digest -> parent obj_create)
+    # without starving on the parent's `to_json` waiting for child digests.
+    # The deferred output-side `_save_nested_objects` shifts more work into
+    # workers, which makes the latent starvation in this fixture observable.
+    with client_creator(settings=UserSettings(client_parallelism=24)) as client:
+        await _run_evaluation_performance(client)
+
+
+async def _run_evaluation_performance(client: WeaveClient):
     client.project = "test_evaluation_performance"
     evaluation, predict = build_evaluation()
 
