@@ -305,14 +305,20 @@ def parse_internal_uri(
     elif kind == "artifact":
         id_ = remaining[0]
         return InternalArtifactRef(project_id=project_id, id=id_)
-    elif kind == "agent_turn":
-        return InternalAgentTurnRef(project_id=project_id, trace_id=remaining[0])
-    elif kind == "agent_conversation":
-        return InternalAgentConversationRef(
-            project_id=project_id,
-            conversation_id=urllib.parse.unquote(remaining[0]),
-        )
-    elif kind == "agent_span":
+    elif kind in {"agent_turn", "agent_conversation", "agent_span"}:
+        if len(remaining) != 1:
+            raise InvalidInternalRef(
+                f"Invalid URI: {uri}. {kind} ref must have exactly one path "
+                f"segment after the kind; got {len(remaining)}. "
+                f"IDs containing '/' must be URL-encoded."
+            )
+        if kind == "agent_turn":
+            return InternalAgentTurnRef(project_id=project_id, trace_id=remaining[0])
+        if kind == "agent_conversation":
+            return InternalAgentConversationRef(
+                project_id=project_id,
+                conversation_id=urllib.parse.unquote(remaining[0]),
+            )
         return InternalAgentSpanRef(project_id=project_id, span_id=remaining[0])
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")

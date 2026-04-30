@@ -51,15 +51,23 @@ class Ref:
         remaining = tuple(parts[3:])
         if kind == "table":
             return TableRef(entity=entity, project=project, _digest=remaining[0])
-        if kind == "agent_turn":
-            return AgentTurnRef(entity=entity, project=project, trace_id=remaining[0])
-        if kind == "agent_conversation":
-            return AgentConversationRef(
-                entity=entity,
-                project=project,
-                conversation_id=urllib.parse.unquote(remaining[0]),
-            )
-        if kind == "agent_span":
+        if kind in {"agent_turn", "agent_conversation", "agent_span"}:
+            if len(remaining) != 1:
+                raise ValueError(
+                    f"Invalid URI: {uri}. {kind} ref must have exactly one path "
+                    f"segment after the kind; got {len(remaining)}. "
+                    f"IDs containing '/' must be URL-encoded."
+                )
+            if kind == "agent_turn":
+                return AgentTurnRef(
+                    entity=entity, project=project, trace_id=remaining[0]
+                )
+            if kind == "agent_conversation":
+                return AgentConversationRef(
+                    entity=entity,
+                    project=project,
+                    conversation_id=urllib.parse.unquote(remaining[0]),
+                )
             return AgentSpanRef(entity=entity, project=project, span_id=remaining[0])
         extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
         if kind == "call":

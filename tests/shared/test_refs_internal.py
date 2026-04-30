@@ -161,3 +161,29 @@ def test_internal_agent_ref_rejects_slash():
         refs_internal.InternalAgentTurnRef(project_id="project", trace_id="bad/value")
     with pytest.raises(refs_internal.InvalidInternalRef):
         refs_internal.InternalAgentSpanRef(project_id="project", span_id="bad/value")
+
+
+@pytest.mark.parametrize("kind", ["agent_turn", "agent_conversation", "agent_span"])
+def test_agent_ref_rejects_extra_path_segments(kind):
+    uri = f"weave:///entity/project/{kind}/user/42"
+    with pytest.raises(ValueError, match="exactly one path segment"):
+        refs.Ref.parse_uri(uri)
+
+    internal_uri = f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///project/{kind}/user/42"
+    with pytest.raises(
+        refs_internal.InvalidInternalRef, match="exactly one path segment"
+    ):
+        refs_internal.parse_internal_uri(internal_uri)
+
+
+@pytest.mark.parametrize("kind", ["agent_turn", "agent_conversation", "agent_span"])
+def test_agent_ref_rejects_missing_id(kind):
+    uri = f"weave:///entity/project/{kind}"
+    with pytest.raises(ValueError, match="exactly one path segment"):
+        refs.Ref.parse_uri(uri)
+
+    internal_uri = f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///project/{kind}"
+    with pytest.raises(
+        refs_internal.InvalidInternalRef, match="exactly one path segment"
+    ):
+        refs_internal.parse_internal_uri(internal_uri)
