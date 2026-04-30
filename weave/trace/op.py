@@ -1374,15 +1374,19 @@ def op(
             try:
                 cached_sig = inspect.signature(func)
                 wrapper.__signature__ = cached_sig  # type: ignore
-                wrapper._weave_cached_parsed_input_annotations = parse_from_signature(cached_sig)  # type: ignore
+                wrapper._weave_cached_parsed_input_annotations = parse_from_signature(
+                    cached_sig
+                )  # type: ignore
 
                 return_annotation = cached_sig.return_annotation
                 if (
                     return_annotation is not inspect.Signature.empty
                     and return_annotation
                 ):
-                    wrapper._weave_cached_parsed_return_annotation = parse_content_annotation(  # type: ignore
-                        str(return_annotation)
+                    wrapper._weave_cached_parsed_return_annotation = (
+                        parse_content_annotation(  # type: ignore
+                            str(return_annotation)
+                        )
                     )
                 else:
                     wrapper._weave_cached_parsed_return_annotation = None  # type: ignore
