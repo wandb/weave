@@ -140,6 +140,19 @@ DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 # Constants for table naming conventions
 VIEW_SUFFIX = "_view"
 
+# The migration version that the squash file represents. Must match the highest
+# numbered migration file.  When the squash is applied on a fresh database the
+# migrator records this as the current version, then applies any remaining
+# individual migrations (SQUASH_MIGRATION_VERSION+1 … latest).
+SQUASH_MIGRATION_VERSION = 28
+
+# Migration files that seed data and must also be applied after the squash
+# migration creates the schema.  Migration 006 seeds default LLM token prices
+# with effective_date = now().  The post-migration hook later adds any NEWER
+# entries from cost_checkpoint.json but deduplicates against what's already
+# present, so the 006 rows remain authoritative (their now()-based date wins).
+SQUASH_SEED_MIGRATIONS = ("006_seed_costs.up.sql",)
+
 # Schema for the migration tracking table (shared across all migrator variants)
 _MIGRATIONS_TABLE_COLUMNS = """
     db_name String,
@@ -194,6 +207,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
     management_db: str
     migration_dir: str
     post_migration_hook: PostMigrationHook | None
+    use_squash_migration: bool
 
     def __init__(
         self,
@@ -208,6 +222,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self.management_db = management_db
         self.migration_dir = self._resolve_migration_dir(migration_dir)
         self.post_migration_hook = post_migration_hook
+        self.use_squash_migration = True
         self._initialize_migration_db()
 
     def _uses_replicated_db_engine(self, db_name: str) -> bool:
@@ -241,6 +256,63 @@ class BaseClickHouseTraceServerMigrator(ABC):
         if not os.path.isdir(migration_dir):
             raise MigrationError(f"Migration directory not found: {migration_dir}")
         return migration_dir
+
+    def _get_squash_migration_path(self) -> str | None:
+        """Return path to squash migration file if it exists, None otherwise.
+
+        The squash file lives alongside the migrations directory as
+        ``squash_migration.sql``.
+        """
+        squash_path = os.path.join(
+            os.path.dirname(self.migration_dir), "squash_migration.sql"
+        )
+        if os.path.isfile(squash_path):
+            return squash_path
+        return None
+
+    def _apply_squash_migration(self, target_db: str, squash_path: str) -> int:
+        """Apply the squash migration and return the version it represents.
+
+        After creating the schema, any data-seeding migrations listed in
+        ``SQUASH_SEED_MIGRATIONS`` are replayed so that the database state
+        matches the sequential migration path exactly.
+        """
+        logger.info(
+            "Applying squash migration (version %s) to `%s`",
+            SQUASH_MIGRATION_VERSION,
+            target_db,
+        )
+        with open(squash_path, encoding="utf-8") as f:
+            migration_sql = f.read()
+
+        self._update_migration_status(
+            target_db, SQUASH_MIGRATION_VERSION, is_start=True
+        )
+        migration_sub_commands = migration_sql.split(";")
+        for command in migration_sub_commands:
+            self._execute_migration_command(target_db, command)
+
+        # Replay data-seeding migrations that the squash DDL intentionally
+        # omits (e.g. cost seed data from migration 006).
+        for seed_file in SQUASH_SEED_MIGRATIONS:
+            seed_path = os.path.join(self.migration_dir, seed_file)
+            if os.path.isfile(seed_path):
+                logger.info("Seeding data from %s", seed_file)
+                with open(seed_path, encoding="utf-8") as f:
+                    seed_sql = f.read()
+                for command in seed_sql.split(";"):
+                    self._execute_migration_command(target_db, command)
+
+        self._update_migration_status(
+            target_db, SQUASH_MIGRATION_VERSION, is_start=False
+        )
+
+        logger.info(
+            "Squash migration applied to `%s` (version %s)",
+            target_db,
+            SQUASH_MIGRATION_VERSION,
+        )
+        return SQUASH_MIGRATION_VERSION
 
     @abstractmethod
     def _execute_migration_command(self, target_db: str, command: str) -> None:
@@ -284,9 +356,29 @@ class BaseClickHouseTraceServerMigrator(ABC):
                 f"migration version {status['partially_applied_version']}. "
                 f"Please fix the database manually and try again."
             )
+
+        current_version = status["curr_version"]
+
+        # For fresh databases, use the squash migration if available. The squash
+        # brings the schema to SQUASH_MIGRATION_VERSION in a single pass.
+        if (
+            current_version == 0
+            and self.use_squash_migration
+            and (target_version is None or target_version >= SQUASH_MIGRATION_VERSION)
+        ):
+            squash_path = self._get_squash_migration_path()
+            if squash_path is not None:
+                self._ensure_database(target_db)
+                current_version = self._apply_squash_migration(target_db, squash_path)
+                logger.info(
+                    "Applied squash migration to `%s`, now at version %s",
+                    target_db,
+                    current_version,
+                )
+
         migration_map = self._get_migrations()
         migrations_to_apply = self._determine_migrations_to_apply(
-            status["curr_version"], migration_map, target_version
+            current_version, migration_map, target_version
         )
         if len(migrations_to_apply) == 0:
             logger.info("No migrations to apply to `%s`", target_db)
@@ -295,7 +387,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
             )
             return
         logger.info("Migrations to apply: %s", migrations_to_apply)
-        if status["curr_version"] == 0:
+        if current_version == 0:
             self._ensure_database(target_db)
         applied_target_version = target_version
         for migration_target_version, migration_file in migrations_to_apply:
@@ -362,6 +454,8 @@ class BaseClickHouseTraceServerMigrator(ABC):
         migration_map: dict[int, dict[str, str | None]] = {}
         max_version = 0
         for file in migration_files:
+            if not file.endswith(".sql"):
+                continue  # Skip non-SQL files (e.g., README.md)
             if not file.endswith(".up.sql") and not file.endswith(".down.sql"):
                 raise MigrationError(f"Invalid migration file: {file}")
             file_name_parts = file.split("_", 1)
