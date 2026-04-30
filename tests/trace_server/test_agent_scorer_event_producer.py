@@ -11,6 +11,7 @@ from weave.trace_server.agents.kafka_events import (
     SCORE_AGENT_SPANS_TOPIC,
     ScoreAgentSpansEvent,
 )
+from weave.trace_server.kafka import KafkaProducer
 
 _ENDED_AT = datetime.datetime(2024, 1, 1, 12, 0, 0)
 
@@ -52,8 +53,6 @@ def test_event_defaults() -> None:
 
 @pytest.mark.disable_logging_error_check
 def test_producer_drops_when_buffer_full() -> None:
-    from weave.trace_server.kafka import KafkaProducer
-
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 2
     producer.__len__ = MagicMock(return_value=5)  # buffer full
@@ -74,8 +73,6 @@ def test_producer_drops_when_buffer_full() -> None:
 
 
 def test_producer_publishes_under_buffer_limit() -> None:
-    from weave.trace_server.kafka import KafkaProducer
-
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 100
     producer.__len__ = MagicMock(return_value=0)

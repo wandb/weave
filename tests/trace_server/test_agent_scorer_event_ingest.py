@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+import datetime
 from unittest.mock import MagicMock
+
+from weave.trace_server.agents import clickhouse as ch_module
+from weave.trace_server.agents.clickhouse import AgentWriteHandler
+from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
+from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.agents.types import GenAIOTelExportReq
+from weave.trace_server.kafka import KafkaProducer
 
 # This test is intentionally stub-heavy because we only want to verify that
 # the Kafka emission hook fires when a root span ends. It does NOT exercise
@@ -10,14 +18,6 @@ from unittest.mock import MagicMock
 
 
 def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
-    import datetime
-
-    from weave.trace_server.agents.clickhouse import AgentWriteHandler
-    from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
-    from weave.trace_server.agents.schema import AgentSpanCHInsertable
-    from weave.trace_server.agents.types import GenAIOTelExportReq
-    from weave.trace_server.kafka import KafkaProducer
-
     # Stub Span.from_proto and extract_genai_span so we don't need real OTel bytes.
     # Datetimes must be tz-aware because from_row compares against SENTINEL_EPOCH (UTC).
     utc = datetime.timezone.utc
@@ -64,8 +64,6 @@ def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
     processed = MagicMock()
     processed.resource_spans = resource_spans
     processed.run_id = ""
-
-    from weave.trace_server.agents import clickhouse as ch_module
 
     monkeypatch.setattr(
         ch_module, "Span", MagicMock(from_proto=lambda *a, **kw: MagicMock())
