@@ -1814,7 +1814,7 @@ class CallsQuery(BaseModel):
         # eligibility check; the real CTE construction below re-runs the
         # optimizer on `pb` so its params become canonical.
         #
-        # TODO(#6750): the duplicate optimizer pass exists because
+        # TODO(WB-33883): the duplicate optimizer pass exists because
         # _build_where_clause_optimizations couples hardcoded-filter param
         # allocation with optimization-SQL computation. Splitting those
         # phases will let this method ask "is there a heavy LIKE?" without
