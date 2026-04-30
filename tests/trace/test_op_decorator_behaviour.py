@@ -499,6 +499,54 @@ def test_op_cached_signature_drives_defaults_and_content_annotations(monkeypatch
     assert output.extension == ".txt"
 
 
+def test_op_annotation_parse_failure_at_decoration_falls_back_at_runtime():
+    # When annotation parsing raises while decorating, the op is still
+    # created with `None` cache sentinels (decoration-time except branch)
+    # and the runtime handler falls back to parsing annotations live.
+    # Deleting the return-annotation cache attr also exercises the
+    # missing-attr fallback for the return annotation.
+    def failing_parse(*args: Any, **kwargs: Any) -> Any:
+        raise ValueError("simulated parse failure")
+
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr("weave.trace.op.parse_from_signature", failing_parse)
+
+        @op
+        def my_op(
+            data: Annotated[bytes, weave.Content[Literal["txt"]]],
+        ) -> Annotated[bytes, weave.Content[Literal["txt"]]]:
+            return data
+
+    assert my_op._weave_cached_parsed_input_annotations is None
+    assert my_op._weave_cached_parsed_return_annotation is None
+
+    delattr(my_op, "_weave_cached_parsed_return_annotation")
+
+    processed = _default_on_input_handler(my_op, (b"hello",), {})
+    assert isinstance(processed.inputs["data"], weave.Content)
+    assert processed.inputs["data"].data == b"hello"
+    assert my_op.postprocess_output is not None
+    output = my_op.postprocess_output(b"hello")
+    assert isinstance(output, weave.Content)
+    assert output.extension == ".txt"
+
+
+def test_op_signature_failure_at_call_raises_op_call_error(monkeypatch):
+    # When `inspect.signature` raises at call time (after a successful
+    # decoration), the handler must wrap the failure in `OpCallError`.
+    @op
+    def my_op(x: int) -> int:
+        return x + 1
+
+    def failing_signature(*args: Any, **kwargs: Any) -> inspect.Signature:
+        raise ValueError("runtime signature failure")
+
+    monkeypatch.setattr("weave.trace.op.inspect.signature", failing_signature)
+
+    with pytest.raises(OpCallError, match="runtime signature failure"):
+        _default_on_input_handler(my_op, (5,), {})
+
+
 def test_op_kind_attribute():
     """Test that setting kind on op decorator sets attributes.weave.kind."""
 
