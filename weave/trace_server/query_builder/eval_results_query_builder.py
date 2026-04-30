@@ -18,7 +18,7 @@ from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
 )
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
     ParamBuilder,
@@ -539,7 +539,7 @@ def build_eval_results_cte_chain(
     deleted_at_sentinel_param = None
     if read_table != "calls_merged":
         deleted_at_sentinel_param = param_slot(
-            pb.add_param(SENTINEL_DATETIME), "DateTime64(3)"
+            pb.add_param(SENTINEL_EPOCH), "DateTime64(3)"
         )
 
     inputs_field = (

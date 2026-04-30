@@ -17,7 +17,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
 )
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
@@ -67,7 +67,7 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
         assert_sql(
             cq,
             expected_query,
-            {"pb_0": SENTINEL_DATETIME, "pb_1": "project"},
+            {"pb_0": SENTINEL_EPOCH, "pb_1": "project"},
         )
 
 
@@ -755,7 +755,7 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
             "pb_0": "wandb.runnable.my_op",
             "pb_1": '$."output"."expected"',
             "pb_2": '$."output"."found"',
-            "pb_3": SENTINEL_DATETIME,
+            "pb_3": SENTINEL_EPOCH,
             "pb_4": "project",
         },
     )
@@ -1349,7 +1349,7 @@ def test_calls_query_with_like_optimization_calls_complete() -> None:
         {
             "pb_0": '$."param"',
             "pb_1": "hello",
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": '%"hello"%',
             "pb_4": "project",
         },
@@ -1387,7 +1387,7 @@ def test_calls_query_with_like_optimization_contains_calls_complete() -> None:
         {
             "pb_0": '$."param"',
             "pb_1": "hello",
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": '%"%hello%"%',
             "pb_4": "project",
         },
@@ -1425,7 +1425,7 @@ def test_calls_query_with_like_optimization_in_calls_complete() -> None:
             "pb_0": '$."param"',
             "pb_1": "hello",
             "pb_2": "world",
-            "pb_3": SENTINEL_DATETIME,
+            "pb_3": SENTINEL_EPOCH,
             "pb_4": '%"hello"%',
             "pb_5": '%"world"%',
             "pb_6": "project",
@@ -1782,9 +1782,9 @@ def test_summary_weave_field_select_backtick_quoting(
                 "pb_4": "success",
                 "pb_5": "descendant_error",
                 "pb_6": "",
-                "pb_7": SENTINEL_DATETIME,
-                "pb_8": SENTINEL_DATETIME,
-                "pb_9": SENTINEL_DATETIME,
+                "pb_7": SENTINEL_EPOCH,
+                "pb_8": SENTINEL_EPOCH,
+                "pb_9": SENTINEL_EPOCH,
                 "pb_10": "project",
             },
         )
@@ -3237,7 +3237,7 @@ def test_calls_complete_with_light_filter_and_order() -> None:
         {
             "pb_0": "2024-03-01 00:00:00.000000",
             "pb_1": "user_123",
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": "project",
         },
     )
@@ -3315,7 +3315,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         {
             "pb_0": '$."latency"',
             "pb_1": 1000,
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": ["my_op"],
             "pb_4": "trace_abc",
             "pb_5": '$."status_counts"."error"',
@@ -3324,7 +3324,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_8": "success",
             "pb_9": "descendant_error",
             "pb_10": "",
-            "pb_11": SENTINEL_DATETIME,
+            "pb_11": SENTINEL_EPOCH,
             "pb_12": "project",
         },
     )
@@ -3370,7 +3370,7 @@ def test_query_with_simple_feedback_sort_calls_complete() -> None:
                 {pb_4:String}), 'null'), '')) DESC
             """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "wandb.runnable.my_op",
             "pb_2": "output",
             "pb_3": "expected",
@@ -3419,7 +3419,7 @@ def test_calls_complete_with_refs_filter() -> None:
                 AND (hasAny(calls_complete.output_refs, {pb_3:Array(String)})))))
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": ["weave-trace-internal:///project/object/my_input:abc"],
             "pb_2": "weave-trace-internal:///project/object/my_input:",
             "pb_3": ["weave-trace-internal:///project/object/my_output:xyz"],
@@ -3478,7 +3478,7 @@ def test_calls_complete_with_feedback_filter() -> None:
             "pb_0": "wandb.runnable.my_op",
             "pb_1": '$."output"."score"',
             "pb_2": 0.5,
-            "pb_3": SENTINEL_DATETIME,
+            "pb_3": SENTINEL_EPOCH,
             "pb_4": "project",
         },
     )
@@ -3545,10 +3545,10 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             "pb_3": "success",
             "pb_4": "descendant_error",
             "pb_5": "",
-            "pb_6": SENTINEL_DATETIME,
+            "pb_6": SENTINEL_EPOCH,
             "pb_7": "",
-            "pb_8": SENTINEL_DATETIME,
-            "pb_9": SENTINEL_DATETIME,
+            "pb_8": SENTINEL_EPOCH,
+            "pb_9": SENTINEL_EPOCH,
             "pb_10": "project",
         },
     )
@@ -3729,7 +3729,7 @@ def test_query_with_queue_filter_calls_complete() -> None:
         """,
         {
             "pb_0": "test_queue_id",
-            "pb_1": SENTINEL_DATETIME,
+            "pb_1": SENTINEL_EPOCH,
             "pb_2": "project",
         },
     )
@@ -3831,7 +3831,7 @@ def test_stats_query_calls_complete_flat_count() -> None:
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "project",
         },
         read_table=ReadTable.CALLS_COMPLETE,
@@ -3855,7 +3855,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": ["my_op"],
             "pb_2": "project",
         },
@@ -3891,7 +3891,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "project",
             "pb_2": "",
         },
@@ -3944,7 +3944,7 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
             "pb_0": "wandb.annotation.rating",
             "pb_1": '$."value"',
             "pb_2": "good",
-            "pb_3": SENTINEL_DATETIME,
+            "pb_3": SENTINEL_EPOCH,
             "pb_4": "project",
         },
         read_table=ReadTable.CALLS_COMPLETE,
@@ -4010,8 +4010,8 @@ def test_latency_ms_sort_calls_complete_uses_sentinel_for_ended_at() -> None:
         END DESC
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
-            "pb_1": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
+            "pb_1": SENTINEL_EPOCH,
             "pb_2": "project",
         },
     )
@@ -4046,9 +4046,9 @@ def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
        AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": 1000,
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": "project",
         },
     )
@@ -4068,7 +4068,7 @@ def test_trace_roots_only_filter_calls_complete() -> None:
               AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "",
             "pb_2": "project",
         },
@@ -4108,7 +4108,7 @@ def test_trace_name_filter_calls_complete_uses_sentinel() -> None:
         {
             "pb_0": "",
             "pb_1": "my_model",
-            "pb_2": SENTINEL_DATETIME,
+            "pb_2": SENTINEL_EPOCH,
             "pb_3": "project",
         },
     )
@@ -4145,7 +4145,7 @@ def test_not_eq_none_display_name_calls_complete() -> None:
         """,
         {
             "pb_0": "",
-            "pb_1": SENTINEL_DATETIME,
+            "pb_1": SENTINEL_EPOCH,
             "pb_2": "project",
         },
     )
@@ -4187,7 +4187,7 @@ def test_hardcoded_filters_calls_complete() -> None:
                      AND (calls_complete.wb_run_id IN {pb_4:Array(String)}))))
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": ["parent_aaa", "parent_bbb"],
             "pb_2": ["thread_123"],
             "pb_3": ["turn_456"],
@@ -4226,14 +4226,14 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
                  END ASC
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": '$."status_counts"."error"',
             "pb_2": "error",
             "pb_3": "running",
             "pb_4": "success",
             "pb_5": "descendant_error",
             "pb_6": "",
-            "pb_7": SENTINEL_DATETIME,
+            "pb_7": SENTINEL_EPOCH,
             "pb_8": "project",
         },
     )

@@ -3,7 +3,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
 )
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
@@ -1032,8 +1032,8 @@ def test_object_ref_filter_calls_complete() -> None:
             "pb_1": '$."temperature"',
             "pb_2": 1,
             "pb_3": '$."model"',
-            "pb_4": SENTINEL_DATETIME,
-            "pb_5": SENTINEL_DATETIME,
+            "pb_4": SENTINEL_EPOCH,
+            "pb_5": SENTINEL_EPOCH,
         },
     )
 
@@ -1119,7 +1119,7 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
             "pb_3": '$."model"',
             "pb_4": '$."prompt"',
             "pb_5": "test prompt",
-            "pb_6": SENTINEL_DATETIME,
+            "pb_6": SENTINEL_EPOCH,
             "pb_7": "",
         },
     )

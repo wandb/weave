@@ -33,7 +33,7 @@ from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
-from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -85,7 +85,11 @@ from weave.trace_server.trace_server_common import (
     scorer_read_res_from_obj,
     set_nested_key,
 )
-from weave.trace_server.ttl_settings import compute_expire_at
+from weave.trace_server.ttl_settings import (
+    RETENTION_DAYS_NO_TTL,
+    compute_expire_at,
+    invalidate_ttl_cache,
+)
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -378,7 +382,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             CREATE TABLE IF NOT EXISTS project_ttl_settings (
                 project_id TEXT NOT NULL,
                 retention_days INTEGER NOT NULL,
-                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_by TEXT NOT NULL DEFAULT ''
             )
             """
         )
@@ -483,24 +488,28 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         cursor.execute(TABLE_FEEDBACK.create_sql())
 
     def _get_project_retention_days(self, project_id: str) -> int:
-        """Return retention_days for a project (0 = no TTL). SQLite-local, uncached."""
+        """Return retention_days for a project (RETENTION_DAYS_NO_TTL = no TTL).
+
+        SQLite-local, uncached.
+        """
         _, cursor = get_conn_cursor(self.db_path)
         cursor.execute(
             "SELECT retention_days FROM project_ttl_settings "
-            "WHERE project_id = ? ORDER BY updated_at DESC LIMIT 1",
+            "WHERE project_id = ? ORDER BY updated_at DESC, rowid DESC LIMIT 1",
             (project_id,),
         )
         row = cursor.fetchone()
-        return int(row[0]) if row is not None else 0
+        return int(row[0]) if row is not None else RETENTION_DAYS_NO_TTL
 
     def _compute_call_expire_at(
         self, project_id: str, anchor: datetime.datetime
     ) -> str:
         """Compute the ISO-formatted expire_at for a call row."""
         retention_days = self._get_project_retention_days(project_id)
-        if retention_days == 0:
+        expire_at = compute_expire_at(retention_days, anchor)
+        if expire_at is None:
             return EXPIRE_AT_NEVER.isoformat(sep=" ")
-        return compute_expire_at(retention_days, anchor).isoformat(sep=" ")
+        return expire_at.isoformat(sep=" ")
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
@@ -1403,6 +1412,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 exception=call_dict.get("exception"),
                 display_name=call_dict.get("display_name"),
             )
+            # Normalize expire_at: the 2100-01-01 sentinel means "no TTL".
+            raw_expire_at = call_dict.get("expire_at")
+            if raw_expire_at:
+                expire_at_dt = datetime.datetime.fromisoformat(raw_expire_at)
+                if expire_at_dt.tzinfo is None:
+                    expire_at_dt = expire_at_dt.replace(tzinfo=datetime.timezone.utc)
+                call_dict["expire_at"] = (
+                    None if expire_at_dt == EXPIRE_AT_NEVER else expire_at_dt
+                )
+
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:
@@ -2834,6 +2853,44 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"
         )
+
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
+        stored_days = self._get_project_retention_days(req.project_id)
+        return tsi.ProjectTTLSettingsReadRes(
+            retention_days=stored_days if stored_days != RETENTION_DAYS_NO_TTL else None
+        )
+
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
+        if req.retention_days is not None and req.retention_days < 1:
+            raise InvalidRequest(
+                "retention_days must be None (no TTL) or >= 1 (days of retention)"
+            )
+        if not req.wb_user_id:
+            raise InvalidRequest("wb_user_id is required for audit trail")
+
+        stored_days = (
+            RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
+        )
+        conn, cursor = get_conn_cursor(self.db_path)
+        # Pad microseconds so updated_at strings sort lexicographically by time.
+        # isoformat() drops microseconds when they're 0, which would make
+        # "...:52+00:00" sort before "...:51.999999+00:00".
+        updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat(
+            timespec="microseconds"
+        )
+        cursor.execute(
+            "INSERT INTO project_ttl_settings "
+            "(project_id, retention_days, updated_at, updated_by) "
+            "VALUES (?, ?, ?, ?)",
+            (req.project_id, stored_days, updated_at, req.wb_user_id),
+        )
+        conn.commit()
+        invalidate_ttl_cache(req.project_id)
+        return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
