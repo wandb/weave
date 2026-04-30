@@ -12,10 +12,6 @@ from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import GenAIOTelExportReq
 from weave.trace_server.kafka import KafkaProducer
 
-# This test is intentionally stub-heavy because we only want to verify that
-# the Kafka emission hook fires when a root span ends. It does NOT exercise
-# the real OTel protobuf path.
-
 
 def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
     # Stub Span.from_proto and extract_genai_span so we don't need real OTel bytes.
