@@ -36,6 +36,11 @@ from typing import (
 from typing_extensions import ParamSpec, Self, TypeIs, Unpack
 
 from weave.trace import box, settings
+from weave.trace.annotation_parser import (
+    ContentAnnotation,
+    parse_content_annotation,
+    parse_from_signature,
+)
 from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import (
     call_attributes,
@@ -276,24 +281,13 @@ def _is_unbound_method(func: Callable) -> bool:
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
-    # Lazy load so Content modele isn't resolved until necessary
-    from weave.trace.annotation_parser import (
-        ContentAnnotation,
-        parse_content_annotation,
-        parse_from_signature,
-    )
+    # Avoid circular import: Content -> serialization.op_type -> op.
     from weave.type_wrappers import Content
 
-    # Use cached signature + parsed annotations from op_deco when available.
-    # Avoids re-running inspect.signature and parse_from_signature on every
-    # call, which is the dominant per-op overhead for high-throughput async
-    # ops (see WB-33844).
-    sig = getattr(func, "_cached_signature", None)
-    if sig is None:
-        try:
-            sig = inspect.signature(func)
-        except (TypeError, ValueError) as e:
-            raise OpCallError(f"Error calling {func.name}: {e}") from e
+    try:
+        sig = inspect.signature(func)
+    except (TypeError, ValueError) as e:
+        raise OpCallError(f"Error calling {func.name}: {e}") from e
 
     try:
         inputs = sig.bind(*args, **kwargs).arguments
@@ -306,7 +300,9 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # If user defines postprocess_inputs manually, trust it instead of running this
     to_weave_inputs = {}
     if not func.postprocess_inputs:
-        parsed_annotations = getattr(func, "_cached_parsed_annotations", None)
+        parsed_annotations = getattr(
+            func, "_weave_cached_parsed_input_annotations", None
+        )
         if parsed_annotations is None:
             parsed_annotations = parse_from_signature(sig)
         for param_name, value in inputs_with_defaults.items():
@@ -325,8 +321,14 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
     # Annotated return type flow
     # If user defines postprocess_output manually, trust it instead of running this
-    if not func.postprocess_output and sig.return_annotation:
-        parsed = parse_content_annotation(str(sig.return_annotation))
+    if not func.postprocess_output:
+        parsed = getattr(func, "_weave_cached_parsed_return_annotation", None)
+        if parsed is None and not hasattr(
+            func, "_weave_cached_parsed_return_annotation"
+        ):
+            return_annotation = sig.return_annotation
+            if return_annotation is not inspect.Signature.empty and return_annotation:
+                parsed = parse_content_annotation(str(return_annotation))
         if isinstance(parsed, ContentAnnotation):
             func.postprocess_output = lambda x: Content._from_guess(
                 x, mimetype=parsed.mimetype, extension=parsed.extension
@@ -1367,18 +1369,26 @@ def op(
             wrapper.kind = kind  # type: ignore
             wrapper.color = color  # type: ignore
 
-            # Cache signature + parsed annotations at decoration time. These
-            # are otherwise recomputed in `_default_on_input_handler` on every
-            # call, which is the hot path for high-throughput async ops.
-            from weave.trace.annotation_parser import parse_from_signature  # circular
-
+            # `inspect.signature` returns `__signature__` directly, so this
+            # makes all callers hit the cached signature for the wrapper.
             try:
                 cached_sig = inspect.signature(func)
-                wrapper._cached_signature = cached_sig  # type: ignore
-                wrapper._cached_parsed_annotations = parse_from_signature(cached_sig)  # type: ignore
+                wrapper.__signature__ = cached_sig  # type: ignore
+                wrapper._weave_cached_parsed_input_annotations = parse_from_signature(cached_sig)  # type: ignore
+
+                return_annotation = cached_sig.return_annotation
+                if (
+                    return_annotation is not inspect.Signature.empty
+                    and return_annotation
+                ):
+                    wrapper._weave_cached_parsed_return_annotation = parse_content_annotation(  # type: ignore
+                        str(return_annotation)
+                    )
+                else:
+                    wrapper._weave_cached_parsed_return_annotation = None  # type: ignore
             except (TypeError, ValueError):
-                wrapper._cached_signature = None  # type: ignore
-                wrapper._cached_parsed_annotations = None  # type: ignore
+                wrapper._weave_cached_parsed_input_annotations = None  # type: ignore
+                wrapper._weave_cached_parsed_return_annotation = None  # type: ignore
 
             return cast(Op[P, R], wrapper)
 

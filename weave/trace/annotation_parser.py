@@ -6,14 +6,13 @@ from inspect import Signature
 
 from pydantic import BaseModel
 
-from weave.type_wrappers import Content
-
 logger = logging.getLogger(__name__)
 
-CONTENT_CLASS_NAME = f"{Content.__module__}.{Content.__qualname__}"
+# Keep this as a string so op.py can import the parser without importing Content.
+CONTENT_CLASS_NAME = "weave.type_wrappers.Content.content.Content"
 
 # Content annotation with a nested Literal type
-# Example: "typing.Annotated[str, weave.type_handlers.Content.content.Content[Literal['pdf']]'>]"
+# Example: "typing.Annotated[str, weave.type_wrappers.Content.content.Content[Literal['pdf']]'>]"
 PATTERN_WITH_TYPE_HINT = re.compile(
     r"(?:\w+(?:\.\w+)*\.)?Annotated\["  # Optional module prefix for Annotated
     r"(.+?),\s*"  # Group 1: Base type (non-greedy)
@@ -24,7 +23,7 @@ PATTERN_WITH_TYPE_HINT = re.compile(
 )
 
 # Content annotation without a format specifier
-# Example: typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Content.content.Content'>]"
+# Example: typing.Annotated[SomePathLikeType, <class 'weave.type_wrappers.Content.content.Content'>]"
 PATTERN_WITHOUT_TYPE_HINT = re.compile(
     r"(?:\w+(?:\.\w+)*\.)?Annotated\["  # Optional module prefix for Annotated
     r"(.+?),\s*"  # Group 1: Base type (non-greedy)

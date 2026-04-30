@@ -1,11 +1,17 @@
 import inspect
-from typing import Any, get_type_hints
+from typing import Annotated, Any, Literal, get_type_hints
 
 import pytest
 
 import weave
 from weave.trace.call import Call
-from weave.trace.op import OpCallError, is_op, op, setup_dunder_weave_dict
+from weave.trace.op import (
+    OpCallError,
+    _default_on_input_handler,
+    is_op,
+    op,
+    setup_dunder_weave_dict,
+)
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.vals import MissingSelfInstanceError
 
@@ -453,6 +459,44 @@ def test_op_preserves_type_information():
     }
     # Check that the function can be called with the correct types
     assert typed_func(**values) == decorated_func(**values) == values
+
+
+def test_op_cached_signature_drives_defaults_and_content_annotations(monkeypatch):
+    @op
+    def content_op(
+        data: Annotated[bytes, weave.Content[Literal["txt"]]],
+        *items: int,
+        label: str = "fallback",
+        **metadata: str,
+    ) -> Annotated[bytes, weave.Content[Literal["txt"]]]:
+        return data
+
+    sig = inspect.signature(content_op)
+    assert sig == inspect.signature(content_op.resolve_fn)
+    assert sig is content_op.__signature__
+    assert not hasattr(content_op, "_cached_signature")
+
+    def fail_parse(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("annotation parsing should be cached at decoration time")
+
+    monkeypatch.setattr("weave.trace.op.parse_from_signature", fail_parse)
+    monkeypatch.setattr("weave.trace.op.parse_content_annotation", fail_parse)
+
+    processed = _default_on_input_handler(
+        content_op, (b"hello", 1, 2), {"source": "test"}
+    )
+
+    assert processed.inputs["label"] == "fallback"
+    assert processed.inputs["items"] == (1, 2)
+    assert processed.inputs["metadata"] == {"source": "test"}
+    assert isinstance(processed.inputs["data"], weave.Content)
+    assert processed.inputs["data"].data == b"hello"
+    assert processed.inputs["data"].extension == ".txt"
+    assert content_op.postprocess_output is not None
+    output = content_op.postprocess_output(b"hello")
+    assert isinstance(output, weave.Content)
+    assert output.data == b"hello"
+    assert output.extension == ".txt"
 
 
 def test_op_kind_attribute():
