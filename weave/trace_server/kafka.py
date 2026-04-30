@@ -191,10 +191,10 @@ class KafkaProducer(ConfluentKafkaProducer):
     def produce_score_agent_spans(
         self, event: ScoreAgentSpansEvent, flush_immediately: bool = False
     ) -> None:
-        """Produce a weave.score_agent_spans to Kafka with buffer back-pressure.
+        """Produce a weave.score_agent_spans event to Kafka.
 
         Drops the message when the producer buffer is full to prevent unbounded
-        memory growth (same policy as ``produce_call_end``).
+        memory growth (same policy as `produce_call_end`).
         """
         buffer_size = len(self)
         if buffer_size >= self.max_buffer_size:
