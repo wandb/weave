@@ -10,11 +10,15 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 from dataclasses import dataclass
 from typing import Any
 
 from weave.trace_server.agents import semconv
-from weave.trace_server.agents.constants import OP_INVOKE_AGENT
+from weave.trace_server.agents.constants import (
+    MAX_AGENT_STATS_RESULT_ROWS,
+    OP_INVOKE_AGENT,
+)
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSpanStatsAggregation,
@@ -193,7 +197,8 @@ def build_agent_span_stats_query(
     end_param = pb.add_param(end_epoch)
     tz_param = pb.add_param(tz)
     bucket_interval_param = pb.add_param(granularity_seconds)
-    group_limit_slot = pb.add(req.group_limit, param_type="UInt64")
+    group_limit = _effective_group_limit(req, start, end, granularity_seconds)
+    group_limit_slot = pb.add(group_limit, param_type="UInt64")
 
     raw_sql = _build_grouped_query(
         where=where,
@@ -234,7 +239,7 @@ def _resolve_time_bounds(
 
 
 def _as_utc(dt: datetime.datetime) -> datetime.datetime:
-    if dt.tzinfo is None:
+    if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(datetime.timezone.utc)
 
@@ -247,6 +252,29 @@ def _resolve_granularity(
     range_seconds = (end - start).total_seconds()
     granularity = req.granularity or auto_select_granularity_seconds(end - start)
     return ensure_max_buckets(granularity, range_seconds)
+
+
+def _effective_group_limit(
+    req: AgentSpanStatsReq,
+    start: datetime.datetime,
+    end: datetime.datetime,
+    granularity_seconds: int,
+) -> int:
+    if not req.group_by:
+        return req.group_limit
+
+    bucket_count = _estimated_bucket_count(start, end, granularity_seconds)
+    max_groups = max(1, MAX_AGENT_STATS_RESULT_ROWS // bucket_count)
+    return min(req.group_limit, max_groups)
+
+
+def _estimated_bucket_count(
+    start: datetime.datetime,
+    end: datetime.datetime,
+    granularity_seconds: int,
+) -> int:
+    range_seconds = max(0.0, (end - start).total_seconds())
+    return max(1, math.ceil(range_seconds / granularity_seconds) + 1)
 
 
 def _spans_where(
@@ -406,9 +434,7 @@ def _output_name(agg: AgentSpanStatsAggregation, alias: str) -> str:
 
 
 def _outer_metric_expr(output_name: str) -> str:
-    if output_name.startswith(
-        ("sum_", "avg_", "count_", "count_distinct_", "count_true_", "count_false_")
-    ):
+    if output_name.startswith(("sum_", "count_")):
         return f"COALESCE(aggregated_data.{output_name}, 0)"
     return f"aggregated_data.{output_name}"
 

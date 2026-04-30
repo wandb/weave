@@ -77,6 +77,12 @@ _ALLOWED_AGGS_BY_TYPE: dict[AgentSpanStatsValueType, set[AgentSpanStatsAggregati
 }
 
 
+def _as_utc(dt: datetime.datetime) -> datetime.datetime:
+    if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(datetime.timezone.utc)
+
+
 class AgentSpanStatsFieldRef(BaseModel):
     """Reference to a span field or typed custom attribute map value."""
 
@@ -179,6 +185,10 @@ class AgentSpanStatsReq(BaseModel):
         )
         if duplicate_aliases:
             raise ValueError(f"duplicate metric aliases: {duplicate_aliases!r}")
+
+        self.start = _as_utc(self.start)
+        if self.end is not None:
+            self.end = _as_utc(self.end)
 
         end = self.end or datetime.datetime.now(datetime.timezone.utc)
         if end < self.start:

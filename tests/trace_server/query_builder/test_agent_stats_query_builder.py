@@ -3,6 +3,7 @@ import datetime
 import pytest
 from pydantic import ValidationError
 
+from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSpanStatsFieldRef,
@@ -79,6 +80,8 @@ def test_basic_stats_query_uses_query_filter_and_bucket() -> None:
         "quantileOrNull(0.95)(if(v_duration_ms, m_duration_ms, NULL)) AS p95_duration_ms"
         in sql
     )
+    assert "aggregated_data.avg_duration_ms AS avg_duration_ms" in sql
+    assert "COALESCE(aggregated_data.avg_duration_ms, 0)" not in sql
     assert "countIf(v_errors AND m_errors = 1) AS count_true_errors" in sql
     assert result.columns == [
         "timestamp",
@@ -121,6 +124,36 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
     assert "GROUP BY bucket, env" in sql
     assert "LIMIT {genai_9:UInt64}" in result.sql
     assert result.columns == ["timestamp", "env", "avg_score", "count_score"]
+
+
+def test_group_by_caps_output_rows() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        group_by=[
+            AgentGroupByRef(
+                source="custom_attrs_string",
+                key="env",
+                alias="env",
+            )
+        ],
+        group_limit=1000,
+    )
+
+    result = build_agent_span_stats_query(req, pb)
+
+    expected_bucket_count = 25
+    expected_group_limit = MAX_AGENT_STATS_RESULT_ROWS // expected_bucket_count
+    assert expected_group_limit in result.parameters.values()
+    assert 1000 not in result.parameters.values()
+
+
+def test_request_validation_normalizes_naive_datetimes() -> None:
+    start = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+
+    req = _req(start=start, end=None)
+
+    assert req.start.tzinfo == datetime.timezone.utc
+    assert req.end is None
 
 
 def test_metric_validation_rejects_invalid_type_aggregation() -> None:
