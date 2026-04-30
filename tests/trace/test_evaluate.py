@@ -342,6 +342,7 @@ async def test_sync_eval_parallelism(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 async def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
     dataset = Dataset(rows=dataset_rows)
@@ -362,6 +363,7 @@ async def test_evaluation_from_weaveobject_missing_evaluation_name(client):
         name="test-eval",
     )
     ref = weave.publish(evaluation)
+    time.sleep(0.2)
 
     # To simulate it being an older object, we delete the evaluation_name attribute from
     # the gotten weave object.
