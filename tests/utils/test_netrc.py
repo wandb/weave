@@ -6,6 +6,7 @@ the Netrc class, helper functions, and edge cases.
 
 import netrc
 import os
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -100,9 +101,11 @@ def test_netrc_write_credentials(temp_netrc):
     # Verify file was created
     assert temp_netrc.path.exists()
 
-    # Check file permissions (should be 0o600)
-    file_stat = temp_netrc.path.stat()
-    assert file_stat.st_mode & 0o777 == 0o600
+    # Check file permissions (should be 0o600). POSIX-only — Windows ignores
+    # chmod for these mode bits.
+    if sys.platform != "win32":
+        file_stat = temp_netrc.path.stat()
+        assert file_stat.st_mode & 0o777 == 0o600
 
     # Verify content by reading it back
     written_credentials = temp_netrc.read()
@@ -358,7 +361,7 @@ def test_check_netrc_access_os_error(mock_stat, tmp_path):
 def test_get_netrc_file_path_from_env():
     """Test getting netrc file path from environment variable."""
     path = get_netrc_file_path()
-    assert path == "/custom/netrc/path"
+    assert Path(path) == Path("/custom/netrc/path")
 
 
 @patch.dict(os.environ, {"NETRC": "~/custom/netrc"})
@@ -386,7 +389,7 @@ def test_get_netrc_file_path_default_unix(mock_system):
     """Test getting default netrc file path on Unix systems."""
     with patch("pathlib.Path.home", return_value=Path("/home/user")):
         path = get_netrc_file_path()
-        assert path == "/home/user/.netrc"
+        assert Path(path) == Path("/home/user/.netrc")
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -395,4 +398,4 @@ def test_get_netrc_file_path_default_windows(mock_system):
     """Test getting default netrc file path on Windows systems."""
     with patch("pathlib.Path.home", return_value=Path("C:/Users/user")):
         path = get_netrc_file_path()
-        assert path == "C:/Users/user/_netrc"
+        assert Path(path) == Path("C:/Users/user/_netrc")

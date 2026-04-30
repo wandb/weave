@@ -63,6 +63,7 @@ from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
 from weave.session.session import (
     LLM,
     LogResult,
+    MediaAttachment,
     Message,
     Reasoning,
     Session,
@@ -80,6 +81,8 @@ from weave.session.session import (
     log_turn,
     start_llm,
     start_session,
+    start_subagent,
+    start_tool,
     start_turn,
 )
 from weave.trace.log_call import log_call
@@ -108,6 +111,7 @@ __all__ = [
     "File",
     "LogResult",
     "Markdown",
+    "MediaAttachment",
     "Message",
     "MessagesPrompt",
     "Model",
@@ -159,6 +163,8 @@ __all__ = [
     "set_view",
     "start_llm",
     "start_session",
+    "start_subagent",
+    "start_tool",
     "start_turn",
     "thread",
     "weave_client_context",
