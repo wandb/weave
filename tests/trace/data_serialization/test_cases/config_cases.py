@@ -302,6 +302,8 @@ config_cases = [
             "is_traced": False,
             "active": False,
             "scorer_debounce_config": None,
+            "prompt_header": None,
+            "prompt_footer": None,
             "_class_name": "ClassifierMonitor",
             "_bases": ["Monitor", "Object", "BaseModel"],
         },

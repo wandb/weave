@@ -2,6 +2,8 @@ import logging
 import socket
 from typing import Any
 
+import ddtrace
+
 from confluent_kafka import (
     Consumer as ConfluentKafkaConsumer,
 )
@@ -188,13 +190,11 @@ class KafkaProducer(ConfluentKafkaProducer):
         if flush_immediately:
             self.flush(0)
 
-    def produce_score_agent_spans(
-        self, event: ScoreAgentSpansEvent, flush_immediately: bool = False
-    ) -> None:
+    @ddtrace.tracer.wrap(name="kafka_producer.produce_score_agent_spans")
+    def produce_score_agent_spans(self, event: ScoreAgentSpansEvent) -> None:
         """Produce a weave.score_agent_spans event to Kafka.
 
-        Drops the message when the producer buffer is full to prevent unbounded
-        memory growth (same policy as `produce_call_end`).
+        Drops the message when the producer buffer is full (same policy as `produce_call_end`).
         """
         buffer_size = len(self)
         if buffer_size >= self.max_buffer_size:
@@ -234,8 +234,6 @@ class KafkaProducer(ConfluentKafkaProducer):
             value=event.model_dump_json(),
             key=publish_key,
         )
-        if flush_immediately:
-            self.flush(0)
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):

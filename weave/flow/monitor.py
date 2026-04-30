@@ -13,6 +13,7 @@ from weave.trace_server.interface.query import Query
 DebounceAggregationField: TypeAlias = Literal["trace_id", "thread_id"]
 DebounceAggregationMethod: TypeAlias = Literal["last_message", "all_messages"]
 
+# Monitors can be configured to score agent spans by including an AgentSpanOpName in their `op_names` list.
 AgentSpanOpName: TypeAlias = Literal["weave.genai.turn"]
 AGENT_SPAN_OP_NAMES: frozenset[AgentSpanOpName] = frozenset(get_args(AgentSpanOpName))
 
@@ -195,6 +196,16 @@ class ClassifierMonitor(Monitor):
     Classifier monitors combine prompts from multiple LLMAsAJudgeScorers
     targeting the same model into a single scoring call.
     """
+
+    # DEPRECATED: header/footer are now hardcoded and these fields are ignored
+    prompt_header: str | None = Field(
+        default=None,
+        deprecated="prompt_header is unused; templates are hardcoded via get_prompt_header.",
+    )
+    prompt_footer: str | None = Field(
+        default=None,
+        deprecated="prompt_footer is unused; templates are hardcoded via get_prompt_footer.",
+    )
 
     def get_prompt_header(self, op_name: str) -> str:
         """Text to prepend before the merged classifier prompts."""

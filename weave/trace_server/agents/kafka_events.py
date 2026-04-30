@@ -29,10 +29,10 @@ class ScoreAgentSpansEvent(BaseModel):
     trace_id: str
     root_span_id: str
     ended_at: datetime.datetime
-    conversation_id: str | None
-    agent_name: str | None
-    operation_name: str | None
-    request_model: str | None
+    conversation_id: str | None = None
+    agent_name: str | None = None
+    operation_name: str | None = None
+    request_model: str | None = None
 
     def emit(self, producer: KafkaProducer) -> None:
         """Produce this event to Kafka. Logs failures without raising."""

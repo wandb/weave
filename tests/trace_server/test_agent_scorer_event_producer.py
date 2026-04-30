@@ -44,10 +44,10 @@ def test_event_defaults() -> None:
         root_span_id="r",
         ended_at=_ENDED_AT,
     )
-    assert event.conversation_id == ""
-    assert event.agent_name == ""
-    assert event.operation_name == ""
-    assert event.request_model == ""
+    assert event.conversation_id is None
+    assert event.agent_name is None
+    assert event.operation_name is None
+    assert event.request_model is None
 
 
 @pytest.mark.disable_logging_error_check
@@ -57,8 +57,8 @@ def test_producer_drops_when_buffer_full() -> None:
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 2
     producer.__len__ = MagicMock(return_value=5)  # buffer full
-    producer.produce_agent_scorer_event = (
-        KafkaProducer.produce_agent_scorer_event.__get__(producer)
+    producer.produce_score_agent_spans = (
+        KafkaProducer.produce_score_agent_spans.__get__(producer)
     )
 
     event = ScoreAgentSpansEvent(
@@ -68,19 +68,19 @@ def test_producer_drops_when_buffer_full() -> None:
         root_span_id="r",
         ended_at=_ENDED_AT,
     )
-    producer.produce_agent_scorer_event(event)
+    producer.produce_score_agent_spans(event)
 
     producer.produce.assert_not_called()
 
 
-def test_producer_flushes_when_requested() -> None:
+def test_producer_publishes_under_buffer_limit() -> None:
     from weave.trace_server.kafka import KafkaProducer
 
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 100
     producer.__len__ = MagicMock(return_value=0)
-    producer.produce_agent_scorer_event = (
-        KafkaProducer.produce_agent_scorer_event.__get__(producer)
+    producer.produce_score_agent_spans = (
+        KafkaProducer.produce_score_agent_spans.__get__(producer)
     )
 
     event = ScoreAgentSpansEvent(
@@ -90,9 +90,8 @@ def test_producer_flushes_when_requested() -> None:
         root_span_id="r",
         ended_at=_ENDED_AT,
     )
-    producer.produce_agent_scorer_event(event, flush_immediately=True)
+    producer.produce_score_agent_spans(event)
 
     producer.produce.assert_called_once()
     call_kwargs = producer.produce.call_args.kwargs
     assert call_kwargs["topic"] == "weave.score_agent_spans"
-    producer.flush.assert_called_once_with(0)

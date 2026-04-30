@@ -16,8 +16,11 @@ def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
     from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
     from weave.trace_server.agents.schema import AgentSpanCHInsertable
     from weave.trace_server.agents.types import GenAIOTelExportReq
+    from weave.trace_server.kafka import KafkaProducer
 
     # Stub Span.from_proto and extract_genai_span so we don't need real OTel bytes.
+    # Datetimes must be tz-aware because from_row compares against SENTINEL_EPOCH (UTC).
+    utc = datetime.timezone.utc
     stub_rows = [
         AgentSpanCHInsertable(
             project_id="p",
@@ -25,8 +28,8 @@ def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
             span_id="root",
             parent_span_id="",
             span_name="root",
-            started_at=datetime.datetime(2024, 1, 1, 11, 0, 0),
-            ended_at=datetime.datetime(2024, 1, 1, 12, 0, 0),
+            started_at=datetime.datetime(2024, 1, 1, 11, 0, 0, tzinfo=utc),
+            ended_at=datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=utc),
             agent_name="a",
             operation_name="invoke_agent",
         ),
@@ -36,13 +39,15 @@ def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
             span_id="child",
             parent_span_id="root",
             span_name="child",
-            started_at=datetime.datetime(2024, 1, 1, 11, 5, 0),
-            ended_at=datetime.datetime(2024, 1, 1, 11, 55, 0),
+            started_at=datetime.datetime(2024, 1, 1, 11, 5, 0, tzinfo=utc),
+            ended_at=datetime.datetime(2024, 1, 1, 11, 55, 0, tzinfo=utc),
         ),
     ]
 
     ch = MagicMock()
-    kafka_producer = MagicMock()
+    # spec=KafkaProducer ensures typo'd attribute names raise AttributeError instead
+    # of auto-vivifying — without this, asserting against the wrong method name silently passes.
+    kafka_producer = MagicMock(spec=KafkaProducer)
 
     handler = AgentWriteHandler(ch, kafka_producer)
 
@@ -78,9 +83,10 @@ def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
     res = handler.insert_otel_spans(req)
 
     assert res.accepted_spans == 2
-    assert kafka_producer.produce_agent_scorer_event.call_count == 1
-    event = kafka_producer.produce_agent_scorer_event.call_args.args[0]
+    assert kafka_producer.produce_score_agent_spans.call_count == 1
+    event = kafka_producer.produce_score_agent_spans.call_args.args[0]
     assert isinstance(event, ScoreAgentSpansEvent)
     assert event.event_type == "turn_ended"
     assert event.trace_id == "tr"
     assert event.root_span_id == "root"
+    kafka_producer.flush.assert_called_once_with(0)
