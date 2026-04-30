@@ -9,6 +9,8 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import threading
 import time
 from concurrent.futures import Future
@@ -220,7 +222,6 @@ async def test_concurrent_finishes_drain(client: WeaveClient) -> None:
     Object whose digest is pending while the server is paused; releasing the
     pause must let every pending finalize_send fire and `_flush()` return.
     """
-    import asyncio
 
     class Item(weave.Object):  # type: ignore[name-defined]
         i: int = 0
@@ -235,24 +236,55 @@ async def test_concurrent_finishes_drain(client: WeaveClient) -> None:
     assert results == [k * 2 for k in range(20)]
 
 
-def test_call_end_error_is_logged_once(client: WeaveClient) -> None:
-    """Errors in the deferred Phase 2 (server.call_end) propagate via
-    `end_complete_future` and surface to the user the same way master does.
+class _CallEndRaisingServer:
+    """Server proxy that raises `RuntimeError` from `call_end`.
 
-    Regression guard: in earlier drafts we set `log_exception=False` on the
-    barrier future, which silently swallowed call_end errors. The fix is to
-    log on `end_complete_future`; this test fails if that flips back.
+    Plain class (no `TraceServerInterface` subclass) so `__getattr__`
+    forwards every other method to the inner server — subclassing the
+    interface would resolve abstract methods via MRO and never reach
+    `__getattr__`.
+    """
+
+    def __init__(self, inner: tsi.TraceServerInterface) -> None:
+        self._inner = inner
+
+    def __getattr__(self, item: str) -> Any:
+        return getattr(self._inner, item)
+
+    def call_end(self, *args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("simulated call_end failure")
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_end_error_is_logged(
+    client: WeaveClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Errors raised by `server.call_end` in the deferred Phase 2 must surface
+    as a "Task failed" log line via `_track_future`'s logger.
+
+    Regression guard: an earlier draft tracked the barrier future with
+    `log_exception=False`, which silently swallowed `call_end` errors. If
+    that flips back, the assertion below fails.
     """
 
     @weave.op
     def f(x: int) -> int:
         return x + 1
 
-    f(1)
-    f(2)
-    client._flush()
-    # Smoke: just asserting flush returns. The failure mode was a hang/silence,
-    # not a wrong return value.
+    original = client.server
+    client.server = _CallEndRaisingServer(original)
+    try:
+        with caplog.at_level(logging.ERROR):
+            f(1)
+            client._flush()
+    finally:
+        client.server = original
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert any(
+        "Task failed" in m and "simulated call_end failure" in m for m in messages
+    ), f"Expected 'Task failed' log with our error; got: {messages}"
 
 
 def test_finish_call_returns_before_send(client: WeaveClient) -> None:

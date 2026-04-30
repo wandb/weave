@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
 from httpx import HTTPStatusError as HTTPError
@@ -385,6 +385,27 @@ def _collect_pending_digests(val: Any) -> list[Future]:
 
     walk(val)
     return pending
+
+
+_R = TypeVar("_R")
+
+
+def _defer_after_pending_digests(
+    future_executor: FutureExecutor,
+    val: Any,
+    fn: Callable[[], _R],
+) -> Future[_R]:
+    """Schedule `fn` so it runs after any unresolved nested digest futures in
+    `val` resolve. If none are pending, defer normally.
+
+    Pre-gating via `then(...)` returns the worker thread to the pool while
+    waiting; chaining to `defer(...)` would leave the worker blocked inside
+    `to_json -> digest.result()` and risk thread pool starvation under load.
+    """
+    pending = _collect_pending_digests(val)
+    if pending:
+        return future_executor.then(pending, lambda _resolved: fn())
+    return future_executor.defer(fn)
 
 
 RESERVED_SUMMARY_USAGE_KEY = "usage"
@@ -1340,7 +1361,7 @@ class WeaveClient:
                 else:
                     self.server.call_end(call_end_req)
                 end_complete_future.set_result(None)
-            except BaseException as e:
+            except Exception as e:
                 end_complete_future.set_exception(e)
 
         # Phase 1: in a worker, save any new nested Objects/Tables/Ops in the
@@ -1362,7 +1383,7 @@ class WeaveClient:
                     )
                 else:
                     finalize_send(output_as_refs)
-            except BaseException as e:
+            except Exception as e:
                 end_complete_future.set_exception(e)
 
         # For calls_complete path (non-eager CallBatchProcessor), print the call link
@@ -2421,18 +2442,9 @@ class WeaveClient:
                 req.obj.expected_digest = None
                 return self.server.obj_create(req)
 
-        # Pre-walk val for nested unresolved digest futures. If any are still
-        # pending, chain `send_obj_create` after them via `then(...)` so the
-        # worker that ends up running it doesn't block on `digest.result()`
-        # inside `to_json`. See `_collect_pending_digests` for context.
-        pending = _collect_pending_digests(val)
-        res_future: Future[ObjCreateRes]
-        if pending:
-            res_future = self.future_executor.then(
-                pending, lambda _resolved: send_obj_create()
-            )
-        else:
-            res_future = self.future_executor.defer(send_obj_create)
+        res_future = _defer_after_pending_digests(
+            self.future_executor, val, send_obj_create
+        )
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
@@ -2524,24 +2536,12 @@ class WeaveClient:
 
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
-            # Simple case: defer the entire serialization and upload.
-            # `_send_table_create` calls `to_json(rows)` which will block on
-            # any unresolved nested ref digests. Pre-gate via `then(...)` so
-            # the worker doesn't block on `result()`. See
-            # `_collect_pending_digests` for context.
             rows_list = list(table.rows)
-            pending = _collect_pending_digests(rows_list)
-
-            def send_simple_table() -> TableCreateRes:
-                return self._send_table_create(rows_list)
-
-            res_future: Future[TableCreateRes]
-            if pending:
-                res_future = self.future_executor.then(
-                    pending, lambda _resolved: send_simple_table()
-                )
-            else:
-                res_future = self.future_executor.defer(send_simple_table)
+            res_future = _defer_after_pending_digests(
+                self.future_executor,
+                rows_list,
+                lambda: self._send_table_create(rows_list),
+            )
         elif chunking_config.use_parallel_chunks:
             # Need to chunk up, use parallelism
             res_future = self._create_table_with_parallel_chunks(table)
@@ -2629,10 +2629,6 @@ class WeaveClient:
         chunk_manager = TableChunkManager()
         raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
 
-        # Create chunks in parallel using future_executor - defer serialization.
-        # Pre-walk each chunk for unresolved nested digests; if any are
-        # pending, chain via `then(...)` so the chunk worker doesn't block on
-        # `digest.result()` from inside `to_json`.
         chunk_futures = []
         for raw_chunk in raw_chunks:
 
@@ -2642,18 +2638,9 @@ class WeaveClient:
 
                 return chunk_task
 
-            task = make_chunk_task(raw_chunk)
-            pending = _collect_pending_digests(raw_chunk)
-            if pending:
-
-                def chunk_after_pending(
-                    _resolved: list[Any], t: Callable[[], TableCreateRes] = task
-                ) -> TableCreateRes:
-                    return t()
-
-                chunk_future = self.future_executor.then(pending, chunk_after_pending)
-            else:
-                chunk_future = self.future_executor.defer(task)
+            chunk_future = _defer_after_pending_digests(
+                self.future_executor, raw_chunk, make_chunk_task(raw_chunk)
+            )
             chunk_futures.append(chunk_future)
 
         # Chain the operations using future_executor.then
@@ -2700,21 +2687,15 @@ class WeaveClient:
         if not raw_chunks:
             return self.future_executor.defer(lambda: self._send_table_create([]))
 
-        # Create first chunk as the base table - defer serialization.
-        # Pre-gate on unresolved nested digests; see `_collect_pending_digests`.
         first_raw_chunk = raw_chunks[0]
 
         def create_first_chunk() -> TableCreateRes:
             serialized_rows = to_json(first_raw_chunk, self.project_id, self)
             return self._send_table_create(serialized_rows)
 
-        first_pending = _collect_pending_digests(first_raw_chunk)
-        if first_pending:
-            base_future = self.future_executor.then(
-                first_pending, lambda _resolved: create_first_chunk()
-            )
-        else:
-            base_future = self.future_executor.defer(create_first_chunk)
+        base_future = _defer_after_pending_digests(
+            self.future_executor, first_raw_chunk, create_first_chunk
+        )
 
         # Chain the incremental updates sequentially
         def process_remaining_chunks(
