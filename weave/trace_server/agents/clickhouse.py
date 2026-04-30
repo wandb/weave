@@ -315,7 +315,7 @@ class AgentWriteHandler:
     """Write-side operations for agent data.
 
     Takes a `ch_client` for `insert` calls, which have no query wrapper and
-    a `kafka_producer` so the ingest path can publish AgentScorerEvents.
+    a `kafka_producer` so the ingest path can publish a "weave.score_agent_spans" event.
     """
 
     _ch_client: CHClient

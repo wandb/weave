@@ -1,66 +1,52 @@
-"""Unit tests for the agent scorer event helpers."""
+"""Unit tests for ScoreAgentSpansEvent."""
 
 from __future__ import annotations
 
 import datetime
-from unittest.mock import MagicMock
 
-from weave.trace_server.agents.kafka_events import (
-    ScoreAgentSpansEvent,
-    emit_scorer_events,
-    make_turn_ended_event,
-)
+from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 
-_LATER = datetime.datetime(2024, 1, 1, 12, 0, 0)
+_STARTED_AT = datetime.datetime(2024, 1, 1, 11, 0, 0, tzinfo=datetime.timezone.utc)
+_ENDED_AT = datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
 
 
-def _make_row(
-    *,
-    span_id: str = "s",
-    parent_span_id: str = "",
-    trace_id: str = "t",
-    ended_at: datetime.datetime | None = None,
-    **kwargs,
-) -> AgentSpanCHInsertable:
-    return AgentSpanCHInsertable(
+def test_from_row() -> None:
+    """A finished root span yields a turn_ended event; a child span yields None."""
+    root_row = AgentSpanCHInsertable(
         project_id="p",
-        trace_id=trace_id,
-        span_id=span_id,
-        parent_span_id=parent_span_id,
-        span_name="n",
-        started_at=datetime.datetime(2024, 1, 1, 11, 0, 0),
-        ended_at=ended_at if ended_at is not None else datetime.datetime(1970, 1, 1),
-        **kwargs,
+        trace_id="tr",
+        span_id="root",
+        parent_span_id="",
+        span_name="root",
+        started_at=_STARTED_AT,
+        ended_at=_ENDED_AT,
+        conversation_id="c",
+        agent_name="a",
+        operation_name="invoke_agent",
+        request_model="gpt-5",
+    )
+    event = ScoreAgentSpansEvent.from_row(root_row)
+    assert event == ScoreAgentSpansEvent(
+        event_type="turn_ended",
+        project_id="p",
+        trace_id="tr",
+        root_span_id="root",
+        ended_at=_ENDED_AT,
+        conversation_id="c",
+        agent_name="a",
+        operation_name="invoke_agent",
+        request_model="gpt-5",
     )
 
-
-def test_emit_events_produces_and_flushes() -> None:
-    producer = MagicMock()
-    events = [
-        ScoreAgentSpansEvent(
-            event_type="turn_ended",
-            project_id="p",
-            trace_id="t",
-            root_span_id="r",
-            ended_at=_LATER,
-        )
-    ]
-
-    count = emit_scorer_events(producer, events)
-
-    assert count == 1
-    producer.produce_agent_scorer_event.assert_called_once()
-    event_arg = producer.produce_agent_scorer_event.call_args.args[0]
-    assert isinstance(event_arg, ScoreAgentSpansEvent)
-    producer.flush.assert_called_once_with(0)
-
-
-def test_emit_events_noop_on_empty_list() -> None:
-    producer = MagicMock()
-
-    count = emit_scorer_events(producer, [])
-
-    assert count == 0
-    producer.produce_agent_scorer_event.assert_not_called()
-    producer.flush.assert_not_called()
+    child_row = AgentSpanCHInsertable(
+        project_id="p",
+        trace_id="tr",
+        span_id="child",
+        parent_span_id="root",
+        span_name="child",
+        started_at=_STARTED_AT,
+        ended_at=_ENDED_AT,
+    )
+    assert ScoreAgentSpansEvent.from_row(child_row) is None

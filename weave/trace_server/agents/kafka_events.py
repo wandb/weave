@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import BaseModel
 
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 
 if TYPE_CHECKING:
     from weave.trace_server.kafka import KafkaProducer
@@ -52,7 +52,7 @@ class ScoreAgentSpansEvent(BaseModel):
         if not row.parent_span_id:
             event_type = "turn_ended"
         # Ignore in-progress spans
-        if event_type and row.ended_at > SENTINEL_DATETIME:
+        if event_type and row.ended_at > SENTINEL_EPOCH:
             return ScoreAgentSpansEvent(
                 event_type=event_type,
                 project_id=row.project_id,
