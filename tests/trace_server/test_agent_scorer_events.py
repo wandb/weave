@@ -6,7 +6,6 @@ import datetime
 
 from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
-from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 
 _STARTED_AT = datetime.datetime(2024, 1, 1, 11, 0, 0, tzinfo=datetime.timezone.utc)
 _ENDED_AT = datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)

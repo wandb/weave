@@ -3,7 +3,6 @@ import socket
 from typing import Any
 
 import ddtrace
-
 from confluent_kafka import (
     Consumer as ConfluentKafkaConsumer,
 )
