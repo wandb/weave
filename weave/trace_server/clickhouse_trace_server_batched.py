@@ -6602,9 +6602,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return AgentQueryHandler(self._query).conversation_chat(req)
 
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        return AgentWriteHandler(self.ch_client, self.kafka_producer).insert_otel_spans(
-            req
-        )
+        # Only emit score_agent_spans events when the consumer side is enabled.
+        # There are 2 gates: `wf_enable_agent_scoring` and `wf_enable_online_eval`.
+        producer = self.kafka_producer if wf_env.wf_enable_agent_scoring() else None
+        return AgentWriteHandler(self.ch_client, producer).insert_otel_spans(req)
 
     # Private Methods
     @property

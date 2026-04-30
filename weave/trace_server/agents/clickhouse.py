@@ -319,7 +319,7 @@ class AgentWriteHandler:
     """
 
     _ch_client: CHClient
-    _kafka_producer: KafkaProducer
+    _kafka_producer: KafkaProducer | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -383,8 +383,11 @@ class AgentWriteHandler:
                     span_rows.append(genai_span_to_row(genai_row))
                     accepted += 1
 
-                    # Emit kafka events
-                    if event := ScoreAgentSpansEvent.from_row(genai_row):
+                    # Emit kafka events when the producer is wired in (gated
+                    # off in environments where the consumer hasn't shipped).
+                    if self._kafka_producer is not None and (
+                        event := ScoreAgentSpansEvent.from_row(genai_row)
+                    ):
                         flush_kafka_events = True
                         event.emit(self._kafka_producer)
 
@@ -393,7 +396,7 @@ class AgentWriteHandler:
                 "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
             )
 
-        if flush_kafka_events:
+        if flush_kafka_events and self._kafka_producer is not None:
             try:
                 self._kafka_producer.flush(0)
             except Exception as e:
