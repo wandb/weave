@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # OTel GenAI traces ingestion path on the weave trace server. Appended to
 # ``weave_trace_server_url()`` to form the OTLP HTTP exporter endpoint.
-_OTEL_GENAI_TRACES_PATH = "/otel/v1/genai/traces"
+_OTEL_GENAI_TRACES_PATH = "/agents/otel/v1/traces"
 
 
 class WeaveWandbAuthenticationException(Exception): ...
