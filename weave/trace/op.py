@@ -287,7 +287,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     try:
         sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
-    except TypeError as e:
+    except (TypeError, ValueError) as e:
         raise OpCallError(f"Error calling {func.name}: {e}") from e
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
