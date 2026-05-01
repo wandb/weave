@@ -126,6 +126,11 @@ class ObjectMetadataQueryBuilder:
         self._include_deleted: bool = include_deleted
         self.include_storage_size: bool = False
         self._main_table_alias: str = "main"
+        # When True, append `SETTINGS final = 1` so the query reads merged
+        # state from the underlying ReplacingMergeTree parts. Used as a
+        # read-after-write fallback in `obj_read` when the standard query
+        # returns 0 rows; see `clickhouse_trace_server_batched.obj_read`.
+        self._final: bool = False
 
     @property
     def conditions_part(self) -> str:
@@ -305,6 +310,13 @@ class ObjectMetadataQueryBuilder:
     def set_include_deleted(self, include_deleted: bool) -> None:
         self._include_deleted = include_deleted
 
+    @property
+    def final(self) -> bool:
+        return self._final
+
+    def set_final(self, final: bool) -> None:
+        self._final = final
+
     def make_metadata_query(self) -> str:
         columns = list(OBJECT_METADATA_COLUMNS)
 
@@ -399,11 +411,16 @@ FROM object_versions_with_index AS {main_table_alias}
             query += f"\n{self.limit_part}"
         if self.offset_part:
             query += f"\n{self.offset_part}"
+        if self._final:
+            query += "\nSETTINGS final = 1"
         return query
 
 
 def make_objects_val_query_and_parameters(
-    project_id: str, object_ids: list[str], digests: list[str]
+    project_id: str,
+    object_ids: list[str],
+    digests: list[str],
+    final: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     query = """
         SELECT object_id, digest, argMax(val_dump, created_at)
@@ -413,6 +430,8 @@ def make_objects_val_query_and_parameters(
             digest IN {digests: Array(String)}
         GROUP BY object_id, digest
     """
+    if final:
+        query += "\nSETTINGS final = 1"
     parameters = {
         "project_id": project_id,
         "object_ids": object_ids,

@@ -315,3 +315,33 @@ def test_make_objects_val_query_and_parameters():
         "object_ids": ["object_1"],
         "digests": ["digestttttttttttttttt", "digestttttttttttttttt2"],
     }
+
+
+def test_object_query_builder_set_final_appends_settings():
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.add_digests_conditions("abc123")
+    builder.add_object_ids_condition(["obj1"])
+
+    assert builder.final is False
+    assert "SETTINGS final = 1" not in builder.make_metadata_query()
+
+    builder.set_final(True)
+    assert builder.final is True
+    final_query = builder.make_metadata_query()
+    assert final_query.rstrip().endswith("SETTINGS final = 1")
+
+
+def test_make_objects_val_query_appends_settings_when_final():
+    project_id = "test_project"
+    object_ids = ["object_1"]
+    digests = ["digestttttttttttttttt"]
+
+    plain_query, _ = make_objects_val_query_and_parameters(
+        project_id, object_ids, digests
+    )
+    final_query, _ = make_objects_val_query_and_parameters(
+        project_id, object_ids, digests, final=True
+    )
+
+    assert "SETTINGS final = 1" not in plain_query
+    assert final_query.rstrip().endswith("SETTINGS final = 1")

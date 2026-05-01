@@ -1905,7 +1905,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         objs = self._select_objs_query(object_query_builder, metadata_only)
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+            # Read-after-write fallback for ReplacingMergeTree visibility:
+            # the standard query relies on PK pruning over
+            # (project_id, kind, object_id, digest) and a LEFT JOIN against
+            # the `object_version_first_seen` MV. Both can transiently miss
+            # a freshly inserted row whose part has not merged yet (see
+            # weave-test-flake CH hypothesis). `SETTINGS final = 1` forces
+            # merge-on-read and is the cheapest way to recover that row
+            # without splitting the query into a separate digest-keyed
+            # path.
+            object_query_builder.set_final(True)
+            objs = self._select_objs_query(object_query_builder, metadata_only)
+            if len(objs) == 0:
+                raise NotFoundError(
+                    f"Obj {req.object_id}:{req.digest} not found"
+                )
 
         obj = objs[0]
         if obj.deleted_at is not None:
@@ -5834,20 +5848,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._file_content_read_with_retry(req)
 
-    def _file_content_read_once(
-        self, req: tsi.FileContentReadReq
-    ) -> tsi.FileContentReadRes:
+    def _run_file_content_read_query(
+        self, req: tsi.FileContentReadReq, *, final: bool
+    ) -> Any:
         pb = ParamBuilder()
         query = make_file_content_read_query(
             project_id=req.project_id,
             digest=req.digest,
             pb=pb,
+            final=final,
         )
-        query_result = self.ch_client.query(
+        return self.ch_client.query(
             query,
             parameters=pb.get_params(),
             column_formats={"val_bytes": "bytes"},
         )
+
+    def _file_content_read_once(
+        self, req: tsi.FileContentReadReq
+    ) -> tsi.FileContentReadRes:
+        query_result = self._run_file_content_read_query(req, final=False)
+        if len(query_result.result_rows) == 0:
+            # Read-after-write fallback for ReplacingMergeTree visibility on
+            # `files`; same rationale as `obj_read`.
+            query_result = self._run_file_content_read_query(req, final=True)
 
         if len(query_result.result_rows) == 0:
             raise NotFoundError(f"File with digest {req.digest} not found")
@@ -6707,6 +6731,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=object_query_builder.project_id,
             object_ids=list({row.object_id for row in metadata_result}),
             digests=list({row.digest for row in metadata_result}),
+            final=object_query_builder.final,
         )
         query_result = self._query_stream(value_query, value_parameters)
         # Map (object_id, digest) to val_dump

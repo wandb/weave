@@ -1106,6 +1106,113 @@ def test_select_objs_query_partial_value_miss_returns_empty():
     assert result[0].val_dump == '{"x": 1}'
 
 
+def test_obj_read_retries_with_final_on_miss():
+    """When the first metadata read finds nothing, obj_read retries with
+    `SETTINGS final = 1` to defeat the ReplacingMergeTree visibility race.
+    """
+    server = chts.ClickHouseTraceServer(host="test_host")
+
+    metadata_row = (
+        "test_project",  # project_id
+        "obj-id-1",  # object_id
+        datetime(2024, 1, 1, tzinfo=timezone.utc),  # created_at
+        [],  # refs
+        "object",  # kind
+        None,  # base_object_class
+        None,  # leaf_object_class
+        "digest-abc",  # digest
+        0,  # version_index
+        1,  # is_latest
+        None,  # deleted_at
+        None,  # wb_user_id
+        1,  # version_count
+        0,  # is_op
+    )
+
+    captured_queries: list[str] = []
+
+    def fake_query_stream(self, query, parameters, **kwargs):
+        captured_queries.append(query)
+        # First call (metadata, no FINAL): empty -> triggers fallback.
+        # Second call (metadata, FINAL): returns the row.
+        # Third call (value, FINAL): returns the val_dump.
+        idx = len(captured_queries) - 1
+        if idx == 0:
+            return iter([])
+        if idx == 1:
+            return iter([metadata_row])
+        return iter([("obj-id-1", "digest-abc", '{"x": 1}')])
+
+    req = tsi.ObjReadReq(
+        project_id="test_project", object_id="obj-id-1", digest="digest-abc"
+    )
+
+    with patch.object(chts.ClickHouseTraceServer, "_query_stream", fake_query_stream):
+        with patch.object(
+            chts.ClickHouseTraceServer,
+            "_maybe_resolve_alias",
+            return_value=None,
+        ):
+            res = server.obj_read(req)
+
+    assert res.obj.digest == "digest-abc"
+    assert len(captured_queries) == 3
+    assert "SETTINGS final = 1" not in captured_queries[0]
+    assert captured_queries[1].rstrip().endswith("SETTINGS final = 1")
+    assert captured_queries[2].rstrip().endswith("SETTINGS final = 1")
+
+
+def test_obj_read_raises_when_final_retry_also_misses():
+    """If even the FINAL retry returns no row, NotFoundError surfaces."""
+    server = chts.ClickHouseTraceServer(host="test_host")
+
+    req = tsi.ObjReadReq(
+        project_id="test_project", object_id="obj-id-1", digest="digest-abc"
+    )
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_query_stream", return_value=iter([])
+    ) as mock_q, patch.object(
+        chts.ClickHouseTraceServer, "_maybe_resolve_alias", return_value=None
+    ):
+        with pytest.raises(NotFoundError, match="Obj obj-id-1:digest-abc not found"):
+            server.obj_read(req)
+
+    # Two metadata attempts: plain then FINAL. No value query since both miss.
+    assert mock_q.call_count == 2
+
+
+def test_file_content_read_once_retries_with_final_on_miss():
+    """`_file_content_read_once` retries with `SETTINGS final = 1` when the
+    first plain query returns no rows.
+    """
+    server = chts.ClickHouseTraceServer(host="test_host")
+    req = tsi.FileContentReadReq(project_id="test_project", digest="digest-1")
+
+    captured_queries: list[str] = []
+
+    def fake_query(query, **kwargs):
+        captured_queries.append(query)
+        result = MagicMock()
+        if len(captured_queries) == 1:
+            result.result_rows = []
+        else:
+            # n_chunks=1, val_bytes=b"hi", file_storage_uri=None
+            result.result_rows = [(1, b"hi", None)]
+        return result
+
+    mock_client = MagicMock()
+    mock_client.query.side_effect = fake_query
+    server._thread_local.ch_client = mock_client
+
+    res = server._file_content_read_once(req)
+
+    assert res.content == b"hi"
+    assert len(captured_queries) == 2
+    assert "SETTINGS final = 1" not in captured_queries[0]
+    assert captured_queries[1].rstrip().endswith("SETTINGS final = 1")
+
+
 def test_file_content_read_retries_eventual_consistency():
     """File reads should tolerate transient read-after-write misses."""
     server = chts.ClickHouseTraceServer(host="test_host")
