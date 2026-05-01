@@ -1108,7 +1108,8 @@ def test_select_objs_query_partial_value_miss_returns_empty():
 
 def test_obj_read_retries_with_final_on_miss():
     """When the first metadata read finds nothing, obj_read retries with
-    `SETTINGS final = 1` to defeat the ReplacingMergeTree visibility race.
+    `settings={"final": 1}` to defeat the ReplacingMergeTree visibility race.
+    Both the metadata and value queries on the retry pass `final=1`.
     """
     server = chts.ClickHouseTraceServer(host="test_host")
 
@@ -1129,14 +1130,14 @@ def test_obj_read_retries_with_final_on_miss():
         0,  # is_op
     )
 
-    captured_queries: list[str] = []
+    captured_settings: list[dict | None] = []
 
     def fake_query_stream(self, query, parameters, **kwargs):
-        captured_queries.append(query)
-        # First call (metadata, no FINAL): empty -> triggers fallback.
-        # Second call (metadata, FINAL): returns the row.
-        # Third call (value, FINAL): returns the val_dump.
-        idx = len(captured_queries) - 1
+        captured_settings.append(kwargs.get("settings"))
+        idx = len(captured_settings) - 1
+        # Plain metadata: empty -> triggers fallback.
+        # Final metadata: returns the row.
+        # Final value: returns the val_dump.
         if idx == 0:
             return iter([])
         if idx == 1:
@@ -1156,10 +1157,7 @@ def test_obj_read_retries_with_final_on_miss():
             res = server.obj_read(req)
 
     assert res.obj.digest == "digest-abc"
-    assert len(captured_queries) == 3
-    assert "SETTINGS final = 1" not in captured_queries[0]
-    assert captured_queries[1].rstrip().endswith("SETTINGS final = 1")
-    assert captured_queries[2].rstrip().endswith("SETTINGS final = 1")
+    assert captured_settings == [None, {"final": 1}, {"final": 1}]
 
 
 def test_obj_read_raises_when_final_retry_also_misses():
@@ -1170,10 +1168,14 @@ def test_obj_read_raises_when_final_retry_also_misses():
         project_id="test_project", object_id="obj-id-1", digest="digest-abc"
     )
 
+    captured_settings: list[dict | None] = []
+
+    def fake_query_stream(self, query, parameters, **kwargs):
+        captured_settings.append(kwargs.get("settings"))
+        return iter([])
+
     with (
-        patch.object(
-            chts.ClickHouseTraceServer, "_query_stream", return_value=iter([])
-        ) as mock_q,
+        patch.object(chts.ClickHouseTraceServer, "_query_stream", fake_query_stream),
         patch.object(
             chts.ClickHouseTraceServer, "_maybe_resolve_alias", return_value=None
         ),
@@ -1181,23 +1183,23 @@ def test_obj_read_raises_when_final_retry_also_misses():
         with pytest.raises(NotFoundError, match="Obj obj-id-1:digest-abc not found"):
             server.obj_read(req)
 
-    # Two metadata attempts: plain then FINAL. No value query since both miss.
-    assert mock_q.call_count == 2
+    # Plain metadata, then FINAL metadata. No value query since both miss.
+    assert captured_settings == [None, {"final": 1}]
 
 
 def test_file_content_read_once_retries_with_final_on_miss():
-    """`_file_content_read_once` retries with `SETTINGS final = 1` when the
+    """`_file_content_read_once` retries with `settings={"final": 1}` when the
     first plain query returns no rows.
     """
     server = chts.ClickHouseTraceServer(host="test_host")
     req = tsi.FileContentReadReq(project_id="test_project", digest="digest-1")
 
-    captured_queries: list[str] = []
+    captured_settings: list[dict | None] = []
 
     def fake_query(query, **kwargs):
-        captured_queries.append(query)
+        captured_settings.append(kwargs.get("settings"))
         result = MagicMock()
-        if len(captured_queries) == 1:
+        if len(captured_settings) == 1:
             result.result_rows = []
         else:
             # n_chunks=1, val_bytes=b"hi", file_storage_uri=None
@@ -1211,9 +1213,7 @@ def test_file_content_read_once_retries_with_final_on_miss():
     res = server._file_content_read_once(req)
 
     assert res.content == b"hi"
-    assert len(captured_queries) == 2
-    assert "SETTINGS final = 1" not in captured_queries[0]
-    assert captured_queries[1].rstrip().endswith("SETTINGS final = 1")
+    assert captured_settings == [None, {"final": 1}]
 
 
 def test_file_content_read_retries_eventual_consistency():

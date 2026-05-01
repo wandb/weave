@@ -54,24 +54,6 @@ def test_make_file_content_read_query() -> None:
     assert_sql(expected_query, expected_params, query, params)
 
 
-def test_make_file_content_read_query_with_final() -> None:
-    pb = ParamBuilder("pb")
-    query = make_file_content_read_query(
-        project_id="project",
-        digest="abc123",
-        pb=pb,
-        final=True,
-    )
-
-    assert query.rstrip().endswith("SETTINGS final = 1")
-    plain_query = make_file_content_read_query(
-        project_id="project",
-        digest="abc123",
-        pb=ParamBuilder("pb"),
-    )
-    assert "SETTINGS final = 1" not in plain_query
-
-
 def test_make_files_stats_query() -> None:
     pb = ParamBuilder("pb")
     query = make_files_stats_query(project_id="project", pb=pb)
