@@ -7,8 +7,8 @@ import datetime
 from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 
-_STARTED_AT = datetime.datetime(2024, 1, 1, 11, 0, 0, tzinfo=datetime.timezone.utc)
-_ENDED_AT = datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+_STARTED_AT = datetime.datetime(2024, 1, 1, 11, 0, 0)
+_ENDED_AT = datetime.datetime(2024, 1, 1, 12, 0, 0)
 
 
 def test_from_row() -> None:
