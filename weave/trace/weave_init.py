@@ -20,6 +20,7 @@ from weave.trace.settings import (
     should_use_stainless_server,
     use_server_cache,
 )
+from weave.trace.urls import otel_traces_endpoint
 from weave.trace.wandb_run_context import (
     check_wandb_run_matches,
     get_global_wb_run_context,
@@ -36,26 +37,6 @@ if TYPE_CHECKING:
     from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc
 
 logger = logging.getLogger(__name__)
-
-# OTel GenAI traces ingestion path on the weave trace server. Appended to
-# ``weave_trace_server_url()`` to form the OTLP HTTP exporter endpoint.
-_OTEL_GENAI_TRACES_PATH = "/agents/otel/v1/traces"
-
-
-def otel_traces_endpoint(base_url: str | None = None) -> str:
-    """Return the full OTLP HTTP endpoint URL for Weave GenAI trace ingestion.
-
-    External callers (e.g. boot-time probes that want to verify the
-    ingest endpoint is reachable before relying on the BatchSpanProcessor
-    to silently drop exports) should call this rather than constructing
-    the URL by hand. The path is owned by the SDK and may move.
-
-    Args:
-        base_url: Trace server base URL. Defaults to
-            ``weave_trace_server_url()``.
-    """
-    server_url = (base_url or env.weave_trace_server_url()).rstrip("/")
-    return f"{server_url}{_OTEL_GENAI_TRACES_PATH}"
 
 
 class WeaveWandbAuthenticationException(Exception): ...
