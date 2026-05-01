@@ -1318,20 +1318,13 @@ async def test_from_evaluate_call_adds_score_to_existing_row(
     seeded = await seed_fn(user_dataset, user_model)
     client.flush()
 
-    pas_calls = sorted(
-        (
-            c
-            for c in client.get_calls()
-            if op_name_from_call(c) == "Evaluation.predict_and_score"
-        ),
-        key=lambda c: c.started_at,
-    )
-    assert len(pas_calls) == len(user_dataset)
-
-    for pas_call in pas_calls:
-        score_logger = ScoreLogger.from_call(pas_call.id)
-        score_logger.log_score("latency_ms", 42)
-        score_logger.finish()
+    ev2 = EvaluationLogger.from_evaluate_call(seeded.call_id)
+    appended_pas_ids: list[str] = []
+    for prediction in ev2.get_predictions():
+        prediction.log_score("latency_ms", 42)
+        prediction.finish()
+        appended_pas_ids.append(prediction.predict_and_score_call.id)
+    assert len(appended_pas_ids) == len(user_dataset)
     client.flush()
 
     res = client.server.eval_results_query(
@@ -1370,8 +1363,8 @@ async def test_from_evaluate_call_adds_score_to_existing_row(
 
     # The original predict_and_score's frozen output["scores"] must NOT have
     # been mutated by the score append.
-    for pas_call in pas_calls:
-        refetched = client.get_call(pas_call.id)
+    for pas_id in appended_pas_ids:
+        refetched = client.get_call(pas_id)
         original_scores = (
             refetched.output.get("scores", {})
             if isinstance(refetched.output, dict)

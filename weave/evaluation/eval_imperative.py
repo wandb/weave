@@ -1054,6 +1054,41 @@ class EvaluationLogger:
 
         self._is_finalized = True
 
+    def get_predictions(self) -> Iterator[ScoreLogger]:
+        """Iterate ``ScoreLogger`` handles for the predictions already logged
+        under this evaluate call.
+
+        Use this on a logger created via ``from_evaluate_call(...)`` to
+        annotate existing predictions with new scores without having to fish
+        predict_and_score call IDs out of ``client.get_calls()``::
+
+            ev = EvaluationLogger.from_evaluate_call(eval_call_id)
+            for pred in ev.get_predictions():
+                pred.log_score("latency_ms", measure_latency(pred))
+                pred.finish()
+
+        Each yielded ``ScoreLogger`` is bound to the existing
+        predict_and_score call (already finished); ``log_score(...)`` writes
+        a child scorer call without mutating the original frozen output.
+        """
+        assert self._evaluate_call is not None
+        wc = require_weave_client()
+        children = list(
+            wc.get_calls(filter={"parent_ids": [self._evaluate_call.id]})
+        )
+        for child in children:
+            op_name_value = child.op_name
+            parsed = (
+                Ref.parse_uri(op_name_value)
+                if isinstance(op_name_value, str)
+                else None
+            )
+            if (
+                isinstance(parsed, OpRef)
+                and parsed.name == "Evaluation.predict_and_score"
+            ):
+                yield ScoreLogger.from_call(child.id)
+
     def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
         """Log a prediction to the Evaluation.
 
