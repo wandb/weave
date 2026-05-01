@@ -286,10 +286,6 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
     try:
         sig = inspect.signature(func)
-    except (TypeError, ValueError) as e:
-        raise OpCallError(f"Error calling {func.name}: {e}") from e
-
-    try:
         inputs = sig.bind(*args, **kwargs).arguments
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}") from e
@@ -300,9 +296,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # If user defines postprocess_inputs manually, trust it instead of running this
     to_weave_inputs = {}
     if not func.postprocess_inputs:
-        parsed_annotations = getattr(
-            func, "_weave_cached_parsed_input_annotations", None
-        )
+        parsed_annotations = func._weave_cached_parsed_input_annotations  # type: ignore[attr-defined]
         if parsed_annotations is None:
             parsed_annotations = parse_from_signature(sig)
         for param_name, value in inputs_with_defaults.items():
@@ -322,13 +316,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # Annotated return type flow
     # If user defines postprocess_output manually, trust it instead of running this
     if not func.postprocess_output:
-        parsed = getattr(func, "_weave_cached_parsed_return_annotation", None)
-        if parsed is None and not hasattr(
-            func, "_weave_cached_parsed_return_annotation"
-        ):
-            return_annotation = sig.return_annotation
-            if return_annotation is not inspect.Signature.empty and return_annotation:
-                parsed = parse_content_annotation(str(return_annotation))
+        parsed = func._weave_cached_parsed_return_annotation  # type: ignore[attr-defined]
         if isinstance(parsed, ContentAnnotation):
             func.postprocess_output = lambda x: Content._from_guess(
                 x, mimetype=parsed.mimetype, extension=parsed.extension
@@ -1369,8 +1357,8 @@ def op(
             wrapper.kind = kind  # type: ignore
             wrapper.color = color  # type: ignore
 
-            # `inspect.signature` returns `__signature__` directly, so this
-            # makes all callers hit the cached signature for the wrapper.
+            # Set `__signature__` so future `inspect.signature(wrapper)` calls
+            # short-circuit to this object instead of re-walking `func`.
             try:
                 cached_sig = inspect.signature(func)
                 wrapper_any = cast(Any, wrapper)
