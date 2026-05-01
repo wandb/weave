@@ -65,7 +65,6 @@ from weave.session.session import (
     LogResult,
     MediaAttachment,
     Message,
-    Reasoning,
     Session,
     SubAgent,
     Tool,
@@ -86,6 +85,7 @@ from weave.session.session import (
     start_turn,
 )
 from weave.trace.log_call import log_call
+from weave.trace.urls import otel_traces_endpoint
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 from weave.type_handlers.Audio.audio import Audio
@@ -119,7 +119,6 @@ __all__ = [
     "Object",
     "ObjectRef",
     "Prompt",
-    "Reasoning",
     "SavedView",
     "Scorer",
     "Session",
@@ -154,6 +153,7 @@ __all__ = [
     "log_session",
     "log_turn",
     "op",
+    "otel_traces_endpoint",
     "publish",
     "ref",
     "remove_aliases",
