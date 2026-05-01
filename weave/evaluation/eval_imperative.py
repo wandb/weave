@@ -677,7 +677,7 @@ class EvaluationLogger:
         self.name = name
         self.scorers = scorers
         self.eval_attributes = eval_attributes if eval_attributes is not None else {}
-        # Init with just the marker if _eval_meta hasn't been pre-seeded by _with_meta.
+        # Init with just the marker if _eval_meta hasn't been pre-seeded by _create_with_meta.
         if not hasattr(self, "_eval_meta"):
             self._eval_meta = {**IMPERATIVE_EVAL_META_MARKER}
 
@@ -781,7 +781,7 @@ class EvaluationLogger:
         )
 
     @classmethod
-    def _with_meta(
+    def _create_with_meta(
         cls,
         eval_meta: dict[str, Any],
         **init_kwargs: Any,
