@@ -212,7 +212,9 @@ def test_use_distributed_mode_auto_detect_paths():
     # 1. Env var unset + replicated + multi-shard -> auto-detected True, cached.
     mock_client = _mock_client(shard_count=3)
     with (
-        patch.object(chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client),
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client
+        ),
         patch(
             "weave.trace_server.environment.wf_clickhouse_use_distributed_tables",
             return_value=None,
@@ -236,14 +238,14 @@ def test_use_distributed_mode_auto_detect_paths():
             if c.args and c.args[0] == CLUSTER_SHARD_COUNT_QUERY
         ]
         assert len(cluster_calls) == 1
-        assert cluster_calls[0].kwargs["parameters"] == {
-            "cluster_name": "auto_cluster"
-        }
+        assert cluster_calls[0].kwargs["parameters"] == {"cluster_name": "auto_cluster"}
 
     # 2. Env var unset + non-replicated -> False, no system.clusters query.
     mock_client = _mock_client(shard_count=99)
     with (
-        patch.object(chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client),
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client
+        ),
         patch(
             "weave.trace_server.environment.wf_clickhouse_use_distributed_tables",
             return_value=None,
@@ -260,7 +262,9 @@ def test_use_distributed_mode_auto_detect_paths():
     # 3. Env var unset + replicated + single shard -> False.
     mock_client = _mock_client(shard_count=1)
     with (
-        patch.object(chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client),
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client
+        ),
         patch(
             "weave.trace_server.environment.wf_clickhouse_use_distributed_tables",
             return_value=None,

@@ -22,9 +22,7 @@ DEFAULT_MIGRATION_DIR = os.path.abspath(
 )
 
 
-def _make_ch_client(
-    database_engine: str = "Atomic", shard_count: int = 0
-) -> Mock:
+def _make_ch_client(database_engine: str = "Atomic", shard_count: int = 0) -> Mock:
     """Create a mock CH client that returns *database_engine* for system.databases
     queries and *shard_count* for system.clusters queries.
 
@@ -1321,9 +1319,7 @@ def test_get_migrator_auto_detects_use_distributed_when_replicated(
     )
     assert isinstance(migrator, expected_class)
     cluster_queries = [
-        c
-        for c in ch_client.query.call_args_list
-        if "system.clusters" in c.args[0]
+        c for c in ch_client.query.call_args_list if "system.clusters" in c.args[0]
     ]
     assert len(cluster_queries) == 1
     assert cluster_queries[0].kwargs["parameters"] == {"cluster_name": "test_cluster"}
