@@ -11,6 +11,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "ibm-granite/granite-4.1-8b": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "MiniMaxAI/MiniMax-M2.5": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -28,6 +32,10 @@
     "api_key_name": "WANDB_API_KEY"
   },
   "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "Qwen/Qwen3.5-27B": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
@@ -56,6 +64,10 @@
     "api_key_name": "WANDB_API_KEY"
   },
   "Qwen/Qwen2.5-14B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "moonshotai/Kimi-K2.6": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
@@ -369,6 +381,10 @@
   },
   "anthropic.claude-opus-4-7": {
     "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "anthropic.claude-mythos-preview": {
+    "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "global.anthropic.claude-opus-4-7": {
@@ -927,11 +943,35 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-5.5": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5.5-2026-04-23": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5.5-pro": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5.5-pro-2026-04-23": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/gpt-5.4-mini": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-5.4-mini-2026-03-17": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/gpt-5.4-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5.4-nano-2026-03-17": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -2700,6 +2740,10 @@
     "litellm_provider": "vertex_ai",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
+  "vertex_ai/gemini-embedding-2": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
   "gemini-flash-experimental": {
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
@@ -2709,6 +2753,10 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-embedding-2-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-embedding-2": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -3333,6 +3381,22 @@
     "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
     "deprecated_date": "2026-01-29T17:58:16.718606"
   },
+  "gpt-5.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5.5-2026-04-23": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5.5-pro": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5.5-pro-2026-04-23": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-5.4": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -3353,7 +3417,15 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-5.4-mini-2026-03-17": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-5.4-nano": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5.4-nano-2026-03-17": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -3947,6 +4019,10 @@
     "api_key_name": "MOONSHOT_API_KEY"
   },
   "moonshot/kimi-k2.5": {
+    "litellm_provider": "moonshot",
+    "api_key_name": "MOONSHOT_API_KEY"
+  },
+  "moonshot/kimi-k2.6": {
     "litellm_provider": "moonshot",
     "api_key_name": "MOONSHOT_API_KEY"
   },
@@ -4584,6 +4660,10 @@
     "api_key_name": "XAI_API_KEY"
   },
   "xai/grok-4.20-beta-0309-reasoning": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-4.20-0309-reasoning": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
@@ -5692,6 +5772,14 @@
   "gemini-exp-1206": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
+  },
+  "bedrock/us-east-1/zai.glm-5": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-west-2/zai.glm-5": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
   },
   "bedrock/us-gov-east-1/anthropic.claude-haiku-4-5-20251001-v1:0": {
     "litellm_provider": "bedrock",

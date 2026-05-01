@@ -152,7 +152,7 @@ def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
 def _truncate_all_tables(ch_client, database: str, tables: list[str]) -> None:
     """Truncate all data tables in the database for test isolation."""
     for table in tables:
-        ch_client.command(f"TRUNCATE TABLE {database}.{table}")
+        ch_client.command(f"TRUNCATE TABLE {database}.{table} SYNC")
 
 
 def _reset_server_state(server: ClickHouseTraceServer) -> None:
@@ -384,3 +384,10 @@ def internal_server(client):
     if client_is_sqlite(client):
         return find_server_layer(client.server, SqliteTraceServer)
     return find_server_layer(client.server, ClickHouseTraceServer)
+
+
+@pytest.fixture
+def require_clickhouse(request):
+    """Skip the test unless running with --trace-server=clickhouse."""
+    if get_trace_server_flag(request) != "clickhouse":
+        pytest.skip("ClickHouse-only test")

@@ -1,3 +1,5 @@
+import random
+import string
 from typing import Any
 
 import pandas as pd
@@ -162,9 +164,6 @@ def _build_dataframe(
 
 
 def _placeholder_model_name() -> str:
-    import random
-    import string
-
     alphabet = string.ascii_lowercase + string.digits
     return "".join(random.choices(alphabet, k=8))
 

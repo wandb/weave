@@ -2176,31 +2176,28 @@ def test_delete_op_version(client):
         op_ref.get()
 
 
-def test_global_attributes(client_creator):
+def test_client_attributes(client_creator):
     @weave.op
     def my_op(a: int) -> int:
         return a
 
-    with client_creator(global_attributes={"env": "test", "version": "1.0"}) as client:
+    with client_creator(attributes={"env": "test", "version": "1.0"}) as client:
         my_op(1)
 
         calls = list(client.get_calls())
         assert len(calls) == 1
         call = calls[0]
 
-        # Check global attributes are present
         assert call.attributes["env"] == "test"
         assert call.attributes["version"] == "1.0"
 
 
-def test_global_attributes_with_call_attributes(client_creator):
+def test_client_attributes_with_call_attributes(client_creator):
     @weave.op
     def my_op(a: int) -> int:
         return a
 
-    with client_creator(
-        global_attributes={"global_attr": "global", "env": "test"}
-    ) as client:
+    with client_creator(attributes={"client_attr": "client", "env": "test"}) as client:
         with weave.attributes({"local_attr": "local", "env": "override"}):
             my_op(1)
 
@@ -2208,11 +2205,10 @@ def test_global_attributes_with_call_attributes(client_creator):
         assert len(calls) == 1
         call = calls[0]
 
-        # Both global and local attributes are present
-        assert call.attributes["global_attr"] == "global"
+        assert call.attributes["client_attr"] == "client"
         assert call.attributes["local_attr"] == "local"
 
-        # Local attributes override global ones
+        # Per-call attributes override the client's default attributes
         assert call.attributes["env"] == "override"
 
 

@@ -42,6 +42,11 @@ def test_basic_evaluation(
 ):
     ev = EvaluationLogger()
 
+    # The imperative root `Evaluation.evaluate` op must mirror the declarative
+    # path and ship its start eagerly so the eval is visible in the UI before
+    # any predictions or `log_summary()` arrive.
+    assert ev._pseudo_evaluation.evaluate.eager_call_start is True
+
     outputs = []
     score1_results = []
     score2_results = []

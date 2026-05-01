@@ -13,13 +13,14 @@ The app layer converts between Python None and sentinels at the CH boundary:
 IMPORTANT: Never write raw ``IS NULL`` / ``IS NOT NULL`` checks on sentinel
 fields in SQL query builders. Always use ``null_check_sql()`` from this module,
 which generates the correct comparison for the active ``ReadTable``:
-- calls_merged (nullable columns): ``field IS [NOT] NULL``
+- calls_merged (nullable columns, except expire_at): ``field IS [NOT] NULL``
 - calls_complete (sentinel columns): ``field [!]= <sentinel>``
 
 Sentinel string fields: parent_id, display_name, exception, otel_dump,
     wb_user_id, wb_run_id, thread_id, turn_id  (sentinel = '')
 Sentinel datetime fields: ended_at, updated_at, deleted_at
-    (sentinel = epoch zero)
+    (sentinel = SENTINEL_EPOCH, 1970-01-01),
+    expire_at (sentinel = EXPIRE_AT_NEVER, 2100-01-01)
 Sentinel int fields: wb_run_step, wb_run_step_end  (sentinel = 0)
 """
 
@@ -33,7 +34,10 @@ from weave.trace_server.project_version.types import ReadTable
 if TYPE_CHECKING:
     from weave.trace_server.orm import ParamBuilder
 
-SENTINEL_DATETIME = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+SENTINEL_EPOCH = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+# expire_at uses a far-future sentinel so that ClickHouse's TTL DELETE clause
+# (toDateTime(expire_at) DELETE) does not see "no TTL" rows as already expired.
+EXPIRE_AT_NEVER = datetime.datetime(2100, 1, 1, tzinfo=datetime.timezone.utc)
 SENTINEL_STRING = ""
 SENTINEL_INT = 0
 
@@ -50,13 +54,14 @@ SENTINEL_STRING_FIELDS = frozenset(
     }
 )
 
-SENTINEL_DATETIME_FIELDS = frozenset(
-    {
-        "ended_at",
-        "updated_at",
-        "deleted_at",
-    }
-)
+SENTINEL_DATETIME_VALUES: dict[str, datetime.datetime] = {
+    "ended_at": SENTINEL_EPOCH,
+    "updated_at": SENTINEL_EPOCH,
+    "deleted_at": SENTINEL_EPOCH,
+    "expire_at": EXPIRE_AT_NEVER,
+}
+
+SENTINEL_DATETIME_FIELDS = frozenset(SENTINEL_DATETIME_VALUES)
 
 SENTINEL_INT_FIELDS = frozenset(
     {
@@ -69,12 +74,20 @@ ALL_SENTINEL_FIELDS = (
     SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS | SENTINEL_INT_FIELDS
 )
 
+# These sentinel fields apply to calls_complete (everything in ALL_SENTINEL_FIELDS
+# is non-nullable there). The legacy calls_merged/call_parts schema stores every
+# column as Nullable except expire_at, which was added as a non-nullable column
+# with a far-future default in migration 029. So calls_merged only needs sentinel
+# handling for expire_at; see _uses_sentinel_for_read_table() below.
+SENTINEL_IN_CALLS_MERGED_FIELDS = frozenset({"expire_at"})
+
 # Single source of truth for ClickHouse DateTime64 precision per column.
 # Must match the column definitions in migration 024_calls_complete_v2.up.sql.
 DATETIME_PRECISION: dict[str, int] = {
     "ended_at": 6,
     "updated_at": 3,
     "deleted_at": 3,
+    "expire_at": 3,
 }
 
 
@@ -123,8 +136,8 @@ def sentinel_ch_literal(field: str) -> str:
         field: The column name (must be a sentinel field).
 
     Returns:
-        SQL expression: ``toDateTime64(0, N)`` for datetime fields, ``''`` for
-        string fields.
+        SQL expression: ``toDateTime64(0, N)`` or a custom datetime sentinel
+        for datetime fields, ``''`` for string fields.
 
     Raises:
         ValueError: If the field is not a sentinel field.
@@ -141,7 +154,15 @@ def sentinel_ch_literal(field: str) -> str:
         return "''"
     if field in SENTINEL_DATETIME_FIELDS:
         precision = DATETIME_PRECISION[field]
-        return f"toDateTime64(0, {precision})"
+        sentinel = SENTINEL_DATETIME_VALUES[field]
+        # Epoch zero gets a shorter literal that matches the canonical
+        # `toDateTime64(0, N)` form already hardcoded across the query
+        # builders; non-epoch sentinels (e.g. EXPIRE_AT_NEVER) need the
+        # full datetime string.
+        if sentinel == SENTINEL_EPOCH:
+            return f"toDateTime64(0, {precision})"
+        sentinel_str = sentinel.replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+        return f"toDateTime64('{sentinel_str}', {precision})"
     if field in SENTINEL_INT_FIELDS:
         return "0"
     raise ValueError(f"Not a sentinel field: {field}")
@@ -175,7 +196,7 @@ def null_check_literal_sql(
         >>> null_check_literal_sql("parent_id", "t.parent_id", ReadTable.CALLS_MERGED)
         "t.parent_id IS NULL"
     """
-    if read_table == ReadTable.CALLS_MERGED or field_name not in ALL_SENTINEL_FIELDS:
+    if not _uses_sentinel_for_read_table(field_name, read_table):
         return f"{field_sql} IS NOT NULL" if negate else f"{field_sql} IS NULL"
 
     literal = sentinel_ch_literal(field_name)
@@ -188,7 +209,7 @@ def get_sentinel_value(field: str) -> str | datetime.datetime | int | None:
     if field in SENTINEL_STRING_FIELDS:
         return SENTINEL_STRING
     if field in SENTINEL_DATETIME_FIELDS:
-        return SENTINEL_DATETIME
+        return SENTINEL_DATETIME_VALUES[field]
     if field in SENTINEL_INT_FIELDS:
         return SENTINEL_INT
     return None
@@ -210,7 +231,7 @@ def to_ch_value(field: str, value: Any) -> Any:
     if field in SENTINEL_STRING_FIELDS:
         return SENTINEL_STRING
     if field in SENTINEL_DATETIME_FIELDS:
-        return SENTINEL_DATETIME
+        return SENTINEL_DATETIME_VALUES[field]
     if field in SENTINEL_INT_FIELDS:
         return SENTINEL_INT
     return value
@@ -235,7 +256,7 @@ def from_ch_value(field: str, value: Any) -> Any:
         if isinstance(value, datetime.datetime):
             # Compare ignoring timezone: CH may return naive datetimes
             val_utc = value.replace(tzinfo=None)
-            sentinel_utc = SENTINEL_DATETIME.replace(tzinfo=None)
+            sentinel_utc = SENTINEL_DATETIME_VALUES[field].replace(tzinfo=None)
             return None if val_utc == sentinel_utc else value
         return value
     if field in SENTINEL_INT_FIELDS:
@@ -273,7 +294,7 @@ def null_check_sql(
         >>> null_check_sql("ended_at", "t.ended_at", ReadTable.CALLS_MERGED, pb)
         't.ended_at IS NULL'
     """
-    if read_table == ReadTable.CALLS_MERGED or field_name not in ALL_SENTINEL_FIELDS:
+    if not _uses_sentinel_for_read_table(field_name, read_table):
         return f"{field_sql} IS NOT NULL" if negate else f"{field_sql} IS NULL"
 
     sentinel = get_sentinel_value(field_name)
@@ -283,3 +304,14 @@ def null_check_sql(
     sentinel_slot = pb.add(sentinel, param_type=ch_type)
     op = "!=" if negate else "="
     return f"{field_sql} {op} {sentinel_slot}"
+
+
+def _uses_sentinel_for_read_table(field_name: str, read_table: ReadTable) -> bool:
+    """Return whether the selected read table stores this field with a sentinel."""
+    if field_name not in ALL_SENTINEL_FIELDS:
+        return False
+    if read_table == ReadTable.CALLS_COMPLETE:
+        return True
+    if read_table == ReadTable.CALLS_MERGED:
+        return field_name in SENTINEL_IN_CALLS_MERGED_FIELDS
+    return False
