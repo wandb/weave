@@ -46,14 +46,18 @@ def test_event_round_trip() -> None:
     assert parsed == event
 
 
+def _bind_real_methods(producer: MagicMock, *names: str) -> None:
+    """Replace MagicMock auto-stubs with real `KafkaProducer` methods bound to the mock."""
+    for name in names:
+        setattr(producer, name, getattr(KafkaProducer, name).__get__(producer))
+
+
 @pytest.mark.disable_logging_error_check
 def test_producer_drops_when_buffer_full() -> None:
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 2
     producer.__len__ = MagicMock(return_value=5)  # buffer full
-    producer.produce_score_agent_spans = (
-        KafkaProducer.produce_score_agent_spans.__get__(producer)
-    )
+    _bind_real_methods(producer, "produce_score_agent_spans", "_check_buffer_pressure")
 
     producer.produce_score_agent_spans(_make_event())
 
@@ -64,9 +68,7 @@ def test_producer_publishes_under_buffer_limit() -> None:
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 100
     producer.__len__ = MagicMock(return_value=0)
-    producer.produce_score_agent_spans = (
-        KafkaProducer.produce_score_agent_spans.__get__(producer)
-    )
+    _bind_real_methods(producer, "produce_score_agent_spans", "_check_buffer_pressure")
 
     producer.produce_score_agent_spans(_make_event())
 

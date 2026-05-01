@@ -91,45 +91,13 @@ class KafkaProducer(ConfluentKafkaProducer):
         Drops messages if buffer is full to prevent unbounded memory growth.
         Logs warnings at 50% capacity and errors when dropping messages.
         """
-        buffer_size = len(self)
-
-        if buffer_size >= self.max_buffer_size:
-            logger.error(
-                "Kafka producer buffer full, dropping message",
-                extra={
-                    "buffer_size": buffer_size,
-                    "max_buffer_size": self.max_buffer_size,
-                    "project_id": call_end.project_id,
-                    "call_id": call_end.id,
-                },
-            )
-            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
-
-            # Drop the message - do not produce
+        if self._check_buffer_pressure(
+            message_type="call_end",
+            logging_extra={"project_id": call_end.project_id, "call_id": call_end.id},
+        ):
             return
 
-        # Log warning if buffer is at 50% capacity
-        if buffer_size >= self.max_buffer_size * BUFFER_WARN_THRESHOLD:
-            buffer_percentage = (buffer_size / self.max_buffer_size) * 100
-            logger.warning(
-                "Kafka producer buffer at 50%% capacity or higher",
-                extra={
-                    "buffer_size": buffer_size,
-                    "max_buffer_size": self.max_buffer_size,
-                    "buffer_percentage": buffer_percentage,
-                },
-            )
-            set_root_span_dd_tags(
-                {
-                    "kafka.producer.buffer_size": buffer_size,
-                    "kafka.producer.buffer_percentage": buffer_percentage,
-                }
-            )
-
-        publish_key = None
-        if kafka_partition_by_project_id():
-            publish_key = call_end.project_id
-
+        publish_key = call_end.project_id if kafka_partition_by_project_id() else None
         self.produce(
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
@@ -160,26 +128,16 @@ class KafkaProducer(ConfluentKafkaProducer):
             req: The CallsScoreReq containing project_id, call_ids, scorer_refs, and wb_user_id
             flush_immediately: Whether to flush the producer immediately (default True)
         """
-        # len(self) returns the number of messages currently queued in the producer buffer
-        buffer_size = len(self)
-
-        if buffer_size >= self.max_buffer_size:
-            logger.error(
-                "Kafka producer buffer full, dropping score_calls message",
-                extra={
-                    "buffer_size": buffer_size,
-                    "max_buffer_size": self.max_buffer_size,
-                    "project_id": req.project_id,
-                    "call_ids_count": len(req.call_ids),
-                },
-            )
-            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
+        if self._check_buffer_pressure(
+            message_type="score_calls",
+            logging_extra={
+                "project_id": req.project_id,
+                "call_ids_count": len(req.call_ids),
+            },
+        ):
             return
 
-        publish_key = None
-        if kafka_partition_by_project_id():
-            publish_key = req.project_id
-
+        publish_key = req.project_id if kafka_partition_by_project_id() else None
         for i in range(0, len(req.call_ids), self.SCORE_CALLS_CHUNK_SIZE):
             chunk = req.call_ids[i : i + self.SCORE_CALLS_CHUNK_SIZE]
             self.produce(
@@ -197,29 +155,63 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         Drops the message when the producer buffer is full (same policy as `produce_call_end`).
         """
+        if self._check_buffer_pressure(
+            message_type="score_agent_spans",
+            logging_extra={
+                "event_type": event.event_type,
+                "status_code": event.status_code,
+                "project_id": event.project_id,
+                "trace_id": event.trace_id,
+                "span_id": event.span_id,
+            },
+        ):
+            return
+
+        publish_key = event.project_id if kafka_partition_by_project_id() else None
+        self.produce(
+            topic=SCORE_AGENT_SPANS_TOPIC,
+            value=event.model_dump_json(),
+            key=publish_key,
+        )
+
+    def _check_buffer_pressure(
+        self, message_type: str, logging_extra: dict[str, str | int] | None = None
+    ) -> bool:
+        """Check producer buffer pressure before a `produce(...)` call.
+
+        Returns True when the buffer is full and the caller MUST drop the
+        message; in that case an error is logged with `drop_log_message` and
+        `extra` (caller-supplied identifiers like project_id / call_id /
+        trace_id) and a DD tag is set.
+
+        At >= BUFFER_WARN_THRESHOLD of capacity a warning is logged but the
+        call is allowed to proceed (returns False).
+        """
         buffer_size = len(self)
+
         if buffer_size >= self.max_buffer_size:
             logger.error(
-                "Kafka producer buffer full, dropping agent scorer event",
+                "Kafka producer buffer full, dropping message %r",
+                message_type,
                 extra={
                     "buffer_size": buffer_size,
                     "max_buffer_size": self.max_buffer_size,
-                    "event_type": event.event_type,
-                    "project_id": event.project_id,
-                    "trace_id": event.trace_id,
+                    **(logging_extra or {}),
                 },
             )
             set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
-            return
+            return True
 
         if buffer_size >= self.max_buffer_size * BUFFER_WARN_THRESHOLD:
             buffer_percentage = (buffer_size / self.max_buffer_size) * 100
             logger.warning(
-                "Kafka producer buffer at 50%% capacity or higher",
+                "Kafka producer buffer at 50%% capacity or higher for message type %r",
+                message_type,
                 extra={
                     "buffer_size": buffer_size,
                     "max_buffer_size": self.max_buffer_size,
                     "buffer_percentage": buffer_percentage,
+                    **(logging_extra or {}),
                 },
             )
             set_root_span_dd_tags(
@@ -229,12 +221,7 @@ class KafkaProducer(ConfluentKafkaProducer):
                 }
             )
 
-        publish_key = event.project_id if kafka_partition_by_project_id() else None
-        self.produce(
-            topic=SCORE_AGENT_SPANS_TOPIC,
-            value=event.model_dump_json(),
-            key=publish_key,
-        )
+        return False
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):
