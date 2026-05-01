@@ -550,7 +550,9 @@ def _create_like_optimized_eq_condition(
         _create_like_condition(field, p, pb, table_alias) for p in like_patterns
     ]
     like_condition = (
-        per_pattern[0] if len(per_pattern) == 1 else "(" + " OR ".join(per_pattern) + ")"
+        per_pattern[0]
+        if len(per_pattern) == 1
+        else "(" + " OR ".join(per_pattern) + ")"
     )
     return _maybe_use_null_check(like_condition, field, table_alias, use_null_check)
 

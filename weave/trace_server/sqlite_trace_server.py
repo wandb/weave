@@ -1076,7 +1076,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     operand_part = process_operand(operation.not_[0])
                     cond = f"(NOT ({operand_part}))"
                 elif isinstance(operation, tsi_query.EqOperation):
-                    lhs_part = process_operand(operation.eq_[0])
                     is_multi_value_feedback = _is_multi_value_feedback_operand(
                         operation.eq_[0]
                     )
@@ -1084,32 +1083,48 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         isinstance(operation.eq_[1], tsi_query.LiteralOperation)
                         and operation.eq_[1].literal_ is None
                     ):
+                        lhs_part = process_operand(operation.eq_[0])
                         cond = f"({lhs_part} IS NULL)"
                     elif is_multi_value_feedback:
                         # Multi-value: GROUP_CONCAT result, use INSTR to find value
+                        lhs_part = process_operand(operation.eq_[0])
                         rhs_part = process_operand(operation.eq_[1])
                         cond = f"instr({lhs_part}, {rhs_part})"
                     else:
-                        rhs_part = process_operand(operation.eq_[1])
+                        lhs_part, rhs_part = _process_binary_operands(
+                            operation.eq_[0], operation.eq_[1]
+                        )
                         cond = f"({lhs_part} = {rhs_part})"
                 elif isinstance(operation, tsi_query.GtOperation):
-                    lhs_part = process_operand(operation.gt_[0])
-                    rhs_part = process_operand(operation.gt_[1])
+                    lhs_part, rhs_part = _process_binary_operands(
+                        operation.gt_[0], operation.gt_[1]
+                    )
                     cond = f"({lhs_part} > {rhs_part})"
                 elif isinstance(operation, tsi_query.LtOperation):
-                    lhs_part = process_operand(operation.lt_[0])
-                    rhs_part = process_operand(operation.lt_[1])
+                    lhs_part, rhs_part = _process_binary_operands(
+                        operation.lt_[0], operation.lt_[1]
+                    )
                     cond = f"({lhs_part} < {rhs_part})"
                 elif isinstance(operation, tsi_query.GteOperation):
-                    lhs_part = process_operand(operation.gte_[0])
-                    rhs_part = process_operand(operation.gte_[1])
+                    lhs_part, rhs_part = _process_binary_operands(
+                        operation.gte_[0], operation.gte_[1]
+                    )
                     cond = f"({lhs_part} >= {rhs_part})"
                 elif isinstance(operation, tsi_query.LteOperation):
-                    lhs_part = process_operand(operation.lte_[0])
-                    rhs_part = process_operand(operation.lte_[1])
+                    lhs_part, rhs_part = _process_binary_operands(
+                        operation.lte_[0], operation.lte_[1]
+                    )
                     cond = f"({lhs_part} <= {rhs_part})"
                 elif isinstance(operation, tsi_query.InOperation):
-                    lhs_part = process_operand(operation.in_[0])
+                    in_cast = _shared_cast_for_literals(operation.in_[1])
+                    lhs_field = _process_get_field_with_inferred_cast(
+                        operation.in_[0], in_cast
+                    )
+                    lhs_part = (
+                        lhs_field
+                        if lhs_field is not None
+                        else process_operand(operation.in_[0])
+                    )
                     rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
                     cond = f"({lhs_part} IN ({rhs_part}))"
                 elif isinstance(operation, tsi_query.ContainsOperation):
@@ -1123,6 +1138,70 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     raise TypeError(f"Unknown operation type: {operation}")
 
                 return cond
+
+            def _cast_for_literal(
+                operand: tsi_query.Operand,
+            ) -> str | None:
+                """Map a typed literal to a sqlite cast for a dynamic JSON field.
+
+                Without an explicit `$convert`, dynamic fields default to
+                `CAST(json_extract(...) AS TEXT)`, which causes
+                `'1' = 1.0` to be FALSE under SQLite's type-affinity rules.
+                Inferring a numeric/bool cast from the peer literal makes the
+                comparison numeric so JSON-int and JSON-float encodings of the
+                same value compare equal.
+                """
+                if not isinstance(operand, tsi_query.LiteralOperation):
+                    return None
+                value = operand.literal_
+                if isinstance(value, bool):
+                    return "bool"
+                if isinstance(value, int):
+                    return "int"
+                if isinstance(value, float):
+                    return "float"
+                return None
+
+            def _shared_cast_for_literals(
+                operands: list[tsi_query.Operand],
+            ) -> str | None:
+                """Return a shared inferred cast iff every operand is a literal of the same type."""
+                cast: str | None = None
+                for operand in operands:
+                    if not isinstance(operand, tsi_query.LiteralOperation):
+                        return None
+                    operand_cast = _cast_for_literal(operand)
+                    if operand_cast is None:
+                        return None
+                    if cast is None:
+                        cast = operand_cast
+                    elif cast != operand_cast:
+                        return None
+                return cast
+
+            def _process_get_field_with_inferred_cast(
+                operand: tsi_query.Operand,
+                cast: str | None,
+            ) -> str | None:
+                if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
+                    return None
+                if operand.get_field_.startswith("feedback."):
+                    return None
+                return _transform_external_calls_field_to_internal_calls_field(
+                    operand.get_field_, cast
+                )
+
+            def _process_binary_operands(
+                lhs: tsi_query.Operand,
+                rhs: tsi_query.Operand,
+            ) -> tuple[str, str]:
+                lhs_cast = _cast_for_literal(rhs)
+                rhs_cast = _cast_for_literal(lhs)
+                lhs_field = _process_get_field_with_inferred_cast(lhs, lhs_cast)
+                rhs_field = _process_get_field_with_inferred_cast(rhs, rhs_cast)
+                lhs_part = lhs_field if lhs_field is not None else process_operand(lhs)
+                rhs_part = rhs_field if rhs_field is not None else process_operand(rhs)
+                return lhs_part, rhs_part
 
             def process_operand(operand: tsi_query.Operand) -> str:
                 if isinstance(operand, tsi_query.LiteralOperation):
