@@ -8,16 +8,16 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "import": "./dist/index.js"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
     "./instrument": {
-      "types": "./dist/esm/instrument.d.ts",
-      "import": "./dist/esm/instrument.js"
+      "types": "./dist/esm/instrument.d.mts",
+      "import": "./dist/esm/instrument.mjs"
     }
   },
   "scripts": {
-    "build": "tsc --outDir dist",
+    "build": "node scripts/build.mjs",
     "prepare": "npm run build",
     "test": "jest --silent",
     "test:coverage": "jest --coverage",
@@ -167,6 +167,7 @@
     "swagger-typescript-api": "^13.0.22",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
+    "tsc-multi": "^1.1.0",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.19.1",
     "typedoc": "^0.28",

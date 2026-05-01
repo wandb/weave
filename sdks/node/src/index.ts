@@ -28,5 +28,17 @@ export {op} from './op';
 export * from './types';
 export {WeaveObject, ObjectRef} from './weaveObject';
 export {MessagesPrompt, StringPrompt} from './prompt';
-import './utils/commonJSLoader';
+// CJS-only side-effect: install the `require()` patcher so CJS hosts
+// auto-instrument supported modules. ESM hosts use the loader hook in
+// `./esm/instrument.mjs` instead, registered via `--import=weave/instrument`.
+//
+// The runtime guard pairs with the ESM tsconfig's `exclude` of
+// `src/utils/commonJSLoader.ts`: under the ESM build, no `.mjs` sibling
+// is emitted, the `require()` call here is dead code, and the typeof
+// check prevents the missing module from ever being requested.
+if (typeof require === 'function' && typeof module === 'object') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('./utils/commonJSLoader');
+}
+
 import './integrations/hooks';
