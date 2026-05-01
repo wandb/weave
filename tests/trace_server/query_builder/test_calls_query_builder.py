@@ -1641,6 +1641,52 @@ def test_dynamic_json_filters_infer_casts_from_literals() -> None:
     )
 
 
+def test_inferred_float_cast_eq_pairs_with_text_form_like_prefilter() -> None:
+    """Lock the interaction between the inferred float cast and the LIKE prefilter.
+
+    A float literal like `1.0` produces:
+    - HAVING: `toFloat64OrNull(...) = 1.0` (numerically equal to JSON `1` and `1.0`)
+    - WHERE LIKE prefilter: `%1.0%` (text form only, will NOT match a JSON dump
+      that serialized the value as `1`)
+
+    Callers comparing in the same shape they queried with are unaffected, but
+    mixed int/float JSON encodings can produce a false-negative because the
+    PREWHERE prefilter is stricter than the typed HAVING comparison.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "inputs.x"}, {"$literal": 1.0}]}
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '')) = {pb_1:Float64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."x"',
+            "pb_1": 1.0,
+            "pb_2": "%1.0%",
+            "pb_3": "project",
+        },
+    )
+
+
 def test_calls_query_filter_by_empty_string() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
