@@ -84,6 +84,7 @@ EVAL_META_KEY = "_weave_eval_meta"
 IMPERATIVE_EVAL_META_MARKER = {"imperative": True}
 IMPERATIVE_SCORE_META_MARKER = {"imperative": True, "score": True}
 
+
 def _as_call_attributes(eval_meta: dict[str, Any]) -> dict[str, Any]:
     return {EVAL_META_KEY: eval_meta}
 
