@@ -1917,9 +1917,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_query_builder.set_final(True)
             objs = self._select_objs_query(object_query_builder, metadata_only)
             if len(objs) == 0:
-                raise NotFoundError(
-                    f"Obj {req.object_id}:{req.digest} not found"
-                )
+                raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         obj = objs[0]
         if obj.deleted_at is not None:

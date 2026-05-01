@@ -1170,10 +1170,13 @@ def test_obj_read_raises_when_final_retry_also_misses():
         project_id="test_project", object_id="obj-id-1", digest="digest-abc"
     )
 
-    with patch.object(
-        chts.ClickHouseTraceServer, "_query_stream", return_value=iter([])
-    ) as mock_q, patch.object(
-        chts.ClickHouseTraceServer, "_maybe_resolve_alias", return_value=None
+    with (
+        patch.object(
+            chts.ClickHouseTraceServer, "_query_stream", return_value=iter([])
+        ) as mock_q,
+        patch.object(
+            chts.ClickHouseTraceServer, "_maybe_resolve_alias", return_value=None
+        ),
     ):
         with pytest.raises(NotFoundError, match="Obj obj-id-1:digest-abc not found"):
             server.obj_read(req)
