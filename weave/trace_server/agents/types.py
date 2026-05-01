@@ -30,9 +30,13 @@ from weave.trace_server.agents.schema import (
 from weave.trace_server.interface.query import Query
 
 if TYPE_CHECKING:
-    from weave.trace_server.trace_server_interface import ProcessedResourceSpans
+    from weave.trace_server.trace_server_interface import (
+        FeedbackDict,
+        ProcessedResourceSpans,
+    )
 else:
     ProcessedResourceSpans = Any
+    FeedbackDict = dict
 
 SearchMessageRole = Literal[
     "",
@@ -539,7 +543,7 @@ class AgentChatMessage(BaseModel):
             )
         return self
 
-    feedback: list[dict[str, Any]] | None = None
+    feedback: list[FeedbackDict] | None = None
 
 
 class AgentTraceChatReq(BaseModel):
@@ -566,7 +570,7 @@ class AgentTraceChatRes(BaseModel):
         ),
     )
     messages: list[AgentChatMessage] = Field(default_factory=list)
-    turn_feedback: list[dict[str, Any]] | None = None
+    feedback: list[FeedbackDict] | None = None
 
 
 class AgentConversationChatReq(BaseModel):
@@ -607,7 +611,7 @@ class AgentConversationChatRes(BaseModel):
     has_more: bool = False
     limit: int = MAX_CONVERSATION_CHAT_TURNS
     offset: int = 0
-    conversation_feedback: list[dict[str, Any]] | None = None
+    feedback: list[FeedbackDict] | None = None
 
 
 class AgentSchema(BaseModel):

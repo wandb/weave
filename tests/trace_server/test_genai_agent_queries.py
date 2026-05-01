@@ -7,7 +7,7 @@ Migration 030 creates the genai tables automatically.
 import datetime
 import uuid
 
-from tests.trace_server.project_id_util import make_project_id as _make_project_id
+from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,

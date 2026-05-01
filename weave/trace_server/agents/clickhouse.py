@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
+from weave.shared import refs_internal as ri
 from weave.trace_server.agents.chat_view import build_trace_chat
 from weave.trace_server.agents.constants import (
     MAX_INGEST_ERRORS_REPORTED,
@@ -291,9 +292,7 @@ class AgentQueryHandler:
                     project_id=req.project_id,
                     conversation_ids=[req.conversation_id],
                 )
-                res.conversation_feedback = groups.by_conversation_id.get(
-                    req.conversation_id, []
-                )
+                res.feedback = groups.by_conversation_id.get(req.conversation_id, [])
             return res
 
         # Group spans by trace_id, preserving insertion order. Weave treats
@@ -328,9 +327,7 @@ class AgentQueryHandler:
                 trace_ids=[t.trace_id for t in turns],
                 span_ids=span_ids,
             )
-            res.conversation_feedback = groups.by_conversation_id.get(
-                req.conversation_id, []
-            )
+            res.feedback = groups.by_conversation_id.get(req.conversation_id, [])
             for turn in res.turns:
                 _fold_feedback_into_trace_chat(turn, groups)
 
@@ -344,12 +341,13 @@ class AgentQueryHandler:
         span_ids: list[str] | None = None,
     ) -> AgentFeedbackByTarget:
         """Run one feedback query for a batch of agent targets."""
-        req = make_agent_feedback_query_req(
+        refs = _build_agent_target_refs(
             project_id=project_id,
             trace_ids=trace_ids,
             conversation_ids=conversation_ids,
             span_ids=span_ids,
         )
+        req = make_agent_feedback_query_req(project_id=project_id, refs=refs)
         feedback = self._feedback_query(req)
         return group_agent_feedback_by_target(feedback)
 
@@ -519,12 +517,35 @@ def _rows_to_dicts(
     return [dict(zip(columns, row, strict=True)) for row in rows]
 
 
+def _build_agent_target_refs(
+    project_id: str,
+    trace_ids: list[str] | None = None,
+    conversation_ids: list[str] | None = None,
+    span_ids: list[str] | None = None,
+) -> list[str]:
+    """Build the union of agent_turn / agent_conversation / agent_span refs."""
+    refs: list[str] = []
+    for trace_id in trace_ids or []:
+        refs.append(
+            ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
+        )
+    for conversation_id in conversation_ids or []:
+        refs.append(
+            ri.InternalAgentConversationRef(
+                project_id=project_id, conversation_id=conversation_id
+            ).uri
+        )
+    for span_id in span_ids or []:
+        refs.append(ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri)
+    return refs
+
+
 def _fold_feedback_into_trace_chat(
     trace_chat: AgentTraceChatRes,
     groups: AgentFeedbackByTarget,
 ) -> None:
     """Fold turn-level and step-level feedback into a trace chat response."""
-    trace_chat.turn_feedback = groups.by_trace_id.get(trace_chat.trace_id, [])
+    trace_chat.feedback = groups.by_trace_id.get(trace_chat.trace_id, [])
     for message in trace_chat.messages:
         if message.span_id and message.span_id in groups.by_span_id:
             message.feedback = groups.by_span_id[message.span_id]

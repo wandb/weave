@@ -1,3 +1,5 @@
+"""Shared helpers for trace_server tests."""
+
 import base64
 import uuid
 

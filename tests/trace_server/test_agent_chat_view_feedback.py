@@ -6,7 +6,7 @@ Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
 import datetime
 import uuid
 
-from tests.trace_server.project_id_util import make_project_id as _make_project_id
+from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.helpers import genai_span_to_row
@@ -94,9 +94,9 @@ def test_agent_traces_chat_folds_turn_and_step_feedback(ch_server):
         )
     )
 
-    assert res.turn_feedback is not None
-    assert len(res.turn_feedback) == 1
-    assert res.turn_feedback[0]["payload"] == {"emoji": "👍"}
+    assert res.feedback is not None
+    assert len(res.feedback) == 1
+    assert res.feedback[0]["payload"] == {"emoji": "👍"}
 
     step_msgs = [m for m in res.messages if m.span_id == child_span_id and m.feedback]
     assert len(step_msgs) == 1
@@ -123,7 +123,7 @@ def test_agent_traces_chat_include_feedback_false_leaves_feedback_fields_none(
         AgentTraceChatReq(project_id=project_id, trace_id=trace_id)
     )
 
-    assert res.turn_feedback is None
+    assert res.feedback is None
     for m in res.messages:
         assert m.feedback is None
 
@@ -172,15 +172,15 @@ def test_agent_conversation_chat_folds_conversation_turn_and_step_feedback(ch_se
         )
     )
 
-    assert res.conversation_feedback is not None
-    assert len(res.conversation_feedback) == 1
-    assert res.conversation_feedback[0]["payload"] == {"emoji": "💬"}
+    assert res.feedback is not None
+    assert len(res.feedback) == 1
+    assert res.feedback[0]["payload"] == {"emoji": "💬"}
 
     assert len(res.turns) == 1
     turn = res.turns[0]
-    assert turn.turn_feedback is not None
-    assert len(turn.turn_feedback) == 1
-    assert turn.turn_feedback[0]["payload"] == {"emoji": "👍"}
+    assert turn.feedback is not None
+    assert len(turn.feedback) == 1
+    assert turn.feedback[0]["payload"] == {"emoji": "👍"}
 
     step_msgs = [m for m in turn.messages if m.span_id == child_span_id and m.feedback]
     assert len(step_msgs) == 1
