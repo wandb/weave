@@ -82,8 +82,7 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
 
 EVAL_META_KEY = "_weave_eval_meta"
 IMPERATIVE_EVAL_META_MARKER = {"imperative": True}
-SCORE_META_MARKER = {"score": True}
-
+IMPERATIVE_SCORE_META_MARKER = {"imperative": True, "score": True}
 
 def _as_call_attributes(eval_meta: dict[str, Any]) -> dict[str, Any]:
     return {EVAL_META_KEY: eval_meta}
@@ -359,14 +358,12 @@ class ScoreLogger:
         evaluate_call: Call,
         predict_call: Call,
         predefined_scorers: list[str] | None = None,
-        _eval_meta: dict[str, Any] | None = None,
     ) -> None:
         self.predict_and_score_call = predict_and_score_call
         self.evaluate_call = evaluate_call
         self.predict_call = predict_call
         self.predefined_scorers = predefined_scorers
-        _eval_meta = _eval_meta if _eval_meta is not None else {}
-        self._score_call_meta = {**_eval_meta, **SCORE_META_MARKER}
+        self._score_meta = IMPERATIVE_SCORE_META_MARKER
 
         self._captured_scores: dict[str, ScoreType] = {}
         self._has_finished: bool = False
@@ -374,6 +371,10 @@ class ScoreLogger:
         self._call_stack_context: (
             contextlib.AbstractContextManager[list[Call]] | None
         ) = None
+
+    def _apply_eval_meta(self, eval_meta: dict[str, Any]) -> None:
+        """Internal-only: Merge potential caller-provided fields into the eval meta."""
+        self._score_meta = {**eval_meta, **IMPERATIVE_SCORE_META_MARKER}
 
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
@@ -444,8 +445,7 @@ class ScoreLogger:
 
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
-        # Create the score call with predict_and_score as parent
-        with attributes(_as_call_attributes(self._score_call_meta)):
+        with attributes(_as_call_attributes(self._score_meta)):
             wc = require_weave_client()
             score_call = wc.create_call(
                 as_op(scorer.score),
@@ -586,7 +586,7 @@ class ScoreLogger:
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with attributes(_as_call_attributes(self._score_call_meta)):
+                with attributes(_as_call_attributes(self._score_meta)):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
@@ -674,12 +674,28 @@ class EvaluationLogger:
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
     ) -> None:
+        self._eval_meta = {**IMPERATIVE_EVAL_META_MARKER}
+        self._init_common(
+            name=name,
+            model=model,
+            dataset=dataset,
+            eval_attributes=eval_attributes,
+            scorers=scorers,
+        )
+
+    def _init_common(
+        self,
+        *,
+        name: str | None = None,
+        model: Model | dict | str | None = None,
+        dataset: Dataset | list[dict] | str | None = None,
+        eval_attributes: dict[str, Any] | None = None,
+        scorers: list[str] | None = None,
+    ) -> None:
+        """Shared post-meta-setup body for `__init__` and `_create_with_meta`."""
         self.name = name
         self.scorers = scorers
         self.eval_attributes = eval_attributes if eval_attributes is not None else {}
-        # Init with just the marker if _eval_meta hasn't been pre-seeded by _create_with_meta.
-        if not hasattr(self, "_eval_meta"):
-            self._eval_meta = {**IMPERATIVE_EVAL_META_MARKER}
 
         # Convert model to Model instance if needed
         if model is None:
@@ -784,18 +800,29 @@ class EvaluationLogger:
     def _create_with_meta(
         cls,
         eval_meta: dict[str, Any],
-        **init_kwargs: Any,
+        *,
+        name: str | None = None,
+        model: Model | dict | str | None = None,
+        dataset: Dataset | list[dict] | str | None = None,
+        eval_attributes: dict[str, Any] | None = None,
+        scorers: list[str] | None = None,
     ) -> EvaluationLogger:
         """Internal factory: build an EvaluationLogger with extra
         `_weave_eval_meta` keys propagated to every emitted call.
-
-        Used by wandb.EvalTable to tag calls with `wandb_eval_table: True`
-        without exposing the side channel on the public constructor.
         """
+        # Use __new__ instead of cls(**init_kwargs) because we need to set the
+        # _eval_meta before running the body of the constructor, which uses it when
+        # declaring the predict_and_score inner class and creating the actual
+        # evaluate call.
         instance = cls.__new__(cls)
-        # Pre-seed before __init__ runs; __init__ will leave it alone if set.
         instance._eval_meta = {**eval_meta, **IMPERATIVE_EVAL_META_MARKER}
-        instance.__init__(**init_kwargs)
+        instance._init_common(
+            name=name,
+            model=model,
+            dataset=dataset,
+            eval_attributes=eval_attributes,
+            scorers=scorers,
+        )
         return instance
 
     @property
@@ -904,8 +931,8 @@ class EvaluationLogger:
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
             predefined_scorers=self.scorers,
-            _eval_meta=self._eval_meta,
         )
+        pred._apply_eval_meta(self._eval_meta)
         # Store the output so we can use it when finishing the predict_call
         pred._predict_output = output
         self._accumulated_predictions.append(pred)
