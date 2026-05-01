@@ -5226,15 +5226,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
 
-        # SQL groups + paginates by its own per-call digest, but the digest
-        # format used by SQL doesn't always agree with the canonical
-        # base64url form (see digest re-canonicalization below). For ref-
-        # backed and inline-dict trials of the *same* row that disagreement
-        # produces two SQL "rows" with different row_order ranks; if SQL
-        # paginates first, one of the two trials can be dropped from the
-        # current page or split across pages, leaving the canonical row
-        # under-counted. Fetch unbounded here and paginate in Python after
-        # canonical grouping below.
+        # when summary is requested, fetch all rows
+        ch_limit = None if req.include_summary else req.limit
+        ch_offset = 0 if req.include_summary else req.offset
+
         pb = ParamBuilder()
 
         page_query = eval_results_query_builder.build_eval_results_query(
@@ -5243,8 +5238,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.sort_by,
             req.filters,
             req.require_intersection,
-            None,
-            0,
+            ch_limit,
+            ch_offset,
             pb,
             read_table,
         )
@@ -5280,22 +5275,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if call.id in resolved_by_call_id and isinstance(call.inputs, dict):
                 call.inputs["example"] = resolved_by_call_id[call.id]
 
-        # Recompute row digests in Python using the shared helper so that
-        # refs, decoded dicts, and raw JSON-string inputs all collapse to the
-        # same canonical digest. The SQL-level __row_digest uses
-        # hex(SHA256(raw JSON)) for non-ref inputs, which doesn't match the
-        # base64url form produced by str_digest / extract_row_digest_from_ref_path.
-        # Without this override, a row stored as a ref and a replayed trial
-        # passing the same dict would be grouped into different rows.
-        for call in page_calls:
-            example = (
-                call.inputs.get("example") if isinstance(call.inputs, dict) else None
-            )
-            if example is None:
-                continue
-            digest, _ = eval_helpers.extract_row_digest_from_example(example)
-            digest_by_call[call.id] = digest
-
         if req.include_predict_and_score_children and len(page_calls) > 0:
             predict_and_score_ids = [c.id for c in page_calls]
             child_columns = [
@@ -5322,13 +5301,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.include_predict_and_score_children,
         )
 
-        # When the user provided a sort_by, SQL has already ordered the calls
-        # accordingly and `build_eval_rows` preserves that order in
-        # `all_rows`. In that case we must NOT re-sort by row_digest in the
-        # pagination step. Otherwise we sort canonically so the result is
-        # deterministic regardless of SQL's hex digest.
-        sort_rows = not req.sort_by
-
         summary: tsi.EvalResultsSummaryRes | None = None
         if req.include_summary:
             summary_intersection = (
@@ -5337,12 +5309,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 else req.require_intersection
             )
             summary_rows, _ = eval_helpers.apply_row_selection(
-                all_rows,
-                eval_root_ids,
-                summary_intersection,
-                0,
-                None,
-                sort=sort_rows,
+                all_rows, eval_root_ids, summary_intersection, 0, None
             )
             eval_call_metadata = eval_helpers.fetch_eval_root_metadata(
                 self, req.project_id, eval_root_ids
@@ -5351,20 +5318,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 summary_rows, eval_call_metadata
             )
 
-        # `all_rows` is unpaginated and grouped by canonical digest; apply
-        # pagination here so the SQL hex-vs-base64url digest mismatch can't
-        # split a single canonical row across pages.
+        # apply pagination in python if include_summary is True; otherwise, we already applied pagination in the CH query
         rows: list[tsi.EvalResultsRow] = []
         warnings: list[str] = []
         if req.include_rows:
-            rows, total_rows = eval_helpers.apply_row_selection(
-                all_rows,
-                eval_root_ids,
-                req.require_intersection,
-                req.offset,
-                req.limit,
-                sort=sort_rows,
-            )
+            if req.include_summary:
+                # all_rows has everything; apply pagination in Python
+                rows, total_rows = eval_helpers.apply_row_selection(
+                    all_rows,
+                    eval_root_ids,
+                    req.require_intersection,
+                    req.offset,
+                    req.limit,
+                )
+            else:
+                rows = all_rows
 
             if rows and req.include_raw_data_rows and req.resolve_row_refs:
                 unresolved = [

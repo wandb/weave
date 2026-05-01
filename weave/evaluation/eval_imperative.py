@@ -369,6 +369,96 @@ class ScoreLogger:
             contextlib.AbstractContextManager[list[Call]] | None
         ) = None
 
+    @classmethod
+    def from_call(cls, predict_and_score_call_id: str) -> ScoreLogger:
+        """Hydrate a ScoreLogger from an existing (possibly finished)
+        ``Evaluation.predict_and_score`` call so additional scores can be
+        appended.
+
+        Each ``log_score(...)`` writes a scorer op call as a child of the
+        existing predict_and_score; the original predict_and_score's frozen
+        ``output`` is not mutated. New scores surface at read time via
+        ``eval_results_query``'s rollup, which augments the trial's score
+        dict with any scorer-child outputs that aren't already present.
+
+        Args:
+            predict_and_score_call_id: The id of the existing
+                ``Evaluation.predict_and_score`` call to append scores to.
+
+        Returns:
+            A ``ScoreLogger`` bound to the existing prediction. Calling
+            ``finish()`` on this instance is a no-op for the already-ended
+            predict_and_score (the scorer children persisted via
+            ``log_score`` are the only writes).
+        """
+        wc = require_weave_client()
+        pas_call = wc.get_call(predict_and_score_call_id)
+
+        op_name_value = pas_call.op_name
+        parsed_op_ref = (
+            Ref.parse_uri(op_name_value) if isinstance(op_name_value, str) else None
+        )
+        if (
+            not isinstance(parsed_op_ref, OpRef)
+            or parsed_op_ref.name != "Evaluation.predict_and_score"
+        ):
+            raise ValueError(
+                f"Call {predict_and_score_call_id} is not an "
+                f"Evaluation.predict_and_score call (got op_name={op_name_value!r})"
+            )
+        if pas_call.parent_id is None:
+            raise ValueError(
+                f"predict_and_score call {predict_and_score_call_id} has no "
+                "parent Evaluation.evaluate call"
+            )
+
+        evaluate_call = wc.get_call(pas_call.parent_id)
+
+        # Locate the predict-side child so log_score can quote its inputs
+        # when it builds new scorer calls. The op name varies across eval
+        # styles (`Model.predict` for imperative, the user's @op function
+        # name for declarative), so identify it by exclusion: any non-scorer
+        # child counts.
+        children = list(
+            wc.get_calls(filter={"parent_ids": [predict_and_score_call_id]})
+        )
+        predict_call: Call | None = None
+        for child in children:
+            weave_attrs = child.attributes.get(
+                "weave", {}
+            ) if isinstance(child.attributes, dict) else {}
+            eval_meta = (
+                child.attributes.get("_weave_eval_meta", {})
+                if isinstance(child.attributes, dict)
+                else {}
+            )
+            is_scorer = weave_attrs.get("score") == "true" or (
+                isinstance(eval_meta, dict) and eval_meta.get("score")
+            )
+            if is_scorer:
+                continue
+            predict_call = child
+            break
+        if predict_call is None:
+            raise ValueError(
+                f"predict_and_score call {predict_and_score_call_id} has no "
+                "predict-side child; cannot reopen for scoring"
+            )
+
+        instance = cls(
+            predict_and_score_call=pas_call,
+            evaluate_call=evaluate_call,
+            predict_call=predict_call,
+        )
+        # Pre-load the captured output so `log_score` can reference it when
+        # constructing scorer-call inputs (mirrors what `log_prediction` does
+        # when it stashes `_predict_output`).
+        pas_output = (
+            pas_call.output if isinstance(pas_call.output, dict) else {}
+        )
+        instance._predict_output = pas_output.get("output")
+        return instance
+
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
 
@@ -378,6 +468,14 @@ class ScoreLogger:
         """
         if self._has_finished:
             logger.warning("(NO-OP): Already called finish, returning.")
+            return
+
+        # When this ScoreLogger was hydrated via `from_call` for an already-
+        # ended predict_and_score, do NOT re-finish or rewrite the frozen
+        # output. The scorer children created by `log_score` are the only
+        # writes; they surface in the rollup via the read-side augmentation.
+        if self.predict_and_score_call.ended_at is not None:
+            self._has_finished = True
             return
 
         scores = self._captured_scores
@@ -438,7 +536,11 @@ class ScoreLogger:
 
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
-        # Create the score call with predict_and_score as parent
+        # Create the score call with predict_and_score as parent. Pass the
+        # imperative marker via the explicit `attributes=` arg AND via the
+        # `attributes()` context manager — the explicit form is required for
+        # the `ScoreLogger.from_call` path (no surrounding tracing context),
+        # and the context manager keeps any nested ops marked.
         with attributes(IMPERATIVE_SCORE_MARKER):
             wc = require_weave_client()
             score_call = wc.create_call(
@@ -449,6 +551,7 @@ class ScoreLogger:
                     "inputs": self.predict_call.inputs,
                 },
                 parent=self.predict_and_score_call,
+                attributes=IMPERATIVE_SCORE_MARKER,
                 use_stack=False,
             )
 
@@ -511,6 +614,17 @@ class ScoreLogger:
         # Type narrowing: score is now guaranteed to be ScoreType
         assert not isinstance(score, _NotSetType), "score should not be NOT_SET here"
         score_value: ScoreType = score
+
+        # `from_call` flow: the predict_and_score is already ended, so we
+        # can't (and don't need to) route through `apply_scorer` — that path
+        # invokes the scorer against `predict_call.inputs`, which means it
+        # only works when the predict's signature matches a Scorer's
+        # `score(output, inputs, ...)` shape. Just write the scorer call
+        # directly with the precomputed value.
+        if self.predict_and_score_call.ended_at is not None:
+            score_call, prepared_scorer = self._create_score_call(scorer)
+            self._finish_score_call(score_call, prepared_scorer, score_value=score_value)
+            return None
 
         # Otherwise, log the score immediately
         # When in an active asyncio test environment (like pytest.mark.asyncio),

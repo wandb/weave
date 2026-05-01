@@ -11,7 +11,12 @@ import pytest
 
 import weave
 from weave.evaluation.eval import Evaluation
-from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
+from weave.evaluation.eval_imperative import (
+    EvaluationLogger,
+    Model,
+    ScoreLogger,
+    Scorer,
+)
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
@@ -1303,20 +1308,30 @@ async def test_from_evaluate_call_appends_new_row(
 async def test_from_evaluate_call_adds_score_to_existing_row(
     client, user_dataset, user_model, seed_fn
 ):
-    """Reopen a finished evaluation and add a NEW score key to an existing row
-    via a second trial that replays the same inputs. The rollup should combine
-    both trials and surface the new scorer alongside the original.
+    """Append a brand-new score key to each existing prediction via
+    `ScoreLogger.from_call(...)`. The new score must surface in the trial
+    rollup *without* a new predict_and_score call being created — the
+    original predict_and_score's frozen output is untouched, and the new
+    scorer-child call's output is picked up by the read path's
+    augmentation.
     """
     seeded = await seed_fn(user_dataset, user_model)
     client.flush()
 
-    ev2 = EvaluationLogger.from_evaluate_call(seeded.call_id)
-    for row in user_dataset:
-        output = user_model(row["a"], row["b"])
-        pred = ev2.log_prediction(inputs=row, output=output)
-        pred.log_score("latency_ms", 42)
-        pred.finish()
-    ev2.log_summary()
+    pas_calls = sorted(
+        (
+            c
+            for c in client.get_calls()
+            if op_name_from_call(c) == "Evaluation.predict_and_score"
+        ),
+        key=lambda c: c.started_at,
+    )
+    assert len(pas_calls) == len(user_dataset)
+
+    for pas_call in pas_calls:
+        score_logger = ScoreLogger.from_call(pas_call.id)
+        score_logger.log_score("latency_ms", 42)
+        score_logger.finish()
     client.flush()
 
     res = client.server.eval_results_query(
@@ -1333,15 +1348,16 @@ async def test_from_evaluate_call_adds_score_to_existing_row(
         ]
         assert len(eval_entries) == 1
         trials = eval_entries[0].trials
-        assert len(trials) == 2, (
-            f"expected 2 trials (original + appended) for row {row.row_digest}, "
-            f"got {len(trials)}"
+        assert len(trials) == 1, (
+            f"expected exactly 1 trial per row (no replay), got {len(trials)} "
+            f"for row {row.row_digest}"
         )
-        score_keys_across_trials = set()
-        for trial in trials:
-            score_keys_across_trials.update(trial.scores.keys())
-        assert "acc" in score_keys_across_trials
-        assert "latency_ms" in score_keys_across_trials
+        trial = trials[0]
+        assert "acc" in trial.scores
+        assert "latency_ms" in trial.scores, (
+            f"appended score key not in trial.scores: {trial.scores}"
+        )
+        assert trial.scores["latency_ms"] == 42
 
     assert res.summary is not None
     eval_summaries = [
@@ -1351,6 +1367,17 @@ async def test_from_evaluate_call_adds_score_to_existing_row(
     summary_scorer_keys = {stat.scorer_key for stat in eval_summaries[0].scorer_stats}
     assert "acc" in summary_scorer_keys
     assert "latency_ms" in summary_scorer_keys
+
+    # The original predict_and_score's frozen output["scores"] must NOT have
+    # been mutated by the score append.
+    for pas_call in pas_calls:
+        refetched = client.get_call(pas_call.id)
+        original_scores = (
+            refetched.output.get("scores", {})
+            if isinstance(refetched.output, dict)
+            else {}
+        )
+        assert "latency_ms" not in original_scores
 
 
 def test_from_evaluate_call_original_logger_still_finalized(
@@ -1404,9 +1431,11 @@ def test_from_evaluate_call_rejects_non_evaluate_call(client, user_dataset, user
 
 @pytest.mark.asyncio
 async def test_from_evaluate_call_extends_declarative_evaluation(client):
-    """Reopen a declarative weave.Evaluation (not imperative) and append a new
-    prediction + score. The new trial must show up in the server-side rollup
-    alongside the original scorer results.
+    """Reopen a declarative weave.Evaluation:
+      - append a brand-new row via `EvaluationLogger.log_prediction(...)`
+      - append a new score to an existing prediction via `ScoreLogger.from_call(...)`
+    Both new pieces must show up in the eval_results_query rollup; the
+    original evaluate call's `ended_at` / `output` must stay intact.
     """
     dataset_rows = [{"a": 1, "b": 2}, {"a": 2, "b": 3}]
 
@@ -1430,17 +1459,32 @@ async def test_from_evaluate_call_extends_declarative_evaluation(client):
     original_ended_at = eval_call.ended_at
     original_output = eval_call.output
 
+    # 1) new row + new prediction via the EvaluationLogger reopen path.
     ev2 = EvaluationLogger.from_evaluate_call(eval_call_id)
     new_row = {"a": 99, "b": 100}
     pred = ev2.log_prediction(inputs=new_row, output=199)
     pred.log_score("accuracy_scorer", True)
     pred.log_score("latency_ms", 42)
     pred.finish()
-    # Also add a new score to an existing row by replaying its inputs.
-    pred_replay = ev2.log_prediction(inputs=dataset_rows[0], output=3)
-    pred_replay.log_score("latency_ms", 17)
-    pred_replay.finish()
     ev2.log_summary()
+    client.flush()
+
+    # 2) new score on an EXISTING prediction via ScoreLogger.from_call. We
+    #    target the predict_and_score for `dataset_rows[0]`.
+    pas_calls = [
+        c
+        for c in client.get_calls()
+        if op_name_from_call(c) == "Evaluation.predict_and_score"
+        and isinstance(c.inputs, dict)
+        and c.inputs.get("example") == dataset_rows[0]
+    ]
+    assert len(pas_calls) == 1, (
+        f"expected one declarative predict_and_score for row {dataset_rows[0]}, "
+        f"got {len(pas_calls)}"
+    )
+    score_logger = ScoreLogger.from_call(pas_calls[0].id)
+    score_logger.log_score("latency_ms", 17)
+    score_logger.finish()
     client.flush()
 
     res = client.server.eval_results_query(
@@ -1450,19 +1494,22 @@ async def test_from_evaluate_call_extends_declarative_evaluation(client):
             include_summary=True,
         )
     )
+    # 2 original rows + 1 new row = 3.
     assert res.total_rows == len(dataset_rows) + 1
 
-    # The original row that we replayed should now have 2 trials, the other
-    # original row 1 trial, and the new row 1 trial.
-    trials_by_row = {
-        row.row_digest: sum(
-            len(ev_entry.trials)
-            for ev_entry in row.evaluations
-            if ev_entry.evaluation_call_id == eval_call_id
-        )
+    # The reopened row whose existing prediction we scored must now expose
+    # latency_ms in its trial's scores; the new row carries its own scores;
+    # the third (unscored) original row carries only accuracy_scorer.
+    rows_with_latency = [
+        row
         for row in res.rows
-    }
-    assert sorted(trials_by_row.values()) == [1, 1, 2]
+        if any(
+            "latency_ms" in trial.scores
+            for ev_entry in row.evaluations
+            for trial in ev_entry.trials
+        )
+    ]
+    assert len(rows_with_latency) == 2  # the appended-score row + the new row
 
     eval_summaries = [
         s for s in res.summary.evaluations if s.evaluation_call_id == eval_call_id

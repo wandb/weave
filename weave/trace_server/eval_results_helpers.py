@@ -209,16 +209,6 @@ def extract_row_digest_from_example(example: Any) -> tuple[str, bool]:
         digest = ri.extract_row_digest_from_ref_path(example)
         if digest is not None:
             return digest, True
-        # The example may be a serialized dict (e.g. ClickHouse returns call
-        # inputs as compact JSON strings) rather than an already-decoded dict.
-        # Re-parse and re-serialize with the canonical form so digests remain
-        # stable regardless of serialization whitespace.
-        try:
-            parsed = json.loads(example)
-        except ValueError:
-            parsed = None
-        if isinstance(parsed, dict):
-            example = json.dumps(parsed, sort_keys=True, default=str)
     if not isinstance(example, str):
         example = json.dumps(example, sort_keys=True, default=str)
     return str_digest(example), False
@@ -297,6 +287,38 @@ def best_effort_scorer_call_ids(
     return result
 
 
+def _augment_scores_with_child_scorer_outputs(
+    scores: dict[str, Any],
+    trial_children: list[tsi.CallSchema],
+) -> dict[str, Any]:
+    """Return `scores` augmented with any scorer-child call outputs whose key
+    isn't already present. This is how scores appended via
+    ``ScoreLogger.from_call(...)`` after the predict_and_score call ended
+    surface in the rollup — the original predict_and_score's frozen
+    `output["scores"]` doesn't include them, but the scorer calls live as
+    children of the predict_and_score and contribute their outputs here.
+    """
+    augmented = dict(scores)
+    for child in trial_children:
+        weave_attrs = child.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+        eval_meta = child.attributes.get("_weave_eval_meta", {})
+        is_scorer = weave_attrs.get(constants.SCORE_ATTR_KEY) == "true" or (
+            isinstance(eval_meta, dict) and eval_meta.get("score")
+        )
+        if not is_scorer:
+            op_name_lower = child.op_name.lower() if child.op_name else ""
+            if ".score" not in op_name_lower and "scorer" not in op_name_lower:
+                continue
+        scorer_key = (
+            child.op_name.rsplit("/", maxsplit=1)[-1].split(":", maxsplit=1)[0]
+            if child.op_name
+            else None
+        )
+        if scorer_key and scorer_key not in augmented:
+            augmented[scorer_key] = child.output
+    return augmented
+
+
 def _build_trial(
     predict_and_score_call: tsi.CallSchema,
     child_by_parent: dict[str, list[tsi.CallSchema]],
@@ -307,8 +329,9 @@ def _build_trial(
         if isinstance(predict_and_score_call.output, dict)
         else {}
     )
-    scores = output.get("scores", {})
+    raw_scores = output.get("scores", {})
     trial_children = child_by_parent.get(predict_and_score_call.id, [])
+    scores = _augment_scores_with_child_scorer_outputs(raw_scores, trial_children)
     model_ref = (
         predict_and_score_call.inputs.get("model")
         if isinstance(predict_and_score_call.inputs, dict)
@@ -470,15 +493,8 @@ def apply_row_selection(
     require_intersection: bool,
     offset: int,
     limit: int | None,
-    *,
-    sort: bool = True,
 ) -> tuple[list[tsi.EvalResultsRow], int]:
-    """Apply intersection filtering, optional stable sort, and pagination.
-
-    Pass ``sort=False`` when the input is already in the desired order
-    (e.g. SQL returned rows pre-ordered by a user-supplied ``sort_by``)
-    so the row_digest sort doesn't clobber that ordering.
-    """
+    """Apply intersection filtering, stable sort, and pagination to grouped rows."""
     selected_rows = rows
     if require_intersection and len(eval_root_ids) > 1:
         eval_root_id_set = set(eval_root_ids)
@@ -490,8 +506,7 @@ def apply_row_selection(
             )
         ]
 
-    if sort:
-        selected_rows.sort(key=lambda row: row.row_digest)
+    selected_rows.sort(key=lambda row: row.row_digest)
     total_rows = len(selected_rows)
     start = max(offset, 0)
     end = start + limit if limit is not None else None
