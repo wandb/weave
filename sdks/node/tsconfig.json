@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "composite": true,
-    "target": "es2018",
-    "module": "commonjs",
+    // ES2022 matches our minimum supported runtime(Node 18+).
+    "target": "es2022",
     "moduleResolution": "node",
     "sourceMap": true,
     "strict": true,
