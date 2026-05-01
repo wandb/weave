@@ -11,7 +11,7 @@ import clickhouse_connect
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
-from tests.trace_server.project_id_util import make_project_id as _make_project_id
+from tests.trace_server.test_project_version import make_project_id
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
@@ -1389,7 +1389,7 @@ def test_version_index_stable_on_republish(ch_server):
     to its original creation time, so re-inserting digest A doesn't push
     it to the end of the version ordering.
     """
-    project_id = _make_project_id("vidx")
+    project_id = make_project_id("vidx")
     obj_id = "vidx_obj"
 
     r0 = _obj_create(ch_server, project_id, obj_id, {"v": "A"})
