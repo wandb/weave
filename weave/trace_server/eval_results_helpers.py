@@ -470,8 +470,15 @@ def apply_row_selection(
     require_intersection: bool,
     offset: int,
     limit: int | None,
+    *,
+    sort: bool = True,
 ) -> tuple[list[tsi.EvalResultsRow], int]:
-    """Apply intersection filtering, stable sort, and pagination to grouped rows."""
+    """Apply intersection filtering, optional stable sort, and pagination.
+
+    Pass ``sort=False`` when the input is already in the desired order
+    (e.g. SQL returned rows pre-ordered by a user-supplied ``sort_by``)
+    so the row_digest sort doesn't clobber that ordering.
+    """
     selected_rows = rows
     if require_intersection and len(eval_root_ids) > 1:
         eval_root_id_set = set(eval_root_ids)
@@ -483,7 +490,8 @@ def apply_row_selection(
             )
         ]
 
-    selected_rows.sort(key=lambda row: row.row_digest)
+    if sort:
+        selected_rows.sort(key=lambda row: row.row_digest)
     total_rows = len(selected_rows)
     start = max(offset, 0)
     end = start + limit if limit is not None else None

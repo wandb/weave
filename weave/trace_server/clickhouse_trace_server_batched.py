@@ -5226,10 +5226,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
 
-        # when summary is requested, fetch all rows
-        ch_limit = None if req.include_summary else req.limit
-        ch_offset = 0 if req.include_summary else req.offset
-
+        # SQL groups + paginates by its own per-call digest, but the digest
+        # format used by SQL doesn't always agree with the canonical
+        # base64url form (see digest re-canonicalization below). For ref-
+        # backed and inline-dict trials of the *same* row that disagreement
+        # produces two SQL "rows" with different row_order ranks; if SQL
+        # paginates first, one of the two trials can be dropped from the
+        # current page or split across pages, leaving the canonical row
+        # under-counted. Fetch unbounded here and paginate in Python after
+        # canonical grouping below.
         pb = ParamBuilder()
 
         page_query = eval_results_query_builder.build_eval_results_query(
@@ -5238,8 +5243,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.sort_by,
             req.filters,
             req.require_intersection,
-            ch_limit,
-            ch_offset,
+            None,
+            0,
             pb,
             read_table,
         )
@@ -5317,14 +5322,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.include_predict_and_score_children,
         )
 
-        # Re-sort by the (now canonical base64url) row digest when no explicit
-        # sort_by is requested, so result ordering stays stable between the
-        # include_summary=True path (which runs apply_row_selection → sort
-        # in-place on row_digest) and the include_summary=False path (which
-        # previously trusted the SQL hex-sorted row_order). When the user
-        # supplied a sort_by we leave the SQL order intact.
-        if not req.sort_by:
-            all_rows.sort(key=lambda row: row.row_digest)
+        # When the user provided a sort_by, SQL has already ordered the calls
+        # accordingly and `build_eval_rows` preserves that order in
+        # `all_rows`. In that case we must NOT re-sort by row_digest in the
+        # pagination step. Otherwise we sort canonically so the result is
+        # deterministic regardless of SQL's hex digest.
+        sort_rows = not req.sort_by
 
         summary: tsi.EvalResultsSummaryRes | None = None
         if req.include_summary:
@@ -5334,7 +5337,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 else req.require_intersection
             )
             summary_rows, _ = eval_helpers.apply_row_selection(
-                all_rows, eval_root_ids, summary_intersection, 0, None
+                all_rows,
+                eval_root_ids,
+                summary_intersection,
+                0,
+                None,
+                sort=sort_rows,
             )
             eval_call_metadata = eval_helpers.fetch_eval_root_metadata(
                 self, req.project_id, eval_root_ids
@@ -5343,21 +5351,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 summary_rows, eval_call_metadata
             )
 
-        # apply pagination in python if include_summary is True; otherwise, we already applied pagination in the CH query
+        # `all_rows` is unpaginated and grouped by canonical digest; apply
+        # pagination here so the SQL hex-vs-base64url digest mismatch can't
+        # split a single canonical row across pages.
         rows: list[tsi.EvalResultsRow] = []
         warnings: list[str] = []
         if req.include_rows:
-            if req.include_summary:
-                # all_rows has everything; apply pagination in Python
-                rows, total_rows = eval_helpers.apply_row_selection(
-                    all_rows,
-                    eval_root_ids,
-                    req.require_intersection,
-                    req.offset,
-                    req.limit,
-                )
-            else:
-                rows = all_rows
+            rows, total_rows = eval_helpers.apply_row_selection(
+                all_rows,
+                eval_root_ids,
+                req.require_intersection,
+                req.offset,
+                req.limit,
+                sort=sort_rows,
+            )
 
             if rows and req.include_raw_data_rows and req.resolve_row_refs:
                 unresolved = [
