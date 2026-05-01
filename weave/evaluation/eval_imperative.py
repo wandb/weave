@@ -767,9 +767,7 @@ class EvaluationLogger:
             return cast(dict, current_summary.get())
 
         bound_methods: dict[str, Any] = {
-            "predict_and_score": MethodType(
-                predict_and_score, self._pseudo_evaluation
-            ),
+            "predict_and_score": MethodType(predict_and_score, self._pseudo_evaluation),
             "summarize": MethodType(summarize, self._pseudo_evaluation),
         }
         if bind_evaluate:

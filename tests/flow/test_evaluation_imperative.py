@@ -1618,6 +1618,7 @@ async def test_from_evaluate_call_visible_via_query_apis(client):
       4. `client.server.eval_results_query(...)` — the v2 rollup endpoint.
       5. `evaluation.get_score_calls()` — descendent scorer calls per trace.
     """
+
     @weave.op
     def my_model(a: int) -> int:
         return a + 1
@@ -1662,7 +1663,9 @@ async def test_from_evaluate_call_visible_via_query_apis(client):
     assert len(pas_in_trace) == 3, (
         f"expected 3 predict_and_score calls in trace, got {len(pas_in_trace)}"
     )
-    appended_pas_inputs = {tuple(sorted(c.inputs["example"].items())) for c in pas_in_trace}
+    appended_pas_inputs = {
+        tuple(sorted(c.inputs["example"].items())) for c in pas_in_trace
+    }
     assert (("a", 99),) in appended_pas_inputs, (
         f"appended row {{'a': 99}} not found in calls_query results: "
         f"{appended_pas_inputs}"
