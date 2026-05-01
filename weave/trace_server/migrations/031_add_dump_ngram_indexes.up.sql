@@ -27,17 +27,22 @@
 -- pruning while inflating index size and lookup cost ~8x. Coarser keeps
 -- the index small enough to stay hot in RAM and amortizes the filter probe
 -- across more rows.
+--
+-- Lazy backfill: we deliberately skip MATERIALIZE INDEX. On a large
+-- calls_merged that would block the migration on full-table reindexing
+-- and compete with ingest. Instead the index is populated as parts are
+-- naturally re-merged. New parts get the index from the moment this
+-- migration applies, and existing parts gain it over time. Operators
+-- who want immediate coverage can run MATERIALIZE INDEX on each index
+-- name out-of-band.
 ALTER TABLE calls_merged
     ADD INDEX IF NOT EXISTS idx_inputs_dump_ngram
-        ifNull(inputs_dump, '') TYPE ngrambf_v1(5, 65536, 3, 0) GRANULARITY 8
-    SETTINGS alter_sync = 1;
+        ifNull(inputs_dump, '') TYPE ngrambf_v1(5, 65536, 3, 0) GRANULARITY 8;
 
 ALTER TABLE calls_merged
     ADD INDEX IF NOT EXISTS idx_output_dump_ngram
-        ifNull(output_dump, '') TYPE ngrambf_v1(5, 65536, 3, 0) GRANULARITY 8
-    SETTINGS alter_sync = 1;
+        ifNull(output_dump, '') TYPE ngrambf_v1(5, 65536, 3, 0) GRANULARITY 8;
 
 ALTER TABLE calls_merged
     ADD INDEX IF NOT EXISTS idx_summary_dump_ngram
-        ifNull(summary_dump, '') TYPE ngrambf_v1(5, 65536, 3, 0) GRANULARITY 8
-    SETTINGS alter_sync = 1;
+        ifNull(summary_dump, '') TYPE ngrambf_v1(5, 65536, 3, 0) GRANULARITY 8;

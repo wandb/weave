@@ -573,6 +573,21 @@ class WhereFilters(BaseModel):
         ]
         return "\n        ".join(f for f in filters if f)
 
+    def to_where_clause(self) -> str:
+        """Render filters as a complete `WHERE ...` clause, or empty string.
+
+        `to_sql()` joins individual filters with leading `AND`, which is the
+        right shape when a `PREWHERE` already supplies the first predicate.
+        For a standalone `WHERE`, the leading `AND` of the first filter has
+        to be stripped. Centralizing that here keeps callers from
+        re-implementing the strip with regex.
+        """
+        body = self.to_sql()
+        if not body:
+            return ""
+        stripped = re.sub(r"^\s*AND\s+", "", body)
+        return f"WHERE {stripped}"
+
 
 class QueryJoins(BaseModel):
     """Container for all JOIN clauses in the query."""
@@ -1729,13 +1744,10 @@ class CallsQuery(BaseModel):
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
 
         # Use PREWHERE for project_id to filter data before reading from disk
-        # This is a ClickHouse optimization for high-selectivity filters
-        where_filters_sql = where_filters.to_sql()
-        # Strip leading "AND " from where_filters since PREWHERE handles the first condition
-        where_filters_stripped = re.sub(r"^\s*AND\s+", "", where_filters_sql)
-        where_clause = (
-            f"WHERE {where_filters_stripped}" if where_filters_stripped else ""
-        )
+        # This is a ClickHouse optimization for high-selectivity filters.
+        # `to_where_clause` strips the leading `AND ` since PREWHERE provides
+        # the first predicate.
+        where_clause = where_filters.to_where_clause()
 
         # Fix where_clause when empty but we have filter_sql
         # For calls_complete, filter_sql starts with "AND "
@@ -1860,11 +1872,7 @@ class CallsQuery(BaseModel):
         offset_sql = f"OFFSET {self.offset}" if self.offset is not None else ""
 
         project_param = pb.add_param(self.project_id)
-        where_filters_sql = where_filters.to_sql()
-        where_filters_stripped = re.sub(r"^\s*AND\s+", "", where_filters_sql)
-        where_clause = (
-            f"WHERE {where_filters_stripped}" if where_filters_stripped else ""
-        )
+        where_clause = where_filters.to_where_clause()
 
         raw_sql = f"""
         SELECT {table_alias}.id AS id
