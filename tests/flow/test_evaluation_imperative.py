@@ -160,7 +160,7 @@ def test_basic_evaluation(
 def test_meta_attributes_propagate_to_all_calls(
     client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
 ):
-    ev = EvaluationLogger(_meta_attributes={"wandb_meta_foo": True})
+    ev = EvaluationLogger._with_meta({"wandb_meta_foo": True})
 
     for row in user_dataset:
         output = user_model(row["a"], row["b"])

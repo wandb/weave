@@ -673,13 +673,13 @@ class EvaluationLogger:
         dataset: Dataset | list[dict] | str | None = None,
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
-        _meta_attributes: dict[str, Any] | None = None,
     ) -> None:
         self.name = name
         self.scorers = scorers
         self.eval_attributes = eval_attributes if eval_attributes is not None else {}
-        meta_attrs = _meta_attributes if _meta_attributes is not None else {}
-        self._eval_meta = {**meta_attrs, **IMPERATIVE_EVAL_META_MARKER}
+        # Init with just the marker if _eval_meta hasn't been pre-seeded by _with_meta.
+        if not hasattr(self, "_eval_meta"):
+            self._eval_meta = {**IMPERATIVE_EVAL_META_MARKER}
 
         # Convert model to Model instance if needed
         if model is None:
@@ -779,6 +779,24 @@ class EvaluationLogger:
             attributes=self.attributes,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
+
+    @classmethod
+    def _with_meta(
+        cls,
+        eval_meta: dict[str, Any],
+        **init_kwargs: Any,
+    ) -> EvaluationLogger:
+        """Internal factory: build an EvaluationLogger with extra
+        `_weave_eval_meta` keys propagated to every emitted call.
+
+        Used by wandb.EvalTable to tag calls with `wandb_eval_table: True`
+        without exposing the side channel on the public constructor.
+        """
+        instance = cls.__new__(cls)
+        # Pre-seed before __init__ runs; __init__ will leave it alone if set.
+        instance._eval_meta = {**eval_meta, **IMPERATIVE_EVAL_META_MARKER}
+        instance.__init__(**init_kwargs)
+        return instance
 
     @property
     def ui_url(self) -> str | None:
