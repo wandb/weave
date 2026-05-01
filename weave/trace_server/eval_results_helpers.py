@@ -287,6 +287,80 @@ def best_effort_scorer_call_ids(
     return result
 
 
+def _scorer_name_from_score_call(call: tsi.CallSchema) -> str | None:
+    """Extract the scorer name from a score child call.
+
+    Score calls may originate from:
+    - V2 score_create: scorer ref stored in attributes.weave.score.scorer; op_name
+      ends in ``.score`` (e.g. ``my_scorer.score``).
+    - Imperative EvaluationLogger: op_name is the scorer name itself.
+    - Declarative Evaluation: op_name is the scorer name (or ends in ``.score``).
+    """
+    weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+    scorer_ref = weave_attrs.get(constants.SCORE_SCORER_ATTR_KEY)
+    if isinstance(scorer_ref, str) and scorer_ref:
+        try:
+            parsed = ri.parse_internal_uri(scorer_ref)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, (ri.InternalObjectRef, ri.InternalOpRef)):
+            return parsed.name
+    if call.op_name:
+        try:
+            parsed_op = ri.parse_internal_uri(call.op_name)
+        except Exception:
+            parsed_op = None
+        if isinstance(parsed_op, ri.InternalOpRef):
+            name = parsed_op.name
+            if name.endswith(".score"):
+                name = name[: -len(".score")]
+            return name
+    return None
+
+
+def _merge_scores_from_child_calls(
+    scores: dict[str, Any], trial_children: list[tsi.CallSchema]
+) -> dict[str, Any]:
+    """Merge scores from child score calls into ``scores`` (parent wins on conflict).
+
+    Handles scores attached to a finalized predict_and_score call after the fact
+    (e.g. via the V2 score_create API on a finalized EvaluationLogger result).
+    The parent's own ``output["scores"]`` takes priority for any scorer that is
+    already present, so existing data is never overwritten.
+
+    Cost (per trial): one pass over ``trial_children``. ``trial_children`` is
+    already loaded by ``_build_trial`` (and used by ``select_predict_call`` and
+    ``best_effort_scorer_call_ids``), so this adds no DB work and no extra
+    materialization. For each child we do two cheap dict lookups to decide if
+    it's a score call; only score calls pay the URI parse. Zero-copy fast
+    path: if no late-added score is found, the original ``scores`` is returned
+    unchanged — common case (every score is already in the parent's
+    ``output["scores"]``) allocates nothing.
+    """
+    if not isinstance(scores, dict):
+        return {}
+    to_add: dict[str, Any] | None = None
+    for child in trial_children:
+        weave_attrs = child.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+        eval_meta = child.attributes.get("_weave_eval_meta", {})
+        is_score_call = weave_attrs.get(constants.SCORE_ATTR_KEY) == "true" or (
+            isinstance(eval_meta, dict) and eval_meta.get("score")
+        )
+        if not is_score_call:
+            continue
+        scorer_name = _scorer_name_from_score_call(child)
+        if scorer_name is None or scorer_name in scores:
+            continue
+        if to_add is None:
+            to_add = {}
+        elif scorer_name in to_add:
+            continue
+        to_add[scorer_name] = child.output
+    if to_add is None:
+        return scores
+    return {**scores, **to_add}
+
+
 def _build_trial(
     predict_and_score_call: tsi.CallSchema,
     child_by_parent: dict[str, list[tsi.CallSchema]],
@@ -297,8 +371,9 @@ def _build_trial(
         if isinstance(predict_and_score_call.output, dict)
         else {}
     )
-    scores = output.get("scores", {})
+    raw_scores = output.get("scores", {})
     trial_children = child_by_parent.get(predict_and_score_call.id, [])
+    scores = _merge_scores_from_child_calls(raw_scores, trial_children)
     model_ref = (
         predict_and_score_call.inputs.get("model")
         if isinstance(predict_and_score_call.inputs, dict)
