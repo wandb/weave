@@ -87,6 +87,12 @@ ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
 ON_OUTPUT_MSG = "Error capturing call output:\n{}"
 UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log your traces to a project.\n"
 
+# Sentinel for the annotation cache. Decoration writes this when signature
+# introspection or annotation parsing raised, signaling that the runtime
+# handler should retry the parse on the live `sig` instead of treating
+# `None` as "no annotation."
+PARSE_DEFERRED: Any = object()
+
 
 class DisplayNameFuncError(ValueError): ...
 
@@ -297,7 +303,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     to_weave_inputs = {}
     if not func.postprocess_inputs:
         parsed_annotations = func._weave_cached_parsed_input_annotations  # type: ignore[attr-defined]
-        if parsed_annotations is None:
+        if parsed_annotations is PARSE_DEFERRED:
             parsed_annotations = parse_from_signature(sig)
         for param_name, value in inputs_with_defaults.items():
             # Check if we found an annotation which requires substitution
@@ -317,6 +323,12 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # If user defines postprocess_output manually, trust it instead of running this
     if not func.postprocess_output:
         parsed = func._weave_cached_parsed_return_annotation  # type: ignore[attr-defined]
+        if parsed is PARSE_DEFERRED:
+            return_annotation = sig.return_annotation
+            if return_annotation is not inspect.Signature.empty and return_annotation:
+                parsed = parse_content_annotation(str(return_annotation))
+            else:
+                parsed = None
         if isinstance(parsed, ContentAnnotation):
             func.postprocess_output = lambda x: Content._from_guess(
                 x, mimetype=parsed.mimetype, extension=parsed.extension
@@ -1379,8 +1391,8 @@ def op(
                     wrapper_any._weave_cached_parsed_return_annotation = None
             except (TypeError, ValueError):
                 wrapper_any = cast(Any, wrapper)
-                wrapper_any._weave_cached_parsed_input_annotations = None
-                wrapper_any._weave_cached_parsed_return_annotation = None
+                wrapper_any._weave_cached_parsed_input_annotations = PARSE_DEFERRED
+                wrapper_any._weave_cached_parsed_return_annotation = PARSE_DEFERRED
 
             return cast(Op[P, R], wrapper)
 

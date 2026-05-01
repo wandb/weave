@@ -500,9 +500,11 @@ def test_op_cached_signature_drives_defaults_and_content_annotations(monkeypatch
 
 
 def test_op_annotation_parse_failure_at_decoration_falls_back_at_runtime():
-    # When `parse_from_signature` raises while decorating, the op is still
-    # created with `None` cache sentinels (decoration-time except branch)
-    # and the runtime handler falls back to parsing input annotations live.
+    # When `parse_from_signature` raises while decorating, the op caches
+    # the `PARSE_DEFERRED` sentinel and the runtime handler retries parsing
+    # both inputs and the return annotation against the live signature.
+    from weave.trace.op import PARSE_DEFERRED
+
     def failing_parse(*args: Any, **kwargs: Any) -> Any:
         raise ValueError("simulated parse failure")
 
@@ -512,15 +514,19 @@ def test_op_annotation_parse_failure_at_decoration_falls_back_at_runtime():
         @op
         def my_op(
             data: Annotated[bytes, weave.Content[Literal["txt"]]],
-        ) -> bytes:
+        ) -> Annotated[bytes, weave.Content[Literal["txt"]]]:
             return data
 
-    assert my_op._weave_cached_parsed_input_annotations is None
-    assert my_op._weave_cached_parsed_return_annotation is None
+    assert my_op._weave_cached_parsed_input_annotations is PARSE_DEFERRED
+    assert my_op._weave_cached_parsed_return_annotation is PARSE_DEFERRED
 
     processed = _default_on_input_handler(my_op, (b"hello",), {})
     assert isinstance(processed.inputs["data"], weave.Content)
     assert processed.inputs["data"].data == b"hello"
+    assert my_op.postprocess_output is not None
+    output = my_op.postprocess_output(b"hello")
+    assert isinstance(output, weave.Content)
+    assert output.extension == ".txt"
 
 
 def test_op_signature_failure_at_call_raises_op_call_error(monkeypatch):
