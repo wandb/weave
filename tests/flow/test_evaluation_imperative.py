@@ -1,18 +1,24 @@
 import asyncio
+import datetime
 import inspect
 import json
 from collections import defaultdict
 from collections.abc import Callable
-from typing import TypedDict
+from dataclasses import dataclass
+from typing import Any, TypedDict
 
 import pytest
 
 import weave
+from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
-from weave.trace_server.trace_server_interface import ObjectVersionFilter
+from weave.trace_server.trace_server_interface import (
+    EvalResultsQueryReq,
+    ObjectVersionFilter,
+)
 
 
 class ExampleRow(TypedDict):
@@ -1178,4 +1184,557 @@ def test_evaluation_logger_with_weave_disabled(client, monkeypatch):
     pred.log_score("correctness", 0.9)
     pred.finish()
     ev.log_summary({"avg_score": 0.9})
-    ev.finish()
+
+
+@dataclass(frozen=True, slots=True)
+class SeededEval:
+    """Snapshot of a finished evaluation used to test from_evaluate_call.
+
+    `call_id` is the root Evaluation.evaluate call id; `ended_at` and
+    `output` capture the original final state so parent-integrity can be
+    asserted after appending new trials.
+    """
+
+    call_id: str
+    ended_at: datetime.datetime | None
+    output: Any
+
+
+async def _seed_finished_eval_imperative(
+    user_dataset: list[ExampleRow],
+    user_model: Callable[[int, int], int],
+) -> SeededEval:
+    """Seed via EvaluationLogger; record an `acc` score per row."""
+    ev = EvaluationLogger()
+    for row in user_dataset:
+        output = user_model(row["a"], row["b"])
+        pred = ev.log_prediction(inputs=row, output=output)
+        pred.log_score("acc", output > 3)
+        pred.finish()
+    ev.log_summary({"mean_acc": 0.5})
+    return SeededEval(
+        call_id=ev._evaluate_call.id,
+        ended_at=ev._evaluate_call.ended_at,
+        output=ev._evaluate_call.output,
+    )
+
+
+async def _seed_finished_eval_declarative(
+    user_dataset: list[ExampleRow],
+    user_model: Callable[[int, int], int],
+) -> SeededEval:
+    """Seed via the declarative `weave.Evaluation.evaluate.call(...)` API;
+    record an `acc` score per row so downstream assertions are scorer-name
+    compatible with the imperative seeder.
+    """
+
+    @weave.op
+    def my_model(a: int, b: int) -> int:
+        return user_model(a, b)
+
+    @weave.op
+    def acc(a: int, b: int, output: int) -> bool:
+        return output > 3
+
+    evaluation = weave.Evaluation(dataset=user_dataset, scorers=[acc])
+    _, evaluate_call = await evaluation.evaluate.call(evaluation, my_model)
+    return SeededEval(
+        call_id=evaluate_call.id,
+        ended_at=evaluate_call.ended_at,
+        output=evaluate_call.output,
+    )
+
+
+_SEED_FNS = [
+    pytest.param(_seed_finished_eval_imperative, id="imperative_seed"),
+    pytest.param(_seed_finished_eval_declarative, id="declarative_seed"),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("seed_fn", _SEED_FNS)
+async def test_from_evaluate_call_appends_new_row(
+    client, user_dataset, user_model, seed_fn
+):
+    """Reopen a finished evaluation, append a brand-new row, and verify that
+    eval_results_query surfaces the new row in the server-side rollup. The
+    seeding is exercised against BOTH the imperative EvaluationLogger and the
+    declarative weave.Evaluation flows.
+    """
+    seeded = await seed_fn(user_dataset, user_model)
+    client.flush()
+
+    ev2 = EvaluationLogger.from_evaluate_call(seeded.call_id)
+    new_row = {"a": 99, "b": 100}
+    pred = ev2.log_prediction(inputs=new_row, output=199)
+    pred.log_score("acc", True)
+    pred.finish()
+    ev2.log_summary()
+    client.flush()
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[seeded.call_id],
+            include_summary=True,
+        )
+    )
+    assert res.total_rows == len(user_dataset) + 1
+    row_digests_with_new_row = {
+        row.row_digest
+        for row in res.rows
+        if row.raw_data_row == new_row
+        or any(
+            trial.model_output == 199
+            for ev_entry in row.evaluations
+            for trial in ev_entry.trials
+        )
+    }
+    assert len(row_digests_with_new_row) == 1
+
+    # Parent evaluate_call must be untouched on disk.
+    refetched = client.get_call(seeded.call_id)
+    assert refetched.ended_at == seeded.ended_at
+    assert refetched.output == seeded.output
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("seed_fn", _SEED_FNS)
+async def test_from_evaluate_call_adds_score_to_existing_row(
+    client, user_dataset, user_model, seed_fn
+):
+    """Reopen a finished evaluation and add a NEW score key to an existing row
+    via a second trial that replays the same inputs. The rollup should combine
+    both trials and surface the new scorer alongside the original.
+    """
+    seeded = await seed_fn(user_dataset, user_model)
+    client.flush()
+
+    ev2 = EvaluationLogger.from_evaluate_call(seeded.call_id)
+    for row in user_dataset:
+        output = user_model(row["a"], row["b"])
+        pred = ev2.log_prediction(inputs=row, output=output)
+        pred.log_score("latency_ms", 42)
+        pred.finish()
+    ev2.log_summary()
+    client.flush()
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[seeded.call_id],
+            include_summary=True,
+        )
+    )
+    assert res.total_rows == len(user_dataset)
+    for row in res.rows:
+        eval_entries = [
+            e for e in row.evaluations if e.evaluation_call_id == seeded.call_id
+        ]
+        assert len(eval_entries) == 1
+        trials = eval_entries[0].trials
+        assert len(trials) == 2, (
+            f"expected 2 trials (original + appended) for row {row.row_digest}, "
+            f"got {len(trials)}"
+        )
+        score_keys_across_trials = set()
+        for trial in trials:
+            score_keys_across_trials.update(trial.scores.keys())
+        assert "acc" in score_keys_across_trials
+        assert "latency_ms" in score_keys_across_trials
+
+    assert res.summary is not None
+    eval_summaries = [
+        s for s in res.summary.evaluations if s.evaluation_call_id == seeded.call_id
+    ]
+    assert len(eval_summaries) == 1
+    summary_scorer_keys = {stat.scorer_key for stat in eval_summaries[0].scorer_stats}
+    assert "acc" in summary_scorer_keys
+    assert "latency_ms" in summary_scorer_keys
+
+
+def test_from_evaluate_call_original_logger_still_finalized(
+    client, user_dataset, user_model
+):
+    """Reopening via from_evaluate_call must not un-finalize the original logger
+    instance — its finalization guard stays in effect.
+    """
+    ev = EvaluationLogger()
+    for row in user_dataset:
+        output = user_model(row["a"], row["b"])
+        pred = ev.log_prediction(inputs=row, output=output)
+        pred.log_score("acc", output > 3)
+        pred.finish()
+    ev.log_summary({"mean_acc": 0.5})
+    eval_call_id = ev._evaluate_call.id
+    client.flush()
+
+    EvaluationLogger.from_evaluate_call(eval_call_id)
+
+    assert ev._is_finalized is True
+    # Calling log_prediction on the original logger is a no-op warning on
+    # log_summary but raises on log_example; exercise the stricter guard.
+    with pytest.raises(ValueError, match="finalized"):
+        ev.log_example(inputs={"a": 1, "b": 2}, output=3, scores={"acc": True})
+
+
+def test_from_evaluate_call_rejects_non_evaluate_call(client, user_dataset, user_model):
+    """from_evaluate_call must refuse to bind to calls that are not
+    Evaluation.evaluate roots.
+    """
+    ev = EvaluationLogger()
+    pred = ev.log_prediction(inputs={"a": 1, "b": 2}, output=3)
+    pred.log_score("acc", True)
+    pred.finish()
+    ev.log_summary({"mean_acc": 1.0})
+    client.flush()
+
+    # Find a predict_and_score child — not a root evaluate call.
+    calls = list(client.get_calls())
+    pas_calls = [
+        c for c in calls if op_name_from_call(c) == "Evaluation.predict_and_score"
+    ]
+    assert len(pas_calls) >= 1
+
+    with pytest.raises(
+        ValueError, match="not a root Evaluation.evaluate|not an Evaluation.evaluate"
+    ):
+        EvaluationLogger.from_evaluate_call(pas_calls[0].id)
+
+
+@pytest.mark.asyncio
+async def test_from_evaluate_call_extends_declarative_evaluation(client):
+    """Reopen a declarative weave.Evaluation (not imperative) and append a new
+    prediction + score. The new trial must show up in the server-side rollup
+    alongside the original scorer results.
+    """
+    dataset_rows = [{"a": 1, "b": 2}, {"a": 2, "b": 3}]
+
+    @weave.op
+    def my_model(a: int, b: int) -> int:
+        return a + b
+
+    @weave.op
+    def accuracy_scorer(a: int, b: int, output: int) -> bool:
+        return output == a + b
+
+    evaluation = weave.Evaluation(dataset=dataset_rows, scorers=[accuracy_scorer])
+    await evaluation.evaluate(my_model)
+    client.flush()
+
+    calls = list(client.get_calls())
+    eval_calls = [c for c in calls if op_name_from_call(c) == "Evaluation.evaluate"]
+    assert len(eval_calls) == 1
+    eval_call = eval_calls[0]
+    eval_call_id = eval_call.id
+    original_ended_at = eval_call.ended_at
+    original_output = eval_call.output
+
+    ev2 = EvaluationLogger.from_evaluate_call(eval_call_id)
+    new_row = {"a": 99, "b": 100}
+    pred = ev2.log_prediction(inputs=new_row, output=199)
+    pred.log_score("accuracy_scorer", True)
+    pred.log_score("latency_ms", 42)
+    pred.finish()
+    # Also add a new score to an existing row by replaying its inputs.
+    pred_replay = ev2.log_prediction(inputs=dataset_rows[0], output=3)
+    pred_replay.log_score("latency_ms", 17)
+    pred_replay.finish()
+    ev2.log_summary()
+    client.flush()
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_call_id],
+            include_summary=True,
+        )
+    )
+    assert res.total_rows == len(dataset_rows) + 1
+
+    # The original row that we replayed should now have 2 trials, the other
+    # original row 1 trial, and the new row 1 trial.
+    trials_by_row = {
+        row.row_digest: sum(
+            len(ev_entry.trials)
+            for ev_entry in row.evaluations
+            if ev_entry.evaluation_call_id == eval_call_id
+        )
+        for row in res.rows
+    }
+    assert sorted(trials_by_row.values()) == [1, 1, 2]
+
+    eval_summaries = [
+        s for s in res.summary.evaluations if s.evaluation_call_id == eval_call_id
+    ]
+    assert len(eval_summaries) == 1
+    summary_scorer_keys = {stat.scorer_key for stat in eval_summaries[0].scorer_stats}
+    assert "accuracy_scorer" in summary_scorer_keys
+    assert "latency_ms" in summary_scorer_keys
+
+    # Declarative eval's original evaluate_call must be untouched.
+    refetched = client.get_call(eval_call_id)
+    assert refetched.ended_at == original_ended_at
+    assert refetched.output == original_output
+
+
+@pytest.mark.asyncio
+async def test_from_evaluate_call_parent_id_after_declarative_eval_call_api(client):
+    """Regression: after `.call()` on a declarative Evaluation, the appended
+    predict_and_score's parent_id must be the evaluate_call, not the
+    summarize call. (The UI had been showing the appended trial under
+    summarize because the call stack wasn't set correctly.)
+    """
+    ev = weave.Evaluation(dataset=[{"a": 1}])
+
+    @weave.op
+    def model(a: int) -> int:
+        return a + 1
+
+    res, evaluate_call = await ev.evaluate.call(ev, model)
+
+    ev2 = EvaluationLogger.from_evaluate_call(evaluate_call.id)
+    ev2.log_example(inputs={"a": 2}, output=3, scores={})
+    ev2.finish()
+    client.flush()
+
+    calls = list(client.get_calls())
+    pas_calls = [
+        c for c in calls if op_name_from_call(c) == "Evaluation.predict_and_score"
+    ]
+    summarize_calls = [
+        c for c in calls if op_name_from_call(c) == "Evaluation.summarize"
+    ]
+    pas_calls.sort(key=lambda c: c.started_at)
+    new_pas = pas_calls[-1]
+
+    assert new_pas.parent_id == evaluate_call.id, (
+        f"new predict_and_score parent={new_pas.parent_id!r} should be "
+        f"evaluate={evaluate_call.id!r}"
+    )
+    if summarize_calls:
+        assert new_pas.parent_id != summarize_calls[0].id, (
+            "new predict_and_score is incorrectly nested under summarize"
+        )
+
+
+def _ref_uri(x: Any) -> str:
+    if hasattr(x, "uri"):
+        return x.uri() if callable(x.uri) else x.uri
+    if hasattr(x, "ref"):
+        r = x.ref
+        return r.uri() if callable(r.uri) else r.uri
+    if isinstance(x, str):
+        return x
+    raise TypeError(f"cannot extract ref uri from {x!r}")
+
+
+@pytest.mark.asyncio
+async def test_from_evaluate_call_does_not_bump_evaluation_version(client):
+    """Reopening and appending must not publish a new Evaluation version.
+    (The Model ref is separately handled: if the original `model` was a
+    real Model subclass we preserve it too, but if it was an @weave.op
+    function a placeholder Model is substituted.)
+    """
+    ev = weave.Evaluation(dataset=[{"a": 1}])
+
+    @weave.op
+    def model(a: int) -> int:
+        return a + 1
+
+    _, evaluate_call = await ev.evaluate.call(ev, model)
+
+    original_eval_ref = _ref_uri(evaluate_call.inputs["self"])
+
+    ev2 = EvaluationLogger.from_evaluate_call(evaluate_call.id)
+    ev2.log_example(inputs={"a": 2}, output=3, scores={})
+    ev2.finish()
+    client.flush()
+
+    pas_calls = [
+        c
+        for c in client.get_calls()
+        if op_name_from_call(c) == "Evaluation.predict_and_score"
+    ]
+    pas_calls.sort(key=lambda c: c.started_at)
+    new_pas = pas_calls[-1]
+
+    new_eval_ref = _ref_uri(new_pas.inputs["self"])
+
+    assert new_eval_ref == original_eval_ref, (
+        f"appending bumped the Evaluation version: "
+        f"{original_eval_ref} -> {new_eval_ref}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_from_evaluate_call_preserves_eval_ref_with_model_subclass(client):
+    """The Evaluation ref must be preserved when reopening, regardless of the
+    model's type. The Model ref is preserved only when wc.get() round-trips
+    the original to a Model instance — otherwise (Op functions, unregistered
+    Model subclasses surfaced as WeaveObject wrappers) we fall back to a
+    placeholder Model, which bumps a Model version. That tradeoff is
+    acceptable since the user-visible Evaluation identity stays stable.
+    """
+
+    class MyModel(Model):
+        factor: int = 2
+
+        @weave.op
+        def predict(self, a: int) -> int:
+            return a * self.factor
+
+    original_model = MyModel()
+
+    ev = weave.Evaluation(dataset=[{"a": 1}])
+    _, evaluate_call = await ev.evaluate.call(ev, original_model)
+
+    original_eval_ref = _ref_uri(evaluate_call.inputs["self"])
+
+    ev2 = EvaluationLogger.from_evaluate_call(evaluate_call.id)
+    ev2.log_example(inputs={"a": 2}, output=4, scores={})
+    ev2.finish()
+    client.flush()
+
+    pas_calls = [
+        c
+        for c in client.get_calls()
+        if op_name_from_call(c) == "Evaluation.predict_and_score"
+    ]
+    pas_calls.sort(key=lambda c: c.started_at)
+    new_pas = pas_calls[-1]
+
+    assert _ref_uri(new_pas.inputs["self"]) == original_eval_ref
+
+
+@pytest.mark.asyncio
+async def test_from_evaluate_call_visible_via_query_apis(client):
+    """After extending a declarative Evaluation via from_evaluate_call, every query
+    surface that walks the eval tree must see the appended data:
+
+      1. `client.get_call(eval_call_id)` — direct fetch.
+      2. `evaluation.get_evaluate_calls()` — by-evaluation-ref query.
+      3. `client.get_calls(filter=...)` — generic call query by op name.
+      4. `client.server.eval_results_query(...)` — the v2 rollup endpoint.
+      5. `evaluation.get_score_calls()` — descendent scorer calls per trace.
+    """
+    @weave.op
+    def my_model(a: int) -> int:
+        return a + 1
+
+    @weave.op
+    def is_even(a: int, output: int) -> bool:
+        return output % 2 == 0
+
+    evaluation = weave.Evaluation(dataset=[{"a": 1}, {"a": 2}], scorers=[is_even])
+    _, evaluate_call = await evaluation.evaluate.call(evaluation, my_model)
+    eval_call_id = evaluate_call.id
+    eval_trace_id = evaluate_call.trace_id
+
+    # --- extend ---
+    ev2 = EvaluationLogger.from_evaluate_call(eval_call_id)
+    pred = ev2.log_prediction(inputs={"a": 99}, output=100)
+    pred.log_score("is_even", True)
+    pred.finish()
+    ev2.log_summary()
+    client.flush()
+
+    # 1) direct fetch by id
+    refetched = client.get_call(eval_call_id)
+    assert refetched.id == eval_call_id
+    assert refetched.trace_id == eval_trace_id
+
+    # 2) get_evaluate_calls — returns the same root call (input_refs filter
+    #    matches because we preserved the Evaluation ref).
+    eval_calls_via_method = list(evaluation.get_evaluate_calls())
+    assert any(c.id == eval_call_id for c in eval_calls_via_method), (
+        f"evaluation.get_evaluate_calls() did not surface "
+        f"{eval_call_id} after extending"
+    )
+
+    # 3) generic calls_query for predict_and_score under this trace finds
+    #    BOTH the original (2 rows) and the appended (1 new row) trials.
+    pas_in_trace = [
+        c
+        for c in client.get_calls(filter={"trace_ids": [eval_trace_id]})
+        if op_name_from_call(c) == "Evaluation.predict_and_score"
+    ]
+    assert len(pas_in_trace) == 3, (
+        f"expected 3 predict_and_score calls in trace, got {len(pas_in_trace)}"
+    )
+    appended_pas_inputs = {tuple(sorted(c.inputs["example"].items())) for c in pas_in_trace}
+    assert (("a", 99),) in appended_pas_inputs, (
+        f"appended row {{'a': 99}} not found in calls_query results: "
+        f"{appended_pas_inputs}"
+    )
+
+    # 4) eval_results_query rollup includes the appended row.
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_call_id],
+            include_summary=True,
+        )
+    )
+    assert res.total_rows == 3
+    new_row_present = any(
+        any(t.model_output == 100 for ev in row.evaluations for t in ev.trials)
+        for row in res.rows
+    )
+    assert new_row_present, "eval_results_query did not surface the appended row"
+
+    # 5) get_score_calls finds scorer descendents under the eval's trace —
+    #    must include the appended `is_even` scorer call.
+    score_calls_by_trace = evaluation.get_score_calls()
+    assert eval_trace_id in score_calls_by_trace, (
+        f"trace {eval_trace_id} missing from get_score_calls keys: "
+        f"{list(score_calls_by_trace.keys())}"
+    )
+    is_even_calls = [
+        c
+        for c in score_calls_by_trace[eval_trace_id]
+        if c.summary.get("weave", {}).get("trace_name") == "is_even"
+    ]
+    # 2 originals + 1 from the reopen append.
+    assert len(is_even_calls) == 3, (
+        f"expected 3 `is_even` scorer calls (2 original + 1 appended), "
+        f"got {len(is_even_calls)}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_evaluation_from_ref_preserves_digest(client):
+    """`Evaluation.from_ref(ref)` must hydrate the Evaluation while
+    preserving the ref's digest, so callers can pass the result back into
+    op inputs without bumping a new object version.
+    """
+
+    @weave.op
+    def m(a: int) -> int:
+        return a + 1
+
+    evaluation = weave.Evaluation(dataset=[{"a": 1}])
+    await evaluation.evaluate.call(evaluation, m)
+    eval_ref = evaluation.ref
+    assert eval_ref is not None
+
+    hydrated = Evaluation.from_ref(eval_ref)
+    assert isinstance(hydrated, Evaluation)
+    assert hydrated.ref is not None
+    assert hydrated.ref.digest == eval_ref.digest
+
+
+def test_model_from_ref_returns_none_for_non_model_ref(client):
+    """`Model.from_ref` returns `None` when the ref doesn't resolve to a
+    Model instance — for example, when the ref points at an `@weave.op`
+    function. Callers like `EvaluationLogger.from_evaluate_call` rely on
+    that None to know they need to substitute a placeholder.
+    """
+
+    @weave.op
+    def m(a: int) -> int:
+        return a + 1
+
+    weave.publish(m)
+    assert m.ref is not None
+    assert Model.from_ref(m.ref) is None

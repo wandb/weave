@@ -5275,6 +5275,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if call.id in resolved_by_call_id and isinstance(call.inputs, dict):
                 call.inputs["example"] = resolved_by_call_id[call.id]
 
+        # Recompute row digests in Python using the shared helper so that
+        # refs, decoded dicts, and raw JSON-string inputs all collapse to the
+        # same canonical digest. The SQL-level __row_digest uses
+        # hex(SHA256(raw JSON)) for non-ref inputs, which doesn't match the
+        # base64url form produced by str_digest / extract_row_digest_from_ref_path.
+        # Without this override, a row stored as a ref and a replayed trial
+        # passing the same dict would be grouped into different rows.
+        for call in page_calls:
+            example = (
+                call.inputs.get("example") if isinstance(call.inputs, dict) else None
+            )
+            if example is None:
+                continue
+            digest, _ = eval_helpers.extract_row_digest_from_example(example)
+            digest_by_call[call.id] = digest
+
         if req.include_predict_and_score_children and len(page_calls) > 0:
             predict_and_score_ids = [c.id for c in page_calls]
             child_columns = [
@@ -5300,6 +5316,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.include_raw_data_rows if req.include_rows else False,
             req.include_predict_and_score_children,
         )
+
+        # Re-sort by the (now canonical base64url) row digest when no explicit
+        # sort_by is requested, so result ordering stays stable between the
+        # include_summary=True path (which runs apply_row_selection → sort
+        # in-place on row_digest) and the include_summary=False path (which
+        # previously trusted the SQL hex-sorted row_order). When the user
+        # supplied a sort_by we leave the SQL order intact.
+        if not req.sort_by:
+            all_rows.sort(key=lambda row: row.row_digest)
 
         summary: tsi.EvalResultsSummaryRes | None = None
         if req.include_summary:

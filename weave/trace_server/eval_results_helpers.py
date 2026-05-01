@@ -209,6 +209,16 @@ def extract_row_digest_from_example(example: Any) -> tuple[str, bool]:
         digest = ri.extract_row_digest_from_ref_path(example)
         if digest is not None:
             return digest, True
+        # The example may be a serialized dict (e.g. ClickHouse returns call
+        # inputs as compact JSON strings) rather than an already-decoded dict.
+        # Re-parse and re-serialize with the canonical form so digests remain
+        # stable regardless of serialization whitespace.
+        try:
+            parsed = json.loads(example)
+        except ValueError:
+            parsed = None
+        if isinstance(parsed, dict):
+            example = json.dumps(parsed, sort_keys=True, default=str)
     if not isinstance(example, str):
         example = json.dumps(example, sort_keys=True, default=str)
     return str_digest(example), False

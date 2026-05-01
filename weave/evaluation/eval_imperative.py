@@ -30,8 +30,10 @@ from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
+from weave.trace.refs import ObjectRef, OpRef, Ref
 from weave.trace.table import Table
 from weave.trace.util import Thread
+from weave.trace.vals import WeaveObject
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
 from weave.utils.sentinel import NOT_SET, _NotSetType
@@ -696,67 +698,7 @@ class EvaluationLogger:
 
         # The following section is a "hacky" way to create Model and Evaluation
         # objects that "look right" to our object saving system.
-
-        # --- Setup the model object ---
-        # If the model doesn't have a predict method, create a placeholder
-        try:
-            assert isinstance(self.model, Model)
-            self.model.get_infer_method()
-        except MissingInferenceMethodError:
-
-            @op(name="Model.predict", enable_code_capture=False)
-            def predict(self: Model, inputs: dict) -> Any:
-                # Get the output from the context variable
-                return current_output.get()
-
-            self.model.__dict__["predict"] = MethodType(predict, self.model)
-
-        # Always create a context-aware predict method for use during log_prediction
-        @op(name="Model.predict", enable_code_capture=False)  # type: ignore[no-redef]
-        def predict(self: Model, inputs: dict) -> Any:
-            # Get the output from the context variable
-            return current_output.get()
-
-        self._context_predict_method = MethodType(predict, self.model)
-
-        # --- Setup the evaluation object ---
-        @op(
-            name="Evaluation.evaluate",
-            enable_code_capture=False,
-            eager_call_start=True,
-        )
-        def evaluate(self: Evaluation, model: Model) -> None: ...
-
-        @op(name="Evaluation.predict_and_score", enable_code_capture=False)
-        def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
-            predict_method = cast(Op, model.get_infer_method())
-            with attributes(IMPERATIVE_EVAL_MARKER):
-                output, predict_call = predict_method.call(
-                    model, example, __require_explicit_finish=True
-                )
-                current_predict_call.set(predict_call)
-
-            # This data is just a placeholder to give a sense of the data shape.
-            # The actual output is explicitly replaced in ScoreLogger.finish.
-            return {
-                "output": output,
-                "scores": {},
-                "model_latency": None,
-            }
-
-        @op(name="Evaluation.summarize", enable_code_capture=False)
-        def summarize(self: Evaluation) -> dict:
-            return cast(dict, current_summary.get())
-
-        self._pseudo_evaluation.__dict__.update(
-            {
-                "evaluate": MethodType(evaluate, self._pseudo_evaluation),
-                "predict_and_score": MethodType(
-                    predict_and_score, self._pseudo_evaluation
-                ),
-                "summarize": MethodType(summarize, self._pseudo_evaluation),
-            }
-        )
+        self._install_pseudo_methods()
 
         # Create the evaluation call
         wc = require_weave_client()
@@ -770,6 +712,188 @@ class EvaluationLogger:
             attributes=self.attributes,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
+
+    def _install_pseudo_methods(self, *, bind_evaluate: bool = True) -> None:
+        """Bind context-aware placeholder ops onto ``self.model`` and
+        ``self._pseudo_evaluation`` so the imperative logging flow can drive
+        predict/predict_and_score/summarize without invoking the user's real
+        model logic.
+
+        ``log_prediction`` / ``log_summary`` propagate values through context
+        vars (``current_output``, ``current_summary``); the bound ops just
+        return those values, so each call records the right inputs/outputs
+        without re-running anything.
+
+        ``bind_evaluate=False`` is used by ``from_evaluate_call`` — that path
+        binds to an existing Evaluation.evaluate call, so it never invokes
+        ``self._pseudo_evaluation.evaluate`` and binding it would be dead code.
+        """
+        if isinstance(self.model, Model):
+            try:
+                self.model.get_infer_method()
+            except MissingInferenceMethodError:
+
+                @op(name="Model.predict", enable_code_capture=False)
+                def predict(self: Model, inputs: dict) -> Any:
+                    return current_output.get()
+
+                self.model.__dict__["predict"] = MethodType(predict, self.model)
+
+        # Always create a context-aware predict method for use during
+        # log_prediction (temporarily swapped onto self.model.__dict__).
+        @op(name="Model.predict", enable_code_capture=False)  # type: ignore[no-redef]
+        def predict(self: Model, inputs: dict) -> Any:
+            return current_output.get()
+
+        self._context_predict_method = MethodType(predict, self.model)
+
+        @op(name="Evaluation.predict_and_score", enable_code_capture=False)
+        def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
+            predict_method = cast(Op, model.get_infer_method())
+            with attributes(IMPERATIVE_EVAL_MARKER):
+                output, predict_call = predict_method.call(
+                    model, example, __require_explicit_finish=True
+                )
+                current_predict_call.set(predict_call)
+            # Placeholder shape; ScoreLogger.finish replaces the real output.
+            return {
+                "output": output,
+                "scores": {},
+                "model_latency": None,
+            }
+
+        @op(name="Evaluation.summarize", enable_code_capture=False)
+        def summarize(self: Evaluation) -> dict:
+            return cast(dict, current_summary.get())
+
+        bound_methods: dict[str, Any] = {
+            "predict_and_score": MethodType(
+                predict_and_score, self._pseudo_evaluation
+            ),
+            "summarize": MethodType(summarize, self._pseudo_evaluation),
+        }
+        if bind_evaluate:
+
+            @op(
+                name="Evaluation.evaluate",
+                enable_code_capture=False,
+                eager_call_start=True,
+            )
+            def evaluate(self: Evaluation, model: Model) -> None: ...
+
+            bound_methods["evaluate"] = MethodType(evaluate, self._pseudo_evaluation)
+
+        self._pseudo_evaluation.__dict__.update(bound_methods)
+
+    @classmethod
+    def from_evaluate_call(cls, call_id: str) -> EvaluationLogger:
+        """Reopen an existing (possibly finished) ``Evaluation.evaluate`` call so
+        additional predictions and scores can be appended.
+
+        New predictions are written as fresh ``Evaluation.predict_and_score``
+        children of the original evaluate call. To add a new score to an
+        existing row, log a prediction with the same ``inputs`` dict — the
+        server-side read path (``eval_results_query``) groups trials by
+        ``row_digest`` and aggregates scores across all trials, so the new
+        score rolls up automatically.
+
+        The original evaluate call's ``ended_at`` and ``output`` are preserved;
+        ``log_summary`` on a reopened logger writes a new ``Evaluation.summarize``
+        sibling call rather than mutating the original.
+
+        Args:
+            call_id: The id of the ``Evaluation.evaluate`` call to reopen.
+
+        Returns:
+            A fresh ``EvaluationLogger`` bound to the existing evaluate call.
+
+        Raises:
+            ValueError: If ``call_id`` does not refer to a root
+                ``Evaluation.evaluate`` call.
+        """
+        wc = require_weave_client()
+        call = wc.get_call(call_id)
+
+        op_name_value = call.op_name
+        parsed_op_ref = (
+            Ref.parse_uri(op_name_value) if isinstance(op_name_value, str) else None
+        )
+        if (
+            not isinstance(parsed_op_ref, OpRef)
+            or parsed_op_ref.name != "Evaluation.evaluate"
+        ):
+            raise ValueError(
+                f"Call {call_id} is not an Evaluation.evaluate call "
+                f"(got op_name={op_name_value!r})"
+            )
+        if call.parent_id is not None:
+            raise ValueError(
+                f"Call {call_id} is not a root Evaluation.evaluate call "
+                f"(parent_id={call.parent_id!r})"
+            )
+
+        self = cls.__new__(cls)
+        self.name = call.display_name if isinstance(call.display_name, str) else None
+        self.scorers = None
+        call_attributes = call.attributes or {}
+        self.eval_attributes = {
+            k: v for k, v in call_attributes.items() if k != "_weave_eval_meta"
+        }
+
+        # Reuse the original Evaluation and Model referenced by the existing
+        # evaluate call. If we instead built fresh placeholders here, weave
+        # would publish them as new object versions the first time they show
+        # up in `predict_and_score.call(...)` inputs.
+        call_inputs = call.inputs if isinstance(call.inputs, dict) else {}
+        eval_input = call_inputs.get("self")
+        model_input = call_inputs.get("model")
+        if eval_input is None or model_input is None:
+            raise ValueError(
+                f"Evaluation.evaluate call {call_id} is missing required "
+                "'self'/'model' inputs; cannot reopen."
+            )
+        # `call.inputs[...]` may be an ObjectRef, an already-hydrated
+        # `WeaveObject`, or a pydantic instance, depending on whether the
+        # call schema deref'd refs. Dispatch accordingly so the downstream
+        # serializer reuses the original digest in either form.
+        if isinstance(eval_input, Evaluation):
+            self._pseudo_evaluation = eval_input
+        elif isinstance(eval_input, ObjectRef):
+            self._pseudo_evaluation = Evaluation.from_ref(eval_input)
+        elif isinstance(eval_input, WeaveObject):
+            self._pseudo_evaluation = Evaluation.from_obj(eval_input)
+        else:
+            raise TypeError(
+                f"Cannot reopen evaluate call {call_id}: inputs['self'] "
+                f"is {type(eval_input).__name__}, expected Evaluation, "
+                "ObjectRef, or WeaveObject."
+            )
+        # Model is best-effort: only a real Model instance (or a ref that
+        # resolves to one) preserves the model digest. WeaveObject wrappers
+        # around unregistered Model subclasses and `@weave.op` functions both
+        # fall back to a placeholder Model.
+        if isinstance(model_input, Model):
+            self.model = model_input
+        elif isinstance(model_input, ObjectRef):
+            self.model = Model.from_ref(model_input) or _cast_to_cls(Model)(Model())
+        else:
+            self.model = _cast_to_cls(Model)(Model())
+        self.dataset = self._pseudo_evaluation.dataset
+
+        self._is_finalized = False
+        self._accumulated_predictions = []
+
+        _active_evaluation_loggers.append(self)
+
+        # `bind_evaluate=False` since we attach to the existing Evaluation.evaluate
+        # call below; binding a fresh `evaluate` op on the pseudo-evaluation would
+        # be dead code in this path.
+        self._install_pseudo_methods(bind_evaluate=False)
+
+        # Bind to the existing evaluate call — do NOT create a new one.
+        self._evaluate_call = call
+
+        return self
 
     @property
     def ui_url(self) -> str | None:
@@ -801,14 +925,20 @@ class EvaluationLogger:
 
         self._cleanup_predictions()
 
-        # Finish the evaluation call
-        wc = require_weave_client()
-        # Ensure the call is finished even if there was an error during summarize or elsewhere
-        try:
-            wc.finish_call(self._evaluate_call, output=output, exception=exception)
-        except Exception:
-            # Log error but continue cleanup
-            logger.exception("Failed to finish evaluation call during finalization.")
+        # Finish the evaluation call, unless it was already ended on a previous
+        # run (e.g. we were reopened via `from_evaluate_call`). In that case we
+        # preserve the original ended_at and output so history stays intact; the
+        # new summarize call appended as a sibling carries the updated rollup.
+        evaluate_call = getattr(self, "_evaluate_call", None)
+        if evaluate_call is not None and evaluate_call.ended_at is None:
+            wc = require_weave_client()
+            try:
+                wc.finish_call(evaluate_call, output=output, exception=exception)
+            except Exception:
+                # Log error but continue cleanup
+                logger.exception(
+                    "Failed to finish evaluation call during finalization."
+                )
 
         self._is_finalized = True
 
