@@ -84,8 +84,10 @@ EVAL_META_KEY = "_weave_eval_meta"
 IMPERATIVE_EVAL_META_MARKER = {"imperative": True}
 SCORE_META_MARKER = {"score": True}
 
+
 def _as_call_attributes(eval_meta: dict[str, Any]) -> dict[str, Any]:
     return {EVAL_META_KEY: eval_meta}
+
 
 @contextmanager
 def _set_current_output(output: Any) -> Iterator[None]:
