@@ -822,9 +822,7 @@ def _wrap_table(
     if not isinstance(table_ref, TableRef):
         table_ref = getattr(val, "table_ref", None)
         if not isinstance(table_ref, TableRef):
-            raise InternalError(
-                "Expected Table.ref or Table.table_ref to be TableRef"
-            )
+            raise InternalError("Expected Table.ref or Table.table_ref to be TableRef")
     rows = val.rows
     wt = WeaveTable(
         table_ref=table_ref,
