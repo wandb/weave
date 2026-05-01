@@ -421,27 +421,31 @@ def process_query_to_optimization_sql(
     )
 
 
-def _create_like_pattern_for_value(value: str | float | bool) -> str:
-    """Creates a LIKE pattern for a value based on its type in JSON format.
+def _create_like_patterns_for_value(value: str | float | bool) -> list[str]:
+    """Creates LIKE patterns for a value based on its type in JSON format.
 
-    Args:
-        value: The value to create a pattern for
-
-    Returns:
-        LIKE pattern string appropriate for the value type in JSON
+    Returns a list because a single value can serialize to JSON in more than
+    one shape: a Python float like `1.0` is paired with a typed cast that
+    matches JSON `1` numerically, so the prefilter must allow both `%1.0%`
+    and `%1%` to avoid being stricter than the HAVING comparison.
     """
+    if isinstance(value, bool):
+        # bool must be checked before int since bool is a subclass of int.
+        # Boolean values are serialized as true/false without quotes in JSON.
+        return [f"%{str(value).lower()}%"]
     if isinstance(value, str):
         # Boolean string literals are not wrapped in quotes in JSON payloads
         if value in {"true", "false"}:
-            return f"%{value}%"
-        else:
-            return f'%"{value}"%'
-    elif isinstance(value, bool):
-        # Boolean values are serialized as true/false without quotes in JSON
-        return f"%{str(value).lower()}%"
-    else:
-        # Numbers are not quoted in JSON
-        return f"%{value}%"
+            return [f"%{value}%"]
+        return [f'%"{value}"%']
+    # Numbers are not quoted in JSON.
+    if isinstance(value, float) and value.is_integer():
+        # JSON encoders typically drop the trailing `.0` (e.g. `1.0` -> `1`),
+        # so a float literal with no fractional part must also match the
+        # integer-form text. The HAVING toFloat64OrNull comparison filters
+        # the over-included rows precisely.
+        return [f"%{value}%", f"%{int(value)}%"]
+    return [f"%{value}%"]
 
 
 def _create_like_condition(
@@ -541,9 +545,13 @@ def _create_like_optimized_eq_condition(
         # Empty/None values are not valid for LIKE optimization
         return None
 
-    like_pattern = _create_like_pattern_for_value(literal_value)
-
-    like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
+    like_patterns = _create_like_patterns_for_value(literal_value)
+    per_pattern = [
+        _create_like_condition(field, p, pb, table_alias) for p in like_patterns
+    ]
+    like_condition = (
+        per_pattern[0] if len(per_pattern) == 1 else "(" + " OR ".join(per_pattern) + ")"
+    )
     return _maybe_use_null_check(like_condition, field, table_alias, use_null_check)
 
 
@@ -642,10 +650,11 @@ def _create_like_optimized_in_condition(
         if isinstance(value_operand.literal_, str) and not value_operand.literal_:
             return None
 
-        like_pattern = _create_like_pattern_for_value(value_operand.literal_)
-
-        like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
-        like_conditions.append(like_condition)
+        for like_pattern in _create_like_patterns_for_value(value_operand.literal_):
+            like_condition = _create_like_condition(
+                field, like_pattern, pb, table_alias
+            )
+            like_conditions.append(like_condition)
 
     or_sql = "(" + " OR ".join(like_conditions) + ")"
     return _maybe_use_null_check(or_sql, field, table_alias, use_null_check)

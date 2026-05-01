@@ -3717,6 +3717,16 @@ def test_calls_query_filter_by_root_refs(client):
             1,
         ),
         (
+            # The JSON dump for `root_op(1)` is `{"x":1}` (no decimal). A float
+            # literal of 1.0 must still match it: the inferred typed comparison
+            # is `toFloat64OrNull("1") = 1.0`, which is true. This case guards
+            # against the LIKE prefilter being stricter than HAVING for whole
+            # number floats vs int-encoded JSON.
+            "inputs whole-number float vs int-encoded JSON",
+            {"$eq": [{"$getField": "inputs.x"}, {"$literal": 1.0}]},
+            1,
+        ),
+        (
             "output explicit convert",
             {
                 "$eq": [
