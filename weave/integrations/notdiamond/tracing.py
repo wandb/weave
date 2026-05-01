@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
+from typing import Any
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -25,6 +26,24 @@ def passthrough_wrapper(settings: OpSettings) -> Callable:
         return weave.op(fn, **op_kwargs)
 
     return wrapper
+
+
+def _postprocess_model_output(output: Any) -> Any:
+    model_dump = getattr(output, "model_dump", None)
+    if callable(model_dump):
+        return model_dump(mode="json")
+    return output
+
+
+def _chain_postprocess_output(
+    postprocess_output: Callable[[Any], Any] | None,
+) -> Callable[[Any], Any]:
+    def postprocess(output: Any) -> Any:
+        if postprocess_output is not None:
+            output = postprocess_output(output)
+        return _postprocess_model_output(output)
+
+    return postprocess
 
 
 def _patch_client_op(method_name: str) -> list[SymbolPatcher]:
@@ -125,9 +144,36 @@ def get_notdiamond_patcher(
             passthrough_wrapper(toolkit_custom_router_eval_settings),
         ),
     ]
+    model_router_select_settings = base.model_copy(
+        update={
+            "name": base.name or "NotDiamond.model_router.select_model",
+            "kind": base.kind or "tool",
+            "postprocess_output": _chain_postprocess_output(base.postprocess_output),
+        }
+    )
+    custom_router_train_settings = base.model_copy(
+        update={
+            "name": base.name or "NotDiamond.custom_router.train_custom_router",
+            "kind": base.kind or "tool",
+            "postprocess_output": _chain_postprocess_output(base.postprocess_output),
+        }
+    )
+    patched_resource_functions = [
+        SymbolPatcher(
+            lambda: importlib.import_module("notdiamond.resources.model_router"),
+            "ModelRouterResource.select_model",
+            passthrough_wrapper(model_router_select_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("notdiamond.resources.custom_router"),
+            "CustomRouterResource.train_custom_router",
+            passthrough_wrapper(custom_router_train_settings),
+        ),
+    ]
 
     all_patched_functions = (
         patched_client_functions
+        + patched_resource_functions
         + patched_toolkit_functions
         + patched_llmconfig_functions
     )
