@@ -96,6 +96,7 @@ from weave.session.session import (
 from weave.trace.log_call import log_call
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
+from weave.trace.weave_init import otel_traces_endpoint
 from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
@@ -170,6 +171,7 @@ __all__ = [
     "log_session",
     "log_turn",
     "op",
+    "otel_traces_endpoint",
     "publish",
     "ref",
     "remove_aliases",
