@@ -198,6 +198,86 @@ def test_clickhouse_distributed_mode_properties():
         assert server._get_calls_complete_table_name() == "calls_complete"
 
 
+def test_use_distributed_mode_auto_detect_paths():
+    """Cover the new auto-detect resolution: env unset, replicated gate, caching."""
+    from weave.trace_server.database_engine import CLUSTER_SHARD_COUNT_QUERY
+
+    def _mock_client(shard_count: int) -> MagicMock:
+        shard_result = Mock()
+        shard_result.result_rows = [(shard_count,)]
+        client = MagicMock()
+        client.query.return_value = shard_result
+        return client
+
+    # 1. Env var unset + replicated + multi-shard -> auto-detected True, cached.
+    mock_client = _mock_client(shard_count=3)
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client),
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables",
+            return_value=None,
+        ),
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated",
+            return_value=True,
+        ),
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated_cluster",
+            return_value="auto_cluster",
+        ),
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        assert server.use_distributed_mode is True
+        # Repeated access uses the cache; system.clusters is queried exactly once.
+        assert server.use_distributed_mode is True
+        cluster_calls = [
+            c
+            for c in mock_client.query.call_args_list
+            if c.args and c.args[0] == CLUSTER_SHARD_COUNT_QUERY
+        ]
+        assert len(cluster_calls) == 1
+        assert cluster_calls[0].kwargs["parameters"] == {
+            "cluster_name": "auto_cluster"
+        }
+
+    # 2. Env var unset + non-replicated -> False, no system.clusters query.
+    mock_client = _mock_client(shard_count=99)
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client),
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables",
+            return_value=None,
+        ),
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated",
+            return_value=False,
+        ),
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        assert server.use_distributed_mode is False
+        assert mock_client.query.call_count == 0
+
+    # 3. Env var unset + replicated + single shard -> False.
+    mock_client = _mock_client(shard_count=1)
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client),
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables",
+            return_value=None,
+        ),
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated",
+            return_value=True,
+        ),
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated_cluster",
+            return_value=None,
+        ),
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        assert server.use_distributed_mode is False
+
+
 def test_completions_create_stream_custom_provider():
     """Test completions_create_stream for a custom provider (no call tracking)."""
     # Mock chunks to be returned by the stream

@@ -92,9 +92,10 @@ from tenacity import (
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
 from weave.trace_server.database_engine import (
+    DEFAULT_REPLICATED_CLUSTER,
     ENGINE_DISCOVERY_MAX_WAIT_SECONDS,
     EngineDiscoveryError,
-    detect_cluster_shard_count,
+    auto_detect_use_distributed,
     wait_for_database_engine,
 )
 from weave.trace_server.environment import wf_clickhouse_calls_shard_key
@@ -125,7 +126,6 @@ def _is_transient_ch_error(exc: BaseException) -> bool:
 # These settings are only used when `replicated` mode is enabled for
 # self managed clickhouse instances.
 DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
-DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 
 # Constants for table naming conventions
 VIEW_SUFFIX = "_view"
@@ -1228,10 +1228,10 @@ def get_clickhouse_trace_server_migrator(
         replicated_path: ZooKeeper path for replication
         replicated_cluster: Cluster name for replication
         use_distributed: Whether to use distributed tables on top of replicated
-            tables. Pass ``None`` (the default) to auto-detect from the cluster's
-            shard count in ``system.clusters``. Pass ``True``/``False`` to
-            override auto-detection (e.g. via the
-            ``WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES`` env var).
+            tables. Pass `None` (the default) to auto-detect from the cluster's
+            shard count in `system.clusters`. Pass `True`/`False` to override
+            auto-detection (e.g. via the `WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES`
+            env var).
         management_db: Database name for migration management
         migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
         post_migration_hook: Optional callable run after migrations; defaults to the Weave costs backfill hook (pass None to disable)
@@ -1244,39 +1244,14 @@ def get_clickhouse_trace_server_migrator(
     """
     replicated = False if replicated is None else replicated
 
-    # --- Auto-detect distributed mode from cluster shard count ---
-    # When use_distributed is None (no explicit env var / CLI flag), we query
-    # system.clusters to count the shards. >1 shard means data is partitioned
-    # across nodes and we need Distributed engine tables.
-    # An explicit True/False always wins — auto-detect only fires for None.
-    if use_distributed is None and replicated:
-        cluster = replicated_cluster or DEFAULT_REPLICATED_CLUSTER
-        try:
-            shard_count = detect_cluster_shard_count(ch_client, cluster)
-            # >1 shard → distributed tables needed to fan queries across shards.
-            # 0 means the cluster wasn't found (misconfigured or single-node);
-            # 1 means single-shard replicated — no distributed tables needed.
-            use_distributed = shard_count > 1
-            logger.info(
-                "Auto-detected %d shard(s) for cluster '%s' → use_distributed=%s",
-                shard_count,
-                cluster,
-                use_distributed,
-            )
-        except EngineDiscoveryError:
-            # If we can't query system.clusters (e.g. permissions), fall back
-            # to non-distributed mode and let the operator know.
-            logger.warning(
-                "Could not auto-detect shard count for cluster '%s' from "
-                "system.clusters — defaulting to use_distributed=False. "
-                "Set WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES explicitly to "
-                "override.",
-                cluster,
-            )
+    # An explicit True/False from the env var or CLI flag always wins.
+    # When None and replication is on, auto-detect from the cluster shard count.
+    if use_distributed is None:
+        if replicated:
+            cluster = replicated_cluster or DEFAULT_REPLICATED_CLUSTER
+            use_distributed = auto_detect_use_distributed(ch_client, cluster)
+        else:
             use_distributed = False
-    elif use_distributed is None:
-        # Not replicated → distributed tables don't apply.
-        use_distributed = False
 
     logger.info(
         "ClickHouseTraceServerMigrator initialized with: "

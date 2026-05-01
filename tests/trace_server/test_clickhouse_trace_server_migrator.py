@@ -22,22 +22,28 @@ DEFAULT_MIGRATION_DIR = os.path.abspath(
 )
 
 
-def _make_ch_client(database_engine: str = "Atomic") -> Mock:
-    """Create a mock CH client that returns *database_engine* for system.databases queries.
+def _make_ch_client(
+    database_engine: str = "Atomic", shard_count: int = 0
+) -> Mock:
+    """Create a mock CH client that returns *database_engine* for system.databases
+    queries and *shard_count* for system.clusters queries.
 
-    Only ``system.databases`` queries are stubbed; all other ``query()`` calls
-    fall through to the default Mock behaviour so they don't silently return
-    engine data for unrelated code paths.
+    Other ``query()`` calls fall through to the default Mock behaviour so they
+    don't silently return engine data for unrelated code paths.
     """
     ch_client = Mock()
     ch_client.database = "test_db"
 
     engine_result = Mock()
     engine_result.result_rows = [(database_engine,)]
+    shard_result = Mock()
+    shard_result.result_rows = [(shard_count,)]
 
     def _query_side_effect(sql, *args, **kwargs):
         if "system.databases" in sql:
             return engine_result
+        if "system.clusters" in sql:
+            return shard_result
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
@@ -1264,3 +1270,133 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(DatabaseError("some other error"))
     assert not _is_transient_ch_error(DatabaseError(""))
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
+
+
+def _make_shard_count_ch_client(
+    shard_count: int | None = None,
+    raise_on_clusters: Exception | None = None,
+) -> Mock:
+    """Mock CH client that answers system.databases (engine) and system.clusters
+    (shard count) queries.
+    """
+    ch_client = Mock()
+    ch_client.database = "test_db"
+
+    engine_result = Mock()
+    engine_result.result_rows = [("Atomic",)]
+
+    def _query_side_effect(sql, *args, **kwargs):
+        if "system.clusters" in sql:
+            if raise_on_clusters is not None:
+                raise raise_on_clusters
+            shard_result = Mock()
+            shard_result.result_rows = [(shard_count,)]
+            return shard_result
+        if "system.databases" in sql:
+            return engine_result
+        return Mock()
+
+    ch_client.query.side_effect = _query_side_effect
+    return ch_client
+
+
+@pytest.mark.parametrize(
+    ("shard_count", "expected_use_distributed", "expected_class"),
+    [
+        (3, True, DistributedClickHouseTraceServerMigrator),
+        (1, False, ReplicatedClickHouseTraceServerMigrator),
+        (0, False, ReplicatedClickHouseTraceServerMigrator),
+    ],
+)
+def test_get_migrator_auto_detects_use_distributed_when_replicated(
+    shard_count, expected_use_distributed, expected_class
+):
+    """When use_distributed is None and replicated=True, auto-detect from system.clusters."""
+    ch_client = _make_shard_count_ch_client(shard_count=shard_count)
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=True,
+        replicated_cluster="test_cluster",
+        replicated_path="/clickhouse/tables/{db}",
+    )
+    assert isinstance(migrator, expected_class)
+    cluster_queries = [
+        c
+        for c in ch_client.query.call_args_list
+        if "system.clusters" in c.args[0]
+    ]
+    assert len(cluster_queries) == 1
+    assert cluster_queries[0].kwargs["parameters"] == {"cluster_name": "test_cluster"}
+
+
+def test_get_migrator_no_auto_detect_when_not_replicated():
+    """When use_distributed is None and replicated=False, system.clusters is never queried."""
+    ch_client = _make_shard_count_ch_client(shard_count=10)  # would imply distributed
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(ch_client)
+    assert isinstance(migrator, CloudClickHouseTraceServerMigrator)
+    assert all(
+        "system.clusters" not in c.args[0] for c in ch_client.query.call_args_list
+    )
+
+
+def test_get_migrator_auto_detect_falls_back_when_query_fails():
+    """If system.clusters query fails, fall back to use_distributed=False."""
+    ch_client = _make_shard_count_ch_client(
+        raise_on_clusters=DatabaseError("Code: 497. Not enough privileges")
+    )
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=True,
+        replicated_cluster="test_cluster",
+        replicated_path="/clickhouse/tables/{db}",
+    )
+    assert isinstance(migrator, ReplicatedClickHouseTraceServerMigrator)
+
+
+def test_get_migrator_explicit_use_distributed_skips_auto_detect():
+    """An explicit True/False bypasses the system.clusters query entirely."""
+    ch_client = _make_shard_count_ch_client(shard_count=10)
+    trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=True,
+        use_distributed=False,
+        replicated_cluster="test_cluster",
+        replicated_path="/clickhouse/tables/{db}",
+    )
+    assert all(
+        "system.clusters" not in c.args[0] for c in ch_client.query.call_args_list
+    )
+
+
+def test_auto_detect_use_distributed_helper():
+    """Direct coverage for the auto_detect_use_distributed helper."""
+    from weave.trace_server.database_engine import (
+        EngineDiscoveryError,
+        auto_detect_use_distributed,
+        detect_cluster_shard_count,
+    )
+
+    # Multi-shard -> True
+    ch = _make_shard_count_ch_client(shard_count=4)
+    assert auto_detect_use_distributed(ch, "c") is True
+    assert detect_cluster_shard_count(ch, "c") == 4
+
+    # Single shard -> False
+    ch = _make_shard_count_ch_client(shard_count=1)
+    assert auto_detect_use_distributed(ch, "c") is False
+
+    # Cluster not found (count = 0) -> False
+    ch = _make_shard_count_ch_client(shard_count=0)
+    assert auto_detect_use_distributed(ch, "c") is False
+
+    # Query failure -> warning + False from the helper, EngineDiscoveryError
+    # from the lower-level shard counter.
+    ch = _make_shard_count_ch_client(
+        raise_on_clusters=DatabaseError("Code: 497. Not enough privileges")
+    )
+    assert auto_detect_use_distributed(ch, "c") is False
+    ch = _make_shard_count_ch_client(
+        raise_on_clusters=DatabaseError("Code: 497. Not enough privileges")
+    )
+    with pytest.raises(EngineDiscoveryError, match="system.clusters"):
+        detect_cluster_shard_count(ch, "c")

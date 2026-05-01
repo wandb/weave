@@ -182,12 +182,9 @@ def wf_clickhouse_use_distributed_tables() -> bool | None:
 
     Returns:
         True/False: explicit override from the env var.
-        None: env var is not set — caller should auto-detect by querying
+        None: env var is not set; caller should auto-detect by querying
               system.clusters for the shard count.
     """
-    # When the env var is not set at all, return None to signal
-    # "auto-detect from the cluster configuration."
-    # When explicitly set to "true"/"false"/"1"/"0", honour that as an override.
     raw = os.environ.get("WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES")
     if raw is None:
         return None
