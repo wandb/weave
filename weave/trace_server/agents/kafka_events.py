@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import datetime
 import logging
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
 
-from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.agents.schema import AgentSpanCHInsertable, StatusCodeLiteral
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 
 if TYPE_CHECKING:
@@ -25,20 +24,21 @@ class ScoreAgentSpansEvent(BaseModel):
     """Trigger event for agent scoring."""
 
     event_type: ScoreAgentSpansEventType
+    status_code: StatusCodeLiteral
     project_id: str
     trace_id: str
-    root_span_id: str
-    ended_at: datetime.datetime
-    conversation_id: str | None = None
-    agent_name: str | None = None
-    operation_name: str | None = None
-    request_model: str | None = None
+    span_id: str
+    operation_name: str | None
+    parent_span_id: str | None
+    conversation_id: str | None
 
-    def emit(self, producer: KafkaProducer) -> None:
+    def emit(self, producer: KafkaProducer | None) -> None:
         """Produce this event to Kafka. Logs failures without raising."""
+        if producer is None:
+            return
         try:
             producer.produce_score_agent_spans(self)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to emit ScoreAgentSpansEvent")
 
     @staticmethod
@@ -55,14 +55,13 @@ class ScoreAgentSpansEvent(BaseModel):
         if event_type and row.ended_at > SENTINEL_EPOCH:
             return ScoreAgentSpansEvent(
                 event_type=event_type,
+                status_code=row.status_code,
                 project_id=row.project_id,
                 trace_id=row.trace_id,
-                root_span_id=row.span_id,
-                ended_at=row.ended_at,
-                # Resolve empty strings to None for optional fields:
+                span_id=row.span_id,
+                # Resolve optional fields to None (instead of empty strings)
+                parent_span_id=row.parent_span_id or None,
                 conversation_id=row.conversation_id or None,
-                agent_name=row.agent_name or None,
                 operation_name=row.operation_name or None,
-                request_model=row.request_model or None,
             )
         return None

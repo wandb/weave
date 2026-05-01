@@ -24,8 +24,10 @@ from weave.trace_server.agents.helpers import (
     normalize_span_row,
     unpack_string_array,
 )
-from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
-from weave.trace_server.agents.schema import ALL_SPAN_INSERT_COLUMNS
+from weave.trace_server.agents.schema import (
+    ALL_SPAN_INSERT_COLUMNS,
+    AgentSpanCHInsertable,
+)
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -70,8 +72,6 @@ from weave.trace_server.query_builder.agent_query_builder import (
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
     from clickhouse_connect.driver.query import QueryResult
-
-    from weave.trace_server.kafka import KafkaProducer
 
 logger = logging.getLogger(__name__)
 
@@ -314,30 +314,29 @@ class AgentQueryHandler:
 class AgentWriteHandler:
     """Write-side operations for agent data.
 
-    Takes a `ch_client` for `insert` calls, which have no query wrapper and
-    a `kafka_producer` so the ingest path can publish a "weave.score_agent_spans" event.
+    Takes a `ch_client` for `insert` calls, which have no query wrapper.
     """
 
     _ch_client: CHClient
-    _kafka_producer: KafkaProducer | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
     # ------------------------------------------------------------------
 
-    def insert_otel_spans(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+    def insert_otel_spans(
+        self, req: GenAIOTelExportReq
+    ) -> tuple[GenAIOTelExportRes, list[AgentSpanCHInsertable]]:
         """Ingest OTel spans into the spans table.
 
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
         """
-        span_rows: list[list[object]] = []
+        span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
         rejected = 0
         errors: list[str] = []
         failure_counts: dict[str, int] = {}
         failure_examples: list[str] = []
-        flush_kafka_events: bool = False
 
         for processed_span in req.processed_spans:
             resource = Resource.from_proto(processed_span.resource_spans.resource)
@@ -380,29 +379,15 @@ class AgentWriteHandler:
                         )
                         continue
 
-                    span_rows.append(genai_span_to_row(genai_row))
+                    span_rows.append(genai_row)
                     accepted += 1
-
-                    # Emit kafka events when the producer is wired in (gated
-                    # off in environments where the consumer hasn't shipped).
-                    if self._kafka_producer is not None and (
-                        event := ScoreAgentSpansEvent.from_row(genai_row)
-                    ):
-                        flush_kafka_events = True
-                        event.emit(self._kafka_producer)
 
         if span_rows:
             self._ch_client.insert(
-                "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
+                "spans",
+                data=[genai_span_to_row(s) for s in span_rows],
+                column_names=ALL_SPAN_INSERT_COLUMNS,
             )
-
-        if flush_kafka_events and self._kafka_producer is not None:
-            try:
-                self._kafka_producer.flush(0)
-            except Exception as e:
-                logger.exception(
-                    "Failed to flush Kafka producer during OTel span ingest"
-                )
 
         if failure_counts:
             logger.warning(
@@ -415,11 +400,12 @@ class AgentWriteHandler:
         error_msg = "; ".join(errors[:MAX_INGEST_ERRORS_REPORTED])
         if len(errors) > MAX_INGEST_ERRORS_REPORTED:
             error_msg += "; ..."
-        return GenAIOTelExportRes(
+        res = GenAIOTelExportRes(
             accepted_spans=accepted,
             rejected_spans=rejected,
             error_message=error_msg,
         )
+        return res, span_rows
 
 
 # ---------------------------------------------------------------------------

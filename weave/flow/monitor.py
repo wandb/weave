@@ -150,7 +150,7 @@ _AGENT_SPAN_CLASSIFIER_PROMPT_HEADER = "\n".join(
         "  <message>{status_message}</message>",
         "</status>",
         "<messages>",
-        "  <conversation-name>{conversation_name}</conversation_name>",
+        "  <conversation-name>{conversation_name}</conversation-name>",
         "  <system-instructions>",
         "  {system_instructions}",
         "  </system-instructions>",

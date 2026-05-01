@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,7 +12,21 @@ from weave.trace_server.agents.kafka_events import (
 )
 from weave.trace_server.kafka import KafkaProducer
 
-_ENDED_AT = datetime.datetime(2024, 1, 1, 12, 0, 0)
+
+def _make_event(**overrides) -> ScoreAgentSpansEvent:
+    """Minimal valid ScoreAgentSpansEvent for tests; override any field."""
+    base = {
+        "event_type": "turn_ended",
+        "status_code": "OK",
+        "project_id": "p",
+        "trace_id": "t",
+        "span_id": "r",
+        "parent_span_id": None,
+        "conversation_id": None,
+        "operation_name": None,
+    }
+    base.update(overrides)
+    return ScoreAgentSpansEvent(**base)
 
 
 def test_topic_constant_value() -> None:
@@ -21,34 +34,16 @@ def test_topic_constant_value() -> None:
 
 
 def test_event_round_trip() -> None:
-    event = ScoreAgentSpansEvent(
-        event_type="turn_ended",
+    event = _make_event(
         project_id="proj-1",
         trace_id="trace-1",
-        root_span_id="span-root",
+        span_id="span-root",
         conversation_id="conv-1",
-        agent_name="research_agent",
         operation_name="invoke_agent",
-        request_model="gpt-5",
-        ended_at=_ENDED_AT,
     )
     payload = event.model_dump_json()
     parsed = ScoreAgentSpansEvent.model_validate_json(payload)
     assert parsed == event
-
-
-def test_event_defaults() -> None:
-    event = ScoreAgentSpansEvent(
-        event_type="turn_ended",
-        project_id="p",
-        trace_id="t",
-        root_span_id="r",
-        ended_at=_ENDED_AT,
-    )
-    assert event.conversation_id is None
-    assert event.agent_name is None
-    assert event.operation_name is None
-    assert event.request_model is None
 
 
 @pytest.mark.disable_logging_error_check
@@ -60,14 +55,7 @@ def test_producer_drops_when_buffer_full() -> None:
         KafkaProducer.produce_score_agent_spans.__get__(producer)
     )
 
-    event = ScoreAgentSpansEvent(
-        event_type="turn_ended",
-        project_id="p",
-        trace_id="t",
-        root_span_id="r",
-        ended_at=_ENDED_AT,
-    )
-    producer.produce_score_agent_spans(event)
+    producer.produce_score_agent_spans(_make_event())
 
     producer.produce.assert_not_called()
 
@@ -80,14 +68,7 @@ def test_producer_publishes_under_buffer_limit() -> None:
         KafkaProducer.produce_score_agent_spans.__get__(producer)
     )
 
-    event = ScoreAgentSpansEvent(
-        event_type="turn_ended",
-        project_id="p",
-        trace_id="t",
-        root_span_id="r",
-        ended_at=_ENDED_AT,
-    )
-    producer.produce_score_agent_spans(event)
+    producer.produce_score_agent_spans(_make_event())
 
     producer.produce.assert_called_once()
     call_kwargs = producer.produce.call_args.kwargs

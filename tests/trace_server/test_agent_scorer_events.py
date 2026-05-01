@@ -19,24 +19,22 @@ def test_from_row() -> None:
         span_id="root",
         parent_span_id="",
         span_name="root",
+        status_code="OK",
         started_at=_STARTED_AT,
         ended_at=_ENDED_AT,
         conversation_id="c",
-        agent_name="a",
         operation_name="invoke_agent",
-        request_model="gpt-5",
     )
     event = ScoreAgentSpansEvent.from_row(root_row)
     assert event == ScoreAgentSpansEvent(
         event_type="turn_ended",
+        status_code="OK",
         project_id="p",
         trace_id="tr",
-        root_span_id="root",
-        ended_at=_ENDED_AT,
+        span_id="root",
+        parent_span_id=None,
         conversation_id="c",
-        agent_name="a",
         operation_name="invoke_agent",
-        request_model="gpt-5",
     )
 
     child_row = AgentSpanCHInsertable(

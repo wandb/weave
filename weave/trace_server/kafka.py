@@ -32,6 +32,8 @@ CALL_ENDED_TOPIC = "weave.call_ended"
 SCORE_CALLS_TOPIC = "weave.score_calls"
 
 DEFAULT_MAX_BUFFER_SIZE = 10000
+# Fraction of `max_buffer_size` at which a "buffer pressure" warning is logged.
+BUFFER_WARN_THRESHOLD = 0.5
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +109,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             return
 
         # Log warning if buffer is at 50% capacity
-        if buffer_size >= self.max_buffer_size * 0.5:
+        if buffer_size >= self.max_buffer_size * BUFFER_WARN_THRESHOLD:
             buffer_percentage = (buffer_size / self.max_buffer_size) * 100
             logger.warning(
                 "Kafka producer buffer at 50%% capacity or higher",
@@ -210,7 +212,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
             return
 
-        if buffer_size >= self.max_buffer_size * 0.5:
+        if buffer_size >= self.max_buffer_size * BUFFER_WARN_THRESHOLD:
             buffer_percentage = (buffer_size / self.max_buffer_size) * 100
             logger.warning(
                 "Kafka producer buffer at 50%% capacity or higher",

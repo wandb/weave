@@ -1,4 +1,4 @@
-"""Integration: AgentWriteHandler.insert_otel_spans emits ScoreAgentSpansEvent on root span end."""
+"""Integration: AgentWriteHandler.insert_otel_spans returns the accepted rows so callers can emit downstream events."""
 
 from __future__ import annotations
 
@@ -7,13 +7,11 @@ from unittest.mock import MagicMock
 
 from weave.trace_server.agents import clickhouse as ch_module
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
-from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import GenAIOTelExportReq
-from weave.trace_server.kafka import KafkaProducer
 
 
-def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
+def test_insert_otel_spans_returns_accepted_rows(monkeypatch):
     # Stub Span.from_proto and extract_genai_span so we don't need real OTel bytes.
     # Datetimes must be tz-aware because from_row compares against SENTINEL_EPOCH (UTC).
     utc = datetime.timezone.utc
@@ -41,11 +39,7 @@ def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
     ]
 
     ch = MagicMock()
-    # spec=KafkaProducer ensures typo'd attribute names raise AttributeError instead
-    # of auto-vivifying — without this, asserting against the wrong method name silently passes.
-    kafka_producer = MagicMock(spec=KafkaProducer)
-
-    handler = AgentWriteHandler(ch, kafka_producer)
+    handler = AgentWriteHandler(ch)
 
     # Build a fake processed_span with one scope_spans containing two proto_spans.
     # We stub Span.from_proto + extract_genai_span to return our stub rows in
@@ -74,13 +68,8 @@ def test_insert_otel_spans_emits_scorer_event_on_root_span_end(monkeypatch):
     monkeypatch.setattr(ch_module, "genai_span_to_row", lambda r: [])
 
     req = GenAIOTelExportReq(processed_spans=[processed], project_id="p", wb_user_id="")
-    res = handler.insert_otel_spans(req)
+    res, accepted_rows = handler.insert_otel_spans(req)
 
     assert res.accepted_spans == 2
-    assert kafka_producer.produce_score_agent_spans.call_count == 1
-    event = kafka_producer.produce_score_agent_spans.call_args.args[0]
-    assert isinstance(event, ScoreAgentSpansEvent)
-    assert event.event_type == "turn_ended"
-    assert event.trace_id == "tr"
-    assert event.root_span_id == "root"
-    kafka_producer.flush.assert_called_once_with(0)
+    assert [r.span_id for r in accepted_rows] == ["root", "child"]
+    assert all(isinstance(r, AgentSpanCHInsertable) for r in accepted_rows)
