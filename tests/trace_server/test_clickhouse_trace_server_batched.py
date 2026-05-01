@@ -1246,6 +1246,75 @@ def test_file_content_read_retries_eventual_consistency():
         assert mock_read_once.call_count == 2
 
 
+def test_obj_read_final_fallback_recovers_real_row(ch_server):
+    """Integration test: when the first metadata read returns no rows,
+    `obj_read`'s `final=True` retry must execute against real ClickHouse and
+    return the actual row written by `obj_create`. This proves the
+    `settings={"final": 1}` kwarg is accepted by the real driver and that the
+    FINAL-retry path returns the right schema/columns end-to-end.
+    """
+    project_id = _make_project_id("rmt_obj")
+    obj_id = "rmt_recover"
+    val = {"v": "real_value", "n": 42}
+    create_res = _obj_create(ch_server, project_id, obj_id, val)
+
+    original = ch_server._select_objs_query
+    captured: list[dict] = []
+
+    def empty_first_then_real(builder, metadata_only=False, **kwargs):
+        captured.append(kwargs)
+        if len(captured) == 1:
+            return []
+        return original(builder, metadata_only, **kwargs)
+
+    with patch.object(
+        ch_server, "_select_objs_query", side_effect=empty_first_then_real
+    ):
+        res = ch_server.obj_read(
+            tsi.ObjReadReq(
+                project_id=project_id, object_id=obj_id, digest=create_res.digest
+            )
+        )
+
+    assert res.obj.digest == create_res.digest
+    assert res.obj.val == val
+    assert len(captured) == 2
+    assert captured[0].get("final", False) is False
+    assert captured[1].get("final") is True
+
+
+def test_file_content_read_final_fallback_recovers_real_bytes(ch_server):
+    """Integration test: when the first chunks query returns no rows,
+    `_file_content_read_once`'s `settings={"final": 1}` retry must execute
+    against real ClickHouse and return the file bytes written by
+    `file_create`.
+    """
+    project_id = _make_project_id("rmt_file")
+    content = b"final-fallback integration bytes"
+    create_res = ch_server.file_create(
+        tsi.FileCreateReq(project_id=project_id, name="f.bin", content=content)
+    )
+
+    real_query = ch_server.ch_client.query
+    captured_settings: list[dict | None] = []
+
+    def empty_first_then_real(query, **kwargs):
+        captured_settings.append(kwargs.get("settings"))
+        if len(captured_settings) == 1:
+            empty = MagicMock()
+            empty.result_rows = []
+            return empty
+        return real_query(query, **kwargs)
+
+    with patch.object(ch_server.ch_client, "query", side_effect=empty_first_then_real):
+        res = ch_server._file_content_read_once(
+            tsi.FileContentReadReq(project_id=project_id, digest=create_res.digest)
+        )
+
+    assert res.content == content
+    assert captured_settings == [None, {"final": 1}]
+
+
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
     ("error", "expected_calls"),
