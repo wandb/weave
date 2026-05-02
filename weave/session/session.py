@@ -811,7 +811,14 @@ def start_llm(
     """Create and activate an LLM call. Uses the current turn if available.
 
     If no turn is active, returns a disconnected LLM (no contextvar set).
+
+    When ``provider_name`` is omitted, the SDK derives it from the model
+    identifier — e.g. ``gpt-4o`` → ``openai``, ``claude-sonnet-4-5`` →
+    ``anthropic``. Pass an explicit ``provider_name`` to override or to
+    record a custom provider.
     """
+    if not provider_name:
+        provider_name = _detect_provider(model)
     turn = get_current_turn()
     if turn is not None:
         return turn.llm(
@@ -824,6 +831,46 @@ def start_llm(
         provider_name=provider_name,
         system_instructions=system_instructions or [],
     )
+
+
+# Ordered prefix → provider mapping. First match wins; longer prefixes
+# come first so e.g. ``meta-llama/`` resolves before a hypothetical
+# ``meta-`` rule. Keys are model-name prefixes that are unambiguous as
+# of mid-2026; ambiguous names (a bare ``llama-...`` could be hosted by
+# many providers) deliberately resolve to the original publisher.
+_PROVIDER_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("models/gemini-", "google"),
+    ("meta-llama/", "meta"),
+    ("open-mistral-", "mistral"),
+    ("deepseek-", "deepseek"),
+    ("command-", "cohere"),
+    ("gemini-", "google"),
+    ("mistral-", "mistral"),
+    ("claude-", "anthropic"),
+    ("llama-", "meta"),
+    ("text-", "openai"),
+    ("gpt-", "openai"),
+    ("o1-", "openai"),
+    ("o3-", "openai"),
+    ("o4-", "openai"),
+    ("o5-", "openai"),
+)
+
+
+def _detect_provider(model: str) -> str:
+    """Best-effort provider name from a model identifier.
+
+    Returns ``""`` when no prefix matches — callers should treat that as
+    "unknown provider", not raise. The prefix table is conservative: only
+    well-known, unambiguous prefixes are mapped. Custom or fine-tuned
+    model names should always pass an explicit ``provider_name``.
+    """
+    if not model:
+        return ""
+    for prefix, provider in _PROVIDER_PREFIXES:
+        if model.startswith(prefix):
+            return provider
+    return ""
 
 
 def start_tool(*, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:

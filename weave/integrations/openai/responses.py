@@ -6,10 +6,16 @@ message-shape conversion automatically. Manually-instrumented agents
 calls) need an explicit converter from OpenAI's wire format to the
 weave Session SDK types — this module is that converter.
 
-Right now this covers the *input* side (``input`` argument to
-``client.responses.create``). The output side is ergonomic via
-``Message.assistant(text=..., tool_calls=[...])`` from
-``weave.session`` — pass the parsed text and tool calls directly.
+The preferred public surface is the classmethod form on the Session
+SDK types:
+
+- ``Message.from_openai_responses_input(items)``
+- ``Reasoning.from_openai_responses(part)``
+- ``Usage.from_openai_responses(response)``
+
+The module-level ``input_to_weave`` and ``reasoning_to_weave`` are kept
+as back-compat aliases for older call sites and tests; new code should
+use the classmethods.
 """
 
 from __future__ import annotations
@@ -34,13 +40,15 @@ _TEXT_BLOCK_TYPES = {"text", "input_text", "output_text"}
 _IMAGE_BLOCK_TYPES = {"input_image", "image_url"}
 
 
-def input_to_weave(
+def _input_to_weave(
     items: list[dict[str, Any]],
 ) -> tuple[list[Message], list[MediaAttachment]]:
     """Convert OpenAI Responses API input items to weave types.
 
-    Returns a pair ``(messages, media_attachments)`` ready to assign to
-    ``LLM.input_messages`` and ``LLM.media_attachments``.
+    Implementation backing ``Message.from_openai_responses_input``. Lives
+    here (rather than on ``Message``) to keep core types module free of
+    OpenAI-specific shape knowledge; the classmethod is the public entry
+    point.
 
     Handles the shapes that appear in the ``input`` parameter to
     ``client.responses.create``:
@@ -169,14 +177,10 @@ def _url_to_attachment(url: str) -> MediaAttachment:
     )
 
 
-def reasoning_to_weave(reasoning_part: dict[str, Any] | None) -> Reasoning | None:
+def _reasoning_to_weave(reasoning_part: dict[str, Any] | None) -> Reasoning | None:
     """Flatten an OpenAI Responses ``reasoning`` item to a ``Reasoning``.
 
-    OpenAI's Responses API returns reasoning as ``{"summary":
-    [{"text": "..."}, ...], ...}``; weave's ``Reasoning.content`` is a
-    flat string. Joins each summary fragment's ``.text`` with newlines.
-    Returns ``None`` for empty input so the caller can pass the result
-    straight to ``LLM.record(reasoning=...)`` without a guard.
+    Implementation backing ``Reasoning.from_openai_responses``.
     """
     if not reasoning_part:
         return None
@@ -187,3 +191,15 @@ def reasoning_to_weave(reasoning_part: dict[str, Any] | None) -> Reasoning | Non
         s.get("text", "") for s in summaries if isinstance(s, dict) and s.get("text")
     )
     return Reasoning(content=text) if text else None
+
+
+# ---------------------------------------------------------------------------
+# Back-compat module-level aliases
+# ---------------------------------------------------------------------------
+#
+# The preferred public surface is now ``Message.from_openai_responses_input``
+# and ``Reasoning.from_openai_responses``. These wrappers exist so older
+# call sites that import directly from this module keep working.
+
+input_to_weave = _input_to_weave
+reasoning_to_weave = _reasoning_to_weave

@@ -215,6 +215,22 @@ class Message(BaseModel):
             parts=[ToolCallResponsePart(id=call_id, response=output)],
         )
 
+    @classmethod
+    def from_openai_responses_input(
+        cls, items: list[dict[str, Any]]
+    ) -> tuple[list[Message], list[MediaAttachment]]:
+        """Convert OpenAI Responses API input items to weave types.
+
+        Returns a pair ``(messages, media_attachments)`` ready to assign
+        to ``LLM.input_messages`` and ``LLM.media_attachments``. Use this
+        when manually instrumenting a ``client.responses.create`` call.
+        """
+        # Lazy import to avoid a cycle: weave.integrations.openai.responses
+        # imports from this module.
+        from weave.integrations.openai.responses import _input_to_weave
+
+        return _input_to_weave(items)
+
 
 class Usage(BaseModel):
     """Token usage for an LLM call."""
@@ -225,11 +241,59 @@ class Usage(BaseModel):
     cache_creation_input_tokens: int = 0
     cache_read_input_tokens: int = 0
 
+    @classmethod
+    def from_openai_responses(cls, response: Any) -> Usage:
+        """Extract usage from an OpenAI Responses API ``Response``.
+
+        ``response.usage`` may be ``None`` for partial / streamed responses
+        that have not yet emitted a final usage block; callers get an empty
+        ``Usage`` in that case so they can still pass the result through to
+        ``LLM.record(usage=...)`` unconditionally.
+        """
+        usage = response.usage
+        if usage is None:
+            return cls()
+        return cls(
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            reasoning_tokens=usage.output_tokens_details.reasoning_tokens,
+            cache_read_input_tokens=usage.input_tokens_details.cached_tokens,
+        )
+
+    @classmethod
+    def from_anthropic(cls, message: Any) -> Usage:
+        """Extract usage from an Anthropic Messages API ``Message``.
+
+        Anthropic's ``Usage`` types the cache fields as ``Optional[int]``;
+        ``None`` is equivalent to zero for our purposes.
+        """
+        usage = message.usage
+        return cls(
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cache_creation_input_tokens=usage.cache_creation_input_tokens or 0,
+            cache_read_input_tokens=usage.cache_read_input_tokens or 0,
+        )
+
 
 class Reasoning(BaseModel):
     """Reasoning/chain-of-thought content from an LLM call."""
 
     content: str = ""
+
+    @classmethod
+    def from_openai_responses(cls, part: dict[str, Any] | None) -> Reasoning | None:
+        """Flatten an OpenAI Responses ``reasoning`` item to a ``Reasoning``.
+
+        OpenAI's Responses API returns reasoning as
+        ``{"summary": [{"text": "..."}, ...], ...}``; ``Reasoning.content``
+        is a flat string. Returns ``None`` for empty input so the caller
+        can pass the result straight to ``LLM.record(reasoning=...)``.
+        """
+        # Lazy import to avoid a cycle.
+        from weave.integrations.openai.responses import _reasoning_to_weave
+
+        return _reasoning_to_weave(part)
 
 
 class MediaAttachment(BaseModel):
