@@ -1035,11 +1035,13 @@ def _attrs_for_span(
         )
         return f"chat {span.model}", attrs
     if isinstance(span, Tool):
+        arguments_str = _to_json_string(span.arguments)
+        result_str = _to_json_string(span.result)
         attrs = execute_tool_attributes(
             tool_name=span.name,
             conversation_id=session_id,
-            tool_call_arguments=span.arguments if include_content else "",
-            tool_call_result=span.result if include_content else "",
+            tool_call_arguments=arguments_str if include_content else "",
+            tool_call_result=result_str if include_content else "",
             tool_call_id=span.tool_call_id,
             tool_type=span.tool_type,
             tool_description=span.tool_description,
