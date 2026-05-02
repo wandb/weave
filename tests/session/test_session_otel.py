@@ -2118,3 +2118,47 @@ class TestOpenAIResponsesInputAdapter:
         ]
         msgs, _ = input_to_weave(items)
         assert [m.role for m in msgs] == ["user", "assistant", "tool", "assistant"]
+
+
+class TestOpenAIResponsesReasoningAdapter:
+    """reasoning_to_weave flattens OpenAI's reasoning summary into a Reasoning."""
+
+    def test_summary_fragments_joined_with_newlines(self) -> None:
+        from weave.integrations.openai.responses import reasoning_to_weave
+
+        result = reasoning_to_weave(
+            {"summary": [{"text": "first"}, {"text": "second"}]}
+        )
+        assert result is not None
+        assert result.content == "first\nsecond"
+
+    def test_empty_summary_returns_none(self) -> None:
+        from weave.integrations.openai.responses import reasoning_to_weave
+
+        assert reasoning_to_weave({"summary": []}) is None
+
+    def test_none_input_returns_none(self) -> None:
+        """Lets callers pass through ``parsed.reasoning_part`` without guarding."""
+        from weave.integrations.openai.responses import reasoning_to_weave
+
+        assert reasoning_to_weave(None) is None
+
+    def test_summary_with_only_empty_text_returns_none(self) -> None:
+        from weave.integrations.openai.responses import reasoning_to_weave
+
+        assert reasoning_to_weave({"summary": [{"text": ""}, {}]}) is None
+
+    def test_non_list_summary_returns_none(self) -> None:
+        """Defensive: a malformed reasoning part shouldn't raise."""
+        from weave.integrations.openai.responses import reasoning_to_weave
+
+        assert reasoning_to_weave({"summary": "not a list"}) is None  # type: ignore[arg-type]
+
+    def test_skips_non_dict_summary_items(self) -> None:
+        from weave.integrations.openai.responses import reasoning_to_weave
+
+        result = reasoning_to_weave(
+            {"summary": [{"text": "kept"}, "not a dict", {"text": "also kept"}]}
+        )
+        assert result is not None
+        assert result.content == "kept\nalso kept"

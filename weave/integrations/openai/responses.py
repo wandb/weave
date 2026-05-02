@@ -21,11 +21,12 @@ from weave.session.session import _parse_data_url
 from weave.session.types import (
     MediaAttachment,
     Message,
+    Reasoning,
     ToolCallPart,
     ToolCallResponsePart,
 )
 
-__all__ = ["input_to_weave"]
+__all__ = ["input_to_weave", "reasoning_to_weave"]
 
 
 _USER_LIKE_ROLES = {"user", "assistant", "system"}
@@ -166,3 +167,23 @@ def _url_to_attachment(url: str) -> MediaAttachment:
         mime_type="",
         uri=url,
     )
+
+
+def reasoning_to_weave(reasoning_part: dict[str, Any] | None) -> Reasoning | None:
+    """Flatten an OpenAI Responses ``reasoning`` item to a ``Reasoning``.
+
+    OpenAI's Responses API returns reasoning as ``{"summary":
+    [{"text": "..."}, ...], ...}``; weave's ``Reasoning.content`` is a
+    flat string. Joins each summary fragment's ``.text`` with newlines.
+    Returns ``None`` for empty input so the caller can pass the result
+    straight to ``LLM.record(reasoning=...)`` without a guard.
+    """
+    if not reasoning_part:
+        return None
+    summaries = reasoning_part.get("summary", [])
+    if not isinstance(summaries, list):
+        return None
+    text = "\n".join(
+        s.get("text", "") for s in summaries if isinstance(s, dict) and s.get("text")
+    )
+    return Reasoning(content=text) if text else None
