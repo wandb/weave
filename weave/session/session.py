@@ -358,6 +358,56 @@ class LLM(_SpanBase):
             )
         return self.attach_media(uri=url, modality=modality)
 
+    def record(
+        self,
+        *,
+        input_messages: list[Message] | None = None,
+        output_messages: list[Message] | None = None,
+        media_attachments: list[MediaAttachment] | None = None,
+        usage: Usage | None = None,
+        reasoning: Reasoning | str | None = None,
+        response_id: str | None = None,
+        response_model: str | None = None,
+        finish_reasons: list[str] | None = None,
+        output_type: str | None = None,
+    ) -> LLM:
+        """Set multiple LLM-call fields in one call.
+
+        Manually-instrumented agents typically build up a chat span by
+        assigning eight or more individual fields at the end of an LLM
+        call (``input_messages``, ``output_messages``, ``usage``,
+        ``response_id``, etc.). ``record(...)`` collapses those into a
+        single keyword call so the recording site stays compact.
+
+        Only fields explicitly passed (non-``None``) are applied —
+        existing values are preserved. ``reasoning`` accepts either a
+        ``Reasoning`` instance or a plain string (wrapped automatically).
+        Returns ``self`` for chaining.
+        """
+        if input_messages is not None:
+            self.input_messages = input_messages
+        if output_messages is not None:
+            self.output_messages = output_messages
+        if media_attachments is not None:
+            self.media_attachments = media_attachments
+        if usage is not None:
+            self.usage = usage
+        if reasoning is not None:
+            self.reasoning = (
+                Reasoning(content=reasoning)
+                if isinstance(reasoning, str)
+                else reasoning
+            )
+        if response_id is not None:
+            self.response_id = response_id
+        if response_model is not None:
+            self.response_model = response_model
+        if finish_reasons is not None:
+            self.finish_reasons = finish_reasons
+        if output_type is not None:
+            self.output_type = output_type
+        return self
+
     def end(self) -> None:
         if self._ended:
             return

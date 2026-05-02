@@ -36,6 +36,7 @@ from weave.session.session import (
     get_current_turn,
     log_session,
     log_turn,
+    start_llm,
     start_session,
     start_tool,
 )
@@ -1848,3 +1849,272 @@ def _message_parts_via_otel(msg: Message) -> dict:
     from weave.session.session_otel import _message_to_parts
 
     return _message_to_parts(msg)
+
+
+class TestLLMRecord:
+    """LLM.record(...) collapses N attribute assignments into one call."""
+
+    def test_records_all_fields(self) -> None:
+        llm = LLM(model="gpt-4o", provider_name="openai")
+        llm.record(
+            input_messages=[Message.user("hi")],
+            output_messages=[Message.assistant("hello")],
+            usage=Usage(input_tokens=10, output_tokens=5),
+            response_id="resp_1",
+            response_model="gpt-4o-2024",
+            finish_reasons=["stop"],
+            reasoning="thinking...",
+        )
+        assert llm.input_messages == [Message.user("hi")]
+        assert llm.output_messages == [Message.assistant("hello")]
+        assert llm.usage.input_tokens == 10
+        assert llm.usage.output_tokens == 5
+        assert llm.response_id == "resp_1"
+        assert llm.response_model == "gpt-4o-2024"
+        assert llm.finish_reasons == ["stop"]
+        assert llm.reasoning.content == "thinking..."
+
+    def test_partial_record_preserves_existing(self) -> None:
+        """Fields not passed (None) keep their existing values."""
+        llm = LLM(model="m", provider_name="p")
+        llm.response_id = "preset"
+        llm.usage = Usage(input_tokens=42)
+        llm.record(output_messages=[Message.assistant("hi")])
+        assert llm.response_id == "preset"
+        assert llm.usage.input_tokens == 42
+        assert llm.output_messages == [Message.assistant("hi")]
+
+    def test_reasoning_accepts_string(self) -> None:
+        llm = LLM()
+        llm.record(reasoning="flat")
+        assert isinstance(llm.reasoning, Reasoning)
+        assert llm.reasoning.content == "flat"
+
+    def test_reasoning_accepts_instance(self) -> None:
+        llm = LLM()
+        llm.record(reasoning=Reasoning(content="explicit"))
+        assert llm.reasoning.content == "explicit"
+
+    def test_returns_self_for_chaining(self) -> None:
+        llm = LLM()
+        assert llm.record(response_id="x") is llm
+
+    def test_recorded_fields_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """End-to-end: record() values flow through to the OTel attrs."""
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            with start_llm(model="gpt-4o", provider_name="openai") as llm:
+                llm.record(
+                    input_messages=[Message.user("hi")],
+                    output_messages=[Message.assistant("hello")],
+                    usage=Usage(input_tokens=3, output_tokens=2),
+                    response_id="r1",
+                    finish_reasons=["stop"],
+                )
+        chat_spans = [
+            sp for sp in otel_spans.get_finished_spans() if sp.name == "chat gpt-4o"
+        ]
+        assert len(chat_spans) == 1
+        attrs = dict(chat_spans[0].attributes or {})
+        assert attrs["gen_ai.usage.input_tokens"] == 3
+        assert attrs["gen_ai.usage.output_tokens"] == 2
+        assert attrs["gen_ai.response.id"] == "r1"
+        assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
+
+
+class TestOpenAIResponsesInputAdapter:
+    """weave.integrations.openai.responses.input_to_weave covers the input shapes."""
+
+    def test_text_user_message(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        msgs, media = input_to_weave([{"role": "user", "content": "hello"}])
+        assert msgs == [Message.user("hello")]
+        assert media == []
+
+    def test_user_message_with_text_blocks(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "look at"},
+                    {"type": "input_text", "text": "this"},
+                ],
+            }
+        ]
+        msgs, media = input_to_weave(items)
+        assert len(msgs) == 1
+        assert msgs[0].role == "user"
+        assert msgs[0].content == "look at\nthis"
+        assert media == []
+
+    def test_function_call_becomes_assistant_with_tool_call_part(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "type": "function_call",
+                "name": "get_weather",
+                "arguments": '{"city": "Tokyo"}',
+                "call_id": "c1",
+            }
+        ]
+        msgs, _ = input_to_weave(items)
+        assert len(msgs) == 1
+        assert msgs[0].role == "assistant"
+        assert isinstance(msgs[0].parts[0], ToolCallPart)
+        assert msgs[0].parts[0].id == "c1"
+        assert msgs[0].parts[0].name == "get_weather"
+
+    def test_function_call_arguments_dict_is_encoded(self) -> None:
+        """When arguments come in as a dict (not a string), JSON-encode them."""
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "type": "function_call",
+                "name": "x",
+                "arguments": {"k": "v"},
+                "call_id": "c2",
+            }
+        ]
+        msgs, _ = input_to_weave(items)
+        part = msgs[0].parts[0]
+        assert isinstance(part, ToolCallPart)
+        assert json.loads(part.arguments) == {"k": "v"}
+
+    def test_function_call_output_becomes_tool_message(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "type": "function_call_output",
+                "output": '{"temp": 75}',
+                "call_id": "c1",
+            }
+        ]
+        msgs, _ = input_to_weave(items)
+        assert msgs[0].role == "tool"
+        assert isinstance(msgs[0].parts[0], ToolCallResponsePart)
+        assert msgs[0].parts[0].id == "c1"
+
+    def test_function_call_output_dict_is_encoded(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "type": "function_call_output",
+                "output": {"temp": 75},
+                "call_id": "c1",
+            }
+        ]
+        msgs, _ = input_to_weave(items)
+        part = msgs[0].parts[0]
+        assert isinstance(part, ToolCallResponsePart)
+        assert json.loads(part.response) == {"temp": 75}
+
+    def test_reasoning_items_skipped(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {"type": "reasoning", "summary": [{"text": "hmm"}]},
+            {"role": "user", "content": "go"},
+        ]
+        msgs, _ = input_to_weave(items)
+        assert len(msgs) == 1
+        assert msgs[0].role == "user"
+
+    def test_image_data_url_becomes_blob_attachment(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_image",
+                        "image_url": "data:image/png;base64,iVBORw0KGgo=",
+                    },
+                ],
+            }
+        ]
+        msgs, media = input_to_weave(items)
+        assert len(media) == 1
+        assert media[0].kind == "blob"
+        assert media[0].mime_type == "image/png"
+        assert media[0].content == "iVBORw0KGgo="
+
+    def test_image_plain_url_becomes_uri_attachment(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "https://e.com/cat.png"},
+                    },
+                ],
+            }
+        ]
+        msgs, media = input_to_weave(items)
+        assert len(media) == 1
+        assert media[0].kind == "uri"
+        assert media[0].uri == "https://e.com/cat.png"
+
+    def test_duplicate_image_urls_deduplicated(self) -> None:
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_image", "image_url": "https://e.com/a.png"},
+                    {"type": "input_image", "image_url": "https://e.com/a.png"},
+                ],
+            }
+        ]
+        _, media = input_to_weave(items)
+        assert len(media) == 1
+
+    def test_assistant_message_text_content(self) -> None:
+        """Assistant content blocks with output_text are flattened."""
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "hello"}],
+            }
+        ]
+        msgs, _ = input_to_weave(items)
+        assert msgs == [Message(role="assistant", content="hello")]
+
+    def test_full_conversation_round_trip(self) -> None:
+        """User → assistant tool call → tool result → assistant text — common shape."""
+        from weave.integrations.openai.responses import input_to_weave
+
+        items = [
+            {"role": "user", "content": "what's the weather in Tokyo?"},
+            {
+                "type": "function_call",
+                "name": "get_weather",
+                "arguments": '{"city":"Tokyo"}',
+                "call_id": "c1",
+            },
+            {
+                "type": "function_call_output",
+                "output": '{"temp":"75F"}',
+                "call_id": "c1",
+            },
+            {
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "It's 75F."}],
+            },
+        ]
+        msgs, _ = input_to_weave(items)
+        assert [m.role for m in msgs] == ["user", "assistant", "tool", "assistant"]
