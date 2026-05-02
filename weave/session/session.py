@@ -27,6 +27,7 @@ from weave.session.session_otel import (
 from weave.session.types import (
     BlobPart,
     FilePart,
+    JSONStringInput,
     LogResult,
     MediaAttachment,
     Message,
@@ -38,6 +39,7 @@ from weave.session.types import (
     ToolCallResponsePart,
     UriPart,
     Usage,
+    _to_json_string,
 )
 
 # OTel imports — kept top-level under a try/except guard so the module
@@ -103,6 +105,21 @@ __all__ = [
 
 # OTel tracer name — identifies the Session SDK as the source of these spans.
 _TRACER_NAME = "weave.session"
+
+
+def _parse_data_url(url: str) -> tuple[str, str]:
+    """Split a ``data:`` URL into ``(mime_type, payload)``.
+
+    Returns the raw payload after the comma — base64-encoded content is
+    NOT decoded; it's passed through to ``MediaAttachment.content`` as-is
+    so the wire format matches what the producer originally embedded.
+    Returns ``("", "")`` for non-data URLs.
+    """
+    if not url.startswith("data:"):
+        return ("", "")
+    header, _, payload = url[len("data:") :].partition(",")
+    mime_type = header.partition(";")[0]
+    return (mime_type, payload)
 
 
 class _SpanBase(BaseModel):
@@ -171,11 +188,18 @@ class _SpanBase(BaseModel):
 
 
 class Tool(_SpanBase):
-    """One tool execution. Maps to an execute_tool OTel span."""
+    """One tool execution. Maps to an execute_tool OTel span.
+
+    ``arguments`` and ``result`` are stored as strings on the wire (per
+    GenAI semconv) but accept any JSON-serializable value at assignment
+    or construction. Non-string values are JSON-encoded when the span is
+    emitted, so callers can do ``t.result = some_dict`` without wrapping
+    in ``json.dumps``.
+    """
 
     name: str = ""
-    arguments: str = ""
-    result: str = ""
+    arguments: JSONStringInput = ""
+    result: JSONStringInput = ""
     tool_call_id: str = ""
     tool_type: str = ""
     tool_description: str = ""
@@ -198,11 +222,13 @@ class Tool(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
+        arguments_str = _to_json_string(self.arguments)
+        result_str = _to_json_string(self.result)
         attrs = execute_tool_attributes(
             tool_name=self.name,
             conversation_id=session.session_id if session else "",
-            tool_call_arguments=self.arguments if include else "",
-            tool_call_result=self.result if include else "",
+            tool_call_arguments=arguments_str if include else "",
+            tool_call_result=result_str if include else "",
             tool_call_id=self.tool_call_id,
             tool_type=self.tool_type,
             tool_description=self.tool_description,
@@ -313,6 +339,24 @@ class LLM(_SpanBase):
             )
         )
         return self
+
+    def attach_media_url(self, url: str, *, modality: str = "") -> LLM:
+        """Attach a media URL to this LLM call.
+
+        Convenience over ``attach_media`` for the common case where the
+        caller has a URL string from an upstream message and doesn't want
+        to inspect it. ``data:`` URLs are parsed into ``mime_type`` +
+        inline content (kind=blob); plain URIs become ``kind=uri``. Empty
+        URLs are ignored. Returns ``self`` for chaining.
+        """
+        if not url:
+            return self
+        if url.startswith("data:"):
+            mime_type, content = _parse_data_url(url)
+            return self.attach_media(
+                content=content, mime_type=mime_type, modality=modality
+            )
+        return self.attach_media(uri=url, modality=modality)
 
     def end(self) -> None:
         if self._ended:

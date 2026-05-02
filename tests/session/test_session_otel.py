@@ -1620,3 +1620,231 @@ class TestLogSession:
         assert result.root_span_ids == []
         assert result.span_count == 0
         assert otel_spans.get_finished_spans() == ()
+
+
+# ---------------------------------------------------------------------------
+# Ergonomic helpers — accept structured payloads at the SDK boundary
+# ---------------------------------------------------------------------------
+
+
+class TestToolStructuredPayloads:
+    """Tool.arguments / Tool.result accept any JSON-serializable value.
+
+    Storage type is a permissive union so callers can do
+    ``t.result = some_dict`` without manually JSON-encoding. The OTel
+    string attributes still receive a JSON-encoded representation.
+    """
+
+    def test_dict_result_serializes_at_emission(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot", session_id="sess-r1") as s, s.start_turn():
+            with start_tool(name="search", tool_call_id="tc_1") as t:
+                t.result = {"hits": 3, "top": "weave"}
+
+        tool_spans = [
+            sp
+            for sp in otel_spans.get_finished_spans()
+            if sp.name == "execute_tool search"
+        ]
+        assert len(tool_spans) == 1
+        attrs = dict(tool_spans[0].attributes or {})
+        # Wire format is a JSON string regardless of what the caller assigned.
+        assert json.loads(attrs["gen_ai.tool.call.result"]) == {
+            "hits": 3,
+            "top": "weave",
+        }
+
+    def test_list_arguments_serialize(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot", session_id="sess-r2") as s, s.start_turn():
+            with start_tool(name="batch", arguments=[1, 2, 3], tool_call_id="tc"):
+                pass
+        tool_spans = [
+            sp
+            for sp in otel_spans.get_finished_spans()
+            if sp.name == "execute_tool batch"
+        ]
+        attrs = dict(tool_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.tool.call.arguments"]) == [1, 2, 3]
+
+    def test_string_result_passthrough(self, otel_spans: InMemorySpanExporter) -> None:
+        """String values are emitted unchanged (no double-encoding)."""
+        with start_session(agent_name="bot", session_id="sess-r3") as s, s.start_turn():
+            with start_tool(name="echo", tool_call_id="tc") as t:
+                t.result = "already a string"
+        tool_spans = [
+            sp
+            for sp in otel_spans.get_finished_spans()
+            if sp.name == "execute_tool echo"
+        ]
+        attrs = dict(tool_spans[0].attributes or {})
+        assert attrs["gen_ai.tool.call.result"] == "already a string"
+
+    def test_none_result_omitted(self, otel_spans: InMemorySpanExporter) -> None:
+        """``result = None`` produces an empty attribute, which is omitted."""
+        with start_session(agent_name="bot", session_id="sess-r4") as s, s.start_turn():
+            with start_tool(name="noop", tool_call_id="tc") as t:
+                t.result = None
+        tool_spans = [
+            sp
+            for sp in otel_spans.get_finished_spans()
+            if sp.name == "execute_tool noop"
+        ]
+        attrs = dict(tool_spans[0].attributes or {})
+        assert "gen_ai.tool.call.result" not in attrs
+
+
+class TestToolCallPartArgumentsCoercion:
+    """ToolCallPart accepts dict/list inputs and JSON-encodes at construction."""
+
+    def test_dict_arguments_coerced_to_json_string(self) -> None:
+        part = ToolCallPart(id="c1", name="search", arguments={"q": "weave"})
+        assert isinstance(part.arguments, str)
+        assert json.loads(part.arguments) == {"q": "weave"}
+
+    def test_list_arguments_coerced(self) -> None:
+        part = ToolCallPart(id="c2", name="batch", arguments=[1, 2])
+        assert json.loads(part.arguments) == [1, 2]
+
+    def test_string_arguments_passthrough(self) -> None:
+        """Already-encoded JSON strings are not re-encoded."""
+        part = ToolCallPart(id="c3", name="x", arguments='{"already": "json"}')
+        assert part.arguments == '{"already": "json"}'
+
+    def test_none_arguments_becomes_empty(self) -> None:
+        part = ToolCallPart(id="c4", name="x", arguments=None)
+        assert part.arguments == ""
+
+    def test_assignment_after_construction_coerces(self) -> None:
+        """validate_assignment ensures post-construction edits also coerce."""
+        part = ToolCallPart(id="c5", name="x", arguments="")
+        part.arguments = {"k": "v"}
+        assert json.loads(part.arguments) == {"k": "v"}
+
+    def test_serialized_in_message_parts(self) -> None:
+        """Coerced ToolCallPart serializes correctly through the Message pipeline."""
+        msg = Message(
+            role="assistant",
+            parts=[
+                ToolCallPart(id="c1", name="get_weather", arguments={"city": "NYC"})
+            ],
+        )
+        serialized = json.loads(json.dumps(_message_parts_via_otel(msg)))
+        tool_call = serialized["parts"][0]
+        assert tool_call["type"] == "tool_call"
+        assert json.loads(tool_call["arguments"]) == {"city": "NYC"}
+
+
+class TestToolCallResponsePartCoercion:
+    """ToolCallResponsePart accepts structured outputs and JSON-encodes."""
+
+    def test_dict_response_coerced(self) -> None:
+        part = ToolCallResponsePart(id="c1", response={"ok": True})
+        assert json.loads(part.response) == {"ok": True}
+
+    def test_string_response_passthrough(self) -> None:
+        part = ToolCallResponsePart(id="c2", response="plain")
+        assert part.response == "plain"
+
+
+class TestMessageBuilders:
+    """High-level Message constructors for the common message shapes."""
+
+    def test_user_constructor(self) -> None:
+        m = Message.user("hello")
+        assert m.role == "user"
+        assert m.content == "hello"
+        assert m.parts == []
+
+    def test_system_constructor(self) -> None:
+        m = Message.system("you are helpful")
+        assert m.role == "system"
+        assert m.content == "you are helpful"
+
+    def test_assistant_text_only(self) -> None:
+        m = Message.assistant("hi there")
+        assert m.role == "assistant"
+        assert m.content == "hi there"
+        assert m.parts == []
+
+    def test_assistant_with_tool_calls_promotes_to_parts(self) -> None:
+        """When tool_calls are provided, the message uses the parts API."""
+        tc = ToolCallPart(id="c1", name="search", arguments={"q": "weave"})
+        m = Message.assistant(text="let me check", tool_calls=[tc])
+        assert m.role == "assistant"
+        assert m.content == ""
+        assert len(m.parts) == 2
+        assert isinstance(m.parts[0], TextPart)
+        assert m.parts[0].content == "let me check"
+        assert isinstance(m.parts[1], ToolCallPart)
+
+    def test_assistant_tool_calls_only_skips_text_part(self) -> None:
+        """No leading TextPart when text is empty."""
+        tc = ToolCallPart(id="c1", name="x", arguments={})
+        m = Message.assistant(tool_calls=[tc])
+        assert len(m.parts) == 1
+        assert isinstance(m.parts[0], ToolCallPart)
+
+    def test_tool_result_with_dict(self) -> None:
+        m = Message.tool_result("c1", {"answer": 42})
+        assert m.role == "tool"
+        assert len(m.parts) == 1
+        part = m.parts[0]
+        assert isinstance(part, ToolCallResponsePart)
+        assert part.id == "c1"
+        assert json.loads(part.response) == {"answer": 42}
+
+    def test_tool_result_with_string(self) -> None:
+        m = Message.tool_result("c2", "ok")
+        part = m.parts[0]
+        assert isinstance(part, ToolCallResponsePart)
+        assert part.response == "ok"
+
+
+class TestAttachMediaUrl:
+    """LLM.attach_media_url handles data: and plain URLs uniformly."""
+
+    def test_data_url_becomes_blob(self) -> None:
+        url = "data:image/png;base64,iVBORw0KGgo="
+        llm = LLM()
+        llm.attach_media_url(url, modality="image")
+        assert len(llm.media_attachments) == 1
+        att = llm.media_attachments[0]
+        assert att.kind == "blob"
+        assert att.mime_type == "image/png"
+        assert att.content == "iVBORw0KGgo="
+        assert att.modality == "image"
+
+    def test_plain_url_becomes_uri(self) -> None:
+        llm = LLM()
+        llm.attach_media_url("https://example.com/cat.png", modality="image")
+        att = llm.media_attachments[0]
+        assert att.kind == "uri"
+        assert att.uri == "https://example.com/cat.png"
+        assert att.modality == "image"
+
+    def test_data_url_modality_inferred_from_mime(self) -> None:
+        """Modality auto-fills from mime_type when not provided."""
+        llm = LLM()
+        llm.attach_media_url("data:image/jpeg;base64,XXX")
+        att = llm.media_attachments[0]
+        assert att.modality == "image"
+        assert att.mime_type == "image/jpeg"
+
+    def test_empty_url_ignored(self) -> None:
+        llm = LLM()
+        llm.attach_media_url("")
+        assert llm.media_attachments == []
+
+    def test_chainable(self) -> None:
+        """Returns self so callers can chain."""
+        llm = LLM()
+        result = llm.attach_media_url("https://e.com/a.png", modality="image")
+        assert result is llm
+
+
+def _message_parts_via_otel(msg: Message) -> dict:
+    """Helper: serialize one Message through the same path used by the LLM span."""
+    from weave.session.session_otel import _message_to_parts
+
+    return _message_to_parts(msg)
