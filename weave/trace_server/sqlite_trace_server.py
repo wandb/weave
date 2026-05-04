@@ -972,6 +972,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 limit=1,
                 filter=tsi.CallsFilter(call_ids=[req.id]),
                 include_costs=req.include_costs,
+                use_python_cost_hydration=req.use_python_cost_hydration,
                 include_storage_size=req.include_storage_size,
                 include_total_storage_size=req.include_total_storage_size,
             )

@@ -131,3 +131,42 @@ def test_adapter_does_not_mutate_req_when_inner_raises(
         getattr(adapter, method_name)(req)
 
     assert req.model_dump() == snapshot
+
+
+def test_adapter_scopes_python_cost_hydration_to_wandb_projects() -> None:
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    inner.calls_query.return_value = tsi.CallsQueryRes(calls=[])
+    inner.call_read.return_value = tsi.CallReadRes(call=None)
+    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+
+    adapter.calls_query(
+        tsi.CallsQueryReq(
+            project_id="wandb/project-a",
+            include_costs=True,
+            use_python_cost_hydration=False,
+        )
+    )
+    wandb_req = inner.calls_query.call_args.args[0]
+    assert wandb_req.project_id == base64.b64encode(b"wandb/project-a").decode()
+    assert wandb_req.use_python_cost_hydration is True
+
+    adapter.calls_query(
+        tsi.CallsQueryReq(
+            project_id="other/project-b",
+            include_costs=True,
+            use_python_cost_hydration=True,
+        )
+    )
+    other_req = inner.calls_query.call_args.args[0]
+    assert other_req.project_id == base64.b64encode(b"other/project-b").decode()
+    assert other_req.use_python_cost_hydration is False
+
+    adapter.call_read(
+        tsi.CallReadReq(
+            project_id="wandb/project-a",
+            id="call-1",
+            include_costs=True,
+        )
+    )
+    read_req = inner.call_read.call_args.args[0]
+    assert read_req.use_python_cost_hydration is True

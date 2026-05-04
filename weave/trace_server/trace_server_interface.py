@@ -447,6 +447,11 @@ class CallReadReq(BaseModelStrict):
     project_id: str
     id: str
     include_costs: bool | None = False
+    use_python_cost_hydration: bool | None = Field(
+        default=False,
+        description="Internal rollout gate. If true, hydrate call costs after"
+        " the ClickHouse call page query instead of in the SQL query.",
+    )
     include_storage_size: bool | None = False
     include_total_storage_size: bool | None = False
 
@@ -585,6 +590,11 @@ class CallsQueryReq(BaseModelStrict):
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include any model costs for each call.",
+    )
+    use_python_cost_hydration: bool | None = Field(
+        default=False,
+        description="Internal rollout gate. If true, hydrate call costs after"
+        " the ClickHouse call page query instead of in the SQL query.",
     )
     include_feedback: bool | None = Field(
         default=False,

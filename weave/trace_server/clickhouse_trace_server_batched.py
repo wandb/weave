@@ -45,6 +45,7 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import (
     ch_sentinel_values,
     constants,
+    cost_hydration,
     object_creation_utils,
     usage_utils,
 )
@@ -272,7 +273,9 @@ from weave.trace_server.query_builder.table_query_builder import (
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
+    DEFAULT_PRICING_LEVEL_ID,
     LLM_TOKEN_PRICES_TABLE,
+    PRICING_LEVELS,
     build_model_prices_query,
     get_cost_result_columns,
     validate_cost_purge_req,
@@ -1090,6 +1093,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ),
                 limit=1,
                 include_costs=req.include_costs,
+                use_python_cost_hydration=req.use_python_cost_hydration,
                 include_storage_size=req.include_storage_size,
                 include_total_storage_size=req.include_total_storage_size,
             )
@@ -1428,10 +1432,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
         settings = None
+        use_python_cost_hydration = bool(
+            req.include_costs and req.use_python_cost_hydration
+        )
         cq = CallsQuery(
             project_id=req.project_id,
             read_table=read_table,
-            include_costs=req.include_costs or False,
+            include_costs=bool(req.include_costs and not use_python_cost_hydration),
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
         )
@@ -1468,12 +1475,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
             set_current_span_dd_tags({"include_costs": "true"})
+            if use_python_cost_hydration:
+                set_current_span_dd_tags({"cost_hydration": "python"})
             summary_columns = ["summary", "summary_dump"]
             columns = [
                 *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
-            if self.use_distributed_mode:
+            if self.use_distributed_mode and not use_python_cost_hydration:
                 # Use patched settings for distributed bug (more info in ch_settings)
                 settings = ch_settings.CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS
 
@@ -1509,7 +1518,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
 
-        if req.include_costs:
+        if req.include_costs and not use_python_cost_hydration:
             # Cost query SELECT adds ORDER BY fields; result columns must match.
             select_columns = get_cost_result_columns(
                 [c.field for c in cq.select_fields], cq.order_fields
@@ -1529,8 +1538,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 dict(zip(select_columns, row, strict=False))
             )
 
+        cost_price_indexes: dict[str, cost_hydration.PriceIndex] = {}
+        known_cost_models: set[str] = set()
+
         try:
-            if not expand_columns and not include_feedback:
+            if (
+                not expand_columns
+                and not include_feedback
+                and not use_python_cost_hydration
+            ):
                 for row in raw_res:
                     yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
                 return
@@ -1544,6 +1560,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             for batch in batch_processor.make_batches(raw_res):
                 call_dicts = [row_to_call_schema_dict(row) for row in batch]
+                if use_python_cost_hydration:
+                    self._apply_costs_to_call_dicts(
+                        req.project_id,
+                        call_dicts,
+                        cost_price_indexes,
+                        known_cost_models,
+                    )
                 if expand_columns and req.return_expanded_column_values:
                     self._expand_call_refs(
                         req.project_id, call_dicts, expand_columns, ref_cache
@@ -1557,6 +1580,66 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Ensure upstream _query_stream is closed on any exit
             if hasattr(raw_res, "close"):
                 raw_res.close()
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._apply_costs_to_call_dicts"
+    )
+    def _apply_costs_to_call_dicts(
+        self,
+        project_id: str,
+        calls: list[dict[str, Any]],
+        price_index_cache: dict[str, cost_hydration.PriceIndex],
+        known_price_models: set[str],
+    ) -> None:
+        llm_ids: set[str] = set()
+        for call in calls:
+            summary = call.get("summary")
+            if isinstance(summary, dict):
+                llm_ids.update(cost_hydration.cost_usage_from_summary(summary).keys())
+
+        missing_llm_ids = llm_ids - known_price_models
+        if missing_llm_ids:
+            price_index_cache.update(
+                self._get_cost_price_indexes(missing_llm_ids, project_id)
+            )
+            known_price_models.update(missing_llm_ids)
+
+        cost_hydration.hydrate_calls_with_costs(calls, price_index_cache)
+
+    def _get_cost_price_indexes(
+        self, llm_ids: set[str], project_id: str
+    ) -> dict[str, cost_hydration.PriceIndex]:
+        if not llm_ids:
+            return {}
+
+        pb = ParamBuilder()
+        models_param = pb.add_param(sorted(llm_ids))
+        project_param = pb.add_param(project_id)
+        default_param = pb.add_param(DEFAULT_PRICING_LEVEL_ID)
+        empty_param = pb.add_param("")
+        columns = [col.name for col in LLM_TOKEN_PRICES_TABLE.cols]
+        fields = ", ".join(columns)
+        sql = f"""
+        SELECT {fields}
+        FROM {LLM_TOKEN_PRICES_TABLE.name}
+        WHERE llm_id IN {{{models_param}:Array(String)}}
+          AND (
+            (
+              pricing_level = '{PRICING_LEVELS["PROJECT"]}'
+              AND pricing_level_id = {{{project_param}:String}}
+            )
+            OR (
+              pricing_level = '{PRICING_LEVELS["DEFAULT"]}'
+              AND pricing_level_id = {{{default_param}:String}}
+            )
+            OR pricing_level_id = {{{empty_param}:String}}
+          )
+        """
+        result = self._query(sql, pb.get_params())
+        price_rows = [
+            dict(zip(columns, row, strict=False)) for row in result.result_rows
+        ]
+        return cost_hydration.build_price_indexes(price_rows, project_id)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(

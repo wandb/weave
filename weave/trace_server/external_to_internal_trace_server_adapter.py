@@ -8,6 +8,13 @@ from weave.trace_server.trace_server_converter import (
     universal_int_to_ext_ref_converter,
 )
 
+WANDB_ENTITY_NAME = "wandb"
+
+
+def _use_python_cost_hydration_for_external_project(project_id: str) -> bool:
+    entity, separator, _project = project_id.partition("/")
+    return separator == "/" and entity == WANDB_ENTITY_NAME
+
 
 class IdConverter:
     @abc.abstractmethod
@@ -177,6 +184,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
+        req.use_python_cost_hydration = _use_python_cost_hydration_for_external_project(
+            original_project_id
+        )
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         res = self._ref_apply(
             self._internal_trace_server.call_read, req, req.project_id
@@ -195,6 +205,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
+        req.use_python_cost_hydration = _use_python_cost_hydration_for_external_project(
+            original_project_id
+        )
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
@@ -234,6 +247,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
+        req.use_python_cost_hydration = _use_python_cost_hydration_for_external_project(
+            original_project_id
+        )
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
