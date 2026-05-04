@@ -2008,197 +2008,252 @@ class TestUsageFromOpenAIResponses:
 
 
 class TestMessageFromOpenAIResponsesInput:
-    """message_from_openai_responses_input covers the OpenAI Responses input shapes."""
+    """OpenAI Responses ``input=`` payloads round-trip to ``gen_ai.input.messages``.
 
-    def test_text_user_message(self) -> None:
-        msgs, media = message_from_openai_responses_input(
-            [{"role": "user", "content": "hello"}]
-        )
-        assert msgs == [Message.user("hello")]
-        assert media == []
+    Anchored at the OTel attribute boundary — the high-value contract is
+    that a given ``client.responses.create(input=...)`` produces a
+    specific JSON shape on the emitted chat span, not that the
+    intermediate ``Message`` list has any particular length.
+    """
 
-    def test_user_message_with_text_blocks(self) -> None:
-        items = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": "look at"},
-                    {"type": "input_text", "text": "this"},
-                ],
-            }
-        ]
+    @staticmethod
+    def _input_messages_attr(
+        otel_spans: InMemorySpanExporter, items: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         msgs, media = message_from_openai_responses_input(items)
-        assert len(msgs) == 1
-        assert msgs[0].role == "user"
-        assert msgs[0].content == "look at\nthis"
-        assert media == []
+        attrs = _emit_llm_with(otel_spans, input_messages=msgs, media_attachments=media)
+        return json.loads(attrs["gen_ai.input.messages"])
+
+    def test_text_user_message(self, otel_spans: InMemorySpanExporter) -> None:
+        out = self._input_messages_attr(
+            otel_spans, [{"role": "user", "content": "hello"}]
+        )
+        assert out == [
+            {"role": "user", "parts": [{"type": "text", "content": "hello"}]}
+        ]
+
+    def test_user_message_text_blocks_join_with_newline(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": "look at"},
+                        {"type": "input_text", "text": "this"},
+                    ],
+                }
+            ],
+        )
+        assert out == [
+            {"role": "user", "parts": [{"type": "text", "content": "look at\nthis"}]}
+        ]
 
     @pytest.mark.parametrize(
         "arguments",
         ['{"city": "Tokyo"}', {"city": "Tokyo"}],
         ids=["string", "dict"],
     )
-    def test_function_call_becomes_assistant_with_tool_call_part(
-        self, arguments: object
+    def test_function_call_emits_assistant_tool_call_part(
+        self, otel_spans: InMemorySpanExporter, arguments: object
     ) -> None:
-        items = [
-            {
-                "type": "function_call",
-                "name": "get_weather",
-                "arguments": arguments,
-                "call_id": "c1",
-            }
-        ]
-        msgs, _ = message_from_openai_responses_input(items)
-        assert len(msgs) == 1
-        assert msgs[0].role == "assistant"
-        part = msgs[0].parts[0]
-        assert isinstance(part, ToolCallPart)
-        assert part.id == "c1"
-        assert part.name == "get_weather"
-        assert json.loads(part.arguments) == {"city": "Tokyo"}
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {
+                    "type": "function_call",
+                    "name": "get_weather",
+                    "arguments": arguments,
+                    "call_id": "c1",
+                }
+            ],
+        )
+        assert len(out) == 1
+        assert out[0]["role"] == "assistant"
+        (part,) = out[0]["parts"]
+        assert part["type"] == "tool_call"
+        assert part["id"] == "c1"
+        assert part["name"] == "get_weather"
+        assert json.loads(part["arguments"]) == {"city": "Tokyo"}
 
-    def test_parallel_function_calls_coalesce_to_one_assistant_message(self) -> None:
-        """Consecutive function_call items collapse into one assistant Message
-        with multiple ToolCallParts, matching ``Message.assistant(tool_calls=...)``.
-        """
-        items = [
-            {"role": "user", "content": "weather and time?"},
-            {
-                "type": "function_call",
-                "name": "get_weather",
-                "arguments": '{"city":"Tokyo"}',
-                "call_id": "c1",
-            },
-            {
-                "type": "function_call",
-                "name": "get_time",
-                "arguments": '{"city":"Tokyo"}',
-                "call_id": "c2",
-            },
-            {
-                "type": "function_call_output",
-                "output": '{"temp":"75F"}',
-                "call_id": "c1",
-            },
-        ]
-        msgs, _ = message_from_openai_responses_input(items)
-        assert [m.role for m in msgs] == ["user", "assistant", "tool"]
-        assistant_parts = msgs[1].parts
-        assert len(assistant_parts) == 2
-        assert all(isinstance(p, ToolCallPart) for p in assistant_parts)
-        assert [p.name for p in assistant_parts] == ["get_weather", "get_time"]  # type: ignore[attr-defined]
-        assert [p.id for p in assistant_parts] == ["c1", "c2"]  # type: ignore[attr-defined]
+    def test_parallel_function_calls_coalesce_to_one_assistant_message(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {"role": "user", "content": "weather and time?"},
+                {
+                    "type": "function_call",
+                    "name": "get_weather",
+                    "arguments": '{"city":"Tokyo"}',
+                    "call_id": "c1",
+                },
+                {
+                    "type": "function_call",
+                    "name": "get_time",
+                    "arguments": '{"city":"Tokyo"}',
+                    "call_id": "c2",
+                },
+                {
+                    "type": "function_call_output",
+                    "output": '{"temp":"75F"}',
+                    "call_id": "c1",
+                },
+            ],
+        )
+        assert [m["role"] for m in out] == ["user", "assistant", "tool"]
+        assistant_parts = out[1]["parts"]
+        assert [p["type"] for p in assistant_parts] == ["tool_call", "tool_call"]
+        assert [p["name"] for p in assistant_parts] == ["get_weather", "get_time"]
+        assert [p["id"] for p in assistant_parts] == ["c1", "c2"]
 
     @pytest.mark.parametrize(
         "output",
         ['{"temp": 75}', {"temp": 75}],
         ids=["string", "dict"],
     )
-    def test_function_call_output_becomes_tool_message(self, output: object) -> None:
-        items = [{"type": "function_call_output", "output": output, "call_id": "c1"}]
-        msgs, _ = message_from_openai_responses_input(items)
-        assert msgs[0].role == "tool"
-        part = msgs[0].parts[0]
-        assert isinstance(part, ToolCallResponsePart)
-        assert part.id == "c1"
-        assert json.loads(part.response) == {"temp": 75}
+    def test_function_call_output_emits_tool_message(
+        self, otel_spans: InMemorySpanExporter, output: object
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [{"type": "function_call_output", "output": output, "call_id": "c1"}],
+        )
+        assert len(out) == 1
+        assert out[0]["role"] == "tool"
+        (part,) = out[0]["parts"]
+        assert part["type"] == "tool_call_response"
+        assert part["id"] == "c1"
+        assert json.loads(part["response"]) == {"temp": 75}
 
-    def test_reasoning_items_skipped(self) -> None:
-        items = [
-            {"type": "reasoning", "summary": [{"text": "hmm"}]},
-            {"role": "user", "content": "go"},
-        ]
-        msgs, _ = message_from_openai_responses_input(items)
-        assert len(msgs) == 1
-        assert msgs[0].role == "user"
+    def test_reasoning_items_skipped(self, otel_spans: InMemorySpanExporter) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {"type": "reasoning", "summary": [{"text": "hmm"}]},
+                {"role": "user", "content": "go"},
+            ],
+        )
+        assert [m["role"] for m in out] == ["user"]
 
     @pytest.mark.parametrize(
-        ("block", "expected_kind", "expected_field", "expected_value"),
+        ("block", "expected_part"),
         [
             (
                 {
                     "type": "input_image",
                     "image_url": "data:image/png;base64,iVBORw0KGgo=",
                 },
-                "blob",
-                "content",
-                "iVBORw0KGgo=",
+                {
+                    "type": "blob",
+                    "mime_type": "image/png",
+                    "modality": "image",
+                    "content": "iVBORw0KGgo=",
+                },
             ),
             (
                 {"type": "image_url", "image_url": {"url": "https://e.com/cat.png"}},
-                "uri",
-                "uri",
-                "https://e.com/cat.png",
+                {
+                    "type": "uri",
+                    "mime_type": "",
+                    "modality": "image",
+                    "uri": "https://e.com/cat.png",
+                },
             ),
         ],
         ids=["data_url_blob", "plain_url_uri"],
     )
-    def test_image_only_user_message_keeps_message_slot(
+    def test_image_only_user_message_attaches_media(
         self,
+        otel_spans: InMemorySpanExporter,
         block: dict,
-        expected_kind: str,
-        expected_field: str,
-        expected_value: str,
+        expected_part: dict,
     ) -> None:
-        """An image-only user message must still emit a Message so
-        _serialize_input_messages has a slot to bind the attachment to.
+        """Image-only user messages must keep a Message slot so the
+        attachment binds to the right user turn on the wire.
         """
-        items = [{"role": "user", "content": [block]}]
-        msgs, media = message_from_openai_responses_input(items)
-        assert len(msgs) == 1
-        assert msgs[0].role == "user"
-        assert msgs[0].content == ""
-        assert len(media) == 1
-        assert media[0].kind == expected_kind
-        assert getattr(media[0], expected_field) == expected_value
+        out = self._input_messages_attr(
+            otel_spans, [{"role": "user", "content": [block]}]
+        )
+        assert len(out) == 1
+        assert out[0]["role"] == "user"
+        # No text part (empty content), just the media part.
+        assert out[0]["parts"] == [expected_part]
 
-    def test_duplicate_image_urls_deduplicated(self) -> None:
-        items = [
+    def test_duplicate_image_urls_deduplicated(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_image", "image_url": "https://e.com/a.png"},
+                        {"type": "input_image", "image_url": "https://e.com/a.png"},
+                    ],
+                }
+            ],
+        )
+        assert out == [
             {
                 "role": "user",
-                "content": [
-                    {"type": "input_image", "image_url": "https://e.com/a.png"},
-                    {"type": "input_image", "image_url": "https://e.com/a.png"},
+                "parts": [
+                    {
+                        "type": "uri",
+                        "mime_type": "",
+                        "modality": "image",
+                        "uri": "https://e.com/a.png",
+                    }
                 ],
             }
         ]
-        _, media = message_from_openai_responses_input(items)
-        assert len(media) == 1
 
-    def test_assistant_message_text_content(self) -> None:
-        """Assistant content blocks with output_text are flattened."""
-        items = [
-            {
-                "role": "assistant",
-                "content": [{"type": "output_text", "text": "hello"}],
-            }
+    def test_assistant_output_text_blocks_flatten(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "hello"}],
+                }
+            ],
+        )
+        assert out == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "hello"}]}
         ]
-        msgs, _ = message_from_openai_responses_input(items)
-        assert msgs == [Message(role="assistant", content="hello")]
 
-    def test_full_conversation_round_trip(self) -> None:
-        """User → assistant tool call → tool result → assistant text — common shape."""
-        items = [
-            {"role": "user", "content": "what's the weather in Tokyo?"},
-            {
-                "type": "function_call",
-                "name": "get_weather",
-                "arguments": '{"city":"Tokyo"}',
-                "call_id": "c1",
-            },
-            {
-                "type": "function_call_output",
-                "output": '{"temp":"75F"}',
-                "call_id": "c1",
-            },
-            {
-                "role": "assistant",
-                "content": [{"type": "output_text", "text": "It's 75F."}],
-            },
-        ]
-        msgs, _ = message_from_openai_responses_input(items)
-        assert [m.role for m in msgs] == ["user", "assistant", "tool", "assistant"]
+    def test_full_conversation_round_trip(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """User → assistant tool call → tool result → assistant text."""
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {"role": "user", "content": "what's the weather in Tokyo?"},
+                {
+                    "type": "function_call",
+                    "name": "get_weather",
+                    "arguments": '{"city":"Tokyo"}',
+                    "call_id": "c1",
+                },
+                {
+                    "type": "function_call_output",
+                    "output": '{"temp":"75F"}',
+                    "call_id": "c1",
+                },
+                {
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "It's 75F."}],
+                },
+            ],
+        )
+        assert [m["role"] for m in out] == ["user", "assistant", "tool", "assistant"]
 
 
 class TestReasoningFromOpenAIResponses:
