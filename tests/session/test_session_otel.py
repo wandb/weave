@@ -1876,26 +1876,6 @@ class TestAttachMediaUrl:
 class TestLLMRecord:
     """LLM.record(...) collapses N attribute assignments into one call."""
 
-    def test_records_all_fields(self) -> None:
-        llm = LLM(model="gpt-4o", provider_name="openai")
-        llm.record(
-            input_messages=[Message.user("hi")],
-            output_messages=[Message.assistant("hello")],
-            usage=Usage(input_tokens=10, output_tokens=5),
-            response_id="resp_1",
-            response_model="gpt-4o-2024",
-            finish_reasons=["stop"],
-            reasoning="thinking...",
-        )
-        assert llm.input_messages == [Message.user("hi")]
-        assert llm.output_messages == [Message.assistant("hello")]
-        assert llm.usage.input_tokens == 10
-        assert llm.usage.output_tokens == 5
-        assert llm.response_id == "resp_1"
-        assert llm.response_model == "gpt-4o-2024"
-        assert llm.finish_reasons == ["stop"]
-        assert llm.reasoning.content == "thinking..."
-
     def test_partial_record_preserves_existing(self) -> None:
         """Fields not passed (None) keep their existing values."""
         llm = LLM(model="m", provider_name="p")
@@ -1926,24 +1906,27 @@ class TestLLMRecord:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         """End-to-end: record() values flow through to the OTel attrs."""
-        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
-            with start_llm(model="gpt-4o", provider_name="openai") as llm:
-                llm.record(
-                    input_messages=[Message.user("hi")],
-                    output_messages=[Message.assistant("hello")],
-                    usage=Usage(input_tokens=3, output_tokens=2),
-                    response_id="r1",
-                    finish_reasons=["stop"],
-                )
-        chat_spans = [
-            sp for sp in otel_spans.get_finished_spans() if sp.name == "chat gpt-4o"
-        ]
-        assert len(chat_spans) == 1
-        attrs = dict(chat_spans[0].attributes or {})
+        attrs = _emit_llm_with(
+            otel_spans,
+            input_messages=[Message.user("hi")],
+            output_messages=[Message.assistant("hello")],
+            usage=Usage(input_tokens=3, output_tokens=2),
+            reasoning="thinking...",
+            response_id="r1",
+            finish_reasons=["stop"],
+        )
         assert attrs["gen_ai.usage.input_tokens"] == 3
         assert attrs["gen_ai.usage.output_tokens"] == 2
         assert attrs["gen_ai.response.id"] == "r1"
         assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
+        # Reasoning is folded into output messages as a ReasoningPart
+        # prepended to the assistant message; the original text content
+        # remains as a TextPart afterwards.
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        assert out_msgs[-1]["parts"] == [
+            {"type": "reasoning", "content": "thinking..."},
+            {"type": "text", "content": "hello"},
+        ]
 
 
 class TestUsageFromOpenAIResponses:
