@@ -16,8 +16,9 @@ WANDB_ENTITY_NAME = "wandb"
 
 
 def _use_python_cost_hydration_for_external_project(project_id: str) -> bool:
-    entity, separator, _project = project_id.partition("/")
-    return separator == "/" and entity == WANDB_ENTITY_NAME
+    # Temporary QA benchmark override: exercise the Python cost hydration path
+    # for non-wandb projects such as griffin/cost-otel-heavy-20260504.
+    return True
 
 
 class IdConverter:
