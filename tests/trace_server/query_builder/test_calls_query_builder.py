@@ -304,7 +304,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             PREWHERE calls_merged.project_id = {pb_9:String}
             WHERE ((calls_merged.op_name IN {pb_5:Array(String)})
                     OR (calls_merged.op_name IS NULL))
-                AND (calls_merged.trace_id = {pb_6:String}
+                AND (ifNull(calls_merged.trace_id, '') = {pb_6:String}
                     OR calls_merged.trace_id IS NULL)
                 AND ((calls_merged.inputs_dump LIKE {pb_7:String} OR calls_merged.inputs_dump IS NULL)
                     AND (calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL))
@@ -2512,7 +2512,7 @@ def test_trace_id_filter_in():
             calls_merged.id AS id
         FROM calls_merged
         PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.trace_id IN {pb_0:Array(String)}
+        WHERE (ifNull(calls_merged.trace_id, '') IN {pb_0:Array(String)}
                 OR calls_merged.trace_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -2540,7 +2540,7 @@ def test_trace_id_filter_eq():
         PREWHERE calls_merged.project_id = {pb_2:String}
         WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
                 OR (calls_merged.op_name IS NULL))
-            AND (calls_merged.trace_id = {pb_1:String}
+            AND (ifNull(calls_merged.trace_id, '') = {pb_1:String}
                 OR calls_merged.trace_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -2752,7 +2752,7 @@ def test_all_optimization_filters():
                 OR calls_merged.parent_id IS NULL)
             AND ((calls_merged.op_name IN {pb_5:Array(String)})
                 OR (calls_merged.op_name IS NULL))
-            AND (calls_merged.trace_id IN {pb_6:Array(String)}
+            AND (ifNull(calls_merged.trace_id, '') IN {pb_6:Array(String)}
                 OR calls_merged.trace_id IS NULL)
             AND (calls_merged.thread_id IN {pb_7:Array(String)}
                 OR calls_merged.thread_id IS NULL)

@@ -218,10 +218,19 @@ def build_calls_filter_sql(
         where_clauses.append(null_check_sql("parent_id", "parent_id", read_table, pb))
 
     # Handle trace_ids
+    # On calls_merged, match the `ifNull(trace_id, '')` index expression from
+    # migration 031 so the bloom filter can prune granules. On calls_complete,
+    # trace_id is non-nullable String with an index on the raw column.
     if calls_filter.trace_ids:
         trace_ids_param = pb.add_param(calls_filter.trace_ids)
+        if read_table == ReadTable.CALLS_MERGED:
+            trace_id_expr = "ifNull(trace_id, '')"
+        elif read_table == ReadTable.CALLS_COMPLETE:
+            trace_id_expr = "trace_id"
+        else:
+            raise ValueError(f"Unhandled read_table: {read_table}")
         where_clauses.append(
-            f"trace_id IN {param_slot(trace_ids_param, 'Array(String)')}"
+            f"{trace_id_expr} IN {param_slot(trace_ids_param, 'Array(String)')}"
         )
 
     # Handle call_ids

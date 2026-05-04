@@ -1302,7 +1302,7 @@ class CallsQuery(BaseModel):
 
         op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_id = process_trace_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, self.read_table
         )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
@@ -2311,6 +2311,7 @@ def process_trace_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
@@ -2327,15 +2328,30 @@ def process_trace_id_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
+    # On calls_merged, trace_id is SimpleAggregateFunction(any, Nullable(String))
+    # and the idx_trace_id_bloom skip-index (migration 031) is built on
+    # `ifNull(trace_id, '')`. Match that expression character-for-character so
+    # the index can prune granules. On calls_complete, trace_id is non-nullable
+    # String with an index on the raw column, so we keep the raw expression.
+    if read_table == ReadTable.CALLS_MERGED:
+        trace_cond_field_sql = f"ifNull({trace_id_field_sql}, '')"
+    elif read_table == ReadTable.CALLS_COMPLETE:
+        trace_cond_field_sql = trace_id_field_sql
+    else:
+        raise ValueError(f"Unhandled read_table: {read_table}")
+
     # If there's only one trace_id, use an equality condition for performance
     if len(trace_ids) == 1:
-        trace_cond = f"{trace_id_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
+        trace_cond = f"{trace_cond_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
     elif len(trace_ids) > 1:
-        trace_cond = f"{trace_id_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
+        trace_cond = f"{trace_cond_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
     else:
         return ""
 
-    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+    trace_null = trace_id_field.null_check_sql(
+        param_builder, table_alias, read_table, use_agg_fn=False
+    )
+    return f" AND ({trace_cond} OR {trace_null})"
 
 
 def process_thread_id_filter_to_sql(
