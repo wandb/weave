@@ -13,6 +13,8 @@ describe('hostApps — esm-basic', () => {
           `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`
       );
     }
+    // Confirm the fixture's `myOp` actually executed and emitted a trace
+    // the mock captured under our project_id.
     const calls = await getCalls(projectId);
     expect(calls.length).toBeGreaterThanOrEqual(1);
     expect(

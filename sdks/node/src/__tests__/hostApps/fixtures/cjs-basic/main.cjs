@@ -16,7 +16,4 @@ const weave = require('weave');
   });
   await myOp(41);
   await client.waitForBatchProcessing();
-})().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+})();
