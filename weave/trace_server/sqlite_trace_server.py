@@ -5191,6 +5191,7 @@ def _transform_external_calls_field_to_internal_calls_field(
         field = "summary"
 
     if json_path is not None:
+        json_column = field
         sql_type = "TEXT"
         if cast is not None:
             if cast == "int":
@@ -5203,15 +5204,18 @@ def _transform_external_calls_field_to_internal_calls_field(
                 sql_type = "TEXT"
             else:
                 raise ValueError(f"Unknown cast: {cast}")
-        field = (
-            "CAST(json_extract("
-            + json.dumps(field)
-            + ", '"
-            + json_path
-            + "') AS "
-            + sql_type
-            + ")"
+        json_extract_sql = (
+            "json_extract(" + json.dumps(json_column) + ", '" + json_path + "')"
         )
+        field = f"CAST({json_extract_sql} AS {sql_type})"
+        if cast is not None:
+            json_type_sql = (
+                "json_type(" + json.dumps(json_column) + ", '" + json_path + "')"
+            )
+            field = (
+                f"CASE WHEN {json_type_sql} IN ('object', 'array') THEN NULL "
+                f"ELSE {field} END"
+            )
 
     return field
 
