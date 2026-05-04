@@ -5184,19 +5184,17 @@ def _sqlite_inferred_json_cast_sql(
             f"WHEN {json_type_sql} = 'text' AND {text_is_float} THEN {cast_sql} "
             f"ELSE NULL END"
         )
-    if cast == "bool":
-        text_value = f"lower(trim(CAST({json_extract_sql} AS TEXT)))"
-        text_is_int = _sqlite_json_text_is_int_sql(json_extract_sql)
-        return (
-            f"CASE WHEN {json_type_sql} = 'true' THEN 1 "
-            f"WHEN {json_type_sql} = 'false' THEN 0 "
-            f"WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
-            f"WHEN {json_type_sql} = 'text' AND {text_value} = 'true' THEN 1 "
-            f"WHEN {json_type_sql} = 'text' AND {text_value} = 'false' THEN 0 "
-            f"WHEN {json_type_sql} = 'text' AND {text_is_int} THEN {cast_sql} "
-            f"ELSE NULL END"
-        )
-    return cast_sql
+    text_value = f"lower(trim(CAST({json_extract_sql} AS TEXT)))"
+    text_is_int = _sqlite_json_text_is_int_sql(json_extract_sql)
+    return (
+        f"CASE WHEN {json_type_sql} = 'true' THEN 1 "
+        f"WHEN {json_type_sql} = 'false' THEN 0 "
+        f"WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
+        f"WHEN {json_type_sql} = 'text' AND {text_value} = 'true' THEN 1 "
+        f"WHEN {json_type_sql} = 'text' AND {text_value} = 'false' THEN 0 "
+        f"WHEN {json_type_sql} = 'text' AND {text_is_int} THEN {cast_sql} "
+        f"ELSE NULL END"
+    )
 
 
 def _transform_external_calls_field_to_internal_calls_field(
@@ -5266,7 +5264,7 @@ def _transform_external_calls_field_to_internal_calls_field(
             "json_extract(" + json.dumps(json_column) + ", '" + json_path + "')"
         )
         field = f"CAST({json_extract_sql} AS {sql_type})"
-        if cast is not None:
+        if cast in {"int", "float", "bool"}:
             json_type_sql = (
                 "json_type(" + json.dumps(json_column) + ", '" + json_path + "')"
             )
