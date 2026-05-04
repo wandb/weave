@@ -83,6 +83,48 @@ def otel_spans(monkeypatch: pytest.MonkeyPatch):
     provider.shutdown()
 
 
+def _emit_llm_with(
+    otel_spans: InMemorySpanExporter,
+    *,
+    model: str = "gpt-4o",
+    provider_name: str = "openai",
+    input_messages: list[Message] | None = None,
+    output_messages: list[Message] | None = None,
+    media_attachments: list[MediaAttachment] | None = None,
+    usage: Usage | None = None,
+    reasoning: Reasoning | str | None = None,
+    response_id: str | None = None,
+    finish_reasons: list[str] | None = None,
+    # response_model and output_type are intentionally omitted; tests that
+    # need them set the field directly on the LLM span before recording.
+) -> dict[str, Any]:
+    """Build a session+turn+LLM span with the given fields and return the
+    chat span's emitted OTel attributes.
+
+    Used by interface-level tests to assert on what callers actually see
+    on the wire — ``gen_ai.input.messages``, ``gen_ai.usage.*``, etc. —
+    rather than on intermediate Pydantic shape. Clears the exporter
+    first so the helper is safe to call multiple times in a single test.
+    """
+    otel_spans.clear()
+    with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+        with start_llm(model=model, provider_name=provider_name) as llm:
+            llm.record(
+                input_messages=input_messages,
+                output_messages=output_messages,
+                media_attachments=media_attachments,
+                usage=usage,
+                reasoning=reasoning,
+                response_id=response_id,
+                finish_reasons=finish_reasons,
+            )
+    chat_spans = [
+        sp for sp in otel_spans.get_finished_spans() if sp.name == f"chat {model}"
+    ]
+    assert len(chat_spans) == 1, f"expected 1 chat span, got {len(chat_spans)}"
+    return dict(chat_spans[0].attributes or {})
+
+
 # ---------------------------------------------------------------------------
 # invoke_agent_attributes
 # ---------------------------------------------------------------------------
