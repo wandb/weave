@@ -15,6 +15,11 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
+from weave.session.adapters.openai import (
+    message_from_openai_responses_input,
+    reasoning_from_openai_responses,
+    usage_from_openai_responses,
+)
 from weave.session.session import (
     LLM,
     BlobPart,
@@ -1900,14 +1905,14 @@ class TestLLMRecord:
 
 
 class TestUsageFromOpenAIResponses:
-    """Usage.from_openai_responses extracts tokens from OpenAI Responses ``Response``s."""
+    """usage_from_openai_responses extracts tokens from OpenAI Responses ``Response``s."""
 
     @staticmethod
     def _resp(usage: Any) -> Any:
         return type("R", (), {"usage": usage})
 
     def test_returns_empty_usage_when_response_usage_is_none(self) -> None:
-        assert Usage.from_openai_responses(self._resp(None)) == Usage()
+        assert usage_from_openai_responses(self._resp(None)) == Usage()
 
     def test_extracts_full_usage(self) -> None:
         usage = type(
@@ -1920,7 +1925,7 @@ class TestUsageFromOpenAIResponses:
                 "input_tokens_details": type("ID", (), {"cached_tokens": 3})(),
             },
         )()
-        result = Usage.from_openai_responses(self._resp(usage))
+        result = usage_from_openai_responses(self._resp(usage))
         assert result.input_tokens == 10
         assert result.output_tokens == 20
         assert result.reasoning_tokens == 5
@@ -1949,7 +1954,7 @@ class TestUsageFromOpenAIResponses:
                 "input_tokens_details": input_details,
             },
         )()
-        result = Usage.from_openai_responses(self._resp(usage))
+        result = usage_from_openai_responses(self._resp(usage))
         assert result.input_tokens == 10
         assert result.output_tokens == 20
         assert result.reasoning_tokens == (
@@ -1961,10 +1966,10 @@ class TestUsageFromOpenAIResponses:
 
 
 class TestMessageFromOpenAIResponsesInput:
-    """Message.from_openai_responses_input covers the OpenAI Responses input shapes."""
+    """message_from_openai_responses_input covers the OpenAI Responses input shapes."""
 
     def test_text_user_message(self) -> None:
-        msgs, media = Message.from_openai_responses_input(
+        msgs, media = message_from_openai_responses_input(
             [{"role": "user", "content": "hello"}]
         )
         assert msgs == [Message.user("hello")]
@@ -1980,7 +1985,7 @@ class TestMessageFromOpenAIResponsesInput:
                 ],
             }
         ]
-        msgs, media = Message.from_openai_responses_input(items)
+        msgs, media = message_from_openai_responses_input(items)
         assert len(msgs) == 1
         assert msgs[0].role == "user"
         assert msgs[0].content == "look at\nthis"
@@ -2002,7 +2007,7 @@ class TestMessageFromOpenAIResponsesInput:
                 "call_id": "c1",
             }
         ]
-        msgs, _ = Message.from_openai_responses_input(items)
+        msgs, _ = message_from_openai_responses_input(items)
         assert len(msgs) == 1
         assert msgs[0].role == "assistant"
         part = msgs[0].parts[0]
@@ -2035,7 +2040,7 @@ class TestMessageFromOpenAIResponsesInput:
                 "call_id": "c1",
             },
         ]
-        msgs, _ = Message.from_openai_responses_input(items)
+        msgs, _ = message_from_openai_responses_input(items)
         assert [m.role for m in msgs] == ["user", "assistant", "tool"]
         assistant_parts = msgs[1].parts
         assert len(assistant_parts) == 2
@@ -2050,7 +2055,7 @@ class TestMessageFromOpenAIResponsesInput:
     )
     def test_function_call_output_becomes_tool_message(self, output: object) -> None:
         items = [{"type": "function_call_output", "output": output, "call_id": "c1"}]
-        msgs, _ = Message.from_openai_responses_input(items)
+        msgs, _ = message_from_openai_responses_input(items)
         assert msgs[0].role == "tool"
         part = msgs[0].parts[0]
         assert isinstance(part, ToolCallResponsePart)
@@ -2062,7 +2067,7 @@ class TestMessageFromOpenAIResponsesInput:
             {"type": "reasoning", "summary": [{"text": "hmm"}]},
             {"role": "user", "content": "go"},
         ]
-        msgs, _ = Message.from_openai_responses_input(items)
+        msgs, _ = message_from_openai_responses_input(items)
         assert len(msgs) == 1
         assert msgs[0].role == "user"
 
@@ -2098,7 +2103,7 @@ class TestMessageFromOpenAIResponsesInput:
         _serialize_input_messages has a slot to bind the attachment to.
         """
         items = [{"role": "user", "content": [block]}]
-        msgs, media = Message.from_openai_responses_input(items)
+        msgs, media = message_from_openai_responses_input(items)
         assert len(msgs) == 1
         assert msgs[0].role == "user"
         assert msgs[0].content == ""
@@ -2116,7 +2121,7 @@ class TestMessageFromOpenAIResponsesInput:
                 ],
             }
         ]
-        _, media = Message.from_openai_responses_input(items)
+        _, media = message_from_openai_responses_input(items)
         assert len(media) == 1
 
     def test_assistant_message_text_content(self) -> None:
@@ -2127,7 +2132,7 @@ class TestMessageFromOpenAIResponsesInput:
                 "content": [{"type": "output_text", "text": "hello"}],
             }
         ]
-        msgs, _ = Message.from_openai_responses_input(items)
+        msgs, _ = message_from_openai_responses_input(items)
         assert msgs == [Message(role="assistant", content="hello")]
 
     def test_full_conversation_round_trip(self) -> None:
@@ -2150,15 +2155,15 @@ class TestMessageFromOpenAIResponsesInput:
                 "content": [{"type": "output_text", "text": "It's 75F."}],
             },
         ]
-        msgs, _ = Message.from_openai_responses_input(items)
+        msgs, _ = message_from_openai_responses_input(items)
         assert [m.role for m in msgs] == ["user", "assistant", "tool", "assistant"]
 
 
 class TestReasoningFromOpenAIResponses:
-    """Reasoning.from_openai_responses flattens OpenAI's reasoning summary."""
+    """reasoning_from_openai_responses flattens OpenAI's reasoning summary."""
 
     def test_summary_fragments_joined_with_newlines(self) -> None:
-        result = Reasoning.from_openai_responses(
+        result = reasoning_from_openai_responses(
             {"summary": [{"text": "first"}, {"text": "second"}]}
         )
         assert result is not None
@@ -2176,10 +2181,10 @@ class TestReasoningFromOpenAIResponses:
     )
     def test_returns_none(self, part: object) -> None:
         """Empty / malformed inputs collapse to None so callers can pipe through."""
-        assert Reasoning.from_openai_responses(part) is None  # type: ignore[arg-type]
+        assert reasoning_from_openai_responses(part) is None  # type: ignore[arg-type]
 
     def test_skips_non_dict_summary_items(self) -> None:
-        result = Reasoning.from_openai_responses(
+        result = reasoning_from_openai_responses(
             {"summary": [{"text": "kept"}, "not a dict", {"text": "also kept"}]}
         )
         assert result is not None
