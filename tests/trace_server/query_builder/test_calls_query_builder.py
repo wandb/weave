@@ -1685,6 +1685,49 @@ def test_whole_number_float_eq_emits_int_form_like_prefilter() -> None:
     )
 
 
+def test_bool_eq_emits_numeric_form_like_prefilter() -> None:
+    """A bool literal must prefilter on both JSON bool and legacy 1/0 forms.
+
+    The inferred bool HAVING comparison accepts JSON booleans plus legacy
+    numeric encodings via the `toUInt8OrNull` fallback. The LIKE prefilter
+    must therefore allow the numeric text form too, otherwise it can drop rows
+    before HAVING evaluates the precise cast.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "inputs.enabled"}, {"$literal": True}]}
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_4:String}
+        WHERE (((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump LIKE {pb_3:String}) OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((multiIf(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = 'true', 1, coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = 'false', 0, toUInt8OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''))) = {pb_1:Bool}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."enabled"',
+            "pb_1": True,
+            "pb_2": "%true%",
+            "pb_3": "%1%",
+            "pb_4": "project",
+        },
+    )
+
+
 def test_calls_query_filter_by_empty_string() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
