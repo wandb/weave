@@ -21,9 +21,21 @@ def lint(session: nox.Session):
 
     if ruff_only:
         # Run only ruff checks on all files
-        session.run("prek", "run", "--hook-stage=pre-push", "ruff-check", "--all-files")
         session.run(
-            "prek", "run", "--hook-stage=pre-push", "ruff-format", "--all-files"
+            "prek",
+            "run",
+            "--hook-stage=pre-push",
+            "--show-diff-on-failure",
+            "ruff-check",
+            "--all-files",
+        )
+        session.run(
+            "prek",
+            "run",
+            "--hook-stage=pre-push",
+            "--show-diff-on-failure",
+            "ruff-format",
+            "--all-files",
         )
     elif dry_run:
         session.run(
@@ -31,15 +43,22 @@ def lint(session: nox.Session):
             "run",
             "--hook-stage",
             "pre-push",
+            "--show-diff-on-failure",
             "--files",
             "./weave/__init__.py",
         )
     elif all_files:
         # Allow running on all files if explicitly requested
-        session.run("prek", "run", "--hook-stage=pre-push", "--all-files")
+        session.run(
+            "prek",
+            "run",
+            "--hook-stage=pre-push",
+            "--show-diff-on-failure",
+            "--all-files",
+        )
     else:
         # Default: run only on staged files for faster execution
-        session.run("prek", "run", "--hook-stage=pre-push")
+        session.run("prek", "run", "--hook-stage=pre-push", "--show-diff-on-failure")
 
 
 # Shards that don't have corresponding optional dependencies in pyproject.toml
