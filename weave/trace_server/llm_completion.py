@@ -1,6 +1,8 @@
+import threading
 from collections.abc import Callable, Iterator
 from typing import Any
 
+from cachetools import TTLCache
 from pydantic import BaseModel
 
 from weave.prompt.prompt import format_message_with_template_vars
@@ -20,6 +22,18 @@ from weave.trace_server.model_providers.model_providers import (
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
+
+# Per-replica TTL cache for resolved custom provider info. Avoids hammering
+# ClickHouse (two obj_read calls) and the secret fetcher on every completion
+# request. Cross-thread safe via the lock; entries expire after the TTL with
+# no explicit invalidation, so provider config edits propagate within the TTL.
+CUSTOM_PROVIDER_CACHE_MAX_SIZE = 1000
+CUSTOM_PROVIDER_CACHE_TTL_SECONDS = 60
+_custom_provider_cache: TTLCache[tuple[str, str, str], "CustomProviderInfo"] = TTLCache(
+    maxsize=CUSTOM_PROVIDER_CACHE_MAX_SIZE,
+    ttl=CUSTOM_PROVIDER_CACHE_TTL_SECONDS,
+)
+_custom_provider_cache_lock = threading.Lock()
 
 
 def parse_prompt_reference(prompt: str) -> tuple[str, str, str | None]:
@@ -457,6 +471,12 @@ def get_custom_provider_info(
         - return_type: The return type for the provider
         - actual_model_name: The actual model name to use for the API call
     """
+    cache_key = (project_id, provider_name, model_name)
+    with _custom_provider_cache_lock:
+        cached = _custom_provider_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
         raise InvalidRequest(
@@ -523,13 +543,16 @@ def get_custom_provider_info(
             api_key_name=secret_name,
         )
 
-    return CustomProviderInfo(
+    info = CustomProviderInfo(
         base_url=provider_obj.base_url,
         api_key=api_key,
         extra_headers=provider_obj.extra_headers,
         return_type=provider_obj.return_type,
         actual_model_name=actual_model_name,
     )
+    with _custom_provider_cache_lock:
+        _custom_provider_cache[cache_key] = info
+    return info
 
 
 # ---------------------------------------------------------------------------
