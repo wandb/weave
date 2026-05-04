@@ -5141,6 +5141,67 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
+def _sqlite_json_text_is_int_sql(value_sql: str) -> str:
+    trimmed = f"trim(CAST({value_sql} AS TEXT))"
+    unsigned = (
+        f"(CASE WHEN substr({trimmed}, 1, 1) IN ('-', '+') "
+        f"THEN substr({trimmed}, 2) ELSE {trimmed} END)"
+    )
+    return f"({unsigned} != '' AND {unsigned} NOT GLOB '*[^0-9]*')"
+
+
+def _sqlite_json_text_is_float_sql(value_sql: str) -> str:
+    trimmed = f"trim(CAST({value_sql} AS TEXT))"
+    unsigned = (
+        f"(CASE WHEN substr({trimmed}, 1, 1) IN ('-', '+') "
+        f"THEN substr({trimmed}, 2) ELSE {trimmed} END)"
+    )
+    digits = f"replace({unsigned}, '.', '')"
+    dot_count = f"(length({unsigned}) - length(replace({unsigned}, '.', '')))"
+    return (
+        f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' "
+        f"AND {dot_count} <= 1)"
+    )
+
+
+def _sqlite_inferred_json_cast_sql(
+    json_extract_sql: str,
+    json_type_sql: str,
+    cast: str,
+    sql_type: str,
+) -> str:
+    # SQLite CAST coerces nonnumeric text and structured JSON to 0. Inferred
+    # casts should instead behave like ClickHouse's to*OrNull family.
+    cast_sql = f"CAST({json_extract_sql} AS {sql_type})"
+    if cast == "int":
+        text_is_int = _sqlite_json_text_is_int_sql(json_extract_sql)
+        return (
+            f"CASE WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
+            f"WHEN {json_type_sql} = 'text' AND {text_is_int} THEN {cast_sql} "
+            f"ELSE NULL END"
+        )
+    if cast == "float":
+        text_is_float = _sqlite_json_text_is_float_sql(json_extract_sql)
+        return (
+            f"CASE WHEN {json_type_sql} IN ('integer', 'real') THEN {cast_sql} "
+            f"WHEN {json_type_sql} = 'text' AND {text_is_float} THEN {cast_sql} "
+            f"ELSE NULL END"
+        )
+    if cast == "bool":
+        text_value = f"lower(trim(CAST({json_extract_sql} AS TEXT)))"
+        text_is_int = _sqlite_json_text_is_int_sql(json_extract_sql)
+        return (
+            f"CASE WHEN {json_type_sql} = 'true' THEN 1 "
+            f"WHEN {json_type_sql} = 'false' THEN 0 "
+            f"WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
+            f"WHEN {json_type_sql} = 'text' AND {text_value} = 'true' THEN 1 "
+            f"WHEN {json_type_sql} = 'text' AND {text_value} = 'false' THEN 0 "
+            f"WHEN {json_type_sql} = 'text' AND {text_is_int} THEN {cast_sql} "
+            f"ELSE NULL END"
+        )
+    return cast_sql
+
+
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: str | None = None,
@@ -5212,9 +5273,8 @@ def _transform_external_calls_field_to_internal_calls_field(
             json_type_sql = (
                 "json_type(" + json.dumps(json_column) + ", '" + json_path + "')"
             )
-            field = (
-                f"CASE WHEN {json_type_sql} IN ('object', 'array') THEN NULL "
-                f"ELSE {field} END"
+            field = _sqlite_inferred_json_cast_sql(
+                json_extract_sql, json_type_sql, cast, sql_type
             )
 
     return field
