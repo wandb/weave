@@ -97,7 +97,9 @@ class KafkaProducer(ConfluentKafkaProducer):
         ):
             return
 
-        publish_key = call_end.project_id if kafka_partition_by_project_id() else None
+        # The scoring worker assumes that events for each project all route to the same worker instance.
+        # Before changing the partition key, ensure the scoring worker has been updated to support this.
+        publish_key = call_end.project_id
         self.produce(
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
