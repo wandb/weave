@@ -31,7 +31,7 @@ import sys
 
 import uvicorn
 
-from .main import create_app
+from trace_server_mock.main import create_app
 
 
 def main() -> None:
