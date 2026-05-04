@@ -1754,10 +1754,7 @@ class CallsQuery(BaseModel):
         """
         if self.read_table != ReadTable.CALLS_MERGED:
             return None
-        if (
-            self.hardcoded_filter is None
-            or not self.hardcoded_filter.filter.trace_ids
-        ):
+        if self.hardcoded_filter is None or not self.hardcoded_filter.filter.trace_ids:
             return None
 
         trace_id_strict = process_trace_id_filter_to_sql_strict(
