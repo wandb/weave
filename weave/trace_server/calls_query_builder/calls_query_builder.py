@@ -81,6 +81,7 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 
 
 class FilterConditionsResult(NamedTuple):
@@ -1161,8 +1162,34 @@ class CallsQuery(BaseModel):
             table_alias_resolved,
         )
 
+        # Build object-ref and candidate-id CTEs up front so all downstream
+        # code paths (early-return, single-pass, two-pass) can reference them.
+        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
+            pb, self.project_id, object_ref_conditions
+        )
+
+        # Pre-narrow rows via the `idx_trace_id_bloom` skip-index when the
+        # query has a hardcoded trace_ids filter on calls_merged. The CTE
+        # uses the strict (no OR-IS-NULL) form so the bloom filter can prune
+        # granules; the outer query keeps the OR-IS-NULL form for unmerged-
+        # call-part correctness and restricts to `id IN filter_candidate_ids`.
+        candidate_cte_name: str | None = None
+        candidate_cte_sql = self._build_filter_candidate_ids_cte_sql(
+            pb, table_alias_resolved
+        )
+        if candidate_cte_sql is not None:
+            ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
+            candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
+
         if not should_optimize and not self.include_costs and not object_ref_conditions:
-            return self._as_sql_base_format(pb, table_alias_resolved)
+            base_sql = self._as_sql_base_format(
+                pb,
+                table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
+            )
+            if ctes.has_ctes():
+                return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
+            return base_sql
 
         # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
         # where it reduces rows before expensive GROUP BY aggregation.
@@ -1170,10 +1197,6 @@ class CallsQuery(BaseModel):
         # single-pass query — it's both simpler and significantly faster.
         use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
             should_optimize or self.include_costs or bool(object_ref_conditions)
-        )
-
-        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
-            pb, self.project_id, object_ref_conditions
         )
 
         if use_filter_cte:
@@ -1213,6 +1236,7 @@ class CallsQuery(BaseModel):
             filtered_calls_sql = filter_query._as_sql_base_format(
                 pb,
                 table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
@@ -1711,6 +1735,42 @@ class CallsQuery(BaseModel):
         {order_result.limit_sql}
         {order_result.offset_sql}"""
         return QueryBodyResult(sql=sql, needs_feedback_join=needs_feedback_join)
+
+    def _build_filter_candidate_ids_cte_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+    ) -> str | None:
+        """Build the `filter_candidate_ids` CTE body, or None if not applicable.
+
+        The CTE pre-narrows rows by trace_id using the strict
+        `ifNull(trace_id, '')` form so the `idx_trace_id_bloom` skip-index
+        from migration 031 can prune granules. The outer query then keeps the
+        OR-IS-NULL form for unmerged-call-part correctness and restricts to
+        `id IN filter_candidate_ids` to inherit the pruning.
+
+        Returns None when the optimization does not apply: non-calls_merged
+        read tables, or no hardcoded trace_ids filter to push down.
+        """
+        if self.read_table != ReadTable.CALLS_MERGED:
+            return None
+        if (
+            self.hardcoded_filter is None
+            or not self.hardcoded_filter.filter.trace_ids
+        ):
+            return None
+
+        trace_id_strict = process_trace_id_filter_to_sql_strict(
+            self.hardcoded_filter, pb, table_alias
+        )
+        if not trace_id_strict:
+            return None
+
+        project_param = pb.add_param(self.project_id)
+        return f"""SELECT {table_alias}.id AS id
+        FROM {table_alias}
+        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
+        WHERE {trace_id_strict}"""
 
     def _as_sql_base_format(
         self,
@@ -2352,6 +2412,41 @@ def process_trace_id_filter_to_sql(
         param_builder, table_alias, read_table, use_agg_fn=False
     )
     return f" AND ({trace_cond} OR {trace_null})"
+
+
+def process_trace_id_filter_to_sql_strict(
+    hardcoded_filter: HardCodedFilter | None,
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Strict (no `OR IS NULL`) trace_id condition for the candidate-id CTE.
+
+    Wraps the column in `ifNull(trace_id, '')` to match the
+    `idx_trace_id_bloom` skip-index expression from migration 031. The
+    OR-IS-NULL clause we keep in the outer query for unmerged-call-part
+    correctness defeats the bloom filter, so this strict form runs alone
+    inside `filter_candidate_ids` to maximize granule pruning.
+
+    Returns "" when no trace_ids are set (caller decides whether to build
+    the CTE). Only meaningful for calls_merged.
+    """
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
+        return ""
+
+    trace_ids = hardcoded_filter.filter.trace_ids
+    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+
+    trace_id_field = get_field_by_name("trace_id")
+    if not isinstance(trace_id_field, CallsMergedAggField):
+        raise TypeError("trace_id is not an aggregate field")
+    trace_id_field_sql = trace_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+    field_expr = f"ifNull({trace_id_field_sql}, '')"
+
+    if len(trace_ids) == 1:
+        return f"{field_expr} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
+    return f"{field_expr} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
 
 
 def process_thread_id_filter_to_sql(
