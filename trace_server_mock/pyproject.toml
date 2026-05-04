@@ -1,5 +1,5 @@
 [project]
-name = "weave-trace-mock"
+name = "trace_server_mock"
 version = "0.1.0"
 description = "Lightweight in-memory mock of the Weave trace server, for SDK integration tests."
 requires-python = ">=3.10"
@@ -23,7 +23,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/weave_trace_mock"]
+packages = ["src/trace_server_mock"]
 
 [tool.uv.sources]
 # Resolve `weave` through the uv workspace declared in the parent
@@ -34,4 +34,4 @@ packages = ["src/weave_trace_mock"]
 weave = { workspace = true }
 
 [project.scripts]
-weave-trace-mock = "weave_trace_mock.__main__:main"
+trace_server_mock = "trace_server_mock.__main__:main"

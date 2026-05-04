@@ -1,16 +1,16 @@
 r"""Run the mock Weave trace server.
 
 Usage:
-    python -m weave_trace_mock --port=0       # ephemeral port
-    python -m weave_trace_mock --port=6346    # fixed port
-    python -m weave_trace_mock --host=0.0.0.0 --port=6346
+    python -m trace_server_mock --port=0       # ephemeral port
+    python -m trace_server_mock --port=6346    # fixed port
+    python -m trace_server_mock --host=0.0.0.0 --port=6346
 
 The server prints exactly one ready-banner line to stdout before uvicorn
 starts, in the form:
 
     READY=http://HOST:PORT
 
-Test drivers (e.g. the Node SDK's dualBuild Jest globalSetup) spawn this
+Test drivers (e.g. the Node SDK's hostApps Jest globalSetup) spawn this
 module via `child_process.spawn`, capture stdout via `child.stdout.on('data', ...)`,
 and parse the banner with a `READY=(\\S+)` regex to discover the URL.
 

@@ -8,11 +8,11 @@ That's the drift signal we want.
 
 Usage:
 
-    python -m weave_trace_mock --port=0       # ephemeral port; URL printed
-    python -m weave_trace_mock --port=6346
+    python -m trace_server_mock --port=0       # ephemeral port; URL printed
+    python -m trace_server_mock --port=6346
 
-The mock is consumed by the Node SDK's dual-build integration tests
-(sdks/node/src/__tests__/dualBuild/) via subprocess spawn. It is also
+The mock is consumed by the Node SDK's host-app integration tests
+(sdks/node/src/__tests__/hostApps/) via subprocess spawn. It is also
 intended for future Python SDK integration tests — same HTTP contract,
 same Pydantic types, language-agnostic.
 """

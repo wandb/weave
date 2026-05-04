@@ -1,4 +1,4 @@
-# weave-trace-mock
+# trace_server_mock
 
 Lightweight in-memory mock of the Weave trace server. Standalone Python
 project, sibling of the `weave` package — **deliberately not part of the
@@ -15,18 +15,18 @@ drift detection is the central reason for this dependency.
 
 ## Running
 
-From the `weave-trace-mock` directory:
+From the `trace_server_mock` directory:
 
 ```
-uv run python -m weave_trace_mock --port=0          # ephemeral port; prints URL
-uv run python -m weave_trace_mock --port=6346       # fixed port
+uv run python -m trace_server_mock --port=0          # ephemeral port; prints URL
+uv run python -m trace_server_mock --port=6346       # fixed port
 ```
 
 Or from anywhere using the sibling weave-public workspace:
 
 ```
-uv run --project services/weave-python/weave-public/trace-server-mock \
-    python -m weave_trace_mock --port=0
+uv run --project services/weave-python/weave-public/trace_server_mock \
+    python -m trace_server_mock --port=0
 ```
 
 Ready banner on stdout once bound:
@@ -57,11 +57,11 @@ the isolation strategy.
 
 ## Use from Node SDK tests
 
-The Weave Node SDK's `dualBuild` Jest project ([`sdks/node/src/__tests__/dualBuild`](../sdks/node/src/__tests__/dualBuild)) spawns this server in `globalSetup`, points the SDK at it via `WF_TRACE_SERVER_URL`, runs fixtures, and queries `/test/getCalls` to assert on captured traces.
+The Weave Node SDK's `hostApps` Jest project ([`sdks/node/src/__tests__/hostApps`](../sdks/node/src/__tests__/hostApps)) spawns this server in `globalSetup`, points the SDK at it via `WF_TRACE_SERVER_URL`, runs fixtures, and queries `/test/getCalls` to assert on captured traces.
 
 ## Use from Python SDK tests (future)
 
-Same HTTP contract, language-agnostic. Spawn `python -m weave_trace_mock --port=0`, set `WF_TRACE_SERVER_URL`, query the same `/test/*` endpoints. No additional code needed in the mock.
+Same HTTP contract, language-agnostic. Spawn `python -m trace_server_mock --port=0`, set `WF_TRACE_SERVER_URL`, query the same `/test/*` endpoints. No additional code needed in the mock.
 
 ## Caveats
 

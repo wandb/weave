@@ -70,7 +70,7 @@ class CallCreateBatchRes(BaseModel):
 
 def create_app() -> FastAPI:
     """Build the FastAPI app. Each call gets a fresh in-memory store."""
-    app = FastAPI(title="weave-trace-mock", version="0.1.0")
+    app = FastAPI(title="trace_server_mock", version="0.1.0")
     store = CallStore()
     app.state.store = store
 
