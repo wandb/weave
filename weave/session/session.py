@@ -39,6 +39,7 @@ from weave.session.types import (
     ToolCallResponsePart,
     UriPart,
     Usage,
+    _parse_data_url,
     _to_json_string,
 )
 
@@ -105,21 +106,6 @@ __all__ = [
 
 # OTel tracer name — identifies the Session SDK as the source of these spans.
 _TRACER_NAME = "weave.session"
-
-
-def _parse_data_url(url: str) -> tuple[str, str]:
-    """Split a ``data:`` URL into ``(mime_type, payload)``.
-
-    Returns the raw payload after the comma — base64-encoded content is
-    NOT decoded; it's passed through to ``MediaAttachment.content`` as-is
-    so the wire format matches what the producer originally embedded.
-    Returns ``("", "")`` for non-data URLs.
-    """
-    if not url.startswith("data:"):
-        return ("", "")
-    header, _, payload = url[len("data:") :].partition(",")
-    mime_type = header.partition(";")[0]
-    return (mime_type, payload)
 
 
 class _SpanBase(BaseModel):

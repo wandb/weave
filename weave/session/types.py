@@ -32,6 +32,21 @@ def _to_json_string(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
+def _parse_data_url(url: str) -> tuple[str, str]:
+    """Split a ``data:`` URL into ``(mime_type, payload)``.
+
+    Returns the raw payload after the comma — base64-encoded content is
+    NOT decoded; it's passed through to ``MediaAttachment.content`` as-is
+    so the wire format matches what the producer originally embedded.
+    Returns ``("", "")`` for non-data URLs.
+    """
+    if not url.startswith("data:"):
+        return ("", "")
+    header, _, payload = url[len("data:") :].partition(",")
+    mime_type = header.partition(";")[0]
+    return (mime_type, payload)
+
+
 # Type alias for fields that store a string per semconv but accept any
 # JSON-serializable value at construction. Stored value is always ``str``
 # after validation; the union is for caller ergonomics.
@@ -224,12 +239,64 @@ class Message(BaseModel):
         Returns a pair ``(messages, media_attachments)`` ready to assign
         to ``LLM.input_messages`` and ``LLM.media_attachments``. Use this
         when manually instrumenting a ``client.responses.create`` call.
-        """
-        # Lazy import to avoid a cycle: weave.integrations.openai.responses
-        # imports from this module.
-        from weave.integrations.openai.responses import _input_to_weave
 
-        return _input_to_weave(items)
+        Handles the shapes that appear in the ``input`` parameter to
+        ``client.responses.create``:
+
+        - ``{"role": "user"|"assistant"|"system", "content": <str|blocks>}``
+          becomes a ``Message`` with flat text content. User messages are
+          always emitted (even if text is empty) so image-only inputs
+          have a slot for ``_serialize_input_messages`` to bind
+          attachments to. Image blocks within a user message produce
+          ``MediaAttachment`` entries.
+        - ``{"type": "function_call", "name", "arguments", "call_id"}``
+          becomes a ``ToolCallPart``. Consecutive ``function_call`` items
+          (parallel tool calls in one assistant turn) are coalesced into
+          a single assistant ``Message`` with multiple ``ToolCallPart``s,
+          matching ``Message.assistant(tool_calls=[...])``.
+        - ``{"type": "function_call_output", "output", "call_id"}``
+          becomes a tool ``Message`` with a ``ToolCallResponsePart``.
+        - ``{"type": "reasoning", ...}`` is skipped (forwarded via
+          ``LLM.think`` / ``LLM.reasoning``, not part of input replay).
+        """
+        messages: list[Message] = []
+        attachments: list[MediaAttachment] = []
+        seen_urls: set[str] = set()
+        pending_tool_calls: list[ToolCallPart] = []
+
+        def flush_pending_tool_calls() -> None:
+            if pending_tool_calls:
+                messages.append(cls.assistant(tool_calls=list(pending_tool_calls)))
+                pending_tool_calls.clear()
+
+        for item in items:
+            item_type = item.get("type")
+            role = item.get("role")
+
+            if item_type == "function_call":
+                pending_tool_calls.append(_oai_to_tool_call_part(item))
+                continue
+
+            flush_pending_tool_calls()
+
+            if item_type == "function_call_output":
+                messages.append(_oai_function_call_output_message(item))
+                continue
+            if item_type == "reasoning":
+                continue
+
+            if role in _OAI_USER_LIKE_ROLES:
+                content = item.get("content")
+                text = _oai_extract_text_content(content)
+                if role == "user":
+                    messages.append(cls(role=role, content=text))
+                    _oai_collect_image_attachments(content, attachments, seen_urls)
+                elif text:
+                    messages.append(cls(role=role, content=text))
+
+        flush_pending_tool_calls()
+
+        return messages, attachments
 
 
 class Usage(BaseModel):
@@ -248,16 +315,21 @@ class Usage(BaseModel):
         ``response.usage`` may be ``None`` for partial / streamed responses
         that have not yet emitted a final usage block; callers get an empty
         ``Usage`` in that case so they can still pass the result through to
-        ``LLM.record(usage=...)`` unconditionally.
+        ``LLM.record(usage=...)`` unconditionally. The nested
+        ``input_tokens_details`` and ``output_tokens_details`` objects are
+        also defended against ``None`` to match the streaming-friendly
+        handling in ``weave.integrations.openai.openai_sdk``.
         """
         usage = response.usage
         if usage is None:
             return cls()
+        out_details = usage.output_tokens_details
+        in_details = usage.input_tokens_details
         return cls(
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,
-            reasoning_tokens=usage.output_tokens_details.reasoning_tokens,
-            cache_read_input_tokens=usage.input_tokens_details.cached_tokens,
+            reasoning_tokens=(out_details and out_details.reasoning_tokens) or 0,
+            cache_read_input_tokens=(in_details and in_details.cached_tokens) or 0,
         )
 
     @classmethod
@@ -290,10 +362,17 @@ class Reasoning(BaseModel):
         is a flat string. Returns ``None`` for empty input so the caller
         can pass the result straight to ``LLM.record(reasoning=...)``.
         """
-        # Lazy import to avoid a cycle.
-        from weave.integrations.openai.responses import _reasoning_to_weave
-
-        return _reasoning_to_weave(part)
+        if not part:
+            return None
+        summaries = part.get("summary", [])
+        if not isinstance(summaries, list):
+            return None
+        text = "\n".join(
+            s.get("text", "")
+            for s in summaries
+            if isinstance(s, dict) and s.get("text")
+        )
+        return cls(content=text) if text else None
 
 
 class MediaAttachment(BaseModel):
@@ -314,3 +393,98 @@ class LogResult(BaseModel):
     trace_ids: list[str] = Field(default_factory=list)
     root_span_ids: list[str] = Field(default_factory=list)
     span_count: int = 0
+
+
+# ---------------------------------------------------------------------------
+# OpenAI Responses API input-item helpers
+# ---------------------------------------------------------------------------
+#
+# These back ``Message.from_openai_responses_input`` and live here, alongside
+# the type definitions, so the conversion implementation does not require an
+# import from the integrations layer (which would be a cycle).
+
+
+_OAI_USER_LIKE_ROLES = {"user", "assistant", "system"}
+_OAI_TEXT_BLOCK_TYPES = {"text", "input_text", "output_text"}
+_OAI_IMAGE_BLOCK_TYPES = {"input_image", "image_url"}
+
+
+def _oai_to_tool_call_part(item: dict[str, Any]) -> ToolCallPart:
+    arguments = item.get("arguments", "")
+    if not isinstance(arguments, str):
+        arguments = json.dumps(arguments)
+    return ToolCallPart(
+        id=str(item.get("call_id", "")),
+        name=str(item.get("name", "")),
+        arguments=arguments,
+    )
+
+
+def _oai_function_call_output_message(item: dict[str, Any]) -> Message:
+    output = item.get("output")
+    response = output if isinstance(output, str) else json.dumps(output)
+    return Message(
+        role="tool",
+        parts=[
+            ToolCallResponsePart(
+                id=str(item.get("call_id", "")),
+                response=response,
+            )
+        ],
+    )
+
+
+def _oai_extract_text_content(content: Any) -> str:
+    """Pull plain text from an OpenAI Responses-style content list or string."""
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") in _OAI_TEXT_BLOCK_TYPES:
+            text = block.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts)
+
+
+def _oai_collect_image_attachments(
+    content: Any,
+    attachments: list[MediaAttachment],
+    seen_urls: set[str],
+) -> None:
+    """Walk a user-message content list and collect any image URLs."""
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") not in _OAI_IMAGE_BLOCK_TYPES:
+            continue
+        url = block.get("image_url")
+        if isinstance(url, dict):
+            url = url.get("url")
+        if not isinstance(url, str) or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        attachments.append(_oai_url_to_attachment(url))
+
+
+def _oai_url_to_attachment(url: str) -> MediaAttachment:
+    if url.startswith("data:"):
+        mime_type, payload = _parse_data_url(url)
+        return MediaAttachment(
+            kind="blob",
+            modality="image",
+            mime_type=mime_type,
+            content=payload,
+        )
+    return MediaAttachment(
+        kind="uri",
+        modality="image",
+        mime_type="",
+        uri=url,
+    )
