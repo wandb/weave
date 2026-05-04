@@ -13,14 +13,12 @@
 -- `ifNull(trace_id, '')` (and matching the predicate in the query layer
 -- character-for-character) makes the comparison non-nullable on both
 -- sides so the index actually fires.
---
--- Lazy backfill: we deliberately skip MATERIALIZE INDEX. On a large
--- calls_merged that would block the migration on full-table reindexing
--- and compete with ingest. New parts get the index from the moment this
--- migration applies, and existing parts gain it as parts are naturally
--- re-merged. Operators who want immediate coverage can run
--- `ALTER TABLE calls_merged MATERIALIZE INDEX idx_trace_id_bloom`
--- out-of-band.
 ALTER TABLE calls_merged
     ADD INDEX IF NOT EXISTS idx_trace_id_bloom
-        ifNull(trace_id, '') TYPE bloom_filter(0.01) GRANULARITY 1;
+        ifNull(trace_id, '') TYPE bloom_filter(0.01) GRANULARITY 1
+    SETTINGS alter_sync = 1;
+
+-- Materialize the index for existing data
+ALTER TABLE calls_merged
+    MATERIALIZE INDEX idx_trace_id_bloom
+    SETTINGS mutations_sync = 1;
