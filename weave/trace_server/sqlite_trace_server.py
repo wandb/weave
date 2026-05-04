@@ -5158,10 +5158,7 @@ def _sqlite_json_text_is_float_sql(value_sql: str) -> str:
     )
     digits = f"replace({unsigned}, '.', '')"
     dot_count = f"(length({unsigned}) - length(replace({unsigned}, '.', '')))"
-    return (
-        f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' "
-        f"AND {dot_count} <= 1)"
-    )
+    return f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' AND {dot_count} <= 1)"
 
 
 def _sqlite_inferred_json_cast_sql(
