@@ -1411,7 +1411,7 @@ def test_version_index_stable_on_republish(ch_server):
 
 def test_delete_preserves_version_index_gaps(ch_server):
     """Deleting a version should leave a gap, not shift indices."""
-    project_id = _make_project_id("vidx")
+    project_id = make_project_id("vidx")
     obj_id = "vidx_gap"
 
     digests = []
