@@ -534,6 +534,13 @@ conflicts = [
   ],
 ]
 
+# uv workspace members. Each listed path is a sibling Python package that uv
+# manages alongside the root `weave` project. Members can depend on each
+# other and on the root by name; uv resolves those to the local workspace
+# checkout instead of querying PyPI.
+[tool.uv.workspace]
+members = ["trace_server_mock"]
+
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
 omit = ["weave/agent/**"]
