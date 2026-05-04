@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 
 def _to_json_string(value: Any) -> str:
@@ -20,10 +20,10 @@ def _to_json_string(value: Any) -> str:
     other JSON-serializable value (dict, list, int, float, bool) is dumped
     via ``json.dumps`` with ``default=str`` for non-JSON natives.
 
-    Used by ``ToolCallPart.arguments`` and ``ToolCallResponsePart.response``
-    so callers can pass structured data without manually pre-encoding —
-    the underlying GenAI semconv requires a string, but the model layer
-    is more ergonomic when it accepts native types.
+    Used by the ``JSONString`` annotated alias so fields whose wire format
+    is a JSON-encoded string can accept native Python values at the
+    construction / assignment boundary while declaring their stored type
+    honestly as ``str``.
     """
     if value is None:
         return ""
@@ -47,10 +47,13 @@ def _parse_data_url(url: str) -> tuple[str, str]:
     return (mime_type, payload)
 
 
-# Type alias for fields that store a string per semconv but accept any
-# JSON-serializable value at construction. Stored value is always ``str``
-# after validation; the union is for caller ergonomics.
-JSONStringInput = str | dict[str, Any] | list[Any] | int | float | bool | None
+# Annotated string type for fields whose wire format is a JSON-encoded
+# string. Pyright sees the field type as ``str``; pydantic accepts any
+# JSON-serializable input and coerces via ``_to_json_string`` before
+# validation. Use this anywhere the GenAI semconv (or any other wire
+# spec) requires a string but the in-memory ergonomic input is structured
+# data. Same pattern as ``CallsFilterLike`` in ``weave/trace/casting.py``.
+JSONString = Annotated[str, BeforeValidator(_to_json_string)]
 
 
 # ---------------------------------------------------------------------------
@@ -85,10 +88,10 @@ class ReasoningPart(BaseModel):
 class ToolCallPart(BaseModel):
     """An assistant's request to invoke a tool.
 
-    ``arguments`` is stored as a JSON-encoded string per the GenAI
-    semconv. For ergonomics, you may pass a dict / list / scalar at
-    construction and the SDK will JSON-encode it. When you already have
-    a JSON string from the model, pass it through as-is.
+    ``arguments`` is a string on the wire (per GenAI semconv). The
+    ``JSONString`` annotation lets callers pass a dict / list / scalar
+    at construction or assignment and the SDK JSON-encodes it; an
+    already-encoded string passes through unchanged.
     """
 
     model_config = ConfigDict(validate_assignment=True)
@@ -96,31 +99,21 @@ class ToolCallPart(BaseModel):
     type: Literal["tool_call"] = "tool_call"
     id: str = ""
     name: str = ""
-    arguments: JSONStringInput = ""
-
-    @field_validator("arguments", mode="before")
-    @classmethod
-    def _serialize_arguments(cls, v: Any) -> str:
-        return _to_json_string(v)
+    arguments: JSONString = ""
 
 
 class ToolCallResponsePart(BaseModel):
     """The result of executing a previously-requested tool call.
 
-    ``response`` is stored as a string per semconv. Non-string values
-    passed at construction or assignment are JSON-encoded by the SDK.
+    ``response`` is a string on the wire. Same ``JSONString`` ergonomics
+    as ``ToolCallPart.arguments``.
     """
 
     model_config = ConfigDict(validate_assignment=True)
 
     type: Literal["tool_call_response"] = "tool_call_response"
     id: str = ""
-    response: JSONStringInput = ""
-
-    @field_validator("response", mode="before")
-    @classmethod
-    def _serialize_response(cls, v: Any) -> str:
-        return _to_json_string(v)
+    response: JSONString = ""
 
 
 class BlobPart(BaseModel):

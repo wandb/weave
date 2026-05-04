@@ -27,7 +27,7 @@ from weave.session.session_otel import (
 from weave.session.types import (
     BlobPart,
     FilePart,
-    JSONStringInput,
+    JSONString,
     LogResult,
     MediaAttachment,
     Message,
@@ -40,7 +40,6 @@ from weave.session.types import (
     UriPart,
     Usage,
     _parse_data_url,
-    _to_json_string,
 )
 
 # OTel imports — kept top-level under a try/except guard so the module
@@ -176,16 +175,17 @@ class _SpanBase(BaseModel):
 class Tool(_SpanBase):
     """One tool execution. Maps to an execute_tool OTel span.
 
-    ``arguments`` and ``result`` are stored as strings on the wire (per
-    GenAI semconv) but accept any JSON-serializable value at assignment
-    or construction. Non-string values are JSON-encoded when the span is
-    emitted, so callers can do ``t.result = some_dict`` without wrapping
-    in ``json.dumps``.
+    ``arguments`` and ``result`` use the ``JSONString`` annotation:
+    callers can assign a dict / list / scalar and the SDK JSON-encodes
+    it at construction or assignment. The stored value is always a
+    string, matching the wire format per GenAI semconv.
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     name: str = ""
-    arguments: JSONStringInput = ""
-    result: JSONStringInput = ""
+    arguments: JSONString = ""
+    result: JSONString = ""
     tool_call_id: str = ""
     tool_type: str = ""
     tool_description: str = ""
@@ -208,13 +208,11 @@ class Tool(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
-        arguments_str = _to_json_string(self.arguments)
-        result_str = _to_json_string(self.result)
         attrs = execute_tool_attributes(
             tool_name=self.name,
             conversation_id=session.session_id if session else "",
-            tool_call_arguments=arguments_str if include else "",
-            tool_call_result=result_str if include else "",
+            tool_call_arguments=self.arguments if include else "",
+            tool_call_result=self.result if include else "",
             tool_call_id=self.tool_call_id,
             tool_type=self.tool_type,
             tool_description=self.tool_description,
@@ -1021,13 +1019,11 @@ def _attrs_for_span(
         )
         return f"chat {span.model}", attrs
     if isinstance(span, Tool):
-        arguments_str = _to_json_string(span.arguments)
-        result_str = _to_json_string(span.result)
         attrs = execute_tool_attributes(
             tool_name=span.name,
             conversation_id=session_id,
-            tool_call_arguments=arguments_str if include_content else "",
-            tool_call_result=result_str if include_content else "",
+            tool_call_arguments=span.arguments if include_content else "",
+            tool_call_result=span.result if include_content else "",
             tool_call_id=span.tool_call_id,
             tool_type=span.tool_type,
             tool_description=span.tool_description,
