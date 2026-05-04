@@ -1947,64 +1947,104 @@ class TestLLMRecord:
 
 
 class TestUsageFromOpenAIResponses:
-    """usage_from_openai_responses extracts tokens from OpenAI Responses ``Response``s."""
+    """``usage_from_openai_responses`` populates ``gen_ai.usage.*`` on the chat span.
+
+    Streaming / partial OpenAI responses can have ``response.usage`` be
+    ``None``, or have ``input_tokens_details`` / ``output_tokens_details``
+    objects be ``None`` even when ``usage`` itself is present. The
+    extractor must tolerate all three.
+    """
 
     @staticmethod
     def _resp(usage: Any) -> Any:
-        return type("R", (), {"usage": usage})
+        return type("R", (), {"usage": usage})()
 
-    def test_returns_empty_usage_when_response_usage_is_none(self) -> None:
-        assert usage_from_openai_responses(self._resp(None)) == Usage()
+    @staticmethod
+    def _usage(**fields: Any) -> Any:
+        return type("U", (), fields)()
 
-    def test_extracts_full_usage(self) -> None:
-        usage = type(
-            "U",
-            (),
-            {
-                "input_tokens": 10,
-                "output_tokens": 20,
-                "output_tokens_details": type("OD", (), {"reasoning_tokens": 5})(),
-                "input_tokens_details": type("ID", (), {"cached_tokens": 3})(),
-            },
-        )()
-        result = usage_from_openai_responses(self._resp(usage))
-        assert result.input_tokens == 10
-        assert result.output_tokens == 20
-        assert result.reasoning_tokens == 5
-        assert result.cache_read_input_tokens == 3
+    @staticmethod
+    def _details(**fields: Any) -> Any:
+        return type("D", (), fields)()
+
+    def test_response_usage_none_emits_no_usage_attrs(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """When usage is missing entirely, no gen_ai.usage.* attrs land
+        (zeros are stripped by ``llm_attributes``).
+        """
+        attrs = _emit_llm_with(
+            otel_spans, usage=usage_from_openai_responses(self._resp(None))
+        )
+        assert "gen_ai.usage.input_tokens" not in attrs
+        assert "gen_ai.usage.output_tokens" not in attrs
+        assert "gen_ai.usage.reasoning_tokens" not in attrs
+        assert "gen_ai.usage.cache_read.input_tokens" not in attrs
+
+    def test_full_usage_lands_on_span(self, otel_spans: InMemorySpanExporter) -> None:
+        usage = self._usage(
+            input_tokens=10,
+            output_tokens=20,
+            output_tokens_details=self._details(reasoning_tokens=5),
+            input_tokens_details=self._details(cached_tokens=3),
+        )
+        attrs = _emit_llm_with(
+            otel_spans, usage=usage_from_openai_responses(self._resp(usage))
+        )
+        assert attrs["gen_ai.usage.input_tokens"] == 10
+        assert attrs["gen_ai.usage.output_tokens"] == 20
+        assert attrs["gen_ai.usage.reasoning_tokens"] == 5
+        assert attrs["gen_ai.usage.cache_read.input_tokens"] == 3
 
     @pytest.mark.parametrize(
-        ("output_details", "input_details"),
+        ("output_details", "input_details", "expected_reasoning", "expected_cache"),
         [
-            (None, None),
-            (None, type("ID", (), {"cached_tokens": 3})()),
-            (type("OD", (), {"reasoning_tokens": 5})(), None),
+            (None, None, None, None),
+            (None, "details(cached_tokens=3)", None, 3),
+            ("details(reasoning_tokens=5)", None, 5, None),
         ],
         ids=["both_none", "output_none", "input_none"],
     )
-    def test_handles_none_details_objects(
-        self, output_details: Any, input_details: Any
+    def test_none_details_objects_default_to_zero_and_omit_attr(
+        self,
+        otel_spans: InMemorySpanExporter,
+        output_details: Any,
+        input_details: Any,
+        expected_reasoning: int | None,
+        expected_cache: int | None,
     ) -> None:
-        """Streaming / partial responses can have None details objects."""
-        usage = type(
-            "U",
-            (),
-            {
-                "input_tokens": 10,
-                "output_tokens": 20,
-                "output_tokens_details": output_details,
-                "input_tokens_details": input_details,
-            },
-        )()
-        result = usage_from_openai_responses(self._resp(usage))
-        assert result.input_tokens == 10
-        assert result.output_tokens == 20
-        assert result.reasoning_tokens == (
-            output_details.reasoning_tokens if output_details else 0
+        """Streaming partials can have detail objects = None. Extractor
+        substitutes 0; ``llm_attributes`` then omits zero-valued attrs.
+        """
+        out_d = (
+            self._details(reasoning_tokens=5)
+            if output_details == "details(reasoning_tokens=5)"
+            else None
         )
-        assert result.cache_read_input_tokens == (
-            input_details.cached_tokens if input_details else 0
+        in_d = (
+            self._details(cached_tokens=3)
+            if input_details == "details(cached_tokens=3)"
+            else None
         )
+        usage = self._usage(
+            input_tokens=10,
+            output_tokens=20,
+            output_tokens_details=out_d,
+            input_tokens_details=in_d,
+        )
+        attrs = _emit_llm_with(
+            otel_spans, usage=usage_from_openai_responses(self._resp(usage))
+        )
+        assert attrs["gen_ai.usage.input_tokens"] == 10
+        assert attrs["gen_ai.usage.output_tokens"] == 20
+        if expected_reasoning is None:
+            assert "gen_ai.usage.reasoning_tokens" not in attrs
+        else:
+            assert attrs["gen_ai.usage.reasoning_tokens"] == expected_reasoning
+        if expected_cache is None:
+            assert "gen_ai.usage.cache_read.input_tokens" not in attrs
+        else:
+            assert attrs["gen_ai.usage.cache_read.input_tokens"] == expected_cache
 
 
 class TestMessageFromOpenAIResponsesInput:
