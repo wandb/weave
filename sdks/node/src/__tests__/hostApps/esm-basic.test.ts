@@ -18,7 +18,9 @@ describe('hostApps — esm-basic', () => {
     const calls = await getCalls(projectId);
     expect(calls.length).toBeGreaterThanOrEqual(1);
     expect(
-      calls.some(c => typeof c.op_name === 'string' && c.op_name.includes('myOp'))
+      calls.some(
+        c => typeof c.op_name === 'string' && c.op_name.includes('myOp')
+      )
     ).toBe(true);
   }, 60_000);
 });

@@ -1,6 +1,6 @@
 /**
  * Per-test helpers for the hostApps Jest project. Tests resolve the
- * Weave trace-server-mock URL from a sentinel JSON file written by
+ * Weave trace_server_mock URL from a sentinel JSON file written by
  * `jest.global-setup.cjs` (parallel workers don't inherit globalThis or
  * env mutations from globalSetup). They generate a fresh project_id per
  * test, launch a host application via `launchAppFrom()`, then query the
@@ -106,18 +106,15 @@ export function launchAppFrom(opts: {
     child.stderr.on('data', d => (stderr += d.toString()));
 
     let timedOut = false;
-    const timeout = setTimeout(
-      () => {
-        timedOut = true;
-        // Kill the whole process group so npm + node both die.
-        try {
-          if (child.pid) process.kill(-child.pid, 'SIGKILL');
-        } catch {
-          /* already gone — fine */
-        }
-      },
-      opts.timeoutMs ?? 30_000
-    );
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      // Kill the whole process group so npm + node both die.
+      try {
+        if (child.pid) process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        /* already gone — fine */
+      }
+    }, opts.timeoutMs ?? 30_000);
 
     child.on('exit', code => {
       clearTimeout(timeout);

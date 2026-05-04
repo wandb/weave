@@ -12,8 +12,8 @@ tests:
 3. Auto-discover every directory under `src/__tests__/hostApps/fixtures/`
    that has a `package.json` and `npm install` the tarball into it
    (committed scaffold projects, `node_modules/` gitignored).
-4. Spawn `python -m weave_trace_mock` (the in-memory mock trace server in
-   `services/weave-python/weave-public/trace-server-mock/`) on an ephemeral
+4. Spawn `python -m trace_server_mock` (the in-memory mock trace server in
+   `services/weave-python/weave-public/trace_server_mock/`) on an ephemeral
    port.
 5. Launch each host app via `launchAppFrom({path, projectId})`, which runs
    `npm run start` (the script declared by the host app's own `package.json`
@@ -64,8 +64,8 @@ The host apps are real, runnable projects. To debug outside Jest:
 
 ```sh
 # in one shell, start the mock on a known port:
-cd services/weave-python/weave-public/trace-server-mock
-uv run python -m weave_trace_mock --port=6346
+cd services/weave-python/weave-public/trace_server_mock
+uv run python -m trace_server_mock --port=6346
 
 # in another shell, install the tarball and run a host app by hand:
 cd sdks/node
