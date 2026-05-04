@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import BaseModel
 
 from weave.trace_server.agents.schema import AgentSpanCHInsertable, StatusCodeLiteral
-from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH as SENTINEL_EPOCH_UTC
 
 if TYPE_CHECKING:
     from weave.trace_server.kafka import KafkaProducer
@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 SCORE_AGENT_SPANS_TOPIC = "weave.score_agent_spans"
+
+_SENTINEL_EPOCH_NAIVE = SENTINEL_EPOCH_UTC.replace(tzinfo=None)
 
 ScoreAgentSpansEventType = Literal["turn_ended"]
 
@@ -52,7 +54,7 @@ class ScoreAgentSpansEvent(BaseModel):
         if not row.parent_span_id:
             event_type = "turn_ended"
         # Ignore in-progress spans
-        if event_type and row.ended_at > SENTINEL_EPOCH:
+        if event_type and row.ended_at > _SENTINEL_EPOCH_NAIVE:
             return ScoreAgentSpansEvent(
                 event_type=event_type,
                 status_code=row.status_code,
