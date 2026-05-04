@@ -1,15 +1,34 @@
 import datetime
 from bisect import bisect_right
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, TypedDict
 
 from weave.trace_server.token_costs import DEFAULT_PRICING_LEVEL_ID, PRICING_LEVELS
 
 
+class PriceRow(TypedDict):
+    """Mirrors LLM_TOKEN_PRICES_TABLE columns."""
+
+    id: str
+    pricing_level: str
+    pricing_level_id: str
+    provider_id: str
+    llm_id: str
+    effective_date: datetime.datetime
+    prompt_token_cost: float
+    completion_token_cost: float
+    cache_read_input_token_cost: float
+    cache_creation_input_token_cost: float
+    prompt_token_cost_unit: str
+    completion_token_cost_unit: str
+    created_by: str
+    created_at: datetime.datetime
+
+
 @dataclass(frozen=True)
 class _PriceBucket:
-    timestamps: list[float]
-    rows: list[dict[str, Any]]
+    timestamps: tuple[float, ...]
+    rows: tuple[PriceRow, ...]
 
 
 @dataclass(frozen=True)
@@ -17,6 +36,13 @@ class PriceIndex:
     project: _PriceBucket
     default: _PriceBucket
     other: _PriceBucket
+
+
+@dataclass
+class _GroupedRows:
+    project: list[tuple[float, PriceRow]] = field(default_factory=list)
+    default: list[tuple[float, PriceRow]] = field(default_factory=list)
+    other: list[tuple[float, PriceRow]] = field(default_factory=list)
 
 
 def normalize_cost_datetime(
@@ -49,9 +75,7 @@ def cost_usage_from_summary(
             + _safe_int(usage.get("output_tokens")),
             "requests": _safe_int(usage.get("requests")),
             "total_tokens": _safe_int(usage.get("total_tokens")),
-            "cache_read_input_tokens": _safe_int(
-                usage.get("cache_read_input_tokens")
-            ),
+            "cache_read_input_tokens": _safe_int(usage.get("cache_read_input_tokens")),
             "cache_creation_input_tokens": _safe_int(
                 usage.get("cache_creation_input_tokens")
             ),
@@ -60,33 +84,38 @@ def cost_usage_from_summary(
 
 
 def build_price_indexes(
-    price_rows: list[dict[str, Any]], project_id: str
+    price_rows: list[PriceRow], project_id: str
 ) -> dict[str, PriceIndex]:
-    grouped: dict[str, dict[str, list[tuple[float, dict[str, Any]]]]] = {}
+    grouped: dict[str, _GroupedRows] = {}
 
     for row in price_rows:
         effective_date = normalize_cost_datetime(row.get("effective_date"))
         if effective_date is None:
             continue
         llm_id = str(row["llm_id"])
-        bucket_name = _price_bucket_name(row, project_id)
-        grouped.setdefault(
-            llm_id,
-            {
-                "project": [],
-                "default": [],
-                "other": [],
-            },
-        )[bucket_name].append((effective_date.timestamp(), row))
+        ts = effective_date.timestamp()
+        g = grouped.setdefault(llm_id, _GroupedRows())
+        if (
+            row.get("pricing_level") == PRICING_LEVELS["PROJECT"]
+            and row.get("pricing_level_id") == project_id
+        ):
+            g.project.append((ts, row))
+        elif (
+            row.get("pricing_level") == PRICING_LEVELS["DEFAULT"]
+            and row.get("pricing_level_id") == DEFAULT_PRICING_LEVEL_ID
+        ):
+            g.default.append((ts, row))
+        else:
+            g.other.append((ts, row))
 
-    indexes: dict[str, PriceIndex] = {}
-    for llm_id, buckets in grouped.items():
-        indexes[llm_id] = PriceIndex(
-            project=_make_price_bucket(buckets["project"]),
-            default=_make_price_bucket(buckets["default"]),
-            other=_make_price_bucket(buckets["other"]),
+    return {
+        llm_id: PriceIndex(
+            project=_make_price_bucket(g.project),
+            default=_make_price_bucket(g.default),
+            other=_make_price_bucket(g.other),
         )
-    return indexes
+        for llm_id, g in grouped.items()
+    }
 
 
 def hydrate_calls_with_costs(
@@ -134,7 +163,7 @@ def hydrate_calls_with_costs(
 
 def pick_best_cost_row(
     index: PriceIndex | None, started_at: datetime.datetime
-) -> dict[str, Any] | None:
+) -> PriceRow | None:
     if index is None:
         return None
 
@@ -154,14 +183,12 @@ def pick_best_cost_row(
 
 def build_cost_entry(
     usage: dict[str, int],
-    price_row: dict[str, Any],
+    price_row: PriceRow,
 ) -> dict[str, Any]:
     prompt_cost = _safe_float(price_row.get("prompt_token_cost"))
     completion_cost = _safe_float(price_row.get("completion_token_cost"))
     cache_read_cost = _safe_float(price_row.get("cache_read_input_token_cost"))
-    cache_creation_cost = _safe_float(
-        price_row.get("cache_creation_input_token_cost")
-    )
+    cache_creation_cost = _safe_float(price_row.get("cache_creation_input_token_cost"))
     prompt_tokens = usage["prompt_tokens"]
     completion_tokens = usage["completion_tokens"]
     cache_read_input_tokens = usage.get("cache_read_input_tokens", 0)
@@ -179,8 +206,7 @@ def build_cost_entry(
         )
         * prompt_cost,
         "completion_tokens_total_cost": completion_tokens * completion_cost,
-        "cache_read_input_tokens_total_cost": cache_read_input_tokens
-        * cache_read_cost,
+        "cache_read_input_tokens_total_cost": cache_read_input_tokens * cache_read_cost,
         "cache_creation_input_tokens_total_cost": cache_creation_input_tokens
         * cache_creation_cost,
         "prompt_token_cost": prompt_cost,
@@ -198,38 +224,22 @@ def build_cost_entry(
     }
 
 
-def _price_bucket_name(row: dict[str, Any], project_id: str) -> str:
-    if (
-        row.get("pricing_level") == PRICING_LEVELS["PROJECT"]
-        and row.get("pricing_level_id") == project_id
-    ):
-        return "project"
-    if (
-        row.get("pricing_level") == PRICING_LEVELS["DEFAULT"]
-        and row.get("pricing_level_id") == DEFAULT_PRICING_LEVEL_ID
-    ):
-        return "default"
-    return "other"
-
-
-def _make_price_bucket(rows: list[tuple[float, dict[str, Any]]]) -> _PriceBucket:
+def _make_price_bucket(rows: list[tuple[float, PriceRow]]) -> _PriceBucket:
     rows = sorted(rows, key=lambda item: item[0])
     return _PriceBucket(
-        timestamps=[item[0] for item in rows],
-        rows=[item[1] for item in rows],
+        timestamps=tuple(item[0] for item in rows),
+        rows=tuple(item[1] for item in rows),
     )
 
 
-def _latest_at_or_before(
-    bucket: _PriceBucket, started_ts: float
-) -> dict[str, Any] | None:
+def _latest_at_or_before(bucket: _PriceBucket, started_ts: float) -> PriceRow | None:
     idx = bisect_right(bucket.timestamps, started_ts) - 1
     if idx >= 0:
         return bucket.rows[idx]
     return None
 
 
-def _latest_future(bucket: _PriceBucket, started_ts: float) -> dict[str, Any] | None:
+def _latest_future(bucket: _PriceBucket, started_ts: float) -> PriceRow | None:
     if bucket.timestamps and bucket.timestamps[-1] > started_ts:
         return bucket.rows[-1]
     return None

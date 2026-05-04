@@ -3,6 +3,10 @@ from collections.abc import Callable, Iterator
 from typing import Any, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.internal_trace_server_interface import (
+    InternalCallReadReq,
+    InternalCallsQueryReq,
+)
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
@@ -182,10 +186,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        req = req.model_copy(deep=True)
         original_project_id = req.project_id
-        req.use_python_cost_hydration = _use_python_cost_hydration_for_external_project(
-            original_project_id
+        req = InternalCallReadReq(
+            **req.model_dump(),
+            use_python_cost_hydration=_use_python_cost_hydration_for_external_project(
+                original_project_id
+            ),
         )
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         res = self._ref_apply(
@@ -203,10 +209,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return res
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        req = req.model_copy(deep=True)
         original_project_id = req.project_id
-        req.use_python_cost_hydration = _use_python_cost_hydration_for_external_project(
-            original_project_id
+        req = InternalCallsQueryReq(
+            **req.model_dump(),
+            use_python_cost_hydration=_use_python_cost_hydration_for_external_project(
+                original_project_id
+            ),
         )
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
@@ -245,10 +253,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return res
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        req = req.model_copy(deep=True)
         original_project_id = req.project_id
-        req.use_python_cost_hydration = _use_python_cost_hydration_for_external_project(
-            original_project_id
+        req = InternalCallsQueryReq(
+            **req.model_dump(),
+            use_python_cost_hydration=_use_python_cost_hydration_for_external_project(
+                original_project_id
+            ),
         )
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:

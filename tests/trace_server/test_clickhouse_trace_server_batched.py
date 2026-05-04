@@ -22,6 +22,7 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
 )
 from weave.trace_server.errors import NotFoundError
+from weave.trace_server.internal_trace_server_interface import InternalCallsQueryReq
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.token_costs import LLM_TOKEN_PRICES_TABLE
 
@@ -221,7 +222,7 @@ def test_clickhouse_calls_query_python_cost_hydration_against_real_clickhouse(
 
     calls = list(
         ch_server.calls_query_stream(
-            tsi.CallsQueryReq(
+            InternalCallsQueryReq(
                 project_id=project_id,
                 filter=tsi.CallsFilter(call_ids=[call_id]),
                 include_costs=True,

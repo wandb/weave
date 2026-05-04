@@ -195,6 +195,10 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.internal_trace_server_interface import (
+    InternalCallReadReq,
+    InternalCallsQueryReq,
+)
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
@@ -1085,15 +1089,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        use_python_cost_hydration = (
+            isinstance(req, InternalCallReadReq) and req.use_python_cost_hydration
+        )
         res = self.calls_query_stream(
-            tsi.CallsQueryReq(
+            InternalCallsQueryReq(
                 project_id=req.project_id,
                 filter=tsi.CallsFilter(
                     call_ids=[req.id],
                 ),
                 limit=1,
                 include_costs=req.include_costs,
-                use_python_cost_hydration=req.use_python_cost_hydration,
+                use_python_cost_hydration=use_python_cost_hydration,
                 include_storage_size=req.include_storage_size,
                 include_total_storage_size=req.include_total_storage_size,
             )
@@ -1433,7 +1440,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         settings = None
         use_python_cost_hydration = bool(
-            req.include_costs and req.use_python_cost_hydration
+            req.include_costs
+            and isinstance(req, InternalCallsQueryReq)
+            and req.use_python_cost_hydration
         )
         cq = CallsQuery(
             project_id=req.project_id,
@@ -1617,6 +1626,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_param = pb.add_param(project_id)
         default_param = pb.add_param(DEFAULT_PRICING_LEVEL_ID)
         empty_param = pb.add_param("")
+        project_level_param = pb.add_param(PRICING_LEVELS["PROJECT"])
+        default_level_param = pb.add_param(PRICING_LEVELS["DEFAULT"])
         columns = [col.name for col in LLM_TOKEN_PRICES_TABLE.cols]
         fields = ", ".join(columns)
         sql = f"""
@@ -1625,20 +1636,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         WHERE llm_id IN {{{models_param}:Array(String)}}
           AND (
             (
-              pricing_level = '{PRICING_LEVELS["PROJECT"]}'
+              pricing_level = {{{project_level_param}:String}}
               AND pricing_level_id = {{{project_param}:String}}
             )
             OR (
-              pricing_level = '{PRICING_LEVELS["DEFAULT"]}'
+              pricing_level = {{{default_level_param}:String}}
               AND pricing_level_id = {{{default_param}:String}}
             )
             OR pricing_level_id = {{{empty_param}:String}}
           )
         """
         result = self._query(sql, pb.get_params())
-        price_rows = [
-            dict(zip(columns, row, strict=False)) for row in result.result_rows
-        ]
+        price_rows = cast(
+            list[cost_hydration.PriceRow],
+            [dict(zip(columns, row, strict=False)) for row in result.result_rows],
+        )
         return cost_hydration.build_price_indexes(price_rows, project_id)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")

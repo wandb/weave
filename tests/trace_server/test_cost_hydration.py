@@ -3,6 +3,7 @@ import datetime
 import pytest
 
 from weave.trace_server.cost_hydration import (
+    PriceRow,
     build_price_indexes,
     hydrate_calls_with_costs,
 )
@@ -14,7 +15,7 @@ def _price_row(
     pricing_level_id: str,
     effective_date: datetime.datetime,
     prompt_cost: float,
-) -> dict:
+) -> PriceRow:
     return {
         "id": f"{llm_id}-{pricing_level}-{effective_date.isoformat()}",
         "pricing_level": pricing_level,
@@ -125,9 +126,7 @@ def test_hydrate_calls_with_costs_normalizes_usage_and_matches_sql_ranking() -> 
     assert costs_a["prompt_tokens_total_cost"] == pytest.approx((15 - 2 - 1) * 0.01)
     assert costs_a["completion_tokens_total_cost"] == pytest.approx(10 * 0.02)
     assert costs_a["cache_read_input_tokens_total_cost"] == pytest.approx(2 * 0.001)
-    assert costs_a["cache_creation_input_tokens_total_cost"] == pytest.approx(
-        1 * 0.002
-    )
+    assert costs_a["cache_creation_input_tokens_total_cost"] == pytest.approx(1 * 0.002)
     assert costs_a["pricing_level"] == "project"
     assert costs_a["pricing_level_id"] == project_id
 
