@@ -2314,6 +2314,20 @@ def test_calls_query_filter_by_strings(client):
     calls = list(client.get_calls(query=query))
     assert len(calls) == 5
 
+    # Nonnumeric strings should not match numeric scalar filters.
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$eq": [{"$getField": "inputs.name"}, {"$literal": 0}]},
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 0
+
     # Filter with string contains - should return 5 calls (name contains "test")
     query = tsi.Query(
         **{
