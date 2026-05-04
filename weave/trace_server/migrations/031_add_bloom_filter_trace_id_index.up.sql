@@ -15,10 +15,11 @@
 -- sides so the index actually fires.
 ALTER TABLE calls_merged
     ADD INDEX IF NOT EXISTS idx_trace_id_bloom
-        ifNull(trace_id, '') TYPE bloom_filter(0.01) GRANULARITY 1
-    SETTINGS alter_sync = 1;
+        ifNull(trace_id, '') TYPE bloom_filter(0.01) GRANULARITY 1;
 
--- Materialize the index for existing data
+-- Kick off background materialization for existing parts. mutations_sync
+-- defaults to 0, so this returns immediately and ClickHouse runs the
+-- mutation asynchronously instead of blocking the migration on a full-
+-- table reindex.
 ALTER TABLE calls_merged
-    MATERIALIZE INDEX idx_trace_id_bloom
-    SETTINGS mutations_sync = 1;
+    MATERIALIZE INDEX idx_trace_id_bloom;
