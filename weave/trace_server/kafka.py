@@ -167,8 +167,12 @@ class KafkaProducer(ConfluentKafkaProducer):
         ):
             return
 
-        # Partition on trace_id so spans for the same turn route to the same worker.
-        publish_key = event.trace_id
+        # Partition by conversation_id if available, falling back to trace_id.
+        # This ensures spans for the same conversation or turn always route to
+        # the same worker, which allows for more efficient caching/querying in
+        # the scoring worker. We intentionally do NOT partition on project_id:
+        # that would send all spans for a project to a single worker instance.
+        publish_key = event.conversation_id or event.trace_id
         self.produce(
             topic=SCORE_AGENT_SPANS_TOPIC,
             value=event.model_dump_json(),
