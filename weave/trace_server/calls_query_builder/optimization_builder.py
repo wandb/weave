@@ -432,7 +432,9 @@ def _create_like_patterns_for_value(value: str | float | bool) -> list[str]:
     if isinstance(value, bool):
         # bool must be checked before int since bool is a subclass of int.
         # Boolean values are serialized as true/false without quotes in JSON.
-        return [f"%{str(value).lower()}%"]
+        # The precise HAVING bool cast also accepts legacy numeric encodings
+        # through toUInt8OrNull, so keep this prefilter at least as permissive.
+        return [f"%{str(value).lower()}%", f"%{1 if value else 0}%"]
     if isinstance(value, str):
         # Boolean string literals are not wrapped in quotes in JSON payloads
         if value in {"true", "false"}:
