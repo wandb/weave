@@ -14,6 +14,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
+from weave.integrations.openai.responses import input_to_weave, reasoning_to_weave
 from weave.session.session import (
     LLM,
     BlobPart,
@@ -41,6 +42,7 @@ from weave.session.session import (
     start_tool,
 )
 from weave.session.session_otel import (
+    _message_to_parts,
     execute_tool_attributes,
     invoke_agent_attributes,
     llm_attributes,
@@ -1636,85 +1638,68 @@ class TestToolStructuredPayloads:
     string attributes still receive a JSON-encoded representation.
     """
 
-    def test_dict_result_serializes_at_emission(
-        self, otel_spans: InMemorySpanExporter
+    @pytest.mark.parametrize(
+        ("field", "value", "expected_json", "expected_raw"),
+        [
+            # dict result → JSON-encoded at emission
+            ("result", {"hits": 3, "top": "weave"}, {"hits": 3, "top": "weave"}, None),
+            # list arguments → JSON-encoded at emission
+            ("arguments", [1, 2, 3], [1, 2, 3], None),
+            # string passes through unchanged (no double-encoding)
+            ("result", "already a string", None, "already a string"),
+            # None → attribute is omitted entirely
+            ("result", None, None, ...),
+        ],
+        ids=["dict_result", "list_arguments", "string_passthrough", "none_omitted"],
+    )
+    def test_payload_emitted_as_json_string(
+        self,
+        otel_spans: InMemorySpanExporter,
+        field: str,
+        value: object,
+        expected_json: object,
+        expected_raw: object,
     ) -> None:
-        with start_session(agent_name="bot", session_id="sess-r1") as s, s.start_turn():
-            with start_tool(name="search", tool_call_id="tc_1") as t:
-                t.result = {"hits": 3, "top": "weave"}
-
+        attr_key = f"gen_ai.tool.call.{field}"
+        kwargs: dict = {"name": "tool", "tool_call_id": "tc"}
+        if field == "arguments":
+            kwargs["arguments"] = value
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            with start_tool(**kwargs) as t:
+                if field == "result":
+                    t.result = value
         tool_spans = [
             sp
             for sp in otel_spans.get_finished_spans()
-            if sp.name == "execute_tool search"
+            if sp.name == "execute_tool tool"
         ]
         assert len(tool_spans) == 1
         attrs = dict(tool_spans[0].attributes or {})
-        # Wire format is a JSON string regardless of what the caller assigned.
-        assert json.loads(attrs["gen_ai.tool.call.result"]) == {
-            "hits": 3,
-            "top": "weave",
-        }
-
-    def test_list_arguments_serialize(self, otel_spans: InMemorySpanExporter) -> None:
-        with start_session(agent_name="bot", session_id="sess-r2") as s, s.start_turn():
-            with start_tool(name="batch", arguments=[1, 2, 3], tool_call_id="tc"):
-                pass
-        tool_spans = [
-            sp
-            for sp in otel_spans.get_finished_spans()
-            if sp.name == "execute_tool batch"
-        ]
-        attrs = dict(tool_spans[0].attributes or {})
-        assert json.loads(attrs["gen_ai.tool.call.arguments"]) == [1, 2, 3]
-
-    def test_string_result_passthrough(self, otel_spans: InMemorySpanExporter) -> None:
-        """String values are emitted unchanged (no double-encoding)."""
-        with start_session(agent_name="bot", session_id="sess-r3") as s, s.start_turn():
-            with start_tool(name="echo", tool_call_id="tc") as t:
-                t.result = "already a string"
-        tool_spans = [
-            sp
-            for sp in otel_spans.get_finished_spans()
-            if sp.name == "execute_tool echo"
-        ]
-        attrs = dict(tool_spans[0].attributes or {})
-        assert attrs["gen_ai.tool.call.result"] == "already a string"
-
-    def test_none_result_omitted(self, otel_spans: InMemorySpanExporter) -> None:
-        """``result = None`` produces an empty attribute, which is omitted."""
-        with start_session(agent_name="bot", session_id="sess-r4") as s, s.start_turn():
-            with start_tool(name="noop", tool_call_id="tc") as t:
-                t.result = None
-        tool_spans = [
-            sp
-            for sp in otel_spans.get_finished_spans()
-            if sp.name == "execute_tool noop"
-        ]
-        attrs = dict(tool_spans[0].attributes or {})
-        assert "gen_ai.tool.call.result" not in attrs
+        if expected_raw is ...:
+            assert attr_key not in attrs
+        elif expected_raw is not None:
+            assert attrs[attr_key] == expected_raw
+        else:
+            assert json.loads(attrs[attr_key]) == expected_json
 
 
 class TestToolCallPartArgumentsCoercion:
     """ToolCallPart accepts dict/list inputs and JSON-encodes at construction."""
 
-    def test_dict_arguments_coerced_to_json_string(self) -> None:
-        part = ToolCallPart(id="c1", name="search", arguments={"q": "weave"})
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ({"q": "weave"}, '{"q": "weave"}'),
+            ([1, 2], "[1, 2]"),
+            ('{"already": "json"}', '{"already": "json"}'),
+            (None, ""),
+        ],
+        ids=["dict", "list", "string_passthrough", "none"],
+    )
+    def test_construction_coerces_to_string(self, value: object, expected: str) -> None:
+        part = ToolCallPart(id="c", name="x", arguments=value)
         assert isinstance(part.arguments, str)
-        assert json.loads(part.arguments) == {"q": "weave"}
-
-    def test_list_arguments_coerced(self) -> None:
-        part = ToolCallPart(id="c2", name="batch", arguments=[1, 2])
-        assert json.loads(part.arguments) == [1, 2]
-
-    def test_string_arguments_passthrough(self) -> None:
-        """Already-encoded JSON strings are not re-encoded."""
-        part = ToolCallPart(id="c3", name="x", arguments='{"already": "json"}')
-        assert part.arguments == '{"already": "json"}'
-
-    def test_none_arguments_becomes_empty(self) -> None:
-        part = ToolCallPart(id="c4", name="x", arguments=None)
-        assert part.arguments == ""
+        assert part.arguments == expected
 
     def test_assignment_after_construction_coerces(self) -> None:
         """validate_assignment ensures post-construction edits also coerce."""
@@ -1730,7 +1715,7 @@ class TestToolCallPartArgumentsCoercion:
                 ToolCallPart(id="c1", name="get_weather", arguments={"city": "NYC"})
             ],
         )
-        serialized = json.loads(json.dumps(_message_parts_via_otel(msg)))
+        serialized = json.loads(json.dumps(_message_to_parts(msg)))
         tool_call = serialized["parts"][0]
         assert tool_call["type"] == "tool_call"
         assert json.loads(tool_call["arguments"]) == {"city": "NYC"}
@@ -1739,33 +1724,31 @@ class TestToolCallPartArgumentsCoercion:
 class TestToolCallResponsePartCoercion:
     """ToolCallResponsePart accepts structured outputs and JSON-encodes."""
 
-    def test_dict_response_coerced(self) -> None:
-        part = ToolCallResponsePart(id="c1", response={"ok": True})
-        assert json.loads(part.response) == {"ok": True}
-
-    def test_string_response_passthrough(self) -> None:
-        part = ToolCallResponsePart(id="c2", response="plain")
-        assert part.response == "plain"
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [({"ok": True}, '{"ok": true}'), ("plain", "plain")],
+        ids=["dict", "string_passthrough"],
+    )
+    def test_response_coerced_to_string(self, value: object, expected: str) -> None:
+        part = ToolCallResponsePart(id="c", response=value)
+        assert part.response == expected
 
 
 class TestMessageBuilders:
     """High-level Message constructors for the common message shapes."""
 
-    def test_user_constructor(self) -> None:
-        m = Message.user("hello")
-        assert m.role == "user"
+    @pytest.mark.parametrize(
+        ("builder", "role"),
+        [
+            (Message.user, "user"),
+            (Message.system, "system"),
+            (Message.assistant, "assistant"),
+        ],
+    )
+    def test_text_only_constructor(self, builder, role: str) -> None:
+        m = builder("hello")
+        assert m.role == role
         assert m.content == "hello"
-        assert m.parts == []
-
-    def test_system_constructor(self) -> None:
-        m = Message.system("you are helpful")
-        assert m.role == "system"
-        assert m.content == "you are helpful"
-
-    def test_assistant_text_only(self) -> None:
-        m = Message.assistant("hi there")
-        assert m.role == "assistant"
-        assert m.content == "hi there"
         assert m.parts == []
 
     def test_assistant_with_tool_calls_promotes_to_parts(self) -> None:
@@ -1786,20 +1769,19 @@ class TestMessageBuilders:
         assert len(m.parts) == 1
         assert isinstance(m.parts[0], ToolCallPart)
 
-    def test_tool_result_with_dict(self) -> None:
-        m = Message.tool_result("c1", {"answer": 42})
+    @pytest.mark.parametrize(
+        ("output", "expected_response"),
+        [({"answer": 42}, '{"answer": 42}'), ("ok", "ok")],
+        ids=["dict", "string"],
+    )
+    def test_tool_result(self, output: object, expected_response: str) -> None:
+        m = Message.tool_result("c1", output)
         assert m.role == "tool"
         assert len(m.parts) == 1
         part = m.parts[0]
         assert isinstance(part, ToolCallResponsePart)
         assert part.id == "c1"
-        assert json.loads(part.response) == {"answer": 42}
-
-    def test_tool_result_with_string(self) -> None:
-        m = Message.tool_result("c2", "ok")
-        part = m.parts[0]
-        assert isinstance(part, ToolCallResponsePart)
-        assert part.response == "ok"
+        assert part.response == expected_response
 
 
 class TestAttachMediaUrl:
@@ -1844,13 +1826,6 @@ class TestAttachMediaUrl:
         assert result is llm
 
 
-def _message_parts_via_otel(msg: Message) -> dict:
-    """Helper: serialize one Message through the same path used by the LLM span."""
-    from weave.session.session_otel import _message_to_parts
-
-    return _message_to_parts(msg)
-
-
 class TestLLMRecord:
     """LLM.record(...) collapses N attribute assignments into one call."""
 
@@ -1884,16 +1859,17 @@ class TestLLMRecord:
         assert llm.usage.input_tokens == 42
         assert llm.output_messages == [Message.assistant("hi")]
 
-    def test_reasoning_accepts_string(self) -> None:
+    @pytest.mark.parametrize(
+        "reasoning",
+        ["flat", Reasoning(content="explicit")],
+        ids=["string", "instance"],
+    )
+    def test_reasoning_accepts_string_or_instance(self, reasoning: object) -> None:
         llm = LLM()
-        llm.record(reasoning="flat")
+        llm.record(reasoning=reasoning)
         assert isinstance(llm.reasoning, Reasoning)
-        assert llm.reasoning.content == "flat"
-
-    def test_reasoning_accepts_instance(self) -> None:
-        llm = LLM()
-        llm.record(reasoning=Reasoning(content="explicit"))
-        assert llm.reasoning.content == "explicit"
+        expected = reasoning if isinstance(reasoning, str) else reasoning.content
+        assert llm.reasoning.content == expected
 
     def test_returns_self_for_chaining(self) -> None:
         llm = LLM()
@@ -1927,15 +1903,11 @@ class TestOpenAIResponsesInputAdapter:
     """weave.integrations.openai.responses.input_to_weave covers the input shapes."""
 
     def test_text_user_message(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
         msgs, media = input_to_weave([{"role": "user", "content": "hello"}])
         assert msgs == [Message.user("hello")]
         assert media == []
 
     def test_user_message_with_text_blocks(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
         items = [
             {
                 "role": "user",
@@ -1951,74 +1923,46 @@ class TestOpenAIResponsesInputAdapter:
         assert msgs[0].content == "look at\nthis"
         assert media == []
 
-    def test_function_call_becomes_assistant_with_tool_call_part(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
+    @pytest.mark.parametrize(
+        "arguments",
+        ['{"city": "Tokyo"}', {"city": "Tokyo"}],
+        ids=["string", "dict"],
+    )
+    def test_function_call_becomes_assistant_with_tool_call_part(
+        self, arguments: object
+    ) -> None:
         items = [
             {
                 "type": "function_call",
                 "name": "get_weather",
-                "arguments": '{"city": "Tokyo"}',
+                "arguments": arguments,
                 "call_id": "c1",
             }
         ]
         msgs, _ = input_to_weave(items)
         assert len(msgs) == 1
         assert msgs[0].role == "assistant"
-        assert isinstance(msgs[0].parts[0], ToolCallPart)
-        assert msgs[0].parts[0].id == "c1"
-        assert msgs[0].parts[0].name == "get_weather"
-
-    def test_function_call_arguments_dict_is_encoded(self) -> None:
-        """When arguments come in as a dict (not a string), JSON-encode them."""
-        from weave.integrations.openai.responses import input_to_weave
-
-        items = [
-            {
-                "type": "function_call",
-                "name": "x",
-                "arguments": {"k": "v"},
-                "call_id": "c2",
-            }
-        ]
-        msgs, _ = input_to_weave(items)
         part = msgs[0].parts[0]
         assert isinstance(part, ToolCallPart)
-        assert json.loads(part.arguments) == {"k": "v"}
+        assert part.id == "c1"
+        assert part.name == "get_weather"
+        assert json.loads(part.arguments) == {"city": "Tokyo"}
 
-    def test_function_call_output_becomes_tool_message(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
-        items = [
-            {
-                "type": "function_call_output",
-                "output": '{"temp": 75}',
-                "call_id": "c1",
-            }
-        ]
+    @pytest.mark.parametrize(
+        "output",
+        ['{"temp": 75}', {"temp": 75}],
+        ids=["string", "dict"],
+    )
+    def test_function_call_output_becomes_tool_message(self, output: object) -> None:
+        items = [{"type": "function_call_output", "output": output, "call_id": "c1"}]
         msgs, _ = input_to_weave(items)
         assert msgs[0].role == "tool"
-        assert isinstance(msgs[0].parts[0], ToolCallResponsePart)
-        assert msgs[0].parts[0].id == "c1"
-
-    def test_function_call_output_dict_is_encoded(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
-        items = [
-            {
-                "type": "function_call_output",
-                "output": {"temp": 75},
-                "call_id": "c1",
-            }
-        ]
-        msgs, _ = input_to_weave(items)
         part = msgs[0].parts[0]
         assert isinstance(part, ToolCallResponsePart)
+        assert part.id == "c1"
         assert json.loads(part.response) == {"temp": 75}
 
     def test_reasoning_items_skipped(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
         items = [
             {"type": "reasoning", "summary": [{"text": "hmm"}]},
             {"role": "user", "content": "go"},
@@ -2027,48 +1971,41 @@ class TestOpenAIResponsesInputAdapter:
         assert len(msgs) == 1
         assert msgs[0].role == "user"
 
-    def test_image_data_url_becomes_blob_attachment(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
-        items = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_image",
-                        "image_url": "data:image/png;base64,iVBORw0KGgo=",
-                    },
-                ],
-            }
-        ]
-        msgs, media = input_to_weave(items)
+    @pytest.mark.parametrize(
+        ("block", "expected_kind", "expected_field", "expected_value"),
+        [
+            (
+                {
+                    "type": "input_image",
+                    "image_url": "data:image/png;base64,iVBORw0KGgo=",
+                },
+                "blob",
+                "content",
+                "iVBORw0KGgo=",
+            ),
+            (
+                {"type": "image_url", "image_url": {"url": "https://e.com/cat.png"}},
+                "uri",
+                "uri",
+                "https://e.com/cat.png",
+            ),
+        ],
+        ids=["data_url_blob", "plain_url_uri"],
+    )
+    def test_image_attachment(
+        self,
+        block: dict,
+        expected_kind: str,
+        expected_field: str,
+        expected_value: str,
+    ) -> None:
+        items = [{"role": "user", "content": [block]}]
+        _, media = input_to_weave(items)
         assert len(media) == 1
-        assert media[0].kind == "blob"
-        assert media[0].mime_type == "image/png"
-        assert media[0].content == "iVBORw0KGgo="
-
-    def test_image_plain_url_becomes_uri_attachment(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
-        items = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": "https://e.com/cat.png"},
-                    },
-                ],
-            }
-        ]
-        msgs, media = input_to_weave(items)
-        assert len(media) == 1
-        assert media[0].kind == "uri"
-        assert media[0].uri == "https://e.com/cat.png"
+        assert media[0].kind == expected_kind
+        assert getattr(media[0], expected_field) == expected_value
 
     def test_duplicate_image_urls_deduplicated(self) -> None:
-        from weave.integrations.openai.responses import input_to_weave
-
         items = [
             {
                 "role": "user",
@@ -2083,8 +2020,6 @@ class TestOpenAIResponsesInputAdapter:
 
     def test_assistant_message_text_content(self) -> None:
         """Assistant content blocks with output_text are flattened."""
-        from weave.integrations.openai.responses import input_to_weave
-
         items = [
             {
                 "role": "assistant",
@@ -2096,8 +2031,6 @@ class TestOpenAIResponsesInputAdapter:
 
     def test_full_conversation_round_trip(self) -> None:
         """User → assistant tool call → tool result → assistant text — common shape."""
-        from weave.integrations.openai.responses import input_to_weave
-
         items = [
             {"role": "user", "content": "what's the weather in Tokyo?"},
             {
@@ -2124,39 +2057,27 @@ class TestOpenAIResponsesReasoningAdapter:
     """reasoning_to_weave flattens OpenAI's reasoning summary into a Reasoning."""
 
     def test_summary_fragments_joined_with_newlines(self) -> None:
-        from weave.integrations.openai.responses import reasoning_to_weave
-
         result = reasoning_to_weave(
             {"summary": [{"text": "first"}, {"text": "second"}]}
         )
         assert result is not None
         assert result.content == "first\nsecond"
 
-    def test_empty_summary_returns_none(self) -> None:
-        from weave.integrations.openai.responses import reasoning_to_weave
-
-        assert reasoning_to_weave({"summary": []}) is None
-
-    def test_none_input_returns_none(self) -> None:
-        """Lets callers pass through ``parsed.reasoning_part`` without guarding."""
-        from weave.integrations.openai.responses import reasoning_to_weave
-
-        assert reasoning_to_weave(None) is None
-
-    def test_summary_with_only_empty_text_returns_none(self) -> None:
-        from weave.integrations.openai.responses import reasoning_to_weave
-
-        assert reasoning_to_weave({"summary": [{"text": ""}, {}]}) is None
-
-    def test_non_list_summary_returns_none(self) -> None:
-        """Defensive: a malformed reasoning part shouldn't raise."""
-        from weave.integrations.openai.responses import reasoning_to_weave
-
-        assert reasoning_to_weave({"summary": "not a list"}) is None  # type: ignore[arg-type]
+    @pytest.mark.parametrize(
+        "part",
+        [
+            {"summary": []},
+            None,
+            {"summary": [{"text": ""}, {}]},
+            {"summary": "not a list"},
+        ],
+        ids=["empty_summary", "none_input", "only_empty_text", "non_list_summary"],
+    )
+    def test_returns_none(self, part: object) -> None:
+        """Empty / malformed inputs collapse to None so callers can pipe through."""
+        assert reasoning_to_weave(part) is None  # type: ignore[arg-type]
 
     def test_skips_non_dict_summary_items(self) -> None:
-        from weave.integrations.openai.responses import reasoning_to_weave
-
         result = reasoning_to_weave(
             {"summary": [{"text": "kept"}, "not a dict", {"text": "also kept"}]}
         )
