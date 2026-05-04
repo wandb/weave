@@ -58,6 +58,7 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
+from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -128,6 +129,7 @@ from weave.trace_server.clickhouse.utilities import (
     maybe_enqueue_minimal_call_end,
     num_bytes,
     process_parameters,
+    sanitize_invalid_utf8_surrogates,
     should_retry_empty_query,
     string_to_int_in_range,
 )
@@ -6607,7 +6609,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return AgentQueryHandler(self._query).conversation_chat(req)
 
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        return AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+        res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+
+        # Return early without emitting kafka events if online eval or agent scoring are disabled
+        if not wf_env.wf_enable_online_eval() or not wf_env.wf_enable_agent_scoring():
+            return res
+
+        # Emit for each row that produces a valid event type
+        for row in span_rows:
+            if event := ScoreAgentSpansEvent.from_row(row):
+                event.emit(self.kafka_producer)
+
+        # Flush kafka producer
+        if span_rows and self.kafka_producer:
+            try:
+                self.kafka_producer.flush(0)
+            except Exception:
+                logger.exception(
+                    "Failed to flush Kafka producer during OTel span ingest"
+                )
+
+        return res
 
     # Private Methods
     @property
@@ -6913,11 +6935,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         start = time.monotonic()
+        sanitized_invalid_utf8 = False
         for attempt in range(ch_settings.INSERT_MAX_RETRIES):
             try:
                 result = self.ch_client.insert(
                     table, data=data, column_names=column_names, settings=settings
                 )
+
+            # Invalid client Unicode: sanitize the batch and retry once.
+            except UnicodeEncodeError as e:
+                if (
+                    sanitized_invalid_utf8
+                    or attempt == ch_settings.INSERT_MAX_RETRIES - 1
+                ):
+                    log_and_raise_insert_error(e, table, data)
+                sanitized_invalid_utf8 = True
+                data = sanitize_invalid_utf8_surrogates(data)
+                continue
 
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:

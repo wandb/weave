@@ -32,6 +32,7 @@ import {getGlobalClient} from '../clientApi';
 import {uuidv7} from 'uuidv7';
 import type {RealtimeSessionLike} from './openai.realtime.agent.types';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {globalSingleton} from '../utils/globalSingleton';
 
 // ============================================================================
 // Helpers
@@ -700,7 +701,14 @@ export class WeaveRealtimeTracingAdapter {
 // Public API
 // ============================================================================
 
-let realtimeSessionPatched = false;
+// Internal state shared across CJS/ESM module boundaries via globalThis.
+// Without this, a dual-package hazard (same module loaded as both CJS and ESM
+// in one process) would give each copy its own `patched` flag and could
+// double-patch the `RealtimeSession` class.
+const _openaiAgentsRealtimeState = globalSingleton<{patched: boolean}>(
+  '_weave_openai_agents_realtime_state',
+  () => ({patched: false})
+);
 
 function patchRealtimeSessionCommon(realtimeExports: any): void {
   const OriginalSession = realtimeExports?.RealtimeSession;
@@ -750,8 +758,8 @@ function patchRealtimeSessionCommon(realtimeExports: any): void {
 }
 
 function patchRealtimeExports(exports: any) {
-  if (!realtimeSessionPatched) {
-    realtimeSessionPatched = true;
+  if (!_openaiAgentsRealtimeState.patched) {
+    _openaiAgentsRealtimeState.patched = true;
     patchRealtimeSessionCommon(exports);
   }
   return exports;
@@ -787,24 +795,40 @@ export function instrumentOpenAIRealtimeAgent(): void {
  * Call this **once** at app startup, before any `RealtimeSession` is constructed.
  * The function is idempotent — safe to call multiple times.
  *
+ * @returns `true` if the patch was applied (or was already in place), `false` if
+ * `@openai/agents-realtime` could not be loaded.
+ *
  * @example
  * ```typescript
  * import { patchRealtimeSession } from 'weave';
- * patchRealtimeSession();
+ * await patchRealtimeSession();
  * // Every new RealtimeSession(...) is now auto-instrumented
  * ```
  */
-export function patchRealtimeSession(): void {
-  if (realtimeSessionPatched) return;
-  realtimeSessionPatched = true;
+export async function patchRealtimeSession(): Promise<boolean> {
+  if (_openaiAgentsRealtimeState.patched) return true;
 
-  let realtimeExports: any;
+  // Dynamic `import()` (not `require()`) so this compiles cleanly to both CJS
+  // and ESM output; `require` does not exist in ESM.
+  let realtimeExports;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    realtimeExports = require('@openai/agents-realtime');
-  } catch {
-    // @openai/agents-realtime is not installed — skip patching
-    return;
+    // @ts-ignore - Dynamic import of optional peer dependency
+    realtimeExports = await import('@openai/agents-realtime');
+  } catch (error) {
+    console.error(
+      'Weave: Unable to register OpenAI Agents Realtime integration. ' +
+        'To enable tracing, install @openai/agents-realtime: ' +
+        'npm install @openai/agents-realtime',
+      error
+    );
+    return false;
   }
+
+  // Re-check: the dynamic import itself may trigger the ESM hook, which runs
+  // patchRealtimeSessionCommon. Without this guard we would double-wrap
+  // RealtimeSession.prototype.sendAudio.
+  if (_openaiAgentsRealtimeState.patched) return true;
+  _openaiAgentsRealtimeState.patched = true;
   patchRealtimeSessionCommon(realtimeExports);
+  return true;
 }

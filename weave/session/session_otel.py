@@ -5,16 +5,26 @@ for a specific span type. These are pure functions that build attribute
 dicts — no OTel SDK dependency required.
 
 Messages are serialized in the GenAI parts model: each message is
-``{role, parts: [...]}`` where each part is a TextPart, BlobPart, UriPart,
-FilePart, ReasoningPart, or ToolCallResponsePart per the semconv schemas
-at ``docs/gen-ai/gen-ai-input-messages.json`` and ``-output-messages.json``.
+``{role, parts: [...]}`` where each part is a TextPart, ReasoningPart,
+ToolCallPart, ToolCallResponsePart, BlobPart, UriPart, or FilePart per
+the semconv schemas at ``docs/gen-ai/gen-ai-input-messages.json`` and
+``-output-messages.json``.
+
+Two construction styles are supported:
+
+- **Explicit parts:** callers populate ``Message.parts`` directly with
+  typed part objects. The serializer dumps each part as-is.
+- **Flat content (back-compat):** when ``Message.parts`` is empty, the
+  serializer synthesizes a single TextPart from ``Message.content`` (or
+  a ToolCallResponsePart for ``role:"tool"``).
 
 - Media attachments on an LLM call are appended as parts to the most
   recent ``role:"user"`` input message.
-- Reasoning content is emitted as a ``ReasoningPart`` prepended to the
-  most recent ``role:"assistant"`` output message; if there is no
-  assistant message, a synthetic one is created to carry it.
-- ``role:"tool"`` messages serialize to a single ``ToolCallResponsePart``.
+- Reasoning content (``LLM.reasoning``) is emitted as a ``ReasoningPart``
+  prepended to the most recent ``role:"assistant"`` output message; if
+  no assistant message exists, a synthetic one is created. The
+  auto-prepend is suppressed if any output message already carries an
+  explicit ReasoningPart.
 - ``system_instructions`` serialize to an array of ``TextPart`` entries.
 
 The parts model is "Development" tier in the semconv (as of v1.40.0).
@@ -70,11 +80,29 @@ def _message_to_parts(
 ) -> dict[str, Any]:
     """Convert a Message to the GenAI parts-model dict shape.
 
-    role:"tool" messages become a single ToolCallResponsePart.
-    All other roles produce a TextPart when they have content.
-    Extra parts (typically media) are appended after the text part.
+    Two modes:
+
+    - **Explicit parts** (``msg.parts`` non-empty): each part is dumped via
+      Pydantic's ``model_dump(exclude_defaults=True)`` so empty optional
+      fields don't end up in the wire format. Extras (typically media) are
+      appended.
+    - **Flat content** (back-compat): ``role:"tool"`` becomes a single
+      ToolCallResponsePart; everything else produces a TextPart from
+      ``msg.content`` when non-empty. Extras append after.
     """
-    parts: list[dict[str, Any]] = []
+    if msg.parts:
+        parts: list[dict[str, Any]] = [
+            p.model_dump(exclude_defaults=True) for p in msg.parts
+        ]
+        # exclude_defaults strips the discriminator "type" when it equals the
+        # class default (every part type pins a Literal default). Restore it.
+        for serialized, original in zip(parts, msg.parts, strict=True):
+            serialized.setdefault("type", original.type)
+        if extra:
+            parts.extend(extra)
+        return {"role": msg.role, "parts": parts}
+
+    parts = []
     if msg.role == "tool":
         part: dict[str, Any] = {"type": "tool_call_response", "response": msg.content}
         if msg.tool_call_id:
@@ -129,16 +157,22 @@ def _serialize_output_messages(
     out: list[dict[str, Any]] = [_message_to_parts(m) for m in (messages or [])]
     if has_reasoning:
         assert reasoning is not None  # narrow for mypy
-        rpart = {"type": "reasoning", "content": reasoning.content}
-        if out:
-            last_asst = -1
-            for i, m in enumerate(messages or []):
-                if m.role == "assistant":
-                    last_asst = i
-            target = out[last_asst] if last_asst >= 0 else out[-1]
-            target["parts"].insert(0, rpart)
-        else:
-            out.append({"role": "assistant", "parts": [rpart]})
+        # Skip the auto-prepend if any output message already carries a
+        # ReasoningPart — the caller is using the explicit parts API.
+        already_has_reasoning_part = any(
+            any(p.get("type") == "reasoning" for p in msg["parts"]) for msg in out
+        )
+        if not already_has_reasoning_part:
+            rpart = {"type": "reasoning", "content": reasoning.content}
+            if out:
+                last_asst = -1
+                for i, m in enumerate(messages or []):
+                    if m.role == "assistant":
+                        last_asst = i
+                target = out[last_asst] if last_asst >= 0 else out[-1]
+                target["parts"].insert(0, rpart)
+            else:
+                out.append({"role": "assistant", "parts": [rpart]})
     if out and finish_reasons:
         out[-1]["finish_reason"] = finish_reasons[0]
     return json.dumps(out)
@@ -162,6 +196,9 @@ def invoke_agent_attributes(
     model: str = "",
     input_messages: list[Message] | None = None,
     output_messages: list[Message] | None = None,
+    agent_id: str = "",
+    agent_description: str = "",
+    agent_version: str = "",
 ) -> dict[str, Any]:
     """Build OTel attributes for an invoke_agent span."""
     attrs: dict[str, Any] = {
@@ -176,6 +213,12 @@ def invoke_agent_attributes(
         attrs["gen_ai.provider.name"] = provider_name
     if model:
         attrs["gen_ai.request.model"] = model
+    if agent_id:
+        attrs["gen_ai.agent.id"] = agent_id
+    if agent_description:
+        attrs["gen_ai.agent.description"] = agent_description
+    if agent_version:
+        attrs["gen_ai.agent.version"] = agent_version
 
     serialized_in = _serialize_input_messages(input_messages)
     if serialized_in is not None:
@@ -201,6 +244,16 @@ def llm_attributes(
     reasoning: Reasoning | None = None,
     finish_reasons: list[str] | None = None,
     response_id: str = "",
+    response_model: str = "",
+    output_type: str = "",
+    request_temperature: float | None = None,
+    request_max_tokens: int | None = None,
+    request_top_p: float | None = None,
+    request_frequency_penalty: float | None = None,
+    request_presence_penalty: float | None = None,
+    request_seed: int | None = None,
+    request_stop_sequences: list[str] | None = None,
+    request_choice_count: int | None = None,
 ) -> dict[str, Any]:
     """Build OTel attributes for an LLM call (chat operation) span.
 
@@ -219,8 +272,28 @@ def llm_attributes(
         attrs["gen_ai.provider.name"] = provider_name
     if response_id:
         attrs["gen_ai.response.id"] = response_id
+    if response_model:
+        attrs["gen_ai.response.model"] = response_model
+    if output_type:
+        attrs["gen_ai.output.type"] = output_type
     if finish_reasons:
         attrs["gen_ai.response.finish_reasons"] = finish_reasons
+    if request_temperature is not None:
+        attrs["gen_ai.request.temperature"] = request_temperature
+    if request_max_tokens is not None:
+        attrs["gen_ai.request.max_tokens"] = request_max_tokens
+    if request_top_p is not None:
+        attrs["gen_ai.request.top_p"] = request_top_p
+    if request_frequency_penalty is not None:
+        attrs["gen_ai.request.frequency_penalty"] = request_frequency_penalty
+    if request_presence_penalty is not None:
+        attrs["gen_ai.request.presence_penalty"] = request_presence_penalty
+    if request_seed is not None:
+        attrs["gen_ai.request.seed"] = request_seed
+    if request_stop_sequences:
+        attrs["gen_ai.request.stop_sequences"] = request_stop_sequences
+    if request_choice_count is not None:
+        attrs["gen_ai.request.choice.count"] = request_choice_count
     serialized_si = _serialize_system_instructions(system_instructions)
     if serialized_si is not None:
         attrs["gen_ai.system_instructions"] = serialized_si
@@ -231,6 +304,14 @@ def llm_attributes(
             attrs["gen_ai.usage.output_tokens"] = usage.output_tokens
         if usage.reasoning_tokens:
             attrs["gen_ai.usage.reasoning_tokens"] = usage.reasoning_tokens
+        if usage.cache_creation_input_tokens:
+            attrs["gen_ai.usage.cache_creation.input_tokens"] = (
+                usage.cache_creation_input_tokens
+            )
+        if usage.cache_read_input_tokens:
+            attrs["gen_ai.usage.cache_read.input_tokens"] = (
+                usage.cache_read_input_tokens
+            )
 
     serialized_in = _serialize_input_messages(input_messages, media=media_attachments)
     if serialized_in is not None:
@@ -252,6 +333,9 @@ def execute_tool_attributes(
     tool_call_arguments: str = "",
     tool_call_result: str = "",
     tool_call_id: str = "",
+    tool_type: str = "",
+    tool_description: str = "",
+    tool_definitions: str = "",
 ) -> dict[str, Any]:
     """Build OTel attributes for an execute_tool span."""
     attrs: dict[str, Any] = {
@@ -266,5 +350,11 @@ def execute_tool_attributes(
         attrs["gen_ai.tool.call.arguments"] = tool_call_arguments
     if tool_call_result:
         attrs["gen_ai.tool.call.result"] = tool_call_result
+    if tool_type:
+        attrs["gen_ai.tool.type"] = tool_type
+    if tool_description:
+        attrs["gen_ai.tool.description"] = tool_description
+    if tool_definitions:
+        attrs["gen_ai.tool.definitions"] = tool_definitions
 
     return attrs

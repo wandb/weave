@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import logging
 import os
-from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 
 from weave.compat import wandb
@@ -20,6 +19,7 @@ from weave.trace.settings import (
     should_use_stainless_server,
     use_server_cache,
 )
+from weave.trace.urls import otel_traces_endpoint
 from weave.trace.wandb_run_context import (
     check_wandb_run_matches,
     get_global_wb_run_context,
@@ -34,12 +34,9 @@ from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
     from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc
+    from weave.trace_server.service_interface import ServerInfoRes
 
 logger = logging.getLogger(__name__)
-
-# OTel GenAI traces ingestion path on the weave trace server. Appended to
-# ``weave_trace_server_url()`` to form the OTLP HTTP exporter endpoint.
-_OTEL_GENAI_TRACES_PATH = "/otel/v1/genai/traces"
 
 
 class WeaveWandbAuthenticationException(Exception): ...
@@ -98,17 +95,15 @@ Args:
 """
 
 
-def _weave_is_available(server: TraceServerClientInterface) -> bool:
+def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes | None:
+    """Fetch server_info or return None if the server is unavailable."""
     try:
-        server.server_info()
-    except JSONDecodeError:
-        return False
+        return server.server_info()
     except Exception:
         logger.warning(
             "Unexpected error when checking if Weave is available on the server.  Please contact support."
         )
-        return False
-    return True
+        return None
 
 
 def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> None:
@@ -145,7 +140,7 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
     if not trace_server_url:
         return
 
-    endpoint = f"{trace_server_url.rstrip('/')}{_OTEL_GENAI_TRACES_PATH}"
+    endpoint = otel_traces_endpoint(trace_server_url)
 
     # Match the auth pattern used by the rest of weave (see
     # init_weave_get_server: res.set_auth(("api", api_key)) and
@@ -208,7 +203,8 @@ def init_weave(
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
     remote_server = init_weave_get_server(api_key, entity=entity_name)
-    if not _weave_is_available(remote_server):
+    server_info = _get_server_info(remote_server)
+    if server_info is None:
         raise RuntimeError(
             "Weave is not available on the server.  Please contact support."
         )
@@ -224,6 +220,7 @@ def init_weave(
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
         attributes=attributes,
+        api_key=api_key,
     )
 
     # If the project name was formatted by init, update the project name
@@ -245,17 +242,8 @@ def init_weave(
 
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
-    try:
-        server_info = remote_server.server_info()
-        min_required_version = server_info.min_required_weave_python_version
-        trace_server_version = server_info.trace_server_version
-    # TODO: Tighten this exception to only catch the specific exception
-    # that is thrown by the server_info call.
-    except Exception:
-        # Set to a minimum version that will always pass the check
-        # In the future, we may want to throw here.
-        min_required_version = "0.0.0"
-        trace_server_version = None
+    min_required_version = server_info.min_required_weave_python_version
+    trace_server_version = server_info.trace_server_version
     trace_server_url = env.weave_trace_server_url()
     if not init_message.check_min_weave_version(min_required_version, trace_server_url):
         return init_weave_disabled()

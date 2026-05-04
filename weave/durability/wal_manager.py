@@ -8,6 +8,7 @@ from collections.abc import Callable
 from pydantic import BaseModel
 
 from weave.durability.wal import WALRecord, WALRecordType, WALWriter
+from weave.durability.wal_client_id import WAL_ROOT, compute_client_id
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_sender import BackgroundWALSender, create_sender
 from weave.durability.wal_writer import JSONLWALWriter
@@ -32,14 +33,22 @@ class WALManager:
            consumed files.
     """
 
-    def __init__(self, entity: str, project: str) -> None:
-        self.wal_dir = os.path.join(
-            os.path.expanduser("~"),
-            ".weave",
-            "wal",
-            entity,
-            project,
-        )
+    def __init__(self, entity: str, project: str, api_key: str | None = None) -> None:
+        """Create a WAL manager for a given entity and project.
+
+        Args:
+            entity: The entity (team/org) name.
+            project: The project name.
+            api_key: When provided, the WAL directory is namespaced by a
+                stable identifier derived from the key (SHA-256).  This
+                isolates WAL files so that different credentials writing
+                to the same entity/project never cross-talk.  ``None``
+                disables namespacing (backward-compatible flat directory).
+        """
+        parts = [WAL_ROOT, entity, project]
+        if api_key is not None:
+            parts.append(compute_client_id(api_key))
+        self.wal_dir = os.path.join(*parts)
         dir_mgr = FileWALDirectoryManager(self.wal_dir)
         self._writer: WALWriter | None = JSONLWALWriter(dir_mgr)
         self._sender: BackgroundWALSender | None = None
@@ -52,6 +61,7 @@ class WALManager:
         server: TraceServerClientInterface,
         *,
         on_send: Callable[[str, WALRecord], None] | None = None,
+        api_key: str | None = None,
     ) -> WALManager:
         """Create a WAL manager with a background sender thread.
 
@@ -61,8 +71,9 @@ class WALManager:
         Args:
             on_send: Optional callback invoked after a record is successfully
                 sent to the server.  Called with ``(record_type, record)``.
+            api_key: See :meth:`__init__`.
         """
-        mgr = cls(entity, project)
+        mgr = cls(entity, project, api_key=api_key)
         mgr._sender = create_sender(mgr.wal_dir, server, on_success=on_send)
         mgr._sender.start()
         atexit.register(mgr.close)
