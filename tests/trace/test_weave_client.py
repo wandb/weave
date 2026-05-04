@@ -3751,6 +3751,15 @@ def test_calls_query_filter_by_root_refs(client):
         assert op_name_from_call(calls[0]) == "root_op", label
         assert calls[0].inputs["x"] == expected_x, label
 
+    # Structured root JSON values should not match scalar numeric filters.
+    # SQLite's CAST('{"x":1}' AS INT) returns 0, so inferred root casts must
+    # not turn object-valued inputs into false positive scalar matches.
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={"$expr": {"$eq": [{"$getField": "inputs"}, {"$literal": 0}]}},
+    )
+    assert len(calls) == 0
+
     typed_call = client.create_call(
         "typed_filter_op",
         {"x": 1},
