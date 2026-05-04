@@ -167,7 +167,8 @@ class KafkaProducer(ConfluentKafkaProducer):
         ):
             return
 
-        publish_key = event.project_id if kafka_partition_by_project_id() else None
+        # Partition on trace_id so spans for the same turn route to the same worker.
+        publish_key = event.trace_id
         self.produce(
             topic=SCORE_AGENT_SPANS_TOPIC,
             value=event.model_dump_json(),
