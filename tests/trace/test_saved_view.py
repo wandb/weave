@@ -292,7 +292,7 @@ def chat_completion_create(
     return "Hello, world!"
 
 
-def make_calls(client):
+def make_calls():
     chat_completion_create(
         custom_id="1",
         model="gpt-4o-mini",
@@ -336,7 +336,7 @@ def make_calls(client):
 
 
 def test_saved_view_column_select(client):
-    make_calls(client)
+    make_calls()
     view = weave.SavedView("traces", "My saved view")
     view.add_column("inputs.custom_id")
     calls = view.get_calls()

@@ -50,7 +50,7 @@ def test_publish_and_load_scorer_with_prompt_ref(client):
     assert len(loaded_scorer.scoring_prompt.messages) == 1
 
 
-def test_score_with_string_prompt(client):
+def test_score_with_string_prompt():
     """Test score() with a simple string prompt."""
     scorer = LLMAsAJudgeScorer(
         model=LLMStructuredCompletionModel(
@@ -74,7 +74,7 @@ def test_score_with_string_prompt(client):
         assert messages == [{"role": "user", "content": "Output: hello"}]
 
 
-def test_score_with_messages_prompt(client):
+def test_score_with_messages_prompt():
     """Test score() with a MessagesPrompt and template variables."""
     prompt = MessagesPrompt(
         messages=[
