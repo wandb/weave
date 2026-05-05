@@ -1834,24 +1834,47 @@ class TestMessageBuilders:
 class TestAttachMediaUrl:
     """LLM.attach_media_url handles data: and plain URLs uniformly."""
 
-    def test_data_url_becomes_blob(self) -> None:
-        url = "data:image/png;base64,iVBORw0KGgo="
+    @pytest.mark.parametrize(
+        (
+            "url",
+            "expected_kind",
+            "expected_mime",
+            "expected_payload_field",
+            "expected_payload",
+        ),
+        [
+            (
+                "data:image/png;base64,iVBORw0KGgo=",
+                "blob",
+                "image/png",
+                "content",
+                "iVBORw0KGgo=",
+            ),
+            (
+                "https://example.com/cat.png",
+                "uri",
+                "",
+                "uri",
+                "https://example.com/cat.png",
+            ),
+        ],
+        ids=["data_url_blob", "plain_url_uri"],
+    )
+    def test_url_dispatches_to_blob_or_uri(
+        self,
+        url: str,
+        expected_kind: str,
+        expected_mime: str,
+        expected_payload_field: str,
+        expected_payload: str,
+    ) -> None:
         llm = LLM()
         llm.attach_media_url(url, modality="image")
-        assert len(llm.media_attachments) == 1
-        att = llm.media_attachments[0]
-        assert att.kind == "blob"
-        assert att.mime_type == "image/png"
-        assert att.content == "iVBORw0KGgo="
+        (att,) = llm.media_attachments
+        assert att.kind == expected_kind
+        assert att.mime_type == expected_mime
         assert att.modality == "image"
-
-    def test_plain_url_becomes_uri(self) -> None:
-        llm = LLM()
-        llm.attach_media_url("https://example.com/cat.png", modality="image")
-        att = llm.media_attachments[0]
-        assert att.kind == "uri"
-        assert att.uri == "https://example.com/cat.png"
-        assert att.modality == "image"
+        assert getattr(att, expected_payload_field) == expected_payload
 
     def test_data_url_modality_inferred_from_mime(self) -> None:
         """Modality auto-fills from mime_type when not provided."""
