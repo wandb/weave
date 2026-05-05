@@ -336,10 +336,10 @@ class ObjectMetadataQueryBuilder:
         #
         # object_versions_with_index: For each object, number its versions
         # 0, 1, 2, ... ordered by when each digest was first published
-        # (_first_created_at).  Also marks is_latest (1 for the most recently
-        # published non-deleted version; callers always filter with
-        # deleted_at IS NULL, so if all versions are deleted the query returns
-        # no results), and version_count.
+        # (_first_created_at).  is_latest tracks the most recent publish
+        # (by ov.created_at) so re-publishing a prior digest correctly
+        # promotes that digest back to latest; this can yield is_latest=1
+        # on a row whose version_index is not the maximum.
         query = f"""
 WITH latest_row_per_digest AS (
     SELECT
@@ -380,7 +380,7 @@ object_versions_with_index AS (
         ) AS version_count,
         row_number() OVER (
             PARTITION BY project_id, kind, object_id
-            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
+            ORDER BY (deleted_at IS NULL) DESC, created_at DESC, digest DESC
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
     FROM latest_row_per_digest
