@@ -2,13 +2,18 @@ import os
 
 import nox
 
+GSM8K_ENVIRONMENT_PACKAGE = (
+    "gsm8k @ git+https://github.com/willccbb/verifiers.git"
+    "@b4d851db42cebbab2358b827fd0ed19773631937"
+    "#subdirectory=environments/gsm8k ; python_version >= '3.11'"
+)
+SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
+NUM_TRACE_SERVER_SHARDS = 4
+VERIFIERS_MIN_PYTHON_VERSION = (3, 11)
+
 nox.options.default_venv_backend = "uv"
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
-
-
-SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
-NUM_TRACE_SERVER_SHARDS = 4
 
 
 @nox.session
@@ -111,6 +116,11 @@ SHARDS_WITHOUT_EXTRAS = {
     ],
 )
 def tests(session: nox.Session, shard: str):
+    # Normalize nox's configured Python string, like "3.10", for numeric comparison.
+    python_version = tuple(int(part) for part in str(session.python).split(".")[:2])
+    if shard == "verifiers_test" and python_version < VERIFIERS_MIN_PYTHON_VERSION:
+        session.skip("verifiers_test requires Python >= 3.11")
+
     # Only add --extra shard if the shard has a corresponding optional dependency
     # Use --active to sync to the active nox virtual environment
     # Test-related shards (ending in _test/_tests) are dependency groups, not extras
@@ -244,9 +254,7 @@ def tests(session: nox.Session, shard: str):
 
     if shard == "verifiers_test":
         # Pinning to this commit because the latest version of the gsm8k environment is broken.
-        session.install(
-            "git+https://github.com/willccbb/verifiers.git@b4d851db42cebbab2358b827fd0ed19773631937#subdirectory=environments/gsm8k"
-        )
+        session.install(GSM8K_ENVIRONMENT_PACKAGE)
 
     # Check if posargs contains test files (ending with .py or containing :: for specific tests)
     has_test_files = any(
