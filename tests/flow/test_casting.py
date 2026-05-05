@@ -8,7 +8,7 @@ from weave.trace.op import is_op
 
 
 @pytest.fixture
-def valid_dataset(client, request):
+def valid_dataset(in_memory_client, request):
     data = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
 
     if request.param == "dataset":

@@ -673,13 +673,13 @@ def test_evaluation_logger_uses_passed_output_not_model_predict(in_memory_client
 
 
 @pytest.mark.parametrize("model_name", ["for", "42", "a-b-c", "!"])
-def test_evaluation_invalid_model_name_fixable(in_memory_client, model_name):
+def test_evaluation_invalid_model_name_fixable(model_name):
     # Should not raise
-    weave.EvaluationLogger(model=model_name).finish()
+    weave.EvaluationLogger(model=model_name)
 
 
 @pytest.mark.parametrize("model_name", [""])
-def test_evaluation_invalid_model_name_not_fixable(in_memory_client, model_name):
+def test_evaluation_invalid_model_name_not_fixable(model_name):
     with pytest.raises(ValueError, match="name cannot be empty"):
         weave.EvaluationLogger(model=model_name)
 
