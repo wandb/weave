@@ -237,6 +237,16 @@ class UserSettings(BaseModel):
     of this setting (see `should_use_calls_complete`).
     """
 
+    log_to_otel_endpoint: bool = False
+    """
+    Toggles logging Weave session traces to the GenAI OTEL ingestion endpoint.
+
+    The endpoint is built by `weave.trace.urls.otel_traces_endpoint` and resolves
+    to `/agents/otel/v1/traces` on the configured trace server.
+
+    Can be overridden with the environment variable `WEAVE_LOG_TO_OTEL_ENDPOINT`.
+    """
+
     enable_client_side_digests: bool = False
     """
     Toggles client-side digest computation for objects and tables.
@@ -419,6 +429,11 @@ def should_use_calls_complete(entity: str | None = None) -> bool:
     if _should("use_calls_complete"):
         return True
     return entity is not None and entity in CALLS_COMPLETE_ENTITY_ALLOWLIST
+
+
+def should_log_to_otel_endpoint() -> bool:
+    """Returns whether Weave should log to the OTEL ingestion endpoint."""
+    return _should("log_to_otel_endpoint")
 
 
 def should_enable_client_side_digests() -> bool:
