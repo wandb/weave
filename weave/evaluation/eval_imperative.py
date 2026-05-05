@@ -134,6 +134,9 @@ def _sanitize_class_name(name: str) -> str:
 def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
     def _convert_to_cls_inner(value: str | dict | T) -> T:
         if isinstance(value, str):
+            if value == "":
+                _validate_class_name(value, type_.__name__)
+
             # Dynamically create the class if the user only provides a name
             cls_name = _sanitize_class_name(value)
 
@@ -666,6 +669,11 @@ class EvaluationLogger:
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
     ) -> None:
+        # Initialize cleanup state before any validation can raise so __del__ can
+        # safely inspect partially constructed instances.
+        self._is_finalized: bool = True
+        self._accumulated_predictions: list[ScoreLogger] = []
+
         self.name = name
         self.scorers = scorers
         self.eval_attributes = eval_attributes if eval_attributes is not None else {}
@@ -679,13 +687,6 @@ class EvaluationLogger:
         if dataset is None:
             dataset = Dataset(rows=Table([{"dataset_id": _default_dataset_name()}]))
         self.dataset: Dataset = _cast_to_imperative_dataset(dataset)
-
-        # Private state
-        self._is_finalized: bool = False
-        self._accumulated_predictions: list[ScoreLogger] = []
-
-        # Register this instance in the global registry for atexit cleanup
-        _active_evaluation_loggers.append(self)
 
         # At this point dataset has been processed and converted to a Dataset object
         self._pseudo_evaluation = Evaluation(
@@ -770,6 +771,10 @@ class EvaluationLogger:
             attributes=self.attributes,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
+        self._is_finalized = False
+
+        # Register this instance in the global registry for atexit cleanup
+        _active_evaluation_loggers.append(self)
 
     @property
     def ui_url(self) -> str | None:
