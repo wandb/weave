@@ -586,7 +586,9 @@ def test_evaluation_logger_model_inference_method_handling(in_memory_client):
     ev2.finish()
 
 
-def test_evaluation_logger_model_with_different_inference_method_names(in_memory_client):
+def test_evaluation_logger_model_with_different_inference_method_names(
+    in_memory_client,
+):
     """Test that EvaluationLogger handles models with different inference method names."""
 
     class ModelWithInfer(Model):

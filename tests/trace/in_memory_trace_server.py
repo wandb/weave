@@ -100,14 +100,14 @@ class InMemoryTraceServer:
         return tsi.ObjReadRes(obj=obj.model_copy(deep=True))
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        return tsi.RefsReadBatchRes(vals=[self._refs[self._base_ref(ref)] for ref in req.refs])
+        return tsi.RefsReadBatchRes(
+            vals=[self._refs[self._base_ref(ref)] for ref in req.refs]
+        )
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         table = req.table
         digest = table.expected_digest or self._next_digest()
-        row_digests = [
-            f"{ROW_DIGEST_PREFIX}-{next(self._counter)}" for _ in table.rows
-        ]
+        row_digests = [f"{ROW_DIGEST_PREFIX}-{next(self._counter)}" for _ in table.rows]
         rows = [
             tsi.TableRowSchema(digest=row_digest, val=row, original_index=index)
             for index, (row_digest, row) in enumerate(
@@ -119,7 +119,9 @@ class InMemoryTraceServer:
             self._refs[f"weave:///{table.project_id}/table/{digest}"] = table.rows
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
-    def table_query_stream(self, req: tsi.TableQueryReq) -> Iterator[tsi.TableRowSchema]:
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
         rows = self._tables[req.project_id, req.digest]
         offset = req.offset or 0
         limit = req.limit
@@ -152,7 +154,9 @@ class InMemoryTraceServer:
     def close(self) -> None:
         pass
 
-    def _filtered_calls(self, call_filter: tsi.CallsFilter | None) -> list[tsi.CallSchema]:
+    def _filtered_calls(
+        self, call_filter: tsi.CallsFilter | None
+    ) -> list[tsi.CallSchema]:
         with self._lock:
             calls = [self._calls[call_id] for call_id in self._call_order]
         if call_filter is None:
@@ -168,7 +172,10 @@ class InMemoryTraceServer:
             calls = [
                 call
                 for call in calls
-                if any(self._matches_op_name(call.op_name, name) for name in call_filter.op_names)
+                if any(
+                    self._matches_op_name(call.op_name, name)
+                    for name in call_filter.op_names
+                )
             ]
         if call_filter.trace_roots_only:
             calls = [call for call in calls if call.parent_id is None]
@@ -196,9 +203,9 @@ class InMemoryTraceServer:
 
     @staticmethod
     def _matches_op_name(stored_op_name: str, requested_op_name: str) -> bool:
-        stored_name = stored_op_name.rsplit("/", maxsplit=1)[-1].split(
-            ":", maxsplit=1
-        )[0]
+        stored_name = stored_op_name.rsplit("/", maxsplit=1)[-1].split(":", maxsplit=1)[
+            0
+        ]
         return requested_op_name in {stored_op_name, stored_name}
 
     @staticmethod
