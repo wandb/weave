@@ -47,7 +47,6 @@ from weave.session.session import (
     start_tool,
 )
 from weave.session.session_otel import (
-    _message_to_parts,
     execute_tool_attributes,
     invoke_agent_attributes,
     llm_attributes,
@@ -1730,55 +1729,40 @@ class TestToolStructuredPayloads:
             assert json.loads(attrs[attr_key]) == expected_json
 
 
-class TestToolCallPartArgumentsCoercion:
-    """ToolCallPart accepts dict/list inputs and JSON-encodes at construction."""
+class TestToolCallPartCoercion:
+    """ToolCallPart / ToolCallResponsePart accept structured inputs and
+    JSON-encode at construction or assignment.
+
+    The end-to-end coercion path (input dict → emitted attribute string)
+    is covered by ``TestToolStructuredPayloads``; this class pins down
+    construction-time behavior that the OTel test does not exercise:
+    edge inputs (None, list) and post-construction assignment.
+    """
 
     @pytest.mark.parametrize(
-        ("value", "expected"),
+        ("part_cls", "field", "value", "expected"),
         [
-            ({"q": "weave"}, '{"q": "weave"}'),
-            ([1, 2], "[1, 2]"),
-            ('{"already": "json"}', '{"already": "json"}'),
-            (None, ""),
+            (ToolCallPart, "arguments", None, ""),
+            (ToolCallPart, "arguments", [1, 2], "[1, 2]"),
+            (ToolCallResponsePart, "response", None, ""),
+            (ToolCallResponsePart, "response", {"ok": True}, '{"ok": true}'),
         ],
-        ids=["dict", "list", "string_passthrough", "none"],
+        ids=["args_none", "args_list", "resp_none", "resp_dict"],
     )
-    def test_construction_coerces_to_string(self, value: object, expected: str) -> None:
-        part = ToolCallPart(id="c", name="x", arguments=value)
-        assert isinstance(part.arguments, str)
-        assert part.arguments == expected
+    def test_edge_inputs_coerce_to_string(
+        self, part_cls: type, field: str, value: object, expected: str
+    ) -> None:
+        kwargs: dict[str, object] = {"id": "c", field: value}
+        if part_cls is ToolCallPart:
+            kwargs["name"] = "x"
+        part = part_cls(**kwargs)
+        assert getattr(part, field) == expected
 
-    def test_assignment_after_construction_coerces(self) -> None:
-        """validate_assignment ensures post-construction edits also coerce."""
-        part = ToolCallPart(id="c5", name="x", arguments="")
+    def test_post_construction_assignment_coerces(self) -> None:
+        """validate_assignment=True ensures setattr also runs the validator."""
+        part = ToolCallPart(id="c", name="x", arguments="")
         part.arguments = {"k": "v"}
         assert json.loads(part.arguments) == {"k": "v"}
-
-    def test_serialized_in_message_parts(self) -> None:
-        """Coerced ToolCallPart serializes correctly through the Message pipeline."""
-        msg = Message(
-            role="assistant",
-            parts=[
-                ToolCallPart(id="c1", name="get_weather", arguments={"city": "NYC"})
-            ],
-        )
-        serialized = json.loads(json.dumps(_message_to_parts(msg)))
-        tool_call = serialized["parts"][0]
-        assert tool_call["type"] == "tool_call"
-        assert json.loads(tool_call["arguments"]) == {"city": "NYC"}
-
-
-class TestToolCallResponsePartCoercion:
-    """ToolCallResponsePart accepts structured outputs and JSON-encodes."""
-
-    @pytest.mark.parametrize(
-        ("value", "expected"),
-        [({"ok": True}, '{"ok": true}'), ("plain", "plain")],
-        ids=["dict", "string_passthrough"],
-    )
-    def test_response_coerced_to_string(self, value: object, expected: str) -> None:
-        part = ToolCallResponsePart(id="c", response=value)
-        assert part.response == expected
 
 
 class TestMessageBuilders:
