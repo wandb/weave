@@ -1987,35 +1987,32 @@ class TestUsageFromOpenAIResponses:
         assert attrs["gen_ai.usage.cache_read.input_tokens"] == 3
 
     @pytest.mark.parametrize(
-        ("output_details", "input_details", "expected_reasoning", "expected_cache"),
+        (
+            "has_output_details",
+            "has_input_details",
+            "expected_reasoning",
+            "expected_cache",
+        ),
         [
-            (None, None, None, None),
-            (None, "details(cached_tokens=3)", None, 3),
-            ("details(reasoning_tokens=5)", None, 5, None),
+            (False, False, None, None),
+            (False, True, None, 3),
+            (True, False, 5, None),
         ],
         ids=["both_none", "output_none", "input_none"],
     )
     def test_none_details_objects_default_to_zero_and_omit_attr(
         self,
         otel_spans: InMemorySpanExporter,
-        output_details: Any,
-        input_details: Any,
+        has_output_details: bool,
+        has_input_details: bool,
         expected_reasoning: int | None,
         expected_cache: int | None,
     ) -> None:
         """Streaming partials can have detail objects = None. Extractor
         substitutes 0; ``llm_attributes`` then omits zero-valued attrs.
         """
-        out_d = (
-            self._details(reasoning_tokens=5)
-            if output_details == "details(reasoning_tokens=5)"
-            else None
-        )
-        in_d = (
-            self._details(cached_tokens=3)
-            if input_details == "details(cached_tokens=3)"
-            else None
-        )
+        out_d = self._details(reasoning_tokens=5) if has_output_details else None
+        in_d = self._details(cached_tokens=3) if has_input_details else None
         usage = self._usage(
             input_tokens=10,
             output_tokens=20,
