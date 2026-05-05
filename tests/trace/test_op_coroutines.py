@@ -7,8 +7,7 @@ import weave
 from weave.trace.call import Call
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_val():
+def test_sync_val(client):
     @weave.op
     def sync_val():
         return 1
@@ -20,8 +19,7 @@ def test_sync_val():
     assert res == 1
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_val_method():
+def test_sync_val_method(client):
     class TestClass:
         @weave.op
         def sync_val(self):
@@ -36,8 +34,7 @@ def test_sync_val_method():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_sync_coro():
+async def test_sync_coro(client):
     @weave.op
     def sync_coro():
         return asyncio.to_thread(lambda: 1)
@@ -52,8 +49,7 @@ async def test_sync_coro():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_sync_coro_method():
+async def test_sync_coro_method(client):
     class TestClass:
         @weave.op
         def sync_coro(self):
@@ -70,8 +66,7 @@ async def test_sync_coro_method():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_coro():
+async def test_async_coro(client):
     @weave.op
     async def async_coro():
         return asyncio.to_thread(lambda: 1)
@@ -88,8 +83,7 @@ async def test_async_coro():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_coro_method():
+async def test_async_coro_method(client):
     class TestClass:
         @weave.op
         async def async_coro(self):
@@ -109,8 +103,7 @@ async def test_async_coro_method():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_awaited_coro():
+async def test_async_awaited_coro(client):
     @weave.op
     async def async_awaited_coro():
         return await asyncio.to_thread(lambda: 1)
@@ -124,8 +117,7 @@ async def test_async_awaited_coro():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_awaited_coro_method():
+async def test_async_awaited_coro_method(client):
     class TestClass:
         @weave.op
         async def async_awaited_coro(self):
@@ -141,8 +133,7 @@ async def test_async_awaited_coro_method():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_val():
+async def test_async_val(client):
     @weave.op
     async def async_val():
         return 1
@@ -156,8 +147,7 @@ async def test_async_val():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_val_method():
+async def test_async_val_method(client):
     class TestClass:
         @weave.op
         async def async_val(self):
@@ -172,8 +162,7 @@ async def test_async_val_method():
     assert res == 1
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_with_exception():
+def test_sync_with_exception(client):
     @weave.op
     def sync_with_exception():
         raise ValueError("test")
@@ -186,8 +175,7 @@ def test_sync_with_exception():
     assert res is None
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_with_exception_method():
+def test_sync_with_exception_method(client):
     class TestClass:
         @weave.op
         def sync_with_exception(self):
@@ -203,8 +191,7 @@ def test_sync_with_exception_method():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_with_exception():
+async def test_async_with_exception(client):
     @weave.op
     async def async_with_exception():
         raise ValueError("test")
@@ -218,8 +205,7 @@ async def test_async_with_exception():
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_with_exception_method():
+async def test_async_with_exception_method(client):
     class TestClass:
         @weave.op
         async def async_with_exception(self):

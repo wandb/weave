@@ -56,8 +56,7 @@ def py_obj():
     return B()
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_func(func):
+def test_sync_func(client, func):
     assert func(1) == 2
 
     ref = weave.publish(func)
@@ -66,8 +65,7 @@ def test_sync_func(func):
     assert func2(1) == 2
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_func_call(func):
+def test_sync_func_call(client, func):
     res, call = func.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
@@ -85,8 +83,7 @@ def test_sync_func_call(func):
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_func(afunc):
+async def test_async_func(client, afunc):
     assert await afunc(1) == 2
 
     ref = weave.publish(afunc)
@@ -96,8 +93,7 @@ async def test_async_func(afunc):
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_func_call(afunc):
+async def test_async_func_call(client, afunc):
     res, call = await afunc.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
@@ -114,8 +110,7 @@ async def test_async_func_call(afunc):
     assert res2 == 2
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_method(weave_obj, py_obj):
+def test_sync_method(client, weave_obj, py_obj):
     assert weave_obj.method(1) == 2
     assert py_obj.method(1) == 2
 
@@ -124,8 +119,7 @@ def test_sync_method(weave_obj, py_obj):
         weave_obj_method2 = weave_obj_method_ref.get()
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_method_call(weave_obj, py_obj):
+def test_sync_method_call(client, weave_obj, py_obj):
     res, call = weave_obj.method.call(weave_obj, 1)
     assert isinstance(call, Call)
     assert call.inputs == {
@@ -150,8 +144,7 @@ def test_sync_method_call(weave_obj, py_obj):
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_method(weave_obj, py_obj):
+async def test_async_method(client, weave_obj, py_obj):
     assert await weave_obj.amethod(1) == 2
     assert await py_obj.amethod(1) == 2
 
@@ -161,8 +154,7 @@ async def test_async_method(weave_obj, py_obj):
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_method_call(weave_obj, py_obj):
+async def test_async_method_call(client, weave_obj, py_obj):
     res, call = await weave_obj.amethod.call(weave_obj, 1)
     assert isinstance(call, Call)
     assert call.inputs == {
@@ -214,8 +206,7 @@ def test_async_method_patching_passes_inspection(weave_obj, py_obj):
     assert inspect.ismethod(py_obj.amethod)
 
 
-@pytest.mark.usefixtures("client")
-def test_sync_method_calls(weave_obj):
+def test_sync_method_calls(client, weave_obj):
     for x in range(3):
         weave_obj.method(x)
 
@@ -229,8 +220,7 @@ def test_sync_method_calls(weave_obj):
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_async_method_calls(weave_obj):
+async def test_async_method_calls(client, weave_obj):
     for x in range(3):
         await weave_obj.amethod(x)
 
@@ -244,8 +234,7 @@ async def test_async_method_calls(weave_obj):
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_gotten_object_method_is_callable(weave_obj):
+async def test_gotten_object_method_is_callable(client, weave_obj):
     ref = weave.publish(weave_obj)
 
     weave_obj2 = ref.get()
@@ -254,8 +243,7 @@ async def test_gotten_object_method_is_callable(weave_obj):
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("client")
-async def test_gotten_object_method_is_callable_with_call_func(weave_obj):
+async def test_gotten_object_method_is_callable_with_call_func(client, weave_obj):
     ref = weave.publish(weave_obj)
 
     weave_obj2 = ref.get()
