@@ -291,11 +291,16 @@ from weave.trace_server.trace_server_common import (
     LRUCache,
     apply_tags_and_synth_latest_in_place,
     determine_call_status,
+    eval_run_refs_from_call,
     get_nested_key,
     hydrate_calls_with_feedback,
     make_feedback_query_req,
     set_nested_key,
     try_parse_json,
+)
+from weave.trace_server.trace_server_interface import (
+    EvaluateModelArgs,
+    RescoringArgs,
 )
 from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
@@ -303,7 +308,6 @@ from weave.trace_server.ttl_settings import (
     invalidate_ttl_cache,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
-    EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
 
@@ -4311,6 +4315,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             version=op_create_res.digest,
         )
 
+        # Build attributes — include source_evaluation_run_id if this is a rescore run
+        weave_attrs: dict = {
+            constants.EVALUATION_RUN_ATTR_KEY: "true",
+            constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
+            constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+        }
+        if req.source_evaluation_run_id:
+            weave_attrs[constants.EVALUATION_RUN_SOURCE_ATTR_KEY] = (
+                req.source_evaluation_run_id
+            )
+
         # Start a call to represent the evaluation run
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
@@ -4320,11 +4335,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 op_name=op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes={
-                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                        constants.EVALUATION_RUN_ATTR_KEY: "true",
-                        constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
-                        constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
-                    }
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: weave_attrs,
                 },
                 inputs={
                     "self": req.evaluation,
@@ -4349,16 +4360,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise NotFoundError(f"Evaluation run {req.evaluation_run_id} not found")
 
         attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+        evaluation_ref, model_ref = eval_run_refs_from_call(call, attributes)
         status = determine_call_status(call)
 
         return tsi.EvaluationRunReadRes(
             evaluation_run_id=call.id,
-            evaluation=attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""),
-            model=attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY, ""),
+            evaluation=evaluation_ref,
+            model=model_ref,
             status=status,
             started_at=call.started_at,
             finished_at=call.ended_at,
             summary=call.summary,
+            source_evaluation_run_id=attributes.get(
+                constants.EVALUATION_RUN_SOURCE_ATTR_KEY
+            ),
         )
 
     def evaluation_run_list(
@@ -6690,6 +6705,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         )
         return tsi.EvaluateModelRes(call_id=call_id)
+
+    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
+        """Rescore an existing evaluation run with different scorer(s).
+
+        Allocates a new evaluation_run_id and dispatches the rescore worker;
+        the worker is the sole owner of the new call's lifecycle (emits
+        call_start at the top of the job and call_end at the bottom). We
+        deliberately do NOT pre-create the call here — call ownership must
+        live with the process that emits ``call_start``, otherwise the
+        worker's CallBatchProcessor sees an orphaned ``call_end`` (no
+        matching start in its in-memory pairing buffer) and drops it after
+        the flush timeout. See the invariant on ``CallBatchProcessor``.
+
+        Until the worker's first batch flush lands the call_start, the
+        ``/evaluations/status`` endpoint returns ``not_found`` for this id —
+        the rescore-results wrapper page already handles
+        ``not_found → running → complete`` as a normal progression.
+
+        The SDK path (``weave/evaluation/rescore.py``) keeps using
+        ``evaluation_run_create`` directly because in that path the SDK is
+        the owner: it emits start AND end from a single client.
+        """
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+
+        new_evaluation_run_id = generate_id()
+        self._evaluate_model_dispatcher.dispatch(
+            RescoringArgs(
+                project_id=req.project_id,
+                source_evaluation_run_id=req.source_evaluation_run_id,
+                scorer_refs=req.scorer_refs,
+                wb_user_id=req.wb_user_id,
+                new_evaluation_run_id=new_evaluation_run_id,
+            )
+        )
+        return tsi.RescoreRes(
+            call_id=new_evaluation_run_id,
+            evaluation_run_id=new_evaluation_run_id,
+        )
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
