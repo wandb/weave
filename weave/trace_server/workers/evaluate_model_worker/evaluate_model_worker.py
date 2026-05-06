@@ -2,7 +2,6 @@ import asyncio
 from abc import ABC, abstractmethod
 
 import ddtrace
-from pydantic import BaseModel, ConfigDict
 
 import weave
 from weave.evaluation.eval import Evaluation
@@ -14,24 +13,19 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
+from weave.trace_server.trace_server_interface import EvaluateModelArgs, EvalWorkerJob
 from weave.trace_server.validation import assert_safe_payload
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
-
-class EvaluateModelArgs(BaseModel):
-    project_id: str
-    evaluation_ref: str
-    model_ref: str
-    wb_user_id: str
-    evaluation_call_id: str
-
-    model_config = ConfigDict(protected_namespaces=())
+# Re-export EvaluateModelArgs for backwards compatibility — callers that import it
+# from this module (e.g. evaluate_model_dispatcher.py in weave-trace) still work.
+__all__ = ["EvaluateModelArgs", "EvaluateModelDispatcher", "evaluate_model"]
 
 
 class EvaluateModelDispatcher(ABC):
     @abstractmethod
-    def dispatch(self, args: EvaluateModelArgs) -> None:
+    def dispatch(self, args: EvalWorkerJob) -> None:
         pass
 
 
