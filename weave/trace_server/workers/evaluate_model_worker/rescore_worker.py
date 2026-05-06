@@ -10,6 +10,7 @@ Entry points:
 
 import asyncio
 import logging
+from collections.abc import Iterator
 from typing import Any, cast
 
 import ddtrace
@@ -23,6 +24,9 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_interface import RescoringArgs
 from weave.trace_server.validation import assert_safe_payload
+from weave.trace_server.workers.evaluate_model_worker._rescore_source import (
+    _RescoreSource,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,63 +75,48 @@ async def rescore_predictions(args: RescoringArgs) -> None:
 
     try:
         with weave.attributes(RESCORE_WORKER_MARKER):
-            offset = 0
-            while True:
-                page = list(
-                    client.server.prediction_list(
-                        tsi.PredictionListReq(
-                            project_id=args.project_id,
-                            evaluation_run_id=args.source_evaluation_run_id,
-                            limit=PREDICTION_PAGE_SIZE,
-                            offset=offset,
-                        )
-                    )
+            for source in _yield_standard_sources(client, args):
+                # apply_scorer_async handles column_map, op tracing, kwargs — do not
+                # call scorer.score() directly. signature: (scorer, example, model_output)
+                # return_exceptions=True so one scorer failure doesn't abort the whole batch.
+                results = await asyncio.gather(
+                    *[
+                        apply_scorer_async(scorer, source.inputs, source.output)
+                        for scorer in scorers
+                    ],
+                    return_exceptions=True,
                 )
-                if not page:
-                    break
 
-                for prediction in page:
-                    # apply_scorer_async handles column_map, op tracing, kwargs — do not
-                    # call scorer.score() directly. signature: (scorer, example, model_output)
-                    # return_exceptions=True so one scorer failure doesn't abort the whole batch.
-                    results = await asyncio.gather(
-                        *[
-                            apply_scorer_async(
-                                scorer, prediction.inputs, prediction.output
-                            )
-                            for scorer in scorers
-                        ],
-                        return_exceptions=True,
-                    )
-
-                    for i, (result, scorer_ref) in enumerate(
-                        zip(results, args.scorer_refs, strict=True)
-                    ):
-                        if isinstance(result, Exception):
-                            logger.warning(
-                                "Scorer %s failed on prediction %s: %s",
-                                scorer_ref,
-                                prediction.prediction_id,
-                                result,
-                            )
-                            failed_score_counts[i] += 1
-                            continue
-                        raw_value = result.result  # raw Any — dict, bool, float, etc.
-                        client.server.score_create(
-                            tsi.ScoreCreateReq(
-                                project_id=args.project_id,
-                                prediction_id=prediction.prediction_id,
-                                scorer=scorer_ref,
-                                value=raw_value,
-                                evaluation_run_id=args.new_evaluation_run_id,
-                                wb_user_id=args.wb_user_id,
-                            )
+                for i, (result, scorer_ref) in enumerate(
+                    zip(results, args.scorer_refs, strict=True)
+                ):
+                    if isinstance(result, Exception):
+                        logger.warning(
+                            "Scorer %s failed on prediction %s: %s",
+                            scorer_ref,
+                            source.prediction_id,
+                            result,
                         )
-                        raw_scores_by_scorer[i].append(raw_value)
-
-                offset += len(page)
-                if len(page) < PREDICTION_PAGE_SIZE:
-                    break
+                        failed_score_counts[i] += 1
+                        continue
+                    raw_value = result.result  # raw Any — dict, bool, float, etc.
+                    client.server.score_create(
+                        tsi.ScoreCreateReq(
+                            project_id=args.project_id,
+                            prediction_id=source.prediction_id,
+                            # Explicit parent override. For standard sources this
+                            # equals what auto-derive would produce (prediction.parent_id =
+                            # predict_and_score.call_id). For imperative sources (Task 1.4)
+                            # there is no separate prediction call, so we MUST pass the
+                            # parent explicitly — never let it be re-derived.
+                            parent_id=source.parent_call_id,
+                            scorer=scorer_ref,
+                            value=raw_value,
+                            evaluation_run_id=args.new_evaluation_run_id,
+                            wb_user_id=args.wb_user_id,
+                        )
+                    )
+                    raw_scores_by_scorer[i].append(raw_value)
 
         # Log per-scorer failure counts so partial failures are visible.
         for i, scorer_attrs in enumerate(scorer_attributes_list):
@@ -179,6 +168,59 @@ async def rescore_predictions(args: RescoringArgs) -> None:
                 args.new_evaluation_run_id,
             )
         raise
+
+
+def _yield_standard_sources(
+    client: WeaveClient, args: RescoringArgs
+) -> Iterator[_RescoreSource]:
+    """Yield ``_RescoreSource`` rows for a standard ``Evaluation.evaluate`` source.
+
+    Uses ``prediction_list``, which filters on the ``prediction`` call attribute
+    (set only by ``prediction_create``). Imperative source evals do not appear
+    in this query — their branch is handled in a separate generator.
+
+    For standard, ``parent_call_id = prediction.parent_id`` (= the
+    ``predict_and_score`` call). Falls back to the source evaluation run id only
+    if the prediction is somehow root-level — same fallback today's auto-derive
+    uses inside ``score_create``.
+    """
+    offset = 0
+    while True:
+        page = list(
+            client.server.prediction_list(
+                tsi.PredictionListReq(
+                    project_id=args.project_id,
+                    evaluation_run_id=args.source_evaluation_run_id,
+                    limit=PREDICTION_PAGE_SIZE,
+                    offset=offset,
+                )
+            )
+        )
+        if not page:
+            break
+
+        for prediction in page:
+            pred_read = client.server.call_read(
+                tsi.CallReadReq(
+                    project_id=args.project_id,
+                    id=prediction.prediction_id,
+                )
+            )
+            parent_call_id = (
+                pred_read.call.parent_id
+                if pred_read.call and pred_read.call.parent_id
+                else args.source_evaluation_run_id
+            )
+            yield _RescoreSource(
+                prediction_id=prediction.prediction_id,
+                parent_call_id=parent_call_id,
+                inputs=prediction.inputs,
+                output=prediction.output,
+            )
+
+        offset += len(page)
+        if len(page) < PREDICTION_PAGE_SIZE:
+            break
 
 
 def _get_valid_scorer(client: WeaveClient, scorer_ref: str) -> Scorer:
