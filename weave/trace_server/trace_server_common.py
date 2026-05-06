@@ -157,6 +157,14 @@ def make_derived_summary_fields(
     used to store derived fields, adhering to the tsi.SummaryMap type.
     """
     weave_summary = summary.pop("weave", {})
+    # Server-derived fields are recomputed below — discard any stored values
+    # so historically-malformed rows (e.g. a list-shaped `trace_name` written
+    # by an earlier rescore-worker bug that copied `summary["weave"]` from a
+    # source call into a synthetic child, where `sum_dict_leaves` then bubbled
+    # the string up into the parent as a list) don't escape CallSchema
+    # validation. These keys are owned by this function alone.
+    for derived_key in ("status", "trace_name", "latency_ms", "display_name"):
+        weave_summary.pop(derived_key, None)
 
     status = tsi.TraceStatus.SUCCESS
     if exception:
@@ -345,6 +353,42 @@ def determine_call_status(call: tsi.CallSchema) -> CallStatus:
     if call.exception is None:
         return "completed"
     return "failed"
+
+
+def eval_run_refs_from_call(
+    call: tsi.CallSchema, attributes: dict[str, Any]
+) -> tuple[str, str]:
+    """Return (evaluation_ref, model_ref) for an evaluation-run call.
+
+    Both refs are stored in two places: under
+    ``attributes.weave.{evaluation,model}`` (set by ``evaluation_run_create``,
+    used as a denormalization for filterable list queries) and on
+    ``call.inputs`` as ``self``/``model`` (the canonical inputs of every
+    ``Evaluation.evaluate`` call). Standard evaluations and imperative
+    evaluations (``weave.EvaluationLogger``) bypass ``evaluation_run_create``
+    and only populate ``call.inputs``, so we must fall back to inputs to
+    return a non-empty pair for those cases. Mirrors the pattern in
+    ``eval_results_helpers.py``: ``inputs.get("self") or inputs.get("this")``.
+    """
+    from weave.trace_server import constants
+
+    inputs = call.inputs if isinstance(call.inputs, dict) else {}
+
+    def _str_or_none(v: Any) -> str | None:
+        return v if isinstance(v, str) and v else None
+
+    evaluation_ref = (
+        _str_or_none(attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY))
+        or _str_or_none(inputs.get("self"))
+        or _str_or_none(inputs.get("this"))
+        or ""
+    )
+    model_ref = (
+        _str_or_none(attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY))
+        or _str_or_none(inputs.get("model"))
+        or ""
+    )
+    return evaluation_ref, model_ref
 
 
 def op_name_matches(op_name: str | None, expected_name: str) -> bool:

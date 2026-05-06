@@ -1167,6 +1167,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     ) -> tsi.EvaluationStatusRes:
         raise NotImplementedError("evaluation_status is not implemented")
 
+    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
+        raise NotImplementedError("rescore is not implemented")
+
     # === V2 APIs ===
 
     @validate_call
