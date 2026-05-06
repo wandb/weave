@@ -200,6 +200,10 @@ class ObjectRef(RefWithExtra):
 
         return self._digest
 
+    @property
+    def is_digest_resolved(self) -> bool:
+        return not isinstance(self._digest, Future)
+
     def __post_init__(self) -> None:
         if isinstance(self._digest, str):
             refs_internal.validate_no_slashes(self._digest, "digest")

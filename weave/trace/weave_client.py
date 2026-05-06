@@ -331,9 +331,6 @@ BACKGROUND_PARALLELISM_MIX = 0.5
 MAX_AUTO_PARALLELISM = 32
 # Extra threads beyond CPU count for I/O-bound work
 PARALLELISM_CPU_PADDING = 4
-# This size is correlated with the maximum single row insert size
-# in clickhouse, which is currently unavoidable.
-MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
@@ -816,10 +813,10 @@ class WeaveClient:
         # call after the first). Reading `.uri` directly is a no-op string
         # build for an already-resolved ref.
         op_name_future: str | Future[str]
-        if isinstance(op_def_ref._digest, Future):
-            op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
-        else:
+        if op_def_ref.is_digest_resolved:
             op_name_future = op_def_ref.uri
+        else:
+            op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
 
         # Get thread_id from context
         thread_id = call_context.get_thread_id()

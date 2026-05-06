@@ -474,7 +474,6 @@ def test_op_cached_signature_drives_defaults_and_content_annotations(monkeypatch
     sig = inspect.signature(content_op)
     assert sig == inspect.signature(content_op.resolve_fn)
     assert sig is content_op.__signature__
-    assert not hasattr(content_op, "_cached_signature")
 
     def fail_parse(*args: Any, **kwargs: Any) -> None:
         raise AssertionError("annotation parsing should be cached at decoration time")

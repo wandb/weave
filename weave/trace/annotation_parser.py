@@ -85,7 +85,7 @@ def try_parse_annotation_without_hint(
     annotation_string: str,
 ) -> ContentAnnotation | None:
     """The function expects the string to be of the form:
-    typing.Annotated[<SomeType>, <class 'weave.type_handlers.Content.content.Content'>].
+    typing.Annotated[<SomeType>, <class 'weave.type_wrappers.Content.content.Content'>].
 
     where <SomeType> is a string or PathLike type
 
