@@ -462,7 +462,13 @@ def get_custom_provider_info(
         project_id: The project ID
         provider_name: The provider name (e.g., "ollama", "openrouter_xai")
         model_name: The object_id for ProviderModel lookup (e.g., "ollama-gemma2_2b")
-        obj_read_func: Function to read objects from the database
+        obj_read_func: Function to read objects from the database. The cache
+            key does NOT include this callable's identity, so callers must
+            pass a stable reader (typically `self.obj_read`) for a given
+            (project_id, provider_name, model_name) — otherwise a later call
+            with a different reader will return data resolved by an earlier
+            reader.
+
     Returns:
         CustomProviderInfo containing:
         - base_url: The base URL for the provider
@@ -471,17 +477,21 @@ def get_custom_provider_info(
         - return_type: The return type for the provider
         - actual_model_name: The actual model name to use for the API call
     """
-    cache_key = (project_id, provider_name, model_name)
-    with _custom_provider_cache_lock:
-        cached = _custom_provider_cache.get(cache_key)
-    if cached is not None:
-        return cached
-
+    # Validate the request context BEFORE consulting the cache so that callers
+    # without an active secret_fetcher get a consistent error and any
+    # per-request side effects of having a fetcher in scope are not skipped
+    # for cached entries.
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
         raise InvalidRequest(
             f"No secret fetcher found, cannot fetch API key for model {model_name}"
         )
+
+    cache_key = (project_id, provider_name, model_name)
+    with _custom_provider_cache_lock:
+        cached = _custom_provider_cache.get(cache_key)
+    if cached is not None:
+        return cached
 
     # Fetch the ProviderModel object
     try:

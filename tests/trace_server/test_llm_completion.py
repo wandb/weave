@@ -1838,40 +1838,57 @@ def custom_provider_fixture():
         _secret_fetcher_context.reset(token)
 
 
-def test_get_custom_provider_info_caches_within_ttl(custom_provider_fixture):
-    """Second call within the TTL must hit cache: no extra obj_read or secret fetch."""
+@pytest.mark.parametrize(
+    (
+        "override_project",
+        "expected_obj_reads",
+        "expected_secret_fetches",
+        "same_instance",
+    ),
+    [
+        # Same key on the second call -> cache hit; only the first call resolves.
+        (False, 2, 1, True),
+        # Different project_id -> distinct cache key; both calls resolve.
+        (True, 4, 2, False),
+    ],
+    ids=["cache_hit_within_ttl", "distinct_keys_isolate"],
+)
+def test_get_custom_provider_info_cache_behavior(
+    custom_provider_fixture,
+    override_project,
+    expected_obj_reads,
+    expected_secret_fetches,
+    same_instance,
+):
+    """Cache hits within TTL skip resolution; distinct keys do not collide."""
     project_id, provider_id, model_object_id, obj_read, secret_fetcher = (
         custom_provider_fixture
     )
 
     first = get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
+    second_project = "other-project" if override_project else project_id
     second = get_custom_provider_info(
-        project_id, provider_id, model_object_id, obj_read
+        second_project, provider_id, model_object_id, obj_read
     )
 
-    # Same instance returned -> served from cache, not recomputed.
-    assert first is second
-    # Two obj_read calls per miss (Provider + ProviderModel); one miss total.
-    assert obj_read.call_count == 2
-    assert secret_fetcher.fetch.call_count == 1
+    assert (first is second) is same_instance
+    assert obj_read.call_count == expected_obj_reads
+    assert secret_fetcher.fetch.call_count == expected_secret_fetches
 
 
-def test_get_custom_provider_info_cache_key_isolates(custom_provider_fixture):
-    """Different (project_id, provider, model) tuples must not collide in the cache."""
-    project_id, provider_id, model_object_id, obj_read, secret_fetcher = (
-        custom_provider_fixture
-    )
+def test_get_custom_provider_info_requires_secret_fetcher_on_cache_hit(
+    custom_provider_fixture,
+):
+    """A cache hit must not bypass the secret_fetcher-required guard."""
+    project_id, provider_id, model_object_id, obj_read, _ = custom_provider_fixture
 
-    a = get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
-    # Different project_id -> different cache key, even with same provider/model.
-    b = get_custom_provider_info(
-        "other-project", provider_id, model_object_id, obj_read
-    )
+    # Populate the cache while the fixture's fetcher is in context.
+    get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
 
-    assert a is not b
-    # Each unique key triggered a fresh resolution: 2 obj_read pairs, 2 secret fetches.
-    assert obj_read.call_count == 4
-    assert secret_fetcher.fetch.call_count == 2
+    # Drop the fetcher; a subsequent call must still raise rather than serve cache.
+    _secret_fetcher_context.set(None)
+    with pytest.raises(InvalidRequest, match="No secret fetcher found"):
+        get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
 
 
 if __name__ == "__main__":
