@@ -15,6 +15,8 @@ import pytest
 from pydantic import ValidationError
 
 from weave.trace_server.trace_server_interface import (
+    CallReadRes,
+    CallSchema,
     EvaluateModelArgs,
     EvalWorkerJob,
     PredictionReadRes,
@@ -113,6 +115,29 @@ def _make_prediction(prediction_id: str, inputs: dict, output) -> PredictionRead
     )
 
 
+def _fake_call_read_res(prediction_id: str, parent_id: str = "pas-1") -> CallReadRes:
+    """Minimal CallReadRes for the rescore worker's parent-id lookup.
+
+    The standard-path generator reads each prediction's call to find its parent
+    (the predict_and_score call); these tests don't exercise the trace server,
+    so we return a hand-built CallSchema with a synthetic parent_id.
+    """
+    import datetime
+
+    return CallReadRes(
+        call=CallSchema(
+            id=prediction_id,
+            project_id="e/p",
+            op_name="weave:///e/p/op/prediction:1",
+            trace_id="trace-1",
+            parent_id=parent_id,
+            started_at=datetime.datetime(2026, 5, 6, 0, 0, 0),
+            attributes={},
+            inputs={},
+        )
+    )
+
+
 def _make_fake_scorer(name: str, return_value):
     """Build a minimal fake Scorer-like object that passes isinstance check."""
     from weave.flow.scorer import Scorer
@@ -144,6 +169,7 @@ async def test_rescore_predictions_score_create_called_per_prediction_per_scorer
 
     mock_server = MagicMock()
     mock_server.prediction_list.return_value = iter(predictions)
+    mock_server.call_read.side_effect = lambda req: _fake_call_read_res(req.id)
     mock_server.score_create = MagicMock()
     mock_server.evaluation_run_finish = MagicMock()
     mock_server.obj_read = MagicMock()  # for _assert_safe_ref
@@ -209,6 +235,7 @@ async def test_rescore_predictions_summary_keyed_by_scorer_name_not_ref():
 
     mock_server = MagicMock()
     mock_server.prediction_list.return_value = iter([prediction])
+    mock_server.call_read.side_effect = lambda req: _fake_call_read_res(req.id)
     mock_server.score_create = MagicMock()
     captured_finish_calls = []
 
@@ -341,6 +368,7 @@ async def test_rescore_predictions_pagination_exhausts_all_pages():
 
     mock_server = MagicMock()
     mock_server.prediction_list.side_effect = fake_prediction_list
+    mock_server.call_read.side_effect = lambda req: _fake_call_read_res(req.id)
     mock_server.score_create = MagicMock()
     mock_server.evaluation_run_finish = MagicMock()
 
