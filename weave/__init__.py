@@ -53,6 +53,7 @@ from weave.agent.agent import AgentState as AgentState
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
+from weave.evaluation.rescore import rescore_evaluation
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.flow.model import Model
 from weave.flow.monitor import ClassifierMonitor, Monitor
@@ -159,6 +160,7 @@ __all__ = [
     "remove_aliases",
     "remove_tags",
     "require_current_call",
+    "rescore_evaluation",
     "set_aliases",
     "set_view",
     "start_llm",
