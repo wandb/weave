@@ -87,14 +87,7 @@ def make_derived_summary_fields(
     """
     weave_summary = summary.pop("weave", {})
 
-    status = tsi.TraceStatus.SUCCESS
-    if exception:
-        status = tsi.TraceStatus.ERROR
-    elif ended_at is None:
-        status = tsi.TraceStatus.RUNNING
-    elif summary.get("status_counts", {}).get(tsi.TraceStatus.ERROR, 0) > 0:
-        status = tsi.TraceStatus.DESCENDANT_ERROR
-    weave_summary["status"] = status
+    weave_summary["status"] = derive_call_summary_status(summary, ended_at, exception)
 
     if ended_at and started_at:
         days = (ended_at - started_at).days
@@ -115,6 +108,21 @@ def make_derived_summary_fields(
 
     summary["weave"] = weave_summary
     return cast(tsi.SummaryMap, summary)
+
+
+def derive_call_summary_status(
+    summary: dict[str, Any],
+    ended_at: datetime.datetime | None,
+    exception: str | None,
+) -> tsi.TraceStatus:
+    """Return the public summary.weave.status value for stored call state."""
+    if exception:
+        return tsi.TraceStatus.ERROR
+    if ended_at is None:
+        return tsi.TraceStatus.RUNNING
+    if summary.get("status_counts", {}).get(tsi.TraceStatus.ERROR, 0) > 0:
+        return tsi.TraceStatus.DESCENDANT_ERROR
+    return tsi.TraceStatus.SUCCESS
 
 
 def empty_str_to_none(val: str | None) -> str | None:

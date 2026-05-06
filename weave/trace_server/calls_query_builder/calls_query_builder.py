@@ -1871,40 +1871,12 @@ def _handle_status_summary_field(
     use_agg_fn: bool = True,
     read_table: "ReadTable" = ReadTable.CALLS_MERGED,
 ) -> str:
-    # Status logic:
-    # - If exception is not null -> ERROR
-    # - Else if ended_at is null -> RUNNING
-    # - Else -> SUCCESS
-    exception_field = get_field_by_name("exception")
-    ended_at_field = get_field_by_name("ended_at")
-    status_counts_field = get_field_by_name("summary.status_counts.error")
-
-    exception_sql = _field_as_sql_maybe_agg(
-        exception_field, pb, table_alias, use_agg_fn
-    )
-    ended_to_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
-    status_counts_sql = _field_as_sql_maybe_agg(
-        status_counts_field, pb, table_alias, use_agg_fn, cast="int"
-    )
-
-    error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
-    running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
-    success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
-    descendant_error_param = pb.add_param(tsi.TraceStatus.DESCENDANT_ERROR.value)
-
-    exception_check = exception_field.null_check_sql(
-        pb, table_alias, read_table, use_agg_fn=use_agg_fn, negate=True
-    )
-    ended_at_null = ended_at_field.null_check_sql(
-        pb, table_alias, read_table, use_agg_fn=use_agg_fn
-    )
-
-    return f"""CASE
-        WHEN {exception_check} THEN {param_slot(error_param, "String")}
-        WHEN IFNULL({status_counts_sql}, 0) > 0 THEN {param_slot(descendant_error_param, "String")}
-        WHEN {ended_at_null} THEN {param_slot(running_param, "String")}
-        ELSE {param_slot(success_param, "String")}
-    END"""
+    status_field = CallsMergedAggField(field="status", agg_fn="any")
+    status_sql = status_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
+    if read_table == ReadTable.CALLS_MERGED:
+        running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
+        return f"ifNull({status_sql}, {param_slot(running_param, 'String')})"
+    return status_sql
 
 
 # Handler function for latency_ms summary field
@@ -2963,6 +2935,7 @@ def build_calls_complete_update_end_query(
     exception_param: str,
     output_dump_param: str,
     summary_dump_param: str,
+    status_param: str,
     output_refs_param: str,
     wb_run_step_end_param: str,
     started_at_param: str | None = None,
@@ -2978,6 +2951,7 @@ def build_calls_complete_update_end_query(
         exception_param (str): Param slot key for exception.
         output_dump_param (str): Param slot key for output_dump.
         summary_dump_param (str): Param slot key for summary_dump.
+        status_param (str): Param slot key for precomputed summary.weave.status.
         output_refs_param (str): Param slot key for output_refs.
         wb_run_step_end_param (str): Param slot key for wb_run_step_end.
         started_at_param (str | None): Optional param slot key for started_at
@@ -3021,6 +2995,7 @@ def build_calls_complete_update_end_query(
             exception = {{{exception_param}:String}},
             output_dump = {{{output_dump_param}:String}},
             summary_dump = {{{summary_dump_param}:String}},
+            status = {{{status_param}:String}},
             output_refs = {{{output_refs_param}:Array(String)}},
             wb_run_step_end = {{{wb_run_step_end_param}:UInt64}},
             updated_at = now64(3)

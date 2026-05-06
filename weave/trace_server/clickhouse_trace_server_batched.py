@@ -283,6 +283,7 @@ from weave.trace_server.trace_server_common import (
     MAX_FILTER_LENGTH,
     DynamicBatchProcessor,
     LRUCache,
+    derive_call_summary_status,
     determine_call_status,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -1035,7 +1036,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         output = end_call.output
         output_refs = extract_refs_from_values(output)
         output_dump = any_value_to_dump(output)
-        summary_dump = dict_value_to_dump(dict(end_call.summary))
+        summary = dict(end_call.summary)
+        summary_dump = dict_value_to_dump(summary)
+        status = derive_call_summary_status(
+            summary, end_call.ended_at, end_call.exception
+        ).value
 
         # Convert datetimes to microseconds since epoch for DateTime64(6) parameters.
         # clickhouse-connect truncates datetime objects to seconds when passing as params,
@@ -1052,6 +1057,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         output_dump_param = pb.add_param(output_dump)
         summary_dump_param = pb.add_param(summary_dump)
+        status_param = pb.add_param(status)
         output_refs_param = pb.add_param(output_refs)
         wb_run_step_end_param = pb.add_param(
             ch_sentinel_values.to_ch_value("wb_run_step_end", end_call.wb_run_step_end)
@@ -1071,6 +1077,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             exception_param=exception_param,
             output_dump_param=output_dump_param,
             summary_dump_param=summary_dump_param,
+            status_param=status_param,
             output_refs_param=output_refs_param,
             wb_run_step_end_param=wb_run_step_end_param,
             started_at_param=started_at_param,

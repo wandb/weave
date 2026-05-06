@@ -873,7 +873,7 @@ def test_query_with_summary_weave_status_sort() -> None:
             any(calls_merged.exception) AS exception,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
+        PREWHERE calls_merged.project_id = {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -886,25 +886,11 @@ def test_query_with_summary_weave_status_sort() -> None:
                ))
             ))
         )
-        ORDER BY CASE
-            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-            WHEN IFNULL(
-                toInt64OrNull(
-                    coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')
-                ),
-                0
-            ) > 0 THEN {pb_4:String}
-            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
-            ELSE {pb_3:String}
-            END ASC
+        ORDER BY ifNull(any(calls_merged.status), {pb_0:String}) ASC
         """,
         {
-            "pb_0": '$."status_counts"."error"',
-            "pb_1": "error",
-            "pb_2": "running",
-            "pb_3": "success",
-            "pb_4": "descendant_error",
-            "pb_5": "project",
+            "pb_0": "running",
+            "pb_1": "project",
         },
     )
 
@@ -935,30 +921,17 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
             any(calls_merged.exception) AS exception,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
+        PREWHERE calls_merged.project_id = {pb_2:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (((CASE
-                WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
-                ELSE {pb_3:String}
-            END = {pb_3:String}))
+        HAVING (((ifNull(any(calls_merged.status), {pb_0:String}) = {pb_1:String}))
         AND ((any(calls_merged.deleted_at) IS NULL))
         AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
-        ORDER BY CASE
-            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-            WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
-            ELSE {pb_3:String}
-        END DESC
+        ORDER BY ifNull(any(calls_merged.status), {pb_0:String}) DESC
         """,
         {
-            "pb_0": '$."status_counts"."error"',
-            "pb_1": "error",
-            "pb_2": "running",
-            "pb_3": "success",
-            "pb_4": "descendant_error",
-            "pb_5": "project",
+            "pb_0": "running",
+            "pb_1": "success",
+            "pb_2": "project",
         },
     )
 
@@ -1719,18 +1692,13 @@ def test_summary_weave_field_select_backtick_quoting(
                             regexpExtract(toString(any({expected_table}.op_name)), '/([^/:]*):', 1)
                     ELSE any({expected_table}.op_name)
                 END AS `summary.weave.trace_name`,
-                CASE
-                    WHEN any({expected_table}.exception) IS NOT NULL THEN {{pb_1:String}}
-                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any({expected_table}.summary_dump), {{pb_0:String}}), 'null'), '')), 0) > 0 THEN {{pb_4:String}}
-                    WHEN any({expected_table}.ended_at) IS NULL THEN {{pb_2:String}}
-                    ELSE {{pb_3:String}}
-                END AS `summary.weave.status`,
+                ifNull(any({expected_table}.status), {{pb_0:String}}) AS `summary.weave.status`,
                 CASE
                     WHEN any({expected_table}.ended_at) IS NULL THEN NULL
                     ELSE (toUnixTimestamp64Milli(any({expected_table}.ended_at)) - toUnixTimestamp64Milli(any({expected_table}.started_at)))
                 END AS `summary.weave.latency_ms`
             FROM {expected_table}
-            PREWHERE {expected_table}.project_id = {{pb_5:String}}
+            PREWHERE {expected_table}.project_id = {{pb_1:String}}
             GROUP BY ({expected_table}.project_id, {expected_table}.id)
             HAVING (
                 ((any({expected_table}.deleted_at) IS NULL))
@@ -1739,12 +1707,8 @@ def test_summary_weave_field_select_backtick_quoting(
             )
             """,
             {
-                "pb_0": '$."status_counts"."error"',
-                "pb_1": "error",
-                "pb_2": "running",
-                "pb_3": "success",
-                "pb_4": "descendant_error",
-                "pb_5": "project",
+                "pb_0": "running",
+                "pb_1": "project",
             },
         )
     else:
@@ -1759,33 +1723,21 @@ def test_summary_weave_field_select_backtick_quoting(
                             regexpExtract(toString({expected_table}.op_name), '/([^/:]*):', 1)
                     ELSE {expected_table}.op_name
                 END AS `summary.weave.trace_name`,
+                {expected_table}.status AS `summary.weave.status`,
                 CASE
-                    WHEN {expected_table}.exception != {{pb_6:String}} THEN {{pb_2:String}}
-                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE({expected_table}.summary_dump, {{pb_1:String}}), 'null'), '')), 0) > 0 THEN {{pb_5:String}}
-                    WHEN {expected_table}.ended_at = {{pb_7:DateTime64(6)}} THEN {{pb_3:String}}
-                    ELSE {{pb_4:String}}
-                END AS `summary.weave.status`,
-                CASE
-                    WHEN {expected_table}.ended_at = {{pb_8:DateTime64(6)}} THEN NULL
+                    WHEN {expected_table}.ended_at = {{pb_1:DateTime64(6)}} THEN NULL
                     ELSE (toUnixTimestamp64Milli({expected_table}.ended_at) - toUnixTimestamp64Milli({expected_table}.started_at))
                 END AS `summary.weave.latency_ms`
             FROM {expected_table}
-            PREWHERE {expected_table}.project_id = {{pb_10:String}}
+            PREWHERE {expected_table}.project_id = {{pb_3:String}}
             WHERE 1
-              AND ({expected_table}.deleted_at = {{pb_9:DateTime64(3)}})
+              AND ({expected_table}.deleted_at = {{pb_2:DateTime64(3)}})
             """,
             {
                 "pb_0": "",
-                "pb_1": '$."status_counts"."error"',
-                "pb_2": "error",
-                "pb_3": "running",
-                "pb_4": "success",
-                "pb_5": "descendant_error",
-                "pb_6": "",
-                "pb_7": SENTINEL_EPOCH,
-                "pb_8": SENTINEL_EPOCH,
-                "pb_9": SENTINEL_EPOCH,
-                "pb_10": "project",
+                "pb_1": SENTINEL_EPOCH,
+                "pb_2": SENTINEL_EPOCH,
+                "pb_3": "project",
             },
         )
 
@@ -1885,6 +1837,7 @@ def test_build_calls_complete_update_end_query() -> None:
         exception_param="exception",
         output_dump_param="output_dump",
         summary_dump_param="summary_dump",
+        status_param="status",
         output_refs_param="output_refs",
         wb_run_step_end_param="wb_run_step_end",
     )
@@ -1896,6 +1849,7 @@ def test_build_calls_complete_update_end_query() -> None:
             exception = {exception:String},
             output_dump = {output_dump:String},
             summary_dump = {summary_dump:String},
+            status = {status:String},
             output_refs = {output_refs:Array(String)},
             wb_run_step_end = {wb_run_step_end:UInt64},
             updated_at = now64(3)
@@ -3290,7 +3244,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.exception AS exception,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_12:String}
+        PREWHERE calls_complete.project_id = {pb_5:String}
         WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
                 OR (calls_complete.op_name IS NULL))
             AND (calls_complete.trace_id = {pb_4:String}
@@ -3299,17 +3253,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:Int64}))
             AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
         )
-        ORDER BY CASE
-            WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
-            WHEN IFNULL(
-                toInt64OrNull(
-                    coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
-                ),
-                0
-            ) > 0 THEN {pb_9:String}
-            WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
-            ELSE {pb_8:String}
-            END ASC
+        ORDER BY calls_complete.status ASC
         LIMIT 100
         """,
         {
@@ -3318,14 +3262,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_2": SENTINEL_EPOCH,
             "pb_3": ["my_op"],
             "pb_4": "trace_abc",
-            "pb_5": '$."status_counts"."error"',
-            "pb_6": "error",
-            "pb_7": "running",
-            "pb_8": "success",
-            "pb_9": "descendant_error",
-            "pb_10": "",
-            "pb_11": SENTINEL_EPOCH,
-            "pb_12": "project",
+            "pb_5": "project",
         },
     )
 
@@ -3520,36 +3457,19 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         """
         SELECT
             calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_10:String}
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_3:String}
         WHERE 1
           AND (
-            (((CASE
-                WHEN calls_complete.exception != {pb_5:String} THEN {pb_1:String}
-                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                WHEN calls_complete.ended_at = {pb_6:DateTime64(6)} THEN {pb_2:String}
-                ELSE {pb_3:String}
-            END = {pb_3:String})
+            (((calls_complete.status = {pb_0:String})
             OR
-            (CASE
-                WHEN calls_complete.exception != {pb_7:String} THEN {pb_1:String}
-                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                WHEN calls_complete.ended_at = {pb_8:DateTime64(6)} THEN {pb_2:String}
-                ELSE {pb_3:String}
-            END = {pb_1:String})))
-       AND ((calls_complete.deleted_at = {pb_9:DateTime64(3)})))
+            (calls_complete.status = {pb_1:String})))
+       AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
         """,
         {
-            "pb_0": '$."status_counts"."error"',
+            "pb_0": "success",
             "pb_1": "error",
-            "pb_2": "running",
-            "pb_3": "success",
-            "pb_4": "descendant_error",
-            "pb_5": "",
-            "pb_6": SENTINEL_EPOCH,
-            "pb_7": "",
-            "pb_8": SENTINEL_EPOCH,
-            "pb_9": SENTINEL_EPOCH,
-            "pb_10": "project",
+            "pb_2": SENTINEL_EPOCH,
+            "pb_3": "project",
         },
     )
 
@@ -4206,8 +4126,8 @@ def test_hardcoded_filters_calls_complete() -> None:
     )
 
 
-def test_status_sort_calls_complete_uses_sentinels() -> None:
-    """Verify status computation sort uses sentinel checks on calls_complete."""
+def test_status_sort_calls_complete_uses_materialized_status() -> None:
+    """Verify status sort uses the persisted calls_complete.status column."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
     cq.add_order("summary.weave.status", "asc")
@@ -4215,26 +4135,14 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
         cq,
         """
         SELECT calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_8:String}
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_1:String}
         WHERE 1
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
-        ORDER BY CASE
-                     WHEN calls_complete.exception != {pb_6:String} THEN {pb_2:String}
-                     WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_1:String}), 'null'), '')), 0) > 0 THEN {pb_5:String}
-                     WHEN calls_complete.ended_at = {pb_7:DateTime64(6)} THEN {pb_3:String}
-                     ELSE {pb_4:String}
-                 END ASC
+        ORDER BY calls_complete.status ASC
         """,
         {
             "pb_0": SENTINEL_EPOCH,
-            "pb_1": '$."status_counts"."error"',
-            "pb_2": "error",
-            "pb_3": "running",
-            "pb_4": "success",
-            "pb_5": "descendant_error",
-            "pb_6": "",
-            "pb_7": SENTINEL_EPOCH,
-            "pb_8": "project",
+            "pb_1": "project",
         },
     )
 

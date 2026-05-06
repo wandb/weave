@@ -56,6 +56,7 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
         exception_param="x",
         output_dump_param="o",
         summary_dump_param="sm",
+        status_param="st",
         output_refs_param="or",
         wb_run_step_end_param="w",
         cluster_name=CLUSTER,
