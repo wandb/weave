@@ -340,8 +340,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             "pb_4": "my_user_id",
             "pb_5": ["a", "b"],
             "pb_6": "111111111111",
-            "pb_7": '%"hello"%',
-            "pb_8": "%true%",
+            "pb_7": '%"param"%:%"val"%:%"hello"%',
+            "pb_8": '%"param"%:%"bool"%:%true%',
             "pb_9": "project",
         },
     )
@@ -850,7 +850,7 @@ def test_calls_query_with_predicate_filters() -> None:
             "pb_0": '$."param"."val"',
             "pb_1": "hello",
             "pb_2": "my_user_id",
-            "pb_3": '%"hello"%',
+            "pb_3": '%"param"%:%"val"%:%"hello"%',
             "pb_4": "project",
         },
     )
@@ -1027,8 +1027,8 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
             "pb_2": '$."result"',
             "pb_3": "success",
             "pb_4": "my_user_id",
-            "pb_5": '%"hello"%',
-            "pb_6": '%"success"%',
+            "pb_5": '%"param"%:%"val"%:%"hello"%',
+            "pb_6": '%"result"%:%"success"%',
             "pb_7": "project",
         },
     )
@@ -1084,8 +1084,8 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
             "pb_1": "hello",
             "pb_2": '$."result"',
             "pb_3": "success",
-            "pb_4": '%"hello"%',
-            "pb_5": '%"success"%',
+            "pb_4": '%"param"%:%"val"%:%"hello"%',
+            "pb_5": '%"result"%:%"success"%',
             "pb_6": "project",
         },
     )
@@ -1185,8 +1185,8 @@ def test_calls_query_with_complex_heavy_filters() -> None:
             "pb_6": '$."param"."message"',
             "pb_7": "completed",
             "pb_8": "my_user_id",
-            "pb_9": '%"hello"%',
-            "pb_10": '%"success"%',
+            "pb_9": '%"param"%:%"val"%:%"hello"%',
+            "pb_10": '%"result"%:%"status"%:%"success"%',
             "pb_11": '%"%completed%"%',
             "pb_12": "project",
         },
@@ -1225,7 +1225,7 @@ def test_calls_query_with_like_optimization() -> None:
         """,
         {
             "pb_3": "project",
-            "pb_2": '%"hello"%',
+            "pb_2": '%"param"%:%"hello"%',
             "pb_1": "hello",
             "pb_0": '$."param"',
         },
@@ -1308,8 +1308,8 @@ def test_query_with_json_value_in_condition() -> None:
             "pb_1": "hello",
             "pb_2": "world",
             "pb_5": "project",
-            "pb_3": '%"hello"%',
-            "pb_4": '%"world"%',
+            "pb_3": '%"param"%:%"hello"%',
+            "pb_4": '%"param"%:%"world"%',
         },
     )
 
@@ -1350,7 +1350,7 @@ def test_calls_query_with_like_optimization_calls_complete() -> None:
             "pb_0": '$."param"',
             "pb_1": "hello",
             "pb_2": SENTINEL_EPOCH,
-            "pb_3": '%"hello"%',
+            "pb_3": '%"param"%:%"hello"%',
             "pb_4": "project",
         },
     )
@@ -1426,8 +1426,8 @@ def test_calls_query_with_like_optimization_in_calls_complete() -> None:
             "pb_1": "hello",
             "pb_2": "world",
             "pb_3": SENTINEL_EPOCH,
-            "pb_4": '%"hello"%',
-            "pb_5": '%"world"%',
+            "pb_4": '%"param"%:%"hello"%',
+            "pb_5": '%"param"%:%"world"%',
             "pb_6": "project",
         },
     )
@@ -1524,10 +1524,10 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             "pb_5": "0.7",
             "pb_6": "0.8",
             "pb_7": ["llm/openai", "llm/anthropic"],
-            "pb_8": '%"gpt-4"%',
+            "pb_8": '%"model"%:%"gpt-4"%',
             "pb_9": '%"%weather%"%',
-            "pb_10": '%"0.7"%',
-            "pb_11": '%"0.8"%',
+            "pb_10": '%"temperature"%:%"0.7"%',
+            "pb_11": '%"temperature"%:%"0.8"%',
             "pb_12": "project",
         },
     )
@@ -1569,7 +1569,7 @@ def test_calls_query_with_unoptimizable_or_condition() -> None:
             "pb_1": "hello",
             "pb_2": '$."param"."number"',
             "pb_3": 10,
-            "pb_4": '%"hello"%',
+            "pb_4": '%"param"%:%"val"%:%"hello"%',
             "pb_5": "project",
         },
     )
@@ -1678,8 +1678,8 @@ def test_whole_number_float_eq_emits_int_form_like_prefilter() -> None:
         {
             "pb_0": '$."x"',
             "pb_1": 1.0,
-            "pb_2": "%1.0%",
-            "pb_3": "%1%",
+            "pb_2": '%"x"%:%1.0%',
+            "pb_3": '%"x"%:%1%',
             "pb_4": "project",
         },
     )
@@ -1721,8 +1721,8 @@ def test_bool_eq_emits_numeric_form_like_prefilter() -> None:
         {
             "pb_0": '$."enabled"',
             "pb_1": True,
-            "pb_2": "%true%",
-            "pb_3": "%1%",
+            "pb_2": '%"enabled"%:%true%',
+            "pb_3": '%"enabled"%:%1%',
             "pb_4": "project",
         },
     )
@@ -2645,7 +2645,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
             "pb_3": "2024-03-01 00:00:00.000000",
             "pb_4": '$."message"',
             "pb_5": "hello",
-            "pb_6": '%"hello"%',
+            "pb_6": '%"message"%:%"hello"%',
             "pb_7": "2024-02-29 23:55:00.000000",
             "pb_8": "project",
         },
@@ -3333,7 +3333,7 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
         {
             "pb_0": '$."metrics.scorer.run"."value"',
             "pb_1": 42,
-            "pb_2": "%42%",
+            "pb_2": '%"metrics.scorer.run"%:%"value"%:%42%',
             "pb_3": "project",
         },
     )

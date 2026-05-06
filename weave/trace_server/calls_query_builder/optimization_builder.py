@@ -12,6 +12,7 @@ Optimization SQL is applied before GROUP BY, reducing memory usage and
 improving performance for complex conditions.
 """
 
+import json
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -421,7 +422,25 @@ def process_query_to_optimization_sql(
     )
 
 
-def _create_like_patterns_for_value(value: str | float | bool) -> list[str]:
+def _json_key_terms_for_like_path(extra_path: list[str] | None) -> list[str]:
+    """Return JSON object keys usable in an ordered, approximate LIKE pattern."""
+    if not extra_path:
+        return []
+
+    key_terms = []
+    for part in extra_path:
+        try:
+            int(part)
+            continue
+        except ValueError:
+            key_terms.append(json.dumps(part))
+    return key_terms
+
+
+def _create_like_patterns_for_value(
+    value: str | float | bool,
+    extra_path: list[str] | None = None,
+) -> list[str]:
     """Creates LIKE patterns for a value based on its type in JSON format.
 
     Returns a list because a single value can serialize to JSON in more than
@@ -429,25 +448,36 @@ def _create_like_patterns_for_value(value: str | float | bool) -> list[str]:
     matches JSON `1` numerically, so the prefilter must allow both `%1.0%`
     and `%1%` to avoid being stricter than the HAVING comparison.
     """
+    path_prefix = ""
+    key_terms = _json_key_terms_for_like_path(extra_path)
+    if key_terms:
+        path_prefix = "%:%".join(key_terms) + "%:%"
+
+    def pattern_for_value(value_pattern: str) -> str:
+        return f"%{path_prefix}{value_pattern}%"
+
     if isinstance(value, bool):
         # bool must be checked before int since bool is a subclass of int.
         # Boolean values are serialized as true/false without quotes in JSON.
         # The precise HAVING bool cast also accepts legacy numeric encodings
         # through toUInt8OrNull, so keep this prefilter at least as permissive.
-        return [f"%{str(value).lower()}%", f"%{1 if value else 0}%"]
+        return [
+            pattern_for_value(str(value).lower()),
+            pattern_for_value(str(1 if value else 0)),
+        ]
     if isinstance(value, str):
         # Boolean string literals are not wrapped in quotes in JSON payloads
         if value in {"true", "false"}:
-            return [f"%{value}%"]
-        return [f'%"{value}"%']
+            return [pattern_for_value(value)]
+        return [pattern_for_value(f'"{value}"')]
     # Numbers are not quoted in JSON.
     if isinstance(value, float) and value.is_integer():
         # JSON encoders typically drop the trailing `.0` (e.g. `1.0` -> `1`),
         # so a float literal with no fractional part must also match the
         # integer-form text. The HAVING toFloat64OrNull comparison filters
         # the over-included rows precisely.
-        return [f"%{value}%", f"%{int(value)}%"]
-    return [f"%{value}%"]
+        return [pattern_for_value(str(value)), pattern_for_value(str(int(value)))]
+    return [pattern_for_value(str(value))]
 
 
 def _create_like_condition(
@@ -537,7 +567,8 @@ def _create_like_optimized_eq_condition(
         get_field_by_name,
     )
 
-    field = get_field_by_name(field_operand.get_field_).field
+    structured_field = get_field_by_name(field_operand.get_field_)
+    field = structured_field.field
     literal_value = literal_operand.literal_
 
     if not _can_optimize_heavy_field(field):
@@ -547,7 +578,8 @@ def _create_like_optimized_eq_condition(
         # Empty/None values are not valid for LIKE optimization
         return None
 
-    like_patterns = _create_like_patterns_for_value(literal_value)
+    extra_path = getattr(structured_field, "extra_path", None)
+    like_patterns = _create_like_patterns_for_value(literal_value, extra_path)
     per_pattern = [
         _create_like_condition(field, p, pb, table_alias) for p in like_patterns
     ]
@@ -637,7 +669,8 @@ def _create_like_optimized_in_condition(
         get_field_by_name,
     )
 
-    field = get_field_by_name(operation.in_[0].get_field_).field
+    structured_field = get_field_by_name(operation.in_[0].get_field_)
+    field = structured_field.field
     if not _can_optimize_heavy_field(field):
         return None
 
@@ -654,7 +687,10 @@ def _create_like_optimized_in_condition(
         if isinstance(value_operand.literal_, str) and not value_operand.literal_:
             return None
 
-        for like_pattern in _create_like_patterns_for_value(value_operand.literal_):
+        extra_path = getattr(structured_field, "extra_path", None)
+        for like_pattern in _create_like_patterns_for_value(
+            value_operand.literal_, extra_path
+        ):
             like_condition = _create_like_condition(
                 field, like_pattern, pb, table_alias
             )
