@@ -31,6 +31,7 @@ EVALUATION_RUN_SCORE_ATTR_KEY = "score"
 EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY = "predict_call_id"
 EVALUATION_RUN_SCORER_ATTR_KEY = "scorer"
 GENAI_SPAN_REF_ATTR_KEY = "genai_span_ref"
+EVALUATION_RUN_SOURCE_ATTR_KEY = "source_evaluation_run_id"
 
 # Attribute keys for predictions
 PREDICTION_ATTR_KEY = "prediction"
