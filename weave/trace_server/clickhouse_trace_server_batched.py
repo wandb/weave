@@ -1789,13 +1789,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         # Partial-failure semantics: ClickHouse cannot atomically write
-        # across object_versions and aliases.  We insert the version row
-        # first, then the "latest" alias.  If the alias INSERT raises,
+        # across object_versions and aliases. We insert the version row
+        # first, then the "latest" alias. If the alias INSERT raises,
         # the new version is still readable by digest, but "latest"
         # continues to resolve to the prior version (because is_latest
-        # is derived from the aliases table).  The error propagates to
-        # the caller; a retry of obj_create with the same content takes
-        # the dedup path and re-asserts the alias.
+        # is derived from the aliases table). The error propagates to
+        # the caller; a retry of obj_create with the same content lands
+        # on the dedup path (the version row already exists) and
+        # re-asserts the alias — that is the documented recovery flow.
+        #
+        # Read-your-own-write: between the version-row insert and the
+        # alias insert there is a window in which obj_read("latest")
+        # returns the PRIOR digest. Callers that need read-your-own-write
+        # on "latest" must wait for obj_create to return successfully.
         digest_result = compute_object_digest_result(
             req.obj.val,
             req.obj.builtin_object_class,

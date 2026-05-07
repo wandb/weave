@@ -1,6 +1,10 @@
 import datetime
 import json
+import os
+import tempfile
 from unittest.mock import Mock, patch
+
+import pytest
 
 from weave.trace_server import sqlite_trace_server as slts
 from weave.trace_server import trace_server_interface as tsi
@@ -404,3 +408,151 @@ def test_sqlite_calls_query_empty_thread_ids_against_real_db():
         assert len(result) == 0
     finally:
         server.close()
+
+
+# ── "latest" alias write semantics ────────────────────────────────────
+
+
+@pytest.fixture
+def sqlite_db_path():
+    """Yield a fresh on-disk SQLite path; cleanup the file and the cached conn."""
+    fd, path = tempfile.mkstemp(suffix=".sqlite")
+    os.close(fd)
+    try:
+        yield path
+    finally:
+        slts.close_conn_cursor(path)
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+
+
+def _make_obj_create_req(project_id: str, object_id: str, val: dict) -> tsi.ObjCreateReq:
+    return tsi.ObjCreateReq(
+        obj=tsi.ObjSchemaForInsert(
+            project_id=project_id, object_id=object_id, val=val
+        )
+    )
+
+
+class _CursorProxy:
+    """Wraps a sqlite3.Cursor and raises on execute() when sql matches `fail_on`."""
+
+    def __init__(self, real_cursor, fail_on: str, error: Exception):
+        self._real = real_cursor
+        self._fail_on = fail_on
+        self._error = error
+
+    def execute(self, sql, *args, **kwargs):
+        if self._fail_on in sql:
+            raise self._error
+        return self._real.execute(sql, *args, **kwargs)
+
+    def __getattr__(self, item):
+        return getattr(self._real, item)
+
+
+def test_obj_create_atomic_on_alias_failure(sqlite_db_path):
+    """obj_create's IMMEDIATE TRANSACTION must roll back the version row when
+    the alias INSERT fails — neither the new objects row nor the alias row lands.
+    """
+    server = slts.SqliteTraceServer(sqlite_db_path)
+    server.setup_tables()
+
+    project_id = "p"
+    object_id = "atomic_obj"
+
+    # Establish a prior version so we can verify "latest" is unchanged.
+    r1 = server.obj_create(_make_obj_create_req(project_id, object_id, {"v": 1}))
+
+    # Replace the cached cursor with a proxy that raises on the alias INSERT.
+    # The version-row INSERT and the alias INSERT both run inside
+    # `BEGIN IMMEDIATE TRANSACTION`, so a failure before `conn.commit()`
+    # should roll back both.
+    real_conn, real_cursor = slts.get_conn_cursor(sqlite_db_path)
+    proxy = _CursorProxy(
+        real_cursor,
+        fail_on="INSERT OR REPLACE INTO aliases",
+        error=RuntimeError("simulated alias write failure"),
+    )
+    conn_map = slts._get_conn_map()
+    saved = conn_map[sqlite_db_path]
+    conn_map[sqlite_db_path] = slts.ConnCursor(real_conn, proxy)
+    try:
+        with pytest.raises(RuntimeError, match="simulated alias write failure"):
+            server.obj_create(_make_obj_create_req(project_id, object_id, {"v": 2}))
+    finally:
+        conn_map[sqlite_db_path] = saved
+        # Defensive: clear any lingering open transaction from the failed call.
+        try:
+            real_conn.rollback()
+        except Exception:
+            pass
+
+    # The version row for v=2 must NOT have landed (transaction rolled back).
+    real_cursor.execute(
+        "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?",
+        (project_id, object_id),
+    )
+    assert real_cursor.fetchone()[0] == 1
+
+    # And "latest" still resolves to the prior digest (only v=1 exists).
+    read_res = server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=object_id, digest="latest")
+    )
+    assert read_res.obj.digest == r1.digest
+
+
+def test_setup_tables_backfill_idempotent(sqlite_db_path):
+    """setup_tables runs a backfill INSERT OR IGNORE for "latest" on every
+    startup. Re-running it must not duplicate rows.
+    """
+    server = slts.SqliteTraceServer(sqlite_db_path)
+    server.setup_tables()
+
+    project_id = "p"
+    object_id = "idempotent_obj"
+    digest = "deadbeef"
+
+    # Insert an object directly, bypassing obj_create — so no alias row.
+    conn, cursor = slts.get_conn_cursor(sqlite_db_path)
+    cursor.execute(
+        """INSERT INTO objects (
+            project_id, object_id, created_at, kind, base_object_class,
+            leaf_object_class, refs, val_dump, digest, version_index,
+            is_latest, deleted_at, wb_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            project_id,
+            object_id,
+            datetime.datetime.now().isoformat(),
+            "object",
+            None,
+            None,
+            json.dumps([]),
+            json.dumps({"v": 1}),
+            digest,
+            0,
+            1,
+            None,
+            "",
+        ),
+    )
+    conn.commit()
+
+    # First setup_tables run should backfill exactly one alias row.
+    server.setup_tables()
+    cursor.execute(
+        "SELECT COUNT(*) FROM aliases WHERE project_id = ? AND object_id = ? AND alias = 'latest'",
+        (project_id, object_id),
+    )
+    assert cursor.fetchone()[0] == 1
+
+    # Repeat setup_tables — INSERT OR IGNORE must keep the count at 1.
+    server.setup_tables()
+    cursor.execute(
+        "SELECT COUNT(*) FROM aliases WHERE project_id = ? AND object_id = ? AND alias = 'latest'",
+        (project_id, object_id),
+    )
+    assert cursor.fetchone()[0] == 1

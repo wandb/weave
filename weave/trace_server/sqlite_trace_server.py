@@ -499,6 +499,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # already have one (legacy data created before the explicit alias
         # write). INSERT OR IGNORE keeps real alias rows intact. Runs after
         # all DDL to avoid SQLite's "schema locked" interaction.
+        # Layering note: this is a one-shot data migration colocated in
+        # setup_tables for now because SQLite has no separate migration
+        # framework. It is idempotent under INSERT OR IGNORE; if a real
+        # SQLite migration system gets added later, lift this out.
         cursor.execute(
             """
             INSERT OR IGNORE INTO aliases (project_id, object_id, alias, digest, created_at)

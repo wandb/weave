@@ -1487,46 +1487,12 @@ def test_concurrent_queries_on_one_client_vs_session_autogeneration(
 
 
 # ── Explicit "latest" alias on obj_create ────────────────────────────
-
-
-def test_obj_create_writes_latest_alias(ch_server):
-    """obj_create should write a 'latest' alias pointing to the new digest."""
-    project_id = _make_project_id("alias")
-    obj_id = "alias_obj"
-
-    r = _obj_create(ch_server, project_id, obj_id, {"v": 1})
-
-    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
-    assert resolved == r.digest
-
-
-def test_obj_create_moves_latest_alias_on_new_version(ch_server):
-    """Each new version should move the 'latest' alias."""
-    project_id = _make_project_id("alias")
-    obj_id = "alias_move"
-
-    r1 = _obj_create(ch_server, project_id, obj_id, {"v": 1})
-    r2 = _obj_create(ch_server, project_id, obj_id, {"v": 2})
-
-    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
-    assert resolved == r2.digest
-    assert resolved != r1.digest
-
-
-def test_obj_create_moves_latest_alias_on_dedup(ch_server):
-    """Re-publishing old content should move 'latest' to the re-published digest."""
-    project_id = _make_project_id("alias")
-    obj_id = "alias_dedup"
-
-    r1 = _obj_create(ch_server, project_id, obj_id, {"v": "A"})
-    r2 = _obj_create(ch_server, project_id, obj_id, {"v": "B"})
-
-    # latest should point to B
-    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r2.digest
-
-    # Re-publish A (dedup hit) — latest should move to A
-    _obj_create(ch_server, project_id, obj_id, {"v": "A"})
-    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
+#
+# End-to-end alias behavior (write, move on new version, move on dedup) is
+# covered against both backends via tests/trace/test_obj_tags_aliases.py
+# (test_alias_resolution + test_republish_promotes_to_latest). The tests
+# below cover paths that are unique to the CH server: the obj_create_batch
+# API (CH-only) and the partial-failure contract on the alias write.
 
 
 def test_obj_create_batch_writes_latest_alias(ch_server):
@@ -1545,3 +1511,41 @@ def test_obj_create_batch_writes_latest_alias(ch_server):
             project_id, obj_in.object_id, "latest"
         )
         assert resolved == res.digest
+
+
+def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
+    """If the alias INSERT raises after the version row lands, the new version
+    is readable by digest but 'latest' continues to resolve to the prior version.
+
+    Documents the CH best-effort partial-failure contract for the
+    (object_versions insert, aliases insert) pair.
+    """
+    project_id = _make_project_id("alias")
+    obj_id = "alias_failure"
+
+    # Establish a prior latest.
+    r1 = _obj_create(ch_server, project_id, obj_id, {"v": 1})
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
+
+    # Simulate failure on the alias write for the next obj_create.
+    real_insert_aliases = ch_server._insert_aliases
+
+    def failing_insert_aliases(*args, **kwargs):
+        raise RuntimeError("simulated alias write failure")
+
+    ch_server._insert_aliases = failing_insert_aliases  # type: ignore[method-assign]
+    try:
+        with pytest.raises(RuntimeError, match="simulated alias write failure"):
+            _obj_create(ch_server, project_id, obj_id, {"v": 2})
+    finally:
+        ch_server._insert_aliases = real_insert_aliases  # type: ignore[method-assign]
+
+    # The version row landed (object_versions insert is unconditional in CH).
+    # The new digest is reachable directly, but 'latest' still resolves to v1
+    # because the alias write never completed.
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
+
+    # A retry of the same content takes the dedup path, succeeds, and
+    # promotes 'latest' to the new digest — the documented recovery flow.
+    r2_retry = _obj_create(ch_server, project_id, obj_id, {"v": 2})
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r2_retry.digest

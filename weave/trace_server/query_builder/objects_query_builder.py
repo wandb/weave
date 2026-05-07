@@ -163,6 +163,10 @@ class ObjectMetadataQueryBuilder:
         Use index to make the param_key unique if there are multiple digests.
         """
         if digest == "latest":
+            # `is_latest` here refers to the CTE-derived column in
+            # make_objects_query, which is itself a projection of the
+            # `latest` alias from the aliases table. It is not a column
+            # on object_versions on disk.
             return "is_latest = 1"
 
         (is_version, version_index) = digest_is_version_like(digest)
@@ -213,6 +217,9 @@ class ObjectMetadataQueryBuilder:
             self.parameters.update({param_key: object_ids})
 
     def add_is_latest_condition(self) -> None:
+        # `is_latest` here is the CTE-derived projection in make_objects_query
+        # (1 iff (project_id, object_id, digest) matches the current "latest"
+        # alias row). It is not a column on object_versions on disk.
         self._conditions.append("is_latest = 1")
 
     def add_is_op_condition(self, is_op: bool) -> None:

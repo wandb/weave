@@ -1562,6 +1562,19 @@ def test_alias_resolution(client: WeaveClient):
         assert weave.ref(f"resolve_multi:{alias}").get()["v"] == 0
 
 
+def test_aliases_list_contains_latest_after_publish(client: WeaveClient):
+    """A fresh project's aliases_list must include 'latest' after a single publish.
+
+    Focused regression: obj_create writes an explicit 'latest' alias, so
+    aliases_list reflects it without any user-set alias being involved.
+    """
+    weave.publish({"v": 0}, name="aliases_list_obj")
+    client.flush()
+
+    res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
+    assert "latest" in res.aliases
+
+
 def test_republish_promotes_to_latest(client: WeaveClient, monkeypatch):
     """Re-publishing existing content (dedup hit) should move 'latest' to that digest.
 
