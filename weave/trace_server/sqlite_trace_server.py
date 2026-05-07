@@ -319,6 +319,15 @@ def _build_sqlite_ref_filter_condition(column_name: str, refs: list[str]) -> str
     return "(" + " OR ".join(or_conditions) + ")"
 
 
+# is_latest is derived from the aliases table — the "latest" alias is the
+# single source of truth, written by every obj_create. This subquery is
+# used wherever the read path filters or projects "is the latest version".
+_IS_LATEST_FROM_ALIASES_SQL = (
+    "(objects.project_id, objects.object_id, objects.digest) IN "
+    "(SELECT project_id, object_id, digest FROM aliases WHERE alias = 'latest')"
+)
+
+
 class SqliteTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
@@ -1856,7 +1865,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 return tsi.ObjCreateRes(digest=digest, object_id=object_id)
 
             # Use IMMEDIATE transaction to acquire write lock immediately, preventing
-            # race conditions where concurrent transactions read stale version_index values
+            # race conditions where concurrent transactions read stale version_index values.
+            # The transaction also makes the version-row INSERT and the "latest" alias
+            # INSERT atomic — on failure neither lands, so derived is_latest stays
+            # consistent with the prior state.
             cursor.execute("BEGIN IMMEDIATE TRANSACTION")
             self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
             version_index = self._get_obj_version_index(cursor, project_id, object_id)
@@ -1950,7 +1962,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     @staticmethod
     def _make_digest_condition(digest: str) -> str:
         if digest == "latest":
-            return "is_latest = 1"
+            # is_latest is derived from the aliases table — match on the
+            # explicit "latest" alias row directly.
+            return _IS_LATEST_FROM_ALIASES_SQL
         else:
             (is_version, version_index) = digest_is_version_like(digest)
             if is_version:
@@ -2000,7 +2014,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 conds.append(f"object_id IN ({placeholders})")
                 parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
-                conds.append("is_latest = 1")
+                conds.append(_IS_LATEST_FROM_ALIASES_SQL)
             if req.filter.base_object_classes:
                 placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
                 conds.append(f"base_object_class IN ({placeholders})")
@@ -4971,22 +4985,30 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conditions.append("1 = 1")
         pred = " AND ".join(conditions)
         val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
+        # is_latest is derived from the aliases table — the "latest" alias
+        # is the source of truth, written on every obj_create. This keeps
+        # is_latest in lockstep with obj_read("latest") and
+        # objs_query(aliases=["latest"]) without a parallel computed signal.
         query = f"""
             SELECT
-                project_id,
-                object_id,
-                created_at,
-                kind,
-                base_object_class,
-                {val_dump_part},
-                digest,
-                version_index,
-                is_latest,
-                deleted_at,
-                wb_user_id,
-                leaf_object_class
+                objects.project_id,
+                objects.object_id,
+                objects.created_at,
+                objects.kind,
+                objects.base_object_class,
+                {val_dump_part.replace('val_dump', 'objects.val_dump') if not metadata_only else val_dump_part},
+                objects.digest,
+                objects.version_index,
+                CASE WHEN (objects.project_id, objects.object_id, objects.digest) IN (
+                    SELECT project_id, object_id, digest
+                    FROM aliases
+                    WHERE alias = 'latest'
+                ) THEN 1 ELSE 0 END AS is_latest,
+                objects.deleted_at,
+                objects.wb_user_id,
+                objects.leaf_object_class
             FROM objects
-            WHERE project_id = ? AND {pred}
+            WHERE objects.project_id = ? AND {pred}
         """
 
         if sort_by:

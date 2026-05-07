@@ -325,10 +325,10 @@ class ObjectMetadataQueryBuilder:
         #
         # object_versions_with_index: For each object, number its versions
         # 0, 1, 2, ... ordered by when each digest was first published
-        # (_first_created_at).  Also marks is_latest (1 for the most recently
-        # published non-deleted version; callers always filter with
-        # deleted_at IS NULL, so if all versions are deleted the query returns
-        # no results), and version_count.
+        # (_first_created_at).  is_latest is derived from the aliases table
+        # (the "latest" alias is the source of truth, written on every
+        # obj_create); it is 1 iff (project_id, object_id, digest) matches
+        # the current "latest" alias row for that object.
         query = f"""
 WITH latest_row_per_digest AS (
     SELECT
@@ -357,6 +357,14 @@ WITH latest_row_per_digest AS (
     ) AS fc USING (object_id, digest)
     WHERE ov.project_id = {{project_id: String}}{self.object_id_conditions_part}
 ),
+latest_alias_per_object AS (
+    SELECT project_id, object_id, argMax(digest, created_at) AS digest
+    FROM aliases
+    PREWHERE project_id = {{project_id: String}}
+    WHERE alias = 'latest'
+    GROUP BY project_id, object_id, alias
+    HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+),
 object_versions_with_index AS (
     SELECT
         *,
@@ -367,11 +375,11 @@ object_versions_with_index AS (
         count(*) OVER (
             PARTITION BY project_id, kind, object_id
         ) AS version_count,
-        row_number() OVER (
-            PARTITION BY project_id, kind, object_id
-            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
-        ) AS row_num,
-        if (row_num = 1, 1, 0) AS is_latest
+        if(
+            (project_id, object_id, digest) IN
+                (SELECT project_id, object_id, digest FROM latest_alias_per_object),
+            1, 0
+        ) AS is_latest
     FROM latest_row_per_digest
     WHERE rn = 1
 )

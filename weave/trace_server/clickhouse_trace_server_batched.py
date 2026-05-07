@@ -1788,6 +1788,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        # Partial-failure semantics: ClickHouse cannot atomically write
+        # across object_versions and aliases.  We insert the version row
+        # first, then the "latest" alias.  If the alias INSERT raises,
+        # the new version is still readable by digest, but "latest"
+        # continues to resolve to the prior version (because is_latest
+        # is derived from the aliases table).  The error propagates to
+        # the caller; a retry of obj_create with the same content takes
+        # the dedup path and re-asserts the alias.
         digest_result = compute_object_digest_result(
             req.obj.val,
             req.obj.builtin_object_class,
@@ -1842,6 +1850,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         performance increase for operations like OTel ingest.
 
         This should **ONLY** be used when we know an object will never have more than one version.
+
+        Partial-failure semantics: same as obj_create.  Version rows are
+        inserted first; if the subsequent batched alias INSERT fails, the
+        new versions exist but their "latest" alias is missing — readers
+        see the prior latest until the alias write succeeds on retry.
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
