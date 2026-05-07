@@ -448,7 +448,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._thread_local.calls_complete_batch = value
 
     @classmethod
-    def from_env(cls, use_async_insert: bool = False, **kwargs: Any) -> Self:
+    def from_env(cls, use_async_insert: bool | None = None, **kwargs: Any) -> Self:
+        # Default to the env-driven value so any consumer (workers, scripts, the
+        # trace-server) opts into async inserts via configuration alone. Pass
+        # `False` explicitly to force sync inserts.
+        if use_async_insert is None:
+            use_async_insert = wf_env.wf_clickhouse_use_async_insert()
         return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
