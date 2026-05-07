@@ -1,0 +1,20 @@
+// ESM-target tsconfig used by `scripts/build.mjs`. Extends the project root
+// tsconfig and pins `module: esnext` here so the format is self-evident
+// without having to chase the `extends` chain. Also excludes the CJS-only
+// file: `src/utils/commonJSLoader.ts` exists to patch the `require()`
+// chain for CJS hosts and has no role under ESM (where the loader hook in
+// `src/esm/instrument.mts` plays the equivalent role).
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "esnext"
+  },
+  "exclude": [
+    "examples",
+    "dist",
+    "node_modules",
+    "src/integrations/checkOpenai.ts",
+    "src/__tests__/**/*",
+    "src/utils/commonJSLoader.ts"
+  ]
+}

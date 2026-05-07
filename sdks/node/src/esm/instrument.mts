@@ -1,17 +1,16 @@
 // Preload entry for Weave ESM host support.
 //
-// Invoked via `node --import=weave/instrument <entry>`. The file is compiled
-// as CommonJS by the main tsconfig (same as every other file under `src/`);
-// Node's `--import` flag goes through the ESM resolver but transparently
-// handles CJS targets via ESM→CJS interop, so the preload still works for
-// ESM host apps. A future PR will switch this file to true ESM output; for
-// now it stays CJS to keep the build a single tsc invocation.
+// Invoked via `node --import=weave/instrument <entry>`. The `.mts` extension
+// marks this file as ESM-only — TypeScript always emits it as `.mjs`. The
+// CJS target's tsconfig also excludes `src/esm/**` so it is never even
+// considered by the CJS build pass. The `package.json` `"./instrument"`
+// exports map only routes the `import` condition, so consumers always get
+// the ESM build.
 //
 // Its job is to register an `import-in-the-middle` loader hook so the host's
 // ESM graph can be patched as modules are resolved.
 
 import {register} from 'node:module';
-import {pathToFileURL} from 'node:url';
 import {Hook, createAddHookMessageChannel} from 'import-in-the-middle';
 import {
   getESMInstrumentedModules,
@@ -30,11 +29,10 @@ import '../integrations/hooks';
 const {registerOptions, waitForAllMessagesAcknowledged} =
   createAddHookMessageChannel();
 
-register(
-  'import-in-the-middle/hook.mjs',
-  pathToFileURL(__filename),
-  registerOptions
-);
+// Pass `import.meta.url` as `register()`'s `parentURL` so it can resolve the
+// bare `'import-in-the-middle/hook.mjs'` specifier through `node_modules`
+// (omitting parentURL defaults to `data:/`, which can't).
+register('import-in-the-middle/hook.mjs', import.meta.url, registerOptions);
 
 (async () => {
   await waitForAllMessagesAcknowledged();

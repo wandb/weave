@@ -28,7 +28,8 @@ Outstanding Optimizations/Work:
 import logging
 import re
 from collections.abc import Callable, KeysView, Sequence
-from typing import Any, Literal, NamedTuple, cast
+from dataclasses import dataclass
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -83,7 +84,8 @@ CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 
 
-class FilterConditionsResult(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class FilterConditionsResult:
     """Result from building filter conditions.
 
     Attributes:
@@ -99,7 +101,8 @@ class FilterConditionsResult(NamedTuple):
     queue_id_filter: str | None
 
 
-class OrderLimitOffsetResult(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class OrderLimitOffsetResult:
     """Result from building ORDER BY, LIMIT, and OFFSET clauses.
 
     Attributes:
@@ -115,7 +118,8 @@ class OrderLimitOffsetResult(NamedTuple):
     needs_feedback: bool
 
 
-class QueryBodyResult(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class QueryBodyResult:
     """Result from building the query body (FROM through OFFSET)."""
 
     sql: str

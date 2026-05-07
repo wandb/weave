@@ -16,14 +16,20 @@ from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
 from weave.session.session import (
     LLM,
+    BlobPart,
     LogResult,
     MediaAttachment,
     Message,
     Reasoning,
+    ReasoningPart,
     Session,
     SubAgent,
+    TextPart,
     Tool,
+    ToolCallPart,
+    ToolCallResponsePart,
     Turn,
+    UriPart,
     Usage,
     get_current_llm,
     get_current_session,
@@ -568,6 +574,309 @@ class TestExecuteToolAttributes:
         assert attrs["gen_ai.tool.call.id"] == "tc_2"
         assert "gen_ai.tool.call.arguments" not in attrs
         assert "gen_ai.tool.call.result" not in attrs
+
+    def test_tool_metadata_emitted(self) -> None:
+        attrs = execute_tool_attributes(
+            tool_name="search",
+            tool_type="function",
+            tool_description="Search the web for a query",
+            tool_definitions='[{"name":"search","parameters":{}}]',
+        )
+        assert attrs["gen_ai.tool.type"] == "function"
+        assert attrs["gen_ai.tool.description"] == "Search the web for a query"
+        assert attrs["gen_ai.tool.definitions"] == '[{"name":"search","parameters":{}}]'
+
+    def test_empty_tool_metadata_omitted(self) -> None:
+        attrs = execute_tool_attributes(
+            tool_name="search",
+            tool_type="",
+            tool_description="",
+            tool_definitions="",
+        )
+        assert "gen_ai.tool.type" not in attrs
+        assert "gen_ai.tool.description" not in attrs
+        assert "gen_ai.tool.definitions" not in attrs
+
+
+class TestInvokeAgentAgentMetadata:
+    def test_agent_metadata_emitted(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot",
+            agent_id="agent-001",
+            agent_description="Travel assistant",
+            agent_version="1.2.3",
+        )
+        assert attrs["gen_ai.agent.id"] == "agent-001"
+        assert attrs["gen_ai.agent.description"] == "Travel assistant"
+        assert attrs["gen_ai.agent.version"] == "1.2.3"
+
+    def test_empty_agent_metadata_omitted(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot",
+            agent_id="",
+            agent_description="",
+            agent_version="",
+        )
+        assert "gen_ai.agent.id" not in attrs
+        assert "gen_ai.agent.description" not in attrs
+        assert "gen_ai.agent.version" not in attrs
+
+
+class TestLLMRequestParams:
+    def test_request_params_emitted(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            request_temperature=0.7,
+            request_max_tokens=2048,
+            request_top_p=0.95,
+            request_frequency_penalty=0.1,
+            request_presence_penalty=0.2,
+            request_seed=42,
+            request_stop_sequences=["\n\n", "END"],
+            request_choice_count=3,
+        )
+        assert attrs["gen_ai.request.temperature"] == 0.7
+        assert attrs["gen_ai.request.max_tokens"] == 2048
+        assert attrs["gen_ai.request.top_p"] == 0.95
+        assert attrs["gen_ai.request.frequency_penalty"] == 0.1
+        assert attrs["gen_ai.request.presence_penalty"] == 0.2
+        assert attrs["gen_ai.request.seed"] == 42
+        assert attrs["gen_ai.request.stop_sequences"] == ["\n\n", "END"]
+        assert attrs["gen_ai.request.choice.count"] == 3
+
+    def test_zero_temperature_is_emitted(self) -> None:
+        """0.0 is a meaningful value (greedy sampling); only None is omitted."""
+        attrs = llm_attributes(model="gpt-4o", request_temperature=0.0)
+        assert attrs["gen_ai.request.temperature"] == 0.0
+
+    def test_none_request_params_omitted(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            request_temperature=None,
+            request_max_tokens=None,
+            request_top_p=None,
+            request_frequency_penalty=None,
+            request_presence_penalty=None,
+            request_seed=None,
+            request_stop_sequences=None,
+            request_choice_count=None,
+        )
+        assert "gen_ai.request.temperature" not in attrs
+        assert "gen_ai.request.max_tokens" not in attrs
+        assert "gen_ai.request.top_p" not in attrs
+        assert "gen_ai.request.frequency_penalty" not in attrs
+        assert "gen_ai.request.presence_penalty" not in attrs
+        assert "gen_ai.request.seed" not in attrs
+        assert "gen_ai.request.stop_sequences" not in attrs
+        assert "gen_ai.request.choice.count" not in attrs
+
+    def test_empty_stop_sequences_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", request_stop_sequences=[])
+        assert "gen_ai.request.stop_sequences" not in attrs
+
+
+class TestLLMResponseAndOutputType:
+    def test_response_model_emitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", response_model="gpt-4o-2024-05-13")
+        assert attrs["gen_ai.response.model"] == "gpt-4o-2024-05-13"
+
+    def test_empty_response_model_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", response_model="")
+        assert "gen_ai.response.model" not in attrs
+
+    def test_output_type_emitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", output_type="json")
+        assert attrs["gen_ai.output.type"] == "json"
+
+    def test_empty_output_type_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", output_type="")
+        assert "gen_ai.output.type" not in attrs
+
+
+class TestUsageCacheTokens:
+    def test_cache_tokens_emitted(self) -> None:
+        usage = Usage(
+            input_tokens=10,
+            output_tokens=5,
+            cache_creation_input_tokens=200,
+            cache_read_input_tokens=50,
+        )
+        attrs = llm_attributes(model="gpt-4o", usage=usage)
+        assert attrs["gen_ai.usage.cache_creation.input_tokens"] == 200
+        assert attrs["gen_ai.usage.cache_read.input_tokens"] == 50
+
+    def test_zero_cache_tokens_omitted(self) -> None:
+        usage = Usage(
+            input_tokens=10,
+            cache_creation_input_tokens=0,
+            cache_read_input_tokens=0,
+        )
+        attrs = llm_attributes(model="gpt-4o", usage=usage)
+        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
+        assert "gen_ai.usage.cache_read.input_tokens" not in attrs
+
+
+# ---------------------------------------------------------------------------
+# Explicit Message.parts (native parts API)
+# ---------------------------------------------------------------------------
+
+
+class TestExplicitMessageParts:
+    def test_text_part_serializes(self) -> None:
+        msg = Message(role="user", parts=[TextPart(content="hello")])
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=[msg])
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {"role": "user", "parts": [{"type": "text", "content": "hello"}]}
+        ]
+
+    def test_tool_call_part_serializes(self) -> None:
+        msg = Message(
+            role="assistant",
+            parts=[
+                TextPart(content="Let me check."),
+                ToolCallPart(id="c1", name="get_weather", arguments='{"city":"Paris"}'),
+            ],
+        )
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=[msg])
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Let me check."},
+                    {
+                        "type": "tool_call",
+                        "id": "c1",
+                        "name": "get_weather",
+                        "arguments": '{"city":"Paris"}',
+                    },
+                ],
+            }
+        ]
+
+    def test_tool_call_response_part_serializes(self) -> None:
+        msg = Message(
+            role="tool",
+            parts=[ToolCallResponsePart(id="c1", response='{"temp":75}')],
+        )
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=[msg])
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {
+                "role": "tool",
+                "parts": [
+                    {
+                        "type": "tool_call_response",
+                        "id": "c1",
+                        "response": '{"temp":75}',
+                    }
+                ],
+            }
+        ]
+
+    def test_reasoning_part_in_explicit_parts_skips_auto_prepend(self) -> None:
+        """When the caller embeds a ReasoningPart, the auto-prepend is suppressed."""
+        msg = Message(
+            role="assistant",
+            parts=[
+                ReasoningPart(content="user wants weather"),
+                TextPart(content="The weather is 75F"),
+            ],
+        )
+        attrs = llm_attributes(
+            model="gpt-4o",
+            output_messages=[msg],
+            reasoning=Reasoning(content="this would normally be auto-prepended"),
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        # Only the explicit ReasoningPart appears — no double-add.
+        reasoning_parts = [p for p in raw[0]["parts"] if p["type"] == "reasoning"]
+        assert len(reasoning_parts) == 1
+        assert reasoning_parts[0]["content"] == "user wants weather"
+
+    def test_explicit_parts_take_precedence_over_flat_content(self) -> None:
+        """When parts is set, content is ignored."""
+        msg = Message(
+            role="assistant",
+            content="ignored flat content",
+            parts=[TextPart(content="canonical text")],
+        )
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=[msg])
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        texts = [p for p in raw[0]["parts"] if p["type"] == "text"]
+        assert texts == [{"type": "text", "content": "canonical text"}]
+
+    def test_blob_uri_file_parts_serialize(self) -> None:
+        msg = Message(
+            role="user",
+            parts=[
+                BlobPart(mime_type="image/png", modality="image", content="aGVsbG8="),
+                UriPart(
+                    mime_type="image/jpeg",
+                    modality="image",
+                    uri="https://example.com/img.jpg",
+                ),
+            ],
+        )
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=[msg])
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        types_seen = [p["type"] for p in raw[0]["parts"]]
+        assert types_seen == ["blob", "uri"]
+        assert raw[0]["parts"][0]["content"] == "aGVsbG8="
+        assert raw[0]["parts"][1]["uri"] == "https://example.com/img.jpg"
+
+    def test_media_attachments_appended_to_explicit_parts(self) -> None:
+        """media_attachments still extend the last user message even with explicit parts."""
+        msg = Message(role="user", parts=[TextPart(content="see this")])
+        media = [
+            MediaAttachment(
+                kind="uri",
+                modality="image",
+                mime_type="image/png",
+                uri="https://example.com/x.png",
+            )
+        ]
+        attrs = llm_attributes(
+            model="gpt-4o", input_messages=[msg], media_attachments=media
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        types_seen = [p["type"] for p in raw[0]["parts"]]
+        assert types_seen == ["text", "uri"]
+
+    def test_back_compat_flat_content_still_works(self) -> None:
+        """Existing API users (content-only) keep producing the same output."""
+        msg = Message(role="assistant", content="hello")
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=[msg])
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "hello"}]}
+        ]
+
+    def test_back_compat_tool_role_with_flat_content(self) -> None:
+        msg = Message(role="tool", content='{"temp":75}', tool_call_id="c1")
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=[msg])
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {
+                "role": "tool",
+                "parts": [
+                    {
+                        "type": "tool_call_response",
+                        "response": '{"temp":75}',
+                        "id": "c1",
+                    }
+                ],
+            }
+        ]
+
+    def test_finish_reason_attached_with_explicit_parts(self) -> None:
+        msg = Message(role="assistant", parts=[TextPart(content="done")])
+        attrs = llm_attributes(
+            model="gpt-4o", output_messages=[msg], finish_reasons=["stop"]
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw[0]["finish_reason"] == "stop"
 
 
 # ---------------------------------------------------------------------------
