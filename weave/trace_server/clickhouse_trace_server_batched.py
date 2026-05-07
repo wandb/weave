@@ -1859,6 +1859,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
             )
 
+        alias_rows: list[tuple[str, str, str, str]] = []
         for obj in batch:
             digest_result = compute_object_digest_result(
                 obj.val,
@@ -1881,6 +1882,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             insert_data = list(ch_obj.model_dump().values())
             # Add the data to be inserted
             ch_insert_batch.append(insert_data)
+            alias_rows.append(
+                (obj.project_id, obj.object_id, digest, obj.wb_user_id or "")
+            )
 
             # Record the inserted data
             obj_results.append(
@@ -1895,6 +1899,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=ch_insert_batch,
             column_names=ALL_OBJ_INSERT_COLUMNS,
         )
+
+        # Batch-write the "latest" alias for every row, matching obj_create.
+        if alias_rows:
+            ch_alias_rows = [
+                list(
+                    AliasCHInsertable(
+                        project_id=project_id,
+                        object_id=object_id,
+                        alias="latest",
+                        digest=digest,
+                        wb_user_id=wb_user_id,
+                    )
+                    .model_dump()
+                    .values()
+                )
+                for (project_id, object_id, digest, wb_user_id) in alias_rows
+            ]
+            self._insert(
+                "aliases",
+                data=ch_alias_rows,
+                column_names=list(AliasCHInsertable.model_fields.keys()),
+            )
 
         return obj_results
 
@@ -2256,36 +2282,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return None
         if tsc.digest_is_content_hash(digest):
             return None
-        # "latest" is now an explicit alias written on every obj_create.
-        # Resolve it from the aliases table like any other alias.
         query, parameters = make_resolve_alias_query(project_id, object_id, digest)
         result = self._query(query, parameters)
         if result.result_rows:
             return result.result_rows[0][0]
-        # Fallback for "latest": if no explicit alias row exists (legacy
-        # objects created before the alias write, obj_create_batch objects
-        # which skip alias writes, or alias INSERT failed), resolve via
-        # the computed is_latest window function so that obj_read("latest")
-        # stays consistent with objs_query(latest_only).
-        if digest == "latest":
-            return self._resolve_computed_latest(project_id, object_id)
-        return None
-
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._resolve_computed_latest"
-    )
-    def _resolve_computed_latest(
-        self,
-        project_id: str,
-        object_id: str,
-    ) -> str | None:
-        """Fallback: resolve "latest" via the computed is_latest property."""
-        object_query_builder = ObjectMetadataQueryBuilder(project_id)
-        object_query_builder.add_object_ids_condition([object_id])
-        object_query_builder.add_is_latest_condition()
-        objs = self._select_objs_query(object_query_builder, metadata_only=True)
-        if objs:
-            return objs[0].digest
         return None
 
     def _enrich_objs_with_tags_and_aliases(
@@ -2301,29 +2301,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
 
-        # Build a set of object_ids that have an explicit "latest" alias
-        # so we only fall back to computed is_latest for legacy objects
-        # and obj_create_batch objects (which skip alias writes).
-        objects_with_explicit_latest: set[str] = set()
-        for (object_id, _digest), aliases in aliases_map.items():
-            if "latest" in aliases:
-                objects_with_explicit_latest.add(object_id)
-
         for obj in objs:
             key = (obj.object_id, obj.digest)
             obj.tags = sorted(tags_map.get(key, []))
-            aliases = aliases_map.get(key, [])
-            # Fallback: synthesize "latest" from is_latest for objects
-            # that don't have an explicit "latest" alias (legacy objects
-            # created before the explicit alias write, or obj_create_batch
-            # objects which skip alias writes).
-            if (
-                obj.is_latest == 1
-                and "latest" not in aliases
-                and obj.object_id not in objects_with_explicit_latest
-            ):
-                aliases = ["latest"] + aliases
-            obj.aliases = aliases
+            obj.aliases = aliases_map.get(key, [])
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []

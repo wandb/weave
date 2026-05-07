@@ -178,34 +178,23 @@ WHERE (((main.project_id,
 
 
 def test_add_aliases_condition_latest_only():
-    """Filtering by 'latest' checks explicit alias, falling back to is_latest only for legacy objects."""
+    """Filtering by 'latest' resolves through the aliases table like any other alias."""
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_aliases_condition(["latest"])
 
     expected_query = """
-WHERE ((((main.project_id,
-          main.object_id,
-          main.digest) IN
-           (SELECT project_id,
-                   object_id,
-                   argMax(digest, created_at) AS digest
-            FROM aliases PREWHERE project_id = {project_id: String}
-            WHERE alias IN {filter_aliases: Array(String)}
-            GROUP BY project_id,
-                     object_id,
-                     alias
-            HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3))
-         OR (is_latest = 1
-             AND NOT (main.project_id,
-                      main.object_id) IN
-               (SELECT project_id,
-                       object_id
-                FROM aliases PREWHERE project_id = {project_id: String}
-                WHERE alias = 'latest'
-                GROUP BY project_id,
-                         object_id,
-                         alias
-                HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)))))
+WHERE (((main.project_id,
+         main.object_id,
+         main.digest) IN
+          (SELECT project_id,
+                  object_id,
+                  argMax(digest, created_at) AS digest
+           FROM aliases PREWHERE project_id = {project_id: String}
+           WHERE alias IN {filter_aliases: Array(String)}
+           GROUP BY project_id,
+                    object_id,
+                    alias
+           HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)))
        AND (deleted_at IS NULL))
     """
     expected_params = {
@@ -258,34 +247,23 @@ def test_make_list_aliases_query():
 
 
 def test_add_aliases_condition_with_latest():
-    """Filtering by both 'latest' and a real alias should OR them."""
+    """Filtering by both 'latest' and a real alias goes through the aliases table together."""
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_aliases_condition(["latest", "production"])
 
     expected_query = """
-WHERE ((((main.project_id,
-          main.object_id,
-          main.digest) IN
-           (SELECT project_id,
-                   object_id,
-                   argMax(digest, created_at) AS digest
-            FROM aliases PREWHERE project_id = {project_id: String}
-            WHERE alias IN {filter_aliases: Array(String)}
-            GROUP BY project_id,
-                     object_id,
-                     alias
-            HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3))
-         OR (is_latest = 1
-             AND NOT (main.project_id,
-                      main.object_id) IN
-               (SELECT project_id,
-                       object_id
-                FROM aliases PREWHERE project_id = {project_id: String}
-                WHERE alias = 'latest'
-                GROUP BY project_id,
-                         object_id,
-                         alias
-                HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)))))
+WHERE (((main.project_id,
+         main.object_id,
+         main.digest) IN
+          (SELECT project_id,
+                  object_id,
+                  argMax(digest, created_at) AS digest
+           FROM aliases PREWHERE project_id = {project_id: String}
+           WHERE alias IN {filter_aliases: Array(String)}
+           GROUP BY project_id,
+                    object_id,
+                    alias
+           HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)))
        AND (deleted_at IS NULL))
     """
     expected_params = {

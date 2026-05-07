@@ -1562,6 +1562,59 @@ def test_alias_resolution(client: WeaveClient):
         assert weave.ref(f"resolve_multi:{alias}").get()["v"] == 0
 
 
+def test_republish_promotes_to_latest(client: WeaveClient, monkeypatch):
+    """Re-publishing existing content (dedup hit) should move 'latest' to that digest.
+
+    This is the WB-32435 product requirement: matches W&B Artifacts' "promote on
+    re-publish" behavior. Tests the server contract through the SDK; the SDK's
+    obj_create cache is disabled so each publish actually round-trips.
+    """
+    monkeypatch.setenv("WEAVE_USE_SERVER_CACHE", "false")
+
+    ref_a = weave.publish({"v": "A"}, name="republish_obj")
+    ref_b = weave.publish({"v": "B"}, name="republish_obj")
+    client.flush()
+
+    # latest points to B (the second-published digest)
+    assert weave.ref("republish_obj:latest").get()["v"] == "B"
+    assert (
+        client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client.project_id,
+                object_id="republish_obj",
+                digest="latest",
+            )
+        ).obj.digest
+        == ref_b.digest
+    )
+
+    # Re-publish A (dedup hit). 'latest' must now point at A.
+    weave.publish({"v": "A"}, name="republish_obj")
+    client.flush()
+
+    assert weave.ref("republish_obj:latest").get()["v"] == "A"
+    read_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client.project_id,
+            object_id="republish_obj",
+            digest="latest",
+        )
+    )
+    assert read_res.obj.digest == ref_a.digest
+
+    # The aliases query path agrees with obj_read('latest').
+    query_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(
+                object_ids=["republish_obj"], aliases=["latest"]
+            ),
+        )
+    )
+    assert len(query_res.objs) == 1
+    assert query_res.objs[0].digest == ref_a.digest
+
+
 # ---------------------------------------------------------------------------
 # Full end-to-end lifecycle
 # ---------------------------------------------------------------------------

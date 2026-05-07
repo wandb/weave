@@ -1,0 +1,16 @@
+-- Backfill explicit "latest" alias rows for objects created before the
+-- explicit alias write was added (see PR for WB-32435). Rows are inserted
+-- with an epoch created_at so any subsequent real obj_create alias write
+-- wins on ReplacingMergeTree(created_at) merge.
+INSERT INTO aliases (project_id, object_id, alias, digest, wb_user_id, created_at, deleted_at)
+SELECT
+    project_id,
+    object_id,
+    'latest' AS alias,
+    argMax(digest, created_at) AS digest,
+    '' AS wb_user_id,
+    toDateTime64('1970-01-01 00:00:00.001', 3) AS created_at,
+    toDateTime64(0, 3) AS deleted_at
+FROM object_versions
+WHERE deleted_at = toDateTime64(0, 3)
+GROUP BY project_id, object_id;

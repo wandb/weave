@@ -259,43 +259,17 @@ class ObjectMetadataQueryBuilder:
 
     def add_aliases_condition(self, aliases: list[str]) -> None:
         t = self._main_table_alias
-        # "latest" is now an explicit alias written on obj_create.
-        # Include it in the aliases table lookup alongside other aliases,
-        # with is_latest=1 as a fallback for legacy objects that don't
-        # have an explicit "latest" alias row.
-        all_aliases = aliases
-        has_latest = "latest" in aliases
-        alias_subquery = f"""({t}.project_id, {t}.object_id, {t}.digest) IN (
-                    SELECT project_id, object_id, argMax(digest, created_at) AS digest
-                    FROM aliases
-                    PREWHERE project_id = {{project_id: String}}
-                    WHERE alias IN {{filter_aliases: Array(String)}}
-                    GROUP BY project_id, object_id, alias
-                    HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-                )"""
-        if has_latest:
-            # Check explicit "latest" alias in DB, OR computed is_latest
-            # only for legacy objects that don't have an explicit "latest"
-            # alias row.  Without the NOT IN guard the fallback would
-            # return two rows when explicit-latest diverges from
-            # computed is_latest (e.g. after re-publishing old content).
-            has_explicit_latest = f"""({t}.project_id, {t}.object_id) IN (
-                        SELECT project_id, object_id
-                        FROM aliases
-                        PREWHERE project_id = {{project_id: String}}
-                        WHERE alias = 'latest'
-                        GROUP BY project_id, object_id, alias
-                        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-                    )"""
-            self._conditions.append(f"""
-                ({alias_subquery} OR (is_latest = 1 AND NOT {has_explicit_latest}))
-            """)
-            self.parameters["filter_aliases"] = all_aliases
-        else:
-            self._conditions.append(f"""
-                {alias_subquery}
-            """)
-            self.parameters["filter_aliases"] = all_aliases
+        self._conditions.append(f"""
+            ({t}.project_id, {t}.object_id, {t}.digest) IN (
+                SELECT project_id, object_id, argMax(digest, created_at) AS digest
+                FROM aliases
+                PREWHERE project_id = {{project_id: String}}
+                WHERE alias IN {{filter_aliases: Array(String)}}
+                GROUP BY project_id, object_id, alias
+                HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+            )
+        """)
+        self.parameters["filter_aliases"] = aliases
 
     def add_order(self, field: str, direction: str) -> None:
         direction = direction.lower()
