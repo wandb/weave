@@ -25498,5 +25498,185 @@
       "cache_creation_input": 0,
       "created_at": "2026-04-30 13:13:24"
     }
+  ],
+  "azure/gpt-image-2": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 1e-05,
+      "cache_read_input": 1.25e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "azure/gpt-image-2-2026-04-21": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 1e-05,
+      "cache_read_input": 1.25e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "gpt-image-2": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 1e-05,
+      "cache_read_input": 1.25e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "gpt-image-2-2026-04-21": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 1e-05,
+      "cache_read_input": 1.25e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/deepseek-ai/DeepSeek-R1-0528": [
+    {
+      "provider": "crusoe",
+      "input": 3e-06,
+      "output": 7e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/deepseek-ai/DeepSeek-V3-0324": [
+    {
+      "provider": "crusoe",
+      "input": 1.5e-06,
+      "output": 1.5e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/google/gemma-3-12b-it": [
+    {
+      "provider": "crusoe",
+      "input": 1e-07,
+      "output": 1e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/meta-llama/Llama-3.3-70B-Instruct": [
+    {
+      "provider": "crusoe",
+      "input": 2e-07,
+      "output": 2e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/moonshotai/Kimi-K2-Thinking": [
+    {
+      "provider": "crusoe",
+      "input": 2.5e-06,
+      "output": 2.5e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/openai/gpt-oss-120b": [
+    {
+      "provider": "crusoe",
+      "input": 8e-07,
+      "output": 8e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/Qwen/Qwen3-235B-A22B-Instruct-2507": [
+    {
+      "provider": "crusoe",
+      "input": 3e-06,
+      "output": 3e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "vertex_ai/xai/grok-4.1-fast-non-reasoning": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-07,
+      "output": 5e-07,
+      "cache_read_input": 5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "vertex_ai/xai/grok-4.1-fast-reasoning": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-07,
+      "output": 5e-07,
+      "cache_read_input": 5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "vertex_ai/xai/grok-4.20-non-reasoning": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "vertex_ai/xai/grok-4.20-reasoning": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-V4-Flash": [
+    {
+      "provider": "coreweave",
+      "input": 1e-08,
+      "output": 1e-08,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "xai/grok-4.3": [
+    {
+      "provider": "xai",
+      "input": 1.25e-06,
+      "output": 2.5e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-07 10:19:33"
+    }
+  ],
+  "xai/grok-4.3-latest": [
+    {
+      "provider": "xai",
+      "input": 1.25e-06,
+      "output": 2.5e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-07 10:19:33"
+    }
   ]
 }
