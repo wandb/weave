@@ -1641,6 +1641,92 @@ def test_dynamic_json_filters_infer_casts_from_literals() -> None:
     )
 
 
+def test_literal_inferred_casts_cover_feedback_and_mixed_numeric_in() -> None:
+    # Feedback payload values also come from JSON_VALUE and need literal-driven casts.
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.score"
+                    },
+                    {"$literal": 0.5},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String}), 'null'), '')) > {pb_2:Float64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": '$."output"."score"',
+            "pb_2": 0.5,
+            "pb_3": "project",
+        },
+    )
+
+    # Mixed int/float IN lists should promote the JSON field to float instead of
+    # falling back to a string-vs-number comparison.
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.InOperation.model_validate(
+            {
+                "$in": [
+                    {"$getField": "inputs.x"},
+                    [{"$literal": 1}, {"$literal": 2.0}],
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_6:String}
+        WHERE (((calls_merged.inputs_dump LIKE {pb_3:String}
+            OR calls_merged.inputs_dump LIKE {pb_4:String}
+            OR calls_merged.inputs_dump LIKE {pb_5:String})
+            OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump),
+            {pb_0:String}), 'null'), '')) IN ({pb_1:Int64},{pb_2:Float64})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": '$."x"',
+            "pb_1": 1,
+            "pb_2": 2.0,
+            "pb_3": '%"x"%:%1%',
+            "pb_4": '%"x"%:%2.0%',
+            "pb_5": '%"x"%:%2%',
+            "pb_6": "project",
+        },
+    )
+
+
 def test_whole_number_float_eq_emits_int_form_like_prefilter() -> None:
     """A whole-number float literal must prefilter on both `%1.0%` and `%1%`.
 
@@ -3622,9 +3708,9 @@ def test_calls_complete_with_feedback_filter() -> None:
         PREWHERE
             calls_complete.project_id = {pb_4:String}
         WHERE 1
-          AND (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+          AND (((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
             THEN feedback.payload_dump END,
-            {pb_1:String}), 'null'), '') > {pb_2:Float64}))
+            {pb_1:String}), 'null'), '')) > {pb_2:Float64}))
        AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
         """,
         {

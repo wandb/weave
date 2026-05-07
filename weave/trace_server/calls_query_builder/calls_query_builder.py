@@ -2103,19 +2103,20 @@ def _cast_for_literal_filter(
 def _shared_cast_for_literal_filters(
     operands: Sequence[tsi_query.Operand],
 ) -> tsi_query.CastTo | None:
-    """Return a shared inferred cast for homogeneous literal lists."""
-    cast: tsi_query.CastTo | None = None
+    """Return a shared inferred cast for compatible literal lists."""
+    casts: set[tsi_query.CastTo] = set()
     for operand in operands:
         if not isinstance(operand, tsi_query.LiteralOperation):
             return None
         operand_cast = _cast_for_literal_filter(operand)
         if operand_cast is None:
             return None
-        if cast is None:
-            cast = operand_cast
-        elif operand_cast != cast:
-            return None
-    return cast
+        casts.add(operand_cast)
+    if casts == {"int", "double"}:
+        return "double"
+    if len(casts) == 1:
+        return next(iter(casts))
+    return None
 
 
 def process_query_to_conditions(
@@ -2133,7 +2134,7 @@ def process_query_to_conditions(
     def process_operation(operation: tsi_query.Operation) -> str:
         cond = None
 
-        def process_dynamic_field_operand_with_inferred_cast(
+        def process_json_field_operand_with_inferred_cast(
             operand: tsi_query.Operand,
             cast: tsi_query.CastTo | None,
         ) -> str | None:
@@ -2143,16 +2144,27 @@ def process_query_to_conditions(
                 raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
 
             structured_field = get_field_by_name(operand.get_field_)
-            if not isinstance(structured_field, CallsMergedDynamicField):
-                return None
-
-            raw_fields_used[structured_field.field] = structured_field
-            return structured_field.as_sql(
-                param_builder,
-                table_alias,
-                cast=cast,
-                use_agg_fn=use_agg_fn,
-            )
+            if isinstance(structured_field, CallsMergedDynamicField):
+                raw_fields_used[structured_field.field] = structured_field
+                return structured_field.as_sql(
+                    param_builder,
+                    table_alias,
+                    cast=cast,
+                    use_agg_fn=use_agg_fn,
+                )
+            if (
+                isinstance(structured_field, CallsMergedFeedbackPayloadField)
+                and structured_field.feedback_type != "*"
+                and not structured_field.is_multi_value
+            ):
+                raw_fields_used[structured_field.field] = structured_field
+                return structured_field.as_sql(
+                    param_builder,
+                    table_alias,
+                    cast=cast,
+                    use_agg_fn=use_agg_fn,
+                )
+            return None
 
         def process_binary_operands(
             lhs: tsi_query.Operand,
@@ -2170,12 +2182,8 @@ def process_query_to_conditions(
                 if isinstance(lhs, tsi_query.LiteralOperation)
                 else None
             )
-            lhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(
-                lhs, lhs_cast
-            )
-            rhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(
-                rhs, rhs_cast
-            )
+            lhs_cast_sql = process_json_field_operand_with_inferred_cast(lhs, lhs_cast)
+            rhs_cast_sql = process_json_field_operand_with_inferred_cast(rhs, rhs_cast)
             lhs_part = (
                 lhs_cast_sql if lhs_cast_sql is not None else process_operand(lhs)
             )
@@ -2248,7 +2256,7 @@ def process_query_to_conditions(
             lhs_part, rhs_part = process_binary_operands(ops[0], ops[1])
             cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
-            lhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(
+            lhs_cast_sql = process_json_field_operand_with_inferred_cast(
                 operation.in_[0], _shared_cast_for_literal_filters(operation.in_[1])
             )
             lhs_part = (

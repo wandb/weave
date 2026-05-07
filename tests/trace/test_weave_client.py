@@ -2405,6 +2405,28 @@ def test_calls_query_filter_by_strings(client):
         assert call.output["test_id"] == test_id
         assert call.inputs["value"] > 0
 
+    # Mixed int/float IN lists should still compare dynamic JSON numerically.
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$in": [
+                            {"$getField": "inputs.value"},
+                            [
+                                {"$literal": 100},
+                                {"$literal": 200.0},
+                            ],
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert {call.inputs["name"] for call in calls} == {"alpha_test", "beta_test"}
+
     # Filter with boolean - should return 3 calls (active is true)
     query = tsi.Query(
         **{

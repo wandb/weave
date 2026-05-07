@@ -1165,19 +1165,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             def _shared_cast_for_literals(
                 operands: list[tsi_query.Operand],
             ) -> str | None:
-                """Return a shared inferred cast iff every operand is a literal of the same type."""
-                cast: str | None = None
+                """Return a shared inferred cast iff every operand has a compatible scalar type."""
+                casts: set[str] = set()
                 for operand in operands:
                     if not isinstance(operand, tsi_query.LiteralOperation):
                         return None
                     operand_cast = _cast_for_literal(operand)
                     if operand_cast is None:
                         return None
-                    if cast is None:
-                        cast = operand_cast
-                    elif cast != operand_cast:
-                        return None
-                return cast
+                    casts.add(operand_cast)
+                if casts == {"int", "float"}:
+                    return "float"
+                if len(casts) == 1:
+                    return next(iter(casts))
+                return None
 
             def _process_get_field_with_inferred_cast(
                 operand: tsi_query.Operand,
@@ -1185,10 +1186,19 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             ) -> str | None:
                 if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
                     return None
-                if operand.get_field_.startswith("feedback."):
-                    return None
+                field = operand.get_field_
+                if field.startswith("feedback."):
+                    if field.startswith(
+                        "feedback.[*]"
+                    ) or _is_multi_value_feedback_operand(operand):
+                        return None
+                    return _sqlite_inferred_scalar_cast_sql(
+                        _build_feedback_subquery(field),
+                        cast,
+                        _sqlite_sql_type_for_cast(cast),
+                    )
                 return _transform_external_calls_field_to_internal_calls_field(
-                    operand.get_field_, cast
+                    field, cast
                 )
 
             def _process_binary_operands(
@@ -5161,6 +5171,43 @@ def _sqlite_json_text_is_float_sql(value_sql: str) -> str:
     return f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' AND {dot_count} <= 1)"
 
 
+def _sqlite_sql_type_for_cast(cast: str) -> str:
+    if cast == "int":
+        return "INT"
+    if cast in {"double", "float"}:
+        return "FLOAT"
+    if cast == "bool":
+        return "BOOL"
+    if cast in {"str", "string"}:
+        return "TEXT"
+    raise ValueError(f"Unknown cast: {cast}")
+
+
+def _sqlite_inferred_scalar_cast_sql(
+    value_sql: str,
+    cast: str,
+    sql_type: str,
+) -> str:
+    cast_sql = f"CAST({value_sql} AS {sql_type})"
+    if cast == "int":
+        return (
+            f"CASE WHEN {_sqlite_json_text_is_int_sql(value_sql)} "
+            f"THEN {cast_sql} ELSE NULL END"
+        )
+    if cast in {"double", "float"}:
+        return (
+            f"CASE WHEN {_sqlite_json_text_is_float_sql(value_sql)} "
+            f"THEN {cast_sql} ELSE NULL END"
+        )
+    text_value = f"lower(trim(CAST({value_sql} AS TEXT)))"
+    return (
+        f"CASE WHEN {text_value} = 'true' THEN 1 "
+        f"WHEN {text_value} = 'false' THEN 0 "
+        f"WHEN {_sqlite_json_text_is_int_sql(value_sql)} THEN {cast_sql} "
+        f"ELSE NULL END"
+    )
+
+
 def _sqlite_inferred_json_cast_sql(
     json_extract_sql: str,
     json_type_sql: str,
@@ -5250,16 +5297,7 @@ def _transform_external_calls_field_to_internal_calls_field(
         json_column = field
         sql_type = "TEXT"
         if cast is not None:
-            if cast == "int":
-                sql_type = "INT"
-            elif cast == "float":
-                sql_type = "FLOAT"
-            elif cast == "bool":
-                sql_type = "BOOL"
-            elif cast == "str":
-                sql_type = "TEXT"
-            else:
-                raise ValueError(f"Unknown cast: {cast}")
+            sql_type = _sqlite_sql_type_for_cast(cast)
         json_extract_sql = (
             "json_extract(" + json.dumps(json_column) + ", '" + json_path + "')"
         )
