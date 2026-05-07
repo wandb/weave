@@ -55,28 +55,32 @@ class TableRoutingResolver:
         if cached is not None:
             return cached
 
-        residence = get_project_data_residence(project_id, ch_client)
+        # Only span the cache-miss path. Cache-hit calls are extremely high
+        # volume and produce noisy DD spans with no useful information.
+        with ddtrace.tracer.trace("table_routing.fetch_residence"):
+            residence = get_project_data_residence(project_id, ch_client)
 
-        # Log warning if we detect dual residency - data should only ever be in
-        # calls_merged OR calls_complete, not both. This is handled gracefully but
-        # indicates an unexpected state that should be investigated.
-        if residence == ProjectDataResidence.BOTH:
-            logger.warning("Detected dual call residency for project %s. ", project_id)
-            set_current_span_dd_tags(
-                {
-                    "project_version.dual_residency": "true",
-                    "project_version.dual_residency.project_id": project_id,
-                }
-            )
+            # Log warning if we detect dual residency - data should only ever be in
+            # calls_merged OR calls_complete, not both. This is handled gracefully but
+            # indicates an unexpected state that should be investigated.
+            if residence == ProjectDataResidence.BOTH:
+                logger.warning(
+                    "Detected dual call residency for project %s. ", project_id
+                )
+                set_current_span_dd_tags(
+                    {
+                        "project_version.dual_residency": "true",
+                        "project_version.dual_residency.project_id": project_id,
+                    }
+                )
 
-        # Don't cache if project is empty, we could write to either table.
-        if residence != ProjectDataResidence.EMPTY:
-            with _project_residence_cache_lock:
-                _project_residence_cache[project_id] = residence
+            # Don't cache if project is empty, we could write to either table.
+            if residence != ProjectDataResidence.EMPTY:
+                with _project_residence_cache_lock:
+                    _project_residence_cache[project_id] = residence
 
-        return residence
+            return residence
 
-    @ddtrace.tracer.wrap(name="table_routing.resolve_read_table")
     def resolve_read_table(self, project_id: str, ch_client: CHClient) -> ReadTable:
         """Resolve which table to read from for a given project."""
         if self._mode == CallsStorageServerMode.OFF:
@@ -105,7 +109,6 @@ class TableRoutingResolver:
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
 
-    @ddtrace.tracer.wrap(name="table_routing.resolve_v1_write_target")
     def resolve_v1_write_target(
         self,
         project_id: str,
@@ -150,7 +153,6 @@ class TableRoutingResolver:
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
 
-    @ddtrace.tracer.wrap(name="table_routing.resolve_v2_write_target")
     def resolve_v2_write_target(
         self,
         project_id: str,
