@@ -33,6 +33,10 @@ from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
+from weave.trace_server.calls_query_builder.utils import (
+    infer_literal_filter_cast,
+    infer_shared_literal_filter_cast,
+)
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.digest_validation import validate_expected_digest
@@ -1116,7 +1120,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     )
                     cond = f"({lhs_part} <= {rhs_part})"
                 elif isinstance(operation, tsi_query.InOperation):
-                    in_cast = _shared_cast_for_literals(operation.in_[1])
+                    in_cast = infer_shared_literal_filter_cast(operation.in_[1])
                     lhs_field = _process_get_field_with_inferred_cast(
                         operation.in_[0], in_cast
                     )
@@ -1139,50 +1143,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
                 return cond
 
-            def _cast_for_literal(
-                operand: tsi_query.Operand,
-            ) -> str | None:
-                """Map a typed literal to a sqlite cast for a dynamic JSON field.
-
-                Without an explicit `$convert`, dynamic fields default to
-                `CAST(json_extract(...) AS TEXT)`, which causes
-                `'1' = 1.0` to be FALSE under SQLite's type-affinity rules.
-                Inferring a numeric/bool cast from the peer literal makes the
-                comparison numeric so JSON-int and JSON-float encodings of the
-                same value compare equal.
-                """
-                if not isinstance(operand, tsi_query.LiteralOperation):
-                    return None
-                value = operand.literal_
-                if isinstance(value, bool):
-                    return "bool"
-                if isinstance(value, int):
-                    return "int"
-                if isinstance(value, float):
-                    return "float"
-                return None
-
-            def _shared_cast_for_literals(
-                operands: list[tsi_query.Operand],
-            ) -> str | None:
-                """Return a shared inferred cast iff every operand has a compatible scalar type."""
-                casts: set[str] = set()
-                for operand in operands:
-                    if not isinstance(operand, tsi_query.LiteralOperation):
-                        return None
-                    operand_cast = _cast_for_literal(operand)
-                    if operand_cast is None:
-                        return None
-                    casts.add(operand_cast)
-                if casts == {"int", "float"}:
-                    return "float"
-                if len(casts) == 1:
-                    return next(iter(casts))
-                return None
-
             def _process_get_field_with_inferred_cast(
                 operand: tsi_query.Operand,
-                cast: str | None,
+                cast: tsi_query.CastTo | None,
             ) -> str | None:
                 if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
                     return None
@@ -1205,8 +1168,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 lhs: tsi_query.Operand,
                 rhs: tsi_query.Operand,
             ) -> tuple[str, str]:
-                lhs_cast = _cast_for_literal(rhs)
-                rhs_cast = _cast_for_literal(lhs)
+                lhs_cast = infer_literal_filter_cast(rhs)
+                rhs_cast = infer_literal_filter_cast(lhs)
                 lhs_field = _process_get_field_with_inferred_cast(lhs, lhs_cast)
                 rhs_field = _process_get_field_with_inferred_cast(rhs, rhs_cast)
                 lhs_part = lhs_field if lhs_field is not None else process_operand(lhs)
@@ -5165,10 +5128,7 @@ def _sqlite_unsigned_text_is_int_sql(unsigned_sql: str) -> str:
 def _sqlite_unsigned_text_is_decimal_sql(unsigned_sql: str) -> str:
     digits = f"replace({unsigned_sql}, '.', '')"
     dot_count = f"(length({unsigned_sql}) - length(replace({unsigned_sql}, '.', '')))"
-    return (
-        f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' "
-        f"AND {dot_count} <= 1)"
-    )
+    return f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' AND {dot_count} <= 1)"
 
 
 def _sqlite_json_text_is_int_sql(value_sql: str) -> str:
@@ -5190,10 +5150,7 @@ def _sqlite_json_text_is_float_sql(value_sql: str) -> str:
     unsigned_exponent = _sqlite_text_without_leading_sign_sql(exponent)
     mantissa_is_decimal = _sqlite_unsigned_text_is_decimal_sql(unsigned_mantissa)
     exponent_is_int = _sqlite_unsigned_text_is_int_sql(unsigned_exponent)
-    return (
-        f"({mantissa_is_decimal} "
-        f"AND ({exponent_pos} = 0 OR {exponent_is_int}))"
-    )
+    return f"({mantissa_is_decimal} AND ({exponent_pos} = 0 OR {exponent_is_int}))"
 
 
 def _sqlite_sql_type_for_cast(cast: str) -> str:
@@ -5249,7 +5206,7 @@ def _sqlite_inferred_json_cast_sql(
             f"WHEN {json_type_sql} = 'text' AND {text_is_int} THEN {cast_sql} "
             f"ELSE NULL END"
         )
-    if cast == "float":
+    if cast in {"double", "float"}:
         text_is_float = _sqlite_json_text_is_float_sql(json_extract_sql)
         return (
             f"CASE WHEN {json_type_sql} IN ('integer', 'real') THEN {cast_sql} "

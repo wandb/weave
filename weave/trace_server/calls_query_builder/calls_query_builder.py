@@ -56,6 +56,8 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
+    infer_literal_filter_cast,
+    infer_shared_literal_filter_cast,
     json_dump_field_as_sql,
     param_slot,
     parse_string_to_utc_timestamp,
@@ -2081,44 +2083,6 @@ def _get_multi_value_feedback_field(
     return None
 
 
-def _cast_for_literal_filter(
-    literal: tsi_query.LiteralOperation,
-) -> tsi_query.CastTo | None:
-    """Infer a JSON dynamic-field cast from a comparison literal.
-
-    ``JSON_VALUE`` returns strings, so numeric and boolean literals need the
-    field side cast to match the parameter type ClickHouse receives. String,
-    ``None``, and structured literals keep the existing uncast path.
-    """
-    value = literal.literal_
-    if isinstance(value, bool):
-        return "bool"
-    if isinstance(value, int):
-        return "int"
-    if isinstance(value, float):
-        return "double"
-    return None
-
-
-def _shared_cast_for_literal_filters(
-    operands: Sequence[tsi_query.Operand],
-) -> tsi_query.CastTo | None:
-    """Return a shared inferred cast for compatible literal lists."""
-    casts: set[tsi_query.CastTo] = set()
-    for operand in operands:
-        if not isinstance(operand, tsi_query.LiteralOperation):
-            return None
-        operand_cast = _cast_for_literal_filter(operand)
-        if operand_cast is None:
-            return None
-        casts.add(operand_cast)
-    if casts == {"int", "double"}:
-        return "double"
-    if len(casts) == 1:
-        return next(iter(casts))
-    return None
-
-
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
@@ -2172,16 +2136,8 @@ def process_query_to_conditions(
         ) -> tuple[str, str]:
             # Each side's cast is inferred from the *peer* literal: a numeric
             # RHS tells us to cast the LHS field, and vice versa.
-            lhs_cast = (
-                _cast_for_literal_filter(rhs)
-                if isinstance(rhs, tsi_query.LiteralOperation)
-                else None
-            )
-            rhs_cast = (
-                _cast_for_literal_filter(lhs)
-                if isinstance(lhs, tsi_query.LiteralOperation)
-                else None
-            )
+            lhs_cast = infer_literal_filter_cast(rhs)
+            rhs_cast = infer_literal_filter_cast(lhs)
             lhs_cast_sql = process_json_field_operand_with_inferred_cast(lhs, lhs_cast)
             rhs_cast_sql = process_json_field_operand_with_inferred_cast(rhs, rhs_cast)
             lhs_part = (
@@ -2257,7 +2213,7 @@ def process_query_to_conditions(
             cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_cast_sql = process_json_field_operand_with_inferred_cast(
-                operation.in_[0], _shared_cast_for_literal_filters(operation.in_[1])
+                operation.in_[0], infer_shared_literal_filter_cast(operation.in_[1])
             )
             lhs_part = (
                 lhs_cast_sql
