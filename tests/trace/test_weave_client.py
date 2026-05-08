@@ -3828,6 +3828,61 @@ def test_calls_query_filter_by_root_refs(client):
     assert calls[0].attributes["enabled"] is True
     assert calls[0].summary["score"] == 0.75
 
+    exponent_call = client.create_call(
+        "exponent_filter_op",
+        {"x": "1e3"},
+        attributes={"rank_text": "+2.5e2", "bad_rank_text": "not-a-number"},
+    )
+    exponent_call.summary = {"score_text": "-1.2e-3"}
+    client.finish_call(exponent_call, {"n": "5e0"})
+
+    # Exponent-form numeric strings should behave like SQLite numeric casts for
+    # inferred float comparisons, while nonnumeric strings still become NULL.
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$and": [
+                        {"$gt": [{"$getField": "inputs.x"}, {"$literal": 999.0}]},
+                        {
+                            "$gt": [
+                                {"$getField": "attributes.rank_text"},
+                                {"$literal": 200.0},
+                            ]
+                        },
+                        {
+                            "$lt": [
+                                {"$getField": "summary.score_text"},
+                                {"$literal": 0.0},
+                            ]
+                        },
+                        {"$eq": [{"$getField": "output.n"}, {"$literal": 5.0}]},
+                    ]
+                }
+            },
+            columns=["id", "inputs", "attributes", "summary", "output"],
+        )
+    )
+    assert len(calls) == 1
+    assert calls[0].inputs["x"] == "1e3"
+    assert calls[0].attributes["rank_text"] == "+2.5e2"
+    assert calls[0].summary["score_text"] == "-1.2e-3"
+    assert calls[0].output["n"] == "5e0"
+
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "attributes.bad_rank_text"},
+                        {"$literal": 0.0},
+                    ]
+                }
+            }
+        )
+    )
+    assert len(calls) == 0
+
     # trace roots only + op filter
     calls = client.get_calls(
         filter={"trace_roots_only": True, "op_names": [root_op_ref]},

@@ -5151,24 +5151,49 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
+def _sqlite_text_without_leading_sign_sql(text_sql: str) -> str:
+    return (
+        f"(CASE WHEN substr({text_sql}, 1, 1) IN ('-', '+') "
+        f"THEN substr({text_sql}, 2) ELSE {text_sql} END)"
+    )
+
+
+def _sqlite_unsigned_text_is_int_sql(unsigned_sql: str) -> str:
+    return f"({unsigned_sql} != '' AND {unsigned_sql} NOT GLOB '*[^0-9]*')"
+
+
+def _sqlite_unsigned_text_is_decimal_sql(unsigned_sql: str) -> str:
+    digits = f"replace({unsigned_sql}, '.', '')"
+    dot_count = f"(length({unsigned_sql}) - length(replace({unsigned_sql}, '.', '')))"
+    return (
+        f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' "
+        f"AND {dot_count} <= 1)"
+    )
+
+
 def _sqlite_json_text_is_int_sql(value_sql: str) -> str:
     trimmed = f"trim(CAST({value_sql} AS TEXT))"
-    unsigned = (
-        f"(CASE WHEN substr({trimmed}, 1, 1) IN ('-', '+') "
-        f"THEN substr({trimmed}, 2) ELSE {trimmed} END)"
-    )
-    return f"({unsigned} != '' AND {unsigned} NOT GLOB '*[^0-9]*')"
+    unsigned = _sqlite_text_without_leading_sign_sql(trimmed)
+    return _sqlite_unsigned_text_is_int_sql(unsigned)
 
 
 def _sqlite_json_text_is_float_sql(value_sql: str) -> str:
     trimmed = f"trim(CAST({value_sql} AS TEXT))"
-    unsigned = (
-        f"(CASE WHEN substr({trimmed}, 1, 1) IN ('-', '+') "
-        f"THEN substr({trimmed}, 2) ELSE {trimmed} END)"
+    lowered = f"lower({trimmed})"
+    exponent_pos = f"instr({lowered}, 'e')"
+    mantissa = (
+        f"(CASE WHEN {exponent_pos} > 0 THEN substr({lowered}, 1, {exponent_pos} - 1) "
+        f"ELSE {lowered} END)"
     )
-    digits = f"replace({unsigned}, '.', '')"
-    dot_count = f"(length({unsigned}) - length(replace({unsigned}, '.', '')))"
-    return f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' AND {dot_count} <= 1)"
+    exponent = f"substr({lowered}, {exponent_pos} + 1)"
+    unsigned_mantissa = _sqlite_text_without_leading_sign_sql(mantissa)
+    unsigned_exponent = _sqlite_text_without_leading_sign_sql(exponent)
+    mantissa_is_decimal = _sqlite_unsigned_text_is_decimal_sql(unsigned_mantissa)
+    exponent_is_int = _sqlite_unsigned_text_is_int_sql(unsigned_exponent)
+    return (
+        f"({mantissa_is_decimal} "
+        f"AND ({exponent_pos} = 0 OR {exponent_is_int}))"
+    )
 
 
 def _sqlite_sql_type_for_cast(cast: str) -> str:
