@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
+from weave.trace_server import llm_completion as llm_mod
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
@@ -19,6 +20,13 @@ from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_custom_provider_cache():
+    """Reset the module-level custom-provider TTL cache between tests."""
+    with llm_mod._custom_provider_cache_lock:
+        llm_mod._custom_provider_cache.clear()
 
 
 class MockObjectReadError(Exception):
@@ -1756,6 +1764,131 @@ def test_provider_base_url_validation():
         p.base_url = "http://169.254.169.254/v1"
     with pytest.raises(ValidationError):
         p.extra_headers = {"Metadata-Flavor": "Google"}
+
+
+@pytest.fixture
+def custom_provider_fixture():
+    """Build a provider/model/secret fixture and clear the module-level cache.
+
+    Yields a tuple of (project_id, provider_id, model_object_id, mock_obj_read,
+    mock_secret_fetcher). The autouse fixture clears the module-level cache.
+    """
+    project_id = "p"
+    provider_id = "prov"
+    model_object_id = f"{provider_id}-mdl"
+
+    provider_obj = tsi.ObjSchema(
+        project_id=project_id,
+        object_id=provider_id,
+        digest="d1",
+        base_object_class="Provider",
+        leaf_object_class="Provider",
+        val={
+            "base_url": "https://api.example.com",
+            "api_key_name": "TEST_API_KEY",
+            "extra_headers": {},
+            "return_type": "openai",
+        },
+        created_at=datetime.datetime.now(),
+        version_index=1,
+        is_latest=1,
+        kind="object",
+        deleted_at=None,
+    )
+    model_obj = tsi.ObjSchema(
+        project_id=project_id,
+        object_id=model_object_id,
+        digest="d2",
+        base_object_class="ProviderModel",
+        leaf_object_class="ProviderModel",
+        val={
+            "name": "actual-model",
+            "provider": provider_id,
+            "max_tokens": 4096,
+            "mode": "chat",
+        },
+        created_at=datetime.datetime.now(),
+        version_index=1,
+        is_latest=1,
+        kind="object",
+        deleted_at=None,
+    )
+
+    def mock_obj_read(req):
+        if req.object_id == provider_id:
+            return tsi.ObjReadRes(obj=provider_obj)
+        if req.object_id == model_object_id:
+            return tsi.ObjReadRes(obj=model_obj)
+        raise NotFoundError(req.object_id)
+
+    mock_obj_read_func = MagicMock(side_effect=mock_obj_read)
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.return_value = {"secrets": {"TEST_API_KEY": "k"}}
+
+    token = _secret_fetcher_context.set(mock_secret_fetcher)
+    try:
+        yield (
+            project_id,
+            provider_id,
+            model_object_id,
+            mock_obj_read_func,
+            mock_secret_fetcher,
+        )
+    finally:
+        _secret_fetcher_context.reset(token)
+
+
+@pytest.mark.parametrize(
+    (
+        "override_project",
+        "expected_obj_reads",
+        "expected_secret_fetches",
+        "same_instance",
+    ),
+    [
+        # Same key on the second call -> cache hit; only the first call resolves.
+        (False, 2, 1, True),
+        # Different project_id -> distinct cache key; both calls resolve.
+        (True, 4, 2, False),
+    ],
+    ids=["cache_hit_within_ttl", "distinct_keys_isolate"],
+)
+def test_get_custom_provider_info_cache_behavior(
+    custom_provider_fixture,
+    override_project,
+    expected_obj_reads,
+    expected_secret_fetches,
+    same_instance,
+):
+    """Cache hits within TTL skip resolution; distinct keys do not collide."""
+    project_id, provider_id, model_object_id, obj_read, secret_fetcher = (
+        custom_provider_fixture
+    )
+
+    first = get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
+    second_project = "other-project" if override_project else project_id
+    second = get_custom_provider_info(
+        second_project, provider_id, model_object_id, obj_read
+    )
+
+    assert (first is second) is same_instance
+    assert obj_read.call_count == expected_obj_reads
+    assert secret_fetcher.fetch.call_count == expected_secret_fetches
+
+
+def test_get_custom_provider_info_requires_secret_fetcher_on_cache_hit(
+    custom_provider_fixture,
+):
+    """A cache hit must not bypass the secret_fetcher-required guard."""
+    project_id, provider_id, model_object_id, obj_read, _ = custom_provider_fixture
+
+    # Populate the cache while the fixture's fetcher is in context.
+    get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
+
+    # Drop the fetcher; a subsequent call must still raise rather than serve cache.
+    _secret_fetcher_context.set(None)
+    with pytest.raises(InvalidRequest, match="No secret fetcher found"):
+        get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
 
 
 if __name__ == "__main__":
