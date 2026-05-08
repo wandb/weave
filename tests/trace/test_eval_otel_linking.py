@@ -1,0 +1,172 @@
+"""Tests for automatic GenAI span -> eval prediction linking via EvalLinkSpanProcessor."""
+
+import pytest
+from opentelemetry import trace as otel_trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+import weave
+from weave import Evaluation
+from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
+from weave.trace_server import trace_server_interface as tsi
+
+
+@pytest.fixture
+def otel_setup():
+    """Add an InMemorySpanExporter and EvalLinkSpanProcessor to the global provider.
+
+    OTel only allows set_tracer_provider once per process, so we add our
+    processors to whatever provider is already active and clear the exporter
+    between tests.
+    """
+    exporter = InMemorySpanExporter()
+    span_processor = SimpleSpanProcessor(exporter)
+    eval_processor = EvalLinkSpanProcessor()
+
+    provider = otel_trace.get_tracer_provider()
+
+    # If no SDK provider exists yet, create one.
+    if not isinstance(provider, SDKTracerProvider):
+        provider = SDKTracerProvider(resource=Resource.create({}))
+        otel_trace.set_tracer_provider(provider)
+
+    provider.add_span_processor(span_processor)
+    provider.add_span_processor(eval_processor)
+
+    yield exporter
+
+    exporter.clear()
+    span_processor.shutdown()
+    eval_processor.shutdown()
+
+
+def _emit_genai_span(model: str = "gpt-4o") -> None:
+    """Create and end a GenAI OTel span, simulating an LLM call."""
+    tracer = otel_trace.get_tracer("test")
+    span = tracer.start_span("chat")
+    span.set_attribute("gen_ai.operation.name", "chat")
+    span.set_attribute("gen_ai.request.model", model)
+    span.end()
+
+
+@pytest.mark.asyncio
+async def test_genai_span_ref_attached_to_eval_call(client, otel_setup):
+    """A GenAI OTel span emitted during a prediction should produce a
+    GenAISpanRef on the predict_and_score call summary.
+    """
+    exporter = otel_setup
+
+    @weave.op
+    async def model_predict(input) -> str:
+        _emit_genai_span()
+        return str(eval(input))
+
+    evaluation = Evaluation(
+        dataset=[{"input": "1 + 1"}],
+        scorers=[],
+    )
+    await evaluation.evaluate(model_predict)
+    client.flush()
+
+    # Verify the OTel span was emitted
+    spans = exporter.get_finished_spans()
+    genai_spans = [s for s in spans if s.attributes.get("gen_ai.operation.name")]
+    assert len(genai_spans) == 1
+
+    # Verify the GenAISpanRef was attached to the eval results
+    evaluate_call = next(iter(evaluation.evaluate.calls()))
+    res = client.server.eval_results_query(
+        tsi.EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[evaluate_call.id],
+            include_predict_and_score_children=False,
+        )
+    )
+
+    trial = res.rows[0].evaluations[0].trials[0]
+    assert trial.genai_span_ref is not None
+    assert trial.genai_span_ref.trace_id == format(
+        genai_spans[0].context.trace_id, "032x"
+    )
+    assert trial.genai_span_ref.span_id == format(
+        genai_spans[0].context.span_id, "016x"
+    )
+
+
+@pytest.mark.asyncio
+async def test_eval_metadata_injected_onto_spans(client, otel_setup):
+    """Eval context attributes should be injected onto all spans created
+    during a predict_and_score context for reverse lookup in the agent traces UI.
+    """
+    exporter = otel_setup
+
+    @weave.op
+    async def model_predict(input) -> str:
+        _emit_genai_span()
+        return str(eval(input))
+
+    evaluation = Evaluation(
+        dataset=[{"input": "1 + 1"}],
+        scorers=[],
+    )
+    await evaluation.evaluate(model_predict)
+
+    spans = exporter.get_finished_spans()
+    assert len(spans) >= 1
+
+    span_attrs = dict(spans[0].attributes)
+    assert "weave.eval.predict_and_score_call_id" in span_attrs
+    assert "weave.eval.project_id" in span_attrs
+
+
+@pytest.mark.asyncio
+async def test_non_genai_span_gets_eval_metadata_but_no_span_ref(client, otel_setup):
+    """Non-GenAI spans during eval get eval metadata (on_start) but no
+    GenAISpanRef (on_end only links spans with gen_ai.operation.name).
+    """
+    exporter = otel_setup
+
+    @weave.op
+    async def model_predict(input) -> str:
+        tracer = otel_trace.get_tracer("test")
+        span = tracer.start_span("some-other-work")
+        span.end()
+        return str(eval(input))
+
+    evaluation = Evaluation(
+        dataset=[{"input": "1 + 1"}],
+        scorers=[],
+    )
+    await evaluation.evaluate(model_predict)
+    client.flush()
+
+    # The span should have eval metadata from on_start
+    spans = exporter.get_finished_spans()
+    assert len(spans) >= 1
+    span_attrs = dict(spans[0].attributes)
+    assert "weave.eval.predict_and_score_call_id" in span_attrs
+
+    # But the eval results should NOT have a GenAISpanRef
+    evaluate_call = next(iter(evaluation.evaluate.calls()))
+    res = client.server.eval_results_query(
+        tsi.EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[evaluate_call.id],
+            include_predict_and_score_children=False,
+        )
+    )
+
+    trial = res.rows[0].evaluations[0].trials[0]
+    assert trial.genai_span_ref is None
+
+
+@pytest.mark.asyncio
+async def test_genai_span_outside_eval_does_not_crash(otel_setup):
+    """A GenAI span emitted outside of an eval context should be silently ignored."""
+    _emit_genai_span()
+
+    spans = otel_setup.get_finished_spans()
+    assert len(spans) == 1
+    assert "weave.eval.predict_and_score_call_id" not in dict(spans[0].attributes)

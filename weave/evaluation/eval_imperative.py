@@ -19,7 +19,11 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
-from weave.evaluation.eval import Evaluation, default_evaluation_display_name
+from weave.evaluation.eval import (
+    Evaluation,
+    _active_eval_prediction_context,
+    default_evaluation_display_name,
+)
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
@@ -366,6 +370,9 @@ class ScoreLogger:
         self._call_stack_context: (
             contextlib.AbstractContextManager[list[Call]] | None
         ) = None
+        self._eval_prediction_context: (
+            contextlib.AbstractContextManager[None] | None
+        ) = None
 
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
@@ -597,6 +604,10 @@ class ScoreLogger:
 
     def __enter__(self) -> Self:
         """Enter context manager and set call stack to predict_call."""
+        self._eval_prediction_context = _active_eval_prediction_context(
+            self.predict_and_score_call
+        )
+        self._eval_prediction_context.__enter__()
         self._call_stack_context = call_context.set_call_stack([self.predict_call])
         self._call_stack_context.__enter__()
         return self
@@ -614,6 +625,9 @@ class ScoreLogger:
         finally:
             if self._call_stack_context is not None:
                 self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
+            if self._eval_prediction_context is not None:
+                self._eval_prediction_context.__exit__(exc_type, exc_val, exc_tb)
+            self._eval_prediction_context = None
 
 
 class EvaluationLogger:
