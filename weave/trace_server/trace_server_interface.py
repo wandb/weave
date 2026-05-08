@@ -2529,6 +2529,14 @@ class EvaluationRunFinishRes(BaseModel):
     )
 
 
+class AgentTraceRef(BaseModel):
+    trace_id: str
+    span_id: str | None = Field(default=None, exclude_if=_exclude_if_none)
+    conversation_id: str | None = Field(default=None, exclude_if=_exclude_if_none)
+    agent_name: str | None = Field(default=None, exclude_if=_exclude_if_none)
+    agent_version: str | None = Field(default=None, exclude_if=_exclude_if_none)
+
+
 class PredictionCreateBody(BaseModel):
     """Request body for creating a Prediction via REST API.
 
@@ -2541,6 +2549,10 @@ class PredictionCreateBody(BaseModel):
     evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to link this prediction as a child call",
+    )
+    agent_trace_ref: AgentTraceRef | None = Field(
+        default=None,
+        description="Optional agent trace/span reference produced by this prediction.",
     )
 
 
@@ -2836,6 +2848,7 @@ class EvalResultsTrial(BaseModel):
     model_latency_seconds: float | None = None
     total_tokens: int | None = None
     scorer_call_ids: dict[str, str] = Field(default_factory=dict)
+    agent_trace_ref: AgentTraceRef | None = None
 
 
 class EvalResultsRowEvaluation(BaseModel):

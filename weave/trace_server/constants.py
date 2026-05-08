@@ -30,6 +30,7 @@ EVALUATION_RUN_PREDICTION_ATTR_KEY = "prediction"
 EVALUATION_RUN_SCORE_ATTR_KEY = "score"
 EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY = "predict_call_id"
 EVALUATION_RUN_SCORER_ATTR_KEY = "scorer"
+AGENT_TRACE_REF_ATTR_KEY = "agent_trace_ref"
 
 # Attribute keys for predictions
 PREDICTION_ATTR_KEY = "prediction"
