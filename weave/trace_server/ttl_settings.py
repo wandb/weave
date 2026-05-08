@@ -47,7 +47,6 @@ _project_ttl_cache: TTLCache[str, int] = TTLCache(
 _project_ttl_cache_lock = threading.Lock()
 
 
-@ddtrace.tracer.wrap(name="ttl_settings.get_project_retention_days")
 def get_project_retention_days(
     project_id: str,
     ch_client: CHClient,
@@ -180,6 +179,7 @@ def _l2_delete(redis_client: redis.Redis, project_id: str) -> None:
         logger.exception("Redis L2 cache delete failed for project %s", project_id)
 
 
+@ddtrace.tracer.wrap(name="ttl_settings.query_clickhouse")
 def _query_clickhouse(ch_client: CHClient, project_id: str) -> int:
     """Query ClickHouse for the latest retention_days via argMax.
 
