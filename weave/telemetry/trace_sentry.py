@@ -40,6 +40,22 @@ SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
 logger = logging.getLogger(__name__)
 
+# Values of `WANDB_ERROR_REPORTING` that opt the user out of error reporting.
+# Mirrors the falsy spellings accepted by `wandb.env.error_reporting_enabled`
+# (which routes through `distutils.util.strtobool`).
+_ERROR_REPORTING_FALSY = frozenset({"false", "0", "no", "off", "f", "n"})
+
+
+def _error_reporting_enabled() -> bool:
+    """Whether outbound error reporting to Sentry is enabled.
+
+    Honors the wandb-canonical `WANDB_ERROR_REPORTING` environment variable so
+    that customers who already disable error reporting for the `wandb` SDK get
+    the same behavior here. Default is enabled when the variable is unset.
+    """
+    val = os.environ.get("WANDB_ERROR_REPORTING", "").strip().lower()
+    return val not in _ERROR_REPORTING_FALSY
+
 
 def _safe_noop(func: Callable) -> Callable:
     """Decorator to ensure that Sentry methods do nothing if disabled and don't raise."""
@@ -69,8 +85,9 @@ class Sentry:
 
         self.scope: Scope | None = None
 
-        # Disable if sentry is not available
-        self._disabled = not SENTRY_AVAILABLE
+        # Disable if sentry is not available, or if the user opted out via
+        # `WANDB_ERROR_REPORTING=false` (matches `wandb/analytics/sentry.py`).
+        self._disabled = (not SENTRY_AVAILABLE) or (not _error_reporting_enabled())
 
         # ensure we always end the Sentry session
         atexit.register(self.end_session)
