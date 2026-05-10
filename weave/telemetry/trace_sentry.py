@@ -18,6 +18,8 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal
 
+from weave.trace.settings import _str2bool_truthy
+
 try:
     import sentry_sdk  # type: ignore
     import sentry_sdk.utils  # type: ignore
@@ -40,11 +42,6 @@ SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
 logger = logging.getLogger(__name__)
 
-# Values of `WANDB_ERROR_REPORTING` that opt the user out of error reporting.
-# Mirrors the falsy spellings accepted by `wandb.env.error_reporting_enabled`
-# (which routes through `distutils.util.strtobool`).
-_ERROR_REPORTING_FALSY = frozenset({"false", "0", "no", "off", "f", "n"})
-
 
 def _error_reporting_enabled() -> bool:
     """Whether outbound error reporting to Sentry is enabled.
@@ -53,8 +50,7 @@ def _error_reporting_enabled() -> bool:
     that customers who already disable error reporting for the `wandb` SDK get
     the same behavior here. Default is enabled when the variable is unset.
     """
-    val = os.environ.get("WANDB_ERROR_REPORTING", "").strip().lower()
-    return val not in _ERROR_REPORTING_FALSY
+    return _str2bool_truthy(os.environ.get("WANDB_ERROR_REPORTING", "true"))
 
 
 def _safe_noop(func: Callable) -> Callable:
