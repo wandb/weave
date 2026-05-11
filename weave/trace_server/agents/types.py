@@ -260,7 +260,8 @@ class AgentSpanStatsReq(BaseModel):
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:
         numeric_bucket = (
-            self.bucket_by if isinstance(self.bucket_by, AgentSpanStatsNumericBucketSpec)
+            self.bucket_by
+            if isinstance(self.bucket_by, AgentSpanStatsNumericBucketSpec)
             else None
         )
         if not self.metrics and numeric_bucket is None:

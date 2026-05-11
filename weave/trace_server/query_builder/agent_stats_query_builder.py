@@ -42,8 +42,8 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     add_time_filters,
     conversation_aggregate_value_sql,
-    group_numeric_filters_having_sql,
     group_by_ref_alias,
+    group_numeric_filters_having_sql,
     resolve_agent_span_field_column,
     resolve_group_by,
 )
@@ -789,7 +789,9 @@ def _build_numeric_bucket_stats_query(
         f"{bucket_width_sql}))"
     )
     metric_select_sql = ",\n          ".join(metric_exprs)
-    metric_select_clause = f",\n          {metric_select_sql}" if metric_select_sql else ""
+    metric_select_clause = (
+        f",\n          {metric_select_sql}" if metric_select_sql else ""
+    )
     agg_select_sql = ",\n          ".join(agg_selects)
     outer_metric_sql = ",\n      ".join(outer_metric_selects)
     if bucket.conversation_aggregate is None:
