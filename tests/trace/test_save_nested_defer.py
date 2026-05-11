@@ -310,10 +310,94 @@ def test_finish_call_returns_before_send(client: WeaveClient) -> None:
         # Generous bound: the calling thread does sync work for create_call's
         # `_save_nested_objects(inputs)` plus the body, but finish_call should
         # have deferred everything else. 500ms is a sanity ceiling, not a perf
-        # goal — anything under "obviously waiting on the server" is enough.
+        # goal -- anything under "obviously waiting on the server" is enough.
         assert elapsed < 0.5, f"finish_call appears to block: {elapsed:.3f}s"
     finally:
         blocker.resume()
         client.server = blocker._inner
         client._flush()
         client.set_autoflush(True)
+
+
+class _CapturingTraceServer:
+    """Server proxy that captures `call_end` requests for inspection.
+
+    Plain class (not a `TraceServerInterface` subclass) so `__getattr__`
+    forwards every other method to the inner server, matching the pattern
+    used by `_CallEndRaisingServer`.
+    """
+
+    def __init__(self, inner: tsi.TraceServerInterface) -> None:
+        self._inner = inner
+        self.captured: list[tsi.CallEndReq] = []
+
+    def __getattr__(self, item: str) -> Any:
+        return getattr(self._inner, item)
+
+    def call_end(self, req: tsi.CallEndReq) -> Any:
+        self.captured.append(req)
+        return self._inner.call_end(req)
+
+
+def test_output_mutation_after_finish_is_not_recorded(client: WeaveClient) -> None:
+    """Mutating a returned mutable output after `finish_call` must not change
+    what the server records (regression for PR #6740 review concern).
+
+    Output-side `_save_nested_objects` / `map_to_refs` / `to_json` are
+    deferred to a worker, and the deferred walk reads `postprocessed_output`
+    by reference. A caller that mutates the value between `finish_call`
+    returning and the worker running would see their post-call mutation
+    recorded as if it happened during the op:
+
+        @weave.op
+        def func(): return {"result": [1]}
+
+        res = func()
+        res["result"].append(2)   # should NOT change the recorded output
+
+    To remove the timing race we gate `client._save_nested_objects` on the
+    output-side call (call #2 -- call #1 is `create_call` for inputs, sync
+    on the main thread). The mutation lands before the gate releases, so we
+    deterministically observe what the deferred walk captures. Autoflush is
+    disabled so the test-client's per-method `_flush` does not block on the
+    gated worker.
+    """
+
+    @weave.op
+    def func() -> dict:
+        return {"result": [1]}
+
+    # Capture call_end at the server boundary -- avoids depending on the
+    # test fixture's caching/recorder stack to round-trip the value.
+    capturing = _CapturingTraceServer(client.server)
+    client.server = capturing
+
+    gate = threading.Event()
+    save_calls = {"n": 0}
+    original_save = client._save_nested_objects
+
+    def patched_save(obj: Any, name: str | None = None) -> Any:
+        save_calls["n"] += 1
+        if save_calls["n"] >= 2:  # output path inside `schedule_send`
+            gate.wait()
+        return original_save(obj, name=name)
+
+    client._save_nested_objects = patched_save  # type: ignore[method-assign]
+    client.set_autoflush(False)
+    try:
+        res = func()
+        assert res == {"result": [1]}
+        res["result"].append(2)
+        gate.set()
+        client._flush()
+    finally:
+        client.set_autoflush(True)
+        client._save_nested_objects = original_save  # type: ignore[method-assign]
+        client.server = capturing._inner
+
+    assert len(capturing.captured) == 1
+    recorded_output = capturing.captured[0].end.output
+    assert recorded_output == {"result": [1]}, (
+        "Deferred walk captured a post-finish_call mutation: "
+        f"{recorded_output!r}"
+    )
