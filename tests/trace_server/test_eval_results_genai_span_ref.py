@@ -35,8 +35,6 @@ def _genai_span_ref(trace_id: str = "agent-trace-1") -> dict[str, Any]:
     return {
         "trace_id": trace_id,
         "span_id": "span-1",
-        "conversation_id": "conversation-1",
-        "agent_name": "agent-1",
     }
 
 

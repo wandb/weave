@@ -472,8 +472,6 @@ def test_eval_results_query_returns_genai_span_ref_without_children(client):
     genai_span_ref = GenAISpanRef(
         trace_id="agent-trace-1",
         span_id="span-1",
-        conversation_id="conversation-1",
-        agent_name="test-agent",
     )
 
     run = client.server.evaluation_run_create(
