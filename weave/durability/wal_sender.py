@@ -52,6 +52,7 @@ from weave.durability.wal import (
     WALRecord,
     drain,
 )
+from weave.durability.wal_client_id import WAL_ROOT, compute_client_id
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
@@ -427,9 +428,13 @@ def main(argv: list[str] | None = None) -> None:
         print("Error: --api-key or WANDB_API_KEY required", file=sys.stderr)
         sys.exit(1)
 
-    wal_dir = args.wal_dir or os.path.join(
-        os.path.expanduser("~"), ".weave", "wal", args.entity, args.project
-    )
+    if args.wal_dir:
+        wal_dir = args.wal_dir
+    else:
+        parts = [WAL_ROOT, args.entity, args.project]
+        if args.api_key:
+            parts.append(compute_client_id(args.api_key))
+        wal_dir = os.path.join(*parts)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 

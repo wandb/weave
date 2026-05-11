@@ -1,4 +1,11 @@
-const warnedKeys = new Set<string>();
+import {globalSingleton} from './globalSingleton';
+
+// Deduped across CJS/ESM module copies so a dual-loaded SDK does not emit the
+// same warning twice.
+const warnedKeys = globalSingleton(
+  '_weave_warned_keys',
+  () => new Set<string>()
+);
 
 export function warnOnce(key: string, message: string): void {
   if (!warnedKeys.has(key)) {

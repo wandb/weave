@@ -1,0 +1,10 @@
+{
+  "name": "cjs-basic-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node main.cjs"
+  },
+  "description": "CJS smoke host app for the hostApps integration tests. The 'weave' tarball is installed at test time via `npm install <tgz> --no-save`."
+}
