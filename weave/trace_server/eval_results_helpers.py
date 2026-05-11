@@ -287,6 +287,38 @@ def best_effort_scorer_call_ids(
     return result
 
 
+def _augment_scores_with_child_scorer_outputs(
+    scores: dict[str, Any],
+    trial_children: list[tsi.CallSchema],
+) -> dict[str, Any]:
+    """Return `scores` augmented with any scorer-child call outputs whose key
+    isn't already present. This is how scores appended via
+    ``ScoreLogger.from_call(...)`` after the predict_and_score call ended
+    surface in the rollup — the original predict_and_score's frozen
+    `output["scores"]` doesn't include them, but the scorer calls live as
+    children of the predict_and_score and contribute their outputs here.
+    """
+    augmented = dict(scores)
+    for child in trial_children:
+        weave_attrs = child.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+        eval_meta = child.attributes.get("_weave_eval_meta", {})
+        is_scorer = weave_attrs.get(constants.SCORE_ATTR_KEY) == "true" or (
+            isinstance(eval_meta, dict) and eval_meta.get("score")
+        )
+        if not is_scorer:
+            op_name_lower = child.op_name.lower() if child.op_name else ""
+            if ".score" not in op_name_lower and "scorer" not in op_name_lower:
+                continue
+        scorer_key = (
+            child.op_name.rsplit("/", maxsplit=1)[-1].split(":", maxsplit=1)[0]
+            if child.op_name
+            else None
+        )
+        if scorer_key and scorer_key not in augmented:
+            augmented[scorer_key] = child.output
+    return augmented
+
+
 def _build_trial(
     predict_and_score_call: tsi.CallSchema,
     child_by_parent: dict[str, list[tsi.CallSchema]],
@@ -297,8 +329,9 @@ def _build_trial(
         if isinstance(predict_and_score_call.output, dict)
         else {}
     )
-    scores = output.get("scores", {})
+    raw_scores = output.get("scores", {})
     trial_children = child_by_parent.get(predict_and_score_call.id, [])
+    scores = _augment_scores_with_child_scorer_outputs(raw_scores, trial_children)
     model_ref = (
         predict_and_score_call.inputs.get("model")
         if isinstance(predict_and_score_call.inputs, dict)

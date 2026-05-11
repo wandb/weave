@@ -9,10 +9,12 @@ from typing import Any
 
 from weave.object.obj import Object
 from weave.trace.call import Call
+from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
 from weave.trace.op_protocol import Op
+from weave.trace.refs import ObjectRef
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,21 @@ class Model(Object):
         raise MissingInferenceMethodError(
             f"Missing a method with name in ({INFER_METHOD_NAMES})"
         )
+
+    @classmethod
+    def from_ref(cls, ref: ObjectRef) -> "Model | None":
+        """Hydrate a Model from its ObjectRef. Returns None when the ref
+        doesn't resolve to a Model instance (e.g. it points at an
+        `@weave.op` function or to an unregistered Model subclass that
+        `wc.get()` surfaces only as a `WeaveObject` wrapper). Callers can
+        treat `None` as "the original model can't be reused as-is" and
+        substitute a placeholder.
+        """
+        wc = require_weave_client()
+        val = wc.get(ref)
+        if isinstance(val, Model):
+            return val
+        return None
 
 
 def get_infer_method(model: Model) -> Op:

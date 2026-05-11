@@ -117,6 +117,27 @@ class Evaluation(Object):
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
 
     @classmethod
+    def from_ref(cls, ref: ObjectRef) -> Self:
+        """Hydrate an Evaluation from its ObjectRef, preserving the digest.
+
+        `wc.get(ref)` typically returns a `WeaveObject` wrapper rather than
+        an Evaluation directly; this method routes that through `from_obj`
+        and asserts the result's ref still has the original digest, so the
+        Evaluation can be reused as op input without bumping a new version.
+        """
+        wc = require_weave_client()
+        val = wc.get(ref)
+        evaluation = val if isinstance(val, cls) else cls.from_obj(val)
+        resolved_digest = evaluation.ref.digest if evaluation.ref else None
+        if resolved_digest != ref.digest:
+            raise RuntimeError(
+                "Evaluation ref digest changed during Evaluation.from_ref "
+                f"({ref.digest!r} → {resolved_digest!r}); reusing the result "
+                "as op input would publish a new Evaluation version."
+            )
+        return evaluation
+
+    @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
         field_values = {}
         for field_name in cls.model_fields:
