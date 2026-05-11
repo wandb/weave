@@ -526,7 +526,7 @@ def test_newer_agent_task_and_turn_fields_prevent_unknown_blocks(
         ),
     ],
 )
-def test_usage_to_metrics_branches(client: WeaveClient, usage, expected) -> None:
+def test_usage_to_metrics_branches(usage, expected) -> None:
     assert _usage_to_metrics(usage) == expected
 
 
@@ -539,9 +539,7 @@ def test_usage_to_metrics_branches(client: WeaveClient, usage, expected) -> None
         (None, None, "Turn"),
     ],
 )
-def test_call_name_for_turn_span_branches(
-    client: WeaveClient, turn, agent_name, expected
-) -> None:
+def test_call_name_for_turn_span_branches(turn, agent_name, expected) -> None:
     span_data = Mock(spec=TurnSpanData)
     span_data.name = None
     span_data.turn = turn
@@ -554,9 +552,7 @@ def test_call_name_for_turn_span_branches(
     assert _call_name(span) == expected
 
 
-def test_task_and_turn_log_data_handle_missing_optional_fields(
-    client: WeaveClient,
-) -> None:
+def test_task_and_turn_log_data_handle_missing_optional_fields() -> None:
     """Task/turn spans with missing optional fields produce empty metrics and
     only the metadata they actually carry. Exercises the False branches of the
     isinstance/getattr guards in _task_log_data and _turn_log_data.
@@ -588,7 +584,7 @@ def test_task_and_turn_log_data_handle_missing_optional_fields(
     assert _call_name(turn_span) == "Turn"
 
 
-def test_generation_log_data_uses_usage_metrics(client: WeaveClient) -> None:
+def test_generation_log_data_uses_usage_metrics() -> None:
     """_generation_log_data delegates token-metric assembly to _usage_to_metrics."""
     span_data = GenerationSpanData(
         input=[{"role": "user", "content": "hi"}],
@@ -615,7 +611,7 @@ def test_generation_log_data_uses_usage_metrics(client: WeaveClient) -> None:
 
 
 def test_optional_span_classes_absent_falls_back_to_unknown(
-    client: WeaveClient, monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When TaskSpanData/TurnSpanData failed to import (older SDK), the
     isinstance helpers must short-circuit to False and _log_data must fall

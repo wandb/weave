@@ -14,6 +14,16 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
+            -   name: Create GitHub App token
+                id: app-token
+                uses: actions/create-github-app-token@v3
+                with:
+                    app-id: ${{ vars.WANDBOT_3000_APP_ID }}
+                    private-key: ${{ secrets.WANDBOT_3000_PRIVATE_KEY }}
+                    owner: wandb
+                    repositories: core
+                    permission-contents: write
+
             -   name: capture payload
                 run: |
                     cat >> "${GITHUB_STEP_SUMMARY}" <<- '__summary'
@@ -29,7 +39,7 @@ jobs:
             -   name: Send repository dispatch to wandb/core
                 uses: peter-evans/repository-dispatch@v3
                 with:
-                    token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
+                    token: ${{ steps.app-token.outputs.token }}
                     repository: wandb/core
                     event-type: weave-branch-deleted
                     client-payload: |-

@@ -47,6 +47,26 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     return ch_client
 
 
+def _make_ch_client_with_database_engines(database_engines: dict[str, str]) -> Mock:
+    """Create a mock CH client with per-database system.databases responses."""
+    ch_client = Mock()
+    ch_client.database = "test_db"
+
+    def _query_side_effect(sql, *args, **kwargs):
+        if "system.databases" in sql:
+            db_name = kwargs.get("parameters", {}).get("db_name")
+            engine_result = Mock()
+            if db_name in database_engines:
+                engine_result.result_rows = [(database_engines[db_name],)]
+            else:
+                engine_result.result_rows = []
+            return engine_result
+        return Mock()
+
+    ch_client.query.side_effect = _query_side_effect
+    return ch_client
+
+
 @pytest.fixture
 def mock_migration_lock():
     """Bypass the distributed migration lock for tests that call apply_migrations."""
@@ -177,6 +197,97 @@ def test_apply_migrations_with_target_version(
     assert migrator.ch_client.command.call_count == 2
     migrator.ch_client.command.assert_has_calls(
         [call("CREATE TABLE test1 (id Int32)"), call("CREATE TABLE test2 (id Int32)")]
+    )
+
+
+def test_apply_migrations_discovers_existing_target_database_engine(
+    mock_migration_lock, mock_costs, tmp_path
+):
+    migration_dir = tmp_path / "migrations"
+    migration_dir.mkdir()
+    migration_file = migration_dir / "026_object_version_first_seen.up.sql"
+    migration_file.write_text(
+        """
+        -- Customer regression: comments before CREATE TABLE must not hide the DDL.
+        CREATE TABLE IF NOT EXISTS object_version_first_seen (
+            project_id String,
+            object_id String,
+            digest String,
+            first_created_at SimpleAggregateFunction(min, DateTime64(3))
+        ) ENGINE = AggregatingMergeTree()
+        ORDER BY (project_id, object_id, digest);
+        """
+    )
+
+    def run_upgrade_case(
+        *,
+        target_db: str,
+        target_engine: str,
+        expect_on_cluster: bool,
+        use_distributed: bool = False,
+    ) -> None:
+        ch_client = _make_ch_client_with_database_engines(
+            {"db_management": "Atomic", target_db: target_engine}
+        )
+        migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+            ch_client,
+            replicated=True,
+            use_distributed=use_distributed,
+            replicated_cluster="test_cluster",
+            migration_dir=str(migration_dir),
+            post_migration_hook=None,
+        )
+        migrator._get_migration_status = Mock(
+            return_value={"curr_version": 25, "partially_applied_version": None}
+        )
+        migrator._get_migrations = Mock()
+        migrator._determine_migrations_to_apply = Mock(
+            return_value=[(26, migration_file.name)]
+        )
+        migrator._update_migration_status = Mock()
+        ch_client.command.reset_mock()
+
+        migrator.apply_migrations(target_db, target_version=26)
+
+        executed_sql = [call.args[0] for call in ch_client.command.call_args_list]
+        create_sql = executed_sql[0]
+        assert "CREATE TABLE" in create_sql
+        assert "object_version_first_seen" in create_sql
+        assert "ENGINE = ReplicatedAggregatingMergeTree()" in create_sql
+        assert ("ON CLUSTER test_cluster" in create_sql) is expect_on_cluster
+        assert migrator._replicated_db_engine_cache[target_db] is (
+            target_engine == "Replicated"
+        )
+
+        if use_distributed:
+            distributed_sql = executed_sql[1]
+            assert "CREATE TABLE IF NOT EXISTS object_version_first_seen" in (
+                distributed_sql
+            )
+            assert "ENGINE = Distributed" in distributed_sql
+            assert ("ON CLUSTER test_cluster" in distributed_sql) is expect_on_cluster
+
+    # Existing legacy Replicated DBs reject ON CLUSTER during upgrades.
+    run_upgrade_case(
+        target_db="legacy_replicated_db",
+        target_engine="Replicated",
+        expect_on_cluster=False,
+    )
+
+    # Existing Atomic DBs still need ON CLUSTER fan-out.
+    run_upgrade_case(
+        target_db="atomic_db",
+        target_engine="Atomic",
+        expect_on_cluster=True,
+    )
+
+    # Distributed mode inherits the same discovery path before splitting DDL
+    # into local and distributed table statements.
+    run_upgrade_case(
+        target_db="legacy_replicated_distributed_db",
+        target_engine="Replicated",
+        expect_on_cluster=False,
+        use_distributed=True,
     )
 
 
@@ -1260,6 +1371,77 @@ def test_ddl_adapts_to_database_engine(replicated_migrator, distributed_migrator
     )
 
 
+def test_replicated_database_engine_suppresses_on_cluster_for_ddl_families(
+    replicated_migrator, distributed_migrator
+):
+    """Legacy Replicated DBs must not get ON CLUSTER from any DDL branch."""
+    replicated_commands = [
+        "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id",
+        "ALTER TABLE test ADD COLUMN x Int32",
+        "ALTER TABLE test MODIFY TTL toDateTime(expire_at) DELETE",
+        "DROP TABLE IF EXISTS test",
+        "DROP VIEW IF EXISTS test_view",
+        "CREATE VIEW test_view AS SELECT * FROM test",
+        "CREATE MATERIALIZED VIEW test_mv TO test AS SELECT * FROM test",
+        "RENAME TABLE old_name TO new_name",
+    ]
+    distributed_commands = [
+        "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id",
+        "ALTER TABLE test ADD COLUMN x Int32",
+        "ALTER TABLE test ADD INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 1",
+        "ALTER TABLE test MODIFY TTL toDateTime(expire_at) DELETE",
+        "ALTER TABLE calls_merged_view MODIFY QUERY SELECT project_id, id FROM call_parts GROUP BY project_id, id",
+        "DROP TABLE IF EXISTS test",
+        "DROP VIEW IF EXISTS test_view",
+        "CREATE VIEW test_view AS SELECT * FROM test",
+        "CREATE MATERIALIZED VIEW test_mv TO test AS SELECT * FROM test",
+        "RENAME TABLE old_name TO new_name",
+    ]
+
+    for migrator, commands in [
+        (replicated_migrator, replicated_commands),
+        (distributed_migrator, distributed_commands),
+    ]:
+        migrator._replicated_db_engine_cache["test_db"] = True
+        for command in commands:
+            migrator.ch_client.command.reset_mock()
+
+            migrator._execute_migration_command("test_db", command)
+
+            emitted_sql = [
+                call.args[0] for call in migrator.ch_client.command.call_args_list
+            ]
+            assert emitted_sql, command
+            assert all("ON CLUSTER" not in sql for sql in emitted_sql), (
+                command,
+                emitted_sql,
+            )
+            assert migrator.ch_client.database == "original_db"
+
+
+def test_execute_migration_command_restores_database_on_error(
+    replicated_migrator, distributed_migrator
+):
+    """DDL errors should not leave the shared ClickHouse client on target_db."""
+    for migrator, command in [
+        (
+            replicated_migrator,
+            "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id",
+        ),
+        (distributed_migrator, "ALTER TABLE test ADD COLUMN x Int32"),
+    ]:
+        migrator.ch_client.command.reset_mock()
+        migrator.ch_client.command.side_effect = DatabaseError(
+            "Code: 80. DB::Exception: boom"
+        )
+
+        with pytest.raises(DatabaseError, match="boom"):
+            migrator._execute_migration_command("test_db", command)
+
+        assert migrator.ch_client.database == "original_db"
+        migrator.ch_client.command.side_effect = None
+
+
 def test_index_operations_only_on_local_tables_distributed(distributed_migrator):
     """Test that ADD/DROP INDEX operations are only applied to local tables in distributed mode."""
     test_cases = [
@@ -1460,6 +1642,22 @@ def test_split_migration_sql() -> None:
         assert not s.endswith(";")
         assert "--" not in s
         assert "/*" not in s
+
+
+def test_shipped_migrations_do_not_embed_on_cluster() -> None:
+    """The migrator owns ON CLUSTER insertion so Replicated DBs can suppress it."""
+    offenders: list[str] = []
+    for file_name in sorted(os.listdir(DEFAULT_MIGRATION_DIR)):
+        if not file_name.endswith((".up.sql", ".down.sql")):
+            continue
+        file_path = os.path.join(DEFAULT_MIGRATION_DIR, file_name)
+        with open(file_path, encoding="utf-8") as f:
+            for statement in split_migration_sql(f.read()):
+                if SQLPatterns.ON_CLUSTER.search(statement):
+                    offenders.append(file_name)
+                    break
+
+    assert offenders == []
 
 
 def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:

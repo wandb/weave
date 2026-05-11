@@ -19,6 +19,7 @@ import {CallStack} from '../weaveClient';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {uuidv7} from 'uuidv7';
 import {topologicalSortChildrenFirst} from '../utils/topologicalSort';
+import {globalSingleton} from '../utils/globalSingleton';
 import type {
   Span,
   Trace,
@@ -190,12 +191,9 @@ interface CallData {
 // This allows the OpenAI SDK integration to look up parent call information
 // Uses globalThis + Symbol.for to ensure a single shared Map instance across
 // CJS and ESM module boundaries (the module can be loaded twice by different loaders).
-const globalWeaveCallDataMap: Map<
-  string,
-  {weaveCallId: string; weaveTraceId: string}
-> =
-  (globalThis as any)[Symbol.for('_weave_call_data_map')] ||
-  ((globalThis as any)[Symbol.for('_weave_call_data_map')] = new Map());
+const globalWeaveCallDataMap = globalSingleton<
+  Map<string, {weaveCallId: string; weaveTraceId: string}>
+>('_weave_call_data_map', () => new Map());
 
 // ============================================================================
 // Agent Context Provider
@@ -224,12 +222,10 @@ const globalWeaveCallDataMap: Map<
 // ============================================================================
 
 /** Internal store — shared across module boundaries via globalThis. */
-const _agentContextProvider: {
+const _agentContextProvider = globalSingleton<{
   getCurrentTrace?: () => any;
   getCurrentSpan?: () => any;
-} =
-  (globalThis as any)[Symbol.for('_weave_agent_context_provider')] ||
-  ((globalThis as any)[Symbol.for('_weave_agent_context_provider')] = {});
+}>('_weave_agent_context_provider', () => ({}));
 
 /**
  * Register the OpenAI Agents context functions.
@@ -582,7 +578,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
     this.cleanup();
     // Allow re-registration if the processor is shut down externally
     // (e.g., when @openai/agents calls setTraceProcessors during CJS module init)
-    _agentsInstrumented = false;
+    _agentsInstrumentedHolder.value = false;
   }
 
   /**
@@ -757,20 +753,26 @@ export async function instrumentOpenAIAgents(): Promise<boolean> {
   }
 }
 
-let _agentsInstrumented = false;
+// Shared across CJS/ESM module copies via globalThis so both resolve the
+// "already instrumented" decision identically. Without this, each copy would
+// track its own flag and double-instrument the SDK.
+const _agentsInstrumentedHolder = globalSingleton<{value: boolean}>(
+  '_weave_agents_instrumented',
+  () => ({value: false})
+);
 
 export function instrumentOpenAIAgentsCommon(exports: any): boolean {
   // Always capture context functions when available — even if already instrumented,
   // because a later module load may provide fresh references after a processor reset.
   registerAgentContextProvider(exports);
 
-  if (_agentsInstrumented) {
+  if (_agentsInstrumentedHolder.value) {
     return true;
   }
   if (typeof exports.addTraceProcessor === 'function') {
     const processor = createOpenAIAgentsTracingProcessor();
     exports.addTraceProcessor(processor);
-    _agentsInstrumented = true;
+    _agentsInstrumentedHolder.value = true;
     return true;
   } else {
     console.warn(

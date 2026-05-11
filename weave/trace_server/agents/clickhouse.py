@@ -24,7 +24,10 @@ from weave.trace_server.agents.helpers import (
     normalize_span_row,
     unpack_string_array,
 )
-from weave.trace_server.agents.schema import ALL_SPAN_INSERT_COLUMNS
+from weave.trace_server.agents.schema import (
+    ALL_SPAN_INSERT_COLUMNS,
+    AgentSpanCHInsertable,
+)
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -320,13 +323,15 @@ class AgentWriteHandler:
     # OTel ingest
     # ------------------------------------------------------------------
 
-    def insert_otel_spans(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+    def insert_otel_spans(
+        self, req: GenAIOTelExportReq
+    ) -> tuple[GenAIOTelExportRes, list[AgentSpanCHInsertable]]:
         """Ingest OTel spans into the spans table.
 
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
         """
-        span_rows: list[list[object]] = []
+        span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
         rejected = 0
         errors: list[str] = []
@@ -374,12 +379,14 @@ class AgentWriteHandler:
                         )
                         continue
 
-                    span_rows.append(genai_span_to_row(genai_row))
+                    span_rows.append(genai_row)
                     accepted += 1
 
         if span_rows:
             self._ch_client.insert(
-                "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
+                "spans",
+                data=[genai_span_to_row(s) for s in span_rows],
+                column_names=ALL_SPAN_INSERT_COLUMNS,
             )
 
         if failure_counts:
@@ -393,11 +400,12 @@ class AgentWriteHandler:
         error_msg = "; ".join(errors[:MAX_INGEST_ERRORS_REPORTED])
         if len(errors) > MAX_INGEST_ERRORS_REPORTED:
             error_msg += "; ..."
-        return GenAIOTelExportRes(
+        res = GenAIOTelExportRes(
             accepted_spans=accepted,
             rejected_spans=rejected,
             error_message=error_msg,
         )
+        return res, span_rows
 
 
 # ---------------------------------------------------------------------------
