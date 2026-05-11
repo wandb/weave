@@ -2,13 +2,21 @@ import base64
 import os
 import uuid
 from contextlib import contextmanager
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from tests.trace.util import client_is_sqlite
+from weave.trace_server.project_version import project_version
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
+)
+from weave.trace_server.project_version.project_version import (
+    REDIS_RESIDENCE_EXPIRY_SECS,
+    TableRoutingResolver,
+    _residence_cache_key,
+    invalidate_project_residence_cache,
+    reset_project_residence_cache,
 )
 from weave.trace_server.project_version.types import (
     CallsStorageServerMode,
@@ -274,3 +282,222 @@ def test_project_version_mode_from_env():
             os.environ["PROJECT_VERSION_MODE"] = original_value
         elif "PROJECT_VERSION_MODE" in os.environ:
             del os.environ["PROJECT_VERSION_MODE"]
+
+
+# ---------------------------------------------------------------------------
+# Two-layer cache (L1 + Redis L2) unit tests
+# ---------------------------------------------------------------------------
+
+
+class _FakeRedis:
+    """Minimal dict-backed Redis mock for testing L2 cache."""
+
+    def __init__(self):
+        self._store: dict[str, tuple[str, int | None]] = {}
+
+    def get(self, key: str) -> str | None:
+        entry = self._store.get(key)
+        return entry[0] if entry else None
+
+    def set(self, key: str, value: str, ex: int | None = None) -> None:
+        self._store[key] = (value, ex)
+
+    def delete(self, key: str) -> None:
+        self._store.pop(key, None)
+
+
+@pytest.fixture
+def fresh_l1_cache():
+    """Ensure L1 is empty around each test."""
+    reset_project_residence_cache()
+    yield
+    reset_project_residence_cache()
+
+
+@pytest.fixture
+def no_redis(monkeypatch):
+    """Pin get_redis_client() to None so L2 is skipped."""
+    monkeypatch.setattr(project_version, "get_redis_client", lambda: None)
+
+
+def _patch_redis(monkeypatch, redis_obj):
+    """Pin get_redis_client() to return the given redis-like object."""
+    monkeypatch.setattr(project_version, "get_redis_client", lambda: redis_obj)
+
+
+def _make_resolver_with_residence(residences):
+    """Return (resolver, ch_client, residence_fn_mock) backed by `residences`.
+
+    `residences` is the value (or list of sequential values) that the patched
+    `get_project_data_residence` returns. A MagicMock CH client stands in for
+    a real ClickHouse client; the residence fn is what we count to detect
+    fall-through to the DB.
+    """
+    resolver = TableRoutingResolver()
+    resolver._mode = CallsStorageServerMode.AUTO
+    ch_client = MagicMock()
+    fn = MagicMock()
+    if isinstance(residences, list):
+        fn.side_effect = residences
+    else:
+        fn.return_value = residences
+    return resolver, ch_client, fn
+
+
+def test_get_residence_l1_cache_hit_skips_redis_and_ch(
+    fresh_l1_cache, monkeypatch
+):
+    """L1 hit short-circuits — neither Redis nor ClickHouse should be touched."""
+    redis_mock = MagicMock()
+    _patch_redis(monkeypatch, redis_mock)
+    resolver, ch_client, residence_fn = _make_resolver_with_residence(
+        ProjectDataResidence.MERGED_ONLY
+    )
+    monkeypatch.setattr(
+        project_version, "get_project_data_residence", residence_fn
+    )
+
+    # Cold: one CH fetch populates L1 + L2.
+    first = resolver._get_residence("p1", ch_client)
+    # Warm: pure L1 hit — Redis and CH untouched on this call.
+    redis_mock.reset_mock()
+    second = resolver._get_residence("p1", ch_client)
+
+    assert first == ProjectDataResidence.MERGED_ONLY
+    assert second == ProjectDataResidence.MERGED_ONLY
+    assert residence_fn.call_count == 1
+    redis_mock.get.assert_not_called()
+    redis_mock.set.assert_not_called()
+
+
+def test_get_residence_redis_l2_paths(fresh_l1_cache, monkeypatch):
+    """L2 read, L2 populate after CH miss, and graceful Redis-failure fallback."""
+    # 1. Pre-populated Redis → serves L2, no CH; second call promoted to L1.
+    redis = _FakeRedis()
+    _patch_redis(monkeypatch, redis)
+    resolver, ch_client, residence_fn = _make_resolver_with_residence(
+        ProjectDataResidence.COMPLETE_ONLY
+    )
+    monkeypatch.setattr(
+        project_version, "get_project_data_residence", residence_fn
+    )
+    redis.set(
+        _residence_cache_key("p_warm"),
+        ProjectDataResidence.MERGED_ONLY.value,
+        ex=REDIS_RESIDENCE_EXPIRY_SECS,
+    )
+
+    first = resolver._get_residence("p_warm", ch_client)
+    second = resolver._get_residence("p_warm", ch_client)
+    assert first == ProjectDataResidence.MERGED_ONLY
+    assert second == ProjectDataResidence.MERGED_ONLY
+    assert residence_fn.call_count == 0
+
+    # 2. Cold Redis → CH populates both L2 and L1 (with the right TTL).
+    reset_project_residence_cache()
+    cold_redis = _FakeRedis()
+    _patch_redis(monkeypatch, cold_redis)
+    resolver2, ch2, fn2 = _make_resolver_with_residence(
+        ProjectDataResidence.BOTH
+    )
+    monkeypatch.setattr(project_version, "get_project_data_residence", fn2)
+
+    result = resolver2._get_residence("p_cold", ch2)
+    assert result == ProjectDataResidence.BOTH
+    assert fn2.call_count == 1
+    key = _residence_cache_key("p_cold")
+    assert cold_redis.get(key) == ProjectDataResidence.BOTH.value
+    assert cold_redis._store[key][1] == REDIS_RESIDENCE_EXPIRY_SECS
+
+    # 3. EMPTY residence must NOT be cached at either layer.
+    reset_project_residence_cache()
+    empty_redis = _FakeRedis()
+    _patch_redis(monkeypatch, empty_redis)
+    resolver3, ch3, fn3 = _make_resolver_with_residence(
+        [ProjectDataResidence.EMPTY, ProjectDataResidence.EMPTY]
+    )
+    monkeypatch.setattr(project_version, "get_project_data_residence", fn3)
+
+    assert resolver3._get_residence("p_empty", ch3) == ProjectDataResidence.EMPTY
+    assert resolver3._get_residence("p_empty", ch3) == ProjectDataResidence.EMPTY
+    # Both calls fall through — no caching.
+    assert fn3.call_count == 2
+    assert empty_redis.get(_residence_cache_key("p_empty")) is None
+
+
+@pytest.mark.disable_logging_error_check
+def test_get_residence_broken_redis_falls_back_to_clickhouse(
+    fresh_l1_cache, monkeypatch
+):
+    """Redis read/write/decode failures degrade gracefully to ClickHouse."""
+    # Connection errors on get/set.
+    broken = MagicMock()
+    broken.get.side_effect = ConnectionError("Redis down")
+    broken.set.side_effect = ConnectionError("Redis down")
+    _patch_redis(monkeypatch, broken)
+    resolver, ch_client, residence_fn = _make_resolver_with_residence(
+        ProjectDataResidence.COMPLETE_ONLY
+    )
+    monkeypatch.setattr(
+        project_version, "get_project_data_residence", residence_fn
+    )
+
+    assert (
+        resolver._get_residence("p_broken", ch_client)
+        == ProjectDataResidence.COMPLETE_ONLY
+    )
+    assert residence_fn.call_count == 1
+
+    # Stale/unknown enum value in Redis is treated as a miss.
+    reset_project_residence_cache()
+    stale_redis = _FakeRedis()
+    stale_redis.set(_residence_cache_key("p_stale"), "future_value")
+    _patch_redis(monkeypatch, stale_redis)
+    resolver2, ch2, fn2 = _make_resolver_with_residence(
+        ProjectDataResidence.MERGED_ONLY
+    )
+    monkeypatch.setattr(project_version, "get_project_data_residence", fn2)
+
+    assert (
+        resolver2._get_residence("p_stale", ch2)
+        == ProjectDataResidence.MERGED_ONLY
+    )
+    assert fn2.call_count == 1
+
+
+@pytest.mark.disable_logging_error_check
+def test_invalidate_project_residence_cache_clears_both_layers(
+    fresh_l1_cache, monkeypatch
+):
+    """Invalidation drops L1 + L2 and forces a refetch from ClickHouse."""
+    redis = _FakeRedis()
+    _patch_redis(monkeypatch, redis)
+    resolver, ch_client, residence_fn = _make_resolver_with_residence(
+        [ProjectDataResidence.MERGED_ONLY, ProjectDataResidence.COMPLETE_ONLY]
+    )
+    monkeypatch.setattr(
+        project_version, "get_project_data_residence", residence_fn
+    )
+    key = _residence_cache_key("p_inv")
+
+    # Populate caches via a CH fetch.
+    assert (
+        resolver._get_residence("p_inv", ch_client)
+        == ProjectDataResidence.MERGED_ONLY
+    )
+    assert redis.get(key) == ProjectDataResidence.MERGED_ONLY.value
+    assert residence_fn.call_count == 1
+
+    # Invalidate clears L2 immediately and forces the next call back to CH.
+    invalidate_project_residence_cache("p_inv")
+    assert redis.get(key) is None
+
+    refreshed = resolver._get_residence("p_inv", ch_client)
+    assert refreshed == ProjectDataResidence.COMPLETE_ONLY
+    assert residence_fn.call_count == 2
+
+    # Broken Redis on delete must not raise.
+    broken = MagicMock()
+    broken.delete.side_effect = ConnectionError("Redis down")
+    _patch_redis(monkeypatch, broken)
+    invalidate_project_residence_cache("p_inv")
