@@ -428,11 +428,11 @@ def sqlite_db_path():
             pass
 
 
-def _make_obj_create_req(project_id: str, object_id: str, val: dict) -> tsi.ObjCreateReq:
+def _make_obj_create_req(
+    project_id: str, object_id: str, val: dict
+) -> tsi.ObjCreateReq:
     return tsi.ObjCreateReq(
-        obj=tsi.ObjSchemaForInsert(
-            project_id=project_id, object_id=object_id, val=val
-        )
+        obj=tsi.ObjSchemaForInsert(project_id=project_id, object_id=object_id, val=val)
     )
 
 

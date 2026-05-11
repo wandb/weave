@@ -5000,7 +5000,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 objects.created_at,
                 objects.kind,
                 objects.base_object_class,
-                {val_dump_part.replace('val_dump', 'objects.val_dump') if not metadata_only else val_dump_part},
+                {val_dump_part.replace("val_dump", "objects.val_dump") if not metadata_only else val_dump_part},
                 objects.digest,
                 objects.version_index,
                 CASE WHEN (objects.project_id, objects.object_id, objects.digest) IN (

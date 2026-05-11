@@ -1528,8 +1528,6 @@ def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
     assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
 
     # Simulate failure on the alias write for the next obj_create.
-    real_insert_aliases = ch_server._insert_aliases
-
     def failing_insert_aliases(*args, **kwargs):
         raise RuntimeError("simulated alias write failure")
 
@@ -1538,7 +1536,10 @@ def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
         with pytest.raises(RuntimeError, match="simulated alias write failure"):
             _obj_create(ch_server, project_id, obj_id, {"v": 2})
     finally:
-        ch_server._insert_aliases = real_insert_aliases  # type: ignore[method-assign]
+        # `del` removes the instance attribute so attribute access falls back
+        # to the class method — leaves __dict__ clean (see
+        # test_reset_server_state_covers_all_attrs).
+        del ch_server._insert_aliases
 
     # The version row landed (object_versions insert is unconditional in CH).
     # The new digest is reachable directly, but 'latest' still resolves to v1
@@ -1548,4 +1549,6 @@ def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
     # A retry of the same content takes the dedup path, succeeds, and
     # promotes 'latest' to the new digest — the documented recovery flow.
     r2_retry = _obj_create(ch_server, project_id, obj_id, {"v": 2})
-    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r2_retry.digest
+    assert (
+        ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r2_retry.digest
+    )
