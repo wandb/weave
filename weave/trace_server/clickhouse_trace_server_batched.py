@@ -6920,6 +6920,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "clickhouse_trace_server_batched._insert.table": table,
             }
         )
+        set_root_span_dd_tags(
+            {
+                "weave_trace_server.insert.table": table,
+                "weave_trace_server.insert.row_count": len(data),
+            }
+        )
 
         async_insert = self._use_async_insert and not do_sync_insert
         if async_insert:
