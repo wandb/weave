@@ -176,6 +176,7 @@ def _reset_server_state(server: ClickHouseTraceServer) -> None:
     server._call_batch = []
     server._file_batch = []
     server._calls_complete_batch = []
+    server._pending_bucket_uploads = []
     server._flush_immediately = False
 
 

@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+import contextvars
 import dataclasses
 import datetime
 import json
@@ -8,6 +9,7 @@ import threading
 import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from functools import partial
 from re import sub
@@ -336,6 +338,88 @@ _CH_POOL_MANAGER = get_pool_manager(
     maxsize=CH_POOL_MAX_CONNECTIONS, num_pools=CH_POOL_COUNT
 )
 
+# Process-wide thread pool used to flush deferred bucket PUTs in parallel during
+# `_flush_all_batches_in_order`. Sized to stay under the default `requests`
+# HTTPAdapter pool (10) so we never starve connections; a follow-up can bump
+# both this and the underlying connection pool together.
+_BUCKET_UPLOAD_POOL_MAX_WORKERS = 8
+_bucket_upload_pool: ThreadPoolExecutor | None = None
+_bucket_upload_pool_lock = threading.Lock()
+
+
+def _get_bucket_upload_pool() -> ThreadPoolExecutor:
+    """Lazily build the shared bucket-upload pool.
+
+    Class-level (not per-instance) so that many concurrent `call_batch()`
+    handlers on the same pod share a single thread cap instead of compounding.
+    """
+    global _bucket_upload_pool  # noqa: PLW0603 — lazy-init process-wide singleton
+    if _bucket_upload_pool is None:
+        with _bucket_upload_pool_lock:
+            if _bucket_upload_pool is None:
+                _bucket_upload_pool = ThreadPoolExecutor(
+                    max_workers=_BUCKET_UPLOAD_POOL_MAX_WORKERS,
+                    thread_name_prefix="bucket-put",
+                )
+    return _bucket_upload_pool
+
+
+@dataclasses.dataclass(frozen=True)
+class _PendingBucketUpload:
+    """A bucket PUT queued by `_file_create_bucket` during a `call_batch()`.
+
+    The target URI is deterministic from `(project_id, digest)`, so the chunk
+    record's `file_storage_uri` is known before the PUT runs. We only commit
+    the chunk to `_file_batch` once the PUT has actually succeeded; on failure
+    we fall back to ClickHouse for that one digest, preserving the same
+    error-recovery shape as the prior synchronous code path.
+    """
+
+    client: FileStorageClient
+    project_id: str
+    digest: str
+    name: str
+    content: bytes
+    target_uri: FileStorageURI
+
+
+def _run_bucket_put(item: _PendingBucketUpload) -> None:
+    """Worker body executed inside the pool for one queued PUT.
+
+    Module-level (not a method) so it can be pickled / introspected cleanly
+    and so the worker doesn't carry a reference to the trace server instance.
+    The returned URI is discarded — we already pre-computed it, and the
+    deterministic key guarantees it matches.
+    """
+    store_in_bucket(
+        item.client,
+        key_for_project_digest(item.project_id, item.digest),
+        item.content,
+    )
+
+
+def _clickhouse_chunks_for(
+    project_id: str, digest: str, name: str, content: bytes
+) -> list[FileChunkCreateCHInsertable]:
+    """Build the ClickHouse chunk rows for a file stored directly in CH."""
+    chunks = [
+        content[i : i + ch_settings.FILE_CHUNK_SIZE]
+        for i in range(0, len(content), ch_settings.FILE_CHUNK_SIZE)
+    ]
+    return [
+        FileChunkCreateCHInsertable(
+            project_id=project_id,
+            digest=digest,
+            chunk_index=i,
+            n_chunks=len(chunks),
+            name=name,
+            val_bytes=chunk,
+            bytes_stored=len(chunk),
+            file_storage_uri=None,
+        )
+        for i, chunk in enumerate(chunks)
+    ]
+
 
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
 # in ALL_CALL_COMPLETE_INSERT_COLUMNS.  Used by _insert_call_complete_batch to enforce
@@ -391,7 +475,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def __del__(self) -> None:
         """Flush batches and the Kafka producer on cleanup."""
-        if self._call_batch or self._calls_complete_batch or self._file_batch:
+        if (
+            self._call_batch
+            or self._calls_complete_batch
+            or self._file_batch
+            or self._pending_bucket_uploads
+        ):
             try:
                 self._flush_all_batches_in_order()
             except Exception:
@@ -400,6 +489,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._file_batch = []
                 self._call_batch = []
                 self._calls_complete_batch = []
+                self._pending_bucket_uploads = []
                 self._flush_immediately = True
 
         # Always drain remaining kafka messages at shutdown.
@@ -448,6 +538,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_calls_complete_batch.setter
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
         self._thread_local.calls_complete_batch = value
+
+    @property
+    def _pending_bucket_uploads(self) -> list[_PendingBucketUpload]:
+        if not hasattr(self._thread_local, "pending_bucket_uploads"):
+            self._thread_local.pending_bucket_uploads = []
+        return self._thread_local.pending_bucket_uploads
+
+    @_pending_bucket_uploads.setter
+    def _pending_bucket_uploads(self, value: list[_PendingBucketUpload]) -> None:
+        self._thread_local.pending_bucket_uploads = value
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False, **kwargs: Any) -> Self:
@@ -778,10 +878,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._file_batch = []
             self._call_batch = []
             self._calls_complete_batch = []
+            self._pending_bucket_uploads = []
             self._flush_immediately = True
 
     def _flush_all_batches_in_order(self) -> None:
         """Flush all batches in order of dependency.
+        0. Bucket PUTs queued during the batch, fanned out in parallel. Per-digest
+           fallback to ClickHouse on PUT failure preserves the prior single-shot
+           semantics. We must finish this before the file_chunks insert because
+           each successful PUT contributes a chunk row that carries the final
+           `file_storage_uri`.
         1. File chunks, if this fails, we raise so that we don't insert calls that
            are missing file data. Forces retry.
         2. Calls, if this fails, we raise so that clients can retry, and so we don't
@@ -790,6 +896,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
            is already in the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
+        # Raises on fail
+        try:
+            self._flush_pending_bucket_uploads()
+        except Exception:
+            logger.exception("Failed to flush pending bucket uploads")
+            raise
+
         # Raises on fail
         try:
             self._flush_file_chunks()
@@ -5719,6 +5832,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ):
             return tsi.FileCreateRes(digest=digest)
 
+        # During a batch we may also have a bucket PUT queued for this digest
+        # but not yet executed (chunk record is appended only after the PUT
+        # succeeds). Dedup against that queue too so we never enqueue the same
+        # PUT twice in one batch.
+        if any(
+            p.project_id == req.project_id and p.digest == digest
+            for p in self._pending_bucket_uploads
+        ):
+            return tsi.FileCreateRes(digest=digest)
+
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
@@ -5735,24 +5858,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
-        chunks = [
-            req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
-            for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
-        ]
         self._insert_file_chunks(
-            [
-                FileChunkCreateCHInsertable(
-                    project_id=req.project_id,
-                    digest=digest,
-                    chunk_index=i,
-                    n_chunks=len(chunks),
-                    name=req.name,
-                    val_bytes=chunk,
-                    bytes_stored=len(chunk),
-                    file_storage_uri=None,
-                )
-                for i, chunk in enumerate(chunks)
-            ]
+            _clickhouse_chunks_for(req.project_id, digest, req.name, req.content)
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
@@ -5760,23 +5867,116 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
         set_root_span_dd_tags({"storage_provider": "bucket"})
-        target_file_storage_uri = store_in_bucket(
-            client, key_for_project_digest(req.project_id, digest), req.content
+
+        # Outside of a batch context every file_create is a one-shot. There's
+        # nothing to parallelize, and going through the pool would only add
+        # task-handoff overhead and a thread-cache miss for ddtrace context.
+        # Stay on the original synchronous path here.
+        if self._flush_immediately:
+            target_file_storage_uri = store_in_bucket(
+                client, key_for_project_digest(req.project_id, digest), req.content
+            )
+            self._insert_file_chunks(
+                [
+                    FileChunkCreateCHInsertable(
+                        project_id=req.project_id,
+                        digest=digest,
+                        chunk_index=0,
+                        n_chunks=1,
+                        name=req.name,
+                        val_bytes=b"",
+                        bytes_stored=len(req.content),
+                        file_storage_uri=target_file_storage_uri.to_uri_str(),
+                    )
+                ]
+            )
+            return
+
+        # Inside a `call_batch()` we defer the PUT to phase 0 of
+        # `_flush_all_batches_in_order` so the N PUTs in this batch fan out
+        # across the shared pool instead of running serially in the request
+        # thread. The key is deterministic from `(project_id, digest)`, so the
+        # chunk record knows its final URI before the PUT starts — we just
+        # withhold appending it until the PUT actually succeeds (or fall back
+        # to ClickHouse for that one digest if it fails).
+        target_uri = client.base_uri.with_path(
+            key_for_project_digest(req.project_id, digest)
         )
-        self._insert_file_chunks(
-            [
+        self._pending_bucket_uploads.append(
+            _PendingBucketUpload(
+                client=client,
+                project_id=req.project_id,
+                digest=digest,
+                name=req.name,
+                content=req.content,
+                target_uri=target_uri,
+            )
+        )
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._flush_pending_bucket_uploads"
+    )
+    def _flush_pending_bucket_uploads(self) -> None:
+        """Fan out queued bucket PUTs over the shared pool.
+
+        For each pending upload we submit a worker that calls `store_in_bucket`.
+        Workers run inside a copy of the caller's `contextvars.Context`, so the
+        ddtrace tracer (which tracks the active span via a `ContextVar`) keeps
+        child PUT spans attached to the originating `upsert_batch` trace.
+
+        On success we append the pre-computed chunk record to `_file_batch`,
+        which the immediately-following `_flush_file_chunks` insert will pick
+        up. On `FileStorageWriteError` we drop back to a ClickHouse-chunked
+        write for that one digest, matching the prior per-call fallback.
+        """
+        pending = self._pending_bucket_uploads
+        if not pending:
+            return
+
+        pool = _get_bucket_upload_pool()
+        # One fresh Context per submit — Context.run() can't be re-entered, so
+        # a single shared copy would fail under concurrent workers.
+        futures = [
+            (
+                item,
+                pool.submit(contextvars.copy_context().run, _run_bucket_put, item),
+            )
+            for item in pending
+        ]
+
+        fallbacks: list[_PendingBucketUpload] = []
+        for item, fut in futures:
+            try:
+                fut.result()
+            except FileStorageWriteError:
+                logger.exception(
+                    "Parallel bucket PUT failed for digest %s; "
+                    "falling back to ClickHouse for that digest only",
+                    item.digest,
+                )
+                fallbacks.append(item)
+                continue
+            self._file_batch.append(
                 FileChunkCreateCHInsertable(
-                    project_id=req.project_id,
-                    digest=digest,
+                    project_id=item.project_id,
+                    digest=item.digest,
                     chunk_index=0,
                     n_chunks=1,
-                    name=req.name,
+                    name=item.name,
                     val_bytes=b"",
-                    bytes_stored=len(req.content),
-                    file_storage_uri=target_file_storage_uri.to_uri_str(),
+                    bytes_stored=len(item.content),
+                    file_storage_uri=item.target_uri.to_uri_str(),
                 )
-            ]
-        )
+            )
+
+        self._pending_bucket_uploads = []
+
+        for item in fallbacks:
+            self._file_batch.extend(
+                _clickhouse_chunks_for(
+                    item.project_id, item.digest, item.name, item.content
+                )
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_file_chunks")
     def _flush_file_chunks(self) -> None:
