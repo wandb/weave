@@ -5284,7 +5284,7 @@ def _transform_external_calls_field_to_internal_calls_field(
             "json_extract(" + json.dumps(json_column) + ", '" + json_path + "')"
         )
         field = f"CAST({json_extract_sql} AS {sql_type})"
-        if cast in {"int", "float", "bool"}:
+        if cast in {"int", "double", "bool"}:
             json_type_sql = (
                 "json_type(" + json.dumps(json_column) + ", '" + json_path + "')"
             )
