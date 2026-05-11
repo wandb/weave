@@ -6673,13 +6673,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         client.database = self._database
         return client
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(
         self,
         batch: list,
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,
     ) -> None:
+        # Tags roll up to the parent _flush_calls span instead of creating a
+        # separate intermediate span on every call.
         set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._insert_call_batch.count": str(
@@ -6924,6 +6925,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "clickhouse_trace_server_batched._insert.table": table,
             }
         )
+        set_root_span_dd_tags(
+            {
+                "weave_trace_server.insert.table": table,
+                "weave_trace_server.insert.row_count": len(data),
+            }
+        )
 
         async_insert = self._use_async_insert and not do_sync_insert
         if async_insert:
@@ -6982,7 +6989,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 return result
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
@@ -7001,7 +7007,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._call_batch = []
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_complete")
     def _insert_call_complete(self, ch_call: CallCompleteCHInsertable) -> None:
         """Insert a complete call into the calls_complete batch.
 
@@ -7017,7 +7022,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._flush_immediately:
             self._flush_calls_complete()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_to_v1")
     def _insert_call_to_v1(self, ch_call: CallCompleteCHInsertable) -> None:
         """Insert a complete call into the v1 call_parts table.
 
@@ -7031,9 +7035,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._insert_call_complete_batch"
-    )
     def _insert_call_complete_batch(
         self,
         batch: list,
@@ -7047,6 +7048,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings: Optional ClickHouse settings.
             do_sync_insert: If True, use synchronous insert.
         """
+        # Tags roll up to the parent _flush_calls_complete span instead of
+        # creating a separate intermediate span on every call.
         set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._insert_call_complete_batch.count": str(

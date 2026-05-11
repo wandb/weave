@@ -1,7 +1,7 @@
 from weave.utils.dict_utils import sum_dict_leaves
 
 
-def test_sum_dict_leaves_list_of_dicts(client):
+def test_sum_dict_leaves_list_of_dicts():
     """Test that sum_dict_leaves correctly handles lists of dictionaries."""
     dicts = [
         {"a": 1, "b": "hello", "c": 2},
@@ -36,7 +36,7 @@ def test_sum_dict_leaves_list_of_dicts(client):
     assert result == {"a": 9, "c": 12}
 
 
-def test_sum_dict_leaves_mixed_types(client):
+def test_sum_dict_leaves_mixed_types():
     """Test that sum_dict_leaves correctly handles dictionaries where the same key has different types."""
     dicts = [
         {"a": 1, "b": "hello", "c": 2},
@@ -60,7 +60,7 @@ def test_sum_dict_leaves_mixed_types(client):
     }
 
 
-def test_sum_dict_leaves_deep_nested(client):
+def test_sum_dict_leaves_deep_nested():
     """Test that sum_dict_leaves correctly handles deeply nested dictionaries (2 levels) with mixed types."""
     dicts = [
         {
