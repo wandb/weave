@@ -8,7 +8,7 @@ endpoints (services/weave-trace) and the ClickHouse query handlers
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -62,6 +62,16 @@ AgentSpanStatsDerivedMetric = Literal[
     "total_tokens",
     "is_error",
     "is_invocation",
+]
+AgentSpanGroupNumericField = Literal[
+    "span_count",
+    "invocation_count",
+    "conversation_count",
+    "total_input_tokens",
+    "total_output_tokens",
+    "total_tokens",
+    "total_duration_ms",
+    "error_count",
 ]
 
 _IDENT_RE = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
@@ -154,10 +164,76 @@ class AgentSpanStatsColumn(BaseModel):
     """Metadata describing one column in an agent span stats result row."""
 
     name: str
-    role: Literal["time", "group", "metric"]
+    role: Literal["time", "bucket", "group", "metric"]
     value_type: AgentSpanStatsColumnValueType
     metric: str | None = None
     aggregation: str | None = None
+
+
+class AgentSpanGroupNumericFilter(BaseModel):
+    """Numeric range filter over grouped span aggregate rows."""
+
+    field: AgentSpanGroupNumericField
+    min: float | None = None
+    max: float | None = None
+
+    @model_validator(mode="after")
+    def validate_group_numeric_filter(self) -> AgentSpanGroupNumericFilter:
+        if self.min is None and self.max is None:
+            raise ValueError("group numeric filter must set min or max")
+        if self.min is not None and self.max is not None and self.max < self.min:
+            raise ValueError("group numeric filter max must be greater than min")
+        return self
+
+
+class AgentSpanStatsTimeBucketSpec(BaseModel):
+    """Bucket stats rows by started_at time intervals."""
+
+    type: Literal["time"] = "time"
+
+
+class AgentSpanStatsNumericBucketSpec(BaseModel):
+    """Bucket stats rows by ranges of one numeric span or conversation value."""
+
+    type: Literal["number"] = "number"
+    alias: str = Field(default="value", pattern=_IDENT_RE)
+    bins: int = Field(default=24, ge=1, le=200)
+    min: float | None = None
+    max: float | None = None
+    field: AgentSpanStatsFieldRef | None = None
+    derived: AgentSpanStatsDerivedMetric | None = None
+    conversation_aggregate: AgentSpanGroupNumericField | None = None
+
+    @model_validator(mode="after")
+    def validate_numeric_bucket_spec(self) -> AgentSpanStatsNumericBucketSpec:
+        sources = [
+            self.field is not None,
+            self.derived is not None,
+            self.conversation_aggregate is not None,
+        ]
+        if sum(sources) != 1:
+            raise ValueError(
+                "exactly one of field, derived, or conversation_aggregate must be set"
+            )
+
+        if self.derived is not None:
+            expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[self.derived]
+            if expected_type != "number":
+                raise ValueError(
+                    f"derived bucket field {self.derived!r} has value_type "
+                    f"{expected_type!r}, expected 'number'"
+                )
+
+        if self.min is not None and self.max is not None and self.max < self.min:
+            raise ValueError("numeric bucket max must be greater than or equal to min")
+
+        return self
+
+
+AgentSpanStatsBucketSpec = Annotated[
+    AgentSpanStatsTimeBucketSpec | AgentSpanStatsNumericBucketSpec,
+    Field(discriminator="type"),
+]
 
 
 class AgentSpanStatsReq(BaseModel):
@@ -170,16 +246,24 @@ class AgentSpanStatsReq(BaseModel):
     granularity: int | None = Field(default=None, gt=0)
     timezone: str = "UTC"
     group_by: list[AgentGroupByRef] = Field(default_factory=list)
-    metrics: list[AgentSpanStatsMetricSpec]
+    metrics: list[AgentSpanStatsMetricSpec] = Field(default_factory=list)
     group_limit: int = Field(
         default=DEFAULT_AGENT_STATS_GROUP_LIMIT,
         ge=1,
         le=MAX_AGENT_STATS_GROUP_LIMIT,
     )
+    bucket_by: AgentSpanStatsBucketSpec | None = None
+    group_numeric_filters: list[AgentSpanGroupNumericFilter] = Field(
+        default_factory=list
+    )
 
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:
-        if not self.metrics:
+        numeric_bucket = (
+            self.bucket_by if isinstance(self.bucket_by, AgentSpanStatsNumericBucketSpec)
+            else None
+        )
+        if not self.metrics and numeric_bucket is None:
             raise ValueError("at least one metric is required")
 
         aliases = [metric.alias for metric in self.metrics]
@@ -202,6 +286,20 @@ class AgentSpanStatsReq(BaseModel):
                 "AgentSpanStatsReq date range cannot exceed "
                 f"{MAX_AGENT_STATS_RANGE_DAYS} days"
             )
+
+        if numeric_bucket is not None and self.group_by:
+            raise ValueError("numeric bucket stats do not support group_by")
+        if self.group_numeric_filters:
+            if self.group_by:
+                raise ValueError("group_numeric_filters do not support group_by")
+            if (
+                numeric_bucket is not None
+                and numeric_bucket.conversation_aggregate is None
+            ):
+                raise ValueError(
+                    "group_numeric_filters are only supported for time stats "
+                    "or conversation numeric bucket stats"
+                )
         return self
 
 
@@ -210,8 +308,9 @@ class AgentSpanStatsRes(BaseModel):
 
     start: datetime.datetime
     end: datetime.datetime
-    granularity: int
+    granularity: int | None = None
     timezone: str
+    bucket_type: Literal["time", "number"] = "time"
     columns: list[AgentSpanStatsColumn] = Field(default_factory=list)
     rows: list[dict[str, AgentSpanStatsCell]] = Field(default_factory=list)
 
@@ -353,6 +452,9 @@ class AgentSpansQueryReq(BaseModel):
     # span columns, or the typed custom attribute Map columns.
     query: Query | None = None
     group_by: list[AgentGroupByRef] | None = None
+    group_numeric_filters: list[AgentSpanGroupNumericFilter] = Field(
+        default_factory=list
+    )
     sort_by: list[AgentSortBy] | None = None
     limit: int = Field(
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
@@ -360,6 +462,12 @@ class AgentSpansQueryReq(BaseModel):
     offset: int = Field(default=0, ge=0)
     started_after: datetime.datetime | None = None  # filter started_at >= start
     started_before: datetime.datetime | None = None  # filter started_at < end
+
+    @model_validator(mode="after")
+    def validate_spans_query_request(self) -> AgentSpansQueryReq:
+        if self.group_numeric_filters and not self.group_by:
+            raise ValueError("group_numeric_filters require group_by")
+        return self
 
 
 class AgentSpansQueryRes(BaseModel):

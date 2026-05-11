@@ -23,6 +23,7 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
+    AgentSpanGroupNumericFilter,
     AgentSpanSchema,
     AgentSpansQueryReq,
     AgentsQueryReq,
@@ -77,6 +78,19 @@ SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
         "error_count",
         "first_seen",
         "last_seen",
+    }
+)
+
+SPAN_GROUP_NUMERIC_FILTER_COLS: frozenset[str] = frozenset(
+    {
+        "span_count",
+        "invocation_count",
+        "conversation_count",
+        "total_input_tokens",
+        "total_output_tokens",
+        "total_tokens",
+        "total_duration_ms",
+        "error_count",
     }
 )
 
@@ -450,6 +464,52 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
                max(s.started_at) AS last_seen"""
 
 
+def conversation_aggregate_value_sql(field: str) -> str:
+    """Return the grouped conversation aggregate expression for a numeric field."""
+    if field == "span_count":
+        return "toFloat64(count())"
+    if field == "invocation_count":
+        return "toFloat64(countIf(s.operation_name = 'invoke_agent'))"
+    if field == "conversation_count":
+        return "toFloat64(uniqExact(s.conversation_id))"
+    if field == "total_input_tokens":
+        return "toFloat64(sum(s.input_tokens))"
+    if field == "total_output_tokens":
+        return "toFloat64(sum(s.output_tokens))"
+    if field == "total_tokens":
+        return (
+            "toFloat64(sum(s.input_tokens) + sum(s.output_tokens) + "
+            "sum(s.reasoning_tokens))"
+        )
+    if field == "total_duration_ms":
+        return (
+            "toFloat64(sum(toUnixTimestamp64Milli(s.ended_at) - "
+            "toUnixTimestamp64Milli(s.started_at)))"
+        )
+    if field == "error_count":
+        return "toFloat64(countIf(s.status_code = 'ERROR'))"
+    raise ValueError(f"Invalid group numeric filter field: {field!r}")
+
+
+def group_numeric_filters_having_sql(
+    pb: ParamBuilder,
+    filters: list[AgentSpanGroupNumericFilter],
+) -> str:
+    """Build HAVING conditions for grouped span aggregate numeric filters."""
+    conditions: list[str] = []
+    for filter_ in filters:
+        if filter_.field not in SPAN_GROUP_NUMERIC_FILTER_COLS:
+            raise ValueError(f"Invalid group numeric filter field: {filter_.field!r}")
+        expr = conversation_aggregate_value_sql(filter_.field)
+        if filter_.min is not None:
+            min_slot = pb.add(filter_.min, param_type="Float64")
+            conditions.append(f"{expr} >= {min_slot}")
+        if filter_.max is not None:
+            max_slot = pb.add(filter_.max, param_type="Float64")
+            conditions.append(f"{expr} <= {max_slot}")
+    return " AND ".join(conditions)
+
+
 def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """Count spans matching the request, or count of distinct groups if grouped."""
     where = _spans_where(pb, req)
@@ -457,9 +517,12 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         return f"SELECT count() FROM spans s WHERE {where}"
     resolved = resolve_group_by(pb, req.group_by)
     group_exprs = ", ".join(expr for expr, _ in resolved)
+    having = group_numeric_filters_having_sql(pb, req.group_numeric_filters)
+    having_sql = f" HAVING {having}" if having else ""
     return (
         f"SELECT count() FROM ("
         f"SELECT {group_exprs} FROM spans s WHERE {where} GROUP BY {group_exprs}"
+        f"{having_sql}"
         f")"
     )
 
@@ -486,6 +549,8 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
 
     sortable = SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases))
     order_by = build_order_by(req.sort_by, sortable, "last_seen DESC")
+    having = group_numeric_filters_having_sql(pb, req.group_numeric_filters)
+    having_sql = f"HAVING {having}" if having else ""
 
     return f"""
         SELECT {select_group_cols},
@@ -493,6 +558,7 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         FROM spans s
         WHERE {where}
         GROUP BY {group_by_clause}
+        {having_sql}
         ORDER BY {order_by}
         LIMIT {limit_slot} OFFSET {offset_slot}
     """

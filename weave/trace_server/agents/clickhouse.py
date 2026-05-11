@@ -139,6 +139,7 @@ class AgentQueryHandler:
             end=query.end,
             granularity=query.granularity_seconds,
             timezone=req.timezone or "UTC",
+            bucket_type=query.bucket_type,
             columns=query.column_metadata,
             rows=_rows_to_dicts(query.columns, result.result_rows),
         )

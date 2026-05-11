@@ -7,8 +7,10 @@ from pydantic import ValidationError
 from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
+    AgentSpanGroupNumericFilter,
     AgentSpanStatsFieldRef,
     AgentSpanStatsMetricSpec,
+    AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
 )
 from weave.trace_server.interface.query import Query
@@ -333,6 +335,52 @@ def test_basic_stats_query_uses_query_filter_and_bucket() -> None:
     ]
 
 
+def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        bucket_by=AgentSpanStatsNumericBucketSpec(
+            type="number",
+            derived="duration_ms",
+            bins=4,
+        ),
+        metrics=[
+            AgentSpanStatsMetricSpec(
+                alias="spans",
+                value_type="boolean",
+                derived="is_error",
+                aggregations=["count"],
+            )
+        ],
+    )
+
+    result = build_agent_span_stats_query(req, pb)
+    sql = " ".join(result.sql.split())
+
+    assert "toStartOfInterval" not in result.sql
+    assert "value_rows AS" in result.sql
+    assert "bounds AS" in result.sql
+    assert "FROM numbers({genai_3:UInt64})" in result.sql
+    assert "all_buckets.bucket AS bucket_index" in sql
+    assert "AS bucket_min" in sql
+    assert "AS bucket_max" in sql
+    assert "countIf(v_spans) AS count_spans" in sql
+    assert "COALESCE(aggregated_data.count_spans, 0) AS count_spans" in sql
+    assert result.columns == [
+        "bucket_index",
+        "bucket_min",
+        "bucket_max",
+        "count_spans",
+    ]
+    assert result.granularity_seconds is None
+    assert result.bucket_type == "number"
+    assert result.parameters == {
+        "genai_0": "p1",
+        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_3": 4,
+    }
+
+
 def test_group_by_custom_attr_and_metric_custom_attr() -> None:
     pb = ParamBuilder("genai")
     req = _req(
@@ -366,6 +414,41 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
     assert "GROUP BY bucket, env" in sql
     assert "LIMIT {genai_9:UInt64}" in result.sql
     assert result.columns == ["timestamp", "env", "avg_score", "count_score"]
+
+
+def test_time_stats_apply_group_numeric_filters() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        metrics=[
+            AgentSpanStatsMetricSpec(
+                alias="conversations",
+                value_type="string",
+                field=AgentSpanStatsFieldRef(source="field", key="conversation_id"),
+                aggregations=["count_distinct"],
+            )
+        ],
+        group_numeric_filters=[
+            AgentSpanGroupNumericFilter(field="total_tokens", min=10, max=100)
+        ],
+    )
+
+    result = build_agent_span_stats_query(req, pb)
+    sql = " ".join(result.sql.split())
+
+    assert "qualified_conversations AS" in result.sql
+    assert "filtered_metric_spans AS" in result.sql
+    assert "HAVING" in result.sql
+    assert (
+        "toFloat64(sum(s.input_tokens) + sum(s.output_tokens) + "
+        "sum(s.reasoning_tokens)) >= {genai_7:Float64}"
+    ) in result.sql
+    assert (
+        "toFloat64(sum(s.input_tokens) + sum(s.output_tokens) + "
+        "sum(s.reasoning_tokens)) <= {genai_8:Float64}"
+    ) in result.sql
+    assert "FROM filtered_metric_spans s" in sql
+    assert result.parameters["genai_7"] == 10.0
+    assert result.parameters["genai_8"] == 100.0
 
 
 def test_group_by_caps_output_rows() -> None:
@@ -431,6 +514,30 @@ def test_request_validation_rejects_duplicate_aliases() -> None:
                     aggregations=["sum"],
                 ),
             ]
+        )
+
+
+def test_numeric_bucket_validation_rejects_non_numeric_derived_field() -> None:
+    with pytest.raises(ValidationError):
+        AgentSpanStatsNumericBucketSpec(
+            type="number",
+            derived="is_error",
+        )
+
+
+def test_request_validation_rejects_numeric_bucket_group_by() -> None:
+    with pytest.raises(ValidationError):
+        _req(
+            bucket_by=AgentSpanStatsNumericBucketSpec(
+                type="number",
+                derived="duration_ms",
+            ),
+            group_by=[
+                AgentGroupByRef(
+                    source="field",
+                    key="agent.name",
+                )
+            ],
         )
 
 
