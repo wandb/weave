@@ -59,9 +59,7 @@ def test_build_eval_rows_returns_genai_span_ref_without_children() -> None:
     )
 
     trial = rows[0].evaluations[0].trials[0]
-    assert trial.genai_span_ref == tsi.GenAISpanRef.model_validate(
-        _genai_span_ref()
-    )
+    assert trial.genai_span_ref == tsi.GenAISpanRef.model_validate(_genai_span_ref())
 
 
 def test_build_trial_prefers_prediction_genai_span_ref() -> None:

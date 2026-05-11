@@ -4126,9 +4126,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
             }
             if genai_span_ref is not None:
-                predict_and_score_weave_attrs[
-                    constants.GENAI_SPAN_REF_ATTR_KEY
-                ] = genai_span_ref
+                predict_and_score_weave_attrs[constants.GENAI_SPAN_REF_ATTR_KEY] = (
+                    genai_span_ref
+                )
 
             # Create the predict_and_score call as a child of the evaluation run
             predict_and_score_start_req = tsi.CallStartReq(
