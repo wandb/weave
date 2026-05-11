@@ -27,7 +27,7 @@ def test_from_row() -> None:
     )
     event = ScoreAgentSpansEvent.from_row(root_row)
     assert event == ScoreAgentSpansEvent(
-        event_type="turn_ended",
+        event_type="weave.genai.turn_ended",
         status_code="OK",
         project_id="p",
         trace_id="tr",
