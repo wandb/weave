@@ -289,8 +289,8 @@ def best_effort_scorer_call_ids(
     return result
 
 
-def extract_agent_trace_ref(call: tsi.CallSchema | None) -> tsi.AgentTraceRef | None:
-    """Extract an optional agent trace ref from call attributes."""
+def extract_genai_span_ref(call: tsi.CallSchema | None) -> tsi.GenAISpanRef | None:
+    """Extract an optional GenAI span ref from call attributes."""
     if call is None or not isinstance(call.attributes, dict):
         return None
 
@@ -298,12 +298,12 @@ def extract_agent_trace_ref(call: tsi.CallSchema | None) -> tsi.AgentTraceRef | 
     if not isinstance(weave_attrs, dict):
         return None
 
-    raw_ref = weave_attrs.get(constants.AGENT_TRACE_REF_ATTR_KEY)
+    raw_ref = weave_attrs.get(constants.GENAI_SPAN_REF_ATTR_KEY)
     if not isinstance(raw_ref, dict):
         return None
 
     try:
-        return tsi.AgentTraceRef.model_validate(raw_ref)
+        return tsi.GenAISpanRef.model_validate(raw_ref)
     except ValidationError:
         return None
 
@@ -346,8 +346,8 @@ def _build_trial(
             predict_call.summary if predict_call else predict_and_score_call.summary
         ),
         scorer_call_ids=best_effort_scorer_call_ids(scores, trial_children),
-        agent_trace_ref=extract_agent_trace_ref(predict_call)
-        or extract_agent_trace_ref(predict_and_score_call),
+        genai_span_ref=extract_genai_span_ref(predict_call)
+        or extract_genai_span_ref(predict_and_score_call),
     )
 
 

@@ -4493,9 +4493,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             PredictionCreateRes with the prediction_id
         """
         prediction_id = generate_id()
-        agent_trace_ref = (
-            req.agent_trace_ref.model_dump(exclude_none=True)
-            if req.agent_trace_ref is not None
+        genai_span_ref = (
+            req.genai_span_ref.model_dump(exclude_none=True)
+            if req.genai_span_ref is not None
             else None
         )
 
@@ -4535,10 +4535,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             predict_and_score_weave_attrs = {
                 constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
             }
-            if agent_trace_ref is not None:
+            if genai_span_ref is not None:
                 predict_and_score_weave_attrs[
-                    constants.AGENT_TRACE_REF_ATTR_KEY
-                ] = agent_trace_ref
+                    constants.GENAI_SPAN_REF_ATTR_KEY
+                ] = genai_span_ref
 
             # Create the predict_and_score call as a child of the evaluation run
             predict_and_score_start_req = tsi.CallStartReq(

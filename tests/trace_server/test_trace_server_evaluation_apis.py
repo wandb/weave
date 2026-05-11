@@ -13,7 +13,6 @@ from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
-    AgentTraceRef,
     CallEndReq,
     CallsDeleteReq,
     CallsQueryReq,
@@ -29,6 +28,7 @@ from weave.trace_server.trace_server_interface import (
     EvaluationStatusNotFound,
     EvaluationStatusReq,
     EvaluationStatusRunning,
+    GenAISpanRef,
     ObjCreateReq,
     PredictionCreateReq,
     PredictionFinishReq,
@@ -467,9 +467,9 @@ def test_eval_results_query_basic(client):
     assert trial.scores["basic_scorer"] == 0.9
 
 
-def test_eval_results_query_returns_agent_trace_ref_without_children(client):
+def test_eval_results_query_returns_genai_span_ref_without_children(client):
     project_id = client.project_id
-    agent_trace_ref = AgentTraceRef(
+    genai_span_ref = GenAISpanRef(
         trace_id="agent-trace-1",
         span_id="span-1",
         conversation_id="conversation-1",
@@ -490,7 +490,7 @@ def test_eval_results_query_returns_agent_trace_ref_without_children(client):
             inputs={"x": 1},
             output="result",
             evaluation_run_id=run.evaluation_run_id,
-            agent_trace_ref=agent_trace_ref,
+            genai_span_ref=genai_span_ref,
         )
     )
     client.server.prediction_finish(
@@ -511,7 +511,7 @@ def test_eval_results_query_returns_agent_trace_ref_without_children(client):
     assert res.total_rows == 1
     trial = res.rows[0].evaluations[0].trials[0]
     assert trial.predict_call_id is None
-    assert trial.agent_trace_ref == agent_trace_ref
+    assert trial.genai_span_ref == genai_span_ref
 
 
 def test_eval_results_query_nonexistent_eval_root(client):
