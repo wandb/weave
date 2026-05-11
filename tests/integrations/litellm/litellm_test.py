@@ -236,6 +236,223 @@ async def test_litellm_quickstart_stream_async(
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+def test_litellm_responses(
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    """
+    Requirement: litellm.responses() should be traced with captured output
+    Interface: weave client call recording
+    Given: A patched litellm environment with weave client
+    When: User calls litellm.responses(model="gpt-4o-mini", input="Say hi")
+    Then: client.get_calls() contains a call with captured output and usage
+    """
+    response = litellm.responses(
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        model="gpt-4o-mini",
+        input="Say hi in one word.",
+    )
+
+    # Get output text from the response
+    output_text = ""
+    for item in response.output:
+        if hasattr(item, "content"):
+            for content in item.content:
+                if hasattr(content, "text"):
+                    output_text += content.text
+
+    assert output_text  # Should have some content
+
+    calls = list(client.get_calls())
+    # Should have litellm.responses call (and possibly nested OpenAI call)
+    assert len(calls) >= 1
+
+    # Find the litellm.responses call
+    responses_call = None
+    for call in calls:
+        if call.op_name and "litellm.responses" in call.op_name:
+            responses_call = call
+            break
+
+    assert responses_call is not None, "litellm.responses call not found"
+    assert responses_call.exception is None
+    assert responses_call.ended_at is not None
+
+    output = responses_call.output
+    assert output is not None
+    assert "id" in output
+    assert "model" in output
+    assert "output" in output
+    assert "usage" in output
+
+    # Check usage is captured in summary
+    summary = responses_call.summary
+    assert summary is not None
+    assert "usage" in summary
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+@pytest.mark.asyncio
+async def test_litellm_aresponses(
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    """
+    Requirement: litellm.aresponses() should be traced with captured output
+    Interface: weave client call recording
+    Given: A patched litellm environment with weave client
+    When: User calls await litellm.aresponses(model="gpt-4o-mini", input="Say hi")
+    Then: client.get_calls() contains a call with captured output and usage
+    """
+    response = await litellm.aresponses(
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        model="gpt-4o-mini",
+        input="Say hi in one word.",
+    )
+
+    # Get output text from the response
+    output_text = ""
+    for item in response.output:
+        if hasattr(item, "content"):
+            for content in item.content:
+                if hasattr(content, "text"):
+                    output_text += content.text
+
+    assert output_text  # Should have some content
+
+    calls = list(client.get_calls())
+    assert len(calls) >= 1
+
+    # Find the litellm.aresponses call
+    responses_call = None
+    for call in calls:
+        if call.op_name and "litellm.aresponses" in call.op_name:
+            responses_call = call
+            break
+
+    assert responses_call is not None, "litellm.aresponses call not found"
+    assert responses_call.exception is None
+    assert responses_call.ended_at is not None
+
+    output = responses_call.output
+    assert output is not None
+    assert "id" in output
+    assert "model" in output
+    assert "output" in output
+    assert "usage" in output
+
+    summary = responses_call.summary
+    assert summary is not None
+    assert "usage" in summary
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+def test_litellm_responses_stream(
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    """
+    Requirement: Streaming litellm.responses() should accumulate and be traced
+    Interface: weave client call recording, iterator behavior
+    Given: A patched litellm environment with weave client
+    When: User calls litellm.responses(stream=True) and iterates
+    Then: User receives streaming chunks, call.output contains accumulated response
+    """
+    response = litellm.responses(
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        model="gpt-4o-mini",
+        input="Say hi in one word.",
+        stream=True,
+    )
+
+    # Consume the stream
+    all_text = ""
+    for event in response:
+        event_type = getattr(event, "type", None)
+        if event_type == "response.output_text.delta":
+            all_text += event.delta
+
+    assert all_text  # Should have accumulated some text
+
+    calls = list(client.get_calls())
+    assert len(calls) >= 1
+
+    # Find the litellm.responses call
+    responses_call = None
+    for call in calls:
+        if call.op_name and "litellm.responses" in call.op_name:
+            responses_call = call
+            break
+
+    assert responses_call is not None, "litellm.responses call not found"
+    assert responses_call.exception is None
+    assert responses_call.ended_at is not None
+
+    output = responses_call.output
+    assert output is not None
+    # For streaming, the accumulated output should contain the response
+    assert "id" in output
+    assert "output" in output
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+@pytest.mark.asyncio
+async def test_litellm_aresponses_stream(
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    """
+    Requirement: Streaming litellm.aresponses() should accumulate and be traced
+    Interface: weave client call recording, async iterator behavior
+    Given: A patched litellm environment with weave client
+    When: User calls await litellm.aresponses(stream=True) and async iterates
+    Then: User receives streaming chunks, call.output contains accumulated response
+    """
+    response = await litellm.aresponses(
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        model="gpt-4o-mini",
+        input="Say hi in one word.",
+        stream=True,
+    )
+
+    # Consume the async stream
+    all_text = ""
+    async for event in response:
+        event_type = getattr(event, "type", None)
+        if event_type == "response.output_text.delta":
+            all_text += event.delta
+
+    assert all_text  # Should have accumulated some text
+
+    calls = list(client.get_calls())
+    assert len(calls) >= 1
+
+    # Find the litellm.aresponses call
+    responses_call = None
+    for call in calls:
+        if call.op_name and "litellm.aresponses" in call.op_name:
+            responses_call = call
+            break
+
+    assert responses_call is not None, "litellm.aresponses call not found"
+    assert responses_call.exception is None
+    assert responses_call.ended_at is not None
+
+    output = responses_call.output
+    assert output is not None
+    assert "id" in output
+    assert "output" in output
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
