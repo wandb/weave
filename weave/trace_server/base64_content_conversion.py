@@ -30,8 +30,17 @@ DATA_URI_PATTERN = re.compile(r"^data:([^;]+);base64,([A-Za-z0-9+/=]+)$", re.IGN
 # Pattern to match standalone base64 strings
 BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 
-# Minimum size to create a file (to avoid making more data than what the original is)
-AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
+# Minimum string length we'll consider for auto-conversion to a Content object.
+#
+# Lifted from 1 KiB to 8 KiB: under the old threshold every long LLM output,
+# serialized tool-call argument, and large system prompt in the 1-8 KiB range
+# was put through ``is_data_uri`` + ``is_base64`` + (occasionally)
+# ``Content.from_base64`` even though those strings are essentially never
+# real binary payloads. Genuine multimodal blobs (PNG/JPEG/WebP/audio) start
+# comfortably above 8 KiB once base64-encoded; small icons that happen to
+# fall below 8 KiB now stay inline in ClickHouse, which is the pre-feature
+# behaviour and is handled correctly by the existing storage path.
+AUTO_CONVERSION_MIN_SIZE = 8192  # 8 KiB
 
 
 def is_base64(value: str) -> bool:
@@ -124,13 +133,29 @@ def replace_base64_with_content_objects(
     """
 
     def _visit(val: Any) -> Any:
+        # For dicts and lists we only allocate a copy on the subtrees that
+        # actually had a base64 string replaced. Trace payloads are dominated
+        # by deeply-nested chat histories with zero binary content, so the
+        # old "always allocate a fresh dict/list at every level" path was
+        # doing a full structural copy of every request for no reason.
         if isinstance(val, dict):
-            result = {}
+            result: dict[Any, Any] | None = None
             for k, v in val.items():
-                result[k] = _visit(v)
-            return result
+                new_v = _visit(v)
+                if new_v is not v:
+                    if result is None:
+                        result = dict(val)
+                    result[k] = new_v
+            return val if result is None else result
         elif isinstance(val, list):
-            return [_visit(v) for v in val]
+            new_items: list[Any] | None = None
+            for i, v in enumerate(val):
+                new_v = _visit(v)
+                if new_v is not v:
+                    if new_items is None:
+                        new_items = list(val)
+                    new_items[i] = new_v
+            return val if new_items is None else new_items
         elif isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
             # Check for data URI pattern first
             if is_data_uri(val):
