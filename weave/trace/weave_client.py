@@ -338,29 +338,37 @@ def map_to_refs(obj: Any) -> Any:
 
 
 def _snapshot_mutable_containers(obj: Any, _seen: set[int] | None = None) -> Any:
-    """Return a copy of `obj` with mutable Python containers (dict/list/set)
+    """Return a copy of `obj` with plain `dict`/`list`/`set`/`tuple` containers
     rebuilt at every level, so a caller mutating the original after
     `finish_call` returns cannot reach into the deferred output walk.
 
-    Tuples, frozensets, primitives, and SDK leaf types (Ref, pydantic
-    BaseModel, ObjectRecord, weave Object/Table) are returned by identity:
-    they are either immutable or carry behavior we want preserved
+    Only EXACT `dict`/`list`/`set`/`tuple` are rebuilt. Subclasses
+    (`namedtuple`, `Counter`, `OrderedDict`, dict-subclass dataclasses like
+    `huggingface_hub.ChatCompletionOutput`) carry type information the
+    serializer needs and are returned by identity — rebuilding as the bare
+    type would strip the subclass and silently change saved output shape
+    (namedtuple field names lost, typed dict becomes plain dict, etc.).
+
+    Frozensets, primitives, and SDK leaf types (Ref, pydantic BaseModel,
+    ObjectRecord, weave Object/Table) are also returned by identity: they
+    are either immutable or carry behavior we want preserved
     (e.g. `_save_nested_objects` mutating an Object to attach a ref).
     """
     if _seen is None:
         _seen = set()
     if id(obj) in _seen:
         return obj
-    if isinstance(obj, dict):
+    t = type(obj)
+    if t is dict:
         _seen.add(id(obj))
         return {k: _snapshot_mutable_containers(v, _seen) for k, v in obj.items()}
-    if isinstance(obj, list):
+    if t is list:
         _seen.add(id(obj))
         return [_snapshot_mutable_containers(v, _seen) for v in obj]
-    if isinstance(obj, set):
+    if t is set:
         _seen.add(id(obj))
         return {_snapshot_mutable_containers(v, _seen) for v in obj}
-    if isinstance(obj, tuple):
+    if t is tuple:
         return tuple(_snapshot_mutable_containers(v, _seen) for v in obj)
     return obj
 

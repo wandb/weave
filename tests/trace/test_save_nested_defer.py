@@ -22,7 +22,11 @@ import pytest
 import weave
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, OpRef, TableRef
-from weave.trace.weave_client import WeaveClient, _collect_pending_digests
+from weave.trace.weave_client import (
+    WeaveClient,
+    _collect_pending_digests,
+    _snapshot_mutable_containers,
+)
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -398,6 +402,71 @@ def test_output_mutation_after_finish_is_not_recorded(client: WeaveClient) -> No
     assert len(capturing.captured) == 1
     recorded_output = capturing.captured[0].end.output
     assert recorded_output == {"result": [1]}, (
-        "Deferred walk captured a post-finish_call mutation: "
-        f"{recorded_output!r}"
+        f"Deferred walk captured a post-finish_call mutation: {recorded_output!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# _snapshot_mutable_containers: type preservation. Subclasses of dict/list/
+# set/tuple must be returned by identity — rebuilding them as the bare type
+# would strip subclass information the serializer needs (namedtuple field
+# names, dict-subclass dataclass types like HuggingFace ChatCompletionOutput).
+# ---------------------------------------------------------------------------
+
+
+class TestSnapshotPreservesSubclassTypes:
+    def test_plain_containers_are_rebuilt(self) -> None:
+        # Plain dict/list/set/tuple at the top level get fresh copies so
+        # post-finish mutations can't reach the deferred walk.
+        d = {"k": [1, 2]}
+        snap = _snapshot_mutable_containers(d)
+        assert snap == d
+        assert snap is not d
+        assert snap["k"] is not d["k"]
+
+    def test_namedtuple_preserved(self) -> None:
+        from typing import NamedTuple
+
+        class Point(NamedTuple):
+            x: int
+            y: int
+
+        snap = _snapshot_mutable_containers(Point(1, 2))
+        assert type(snap) is Point
+        assert snap._asdict() == {"x": 1, "y": 2}
+
+    def test_dict_subclass_preserved(self) -> None:
+        from collections import Counter, OrderedDict
+
+        c = Counter({"a": 1, "b": 2})
+        snap_c = _snapshot_mutable_containers(c)
+        assert type(snap_c) is Counter
+        assert snap_c is c
+
+        od = OrderedDict([("a", 1), ("b", 2)])
+        snap_od = _snapshot_mutable_containers(od)
+        assert type(snap_od) is OrderedDict
+        assert snap_od is od
+
+    def test_list_subclass_preserved(self) -> None:
+        class MyList(list):
+            pass
+
+        ml = MyList([1, 2, 3])
+        snap = _snapshot_mutable_containers(ml)
+        assert type(snap) is MyList
+        assert snap is ml
+
+    def test_namedtuple_nested_in_list_preserved(self) -> None:
+        # Mirrors test_namedtuple_support: list containing a namedtuple
+        # should round-trip with the named fields intact.
+        from typing import NamedTuple
+
+        class Point(NamedTuple):
+            x: int
+            y: int
+
+        snap = _snapshot_mutable_containers([Point(1, 2), 3])
+        assert isinstance(snap, list)
+        assert type(snap[0]) is Point
+        assert snap[0]._asdict() == {"x": 1, "y": 2}
