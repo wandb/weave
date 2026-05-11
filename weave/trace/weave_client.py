@@ -337,6 +337,34 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
+def _snapshot_mutable_containers(obj: Any, _seen: set[int] | None = None) -> Any:
+    """Return a copy of `obj` with mutable Python containers (dict/list/set)
+    rebuilt at every level, so a caller mutating the original after
+    `finish_call` returns cannot reach into the deferred output walk.
+
+    Tuples, frozensets, primitives, and SDK leaf types (Ref, pydantic
+    BaseModel, ObjectRecord, weave Object/Table) are returned by identity:
+    they are either immutable or carry behavior we want preserved
+    (e.g. `_save_nested_objects` mutating an Object to attach a ref).
+    """
+    if _seen is None:
+        _seen = set()
+    if id(obj) in _seen:
+        return obj
+    if isinstance(obj, dict):
+        _seen.add(id(obj))
+        return {k: _snapshot_mutable_containers(v, _seen) for k, v in obj.items()}
+    if isinstance(obj, list):
+        _seen.add(id(obj))
+        return [_snapshot_mutable_containers(v, _seen) for v in obj]
+    if isinstance(obj, set):
+        _seen.add(id(obj))
+        return {_snapshot_mutable_containers(v, _seen) for v in obj}
+    if isinstance(obj, tuple):
+        return tuple(_snapshot_mutable_containers(v, _seen) for v in obj)
+    return obj
+
+
 def _collect_pending_digests(val: Any) -> list[Future]:
     """Walk `val` and return any unresolved digest/row-digest futures held by
     nested refs.
@@ -1364,6 +1392,14 @@ class WeaveClient:
             except Exception as e:
                 end_complete_future.set_exception(e)
 
+        # Snapshot mutable containers so a caller mutating the returned
+        # value after `finish_call` returns can't reach into the deferred
+        # walk (PR #6740 review item). Leaf types (Refs, weave Objects,
+        # pydantic models) are preserved by identity so async ref
+        # attachment via `_save_nested_objects` still surfaces to the
+        # caller's alias.
+        output_for_defer = _snapshot_mutable_containers(postprocessed_output)
+
         # Phase 1: in a worker, save any new nested Objects/Tables/Ops in the
         # output and rebuild `output_as_refs`. Then schedule Phase 2 either
         # inline (if no pending digests) or via `then(pending, ...)` so the
@@ -1374,8 +1410,8 @@ class WeaveClient:
         # queued behind us in the executor.
         def schedule_send() -> None:
             try:
-                self._save_nested_objects(postprocessed_output)
-                output_as_refs = map_to_refs(postprocessed_output)
+                self._save_nested_objects(output_for_defer)
+                output_as_refs = map_to_refs(output_for_defer)
                 pending = _collect_pending_digests(output_as_refs)
                 if pending:
                     self.future_executor.then(
