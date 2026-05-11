@@ -132,31 +132,34 @@ def replace_base64_with_content_objects(
         Tuple of (processed_value, list_of_created_refs)
     """
 
+    def _visit_children(items: Any, original: Any, cls: type) -> Any:
+        # Walk one level of a collection's children. We allocate a shallow
+        # copy of ``original`` (via ``cls(original)``) only on the first
+        # child whose subtree returned a new identity, and write subsequent
+        # replacements through that copy. When no child changes, the copy
+        # is never built and we return ``original`` itself — so any clean
+        # no-binary subtree round-trips by identity, not by value.
+        copy = None
+        for k, v in items:
+            new_v = _visit(v)
+            if new_v is not v:
+                if copy is None:
+                    copy = cls(original)
+                copy[k] = new_v
+        return original if copy is None else copy
+
     def _visit(val: Any) -> Any:
-        # For dicts and lists we only allocate a copy on the subtrees that
-        # actually had a base64 string replaced. Trace payloads are dominated
-        # by deeply-nested chat histories with zero binary content, so the
-        # old "always allocate a fresh dict/list at every level" path was
-        # doing a full structural copy of every request for no reason.
+        # Trace payloads are dominated by deeply-nested chat histories with
+        # zero binary content, so the previous "always allocate a fresh
+        # dict/list at every level" path was doing a full structural copy
+        # of every request for no reason. The shared ``_visit_children``
+        # helper keeps the identity-preserving recipe in one place for
+        # both collection shapes.
         if isinstance(val, dict):
-            result: dict[Any, Any] | None = None
-            for k, v in val.items():
-                new_v = _visit(v)
-                if new_v is not v:
-                    if result is None:
-                        result = dict(val)
-                    result[k] = new_v
-            return val if result is None else result
-        elif isinstance(val, list):
-            new_items: list[Any] | None = None
-            for i, v in enumerate(val):
-                new_v = _visit(v)
-                if new_v is not v:
-                    if new_items is None:
-                        new_items = list(val)
-                    new_items[i] = new_v
-            return val if new_items is None else new_items
-        elif isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
+            return _visit_children(val.items(), val, dict)
+        if isinstance(val, list):
+            return _visit_children(enumerate(val), val, list)
+        if isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
             # Check for data URI pattern first
             if is_data_uri(val):
                 try:

@@ -444,6 +444,49 @@ class TestThresholdAndStructuralIdentity:
         # And critically: the input dict was not mutated.
         assert touched_branch["content"][0]["image_url"]["url"] == png_data_uri
 
+    def test_partial_replacement_in_list_isolates_unchanged_indices(self):
+        """List sibling of the dict-partial test: only the touched index is copied.
+
+        Without this the list branch of ``_visit_children`` is only exercised
+        in the all-changed and all-unchanged extremes, which leaves the
+        "first-change triggers a copy of the whole list" path partially
+        covered (codecov flagged this on the original PR).
+        """
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+        png_data_uri = "data:image/png;base64," + base64.b64encode(
+            b"\x89PNG\r\n\x1a\n" + b"\x00" * 12000
+        ).decode("ascii")
+
+        untouched_message = {"role": "user", "content": "plain text"}
+        touched_message = {"role": "assistant", "content": png_data_uri}
+        other_untouched_message = {"role": "tool", "content": "also plain"}
+        original_messages = [
+            untouched_message,
+            touched_message,
+            other_untouched_message,
+        ]
+        original = {"messages": original_messages, "model": "claude-sonnet-4-6"}
+
+        result = replace_base64_with_content_objects(
+            original, "test_project", trace_server
+        )
+
+        # The list itself was copied (one of its entries changed), but the
+        # unchanged dict entries keep their identity inside the new list.
+        assert result["messages"] is not original_messages
+        assert result["messages"][0] is untouched_message
+        assert result["messages"][2] is other_untouched_message
+        # The touched entry was replaced — different identity, and the
+        # original dict is left intact.
+        assert result["messages"][1] is not touched_message
+        assert touched_message["content"] == png_data_uri
+
     def test_caller_overwrite_safe_after_in_place_return(self):
         """Caller pattern ``req.start.inputs = replace_base64(...)`` is safe.
 
