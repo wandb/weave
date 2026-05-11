@@ -5,6 +5,7 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import clickhouse_connect
@@ -21,7 +22,9 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
 )
 from weave.trace_server.errors import NotFoundError
+from weave.trace_server.internal_trace_server_interface import InternalCallsQueryReq
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
+from weave.trace_server.token_costs import LLM_TOKEN_PRICES_TABLE
 
 
 class MockObjectReadError(Exception):
@@ -99,6 +102,142 @@ def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
 
     # Empty thread_ids -> IN [] -> no rows from ClickHouse
     assert result == []
+
+
+def test_clickhouse_python_cost_hydration_uses_cached_price_indexes() -> None:
+    server = chts.ClickHouseTraceServer(host="test_host")
+    project_id = "project-1"
+    started_at = datetime(2026, 5, 4, 14, tzinfo=timezone.utc)
+    columns = [col.name for col in LLM_TOKEN_PRICES_TABLE.cols]
+    price_row = {
+        "id": "price-1",
+        "pricing_level": "project",
+        "pricing_level_id": project_id,
+        "provider_id": "test-provider",
+        "llm_id": "test-llm",
+        "effective_date": started_at,
+        "prompt_token_cost": 0.01,
+        "completion_token_cost": 0.02,
+        "cache_read_input_token_cost": 0.001,
+        "cache_creation_input_token_cost": 0.002,
+        "prompt_token_cost_unit": "USD",
+        "completion_token_cost_unit": "USD",
+        "created_by": "tester",
+        "created_at": started_at,
+    }
+    server._query = MagicMock(  # type: ignore[method-assign]
+        return_value=SimpleNamespace(
+            result_rows=[tuple(price_row[column] for column in columns)]
+        )
+    )
+    price_index_cache = {}
+    known_price_models = set()
+    calls = [
+        {
+            "id": "call-1",
+            "started_at": started_at,
+            "summary": {
+                "usage": {
+                    "test-llm": {
+                        "prompt_tokens": 10,
+                        "completion_tokens": 5,
+                        "requests": 1,
+                        "total_tokens": 15,
+                    }
+                }
+            },
+        }
+    ]
+
+    server._apply_costs_to_call_dicts(
+        project_id, calls, price_index_cache, known_price_models
+    )
+    server._apply_costs_to_call_dicts(
+        project_id, calls, price_index_cache, known_price_models
+    )
+
+    costs = calls[0]["summary"]["weave"]["costs"]["test-llm"]
+    assert costs["prompt_token_cost"] == pytest.approx(0.01)
+    assert costs["completion_token_cost"] == pytest.approx(0.02)
+    assert costs["prompt_tokens_total_cost"] == pytest.approx(0.1)
+    assert costs["completion_tokens_total_cost"] == pytest.approx(0.1)
+    assert known_price_models == {"test-llm"}
+    server._query.assert_called_once()
+
+
+def test_clickhouse_calls_query_python_cost_hydration_against_real_clickhouse(
+    ch_server,
+) -> None:
+    project_id = base64.b64encode(b"ProjectInternalId:987654").decode()
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    llm_id = f"test-llm-{uuid.uuid4()}"
+    started_at = datetime(2026, 5, 4, 14, tzinfo=timezone.utc)
+
+    ch_server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs={
+                llm_id: {
+                    "prompt_token_cost": 0.01,
+                    "completion_token_cost": 0.02,
+                    "effective_date": started_at - dt.timedelta(days=1),
+                },
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    ch_server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=trace_id,
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+    ch_server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=started_at + dt.timedelta(seconds=1),
+                summary={
+                    "usage": {
+                        llm_id: {
+                            "prompt_tokens": 100,
+                            "completion_tokens": 50,
+                            "requests": 1,
+                            "total_tokens": 150,
+                        }
+                    }
+                },
+            )
+        )
+    )
+
+    calls = list(
+        ch_server.calls_query_stream(
+            InternalCallsQueryReq(
+                project_id=project_id,
+                filter=tsi.CallsFilter(call_ids=[call_id]),
+                include_costs=True,
+                use_python_cost_hydration=True,
+            )
+        )
+    )
+
+    assert len(calls) == 1
+    assert calls[0].summary is not None
+    costs = calls[0].summary["weave"]["costs"][llm_id]
+    assert costs["prompt_token_cost"] == pytest.approx(0.01)
+    assert costs["completion_token_cost"] == pytest.approx(0.02)
+    assert costs["prompt_tokens_total_cost"] == pytest.approx(1.0)
+    assert costs["completion_tokens_total_cost"] == pytest.approx(1.0)
 
 
 def test_clickhouse_storage_size_schema_conversion():
