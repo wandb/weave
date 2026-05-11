@@ -27,6 +27,7 @@ from weave.session.session_otel import (
 from weave.session.types import (
     BlobPart,
     FilePart,
+    JSONString,
     LogResult,
     MediaAttachment,
     Message,
@@ -38,6 +39,7 @@ from weave.session.types import (
     ToolCallResponsePart,
     UriPart,
     Usage,
+    _parse_data_url,
 )
 
 # OTel imports — kept top-level under a try/except guard so the module
@@ -171,11 +173,19 @@ class _SpanBase(BaseModel):
 
 
 class Tool(_SpanBase):
-    """One tool execution. Maps to an execute_tool OTel span."""
+    """One tool execution. Maps to an execute_tool OTel span.
+
+    ``arguments`` and ``result`` use the ``JSONString`` annotation:
+    callers can assign a dict / list / scalar and the SDK JSON-encodes
+    it at construction or assignment. The stored value is always a
+    string, matching the wire format per GenAI semconv.
+    """
+
+    model_config = ConfigDict(validate_assignment=True)
 
     name: str = ""
-    arguments: str = ""
-    result: str = ""
+    arguments: JSONString = ""
+    result: JSONString = ""
     tool_call_id: str = ""
     tool_type: str = ""
     tool_description: str = ""
@@ -312,6 +322,74 @@ class LLM(_SpanBase):
                 file_id=file_id,
             )
         )
+        return self
+
+    def attach_media_url(self, url: str, *, modality: str = "") -> LLM:
+        """Attach a media URL to this LLM call.
+
+        Convenience over ``attach_media`` for the common case where the
+        caller has a URL string from an upstream message and doesn't want
+        to inspect it. ``data:`` URLs are parsed into ``mime_type`` +
+        inline content (kind=blob); plain URIs become ``kind=uri``. Empty
+        URLs are ignored. Returns ``self`` for chaining.
+        """
+        if not url:
+            return self
+        if url.startswith("data:"):
+            mime_type, content = _parse_data_url(url)
+            return self.attach_media(
+                content=content, mime_type=mime_type, modality=modality
+            )
+        return self.attach_media(uri=url, modality=modality)
+
+    def record(
+        self,
+        *,
+        input_messages: list[Message] | None = None,
+        output_messages: list[Message] | None = None,
+        media_attachments: list[MediaAttachment] | None = None,
+        usage: Usage | None = None,
+        reasoning: Reasoning | str | None = None,
+        response_id: str | None = None,
+        response_model: str | None = None,
+        finish_reasons: list[str] | None = None,
+        output_type: str | None = None,
+    ) -> LLM:
+        """Set multiple LLM-call fields in one call.
+
+        Manually-instrumented agents typically build up a chat span by
+        assigning eight or more individual fields at the end of an LLM
+        call (``input_messages``, ``output_messages``, ``usage``,
+        ``response_id``, etc.). ``record(...)`` collapses those into a
+        single keyword call so the recording site stays compact.
+
+        Only fields explicitly passed (non-``None``) are applied —
+        existing values are preserved. ``reasoning`` accepts either a
+        ``Reasoning`` instance or a plain string (wrapped automatically).
+        Returns ``self`` for chaining.
+        """
+        if input_messages is not None:
+            self.input_messages = input_messages
+        if output_messages is not None:
+            self.output_messages = output_messages
+        if media_attachments is not None:
+            self.media_attachments = media_attachments
+        if usage is not None:
+            self.usage = usage
+        if reasoning is not None:
+            self.reasoning = (
+                Reasoning(content=reasoning)
+                if isinstance(reasoning, str)
+                else reasoning
+            )
+        if response_id is not None:
+            self.response_id = response_id
+        if response_model is not None:
+            self.response_model = response_model
+        if finish_reasons is not None:
+            self.finish_reasons = finish_reasons
+        if output_type is not None:
+            self.output_type = output_type
         return self
 
     def end(self) -> None:
@@ -717,6 +795,11 @@ def start_llm(
     """Create and activate an LLM call. Uses the current turn if available.
 
     If no turn is active, returns a disconnected LLM (no contextvar set).
+
+    Pass ``provider_name`` explicitly. The SDK does not infer it from the
+    model identifier: prefix-based guessing misattributes user fine-tunes
+    (e.g. a model named ``text-...``) and bakes assumptions about future
+    model names into telemetry that's expensive to correct after the fact.
     """
     turn = get_current_turn()
     if turn is not None:
