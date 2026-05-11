@@ -18,7 +18,6 @@ Public functions:
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any
 
 from weave.session.types import (
@@ -162,25 +161,20 @@ def usage_from_openai_responses(response: Response) -> Usage:
 
 
 def _to_tool_call_part(item: dict[str, Any]) -> ToolCallPart:
-    arguments = item.get("arguments", "")
-    if not isinstance(arguments, str):
-        arguments = json.dumps(arguments)
     return ToolCallPart(
         id=str(item.get("call_id", "")),
         name=str(item.get("name", "")),
-        arguments=arguments,
+        arguments=item.get("arguments", ""),
     )
 
 
 def _function_call_output_message(item: dict[str, Any]) -> Message:
-    output = item.get("output")
-    response = output if isinstance(output, str) else json.dumps(output)
     return Message(
         role="tool",
         parts=[
             ToolCallResponsePart(
                 id=str(item.get("call_id", "")),
-                response=response,
+                response=item.get("output", ""),
             )
         ],
     )

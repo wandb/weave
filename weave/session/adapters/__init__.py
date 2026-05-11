@@ -6,8 +6,8 @@ Anthropic Messages, etc.) into the provider-agnostic types defined in
 types but is not imported by them, so ``types.py`` stays free of
 provider knowledge.
 
-Adapters are optional: importing ``weave.session.adapters.openai``
-requires ``openai`` to be installed; ``weave.session.adapters.anthropic``
-requires ``anthropic``. The base ``weave.session`` package has no such
-dependency.
+The provider SDKs (``openai``, ``anthropic``) are only imported under
+``TYPE_CHECKING`` for parameter annotations — adapters can be imported
+and called at runtime without those packages installed, as long as the
+caller passes a duck-typed object exposing the same attribute shape.
 """
