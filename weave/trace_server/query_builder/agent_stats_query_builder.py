@@ -134,6 +134,7 @@ _COLUMN_VALUE_TYPES: dict[str, AgentSpanStatsValueType] = {
     **_CORE_SPAN_VALUE_TYPES,
 }
 
+
 def _span_col(column: str) -> str:
     return f"{_SPAN_ALIAS}.{column}"
 
