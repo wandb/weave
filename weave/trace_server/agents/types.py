@@ -313,9 +313,7 @@ class AgentGroupByRef(BaseModel):
         "custom_attrs_bool",
     ] = "field"
     key: str
-    alias: str | None = (
-        None  # output key in AgentSpanGroupRow.group_keys
-    )
+    alias: str | None = None  # output key in AgentSpanGroupRow.group_keys
 
 
 class AgentSpanGroupRow(BaseModel):
