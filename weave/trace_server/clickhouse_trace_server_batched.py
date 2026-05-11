@@ -66,6 +66,8 @@ from weave.trace_server.agents.types import (
     AgentSearchRes,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
+    AgentSpanStatsReq,
+    AgentSpanStatsRes,
     AgentsQueryReq,
     AgentsQueryRes,
     AgentTraceChatReq,
@@ -6585,6 +6587,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
         return AgentQueryHandler(self._query).spans_query(req)
+
+    def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
+        return AgentQueryHandler(self._query).spans_stats(req)
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         return AgentQueryHandler(self._query).agents_query(req)

@@ -22,6 +22,7 @@ from weave.trace_server.agents.types import (
     AgentsQueryReq,
     AgentVersionsQueryReq,
 )
+from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
@@ -119,6 +120,47 @@ class TestMakeSpansCountQuery:
             "genai_5": "prod",
         }
         assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_rejects_empty_not(self) -> None:
+        pb = ParamBuilder("genai")
+        query = Query.model_construct(
+            expr_=tsi_query.NotOperation.model_construct(not_=())
+        )
+
+        with pytest.raises(ValueError, match="Empty \\$not"):
+            make_spans_count_query(pb, AgentSpansQueryReq(project_id="p1", query=query))
+
+    def test_rejects_null_non_eq_comparison(self) -> None:
+        pb = ParamBuilder("genai")
+        query = Query.model_validate(
+            {
+                "$expr": {
+                    "$gt": [
+                        {"$getField": "input_tokens"},
+                        {"$literal": None},
+                    ]
+                }
+            }
+        )
+
+        with pytest.raises(ValueError, match="Null values are not allowed"):
+            make_spans_count_query(pb, AgentSpansQueryReq(project_id="p1", query=query))
+
+    def test_rejects_mixed_in_literal_types(self) -> None:
+        pb = ParamBuilder("genai")
+        query = Query.model_validate(
+            {
+                "$expr": {
+                    "$in": [
+                        {"$getField": "agent_name"},
+                        [{"$literal": "bot"}, {"$literal": 1}],
+                    ]
+                }
+            }
+        )
+
+        with pytest.raises(ValueError, match="same type"):
+            make_spans_count_query(pb, AgentSpansQueryReq(project_id="p1", query=query))
 
 
 # ============================================================================
@@ -344,7 +386,7 @@ class TestMakeGroupedSpansListQuery:
             AgentSpansQueryReq(
                 project_id="p1",
                 group_by=[
-                    AgentGroupByRef(source="column", key="agent_name"),
+                    AgentGroupByRef(source="field", key="agent.name"),
                     AgentGroupByRef(source="column", key="request_model"),
                 ],
                 sort_by=[AgentSortBy(field="agent_name", direction="asc")],
@@ -384,10 +426,15 @@ class TestResolveGroupBy:
             resolve_group_by(
                 pb,
                 [
-                    AgentGroupByRef(source="column", key="agent_name"),
+                    AgentGroupByRef(source="field", key="agent.name"),
                     AgentGroupByRef(source="column", key="agent_name"),
                 ],
             )
+
+    def test_field_source_resolves_semconv_key(self) -> None:
+        pb = ParamBuilder("genai")
+        out = resolve_group_by(pb, [AgentGroupByRef(source="field", key="agent.name")])
+        assert out == [("s.agent_name", "agent_name")]
 
     def test_rejects_invalid_alias(self) -> None:
         pb = ParamBuilder("genai")
