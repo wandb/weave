@@ -386,7 +386,7 @@ class TestMakeGroupedSpansListQuery:
             AgentSpansQueryReq(
                 project_id="p1",
                 group_by=[
-                    AgentGroupByRef(source="column", key="agent_name"),
+                    AgentGroupByRef(source="field", key="agent.name"),
                     AgentGroupByRef(source="column", key="request_model"),
                 ],
                 sort_by=[AgentSortBy(field="agent_name", direction="asc")],
@@ -426,10 +426,15 @@ class TestResolveGroupBy:
             resolve_group_by(
                 pb,
                 [
-                    AgentGroupByRef(source="column", key="agent_name"),
+                    AgentGroupByRef(source="field", key="agent.name"),
                     AgentGroupByRef(source="column", key="agent_name"),
                 ],
             )
+
+    def test_field_source_resolves_semconv_key(self) -> None:
+        pb = ParamBuilder("genai")
+        out = resolve_group_by(pb, [AgentGroupByRef(source="field", key="agent.name")])
+        assert out == [("s.agent_name", "agent_name")]
 
     def test_rejects_invalid_alias(self) -> None:
         pb = ParamBuilder("genai")

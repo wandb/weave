@@ -39,6 +39,8 @@ from weave.trace_server.calls_query_builder.utils import param_slot, safely_form
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     add_time_filters,
+    group_by_ref_alias,
+    resolve_agent_span_field_column,
     resolve_group_by,
 )
 from weave.trace_server.query_builder.agent_query_compiler import compile_agent_query
@@ -339,7 +341,7 @@ def _response_columns(
     ]
 
     for group_ref in group_refs:
-        alias = group_ref.alias or group_ref.key
+        alias = group_by_ref_alias(group_ref)
         columns.append(alias)
         metadata.append(
             AgentSpanStatsColumn(
@@ -394,7 +396,7 @@ def _metric_sql(metric: AgentSpanStatsMetricSpec, pb: ParamBuilder) -> _MetricSQ
 
     ref = metric.field
     if ref.source == _SOURCE_FIELD:
-        col = semconv.FILTERABLE_KEY_TO_COLUMN.get(ref.key, ref.key)
+        col = resolve_agent_span_field_column(ref.key)
         column_value_type = _COLUMN_VALUE_TYPES.get(col)
         if column_value_type is None:
             raise ValueError(f"field {ref.key!r} is not stat-aggregatable")
@@ -566,7 +568,8 @@ def _percentile_label(percentile: float) -> str:
 def _group_value_type(group_ref: AgentGroupByRef) -> AgentSpanStatsColumnValueType:
     if group_ref.source in _CUSTOM_ATTR_VALUE_TYPES:
         return _CUSTOM_ATTR_VALUE_TYPES[group_ref.source]
-    return _COLUMN_VALUE_TYPES.get(group_ref.key, _VALUE_TYPE_STRING)
+    column = resolve_agent_span_field_column(group_ref.key)
+    return _COLUMN_VALUE_TYPES.get(column, _VALUE_TYPE_STRING)
 
 
 def _build_stats_query(

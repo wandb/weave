@@ -16,6 +16,7 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
+from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import SEARCH_CONTENT_PREVIEW_CHARS
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
@@ -114,6 +115,7 @@ _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
         "custom_attrs_bool",
     }
 )
+_FIELD_GROUP_BY_SOURCES: frozenset[str] = frozenset({"field", "column"})
 
 # ---------------------------------------------------------------------------
 # Column projections
@@ -298,7 +300,7 @@ def resolve_group_by(
     seen: set[str] = set()
     out: list[tuple[str, str]] = []
     for ref in refs:
-        alias = ref.alias or ref.key
+        alias = group_by_ref_alias(ref)
         if not _IDENT_RE.match(alias):
             raise ValueError(
                 f"group_by alias must match [a-zA-Z_][a-zA-Z0-9_]*, got {alias!r}"
@@ -307,10 +309,11 @@ def resolve_group_by(
             raise ValueError(f"duplicate group_by alias: {alias!r}")
         seen.add(alias)
 
-        if ref.source == "column":
-            if ref.key not in SPAN_GROUP_BY_COLS:
-                raise ValueError(f"group_by column {ref.key!r} is not in the allowlist")
-            sql_expr = f"{table_alias}.{ref.key}"
+        if ref.source in _FIELD_GROUP_BY_SOURCES:
+            column = resolve_agent_span_field_column(ref.key)
+            if column not in SPAN_GROUP_BY_COLS:
+                raise ValueError(f"group_by field {ref.key!r} is not in the allowlist")
+            sql_expr = f"{table_alias}.{column}"
         elif ref.source in _CUSTOM_ATTR_SOURCES:
             key_slot = pb.add(str(ref.key), param_type="String")
             sql_expr = f"{table_alias}.{ref.source}[{key_slot}]"
@@ -318,6 +321,20 @@ def resolve_group_by(
             raise ValueError(f"unknown group_by source: {ref.source!r}")
         out.append((sql_expr, alias))
     return out
+
+
+def resolve_agent_span_field_column(field: str) -> str:
+    """Resolve a public span field name to its storage column when known."""
+    return semconv.FILTERABLE_KEY_TO_COLUMN.get(field, field)
+
+
+def group_by_ref_alias(ref: AgentGroupByRef) -> str:
+    """Return the SQL-safe output alias for a group-by ref."""
+    if ref.alias is not None:
+        return ref.alias
+    if ref.source in _FIELD_GROUP_BY_SOURCES:
+        return resolve_agent_span_field_column(ref.key)
+    return ref.key
 
 
 # ---------------------------------------------------------------------------

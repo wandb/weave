@@ -295,23 +295,26 @@ class AgentSortBy(BaseModel):
 
 
 class AgentGroupByRef(BaseModel):
-    """Reference to a column or map-key that spans should be grouped by.
+    """Reference to a field or map-key that spans should be grouped by.
 
-    `source="column"` targets a named span column (allowlisted server-side).
+    `source="field"` targets a semantic span field (`agent.name`) or direct
+    span column (`agent_name`), allowlisted server-side. `source="column"` is
+    accepted for existing callers.
     The other sources target keys inside the typed custom attribute Map columns,
     which accept arbitrary user-defined keys.
     """
 
     source: Literal[
+        "field",
         "column",
         "custom_attrs_string",
         "custom_attrs_int",
         "custom_attrs_float",
         "custom_attrs_bool",
-    ] = "column"
+    ] = "field"
     key: str
     alias: str | None = (
-        None  # output key in AgentSpanGroupRow.group_keys (defaults to `key`)
+        None  # output key in AgentSpanGroupRow.group_keys
     )
 
 
