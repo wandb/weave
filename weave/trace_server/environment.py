@@ -246,6 +246,11 @@ def wf_clickhouse_use_distributed_tables() -> bool:
     )
 
 
+def wf_clickhouse_pool_max_connections() -> int:
+    """Max connections in the shared urllib3 pool used by `clickhouse-connect`."""
+    return int(os.environ.get("WF_CLICKHOUSE_POOL_MAX_CONNECTIONS", "100"))
+
+
 VALID_CALLS_SHARD_KEYS = frozenset({"trace_id", "id", "project_id"})
 
 

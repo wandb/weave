@@ -4,6 +4,7 @@ This module verifies that multiple calls are properly batched into a single
 ClickHouse insert operation for performance optimization.
 """
 
+import asyncio
 import base64
 import datetime
 import json
@@ -537,3 +538,71 @@ def test_obj_batch_mixed_projects_errors(trace_server, client):
         match="obj_create_batch only supports updating a single project.",
     ):
         server.obj_create_batch(batch=batch)
+
+
+def test_call_batch_state_is_per_task_and_survives_to_thread():
+    """Batch state is per-asyncio-task via ContextVars.
+
+    Verifies three invariants of the ContextVar-backed batch state:
+    1. `call_batch()` resets state on entry so a parent task's prior appends
+       don't leak in (defensive init).
+    2. Two concurrent tasks each see their own batch list. With the old
+       `threading.local()` impl, both tasks ran on the same event loop
+       thread and silently shared a buffer.
+    3. State propagates correctly into `asyncio.to_thread`: appends made on
+       the executor thread are visible back in the calling coroutine.
+    """
+    mock_ch_client = MagicMock()
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = ClickHouseTraceServer(host="test_host")
+
+    # This test only cares about batch-state isolation, not the flush path.
+    captured: dict[str, list[list[str]]] = {}
+
+    def fake_flush(self: ClickHouseTraceServer) -> None:
+        # Snapshot the batch contents at flush time, keyed by the first column
+        # which we use as the task label below.
+        if self._call_batch:
+            captured[self._call_batch[0][0]] = list(self._call_batch)
+
+    async def task_appends(label: str) -> list[str]:
+        with server.call_batch():
+            server._call_batch.append([label, "a"])
+            # Yield control so the other task can run between appends.
+            await asyncio.sleep(0)
+            server._call_batch.append([label, "b"])
+            # Bounce through a worker thread and append from there. With
+            # ContextVars, the executor thread inherits the task's context
+            # and mutates the same list.
+            await asyncio.to_thread(server._call_batch.append, [label, "c"])
+            return [row[1] for row in server._call_batch]
+
+    async def driver() -> tuple[list[str], list[str]]:
+        return await asyncio.gather(task_appends("X"), task_appends("Y"))
+
+    with patch.object(
+        ClickHouseTraceServer,
+        "_flush_all_batches_in_order",
+        fake_flush,
+    ):
+        # Pre-pollute the outer context's batch to verify call_batch() resets on entry.
+        server._call_batch.append(["outer", "pollution"])
+        assert server._call_batch == [["outer", "pollution"]]
+
+        x_rows, y_rows = asyncio.run(driver())
+
+    # Each task sees only its own appends -> ContextVar isolation works.
+    assert x_rows == ["a", "b", "c"]
+    assert y_rows == ["a", "b", "c"]
+
+    # Flush saw each task's complete batch independently.
+    assert captured["X"] == [["X", "a"], ["X", "b"], ["X", "c"]]
+    assert captured["Y"] == [["Y", "a"], ["Y", "b"], ["Y", "c"]]
+
+    # Outer context's pre-existing state is untouched by the inner tasks.
+    assert server._call_batch == [["outer", "pollution"]]
+
+    # Clear so __del__ doesn't try to flush the synthetic row at gc time.
+    server._call_batch = []
