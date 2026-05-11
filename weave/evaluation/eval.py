@@ -3,6 +3,7 @@ import json
 import logging
 import traceback
 from collections.abc import Callable
+from contextvars import ContextVar, Token
 from datetime import datetime
 from itertools import chain, repeat
 from typing import Any, Literal
@@ -28,6 +29,7 @@ from weave.flow.scorer import (
 from weave.flow.util import make_memorable_name, transpose
 from weave.object.obj import Object
 from weave.trace.call import Call, CallsIter
+from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
@@ -37,6 +39,9 @@ from weave.trace.refs import ObjectRef
 from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
+from weave.trace_server import constants
+from weave.trace_server import trace_server_common as tsc
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
 
@@ -46,6 +51,72 @@ INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
+
+
+_current_eval_predict_and_score_call: ContextVar[Call | None] = ContextVar(
+    "current_eval_predict_and_score_call", default=None
+)
+
+
+def set_current_eval_predict_and_score_call(call: Call | None) -> Token | None:
+    if call is None:
+        return None
+    return _current_eval_predict_and_score_call.set(call)
+
+
+def reset_current_eval_predict_and_score_call(token: Token | None) -> None:
+    if token is not None:
+        _current_eval_predict_and_score_call.reset(token)
+
+
+def link_genai_span(
+    trace_id: str,
+    span_id: str,
+) -> tsi.GenAISpanRef:
+    """Link the active v1 eval prediction to a GenAI span.
+
+    Call this from inside the model prediction while running
+    ``Evaluation.evaluate`` or inside an ``EvaluationLogger.log_prediction``
+    context.
+    """
+    genai_span_ref = tsi.GenAISpanRef(trace_id=trace_id, span_id=span_id)
+    predict_and_score_call = (
+        _current_eval_predict_and_score_call.get()
+        or _find_current_predict_and_score_call()
+    )
+    if predict_and_score_call is None:
+        raise RuntimeError(
+            "No active Evaluation.predict_and_score call found. "
+            "Call this while an eval prediction is running."
+        )
+
+    attach_genai_span_ref_to_call_summary(predict_and_score_call, genai_span_ref)
+    return genai_span_ref
+
+
+def attach_genai_span_ref_to_call_summary(
+    call: Call,
+    genai_span_ref: tsi.GenAISpanRef,
+) -> None:
+    if call.summary is None:
+        call.summary = {}
+
+    weave_summary = call.summary.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
+    if not isinstance(weave_summary, dict):
+        weave_summary = {}
+        call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE] = weave_summary
+
+    weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = genai_span_ref.model_dump()
+
+
+def _find_current_predict_and_score_call() -> Call | None:
+    for call in reversed(call_context.get_call_stack()):
+        if any(
+            tsc.op_name_matches(call.op_name, variant)
+            for variant in constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES
+        ):
+            return call
+    return None
 
 
 def default_evaluation_display_name(call: Call) -> str:
@@ -179,9 +250,13 @@ class Evaluation(Object):
 
     @op
     async def predict_and_score(self, model: Op | Model, example: dict) -> dict:
-        apply_model_result = await apply_model_async(
-            model, example, self.preprocess_model_input
-        )
+        token = set_current_eval_predict_and_score_call(call_context.get_current_call())
+        try:
+            apply_model_result = await apply_model_async(
+                model, example, self.preprocess_model_input
+            )
+        finally:
+            reset_current_eval_predict_and_score_call(token)
 
         if isinstance(apply_model_result, ApplyModelError):
             return {

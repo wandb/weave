@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import weave
 from tests.conftest import LATENCY_TOL
 from weave import Dataset, Evaluation, Model
+from weave.trace_server import trace_server_interface as tsi
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
@@ -99,6 +100,38 @@ async def test_evaluate_rows_only(client):
     model = EvalModel()
     result = await evaluation.evaluate(model)
     assert result == expected_eval_result
+
+
+@pytest.mark.asyncio
+async def test_evaluate_links_explicit_genai_span_ref(client):
+    genai_span_ref = tsi.GenAISpanRef(
+        trace_id="11111111111111111111111111111111",
+        span_id="2222222222222222",
+    )
+
+    @weave.op
+    async def model_predict(input) -> str:
+        weave.link_genai_span(
+            genai_span_ref.trace_id,
+            genai_span_ref.span_id,
+        )
+        return eval(input)
+
+    evaluation = Evaluation(dataset=[dataset_rows[0]], scorers=[])
+    await evaluation.evaluate(model_predict)
+    client.flush()
+
+    evaluate_call = next(iter(evaluation.evaluate.calls()))
+    res = client.server.eval_results_query(
+        tsi.EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[evaluate_call.id],
+            include_predict_and_score_children=False,
+        )
+    )
+
+    trial = res.rows[0].evaluations[0].trials[0]
+    assert trial.genai_span_ref == genai_span_ref
 
 
 @pytest.mark.asyncio

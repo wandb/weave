@@ -51,7 +51,7 @@ wandb_init_hook()
 from weave.agent.agent import Agent as Agent
 from weave.agent.agent import AgentState as AgentState
 from weave.dataset.dataset import Dataset
-from weave.evaluation.eval import Evaluation
+from weave.evaluation.eval import Evaluation, link_genai_span
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.flow.model import Model
@@ -143,6 +143,7 @@ __all__ = [
     "get_tags",
     "get_tags_and_aliases",
     "init",
+    "link_genai_span",
     "link_prompt_to_registry",
     "list_aliases",
     "list_tags",

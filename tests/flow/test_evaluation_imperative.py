@@ -12,6 +12,7 @@ from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
@@ -160,6 +161,39 @@ def test_basic_evaluation(
             "total_examples": 3,
         },
     }
+
+
+def test_imperative_evaluation_links_explicit_genai_span_ref(client):
+    genai_span_ref = tsi.GenAISpanRef(
+        trace_id="11111111111111111111111111111111",
+        span_id="2222222222222222",
+    )
+    ev = weave.EvaluationLogger(
+        name="demo-imperative-link-test",
+        model={"name": "DemoModel"},
+        dataset=[{"question": "What is 2 + 2?"}],
+    )
+
+    with ev.log_prediction(inputs={"question": "What is 2 + 2?"}) as pred:
+        weave.link_genai_span(
+            genai_span_ref.trace_id,
+            genai_span_ref.span_id,
+        )
+        pred.output = "4"
+
+    ev.log_summary({"demo": True})
+    client.flush()
+
+    res = client.server.eval_results_query(
+        tsi.EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[ev._evaluate_call.id],
+            include_predict_and_score_children=False,
+        )
+    )
+
+    trial = res.rows[0].evaluations[0].trials[0]
+    assert trial.genai_span_ref == genai_span_ref
 
 
 def test_evaluation_with_custom_models_and_scorers(

@@ -62,6 +62,30 @@ def test_build_eval_rows_returns_genai_span_ref_without_children() -> None:
     assert trial.genai_span_ref == tsi.GenAISpanRef.model_validate(_genai_span_ref())
 
 
+def test_build_eval_rows_returns_genai_span_ref_from_summary_without_children() -> None:
+    predict_and_score_call = _call(
+        call_id="pas-1",
+        inputs={"example": {"x": 1}, "model": "model://agent"},
+        output={"output": "result", "scores": {}},
+    )
+    predict_and_score_call.summary = {
+        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+            constants.GENAI_SPAN_REF_ATTR_KEY: _genai_span_ref(),
+        }
+    }
+
+    rows = eval_helpers.build_eval_rows(
+        [predict_and_score_call],
+        ["eval-1"],
+        {"pas-1": "row-1"},
+        include_raw_data_rows=False,
+        include_predict_and_score_children=False,
+    )
+
+    trial = rows[0].evaluations[0].trials[0]
+    assert trial.genai_span_ref == tsi.GenAISpanRef.model_validate(_genai_span_ref())
+
+
 def test_build_trial_prefers_prediction_genai_span_ref() -> None:
     predict_and_score_call = _call(
         call_id="pas-1",
