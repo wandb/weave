@@ -675,25 +675,11 @@ class EvaluationLogger:
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
     ) -> None:
-        self._eval_meta = {**IMPERATIVE_EVAL_META_MARKER}
-        self._init_common(
-            name=name,
-            model=model,
-            dataset=dataset,
-            eval_attributes=eval_attributes,
-            scorers=scorers,
-        )
+        eval_meta = {}
+        if "_eval_meta" in self.__dict__:
+            eval_meta = self.__dict__["_eval_meta"]
+        self._eval_meta = {**eval_meta, **IMPERATIVE_EVAL_META_MARKER}
 
-    def _init_common(
-        self,
-        *,
-        name: str | None = None,
-        model: Model | dict | str | None = None,
-        dataset: Dataset | list[dict] | str | None = None,
-        eval_attributes: dict[str, Any] | None = None,
-        scorers: list[str] | None = None,
-    ) -> None:
-        """Shared post-meta-setup body for `__init__` and `_create_with_meta`."""
         self.name = name
         self.scorers = scorers
         self.eval_attributes = eval_attributes if eval_attributes is not None else {}
@@ -815,13 +801,10 @@ class EvaluationLogger:
         """Internal factory: build an EvaluationLogger with extra
         `_weave_eval_meta` keys propagated to every emitted call.
         """
-        # Use __new__ instead of cls(**init_kwargs) because we need to set the
-        # _eval_meta before running the body of the constructor, which uses it when
-        # declaring the predict_and_score inner class and creating the actual
-        # evaluate call.
         instance = cls.__new__(cls)
-        instance._eval_meta = {**eval_meta, **IMPERATIVE_EVAL_META_MARKER}
-        instance._init_common(
+        instance._eval_meta = eval_meta
+        EvaluationLogger.__init__(
+            instance,
             name=name,
             model=model,
             dataset=dataset,
