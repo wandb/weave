@@ -165,7 +165,7 @@ def get_cache_sizes(cache_dir: str) -> dict[str, int]:
     }
 
 
-def test_server_cache_size_limit(client):
+def test_server_cache_size_limit():
     count = 500
     limit = 50000
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -215,7 +215,7 @@ def test_server_cache_size_limit(client):
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
-def test_server_cache_latency(client):
+def test_server_cache_latency():
     count = 500
 
     base_server = MockServer("a" * 1000)

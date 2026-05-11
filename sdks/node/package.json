@@ -19,9 +19,9 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepare": "npm run build",
-    "test": "jest --silent --selectProjects legacy modern default",
-    "test:coverage": "jest --coverage --selectProjects legacy modern default",
-    "test:watch": "jest --watch --selectProjects legacy modern default",
+    "test": "jest --silent",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch",
     "test:legacy": "jest --selectProjects legacy",
     "test:modern": "jest --selectProjects modern",
     "test:hostApps": "jest --selectProjects hostApps --runInBand",
