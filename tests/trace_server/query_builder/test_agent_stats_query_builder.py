@@ -162,7 +162,6 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
         "genai_5": 1767312000.0,
         "genai_6": "UTC",
         "genai_7": 3600,
-        "genai_8": 50,
     }
     assert_sql(expected_sql, expected_params, result.sql, result.parameters)
     assert result.columns == [
