@@ -21,6 +21,7 @@ from weave.trace_server.agents.constants import (
     OP_INVOKE_AGENT,
 )
 from weave.trace_server.agents.types import (
+    AGENT_SPAN_STATS_DERIVED_VALUE_TYPES,
     AgentGroupByRef,
     AgentSpanStatsAggregation,
     AgentSpanStatsColumn,
@@ -133,14 +134,6 @@ _COLUMN_VALUE_TYPES: dict[str, AgentSpanStatsValueType] = {
     **_CORE_SPAN_VALUE_TYPES,
 }
 
-_DERIVED_VALUE_TYPES: dict[AgentSpanStatsDerivedMetric, AgentSpanStatsValueType] = {
-    _DERIVED_DURATION_MS: _VALUE_TYPE_NUMBER,
-    _DERIVED_TOTAL_TOKENS: _VALUE_TYPE_NUMBER,
-    _DERIVED_IS_ERROR: _VALUE_TYPE_BOOLEAN,
-    _DERIVED_IS_INVOCATION: _VALUE_TYPE_BOOLEAN,
-}
-
-
 def _span_col(column: str) -> str:
     return f"{_SPAN_ALIAS}.{column}"
 
@@ -230,8 +223,10 @@ def build_agent_span_stats_query(
     end_param = pb.add_param(end_epoch)
     tz_param = pb.add_param(tz)
     bucket_interval_param = pb.add_param(granularity_seconds)
-    group_limit = _effective_group_limit(req, start, end, granularity_seconds)
-    group_limit_slot = pb.add(group_limit, param_type="UInt64")
+    group_limit_slot = None
+    if resolved_groups:
+        group_limit = _effective_group_limit(req, start, end, granularity_seconds)
+        group_limit_slot = pb.add(group_limit, param_type="UInt64")
 
     raw_sql = _build_stats_query(
         where=where,
@@ -385,7 +380,7 @@ def _metric_plan(metric: AgentSpanStatsMetricSpec, pb: ParamBuilder) -> _MetricP
 def _metric_sql(metric: AgentSpanStatsMetricSpec, pb: ParamBuilder) -> _MetricSQL:
     """Return the per-span value expression and validity guard for a metric."""
     if metric.derived is not None:
-        value_type = _DERIVED_VALUE_TYPES[metric.derived]
+        value_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[metric.derived]
         if metric.value_type != value_type:
             raise ValueError(
                 f"metric {metric.alias!r} declares {metric.value_type!r}, "
@@ -585,7 +580,7 @@ def _build_stats_query(
     tz_param: str,
     bucket_interval_param: str,
     granularity_seconds: int,
-    group_limit_slot: str,
+    group_limit_slot: str | None,
 ) -> str:
     """Render the appropriate SQL shape for grouped or ungrouped stats."""
     parts = _stats_query_sql_parts(
@@ -602,6 +597,7 @@ def _build_stats_query(
     if not resolved_groups:
         return _build_ungrouped_stats_query(where=where, parts=parts)
 
+    assert group_limit_slot is not None
     return _build_grouped_stats_query(
         where=where,
         resolved_groups=resolved_groups,

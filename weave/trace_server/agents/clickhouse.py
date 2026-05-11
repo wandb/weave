@@ -37,6 +37,7 @@ from weave.trace_server.agents.types import (
     AgentSearchRes,
     AgentSpanGroupRow,
     AgentSpanSchema,
+    AgentSpanStatsCell,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
     AgentSpanStatsReq,
@@ -443,8 +444,8 @@ def _rows_as_dicts(result: QueryResult) -> list[ClickHouseRow]:
 
 
 def _rows_to_dicts(
-    columns: list[str], rows: list[tuple[Any, ...]]
-) -> list[dict[str, Any]]:
+    columns: list[str], rows: list[tuple[AgentSpanStatsCell, ...]]
+) -> list[dict[str, AgentSpanStatsCell]]:
     """Zip explicit column names with rows returned by a stats query."""
     return [dict(zip(columns, row, strict=True)) for row in rows]
 

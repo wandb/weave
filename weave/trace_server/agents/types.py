@@ -46,6 +46,7 @@ SearchMessageRole = Literal[
 
 AgentSpanStatsValueType = Literal["number", "boolean", "string"]
 AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string"]
+AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
 AgentSpanStatsAggregation = Literal[
     "sum",
     "avg",
@@ -64,7 +65,9 @@ AgentSpanStatsDerivedMetric = Literal[
 ]
 
 _IDENT_RE = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
-_DERIVED_VALUE_TYPES: dict[AgentSpanStatsDerivedMetric, AgentSpanStatsValueType] = {
+AGENT_SPAN_STATS_DERIVED_VALUE_TYPES: dict[
+    AgentSpanStatsDerivedMetric, AgentSpanStatsValueType
+] = {
     "duration_ms": "number",
     "total_tokens": "number",
     "is_error": "boolean",
@@ -112,7 +115,7 @@ class AgentSpanStatsMetricSpec(BaseModel):
             raise ValueError("exactly one of field or derived must be set")
 
         if self.derived is not None:
-            expected_type = _DERIVED_VALUE_TYPES[self.derived]
+            expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[self.derived]
             if self.value_type != expected_type:
                 raise ValueError(
                     f"derived metric {self.derived!r} has value_type "
@@ -210,7 +213,7 @@ class AgentSpanStatsRes(BaseModel):
     granularity: int
     timezone: str
     columns: list[AgentSpanStatsColumn] = Field(default_factory=list)
-    rows: list[dict[str, Any]] = Field(default_factory=list)
+    rows: list[dict[str, AgentSpanStatsCell]] = Field(default_factory=list)
 
 
 class AgentSpanSchema(BaseModel):
