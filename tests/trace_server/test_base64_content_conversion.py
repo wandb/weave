@@ -353,5 +353,168 @@ class TestStandaloneBase64Detection:
         assert metadata["mimetype"] in {"audio/wav", "audio/x-wav", "audio/wave"}
 
 
+class TestThresholdAndStructuralIdentity:
+    """Pins the auto-conversion threshold and the "don't copy unchanged subtrees" behaviour.
+
+    These exist because both knobs are part of the hot path on every
+    ``upsert_batch``: the threshold gates how much expensive regex / decode
+    work runs on long-but-not-binary strings, and the in-place return path
+    avoids allocating a fresh dict/list on each level of a no-binary payload.
+    """
+
+    def test_auto_conversion_threshold_is_eight_kib(self):
+        """Regression guard: the threshold has a real cost when lowered."""
+        # If someone drops this back to 1024, all the mid-sized LLM outputs in
+        # production traces start hitting `is_data_uri` + `is_base64` again —
+        # the very work the threshold bump was meant to skip.
+        assert AUTO_CONVERSION_MIN_SIZE == 8192
+
+    def test_string_below_threshold_does_not_invoke_storage(self):
+        """A 1-8 KiB string must short-circuit on size; no regex, no storage."""
+        trace_server = MagicMock()
+        # 4 KiB string of valid-looking base64 alphabet — would have decoded
+        # successfully under the old threshold and gone through the regex
+        # path. Now it must be returned untouched.
+        below_threshold = "A" * 4096
+        result = replace_base64_with_content_objects(
+            {"field": below_threshold}, "test_project", trace_server
+        )
+        assert result["field"] == below_threshold
+        assert trace_server.file_create.call_count == 0
+
+    def test_no_replacement_returns_same_object_identity(self):
+        """If nothing changed, the caller gets back the original dict object.
+
+        This is what makes the no-binary hot path cheap: every level whose
+        children are all untouched returns the same reference instead of
+        allocating a fresh copy. Identity matters here — checking equality
+        wouldn't catch a regression to the always-allocate code path.
+        """
+        trace_server = MagicMock()
+        original = {
+            "messages": [
+                {"role": "user", "content": "no binary here"},
+                {"role": "assistant", "content": "still nothing"},
+            ],
+            "metadata": {"trace_id": "abc"},
+        }
+        result = replace_base64_with_content_objects(
+            original, "test_project", trace_server
+        )
+        # The outer dict, the messages list, every inner message dict, and
+        # the metadata dict must all be the same object as the input — no
+        # copies anywhere on a clean no-binary tree.
+        assert result is original
+        assert result["messages"] is original["messages"]
+        assert result["messages"][0] is original["messages"][0]
+        assert result["metadata"] is original["metadata"]
+
+    def test_partial_replacement_copies_only_affected_subtrees(self):
+        """A replacement on one branch must not allocate copies on the others."""
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+        png_data_uri = "data:image/png;base64," + base64.b64encode(
+            b"\x89PNG\r\n\x1a\n" + b"\x00" * 12000
+        ).decode("ascii")
+
+        untouched_branch = {"role": "assistant", "content": "plain reply"}
+        touched_branch = {
+            "role": "user",
+            "content": [{"type": "image_url", "image_url": {"url": png_data_uri}}],
+        }
+        original = {
+            "messages": [untouched_branch, touched_branch],
+            "model": "claude-sonnet-4-6",
+        }
+
+        result = replace_base64_with_content_objects(
+            original, "test_project", trace_server
+        )
+
+        # Branches with no replacement keep their identity.
+        assert result["messages"][0] is untouched_branch
+        # The branch that did get a replacement is a fresh object whose
+        # rewritten subtree no longer matches the source.
+        assert result["messages"][1] is not touched_branch
+        # And critically: the input dict was not mutated.
+        assert touched_branch["content"][0]["image_url"]["url"] == png_data_uri
+
+    def test_partial_replacement_in_list_isolates_unchanged_indices(self):
+        """List sibling of the dict-partial test: only the touched index is copied.
+
+        Without this the list branch of ``_visit_children`` is only exercised
+        in the all-changed and all-unchanged extremes, which leaves the
+        "first-change triggers a copy of the whole list" path partially
+        covered (codecov flagged this on the original PR).
+        """
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+        png_data_uri = "data:image/png;base64," + base64.b64encode(
+            b"\x89PNG\r\n\x1a\n" + b"\x00" * 12000
+        ).decode("ascii")
+
+        untouched_message = {"role": "user", "content": "plain text"}
+        touched_message = {"role": "assistant", "content": png_data_uri}
+        other_untouched_message = {"role": "tool", "content": "also plain"}
+        original_messages = [
+            untouched_message,
+            touched_message,
+            other_untouched_message,
+        ]
+        original = {"messages": original_messages, "model": "claude-sonnet-4-6"}
+
+        result = replace_base64_with_content_objects(
+            original, "test_project", trace_server
+        )
+
+        # The list itself was copied (one of its entries changed), but the
+        # unchanged dict entries keep their identity inside the new list.
+        assert result["messages"] is not original_messages
+        assert result["messages"][0] is untouched_message
+        assert result["messages"][2] is other_untouched_message
+        # The touched entry was replaced — different identity, and the
+        # original dict is left intact.
+        assert result["messages"][1] is not touched_message
+        assert touched_message["content"] == png_data_uri
+
+    def test_caller_overwrite_safe_after_in_place_return(self):
+        """Caller pattern ``req.start.inputs = replace_base64(...)`` is safe.
+
+        Confirms the no-copy path doesn't introduce a subtle aliasing bug:
+        even though the result is the same object as the input, the
+        ``CallStartReq`` machinery in ``process_call_req_to_content`` just
+        rebinds the field, which is fine.
+        """
+        from datetime import datetime, timezone
+
+        trace_server = MagicMock()
+        inputs_before = {"text": "no binary content here"}
+        start_req = CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id="proj",
+                op_name="op",
+                started_at=datetime.now(timezone.utc),
+                attributes={},
+                inputs=inputs_before,
+            )
+        )
+        processed = process_call_req_to_content(start_req, trace_server)
+        # Pydantic shallow-copies inputs at model construction, so we compare
+        # by value rather than identity here — content must round-trip
+        # unchanged regardless of the SDK copy.
+        assert processed.start.inputs == inputs_before
+        assert trace_server.file_create.call_count == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
