@@ -1260,6 +1260,96 @@ def _create_call_hierarchy(
     return ids
 
 
+def test_filter_candidate_cte_consistency_with_unmerged_parts(
+    trace_server, clickhouse_trace_server
+):
+    """A heavy LIKE filter on calls_merged routes through the
+    `filter_candidate_ids` CTE. The CTE's `ifNull(<dump>, '') LIKE ...` runs
+    over raw, unmerged calls_merged rows — so if a call exists only as a
+    START part (END not arrived) or only as an END part (START never
+    arrived), the CTE must still agree with the outer query about
+    membership and ORDER BY ranking. Lock that down.
+    """
+    project_id = f"{TEST_ENTITY}/candidate_cte_unmerged_parts"
+    internal_project_id = b64(project_id)
+    # Seed a row directly into calls_merged so residence resolves to
+    # MERGED_ONLY and writes / reads use calls_merged.
+    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
+
+    base = datetime.datetime.now(datetime.timezone.utc)
+    needle = "847d9162-7249-47c7-ab36-2ba4e821d153"
+
+    # Three calls match the filter and one does not. Ordering by
+    # started_at DESC should put C (newest START) first, then B, then A.
+    full_oldest_id = str(uuid.uuid4())  # A: full call, oldest
+    full_middle_id = str(uuid.uuid4())  # B: full call, middle
+    start_only_id = str(uuid.uuid4())  # C: START only, newest
+    end_only_id = str(uuid.uuid4())  # D: END only, no inputs (must NOT match)
+
+    def _start(call_id: str, started_at: datetime.datetime, inputs: dict[str, Any]):
+        trace_server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=str(uuid.uuid4()),
+                    op_name="test_op",
+                    started_at=started_at,
+                    attributes={},
+                    inputs=inputs,
+                )
+            )
+        )
+
+    def _end(call_id: str, ended_at: datetime.datetime):
+        trace_server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=ended_at,
+                    summary={"usage": {}, "status_counts": {}},
+                )
+            )
+        )
+
+    _start(full_oldest_id, base, {"unique_id": needle})
+    _end(full_oldest_id, base + datetime.timedelta(seconds=1))
+
+    _start(full_middle_id, base + datetime.timedelta(seconds=10), {"unique_id": needle})
+    _end(full_middle_id, base + datetime.timedelta(seconds=11))
+
+    _start(start_only_id, base + datetime.timedelta(seconds=20), {"unique_id": needle})
+    # No matching end for start_only_id — leaves a START-only unmerged row.
+
+    # END-only: no preceding call_start, so calls_merged has only an END
+    # part for this id. inputs_dump is NULL on END parts.
+    _end(end_only_id, base + datetime.timedelta(seconds=30))
+
+    query_req = tsi.CallsQueryReq(
+        project_id=project_id,
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$getField": "inputs.unique_id"},
+                    {"$literal": needle},
+                ]
+            }
+        },
+        sort_by=[{"field": "started_at", "direction": "desc"}],
+        limit=10,
+    )
+    calls = list(trace_server.calls_query_stream(query_req))
+    returned_ids = [c.id for c in calls]
+
+    # Membership: D (END-only, no inputs) must be excluded; the other three
+    # must be present. Ordering: C (newest start) > B > A.
+    assert returned_ids == [start_only_id, full_middle_id, full_oldest_id], (
+        f"candidate-CTE ordering diverged from outer ordering: {returned_ids}"
+    )
+    assert end_only_id not in returned_ids
+
+
 def test_call_update_display_name(trace_server, clickhouse_trace_server):
     """Test display_name updates: setting from null and overwriting existing values."""
     project_id = f"{TEST_ENTITY}/calls_complete_display_name"

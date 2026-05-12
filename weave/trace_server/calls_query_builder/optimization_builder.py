@@ -34,7 +34,12 @@ if TYPE_CHECKING:
 
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
-HEAVY_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
+HEAVY_FIELDS_TO_OPTIMIZE = {
+    "inputs_dump",
+    "output_dump",
+    "attributes_dump",
+    "summary_dump",
+}
 DATETIME_FIELDS_TO_OPTIMIZE = {"started_at"}
 
 DATETIME_BUFFER_TIME_SECONDS = 60 * 5  # 5 minutes
@@ -359,6 +364,12 @@ def apply_processor(
 
 class OptimizationConditions(BaseModel):
     heavy_filter_opt_sql: str | None = None
+    # Strict variant of heavy_filter_opt_sql with no `OR <field> IS NULL` clauses.
+    # The OR-IS-NULL form is correct over unmerged calls_merged parts but defeats
+    # the ngram bloom filter index on `ifNull(<dump>, '')`. Use the strict form in
+    # a candidate-id CTE that pre-narrows rows via the index, then keep the
+    # OR-IS-NULL form in the outer query for correctness.
+    heavy_filter_opt_strict_sql: str | None = None
     sortable_datetime_filters_sql: str | None = None
 
 
@@ -400,6 +411,15 @@ def process_query_to_optimization_sql(
     heavy_field_result = apply_processor(heavy_field_processor, and_operation)
     heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
 
+    # Also produce the strict (no OR-IS-NULL) variant for the index-friendly
+    # candidate-id CTE. For calls_complete this matches heavy_field_result_sql;
+    # ParamBuilder dedupes params by value so this doesn't bloat the parameters.
+    strict_processor = HeavyFieldOptimizationProcessor(
+        param_builder, table_alias, use_null_check=False
+    )
+    strict_result = apply_processor(strict_processor, and_operation)
+    strict_result_sql = strict_processor.finalize_sql(strict_result)
+
     sortable_datetime_result_sql = None
     if config.use_aggregation:
         # Apply sortable_datetime optimization only for aggregated tables (calls_merged)
@@ -417,6 +437,7 @@ def process_query_to_optimization_sql(
 
     return OptimizationConditions(
         heavy_filter_opt_sql=heavy_field_result_sql,
+        heavy_filter_opt_strict_sql=strict_result_sql,
         sortable_datetime_filters_sql=sortable_datetime_result_sql,
     )
 
@@ -451,8 +472,14 @@ def _create_like_condition(
     table_alias: str,
     case_insensitive: bool = False,
 ) -> str:
-    """Creates a LIKE condition for a JSON field."""
-    field_name = f"{table_alias}.{field}"
+    """Creates a LIKE condition for a JSON field.
+
+    The dump column is wrapped in `ifNull(..., '')` so that the expression
+    matches the `idx_inputs_dump_ngram` ngram bloom filter index on
+    calls_merged (see migration 031), and so that LIKE never returns NULL
+    over Nullable(String) columns.
+    """
+    field_name = f"ifNull({table_alias}.{field}, '')"
 
     if case_insensitive:
         param_name = pb.add_param(like_pattern.lower())
