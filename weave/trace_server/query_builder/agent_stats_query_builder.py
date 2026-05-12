@@ -35,6 +35,7 @@ from weave.trace_server.calls_query_builder.stats_query_base import (
 from weave.trace_server.calls_query_builder.utils import param_slot, safely_format_sql
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
+    _project_filter_sql,
     add_time_filters,
     ensure_group_filters_match,
     group_by_ref_alias,
@@ -376,7 +377,7 @@ def _spans_source_filter_sql(
     end: datetime.datetime,
 ) -> _SpanSourceFilterSQL:
     pid_slot = pb.add(req.project_id, param_type="String")
-    prewhere_conditions = [f"{_span_col(_COL_PROJECT_ID)} = {pid_slot}"]
+    prewhere_conditions = [_project_filter_sql(_span_col(_COL_PROJECT_ID), pid_slot)]
     add_time_filters(
         prewhere_conditions,
         pb,

@@ -691,9 +691,15 @@ def _optional_where_clause(where: str, *, prefix: str = " ") -> str:
     return f"{prefix}WHERE {where}" if where else ""
 
 
+def _project_filter_sql(column_sql: str, project_slot: str) -> str:
+    # ClickHouse 26.2 can prune internal base64 project ids incorrectly when the
+    # primary-key column is on the left side of the equality.
+    return f"{project_slot} = {column_sql}"
+
+
 def _spans_filter_sql(pb: ParamBuilder, req: AgentSpansQueryReq) -> _FilterSQL:
     pid_slot = pb.add(req.project_id, param_type="String")
-    prewhere_conditions = [f"s.project_id = {pid_slot}"]
+    prewhere_conditions = [_project_filter_sql("s.project_id", pid_slot)]
     add_time_filters(
         prewhere_conditions,
         pb,
@@ -741,7 +747,7 @@ def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
     pid_slot = pb.add(req.project_id, param_type="String")
     content_slot = pb.add(f"%{_escape_like_pattern(req.query)}%", param_type="String")
     prewhere_conditions = [
-        f"project_id = {pid_slot}",
+        _project_filter_sql("project_id", pid_slot),
     ]
     conditions = [
         f"content LIKE {content_slot}",
@@ -899,7 +905,7 @@ def make_trace_detail_spans_query(
     tid = pb.add(trace_id, param_type="String")
     return f"""
         SELECT {CHAT_VIEW_COLS} FROM spans s
-        PREWHERE s.project_id = {pid}
+        PREWHERE {_project_filter_sql("s.project_id", pid)}
         WHERE s.trace_id = {tid}
         ORDER BY s.started_at ASC
     """
@@ -915,7 +921,7 @@ def make_agents_count_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
     where = _agents_where(pb, req)
     where_sql = _optional_where_clause(where)
     return f"""SELECT count() FROM (
-        SELECT agent_name FROM agents PREWHERE project_id = {pid_slot}{where_sql} GROUP BY agent_name
+        SELECT agent_name FROM agents PREWHERE {_project_filter_sql("project_id", pid_slot)}{where_sql} GROUP BY agent_name
     )"""
 
 
@@ -938,7 +944,7 @@ def make_agents_list_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
                min(first_seen) AS first_seen,
                max(last_seen) AS last_seen
         FROM agents
-        PREWHERE project_id = {pid_slot}{where_sql}
+        PREWHERE {_project_filter_sql("project_id", pid_slot)}{where_sql}
         GROUP BY agent_name
         ORDER BY {order_by}
         LIMIT {limit_slot} OFFSET {offset_slot}
@@ -952,7 +958,7 @@ def make_agent_versions_count_query(
     aname = pb.add(req.agent_name, param_type="String")
     return (
         f"SELECT count() FROM ("
-        f"SELECT agent_version FROM agent_versions PREWHERE project_id = {pid}"
+        f"SELECT agent_version FROM agent_versions PREWHERE {_project_filter_sql('project_id', pid)}"
         f" WHERE agent_name = {aname} GROUP BY agent_version"
         f")"
     )
@@ -973,7 +979,7 @@ def make_agent_versions_list_query(pb: ParamBuilder, req: AgentVersionsQueryReq)
                min(first_seen) AS first_seen,
                max(last_seen) AS last_seen
         FROM agent_versions
-        PREWHERE project_id = {pid}
+        PREWHERE {_project_filter_sql("project_id", pid)}
         WHERE agent_name = {aname}
         GROUP BY agent_version
         ORDER BY last_seen DESC
@@ -1029,13 +1035,13 @@ def make_conversation_chat_spans_query(
         INNER JOIN (
             SELECT trace_id, min(started_at) AS turn_started_at
             FROM spans
-            PREWHERE project_id = {pid}
+            PREWHERE {_project_filter_sql("project_id", pid)}
             WHERE conversation_id = {cid}
             GROUP BY trace_id
             ORDER BY turn_started_at DESC, trace_id DESC
             LIMIT {limit_slot} OFFSET {offset_slot}
         ) t ON s.trace_id = t.trace_id
-        PREWHERE s.project_id = {pid}
+        PREWHERE {_project_filter_sql("s.project_id", pid)}
         ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
     """
 
@@ -1050,7 +1056,7 @@ def make_conversation_chat_turns_count_query(
         SELECT count() FROM (
             SELECT trace_id
             FROM spans s
-            PREWHERE s.project_id = {pid}
+            PREWHERE {_project_filter_sql("s.project_id", pid)}
             WHERE s.conversation_id = {cid}
             GROUP BY trace_id
         )
