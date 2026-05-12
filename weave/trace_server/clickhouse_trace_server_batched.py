@@ -450,7 +450,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._thread_local.calls_complete_batch = value
 
     @classmethod
-    def from_env(cls, use_async_insert: bool = False, **kwargs: Any) -> Self:
+    def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
         return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
