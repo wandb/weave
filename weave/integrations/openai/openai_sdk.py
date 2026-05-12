@@ -26,7 +26,19 @@ from openai.types.chat.chat_completion_message_tool_call import (
 )
 
 import weave
+from weave.integrations._session_llm_bridge import (
+    session_aware_async,
+    session_aware_sync,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.session import LLM
+from weave.session.adapters.openai import (
+    finish_reasons_from_openai_responses,
+    message_from_openai_responses_input,
+    output_messages_from_openai_responses,
+    reasoning_from_openai_responses_output,
+    usage_from_openai_responses,
+)
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
     _add_accumulator,
@@ -727,6 +739,34 @@ def responses_on_finish_post_processor(value: Response | None) -> dict | None:
     return dump
 
 
+def _responses_populate_input(llm: LLM, kwargs: dict) -> None:
+    input_data = kwargs.get("input")
+    if not input_data:
+        return
+    messages, attachments = message_from_openai_responses_input(input_data)
+    llm.input_messages = messages
+    if attachments:
+        llm.media_attachments = attachments
+
+
+def _responses_populate_output(llm: LLM, response: Response | None) -> None:
+    if response is None:
+        return
+    llm.record(
+        output_messages=output_messages_from_openai_responses(response),
+        usage=usage_from_openai_responses(response),
+        response_id=getattr(response, "id", "") or "",
+        response_model=getattr(response, "model", "") or "",
+        finish_reasons=finish_reasons_from_openai_responses(response),
+        reasoning=reasoning_from_openai_responses_output(response),
+    )
+
+
+def _responses_model_from_kwargs(kwargs: dict) -> str:
+    model = kwargs.get("model")
+    return str(model) if model else ""
+
+
 def create_wrapper_responses_sync(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
@@ -740,11 +780,20 @@ def create_wrapper_responses_sync(
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        return _add_accumulator(
+        op_with_acc = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: responses_accumulator,
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
+        )
+        return session_aware_sync(
+            op_with_acc,
+            provider_name="openai",
+            model_from_kwargs=_responses_model_from_kwargs,
+            on_input=_responses_populate_input,
+            on_output=_responses_populate_output,
+            is_streaming=should_use_responses_accumulator,
+            accumulator=responses_accumulator,
         )
 
     return wrapper
@@ -763,11 +812,20 @@ def create_wrapper_responses_async(
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        return _add_accumulator(
+        op_with_acc = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: responses_accumulator,
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
+        )
+        return session_aware_async(
+            op_with_acc,
+            provider_name="openai",
+            model_from_kwargs=_responses_model_from_kwargs,
+            on_input=_responses_populate_input,
+            on_output=_responses_populate_output,
+            is_streaming=should_use_responses_accumulator,
+            accumulator=responses_accumulator,
         )
 
     return wrapper

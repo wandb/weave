@@ -22,7 +22,18 @@ from anthropic.types.beta import (
 )
 
 import weave
+from weave.integrations._session_llm_bridge import (
+    session_aware_async,
+    session_aware_sync,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.session import LLM
+from weave.session.adapters.anthropic import (
+    finish_reasons_from_anthropic,
+    input_messages_from_anthropic,
+    output_messages_from_anthropic,
+    usage_from_anthropic,
+)
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator, _IteratorWrapper
 
@@ -88,15 +99,57 @@ def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
+def _anthropic_populate_input(llm: LLM, kwargs: dict) -> None:
+    messages = kwargs.get("messages")
+    if isinstance(messages, list):
+        llm.input_messages = input_messages_from_anthropic(messages)
+    system = kwargs.get("system")
+    if isinstance(system, str) and system:
+        llm.system_instructions = [system]
+    elif isinstance(system, list):
+        instructions = [
+            block.get("text", "") if isinstance(block, dict) else "" for block in system
+        ]
+        instructions = [s for s in instructions if s]
+        if instructions:
+            llm.system_instructions = instructions
+
+
+def _anthropic_populate_output(llm: LLM, response: Message | None) -> None:
+    if response is None:
+        return
+    llm.record(
+        output_messages=output_messages_from_anthropic(response),
+        usage=usage_from_anthropic(response),
+        response_id=getattr(response, "id", "") or "",
+        response_model=getattr(response, "model", "") or "",
+        finish_reasons=finish_reasons_from_anthropic(response),
+    )
+
+
+def _anthropic_model_from_kwargs(kwargs: dict) -> str:
+    model = kwargs.get("model")
+    return str(model) if model else ""
+
+
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         """We need to do this so we can check if `stream` is used."""
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return _add_accumulator(
+        op_with_acc = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
             should_accumulate=should_use_accumulator,
+        )
+        return session_aware_sync(
+            op_with_acc,
+            provider_name="anthropic",
+            model_from_kwargs=_anthropic_model_from_kwargs,
+            on_input=_anthropic_populate_input,
+            on_output=_anthropic_populate_output,
+            is_streaming=should_use_accumulator,
+            accumulator=anthropic_accumulator,
         )
 
     return wrapper
@@ -117,10 +170,19 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         "We need to do this so we can check if `stream` is used"
         op_kwargs = settings.model_dump()
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
-        return _add_accumulator(
+        op_with_acc = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
             should_accumulate=should_use_accumulator,
+        )
+        return session_aware_async(
+            op_with_acc,
+            provider_name="anthropic",
+            model_from_kwargs=_anthropic_model_from_kwargs,
+            on_input=_anthropic_populate_input,
+            on_output=_anthropic_populate_output,
+            is_streaming=should_use_accumulator,
+            accumulator=anthropic_accumulator,
         )
 
     return wrapper
