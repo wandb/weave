@@ -290,7 +290,7 @@ def best_effort_scorer_call_ids(
 
 
 def extract_genai_span_ref_from_weave_namespace(
-    data: dict[str, Any] | tsi.SummaryMap,
+    data: dict[str, Any] | tsi.SummaryMap | None,
 ) -> tsi.GenAISpanRef | None:
     if not isinstance(data, dict):
         return None

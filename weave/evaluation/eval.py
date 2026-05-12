@@ -2,8 +2,9 @@ import asyncio
 import json
 import logging
 import traceback
-from collections.abc import Callable
-from contextvars import ContextVar, Token
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from itertools import chain, repeat
 from typing import Any, Literal
@@ -58,14 +59,16 @@ _current_eval_predict_and_score_call: ContextVar[Call | None] = ContextVar(
 )
 
 
-def set_current_eval_predict_and_score_call(call: Call | None) -> Token | None:
+@contextmanager
+def _active_eval_prediction_context(call: Call | None) -> Iterator[None]:
     if call is None:
-        return None
-    return _current_eval_predict_and_score_call.set(call)
+        yield
+        return
 
-
-def reset_current_eval_predict_and_score_call(token: Token | None) -> None:
-    if token is not None:
+    token = _current_eval_predict_and_score_call.set(call)
+    try:
+        yield
+    finally:
         _current_eval_predict_and_score_call.reset(token)
 
 
@@ -250,13 +253,10 @@ class Evaluation(Object):
 
     @op
     async def predict_and_score(self, model: Op | Model, example: dict) -> dict:
-        token = set_current_eval_predict_and_score_call(call_context.get_current_call())
-        try:
+        with _active_eval_prediction_context(call_context.get_current_call()):
             apply_model_result = await apply_model_async(
                 model, example, self.preprocess_model_input
             )
-        finally:
-            reset_current_eval_predict_and_score_call(token)
 
         if isinstance(apply_model_result, ApplyModelError):
             return {
