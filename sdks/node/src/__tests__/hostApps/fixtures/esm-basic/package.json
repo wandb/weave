@@ -1,0 +1,10 @@
+{
+  "name": "esm-basic-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import=weave/instrument main.mjs"
+  },
+  "description": "ESM smoke host app for the hostApps integration tests. The 'weave' tarball is installed at test time via `npm install <tgz> --no-save`."
+}

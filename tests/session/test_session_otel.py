@@ -6,6 +6,7 @@ import base64
 import json
 import time
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import pytest
 from opentelemetry import trace as otel_trace
@@ -14,22 +15,34 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
+from weave.session.adapters.openai import (
+    message_from_openai_responses_input,
+    reasoning_from_openai_responses,
+    usage_from_openai_responses,
+)
 from weave.session.session import (
     LLM,
+    BlobPart,
     LogResult,
     MediaAttachment,
     Message,
     Reasoning,
+    ReasoningPart,
     Session,
     SubAgent,
+    TextPart,
     Tool,
+    ToolCallPart,
+    ToolCallResponsePart,
     Turn,
+    UriPart,
     Usage,
     get_current_llm,
     get_current_session,
     get_current_turn,
     log_session,
     log_turn,
+    start_llm,
     start_session,
     start_tool,
 )
@@ -67,6 +80,48 @@ def otel_spans(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
     yield exporter
     provider.shutdown()
+
+
+def _emit_llm_with(
+    otel_spans: InMemorySpanExporter,
+    *,
+    model: str = "gpt-4o",
+    provider_name: str = "openai",
+    input_messages: list[Message] | None = None,
+    output_messages: list[Message] | None = None,
+    media_attachments: list[MediaAttachment] | None = None,
+    usage: Usage | None = None,
+    reasoning: Reasoning | str | None = None,
+    response_id: str | None = None,
+    finish_reasons: list[str] | None = None,
+    # response_model and output_type are intentionally omitted; tests that
+    # need them set the field directly on the LLM span before recording.
+) -> dict[str, Any]:
+    """Build a session+turn+LLM span with the given fields and return the
+    chat span's emitted OTel attributes.
+
+    Used by interface-level tests to assert on what callers actually see
+    on the wire — ``gen_ai.input.messages``, ``gen_ai.usage.*``, etc. —
+    rather than on intermediate Pydantic shape. Clears the exporter
+    first so the helper is safe to call multiple times in a single test.
+    """
+    otel_spans.clear()
+    with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+        with start_llm(model=model, provider_name=provider_name) as llm:
+            llm.record(
+                input_messages=input_messages,
+                output_messages=output_messages,
+                media_attachments=media_attachments,
+                usage=usage,
+                reasoning=reasoning,
+                response_id=response_id,
+                finish_reasons=finish_reasons,
+            )
+    chat_spans = [
+        sp for sp in otel_spans.get_finished_spans() if sp.name == f"chat {model}"
+    ]
+    assert len(chat_spans) == 1, f"expected 1 chat span, got {len(chat_spans)}"
+    return dict(chat_spans[0].attributes or {})
 
 
 # ---------------------------------------------------------------------------
@@ -568,6 +623,309 @@ class TestExecuteToolAttributes:
         assert attrs["gen_ai.tool.call.id"] == "tc_2"
         assert "gen_ai.tool.call.arguments" not in attrs
         assert "gen_ai.tool.call.result" not in attrs
+
+    def test_tool_metadata_emitted(self) -> None:
+        attrs = execute_tool_attributes(
+            tool_name="search",
+            tool_type="function",
+            tool_description="Search the web for a query",
+            tool_definitions='[{"name":"search","parameters":{}}]',
+        )
+        assert attrs["gen_ai.tool.type"] == "function"
+        assert attrs["gen_ai.tool.description"] == "Search the web for a query"
+        assert attrs["gen_ai.tool.definitions"] == '[{"name":"search","parameters":{}}]'
+
+    def test_empty_tool_metadata_omitted(self) -> None:
+        attrs = execute_tool_attributes(
+            tool_name="search",
+            tool_type="",
+            tool_description="",
+            tool_definitions="",
+        )
+        assert "gen_ai.tool.type" not in attrs
+        assert "gen_ai.tool.description" not in attrs
+        assert "gen_ai.tool.definitions" not in attrs
+
+
+class TestInvokeAgentAgentMetadata:
+    def test_agent_metadata_emitted(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot",
+            agent_id="agent-001",
+            agent_description="Travel assistant",
+            agent_version="1.2.3",
+        )
+        assert attrs["gen_ai.agent.id"] == "agent-001"
+        assert attrs["gen_ai.agent.description"] == "Travel assistant"
+        assert attrs["gen_ai.agent.version"] == "1.2.3"
+
+    def test_empty_agent_metadata_omitted(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot",
+            agent_id="",
+            agent_description="",
+            agent_version="",
+        )
+        assert "gen_ai.agent.id" not in attrs
+        assert "gen_ai.agent.description" not in attrs
+        assert "gen_ai.agent.version" not in attrs
+
+
+class TestLLMRequestParams:
+    def test_request_params_emitted(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            request_temperature=0.7,
+            request_max_tokens=2048,
+            request_top_p=0.95,
+            request_frequency_penalty=0.1,
+            request_presence_penalty=0.2,
+            request_seed=42,
+            request_stop_sequences=["\n\n", "END"],
+            request_choice_count=3,
+        )
+        assert attrs["gen_ai.request.temperature"] == 0.7
+        assert attrs["gen_ai.request.max_tokens"] == 2048
+        assert attrs["gen_ai.request.top_p"] == 0.95
+        assert attrs["gen_ai.request.frequency_penalty"] == 0.1
+        assert attrs["gen_ai.request.presence_penalty"] == 0.2
+        assert attrs["gen_ai.request.seed"] == 42
+        assert attrs["gen_ai.request.stop_sequences"] == ["\n\n", "END"]
+        assert attrs["gen_ai.request.choice.count"] == 3
+
+    def test_zero_temperature_is_emitted(self) -> None:
+        """0.0 is a meaningful value (greedy sampling); only None is omitted."""
+        attrs = llm_attributes(model="gpt-4o", request_temperature=0.0)
+        assert attrs["gen_ai.request.temperature"] == 0.0
+
+    def test_none_request_params_omitted(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            request_temperature=None,
+            request_max_tokens=None,
+            request_top_p=None,
+            request_frequency_penalty=None,
+            request_presence_penalty=None,
+            request_seed=None,
+            request_stop_sequences=None,
+            request_choice_count=None,
+        )
+        assert "gen_ai.request.temperature" not in attrs
+        assert "gen_ai.request.max_tokens" not in attrs
+        assert "gen_ai.request.top_p" not in attrs
+        assert "gen_ai.request.frequency_penalty" not in attrs
+        assert "gen_ai.request.presence_penalty" not in attrs
+        assert "gen_ai.request.seed" not in attrs
+        assert "gen_ai.request.stop_sequences" not in attrs
+        assert "gen_ai.request.choice.count" not in attrs
+
+    def test_empty_stop_sequences_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", request_stop_sequences=[])
+        assert "gen_ai.request.stop_sequences" not in attrs
+
+
+class TestLLMResponseAndOutputType:
+    def test_response_model_emitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", response_model="gpt-4o-2024-05-13")
+        assert attrs["gen_ai.response.model"] == "gpt-4o-2024-05-13"
+
+    def test_empty_response_model_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", response_model="")
+        assert "gen_ai.response.model" not in attrs
+
+    def test_output_type_emitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", output_type="json")
+        assert attrs["gen_ai.output.type"] == "json"
+
+    def test_empty_output_type_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", output_type="")
+        assert "gen_ai.output.type" not in attrs
+
+
+class TestUsageCacheTokens:
+    def test_cache_tokens_emitted(self) -> None:
+        usage = Usage(
+            input_tokens=10,
+            output_tokens=5,
+            cache_creation_input_tokens=200,
+            cache_read_input_tokens=50,
+        )
+        attrs = llm_attributes(model="gpt-4o", usage=usage)
+        assert attrs["gen_ai.usage.cache_creation.input_tokens"] == 200
+        assert attrs["gen_ai.usage.cache_read.input_tokens"] == 50
+
+    def test_zero_cache_tokens_omitted(self) -> None:
+        usage = Usage(
+            input_tokens=10,
+            cache_creation_input_tokens=0,
+            cache_read_input_tokens=0,
+        )
+        attrs = llm_attributes(model="gpt-4o", usage=usage)
+        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
+        assert "gen_ai.usage.cache_read.input_tokens" not in attrs
+
+
+# ---------------------------------------------------------------------------
+# Explicit Message.parts (native parts API)
+# ---------------------------------------------------------------------------
+
+
+class TestExplicitMessageParts:
+    def test_text_part_serializes(self) -> None:
+        msg = Message(role="user", parts=[TextPart(content="hello")])
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=[msg])
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {"role": "user", "parts": [{"type": "text", "content": "hello"}]}
+        ]
+
+    def test_tool_call_part_serializes(self) -> None:
+        msg = Message(
+            role="assistant",
+            parts=[
+                TextPart(content="Let me check."),
+                ToolCallPart(id="c1", name="get_weather", arguments='{"city":"Paris"}'),
+            ],
+        )
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=[msg])
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Let me check."},
+                    {
+                        "type": "tool_call",
+                        "id": "c1",
+                        "name": "get_weather",
+                        "arguments": '{"city":"Paris"}',
+                    },
+                ],
+            }
+        ]
+
+    def test_tool_call_response_part_serializes(self) -> None:
+        msg = Message(
+            role="tool",
+            parts=[ToolCallResponsePart(id="c1", response='{"temp":75}')],
+        )
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=[msg])
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {
+                "role": "tool",
+                "parts": [
+                    {
+                        "type": "tool_call_response",
+                        "id": "c1",
+                        "response": '{"temp":75}',
+                    }
+                ],
+            }
+        ]
+
+    def test_reasoning_part_in_explicit_parts_skips_auto_prepend(self) -> None:
+        """When the caller embeds a ReasoningPart, the auto-prepend is suppressed."""
+        msg = Message(
+            role="assistant",
+            parts=[
+                ReasoningPart(content="user wants weather"),
+                TextPart(content="The weather is 75F"),
+            ],
+        )
+        attrs = llm_attributes(
+            model="gpt-4o",
+            output_messages=[msg],
+            reasoning=Reasoning(content="this would normally be auto-prepended"),
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        # Only the explicit ReasoningPart appears — no double-add.
+        reasoning_parts = [p for p in raw[0]["parts"] if p["type"] == "reasoning"]
+        assert len(reasoning_parts) == 1
+        assert reasoning_parts[0]["content"] == "user wants weather"
+
+    def test_explicit_parts_take_precedence_over_flat_content(self) -> None:
+        """When parts is set, content is ignored."""
+        msg = Message(
+            role="assistant",
+            content="ignored flat content",
+            parts=[TextPart(content="canonical text")],
+        )
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=[msg])
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        texts = [p for p in raw[0]["parts"] if p["type"] == "text"]
+        assert texts == [{"type": "text", "content": "canonical text"}]
+
+    def test_blob_uri_file_parts_serialize(self) -> None:
+        msg = Message(
+            role="user",
+            parts=[
+                BlobPart(mime_type="image/png", modality="image", content="aGVsbG8="),
+                UriPart(
+                    mime_type="image/jpeg",
+                    modality="image",
+                    uri="https://example.com/img.jpg",
+                ),
+            ],
+        )
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=[msg])
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        types_seen = [p["type"] for p in raw[0]["parts"]]
+        assert types_seen == ["blob", "uri"]
+        assert raw[0]["parts"][0]["content"] == "aGVsbG8="
+        assert raw[0]["parts"][1]["uri"] == "https://example.com/img.jpg"
+
+    def test_media_attachments_appended_to_explicit_parts(self) -> None:
+        """media_attachments still extend the last user message even with explicit parts."""
+        msg = Message(role="user", parts=[TextPart(content="see this")])
+        media = [
+            MediaAttachment(
+                kind="uri",
+                modality="image",
+                mime_type="image/png",
+                uri="https://example.com/x.png",
+            )
+        ]
+        attrs = llm_attributes(
+            model="gpt-4o", input_messages=[msg], media_attachments=media
+        )
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        types_seen = [p["type"] for p in raw[0]["parts"]]
+        assert types_seen == ["text", "uri"]
+
+    def test_back_compat_flat_content_still_works(self) -> None:
+        """Existing API users (content-only) keep producing the same output."""
+        msg = Message(role="assistant", content="hello")
+        attrs = invoke_agent_attributes(agent_name="bot", output_messages=[msg])
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "hello"}]}
+        ]
+
+    def test_back_compat_tool_role_with_flat_content(self) -> None:
+        msg = Message(role="tool", content='{"temp":75}', tool_call_id="c1")
+        attrs = invoke_agent_attributes(agent_name="bot", input_messages=[msg])
+        raw = json.loads(attrs["gen_ai.input.messages"])
+        assert raw == [
+            {
+                "role": "tool",
+                "parts": [
+                    {
+                        "type": "tool_call_response",
+                        "response": '{"temp":75}',
+                        "id": "c1",
+                    }
+                ],
+            }
+        ]
+
+    def test_finish_reason_attached_with_explicit_parts(self) -> None:
+        msg = Message(role="assistant", parts=[TextPart(content="done")])
+        attrs = llm_attributes(
+            model="gpt-4o", output_messages=[msg], finish_reasons=["stop"]
+        )
+        raw = json.loads(attrs["gen_ai.output.messages"])
+        assert raw[0]["finish_reason"] == "stop"
 
 
 # ---------------------------------------------------------------------------
@@ -1311,3 +1669,647 @@ class TestLogSession:
         assert result.root_span_ids == []
         assert result.span_count == 0
         assert otel_spans.get_finished_spans() == ()
+
+
+# ---------------------------------------------------------------------------
+# Ergonomic helpers — accept structured payloads at the SDK boundary
+# ---------------------------------------------------------------------------
+
+
+class TestToolStructuredPayloads:
+    """Tool.arguments / Tool.result accept any JSON-serializable value.
+
+    Storage type is a permissive union so callers can do
+    ``t.result = some_dict`` without manually JSON-encoding. The OTel
+    string attributes still receive a JSON-encoded representation.
+    """
+
+    @pytest.mark.parametrize(
+        ("field", "value", "expected_json", "expected_raw"),
+        [
+            # dict result → JSON-encoded at emission
+            ("result", {"hits": 3, "top": "weave"}, {"hits": 3, "top": "weave"}, None),
+            # list arguments → JSON-encoded at emission
+            ("arguments", [1, 2, 3], [1, 2, 3], None),
+            # string passes through unchanged (no double-encoding)
+            ("result", "already a string", None, "already a string"),
+            # None → attribute is omitted entirely
+            ("result", None, None, ...),
+        ],
+        ids=["dict_result", "list_arguments", "string_passthrough", "none_omitted"],
+    )
+    def test_payload_emitted_as_json_string(
+        self,
+        otel_spans: InMemorySpanExporter,
+        field: str,
+        value: object,
+        expected_json: object,
+        expected_raw: object,
+    ) -> None:
+        attr_key = f"gen_ai.tool.call.{field}"
+        kwargs: dict = {"name": "tool", "tool_call_id": "tc"}
+        if field == "arguments":
+            kwargs["arguments"] = value
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            with start_tool(**kwargs) as t:
+                if field == "result":
+                    t.result = value
+        tool_spans = [
+            sp
+            for sp in otel_spans.get_finished_spans()
+            if sp.name == "execute_tool tool"
+        ]
+        assert len(tool_spans) == 1
+        attrs = dict(tool_spans[0].attributes or {})
+        if expected_raw is ...:
+            assert attr_key not in attrs
+        elif expected_raw is not None:
+            assert attrs[attr_key] == expected_raw
+        else:
+            assert json.loads(attrs[attr_key]) == expected_json
+
+
+class TestToolCallPartCoercion:
+    """ToolCallPart / ToolCallResponsePart accept structured inputs and
+    JSON-encode at construction or assignment.
+
+    The end-to-end coercion path (input dict → emitted attribute string)
+    is covered by ``TestToolStructuredPayloads``; this class pins down
+    construction-time behavior that the OTel test does not exercise:
+    edge inputs (None, list) and post-construction assignment.
+    """
+
+    @pytest.mark.parametrize(
+        ("part_cls", "field", "value", "expected"),
+        [
+            (ToolCallPart, "arguments", None, ""),
+            (ToolCallPart, "arguments", [1, 2], "[1, 2]"),
+            (ToolCallResponsePart, "response", None, ""),
+            (ToolCallResponsePart, "response", {"ok": True}, '{"ok": true}'),
+        ],
+        ids=["args_none", "args_list", "resp_none", "resp_dict"],
+    )
+    def test_edge_inputs_coerce_to_string(
+        self, part_cls: type, field: str, value: object, expected: str
+    ) -> None:
+        kwargs: dict[str, object] = {"id": "c", field: value}
+        if part_cls is ToolCallPart:
+            kwargs["name"] = "x"
+        part = part_cls(**kwargs)
+        assert getattr(part, field) == expected
+
+    def test_post_construction_assignment_coerces(self) -> None:
+        """validate_assignment=True ensures setattr also runs the validator."""
+        part = ToolCallPart(id="c", name="x", arguments="")
+        part.arguments = {"k": "v"}
+        assert json.loads(part.arguments) == {"k": "v"}
+
+
+class TestMessageBuilders:
+    """High-level Message constructors for the common message shapes."""
+
+    @pytest.mark.parametrize(
+        ("builder", "role"),
+        [
+            (Message.user, "user"),
+            (Message.system, "system"),
+            (Message.assistant, "assistant"),
+        ],
+    )
+    def test_text_only_constructor(self, builder, role: str) -> None:
+        m = builder("hello")
+        assert m.role == role
+        assert m.content == "hello"
+        assert m.parts == []
+
+    def test_assistant_with_tool_calls_promotes_to_parts(self) -> None:
+        """When tool_calls are provided, the message uses the parts API."""
+        tc = ToolCallPart(id="c1", name="search", arguments={"q": "weave"})
+        m = Message.assistant(text="let me check", tool_calls=[tc])
+        assert m.role == "assistant"
+        assert m.content == ""
+        assert len(m.parts) == 2
+        assert isinstance(m.parts[0], TextPart)
+        assert m.parts[0].content == "let me check"
+        assert isinstance(m.parts[1], ToolCallPart)
+
+    def test_assistant_tool_calls_only_skips_text_part(self) -> None:
+        """No leading TextPart when text is empty."""
+        tc = ToolCallPart(id="c1", name="x", arguments={})
+        m = Message.assistant(tool_calls=[tc])
+        assert len(m.parts) == 1
+        assert isinstance(m.parts[0], ToolCallPart)
+
+    @pytest.mark.parametrize(
+        ("output", "expected_response"),
+        [({"answer": 42}, '{"answer": 42}'), ("ok", "ok")],
+        ids=["dict", "string"],
+    )
+    def test_tool_result(self, output: object, expected_response: str) -> None:
+        m = Message.tool_result("c1", output)
+        assert m.role == "tool"
+        assert len(m.parts) == 1
+        part = m.parts[0]
+        assert isinstance(part, ToolCallResponsePart)
+        assert part.id == "c1"
+        assert part.response == expected_response
+
+
+class TestAttachMediaUrl:
+    """LLM.attach_media_url handles data: and plain URLs uniformly."""
+
+    @pytest.mark.parametrize(
+        (
+            "url",
+            "expected_kind",
+            "expected_mime",
+            "expected_payload_field",
+            "expected_payload",
+        ),
+        [
+            (
+                "data:image/png;base64,iVBORw0KGgo=",
+                "blob",
+                "image/png",
+                "content",
+                "iVBORw0KGgo=",
+            ),
+            (
+                "https://example.com/cat.png",
+                "uri",
+                "",
+                "uri",
+                "https://example.com/cat.png",
+            ),
+        ],
+        ids=["data_url_blob", "plain_url_uri"],
+    )
+    def test_url_dispatches_to_blob_or_uri(
+        self,
+        url: str,
+        expected_kind: str,
+        expected_mime: str,
+        expected_payload_field: str,
+        expected_payload: str,
+    ) -> None:
+        llm = LLM()
+        llm.attach_media_url(url, modality="image")
+        (att,) = llm.media_attachments
+        assert att.kind == expected_kind
+        assert att.mime_type == expected_mime
+        assert att.modality == "image"
+        assert getattr(att, expected_payload_field) == expected_payload
+
+    def test_data_url_modality_inferred_from_mime(self) -> None:
+        """Modality auto-fills from mime_type when not provided."""
+        llm = LLM()
+        llm.attach_media_url("data:image/jpeg;base64,XXX")
+        att = llm.media_attachments[0]
+        assert att.modality == "image"
+        assert att.mime_type == "image/jpeg"
+
+    def test_empty_url_ignored(self) -> None:
+        llm = LLM()
+        llm.attach_media_url("")
+        assert llm.media_attachments == []
+
+    def test_chainable(self) -> None:
+        """Returns self so callers can chain."""
+        llm = LLM()
+        result = llm.attach_media_url("https://e.com/a.png", modality="image")
+        assert result is llm
+
+
+class TestLLMRecord:
+    """LLM.record(...) collapses N attribute assignments into one call."""
+
+    def test_partial_record_preserves_existing(self) -> None:
+        """Fields not passed (None) keep their existing values."""
+        llm = LLM(model="m", provider_name="p")
+        llm.response_id = "preset"
+        llm.usage = Usage(input_tokens=42)
+        llm.record(output_messages=[Message.assistant("hi")])
+        assert llm.response_id == "preset"
+        assert llm.usage.input_tokens == 42
+        assert llm.output_messages == [Message.assistant("hi")]
+
+    @pytest.mark.parametrize(
+        "reasoning",
+        ["flat", Reasoning(content="explicit")],
+        ids=["string", "instance"],
+    )
+    def test_reasoning_accepts_string_or_instance(self, reasoning: object) -> None:
+        llm = LLM()
+        llm.record(reasoning=reasoning)
+        assert isinstance(llm.reasoning, Reasoning)
+        expected = reasoning if isinstance(reasoning, str) else reasoning.content
+        assert llm.reasoning.content == expected
+
+    def test_returns_self_for_chaining(self) -> None:
+        llm = LLM()
+        assert llm.record(response_id="x") is llm
+
+    def test_recorded_fields_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """End-to-end: record() values flow through to the OTel attrs."""
+        attrs = _emit_llm_with(
+            otel_spans,
+            input_messages=[Message.user("hi")],
+            output_messages=[Message.assistant("hello")],
+            usage=Usage(input_tokens=3, output_tokens=2),
+            reasoning="thinking...",
+            response_id="r1",
+            finish_reasons=["stop"],
+        )
+        assert attrs["gen_ai.usage.input_tokens"] == 3
+        assert attrs["gen_ai.usage.output_tokens"] == 2
+        assert attrs["gen_ai.response.id"] == "r1"
+        assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
+        # Reasoning is folded into output messages as a ReasoningPart
+        # prepended to the assistant message; the original text content
+        # remains as a TextPart afterwards.
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        assert out_msgs[-1]["parts"] == [
+            {"type": "reasoning", "content": "thinking..."},
+            {"type": "text", "content": "hello"},
+        ]
+
+
+class TestUsageFromOpenAIResponses:
+    """``usage_from_openai_responses`` populates ``gen_ai.usage.*`` on the chat span.
+
+    Streaming / partial OpenAI responses can have ``response.usage`` be
+    ``None``, or have ``input_tokens_details`` / ``output_tokens_details``
+    objects be ``None`` even when ``usage`` itself is present. The
+    extractor must tolerate all three.
+    """
+
+    @staticmethod
+    def _resp(usage: Any) -> Any:
+        return type("R", (), {"usage": usage})()
+
+    @staticmethod
+    def _usage(**fields: Any) -> Any:
+        return type("U", (), fields)()
+
+    @staticmethod
+    def _details(**fields: Any) -> Any:
+        return type("D", (), fields)()
+
+    def test_response_usage_none_emits_no_usage_attrs(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """When usage is missing entirely, no gen_ai.usage.* attrs land
+        (zeros are stripped by ``llm_attributes``).
+        """
+        attrs = _emit_llm_with(
+            otel_spans, usage=usage_from_openai_responses(self._resp(None))
+        )
+        assert "gen_ai.usage.input_tokens" not in attrs
+        assert "gen_ai.usage.output_tokens" not in attrs
+        assert "gen_ai.usage.reasoning_tokens" not in attrs
+        assert "gen_ai.usage.cache_read.input_tokens" not in attrs
+
+    def test_full_usage_lands_on_span(self, otel_spans: InMemorySpanExporter) -> None:
+        usage = self._usage(
+            input_tokens=10,
+            output_tokens=20,
+            output_tokens_details=self._details(reasoning_tokens=5),
+            input_tokens_details=self._details(cached_tokens=3),
+        )
+        attrs = _emit_llm_with(
+            otel_spans, usage=usage_from_openai_responses(self._resp(usage))
+        )
+        assert attrs["gen_ai.usage.input_tokens"] == 10
+        assert attrs["gen_ai.usage.output_tokens"] == 20
+        assert attrs["gen_ai.usage.reasoning_tokens"] == 5
+        assert attrs["gen_ai.usage.cache_read.input_tokens"] == 3
+
+    @pytest.mark.parametrize(
+        (
+            "has_output_details",
+            "has_input_details",
+            "expected_reasoning",
+            "expected_cache",
+        ),
+        [
+            (False, False, None, None),
+            (False, True, None, 3),
+            (True, False, 5, None),
+        ],
+        ids=["both_none", "output_none", "input_none"],
+    )
+    def test_none_details_objects_default_to_zero_and_omit_attr(
+        self,
+        otel_spans: InMemorySpanExporter,
+        has_output_details: bool,
+        has_input_details: bool,
+        expected_reasoning: int | None,
+        expected_cache: int | None,
+    ) -> None:
+        """Streaming partials can have detail objects = None. Extractor
+        substitutes 0; ``llm_attributes`` then omits zero-valued attrs.
+        """
+        out_d = self._details(reasoning_tokens=5) if has_output_details else None
+        in_d = self._details(cached_tokens=3) if has_input_details else None
+        usage = self._usage(
+            input_tokens=10,
+            output_tokens=20,
+            output_tokens_details=out_d,
+            input_tokens_details=in_d,
+        )
+        attrs = _emit_llm_with(
+            otel_spans, usage=usage_from_openai_responses(self._resp(usage))
+        )
+        assert attrs["gen_ai.usage.input_tokens"] == 10
+        assert attrs["gen_ai.usage.output_tokens"] == 20
+        if expected_reasoning is None:
+            assert "gen_ai.usage.reasoning_tokens" not in attrs
+        else:
+            assert attrs["gen_ai.usage.reasoning_tokens"] == expected_reasoning
+        if expected_cache is None:
+            assert "gen_ai.usage.cache_read.input_tokens" not in attrs
+        else:
+            assert attrs["gen_ai.usage.cache_read.input_tokens"] == expected_cache
+
+
+class TestMessageFromOpenAIResponsesInput:
+    """OpenAI Responses ``input=`` payloads round-trip to ``gen_ai.input.messages``.
+
+    Anchored at the OTel attribute boundary — the high-value contract is
+    that a given ``client.responses.create(input=...)`` produces a
+    specific JSON shape on the emitted chat span, not that the
+    intermediate ``Message`` list has any particular length.
+    """
+
+    @staticmethod
+    def _input_messages_attr(
+        otel_spans: InMemorySpanExporter, items: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        msgs, media = message_from_openai_responses_input(items)
+        attrs = _emit_llm_with(otel_spans, input_messages=msgs, media_attachments=media)
+        return json.loads(attrs["gen_ai.input.messages"])
+
+    def test_text_user_message(self, otel_spans: InMemorySpanExporter) -> None:
+        out = self._input_messages_attr(
+            otel_spans, [{"role": "user", "content": "hello"}]
+        )
+        assert out == [
+            {"role": "user", "parts": [{"type": "text", "content": "hello"}]}
+        ]
+
+    def test_user_message_text_blocks_join_with_newline(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": "look at"},
+                        {"type": "input_text", "text": "this"},
+                    ],
+                }
+            ],
+        )
+        assert out == [
+            {"role": "user", "parts": [{"type": "text", "content": "look at\nthis"}]}
+        ]
+
+    @pytest.mark.parametrize(
+        "arguments",
+        ['{"city": "Tokyo"}', {"city": "Tokyo"}],
+        ids=["string", "dict"],
+    )
+    def test_function_call_emits_assistant_tool_call_part(
+        self, otel_spans: InMemorySpanExporter, arguments: object
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {
+                    "type": "function_call",
+                    "name": "get_weather",
+                    "arguments": arguments,
+                    "call_id": "c1",
+                }
+            ],
+        )
+        assert len(out) == 1
+        assert out[0]["role"] == "assistant"
+        (part,) = out[0]["parts"]
+        assert part["type"] == "tool_call"
+        assert part["id"] == "c1"
+        assert part["name"] == "get_weather"
+        assert json.loads(part["arguments"]) == {"city": "Tokyo"}
+
+    def test_parallel_function_calls_coalesce_to_one_assistant_message(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {"role": "user", "content": "weather and time?"},
+                {
+                    "type": "function_call",
+                    "name": "get_weather",
+                    "arguments": '{"city":"Tokyo"}',
+                    "call_id": "c1",
+                },
+                {
+                    "type": "function_call",
+                    "name": "get_time",
+                    "arguments": '{"city":"Tokyo"}',
+                    "call_id": "c2",
+                },
+                {
+                    "type": "function_call_output",
+                    "output": '{"temp":"75F"}',
+                    "call_id": "c1",
+                },
+            ],
+        )
+        assert [m["role"] for m in out] == ["user", "assistant", "tool"]
+        assistant_parts = out[1]["parts"]
+        assert [p["type"] for p in assistant_parts] == ["tool_call", "tool_call"]
+        assert [p["name"] for p in assistant_parts] == ["get_weather", "get_time"]
+        assert [p["id"] for p in assistant_parts] == ["c1", "c2"]
+
+    @pytest.mark.parametrize(
+        "output",
+        ['{"temp": 75}', {"temp": 75}],
+        ids=["string", "dict"],
+    )
+    def test_function_call_output_emits_tool_message(
+        self, otel_spans: InMemorySpanExporter, output: object
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [{"type": "function_call_output", "output": output, "call_id": "c1"}],
+        )
+        assert len(out) == 1
+        assert out[0]["role"] == "tool"
+        (part,) = out[0]["parts"]
+        assert part["type"] == "tool_call_response"
+        assert part["id"] == "c1"
+        assert json.loads(part["response"]) == {"temp": 75}
+
+    def test_reasoning_items_skipped(self, otel_spans: InMemorySpanExporter) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {"type": "reasoning", "summary": [{"text": "hmm"}]},
+                {"role": "user", "content": "go"},
+            ],
+        )
+        assert [m["role"] for m in out] == ["user"]
+
+    @pytest.mark.parametrize(
+        ("block", "expected_part"),
+        [
+            (
+                {
+                    "type": "input_image",
+                    "image_url": "data:image/png;base64,iVBORw0KGgo=",
+                },
+                {
+                    "type": "blob",
+                    "mime_type": "image/png",
+                    "modality": "image",
+                    "content": "iVBORw0KGgo=",
+                },
+            ),
+            (
+                {"type": "image_url", "image_url": {"url": "https://e.com/cat.png"}},
+                {
+                    "type": "uri",
+                    "mime_type": "",
+                    "modality": "image",
+                    "uri": "https://e.com/cat.png",
+                },
+            ),
+        ],
+        ids=["data_url_blob", "plain_url_uri"],
+    )
+    def test_image_only_user_message_attaches_media(
+        self,
+        otel_spans: InMemorySpanExporter,
+        block: dict,
+        expected_part: dict,
+    ) -> None:
+        """Image-only user messages must keep a Message slot so the
+        attachment binds to the right user turn on the wire.
+        """
+        out = self._input_messages_attr(
+            otel_spans, [{"role": "user", "content": [block]}]
+        )
+        assert len(out) == 1
+        assert out[0]["role"] == "user"
+        # No text part (empty content), just the media part.
+        assert out[0]["parts"] == [expected_part]
+
+    def test_duplicate_image_urls_deduplicated(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_image", "image_url": "https://e.com/a.png"},
+                        {"type": "input_image", "image_url": "https://e.com/a.png"},
+                    ],
+                }
+            ],
+        )
+        assert out == [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "type": "uri",
+                        "mime_type": "",
+                        "modality": "image",
+                        "uri": "https://e.com/a.png",
+                    }
+                ],
+            }
+        ]
+
+    def test_assistant_output_text_blocks_flatten(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "hello"}],
+                }
+            ],
+        )
+        assert out == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "hello"}]}
+        ]
+
+    def test_full_conversation_round_trip(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """User → assistant tool call → tool result → assistant text."""
+        out = self._input_messages_attr(
+            otel_spans,
+            [
+                {"role": "user", "content": "what's the weather in Tokyo?"},
+                {
+                    "type": "function_call",
+                    "name": "get_weather",
+                    "arguments": '{"city":"Tokyo"}',
+                    "call_id": "c1",
+                },
+                {
+                    "type": "function_call_output",
+                    "output": '{"temp":"75F"}',
+                    "call_id": "c1",
+                },
+                {
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "It's 75F."}],
+                },
+            ],
+        )
+        assert [m["role"] for m in out] == ["user", "assistant", "tool", "assistant"]
+
+
+class TestReasoningFromOpenAIResponses:
+    """reasoning_from_openai_responses flattens OpenAI's reasoning summary."""
+
+    def test_summary_fragments_joined_with_newlines(self) -> None:
+        result = reasoning_from_openai_responses(
+            {"summary": [{"text": "first"}, {"text": "second"}]}
+        )
+        assert result is not None
+        assert result.content == "first\nsecond"
+
+    @pytest.mark.parametrize(
+        "part",
+        [
+            {"summary": []},
+            None,
+            {"summary": [{"text": ""}, {}]},
+            {"summary": "not a list"},
+        ],
+        ids=["empty_summary", "none_input", "only_empty_text", "non_list_summary"],
+    )
+    def test_returns_none(self, part: object) -> None:
+        """Empty / malformed inputs collapse to None so callers can pipe through."""
+        assert reasoning_from_openai_responses(part) is None  # type: ignore[arg-type]
+
+    def test_skips_non_dict_summary_items(self) -> None:
+        result = reasoning_from_openai_responses(
+            {"summary": [{"text": "kept"}, "not a dict", {"text": "also kept"}]}
+        )
+        assert result is not None
+        assert result.content == "kept\nalso kept"

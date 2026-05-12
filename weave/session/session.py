@@ -25,11 +25,21 @@ from weave.session.session_otel import (
     llm_attributes,
 )
 from weave.session.types import (
+    BlobPart,
+    FilePart,
+    JSONString,
     LogResult,
     MediaAttachment,
     Message,
+    MessagePart,
     Reasoning,
+    ReasoningPart,
+    TextPart,
+    ToolCallPart,
+    ToolCallResponsePart,
+    UriPart,
     Usage,
+    _parse_data_url,
 )
 
 # OTel imports — kept top-level under a try/except guard so the module
@@ -55,14 +65,22 @@ if TYPE_CHECKING:
 # in `weave.session.types` to break the import cycle with `session_otel`.
 __all__ = [
     "LLM",
+    "BlobPart",
+    "FilePart",
     "LogResult",
     "MediaAttachment",
     "Message",
+    "MessagePart",
     "Reasoning",
+    "ReasoningPart",
     "Session",
     "SubAgent",
+    "TextPart",
     "Tool",
+    "ToolCallPart",
+    "ToolCallResponsePart",
     "Turn",
+    "UriPart",
     "Usage",
     "end_llm",
     "end_session",
@@ -155,12 +173,23 @@ class _SpanBase(BaseModel):
 
 
 class Tool(_SpanBase):
-    """One tool execution. Maps to an execute_tool OTel span."""
+    """One tool execution. Maps to an execute_tool OTel span.
+
+    ``arguments`` and ``result`` use the ``JSONString`` annotation:
+    callers can assign a dict / list / scalar and the SDK JSON-encodes
+    it at construction or assignment. The stored value is always a
+    string, matching the wire format per GenAI semconv.
+    """
+
+    model_config = ConfigDict(validate_assignment=True)
 
     name: str = ""
-    arguments: str = ""
-    result: str = ""
+    arguments: JSONString = ""
+    result: JSONString = ""
     tool_call_id: str = ""
+    tool_type: str = ""
+    tool_description: str = ""
+    tool_definitions: str = ""
     duration_ms: int = 0
     started_at: datetime | None = None
     ended_at: datetime | None = None
@@ -185,6 +214,9 @@ class Tool(_SpanBase):
             tool_call_arguments=self.arguments if include else "",
             tool_call_result=self.result if include else "",
             tool_call_id=self.tool_call_id,
+            tool_type=self.tool_type,
+            tool_description=self.tool_description,
+            tool_definitions=self.tool_definitions,
         )
         self._end_otel_span(attrs)
 
@@ -213,6 +245,8 @@ class LLM(_SpanBase):
     model: str = ""
     provider_name: str = ""
     response_id: str = ""
+    response_model: str = ""
+    output_type: str = ""
     system_instructions: list[str] = Field(default_factory=list)
     usage: Usage = Field(default_factory=Usage)
     reasoning: Reasoning = Field(default_factory=Reasoning)
@@ -220,6 +254,14 @@ class LLM(_SpanBase):
     input_messages: list[Message] = Field(default_factory=list)
     output_messages: list[Message] = Field(default_factory=list)
     media_attachments: list[MediaAttachment] = Field(default_factory=list)
+    request_temperature: float | None = None
+    request_max_tokens: int | None = None
+    request_top_p: float | None = None
+    request_frequency_penalty: float | None = None
+    request_presence_penalty: float | None = None
+    request_seed: int | None = None
+    request_stop_sequences: list[str] = Field(default_factory=list)
+    request_choice_count: int | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
 
@@ -282,6 +324,74 @@ class LLM(_SpanBase):
         )
         return self
 
+    def attach_media_url(self, url: str, *, modality: str = "") -> LLM:
+        """Attach a media URL to this LLM call.
+
+        Convenience over ``attach_media`` for the common case where the
+        caller has a URL string from an upstream message and doesn't want
+        to inspect it. ``data:`` URLs are parsed into ``mime_type`` +
+        inline content (kind=blob); plain URIs become ``kind=uri``. Empty
+        URLs are ignored. Returns ``self`` for chaining.
+        """
+        if not url:
+            return self
+        if url.startswith("data:"):
+            mime_type, content = _parse_data_url(url)
+            return self.attach_media(
+                content=content, mime_type=mime_type, modality=modality
+            )
+        return self.attach_media(uri=url, modality=modality)
+
+    def record(
+        self,
+        *,
+        input_messages: list[Message] | None = None,
+        output_messages: list[Message] | None = None,
+        media_attachments: list[MediaAttachment] | None = None,
+        usage: Usage | None = None,
+        reasoning: Reasoning | str | None = None,
+        response_id: str | None = None,
+        response_model: str | None = None,
+        finish_reasons: list[str] | None = None,
+        output_type: str | None = None,
+    ) -> LLM:
+        """Set multiple LLM-call fields in one call.
+
+        Manually-instrumented agents typically build up a chat span by
+        assigning eight or more individual fields at the end of an LLM
+        call (``input_messages``, ``output_messages``, ``usage``,
+        ``response_id``, etc.). ``record(...)`` collapses those into a
+        single keyword call so the recording site stays compact.
+
+        Only fields explicitly passed (non-``None``) are applied —
+        existing values are preserved. ``reasoning`` accepts either a
+        ``Reasoning`` instance or a plain string (wrapped automatically).
+        Returns ``self`` for chaining.
+        """
+        if input_messages is not None:
+            self.input_messages = input_messages
+        if output_messages is not None:
+            self.output_messages = output_messages
+        if media_attachments is not None:
+            self.media_attachments = media_attachments
+        if usage is not None:
+            self.usage = usage
+        if reasoning is not None:
+            self.reasoning = (
+                Reasoning(content=reasoning)
+                if isinstance(reasoning, str)
+                else reasoning
+            )
+        if response_id is not None:
+            self.response_id = response_id
+        if response_model is not None:
+            self.response_model = response_model
+        if finish_reasons is not None:
+            self.finish_reasons = finish_reasons
+        if output_type is not None:
+            self.output_type = output_type
+        return self
+
     def end(self) -> None:
         if self._ended:
             return
@@ -302,6 +412,16 @@ class LLM(_SpanBase):
             reasoning=self.reasoning,
             finish_reasons=self.finish_reasons,
             response_id=self.response_id,
+            response_model=self.response_model,
+            output_type=self.output_type,
+            request_temperature=self.request_temperature,
+            request_max_tokens=self.request_max_tokens,
+            request_top_p=self.request_top_p,
+            request_frequency_penalty=self.request_frequency_penalty,
+            request_presence_penalty=self.request_presence_penalty,
+            request_seed=self.request_seed,
+            request_stop_sequences=self.request_stop_sequences,
+            request_choice_count=self.request_choice_count,
         )
 
         if self._token is not None:
@@ -341,6 +461,9 @@ class SubAgent(_SpanBase):
 
     name: str = ""
     model: str = ""
+    agent_id: str = ""
+    agent_description: str = ""
+    agent_version: str = ""
     started_at: datetime | None = None
     ended_at: datetime | None = None
 
@@ -382,6 +505,9 @@ class SubAgent(_SpanBase):
             model=self.model,
             conversation_id=session.session_id if session else "",
             conversation_name=session.session_name if session else "",
+            agent_id=self.agent_id,
+            agent_description=self.agent_description,
+            agent_version=self.agent_version,
         )
         self._end_otel_span(attrs)
 
@@ -419,6 +545,9 @@ class Turn(_SpanBase):
 
     agent_name: str = ""
     model: str = ""
+    agent_id: str = ""
+    agent_description: str = ""
+    agent_version: str = ""
     messages: list[Message] = Field(default_factory=list)
     spans: list[LLM | Tool | SubAgent] = Field(default_factory=list)
     continue_parent_trace: bool = False
@@ -479,6 +608,9 @@ class Turn(_SpanBase):
             conversation_name=session.session_name if session else "",
             model=self.model,
             input_messages=self.messages if include else None,
+            agent_id=self.agent_id,
+            agent_description=self.agent_description,
+            agent_version=self.agent_version,
         )
 
         if self._token is not None:
@@ -663,6 +795,11 @@ def start_llm(
     """Create and activate an LLM call. Uses the current turn if available.
 
     If no turn is active, returns a disconnected LLM (no contextvar set).
+
+    Pass ``provider_name`` explicitly. The SDK does not infer it from the
+    model identifier: prefix-based guessing misattributes user fine-tunes
+    (e.g. a model named ``text-...``) and bakes assumptions about future
+    model names into telemetry that's expensive to correct after the fact.
     """
     turn = get_current_turn()
     if turn is not None:
@@ -827,6 +964,16 @@ def _attrs_for_span(
             reasoning=span.reasoning,
             finish_reasons=span.finish_reasons,
             response_id=span.response_id,
+            response_model=span.response_model,
+            output_type=span.output_type,
+            request_temperature=span.request_temperature,
+            request_max_tokens=span.request_max_tokens,
+            request_top_p=span.request_top_p,
+            request_frequency_penalty=span.request_frequency_penalty,
+            request_presence_penalty=span.request_presence_penalty,
+            request_seed=span.request_seed,
+            request_stop_sequences=span.request_stop_sequences,
+            request_choice_count=span.request_choice_count,
         )
         return f"chat {span.model}", attrs
     if isinstance(span, Tool):
@@ -836,6 +983,9 @@ def _attrs_for_span(
             tool_call_arguments=span.arguments if include_content else "",
             tool_call_result=span.result if include_content else "",
             tool_call_id=span.tool_call_id,
+            tool_type=span.tool_type,
+            tool_description=span.tool_description,
+            tool_definitions=span.tool_definitions,
         )
         return f"execute_tool {span.name}", attrs
     # SubAgent
@@ -844,6 +994,9 @@ def _attrs_for_span(
         model=span.model,
         conversation_id=session_id,
         conversation_name=session_name,
+        agent_id=span.agent_id,
+        agent_description=span.agent_description,
+        agent_version=span.agent_version,
     )
     return f"invoke_agent {span.name}", attrs
 
@@ -894,6 +1047,9 @@ def log_turn(
         conversation_name=session_name,
         model=turn.model,
         input_messages=turn.messages if include_content else None,
+        agent_id=turn.agent_id,
+        agent_description=turn.agent_description,
+        agent_version=turn.agent_version,
     )
 
     parent_ctx = Context() if not continue_parent_trace else None
