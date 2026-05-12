@@ -13,6 +13,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.shared.refs_internal import (
+    InternalAgentConversationRef,
+    InternalAgentSpanRef,
+    InternalAgentTurnRef,
     InternalCallRef,
     InternalObjectRef,
     InternalOpRef,
@@ -107,6 +110,58 @@ def test_same_project_with_index_extra() -> None:
     )
 
 
+def test_same_project_agent_turn_ref() -> None:
+    result = convert_same_project_ref(
+        "weave:///entity/proj/agent_turn/0123456789abcdef0123456789abcdef",
+        ext_project_id="entity/proj",
+        internal_project_id="int-id-1",
+    )
+    assert isinstance(result, InternalAgentTurnRef)
+    assert result.trace_id == "0123456789abcdef0123456789abcdef"
+    assert (
+        result.uri
+        == "weave-trace-internal:///int-id-1/agent_turn/0123456789abcdef0123456789abcdef"
+    )
+
+
+def test_same_project_agent_span_ref() -> None:
+    result = convert_same_project_ref(
+        "weave:///entity/proj/agent_span/0123456789abcdef",
+        ext_project_id="entity/proj",
+        internal_project_id="int-id-1",
+    )
+    assert isinstance(result, InternalAgentSpanRef)
+    assert result.span_id == "0123456789abcdef"
+    assert result.uri == "weave-trace-internal:///int-id-1/agent_span/0123456789abcdef"
+
+
+def test_same_project_agent_conversation_ref_simple() -> None:
+    result = convert_same_project_ref(
+        "weave:///entity/proj/agent_conversation/sess-abc-123",
+        ext_project_id="entity/proj",
+        internal_project_id="int-id-1",
+    )
+    assert isinstance(result, InternalAgentConversationRef)
+    assert result.conversation_id == "sess-abc-123"
+    assert (
+        result.uri == "weave-trace-internal:///int-id-1/agent_conversation/sess-abc-123"
+    )
+
+
+def test_same_project_agent_conversation_ref_encoded() -> None:
+    result = convert_same_project_ref(
+        "weave:///entity/proj/agent_conversation/user%2F42%3Asession",
+        ext_project_id="entity/proj",
+        internal_project_id="int-id-1",
+    )
+    assert isinstance(result, InternalAgentConversationRef)
+    assert result.conversation_id == "user/42:session"
+    assert (
+        result.uri
+        == "weave-trace-internal:///int-id-1/agent_conversation/user%2F42%3Asession"
+    )
+
+
 # ---------------------------------------------------------------------------
 # convert_same_project_ref -- error cases
 # ---------------------------------------------------------------------------
@@ -173,6 +228,25 @@ def test_cross_project_resolves_via_resolver() -> None:
     )
     assert isinstance(result, InternalObjectRef)
     assert result.uri == "weave-trace-internal:///other-int-id/object/thing:xyz"
+    resolver.resolve_external_to_internal_project_id.assert_called_once_with(
+        "other_entity/other_proj"
+    )
+
+
+def test_cross_project_resolves_agent_turn_ref() -> None:
+    resolver = MagicMock()
+    resolver.resolve_external_to_internal_project_id.return_value = "other-int-id"
+
+    result = convert_cross_project_ref(
+        "weave:///other_entity/other_proj/agent_turn/0123456789abcdef0123456789abcdef",
+        ext_project_id="entity/proj",
+        resolver=resolver,
+    )
+    assert isinstance(result, InternalAgentTurnRef)
+    assert (
+        result.uri
+        == "weave-trace-internal:///other-int-id/agent_turn/0123456789abcdef0123456789abcdef"
+    )
     resolver.resolve_external_to_internal_project_id.assert_called_once_with(
         "other_entity/other_proj"
     )
