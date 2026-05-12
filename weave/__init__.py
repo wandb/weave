@@ -63,8 +63,8 @@ from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
 from weave.session.session import (
     LLM,
     LogResult,
+    MediaAttachment,
     Message,
-    Reasoning,
     Session,
     SubAgent,
     Tool,
@@ -80,9 +80,12 @@ from weave.session.session import (
     log_turn,
     start_llm,
     start_session,
+    start_subagent,
+    start_tool,
     start_turn,
 )
 from weave.trace.log_call import log_call
+from weave.trace.urls import otel_traces_endpoint
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 from weave.type_handlers.Audio.audio import Audio
@@ -108,6 +111,7 @@ __all__ = [
     "File",
     "LogResult",
     "Markdown",
+    "MediaAttachment",
     "Message",
     "MessagesPrompt",
     "Model",
@@ -115,7 +119,6 @@ __all__ = [
     "Object",
     "ObjectRef",
     "Prompt",
-    "Reasoning",
     "SavedView",
     "Scorer",
     "Session",
@@ -151,6 +154,7 @@ __all__ = [
     "log_session",
     "log_turn",
     "op",
+    "otel_traces_endpoint",
     "publish",
     "ref",
     "remove_aliases",
@@ -160,6 +164,8 @@ __all__ = [
     "set_view",
     "start_llm",
     "start_session",
+    "start_subagent",
+    "start_tool",
     "start_turn",
     "thread",
     "weave_client_context",

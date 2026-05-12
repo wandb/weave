@@ -58,6 +58,7 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
+from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -65,6 +66,8 @@ from weave.trace_server.agents.types import (
     AgentSearchRes,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
+    AgentSpanStatsReq,
+    AgentSpanStatsRes,
     AgentsQueryReq,
     AgentsQueryRes,
     AgentTraceChatReq,
@@ -126,6 +129,7 @@ from weave.trace_server.clickhouse.utilities import (
     maybe_enqueue_minimal_call_end,
     num_bytes,
     process_parameters,
+    sanitize_invalid_utf8_surrogates,
     should_retry_empty_query,
     string_to_int_in_range,
 )
@@ -6595,6 +6599,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
         return AgentQueryHandler(self._query).spans_query(req)
 
+    def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
+        return AgentQueryHandler(self._query).spans_stats(req)
+
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         return AgentQueryHandler(self._query).agents_query(req)
 
@@ -6613,7 +6620,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return AgentQueryHandler(self._query).conversation_chat(req)
 
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        return AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+        res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+
+        # Return early without emitting kafka events if online eval or agent scoring are disabled
+        if not wf_env.wf_enable_online_eval() or not wf_env.wf_enable_agent_scoring():
+            return res
+
+        # Emit for each row that produces a valid event type
+        for row in span_rows:
+            if event := ScoreAgentSpansEvent.from_row(row):
+                event.emit(self.kafka_producer)
+
+        # Flush kafka producer
+        if span_rows and self.kafka_producer:
+            try:
+                self.kafka_producer.flush(0)
+            except Exception:
+                logger.exception(
+                    "Failed to flush Kafka producer during OTel span ingest"
+                )
+
+        return res
 
     # Private Methods
     @property
@@ -6657,13 +6684,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         client.database = self._database
         return client
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(
         self,
         batch: list,
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,
     ) -> None:
+        # Tags roll up to the parent _flush_calls span instead of creating a
+        # separate intermediate span on every call.
         set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._insert_call_batch.count": str(
@@ -6908,6 +6936,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "clickhouse_trace_server_batched._insert.table": table,
             }
         )
+        set_root_span_dd_tags(
+            {
+                "weave_trace_server.insert.table": table,
+                "weave_trace_server.insert.row_count": len(data),
+            }
+        )
 
         async_insert = self._use_async_insert and not do_sync_insert
         if async_insert:
@@ -6919,11 +6953,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         start = time.monotonic()
+        sanitized_invalid_utf8 = False
         for attempt in range(ch_settings.INSERT_MAX_RETRIES):
             try:
                 result = self.ch_client.insert(
                     table, data=data, column_names=column_names, settings=settings
                 )
+
+            # Invalid client Unicode: sanitize the batch and retry once.
+            except UnicodeEncodeError as e:
+                if (
+                    sanitized_invalid_utf8
+                    or attempt == ch_settings.INSERT_MAX_RETRIES - 1
+                ):
+                    log_and_raise_insert_error(e, table, data)
+                sanitized_invalid_utf8 = True
+                data = sanitize_invalid_utf8_surrogates(data)
+                continue
 
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:
@@ -6954,7 +7000,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 return result
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
@@ -6973,7 +7018,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._call_batch = []
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_complete")
     def _insert_call_complete(self, ch_call: CallCompleteCHInsertable) -> None:
         """Insert a complete call into the calls_complete batch.
 
@@ -6989,7 +7033,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._flush_immediately:
             self._flush_calls_complete()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_to_v1")
     def _insert_call_to_v1(self, ch_call: CallCompleteCHInsertable) -> None:
         """Insert a complete call into the v1 call_parts table.
 
@@ -7003,9 +7046,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._insert_call_complete_batch"
-    )
     def _insert_call_complete_batch(
         self,
         batch: list,
@@ -7019,6 +7059,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings: Optional ClickHouse settings.
             do_sync_insert: If True, use synchronous insert.
         """
+        # Tags roll up to the parent _flush_calls_complete span instead of
+        # creating a separate intermediate span on every call.
         set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._insert_call_complete_batch.count": str(

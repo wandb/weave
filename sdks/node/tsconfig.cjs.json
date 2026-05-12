@@ -1,0 +1,19 @@
+// CJS-target tsconfig used by `scripts/build.mjs`. Extends the project root
+// tsconfig and pins `module: commonjs` here so the format is self-evident
+// without having to chase the `extends` chain. Also excludes the ESM-only
+// `src/esm/**` files (which use `import.meta.url`, a syntax error under
+// `module: commonjs`).
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs"
+  },
+  "exclude": [
+    "examples",
+    "dist",
+    "node_modules",
+    "src/integrations/checkOpenai.ts",
+    "src/__tests__/**/*",
+    "src/esm/**"
+  ]
+}

@@ -63,7 +63,7 @@ describe('ESM Module instrumentation', () => {
     fs.writeFileSync(customInstrumentationPath, customInstrumentationFile);
     const esmLoaderPath = path.resolve(
       __dirname,
-      '../../../dist/esm/instrument.js'
+      '../../../dist/esm/instrument.mjs'
     );
     const childPath = path.join(tmpDir, 'openaiRequire.forkChild.mjs');
     fs.writeFileSync(
@@ -167,7 +167,7 @@ client.chat.completions.create({messages: [{role: 'user', content: 'test'}]}).th
     fs.writeFileSync(customInstrumentationPath, customInstrumentationFile);
     const esmLoaderPath = path.resolve(
       __dirname,
-      '../../../dist/esm/instrument.js'
+      '../../../dist/esm/instrument.mjs'
     );
     const childPath = path.join(tmpDir, 'openaiRequire.forkChild.mjs');
     fs.writeFileSync(

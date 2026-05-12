@@ -5,7 +5,10 @@ import ddtrace
 from cachetools import LRUCache
 from clickhouse_connect.driver.client import Client as CHClient
 
-from weave.trace_server.datadog import set_current_span_dd_tags
+from weave.trace_server.datadog import (
+    set_current_span_dd_tags,
+    set_root_span_dd_tags,
+)
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
@@ -55,30 +58,41 @@ class TableRoutingResolver:
         if cached is not None:
             return cached
 
-        residence = get_project_data_residence(project_id, ch_client)
+        # Only span the cache-miss path. Cache-hit calls are extremely high
+        # volume and produce noisy DD spans with no useful information.
+        with ddtrace.tracer.trace("table_routing.fetch_residence"):
+            residence = get_project_data_residence(project_id, ch_client)
 
-        # Log warning if we detect dual residency - data should only ever be in
-        # calls_merged OR calls_complete, not both. This is handled gracefully but
-        # indicates an unexpected state that should be investigated.
-        if residence == ProjectDataResidence.BOTH:
-            logger.warning("Detected dual call residency for project %s. ", project_id)
-            set_current_span_dd_tags(
-                {
-                    "project_version.dual_residency": "true",
-                    "project_version.dual_residency.project_id": project_id,
-                }
-            )
+            set_root_span_dd_tags({"project_version.fetch_residence": residence.value})
 
-        # Don't cache if project is empty, we could write to either table.
-        if residence != ProjectDataResidence.EMPTY:
-            with _project_residence_cache_lock:
-                _project_residence_cache[project_id] = residence
+            # Log warning if we detect dual residency - data should only ever be in
+            # calls_merged OR calls_complete, not both. This is handled gracefully but
+            # indicates an unexpected state that should be investigated.
+            if residence == ProjectDataResidence.BOTH:
+                logger.warning(
+                    "Detected dual call residency for project %s. ", project_id
+                )
+                set_current_span_dd_tags(
+                    {
+                        "project_version.dual_residency": "true",
+                        "project_version.dual_residency.project_id": project_id,
+                    }
+                )
 
-        return residence
+            # Don't cache if project is empty, we could write to either table.
+            if residence != ProjectDataResidence.EMPTY:
+                with _project_residence_cache_lock:
+                    _project_residence_cache[project_id] = residence
 
-    @ddtrace.tracer.wrap(name="table_routing.resolve_read_table")
+            return residence
+
     def resolve_read_table(self, project_id: str, ch_client: CHClient) -> ReadTable:
         """Resolve which table to read from for a given project."""
+        result = self._resolve_read_table(project_id, ch_client)
+        set_root_span_dd_tags({"call_project_residence": result.value})
+        return result
+
+    def _resolve_read_table(self, project_id: str, ch_client: CHClient) -> ReadTable:
         if self._mode == CallsStorageServerMode.OFF:
             return ReadTable.CALLS_MERGED
 
@@ -105,7 +119,6 @@ class TableRoutingResolver:
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
 
-    @ddtrace.tracer.wrap(name="table_routing.resolve_v1_write_target")
     def resolve_v1_write_target(
         self,
         project_id: str,
@@ -124,6 +137,13 @@ class TableRoutingResolver:
         Returns:
             WriteTarget indicating which table to write to.
         """
+        result = self._resolve_v1_write_target(project_id, ch_client)
+        set_root_span_dd_tags({"call_project_residence": result.value})
+        return result
+
+    def _resolve_v1_write_target(
+        self, project_id: str, ch_client: CHClient
+    ) -> WriteTarget:
         if self._mode == CallsStorageServerMode.OFF:
             return WriteTarget.CALLS_MERGED
 
@@ -150,7 +170,6 @@ class TableRoutingResolver:
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
 
-    @ddtrace.tracer.wrap(name="table_routing.resolve_v2_write_target")
     def resolve_v2_write_target(
         self,
         project_id: str,
@@ -167,6 +186,13 @@ class TableRoutingResolver:
         Returns:
             WriteTarget indicating which table to write to.
         """
+        result = self._resolve_v2_write_target(project_id, ch_client)
+        set_root_span_dd_tags({"call_project_residence": result.value})
+        return result
+
+    def _resolve_v2_write_target(
+        self, project_id: str, ch_client: CHClient
+    ) -> WriteTarget:
         if self._mode == CallsStorageServerMode.OFF:
             return WriteTarget.CALLS_MERGED
 

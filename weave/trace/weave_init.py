@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import base64
 import logging
 import os
-from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 
 from weave.compat import wandb
@@ -19,6 +19,7 @@ from weave.trace.settings import (
     should_use_stainless_server,
     use_server_cache,
 )
+from weave.trace.urls import otel_traces_endpoint
 from weave.trace.wandb_run_context import (
     check_wandb_run_matches,
     get_global_wb_run_context,
@@ -33,6 +34,7 @@ from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
     from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc
+    from weave.trace_server.service_interface import ServerInfoRes
 
 logger = logging.getLogger(__name__)
 
@@ -93,17 +95,73 @@ Args:
 """
 
 
-def _weave_is_available(server: TraceServerClientInterface) -> bool:
+def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes | None:
+    """Fetch server_info or return None if the server is unavailable."""
     try:
-        server.server_info()
-    except JSONDecodeError:
-        return False
+        return server.server_info()
     except Exception:
         logger.warning(
             "Unexpected error when checking if Weave is available on the server.  Please contact support."
         )
-        return False
-    return True
+        return None
+
+
+def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> None:
+    """Configure OTel TracerProvider for the Session SDK using weave credentials.
+
+    Called automatically by init_weave() once version checks have passed.
+    Sets the global OTel TracerProvider so that ``trace.get_tracer("weave.session")``
+    returns a real tracer.
+
+    No-ops if the trace server URL is not configured. Logs a warning and
+    returns early if opentelemetry is unavailable. Other errors propagate
+    so misconfiguration is visible to the user.
+    """
+    try:
+        from opentelemetry import trace
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    except ImportError as e:
+        logger.warning(
+            "Session SDK tracing skipped: opentelemetry not available (%s)", e
+        )
+        return
+
+    # Don't reconfigure if already set up (e.g. from a previous init call
+    # or from a user who installed their own provider before weave.init()).
+    if isinstance(trace.get_tracer_provider(), TracerProvider):
+        return
+
+    trace_server_url = env.weave_trace_server_url()
+    if not trace_server_url:
+        return
+
+    endpoint = otel_traces_endpoint(trace_server_url)
+
+    # Match the auth pattern used by the rest of weave (see
+    # init_weave_get_server: res.set_auth(("api", api_key)) and
+    # wandb_thin/internal_api.py: BasicAuth("api", api_key)).
+    # HTTP Basic auth requires base64("user:pass").
+    headers: dict[str, str] = {}
+    if api_key:
+        token = base64.b64encode(f"api:{api_key}".encode()).decode()
+        headers["Authorization"] = f"Basic {token}"
+
+    resource = Resource.create(
+        {
+            "service.name": "weave-session-sdk",
+            "wandb.entity": entity,
+            "wandb.project": project,
+        }
+    )
+    exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
 
 
 def init_weave(
@@ -145,7 +203,8 @@ def init_weave(
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
     remote_server = init_weave_get_server(api_key, entity=entity_name)
-    if not _weave_is_available(remote_server):
+    server_info = _get_server_info(remote_server)
+    if server_info is None:
         raise RuntimeError(
             "Weave is not available on the server.  Please contact support."
         )
@@ -161,6 +220,7 @@ def init_weave(
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
         attributes=attributes,
+        api_key=api_key,
     )
 
     # If the project name was formatted by init, update the project name
@@ -182,17 +242,8 @@ def init_weave(
 
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
-    try:
-        server_info = remote_server.server_info()
-        min_required_version = server_info.min_required_weave_python_version
-        trace_server_version = server_info.trace_server_version
-    # TODO: Tighten this exception to only catch the specific exception
-    # that is thrown by the server_info call.
-    except Exception:
-        # Set to a minimum version that will always pass the check
-        # In the future, we may want to throw here.
-        min_required_version = "0.0.0"
-        trace_server_version = None
+    min_required_version = server_info.min_required_weave_python_version
+    trace_server_version = server_info.trace_server_version
     trace_server_url = env.weave_trace_server_url()
     if not init_message.check_min_weave_version(min_required_version, trace_server_url):
         return init_weave_disabled()
@@ -202,6 +253,13 @@ def init_weave(
         trace_server_url,
     ):
         return init_weave_disabled()
+
+    # Configure Session SDK OTel tracing using the same server credentials.
+    # Placed after the version checks so a disabled init never installs a
+    # global TracerProvider that would keep exporting spans to an
+    # incompatible server.
+    _setup_session_tracing(entity_name, project_name, api_key)
+
     init_message.print_init_message(
         username, entity_name, project_name, read_only=not ensure_project_exists
     )

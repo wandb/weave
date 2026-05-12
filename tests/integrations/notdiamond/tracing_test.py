@@ -26,17 +26,34 @@ def patch_notdiamond() -> Generator[None, None, None]:
 def test_notdiamond_quickstart(
     client: WeaveClient,
 ) -> None:
-    from notdiamond import LLMConfig, NotDiamond
+    from notdiamond import NotDiamond
 
     api_key = os.environ.get("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     nd_client = NotDiamond(api_key=api_key)
     llm_configs = [
-        LLMConfig.from_string("openai/gpt-4o-mini"),
-        LLMConfig.from_string("openai/gpt-4o"),
+        _llm_provider("openai/gpt-4o-mini"),
+        _llm_provider("openai/gpt-4o"),
     ]
-    _, results = nd_client.model_select(
-        model=llm_configs, messages=[{"role": "user", "content": "Hello, world!"}]
+    nd_client.model_router.select_model(
+        llm_providers=llm_configs,
+        messages=[{"role": "user", "content": "Hello, world!"}],
+        metric="accuracy",
+        max_model_depth=4,
+        hash_content=False,
     )
     calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     flattened_calls = flattened_calls_to_names(flatten_calls(calls))
-    assert len([call for call in flattened_calls if "model_select" in call[0]]) == 1
+    assert len([call for call in flattened_calls if "select_model" in call[0]]) == 1
+
+
+def _llm_provider(model: str) -> dict:
+    provider, model_name = model.split("/", 1)
+    return {
+        "provider": provider,
+        "model": model_name,
+        "is_custom": False,
+        "context_length": None,
+        "input_price": None,
+        "output_price": None,
+        "latency": None,
+    }

@@ -1,11 +1,7 @@
 interactions:
 - request:
-    body: '{"messages": [{"role": "user", "content": "Hello, world!"}], "llm_providers":
-      [{"provider": "openai", "model": "gpt-4o-mini", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4o", "is_custom": false, "context_length": null, "input_price":
-      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
-      2, "hash_content": false}'
+    body: '{"llm_providers":[{"provider":"openai","model":"gpt-4o-mini","is_custom":false,"context_length":null,"input_price":null,"output_price":null,"latency":null},{"provider":"openai","model":"gpt-4o","is_custom":false,"context_length":null,"input_price":null,"output_price":null,"latency":null}],"messages":[{"role":"user","content":"Hello,
+      world!"}],"hash_content":false,"max_model_depth":2,"metric":"accuracy"}'
     headers:
       Accept:
       - '*/*'
@@ -29,8 +25,6 @@ interactions:
       - 99a79b0ceca767a2-SJC
       Connection:
       - keep-alive
-      Content-Encoding:
-      - gzip
       Content-Type:
       - application/json
       Date:

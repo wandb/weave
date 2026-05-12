@@ -58,6 +58,11 @@ jobs:
             "smolagents",
             "autogen_tests",
           ]
+        exclude:
+          # verifiers_test dependencies require Python >= 3.11.
+          - python-version-major: "3"
+            python-version-minor: "10"
+            shard: "verifiers_test"
       fail-fast: false
     services:
       wandbservice:

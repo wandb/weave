@@ -371,6 +371,7 @@ class WeaveClient:
         postprocess_inputs: PostprocessInputsFunc | None = None,
         postprocess_output: PostprocessOutputFunc | None = None,
         attributes: dict[str, Any] | None = None,
+        api_key: str | None = None,
     ):
         self.entity = entity
         self.project = project
@@ -412,7 +413,7 @@ class WeaveClient:
         self._wal_pending_call_ids: set[str] = set()
         if settings.should_enable_wal():
             if settings.should_disable_wal_sender():
-                self._wal = WALManager(self.entity, self.project)
+                self._wal = WALManager(self.entity, self.project, api_key=api_key)
                 logger.debug("WAL enabled (sender disabled): %s", self._wal.wal_dir)
             else:
                 self._wal = WALManager.with_sender(
@@ -420,6 +421,7 @@ class WeaveClient:
                     self.project,
                     self.server,
                     on_send=self._on_wal_send,
+                    api_key=api_key,
                 )
                 logger.debug("WAL enabled: %s", self._wal.wal_dir)
 

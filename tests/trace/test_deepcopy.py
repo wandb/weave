@@ -104,7 +104,7 @@ def test_deepcopy_weaveobject_e2e(client, example_class):
         BoxedTimedelta(seconds=1),
     ],
 )
-def test_deepcopy_boxed(client, boxed_val):
+def test_deepcopy_boxed(boxed_val):
     res = deepcopy(boxed_val)
     assert res == boxed_val
     assert id(res) != id(boxed_val)
@@ -123,7 +123,7 @@ def test_deepcopy_boxed_model_e2e(client):
     assert res == "hmm, You are a helpful assistant."
 
 
-def test_deepcopy_ref_with_future(client):
+def test_deepcopy_ref_with_future():
     future = Future()
     future.set_result("digest")
 
