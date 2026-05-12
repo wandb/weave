@@ -261,9 +261,7 @@ class AgentSpanStatsNumericBucketSpec(BaseModel):
             bool(self.group_by) or self.measure is not None,
         ]
         if sum(sources) != 1:
-            raise ValueError(
-                "exactly one of value or group_by/measure must be set"
-            )
+            raise ValueError("exactly one of value or group_by/measure must be set")
         if bool(self.group_by) != (self.measure is not None):
             raise ValueError("numeric group bucket must set both group_by and measure")
 
