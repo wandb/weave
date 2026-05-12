@@ -1024,7 +1024,7 @@ def log_turn(
     Falls back to the earliest/latest child timestamp, then ``now()``, when
     the turn doesn't supply its own.
     """
-    if not _OTEL_AVAILABLE or is_tracing_setting_disabled():
+    if not _OTEL_AVAILABLE:
         return LogResult(session_id=session_id)
 
     resolved_spans = spans or []
@@ -1105,7 +1105,7 @@ def log_session(
     ``session_id`` if empty. By default each turn gets its own OTel trace.
     """
     sid = session_id or str(uuid.uuid4())
-    if not _OTEL_AVAILABLE or is_tracing_setting_disabled():
+    if not _OTEL_AVAILABLE:
         return LogResult(session_id=sid)
 
     trace_ids: list[str] = []
