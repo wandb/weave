@@ -58,6 +58,23 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
     For eager ops (marked with @op(eager_call_start=True)): starts are sent immediately
     via the legacy path, and ends are sent separately. This is useful for long-running
     operations like evaluations that should be visible in the UI immediately.
+
+    INVARIANT — call ownership is per-client/per-process.
+
+    A call's ``call_start`` and its ``call_end`` MUST be emitted by the
+    same client instance / same process. Pairing happens in this
+    processor's in-memory ``_pending_starts`` / ``_pending_ends`` maps; an
+    ``EndBatchItem`` whose matching ``StartBatchItem`` was emitted by a
+    different client (e.g. the request thread on the API server, while
+    the end is emitted by a Kafka worker) sits in ``_pending_ends``
+    unpaired and is dropped after ``FLUSH_TIMEOUT_SECONDS`` with the
+    "Flush timeout: dropping N orphaned call ends" warning.
+
+    If you need a long-running job to surface a call id to a client
+    before the worker starts (e.g. so a frontend has a target to poll
+    against), allocate the id at the dispatching layer and let the
+    worker emit BOTH start and end against that id. Do not pre-create
+    the call row server-side.
     """
 
     def __init__(
