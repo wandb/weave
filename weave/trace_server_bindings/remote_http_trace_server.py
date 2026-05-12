@@ -63,12 +63,12 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
         auth: tuple[str, str] | None = None,
         extra_headers: dict[str, str] | None = None,
+        entity: str | None = None,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
-        # Opt-in to new calls_complete write path via env var
-        self.use_calls_complete = should_use_calls_complete() and should_batch
+        self.use_calls_complete = should_use_calls_complete(entity) and should_batch
         self.call_processor: AsyncBatchProcessor | CallBatchProcessor | None = None
         self.feedback_processor: AsyncBatchProcessor | None = None
         if self.should_batch:
@@ -104,8 +104,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @classmethod
-    def from_env(cls, should_batch: bool = False) -> Self:
-        return cls(weave_trace_server_url(), should_batch)
+    def from_env(cls, should_batch: bool = False, entity: str | None = None) -> Self:
+        return cls(weave_trace_server_url(), should_batch, entity=entity)
 
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
@@ -1006,6 +1006,26 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         return self._generic_request(
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
+        )
+
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
+        return self._generic_request(
+            "/project/ttl_settings/read",
+            req,
+            tsi.ProjectTTLSettingsReadReq,
+            tsi.ProjectTTLSettingsReadRes,
+        )
+
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
+        return self._generic_request(
+            "/project/ttl_settings/update",
+            req,
+            tsi.ProjectTTLSettingsUpdateReq,
+            tsi.ProjectTTLSettingsUpdateRes,
         )
 
     def threads_query_stream(

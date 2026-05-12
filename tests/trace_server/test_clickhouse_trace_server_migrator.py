@@ -1,11 +1,14 @@
 import os
 import types
+from contextlib import contextmanager
 from unittest.mock import Mock, call, patch
 
 import pytest
+import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
+from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _MAX_RETRIES,
     BaseClickHouseTraceServerMigrator,
@@ -42,6 +45,41 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
 
     ch_client.query.side_effect = _query_side_effect
     return ch_client
+
+
+def _make_ch_client_with_database_engines(database_engines: dict[str, str]) -> Mock:
+    """Create a mock CH client with per-database system.databases responses."""
+    ch_client = Mock()
+    ch_client.database = "test_db"
+
+    def _query_side_effect(sql, *args, **kwargs):
+        if "system.databases" in sql:
+            db_name = kwargs.get("parameters", {}).get("db_name")
+            engine_result = Mock()
+            if db_name in database_engines:
+                engine_result.result_rows = [(database_engines[db_name],)]
+            else:
+                engine_result.result_rows = []
+            return engine_result
+        return Mock()
+
+    ch_client.query.side_effect = _query_side_effect
+    return ch_client
+
+
+@pytest.fixture
+def mock_migration_lock():
+    """Bypass the distributed migration lock for tests that call apply_migrations."""
+
+    @contextmanager
+    def _noop_lock(*_args, **_kwargs):
+        yield "aabbccdd0011"
+
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_migrator.migration_lock",
+        _noop_lock,
+    ):
+        yield
 
 
 @pytest.fixture
@@ -107,7 +145,9 @@ def distributed_migrator():
     return migrator
 
 
-def test_apply_migrations_with_target_version(mock_costs, tmp_path):
+def test_apply_migrations_with_target_version(
+    mock_migration_lock, mock_costs, tmp_path
+):
     # Create a temporary migration file
     migration_dir = tmp_path / "migrations"
     migration_dir.mkdir()
@@ -160,6 +200,97 @@ def test_apply_migrations_with_target_version(mock_costs, tmp_path):
     )
 
 
+def test_apply_migrations_discovers_existing_target_database_engine(
+    mock_migration_lock, mock_costs, tmp_path
+):
+    migration_dir = tmp_path / "migrations"
+    migration_dir.mkdir()
+    migration_file = migration_dir / "026_object_version_first_seen.up.sql"
+    migration_file.write_text(
+        """
+        -- Customer regression: comments before CREATE TABLE must not hide the DDL.
+        CREATE TABLE IF NOT EXISTS object_version_first_seen (
+            project_id String,
+            object_id String,
+            digest String,
+            first_created_at SimpleAggregateFunction(min, DateTime64(3))
+        ) ENGINE = AggregatingMergeTree()
+        ORDER BY (project_id, object_id, digest);
+        """
+    )
+
+    def run_upgrade_case(
+        *,
+        target_db: str,
+        target_engine: str,
+        expect_on_cluster: bool,
+        use_distributed: bool = False,
+    ) -> None:
+        ch_client = _make_ch_client_with_database_engines(
+            {"db_management": "Atomic", target_db: target_engine}
+        )
+        migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+            ch_client,
+            replicated=True,
+            use_distributed=use_distributed,
+            replicated_cluster="test_cluster",
+            migration_dir=str(migration_dir),
+            post_migration_hook=None,
+        )
+        migrator._get_migration_status = Mock(
+            return_value={"curr_version": 25, "partially_applied_version": None}
+        )
+        migrator._get_migrations = Mock()
+        migrator._determine_migrations_to_apply = Mock(
+            return_value=[(26, migration_file.name)]
+        )
+        migrator._update_migration_status = Mock()
+        ch_client.command.reset_mock()
+
+        migrator.apply_migrations(target_db, target_version=26)
+
+        executed_sql = [call.args[0] for call in ch_client.command.call_args_list]
+        create_sql = executed_sql[0]
+        assert "CREATE TABLE" in create_sql
+        assert "object_version_first_seen" in create_sql
+        assert "ENGINE = ReplicatedAggregatingMergeTree()" in create_sql
+        assert ("ON CLUSTER test_cluster" in create_sql) is expect_on_cluster
+        assert migrator._replicated_db_engine_cache[target_db] is (
+            target_engine == "Replicated"
+        )
+
+        if use_distributed:
+            distributed_sql = executed_sql[1]
+            assert "CREATE TABLE IF NOT EXISTS object_version_first_seen" in (
+                distributed_sql
+            )
+            assert "ENGINE = Distributed" in distributed_sql
+            assert ("ON CLUSTER test_cluster" in distributed_sql) is expect_on_cluster
+
+    # Existing legacy Replicated DBs reject ON CLUSTER during upgrades.
+    run_upgrade_case(
+        target_db="legacy_replicated_db",
+        target_engine="Replicated",
+        expect_on_cluster=False,
+    )
+
+    # Existing Atomic DBs still need ON CLUSTER fan-out.
+    run_upgrade_case(
+        target_db="atomic_db",
+        target_engine="Atomic",
+        expect_on_cluster=True,
+    )
+
+    # Distributed mode inherits the same discovery path before splitting DDL
+    # into local and distributed table statements.
+    run_upgrade_case(
+        target_db="legacy_replicated_distributed_db",
+        target_engine="Replicated",
+        expect_on_cluster=False,
+        use_distributed=True,
+    )
+
+
 def test_migration_dir_must_be_absolute():
     ch_client = _make_ch_client()
     with pytest.raises(MigrationError, match="absolute path"):
@@ -168,7 +299,7 @@ def test_migration_dir_must_be_absolute():
         )
 
 
-def test_apply_migrations_raises_on_partially_applied():
+def test_apply_migrations_raises_on_partially_applied(mock_migration_lock):
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
@@ -184,7 +315,7 @@ def test_apply_migrations_raises_on_partially_applied():
         migrator.apply_migrations("test_db")
 
 
-def test_apply_migrations_costs_disabled_does_not_call_costs():
+def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock):
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
@@ -621,6 +752,28 @@ def test_create_distributed_table_sql_id_sharded():
         ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_local, sipHash64(trace_id))
     """
     assert sql.strip() == expected.strip()
+
+
+@pytest.mark.parametrize(
+    ("table_name", "expected_expr"),
+    [
+        ("spans", "sipHash64(trace_id)"),
+        ("messages", "sipHash64(trace_id)"),
+        ("agents", "sipHash64(project_id, agent_name)"),
+        ("agent_versions", "sipHash64(project_id, agent_name)"),
+    ],
+)
+def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_expr):
+    """Test distributed table creation SQL for GenAI agent tables."""
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        _make_ch_client(),
+        replicated_cluster="test_cluster",
+        migration_dir=DEFAULT_MIGRATION_DIR,
+    )
+
+    sql = distributed_migrator._create_distributed_table_sql(table_name)
+
+    assert expected_expr in sql
 
 
 @pytest.mark.parametrize(
@@ -1218,6 +1371,77 @@ def test_ddl_adapts_to_database_engine(replicated_migrator, distributed_migrator
     )
 
 
+def test_replicated_database_engine_suppresses_on_cluster_for_ddl_families(
+    replicated_migrator, distributed_migrator
+):
+    """Legacy Replicated DBs must not get ON CLUSTER from any DDL branch."""
+    replicated_commands = [
+        "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id",
+        "ALTER TABLE test ADD COLUMN x Int32",
+        "ALTER TABLE test MODIFY TTL toDateTime(expire_at) DELETE",
+        "DROP TABLE IF EXISTS test",
+        "DROP VIEW IF EXISTS test_view",
+        "CREATE VIEW test_view AS SELECT * FROM test",
+        "CREATE MATERIALIZED VIEW test_mv TO test AS SELECT * FROM test",
+        "RENAME TABLE old_name TO new_name",
+    ]
+    distributed_commands = [
+        "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id",
+        "ALTER TABLE test ADD COLUMN x Int32",
+        "ALTER TABLE test ADD INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 1",
+        "ALTER TABLE test MODIFY TTL toDateTime(expire_at) DELETE",
+        "ALTER TABLE calls_merged_view MODIFY QUERY SELECT project_id, id FROM call_parts GROUP BY project_id, id",
+        "DROP TABLE IF EXISTS test",
+        "DROP VIEW IF EXISTS test_view",
+        "CREATE VIEW test_view AS SELECT * FROM test",
+        "CREATE MATERIALIZED VIEW test_mv TO test AS SELECT * FROM test",
+        "RENAME TABLE old_name TO new_name",
+    ]
+
+    for migrator, commands in [
+        (replicated_migrator, replicated_commands),
+        (distributed_migrator, distributed_commands),
+    ]:
+        migrator._replicated_db_engine_cache["test_db"] = True
+        for command in commands:
+            migrator.ch_client.command.reset_mock()
+
+            migrator._execute_migration_command("test_db", command)
+
+            emitted_sql = [
+                call.args[0] for call in migrator.ch_client.command.call_args_list
+            ]
+            assert emitted_sql, command
+            assert all("ON CLUSTER" not in sql for sql in emitted_sql), (
+                command,
+                emitted_sql,
+            )
+            assert migrator.ch_client.database == "original_db"
+
+
+def test_execute_migration_command_restores_database_on_error(
+    replicated_migrator, distributed_migrator
+):
+    """DDL errors should not leave the shared ClickHouse client on target_db."""
+    for migrator, command in [
+        (
+            replicated_migrator,
+            "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id",
+        ),
+        (distributed_migrator, "ALTER TABLE test ADD COLUMN x Int32"),
+    ]:
+        migrator.ch_client.command.reset_mock()
+        migrator.ch_client.command.side_effect = DatabaseError(
+            "Code: 80. DB::Exception: boom"
+        )
+
+        with pytest.raises(DatabaseError, match="boom"):
+            migrator._execute_migration_command("test_db", command)
+
+        assert migrator.ch_client.database == "original_db"
+        migrator.ch_client.command.side_effect = None
+
+
 def test_index_operations_only_on_local_tables_distributed(distributed_migrator):
     """Test that ADD/DROP INDEX operations are only applied to local tables in distributed mode."""
     test_cases = [
@@ -1332,3 +1556,156 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(DatabaseError("some other error"))
     assert not _is_transient_ch_error(DatabaseError(""))
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
+
+
+def test_split_migration_sql() -> None:
+    """One dense case exercising every rule the splitter cares about.
+
+    Rules verified (one assertion cluster per rule):
+    - ``;`` inside ``--`` line comments does not split a statement;
+    - ``;`` inside ``/* ... */`` block comments does not split a statement,
+      and block comments spanning lines are handled;
+    - ``;`` inside a single-quoted string stays in the statement, including
+      SQL-style ``''`` escaped quotes;
+    - trailing whitespace/newlines after the final ``;`` do not emit an
+      empty statement;
+    - a file containing only comments (line or block) yields no statements;
+    - a file with N non-empty statements yields exactly N entries, each
+      with no trailing ``;`` and no leaked comment markers;
+    - a mixed end-to-end migration (comments + block comments + string
+      literals with semicolons + blank lines) round-trips to the exact
+      statement bodies we expect.
+    """
+    # 1. Line comment with a `;` inside it does not split the statement.
+    assert split_migration_sql(
+        "-- attributes_dump is preserved; typed maps are a duplicated index.\n"
+        "ALTER TABLE calls ADD COLUMN foo String"
+    ) == ["ALTER TABLE calls ADD COLUMN foo String"]
+
+    # 2. String literal with a `;` stays in one statement; doubled-quote
+    #    escapes are preserved (no spurious termination of the string).
+    assert split_migration_sql("ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'") == [
+        "ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'"
+    ]
+    assert split_migration_sql(
+        "ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'"
+    ) == ["ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'"]
+
+    # 3. Trailing whitespace after the final `;` produces no empty statement.
+    assert split_migration_sql("SELECT 1;\n\n   \n") == ["SELECT 1"]
+
+    # 4. Comment-only files (line or block) yield zero statements.
+    assert split_migration_sql("-- just a comment;\n-- another; one\n") == []
+    assert split_migration_sql("/* header;\n only; */\n") == []
+
+    # 5. Block comments — even those spanning lines with `;` inside — do not
+    #    split the surrounding statements, and the count matches exactly.
+    assert split_migration_sql("/* note; with ; inside */ SELECT 1; SELECT 2") == [
+        "SELECT 1",
+        "SELECT 2",
+    ]
+    assert (
+        len(
+            split_migration_sql(
+                "CREATE TABLE a (id UInt64) ENGINE=Memory;"
+                " INSERT INTO a VALUES (1);"
+                " DROP TABLE a;"
+            )
+        )
+        == 3
+    )
+
+    # 6. End-to-end migration: comments, block comments, string literals with
+    #    semicolons, and blank lines all compose without corrupting bodies.
+    sql = """
+    -- migration: widen config; also tweak defaults
+    ALTER TABLE runs
+        ADD COLUMN config String DEFAULT 'k=v;other=1';
+
+    /* block comment
+       spanning lines; with semicolons */
+
+    -- another; line comment
+    ALTER TABLE runs
+        ADD COLUMN note String DEFAULT 'it''s; ok';
+
+
+    CREATE INDEX idx_runs_config ON runs (config) TYPE minmax;
+    """
+    statements = split_migration_sql(sql)
+    assert statements == [
+        "ALTER TABLE runs\n        ADD COLUMN config String DEFAULT 'k=v;other=1'",
+        "ALTER TABLE runs\n        ADD COLUMN note String DEFAULT 'it''s; ok'",
+        "CREATE INDEX idx_runs_config ON runs (config) TYPE minmax",
+    ]
+    for s in statements:
+        assert not s.endswith(";")
+        assert "--" not in s
+        assert "/*" not in s
+
+
+def test_shipped_migrations_do_not_embed_on_cluster() -> None:
+    """The migrator owns ON CLUSTER insertion so Replicated DBs can suppress it."""
+    offenders: list[str] = []
+    for file_name in sorted(os.listdir(DEFAULT_MIGRATION_DIR)):
+        if not file_name.endswith((".up.sql", ".down.sql")):
+            continue
+        file_path = os.path.join(DEFAULT_MIGRATION_DIR, file_name)
+        with open(file_path, encoding="utf-8") as f:
+            for statement in split_migration_sql(f.read()):
+                if SQLPatterns.ON_CLUSTER.search(statement):
+                    offenders.append(file_name)
+                    break
+
+    assert offenders == []
+
+
+def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:
+    """Every shipped migration file produces the same statement sequence
+    under the new splitter as under the old naive ``split(";")``.
+
+    This is the drop-in-replacement guarantee: for migrations that existed
+    before the splitter change, ClickHouse must receive exactly the same
+    stream of statements, modulo comment stripping (which CH was already
+    ignoring server-side). If the two splitters diverge for any existing
+    migration, that migration either (a) depended on the old bug (``;``
+    inside a comment/string that was landing as garbage in CH), or (b)
+    uncovers a sqlparse quirk we did not anticipate — both worth failing
+    the test over.
+
+    Both outputs are normalized by stripping comments and collapsing
+    internal whitespace, then comparing as lists of normalized statements.
+    Comments are a no-op to ClickHouse's parser, and whitespace inside a
+    statement body never affects execution, so this normalization is the
+    right semantic identity to compare on.
+    """
+
+    # Old splitter, pre-change behavior: naive split on every ``;``, strip
+    # each chunk, drop empties (matches ``_execute_migration_command``'s
+    # ``if len(command) == 0: return`` guard).
+    def old_split(sql: str) -> list[str]:
+        return [chunk.strip() for chunk in sql.split(";") if chunk.strip()]
+
+    def normalize(stmt: str) -> str:
+        # Strip comments (CH ignores them anyway) and collapse whitespace to
+        # a canonical single-space form, so layout differences don't mask a
+        # true-positive semantic match.
+        no_comments = sqlparse.format(stmt, strip_comments=True)
+        return " ".join(no_comments.split())
+
+    migration_files = sorted(
+        f for f in os.listdir(DEFAULT_MIGRATION_DIR) if f.endswith(".up.sql")
+    )
+    assert migration_files, "no .up.sql migrations discovered — wrong path?"
+
+    for name in migration_files:
+        with open(os.path.join(DEFAULT_MIGRATION_DIR, name), encoding="utf-8") as f:
+            sql = f.read()
+        old_norm = [normalize(s) for s in old_split(sql)]
+        old_norm = [s for s in old_norm if s]  # drop comment-only chunks
+        new_norm = [normalize(s) for s in split_migration_sql(sql)]
+        assert old_norm == new_norm, (
+            f"splitter divergence in {name}:\n"
+            f"  old ({len(old_norm)}): {old_norm}\n"
+            f"  new ({len(new_norm)}): {new_norm}"
+        )

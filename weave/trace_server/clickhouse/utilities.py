@@ -10,9 +10,10 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypeVar, cast
 
 import ddtrace
+import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
@@ -22,6 +23,8 @@ from weave.trace_server.errors import InsertTooLarge
 from weave.trace_server.kafka import KafkaProducer
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +42,68 @@ def num_bytes(data: Any) -> int:
         return len(str(data).encode("utf-8"))
     except Exception:
         return 0
+
+
+def sanitize_invalid_utf8_surrogates(value: T) -> T:
+    r"""Normalize malformed client Unicode before ClickHouse UTF-8 encoding.
+
+    Python can deserialize JSON strings containing lone UTF-16 surrogate escapes
+    such as "\\ud83d", but `clickhouse_connect` later rejects those strings when
+    encoding column data as UTF-8. Decoding through UTF-16 preserves valid
+    surrogate pairs as their real code point and replaces unpaired surrogates.
+    """
+    if isinstance(value, str):
+        sanitized = value.encode("utf-16", errors="surrogatepass").decode(
+            "utf-16", errors="replace"
+        )
+        return value if sanitized == value else cast(T, sanitized)
+    if isinstance(value, list):
+        for idx, item in enumerate(value):
+            sanitized = sanitize_invalid_utf8_surrogates(item)
+            if sanitized is not item:
+                sanitized_items = [*value[:idx], sanitized]
+                sanitized_items.extend(
+                    sanitize_invalid_utf8_surrogates(rest) for rest in value[idx + 1 :]
+                )
+                return cast(T, sanitized_items)
+        return value
+    if isinstance(value, tuple):
+        for idx, item in enumerate(value):
+            sanitized = sanitize_invalid_utf8_surrogates(item)
+            if sanitized is not item:
+                return cast(
+                    T,
+                    (
+                        *value[:idx],
+                        sanitized,
+                        *(
+                            sanitize_invalid_utf8_surrogates(rest)
+                            for rest in value[idx + 1 :]
+                        ),
+                    ),
+                )
+        return value
+    if isinstance(value, dict):
+        items = value.items()
+        for idx, (key, val) in enumerate(items):
+            sanitized_key = sanitize_invalid_utf8_surrogates(key)
+            sanitized_val = sanitize_invalid_utf8_surrogates(val)
+            if sanitized_key is not key or sanitized_val is not val:
+                item_list = list(value.items())
+                sanitized_items = [
+                    *item_list[:idx],
+                    (sanitized_key, sanitized_val),
+                    *(
+                        (
+                            sanitize_invalid_utf8_surrogates(rest_key),
+                            sanitize_invalid_utf8_surrogates(rest_val),
+                        )
+                        for rest_key, rest_val in item_list[idx + 1 :]
+                    ),
+                ]
+                return cast(T, dict(sanitized_items))
+        return value
+    return value
 
 
 def dict_value_to_dump(
@@ -70,6 +135,31 @@ def nullable_any_dump_to_any(
     val: str | None,
 ) -> Any | None:
     return any_dump_to_any(val) if val else None
+
+
+# ---------------------------------------------------------------------------
+# Migration SQL helpers
+# ---------------------------------------------------------------------------
+
+
+def split_migration_sql(sql: str) -> list[str]:
+    """Split a ClickHouse migration SQL script into individual statements.
+
+    A naive ``sql.split(";")`` breaks on ``;`` inside ``--`` line comments,
+    ``/* ... */`` block comments, or single-quoted string literals — the
+    migrator then sends a mid-comment fragment to ClickHouse and gets
+    ``DB::Exception: Empty query. (SYNTAX_ERROR)``.
+
+    Delegates to ``sqlparse`` (already a project dependency) for
+    string/comment-aware splitting, then strips comments and empty
+    statements from the result.
+    """
+    statements: list[str] = []
+    for raw in sqlparse.split(sql, strip_semicolon=True):
+        stripped = sqlparse.format(raw, strip_comments=True).strip()
+        if stripped:
+            statements.append(stripped)
+    return statements
 
 
 # ---------------------------------------------------------------------------

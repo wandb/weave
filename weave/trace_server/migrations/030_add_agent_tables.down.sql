@@ -1,0 +1,12 @@
+DROP VIEW IF EXISTS messages_mv_tool_call_result;
+DROP VIEW IF EXISTS messages_mv_tool_call_arguments;
+DROP VIEW IF EXISTS messages_mv_system_instructions;
+DROP VIEW IF EXISTS messages_mv_input_messages;
+DROP VIEW IF EXISTS messages_mv_output_messages;
+DROP VIEW IF EXISTS messages_mv;
+DROP VIEW IF EXISTS agent_versions_mv;
+DROP VIEW IF EXISTS agents_mv;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS agent_versions;
+DROP TABLE IF EXISTS agents;
+DROP TABLE IF EXISTS spans;

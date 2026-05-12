@@ -21,9 +21,19 @@ jobs:
       contents: "write"
       id-token: "write"
     steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.WANDBOT_3000_APP_ID }}
+          private-key: ${{ secrets.WANDBOT_3000_PRIVATE_KEY }}
+          owner: wandb
+          repositories: weave
+          permission-contents: write
+
       - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.WANDBMACHINE_GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
       - id: setup_git
         run: |

@@ -1,12 +1,17 @@
-// @ts-ignore-file This file is compiled as ESM via tsconfig.instrument.json
+// Preload entry for Weave ESM host support.
+//
+// Invoked via `node --import=weave/instrument <entry>`. The `.mts` extension
+// marks this file as ESM-only — TypeScript always emits it as `.mjs`. The
+// CJS target's tsconfig also excludes `src/esm/**` so it is never even
+// considered by the CJS build pass. The `package.json` `"./instrument"`
+// exports map only routes the `import` condition, so consumers always get
+// the ESM build.
+//
+// Its job is to register an `import-in-the-middle` loader hook so the host's
+// ESM graph can be patched as modules are resolved.
 
-const satisfies = require('semifies');
-const {register} = require('node:module');
-const {pathToFileURL} = require('node:url');
-
+import {register} from 'node:module';
 import {Hook, createAddHookMessageChannel} from 'import-in-the-middle';
-require('../integrations/hooks');
-
 import {
   getESMInstrumentedModules,
   symESMInstrumentations,
@@ -16,19 +21,23 @@ import {
 import {requirePackageJson} from '../utils/npmModuleUtils';
 import semifies from 'semifies';
 
+// Side-effect import — populates the instrumentation registry that
+// `instrumentations.ts` exposes on `globalThis`. Must evaluate before the
+// loader hook below starts consulting that registry for matching modules.
+import '../integrations/hooks';
+
 const {registerOptions, waitForAllMessagesAcknowledged} =
   createAddHookMessageChannel();
 
-register(
-  'import-in-the-middle/hook.mjs',
-  pathToFileURL(__filename),
-  registerOptions
-);
+// Pass `import.meta.url` as `register()`'s `parentURL` so it can resolve the
+// bare `'import-in-the-middle/hook.mjs'` specifier through `node_modules`
+// (omitting parentURL defaults to `data:/`, which can't).
+register('import-in-the-middle/hook.mjs', import.meta.url, registerOptions);
 
 (async () => {
   await waitForAllMessagesAcknowledged();
 
-  if (satisfies(process.versions.node, '>=14.13.1')) {
+  if (semifies(process.versions.node, '>=14.13.1')) {
     const modules = getESMInstrumentedModules();
 
     for (const module of modules) {

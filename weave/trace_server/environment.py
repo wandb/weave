@@ -69,6 +69,14 @@ def wf_enable_online_eval() -> bool:
     return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
+def wf_enable_agent_scoring() -> bool:
+    """Whether to emit ScoreAgentSpansEvent triggers from the OTel ingest path.
+
+    In addition to `wf_enable_online_eval` so agent scoring can be toggled independently.
+    """
+    return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(
@@ -132,6 +140,59 @@ def wf_scoring_worker_debounced_scoring_max_call_history() -> int:
     except ValueError:
         return default
     return max(0, value)
+
+
+def wf_scoring_worker_remote_scorer_bearer_token() -> str | None:
+    """Optional bearer credential for outbound remote scorer HTTP requests.
+
+    The wire format is ``Authorization: Bearer <token>``; this environment
+    variable supplies one possible ``<token>`` (alongside other mechanisms such
+    as per-scorer configuration or OAuth client-credentials token exchange).
+    When set, the scoring worker's remote scorer path may prefer this value
+    over those other sources; exact precedence is defined by that
+    implementation. When unset, the worker resolves credentials from other
+    configuration only.
+
+    Returns:
+        The token string, or None if unset. Whitespace-only values are treated as
+        None.
+    """
+    raw = os.environ.get("WF_SCORING_WORKER_REMOTE_SCORER_BEARER_TOKEN")
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    return stripped if stripped else None
+
+
+DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS = 30.0
+
+
+def wf_scoring_worker_remote_scorer_enabled() -> bool:
+    """Whether outbound remote scorer HTTP is enabled in the scoring worker.
+
+    When false (default), the worker does not run the remote HTTP path for
+    :class:`RemoteScorer`, regardless of other configuration.
+    """
+    return (
+        os.environ.get("WF_SCORING_WORKER_REMOTE_SCORING_ENABLED", "false").lower()
+        == "true"
+    )
+
+
+def wf_scoring_worker_remote_scorer_http_timeout_seconds() -> float:
+    """Wall-clock timeout for each remote scorer HTTP request/response (seconds).
+
+    Default ``30`` matches the remote scorer product default.
+    """
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_REMOTE_HTTP_TIMEOUT_SECONDS",
+        str(int(DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS)),
+    )
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+    return value if value > 0 else DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
 
 
 # Clickhouse Settings
@@ -229,6 +290,16 @@ def wf_clickhouse_max_execution_time() -> int | None:
             "WF_CLICKHOUSE_MAX_EXECUTION_TIME value '%s' is not valid", time
         )
         return None
+
+
+def wf_clickhouse_disable_query_failure_prediction() -> bool:
+    """Whether to disable ClickHouse estimated-time query failure prediction."""
+    return (
+        os.environ.get(
+            "WF_CLICKHOUSE_DISABLE_QUERY_FAILURE_PREDICTION", "false"
+        ).lower()
+        == "true"
+    )
 
 
 def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:

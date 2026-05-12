@@ -24263,6 +24263,14 @@
       "cache_read_input": 0.0,
       "cache_creation_input": 0.0,
       "created_at": "2026-04-01 13:02:37"
+    },
+    {
+      "provider": "vertex_ai",
+      "input": 1.5e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
     }
   ],
   "gemini/gemini-embedding-2-preview": [
@@ -25239,6 +25247,436 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "anthropic.claude-mythos-preview": [
+    {
+      "provider": "bedrock",
+      "input": 0.0,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-24 08:54:20"
+    }
+  ],
+  "gpt-5.5": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-24 08:54:20"
+    }
+  ],
+  "moonshot/kimi-k2.6": [
+    {
+      "provider": "moonshot",
+      "input": 9.5e-07,
+      "output": 4e-06,
+      "cache_read_input": 1.6e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-24 08:54:20"
+    }
+  ],
+  "openrouter/anthropic/claude-opus-4.7": [
+    {
+      "provider": "openrouter",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-04-24 08:54:20"
+    }
+  ],
+  "openrouter/google/gemini-3.1-flash-lite-preview": [
+    {
+      "provider": "openrouter",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-24 08:54:20"
+    }
+  ],
+  "xai/grok-4.20-0309-reasoning": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-24 08:54:20"
+    }
+  ],
+  "azure/gpt-5.5": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "azure/gpt-5.5-2026-04-23": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "azure/gpt-5.5-pro": [
+    {
+      "provider": "azure",
+      "input": 3e-05,
+      "output": 0.00018,
+      "cache_read_input": 3e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "azure/gpt-5.5-pro-2026-04-23": [
+    {
+      "provider": "azure",
+      "input": 3e-05,
+      "output": 0.00018,
+      "cache_read_input": 3e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "azure/gpt-5.4-mini-2026-03-17": [
+    {
+      "provider": "azure",
+      "input": 7.5e-07,
+      "output": 4.5e-06,
+      "cache_read_input": 7.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "azure/gpt-5.4-nano-2026-03-17": [
+    {
+      "provider": "azure",
+      "input": 2e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 2e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "gemini-embedding-2": [
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 2e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "vertex_ai/gemini-embedding-2": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "gemini/gemini-embedding-2": [
+    {
+      "provider": "gemini",
+      "input": 2e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "gpt-5.5-2026-04-23": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "gpt-5.5-pro": [
+    {
+      "provider": "openai",
+      "input": 3e-05,
+      "output": 0.00018,
+      "cache_read_input": 3e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "gpt-5.5-pro-2026-04-23": [
+    {
+      "provider": "openai",
+      "input": 3e-05,
+      "output": 0.00018,
+      "cache_read_input": 3e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "gpt-5.4-mini-2026-03-17": [
+    {
+      "provider": "openai",
+      "input": 7.5e-07,
+      "output": 4.5e-06,
+      "cache_read_input": 7.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "gpt-5.4-nano-2026-03-17": [
+    {
+      "provider": "openai",
+      "input": 2e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 2e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "bedrock/us-east-1/zai.glm-5": [
+    {
+      "provider": "bedrock",
+      "input": 1e-06,
+      "output": 3.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "bedrock/us-west-2/zai.glm-5": [
+    {
+      "provider": "bedrock",
+      "input": 1e-06,
+      "output": 3.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "coreweave/ibm-granite/granite-4.1-8b": [
+    {
+      "provider": "coreweave",
+      "input": 5e-08,
+      "output": 1e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "coreweave/Qwen/Qwen3.5-27B": [
+    {
+      "provider": "coreweave",
+      "input": 3.9e-07,
+      "output": 3.12e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "coreweave/moonshotai/Kimi-K2.6": [
+    {
+      "provider": "coreweave",
+      "input": 9.5e-07,
+      "output": 4e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "azure/gpt-image-2": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 1e-05,
+      "cache_read_input": 1.25e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "azure/gpt-image-2-2026-04-21": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 1e-05,
+      "cache_read_input": 1.25e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "gpt-image-2": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 1e-05,
+      "cache_read_input": 1.25e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "gpt-image-2-2026-04-21": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 1e-05,
+      "cache_read_input": 1.25e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/deepseek-ai/DeepSeek-R1-0528": [
+    {
+      "provider": "crusoe",
+      "input": 3e-06,
+      "output": 7e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/deepseek-ai/DeepSeek-V3-0324": [
+    {
+      "provider": "crusoe",
+      "input": 1.5e-06,
+      "output": 1.5e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/google/gemma-3-12b-it": [
+    {
+      "provider": "crusoe",
+      "input": 1e-07,
+      "output": 1e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/meta-llama/Llama-3.3-70B-Instruct": [
+    {
+      "provider": "crusoe",
+      "input": 2e-07,
+      "output": 2e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/moonshotai/Kimi-K2-Thinking": [
+    {
+      "provider": "crusoe",
+      "input": 2.5e-06,
+      "output": 2.5e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/openai/gpt-oss-120b": [
+    {
+      "provider": "crusoe",
+      "input": 8e-07,
+      "output": 8e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "crusoe/Qwen/Qwen3-235B-A22B-Instruct-2507": [
+    {
+      "provider": "crusoe",
+      "input": 3e-06,
+      "output": 3e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "vertex_ai/xai/grok-4.1-fast-non-reasoning": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-07,
+      "output": 5e-07,
+      "cache_read_input": 5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "vertex_ai/xai/grok-4.1-fast-reasoning": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-07,
+      "output": 5e-07,
+      "cache_read_input": 5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "vertex_ai/xai/grok-4.20-non-reasoning": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "vertex_ai/xai/grok-4.20-reasoning": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-V4-Flash": [
+    {
+      "provider": "coreweave",
+      "input": 1e-08,
+      "output": 1e-08,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-06 10:05:19"
+    }
+  ],
+  "xai/grok-4.3": [
+    {
+      "provider": "xai",
+      "input": 1.25e-06,
+      "output": 2.5e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-07 10:19:33"
+    }
+  ],
+  "xai/grok-4.3-latest": [
+    {
+      "provider": "xai",
+      "input": 1.25e-06,
+      "output": 2.5e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-07 10:19:33"
     }
   ]
 }

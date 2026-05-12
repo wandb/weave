@@ -52,12 +52,22 @@ def _handle_host_wandb_setting(host: str | None) -> None:
         _set_setting("base_url", host)
 
 
+def _resolve_config_dir() -> Path:
+    """Resolve WANDB_CONFIG_DIR, falling back to ~/.config/wandb only when unset.
+
+    Avoids calling Path.home() when the env var is set, since on Windows with a
+    cleared environment Path.home() raises RuntimeError and silently breaks
+    settings I/O.
+    """
+    if config_dir := os.getenv(env.CONFIG_DIR):
+        return Path(config_dir)
+    return Path.home() / ".config" / "wandb"
+
+
 def _set_setting(key: str, value: str) -> None:
     """Set a setting in the wandb settings file."""
     try:
-        default_config_dir = Path.home() / ".config" / "wandb"
-        config_dir = os.getenv(env.CONFIG_DIR, str(default_config_dir))
-        settings_path = Path(config_dir) / "settings"
+        settings_path = _resolve_config_dir() / "settings"
 
         # Ensure directory exists
         settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -80,9 +90,7 @@ def _set_setting(key: str, value: str) -> None:
 def _clear_setting(key: str) -> None:
     """Clear a setting from the wandb settings file."""
     try:
-        default_config_dir = Path.home() / ".config" / "wandb"
-        config_dir = os.getenv(env.CONFIG_DIR, str(default_config_dir))
-        settings_path = Path(config_dir) / "settings"
+        settings_path = _resolve_config_dir() / "settings"
 
         if not settings_path.exists():
             return
@@ -430,9 +438,7 @@ def _get_host_from_settings() -> str | None:
         'custom.wandb.server'
     """
     try:
-        default_config_dir = Path.home() / ".config" / "wandb"
-        config_dir = os.getenv(env.CONFIG_DIR, str(default_config_dir))
-        settings_path = Path(config_dir) / "settings"
+        settings_path = _resolve_config_dir() / "settings"
 
         if not settings_path.exists():
             return None

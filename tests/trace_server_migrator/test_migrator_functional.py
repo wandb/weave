@@ -7,6 +7,8 @@ import os
 import time
 import uuid
 
+import pytest
+
 from weave.trace_server.clickhouse_trace_server_migrator import (
     get_clickhouse_trace_server_migrator,
 )
@@ -43,6 +45,24 @@ def _get_table_engine_full(ch_client, db_name: str, table_name: str) -> str:
     )
     assert len(result.result_rows) == 1, f"Table {db_name}.{table_name} not found"
     return result.result_rows[0][0]
+
+
+def _get_migration_version(ch_client, mgmt_db: str, target_db: str) -> int:
+    result = ch_client.query(
+        f"SELECT curr_version FROM {mgmt_db}.migrations WHERE db_name = '{target_db}'"
+    )
+    assert len(result.result_rows) == 1, f"Migration status for {target_db} not found"
+    return int(result.result_rows[0][0])
+
+
+def _get_latest_migration_version(migration_dir: str) -> int:
+    versions = [
+        int(file.split("_", 1)[0])
+        for file in os.listdir(migration_dir)
+        if file.endswith(".up.sql")
+    ]
+    assert versions, f"No up migrations found in {migration_dir}"
+    return max(versions)
 
 
 def _sync_mutations(ch_client, db_name: str, table_name: str) -> None:
@@ -269,6 +289,151 @@ def test_distributed_legacy_replicated_management_db(ch_client):
     )
     assert _get_table_engine_full(ch_client, target_db, "test_tbl").startswith(
         "Distributed"
+    )
+
+
+def test_replicated_existing_replicated_target_db_upgrade(ch_client, tmp_path):
+    """Upgrade path: existing Replicated data DBs must not receive ON CLUSTER DDL."""
+    mgmt_db = _unique_name("db_mgmt_upgrade")
+    target_db = _unique_name("test_upgrade")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    replicated_path = _REPLICATED_PATH.replace("{db}", target_db)
+    ch_client.command(
+        f"CREATE DATABASE {target_db} ON CLUSTER {_CLUSTER}"
+        f" ENGINE = Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
+    )
+
+    migration_dir = tmp_path / "migrations"
+    migration_dir.mkdir()
+    (migration_dir / "001_init.up.sql").write_text(
+        "CREATE TABLE already_applied (id String) ENGINE = MergeTree ORDER BY id;"
+    )
+    (migration_dir / "001_init.down.sql").write_text(
+        "DROP TABLE IF EXISTS already_applied;"
+    )
+    (migration_dir / "002_upgrade.up.sql").write_text(
+        """
+        -- Mirrors the 026 object_version_first_seen shape that failed for customers.
+        CREATE TABLE IF NOT EXISTS object_version_first_seen (
+            project_id String,
+            object_id String,
+            digest String,
+            first_created_at SimpleAggregateFunction(min, DateTime64(3))
+        ) ENGINE = AggregatingMergeTree()
+        ORDER BY (project_id, object_id, digest);
+        """
+    )
+    (migration_dir / "002_upgrade.down.sql").write_text(
+        "DROP TABLE IF EXISTS object_version_first_seen;"
+    )
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=True,
+        use_distributed=False,
+        replicated_cluster=_CLUSTER,
+        replicated_path=_REPLICATED_PATH,
+        management_db=mgmt_db,
+        migration_dir=str(migration_dir),
+        post_migration_hook=None,
+    )
+    ch_client.insert(
+        f"{mgmt_db}.migrations",
+        data=[[target_db, 1, None]],
+        column_names=["db_name", "curr_version", "partially_applied_version"],
+    )
+
+    migrator.apply_migrations(target_db, target_version=2)
+
+    assert _get_db_engine(ch_client, target_db) == "Replicated"
+    assert _get_table_engine_full(
+        ch_client, target_db, "object_version_first_seen"
+    ).startswith("ReplicatedAggregatingMergeTree")
+
+
+@pytest.mark.parametrize(
+    ("case_name", "use_distributed", "precreate_replicated_db", "expected_engine"),
+    [
+        pytest.param("repl_atomic", False, False, "Atomic", id="replicated-atomic-db"),
+        pytest.param(
+            "repl_replicated",
+            False,
+            True,
+            "Replicated",
+            id="replicated-legacy-replicated-db",
+        ),
+        pytest.param("dist_atomic", True, False, "Atomic", id="distributed-atomic-db"),
+        pytest.param(
+            "dist_replicated",
+            True,
+            True,
+            "Replicated",
+            id="distributed-legacy-replicated-db",
+        ),
+    ],
+)
+def test_recent_production_upgrade_path(
+    ch_client,
+    case_name: str,
+    use_distributed: bool,
+    precreate_replicated_db: bool,
+    expected_engine: str,
+):
+    """Customer-style upgrades from an existing DB run the latest migration batch."""
+    latest_version = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+    seed_version = latest_version - 5
+    assert seed_version > 0
+
+    def make_migrator(*, mgmt_db: str, use_distributed: bool):
+        return get_clickhouse_trace_server_migrator(
+            ch_client,
+            replicated=True,
+            use_distributed=use_distributed,
+            replicated_cluster=_CLUSTER,
+            replicated_path=_REPLICATED_PATH,
+            management_db=mgmt_db,
+            migration_dir=_PROD_MIGRATION_DIR,
+            post_migration_hook=None,
+        )
+
+    mgmt_db = _unique_name(f"db_mgmt_recent_{case_name}")
+    target_db = _unique_name(f"prod_recent_{case_name}")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    if precreate_replicated_db:
+        replicated_path = _REPLICATED_PATH.replace("{db}", target_db)
+        ch_client.command(
+            f"CREATE DATABASE {target_db} ON CLUSTER {_CLUSTER}"
+            f" ENGINE = Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
+        )
+
+    # Seed a real old schema using production migrations, not hand-written DDL.
+    seed_migrator = make_migrator(mgmt_db=mgmt_db, use_distributed=use_distributed)
+    seed_migrator.apply_migrations(target_db, target_version=seed_version)
+    _sync_mutations(ch_client, mgmt_db, "migrations")
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == seed_version
+    assert _get_db_engine(ch_client, target_db) == expected_engine
+
+    # A new init container starts with an empty engine cache, then upgrades.
+    upgrade_migrator = make_migrator(mgmt_db=mgmt_db, use_distributed=use_distributed)
+    upgrade_migrator.apply_migrations(target_db)
+    _sync_mutations(ch_client, mgmt_db, "migrations")
+
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest_version
+    assert _get_db_engine(ch_client, target_db) == expected_engine
+    assert _table_exists(ch_client, target_db, "object_version_first_seen")
+
+    if use_distributed:
+        assert _table_exists(ch_client, target_db, "object_version_first_seen_local")
+        engine_table = "object_version_first_seen_local"
+    else:
+        engine_table = "object_version_first_seen"
+
+    assert _get_table_engine_full(ch_client, target_db, engine_table).startswith(
+        "ReplicatedAggregatingMergeTree"
     )
 
 

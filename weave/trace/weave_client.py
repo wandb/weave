@@ -55,6 +55,8 @@ from weave.trace.object_record import (
 )
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import (
+    PostprocessInputsFunc,
+    PostprocessOutputFunc,
     as_op,
     is_op,
     is_placeholder_call,
@@ -73,6 +75,11 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
+)
+from weave.trace.registry_links import (
+    LinkablePrompt,
+    parse_registry_target_path,
+    resolve_prompt_ref,
 )
 from weave.trace.serialization.serialize import (
     from_json,
@@ -159,6 +166,12 @@ from weave.trace_server_bindings.http_utils import (
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
     retry_on_not_found,
+)
+from weave.trace_server_bindings.link_asset_to_registry import (
+    LinkAssetToRegistryReq,
+    LinkAssetToRegistryRes,
+    LinkAssetToRegistryTarget,
+    link_asset_to_registry,
 )
 from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
@@ -275,8 +288,6 @@ def map_to_refs(obj: Any) -> Any:
         return _remove_empty_ref(obj.map_values(map_to_refs))
     elif isinstance(obj, pydantic.BaseModel):
         # Check if this object has a custom serializer registered
-        from weave.trace.serialization.serializer import get_serializer_for_obj
-
         if get_serializer_for_obj(obj) is not None:
             # If it has a custom serializer, don't convert to ObjectRecord
             # Let the serialization layer handle it
@@ -356,10 +367,18 @@ class WeaveClient:
         project: str,
         server: TraceServerClientInterface,
         ensure_project_exists: bool = True,
+        *,
+        postprocess_inputs: PostprocessInputsFunc | None = None,
+        postprocess_output: PostprocessOutputFunc | None = None,
+        attributes: dict[str, Any] | None = None,
+        api_key: str | None = None,
     ):
         self.entity = entity
         self.project = project
         self.server = server
+        self.postprocess_inputs = postprocess_inputs
+        self.postprocess_output = postprocess_output
+        self.attributes: dict[str, Any] = attributes or {}
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
         self.project_id_resolver = ProjectIdResolver(server)
@@ -394,7 +413,7 @@ class WeaveClient:
         self._wal_pending_call_ids: set[str] = set()
         if settings.should_enable_wal():
             if settings.should_disable_wal_sender():
-                self._wal = WALManager(self.entity, self.project)
+                self._wal = WALManager(self.entity, self.project, api_key=api_key)
                 logger.debug("WAL enabled (sender disabled): %s", self._wal.wal_dir)
             else:
                 self._wal = WALManager.with_sender(
@@ -402,6 +421,7 @@ class WeaveClient:
                     self.project,
                     self.server,
                     on_send=self._on_wal_send,
+                    api_key=api_key,
                 )
                 logger.debug("WAL enabled: %s", self._wal.wal_dir)
 
@@ -747,8 +767,6 @@ class WeaveClient:
         ):
             return placeholder_call()
 
-        from weave.trace.api import _global_attributes, _global_postprocess_inputs
-
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -764,8 +782,8 @@ class WeaveClient:
         else:
             inputs_postprocessed = inputs_sensitive_keys_redacted
 
-        if _global_postprocess_inputs:
-            inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
+        if self.postprocess_inputs:
+            inputs_postprocessed = self.postprocess_inputs(inputs_postprocessed)
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -783,9 +801,9 @@ class WeaveClient:
         if not attributes:
             attributes = {}
 
-        # First create an AttributesDict with global attributes, then update with local attributes
-        # Local attributes take precedence over global ones
-        attributes_dict = AttributesDict(**zip_dicts(_global_attributes, attributes))
+        # First create an AttributesDict with the client's default attributes, then update with
+        # per-call attributes. Per-call attributes take precedence over the client defaults.
+        attributes_dict = AttributesDict(**zip_dicts(self.attributes, attributes))
 
         if should_capture_client_info():
             attributes_dict._set_weave_item("client_version", version.VERSION)
@@ -966,8 +984,6 @@ class WeaveClient:
         ):
             return None
 
-        from weave.trace.api import _global_postprocess_output
-
         if ended_at is None:
             ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
@@ -978,8 +994,8 @@ class WeaveClient:
         else:
             postprocessed_output = original_output
 
-        if _global_postprocess_output:
-            postprocessed_output = _global_postprocess_output(postprocessed_output)
+        if self.postprocess_output:
+            postprocessed_output = self.postprocess_output(postprocessed_output)
 
         self._save_nested_objects(postprocessed_output)
         output_as_refs = map_to_refs(postprocessed_output)
@@ -1274,6 +1290,42 @@ class WeaveClient:
         if isinstance(obj_ref, str):
             return ObjectRef.parse_uri(obj_ref)
         return obj_ref
+
+    @trace_sentry.global_trace_sentry.watch()
+    def link_prompt_to_registry(
+        self,
+        prompt: LinkablePrompt,
+        *,
+        target_path: str,
+        aliases: Sequence[str] | None = None,
+    ) -> LinkAssetToRegistryRes:
+        """Link a published prompt version into the registry.
+
+        Args:
+            prompt: A published prompt, an `ObjectRef`, or a fully qualified
+                `weave:///...` URI string.
+            target_path: Registry destination path in the format
+                `<registry_project>/<portfolio_name>`, for example
+                `wandb-registry-prompts/my-prompt-collection`.
+            aliases: Optional aliases to attach to the created registry version.
+
+        Returns:
+            LinkAssetToRegistryRes: Parsed response from the registry-link endpoint.
+        """
+        prompt_ref = resolve_prompt_ref(prompt)
+        target = parse_registry_target_path(target_path)
+
+        return link_asset_to_registry(
+            LinkAssetToRegistryReq(
+                ref=prompt_ref.uri,
+                target=LinkAssetToRegistryTarget(
+                    portfolio_name=target.portfolio_name,
+                    entity_name=self.entity,
+                    project_name=target.registry_project,
+                ),
+                aliases=list(aliases or []),
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def add_tags(self, obj_ref: ObjectRef | str, tags: list[str]) -> None:

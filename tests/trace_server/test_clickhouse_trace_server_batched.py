@@ -13,6 +13,13 @@ from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
+from weave.trace_server.clickhouse.schema_converters import ch_call_to_row
+from weave.trace_server.clickhouse_schema import (
+    ALL_CALL_INSERT_COLUMNS,
+    CallCompleteCHInsertable,
+    CallStartCHInsertable,
+)
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
@@ -156,6 +163,83 @@ def test_clickhouse_storage_size_null_handling():
     ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] is None
     assert ch_schema["total_storage_size_bytes"] is None
+
+
+def test_clickhouse_expire_at_sentinel_converts_to_none():
+    """The DB far-future expire_at sentinel is hidden at the API boundary."""
+    started_at = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    test_data = {
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
+        "id": "test_id",
+        "project_id": "test_project",
+        "trace_id": "test_trace",
+        "parent_id": None,
+        "started_at": started_at,
+        "ended_at": None,
+        "summary_dump": None,
+        "wb_run_id": None,
+        "wb_run_step": None,
+        "wb_user_id": None,
+        "expire_at": EXPIRE_AT_NEVER,
+    }
+
+    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
+
+    assert ch_schema["expire_at"] is None
+
+
+def test_ch_call_to_row_sentinelizes_expire_at_for_v1_insert_paths():
+    """expire_at=None on an insertable lands as EXPIRE_AT_NEVER in the call_parts row.
+
+    Regression guard for the refactor that moved expire_at from a per-subclass
+    `default=EXPIRE_AT_NEVER` to a base-class `default=None`. The non-null call_parts
+    column now relies on `ch_call_to_row` -> `to_ch_value('expire_at', None)` to
+    sentinelize at write time.
+
+    Covers both v1 insert paths through `ch_call_to_row`:
+      - `_insert_call(CallStartCHInsertable)` (and CallEnd/Update/Delete via the union)
+      - `_insert_call_to_v1(CallCompleteCHInsertable)` (v1 fallback when a project
+        has not yet migrated to calls_complete)
+    """
+    expire_at_idx = ALL_CALL_INSERT_COLUMNS.index("expire_at")
+    started_at = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    # validation requires a base64-encoded project_id
+    project_id = base64.b64encode(b"test_project").decode("ascii")
+
+    # CallStartCHInsertable: expire_at default is None -> sentinelized at row time.
+    start = CallStartCHInsertable(
+        project_id=project_id,
+        id="0193f7a5-1234-7000-8000-000000000000",
+        trace_id="0193f7a5-1234-7000-8000-000000000001",
+        op_name="test_op",
+        started_at=started_at,
+        attributes_dump="{}",
+        inputs_dump="{}",
+    )
+    assert start.expire_at is None
+    assert ch_call_to_row(start)[expire_at_idx] == EXPIRE_AT_NEVER
+
+    # CallCompleteCHInsertable: same default, exercised via _insert_call_to_v1.
+    complete = CallCompleteCHInsertable(
+        project_id=project_id,
+        id="0193f7a5-1234-7000-8000-000000000002",
+        trace_id="0193f7a5-1234-7000-8000-000000000003",
+        op_name="test_op",
+        started_at=started_at,
+        ended_at=started_at,
+        attributes_dump="{}",
+        inputs_dump="{}",
+        output_dump="null",
+        summary_dump="{}",
+    )
+    assert complete.expire_at is None
+    assert ch_call_to_row(complete)[expire_at_idx] == EXPIRE_AT_NEVER
+
+    # Explicitly-set expire_at must pass through unchanged (not re-sentinelized).
+    explicit_expire = datetime(2025, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+    start_with_ttl = start.model_copy(update={"expire_at": explicit_expire})
+    assert ch_call_to_row(start_with_ttl)[expire_at_idx] == explicit_expire
 
 
 def test_clickhouse_distributed_mode_properties():
@@ -968,6 +1052,90 @@ def test_ensure_obj_version_exists_retries_eventual_consistency():
         assert mock_query.call_count == chts.OBJ_READ_RETRY_ATTEMPTS
 
 
+def test_select_objs_query_partial_value_miss_returns_empty():
+    """If metadata rows exist but their value rows haven't replicated yet,
+    return empty so obj_read raises NotFoundError and the retry wrapper kicks
+    in. Without this, the missing val_dump would silently default to "{}" and
+    the caller would decode a corrupted empty object.
+    """
+    server = chts.ClickHouseTraceServer(host="test_host")
+
+    metadata_row = (
+        "test_project",  # project_id
+        "obj-id-1",  # object_id
+        datetime(2024, 1, 1, tzinfo=timezone.utc),  # created_at
+        [],  # refs
+        "object",  # kind
+        None,  # base_object_class
+        None,  # leaf_object_class
+        "digest-abc",  # digest
+        0,  # version_index
+        1,  # is_latest
+        None,  # deleted_at
+        None,  # wb_user_id
+        1,  # version_count
+        0,  # is_op
+    )
+
+    builder = chts.ObjectMetadataQueryBuilder("test_project")
+    builder.add_digests_conditions("digest-abc")
+    builder.add_object_ids_condition(["obj-id-1"])
+
+    # Metadata SELECT finds the row; value SELECT returns nothing.
+    with patch.object(
+        chts.ClickHouseTraceServer,
+        "_query_stream",
+        side_effect=[iter([metadata_row]), iter([])],
+    ):
+        result = server._select_objs_query(builder, metadata_only=False)
+
+    assert result == []
+
+    # Sanity: when the value row is present, we get a populated result.
+    with patch.object(
+        chts.ClickHouseTraceServer,
+        "_query_stream",
+        side_effect=[
+            iter([metadata_row]),
+            iter([("obj-id-1", "digest-abc", '{"x": 1}')]),
+        ],
+    ):
+        result = server._select_objs_query(builder, metadata_only=False)
+
+    assert len(result) == 1
+    assert result[0].val_dump == '{"x": 1}'
+
+
+def test_file_content_read_retries_eventual_consistency():
+    """File reads should tolerate transient read-after-write misses."""
+    server = chts.ClickHouseTraceServer(host="test_host")
+    req = tsi.FileContentReadReq(project_id="test_project", digest="digest-1")
+
+    # Transient miss: the first lookup doesn't see the chunks yet, but the retry does.
+    with patch.object(server, "_file_content_read_once") as mock_read_once:
+        mock_read_once.side_effect = [
+            NotFoundError("File with digest digest-1 not found"),
+            tsi.FileContentReadRes(content=b"saved code"),
+        ]
+
+        assert server.file_content_read(req).content == b"saved code"
+        assert mock_read_once.call_count == 2
+
+    # Real miss: after exhausting retries, the original NotFoundError still surfaces.
+    with patch.object(
+        server,
+        "_file_content_read_once",
+        side_effect=NotFoundError("File with digest digest-1 not found"),
+    ) as mock_read_once:
+        with pytest.raises(
+            NotFoundError,
+            match="File with digest digest-1 not found",
+        ):
+            server.file_content_read(req)
+
+        assert mock_read_once.call_count == 2
+
+
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
     ("error", "expected_calls"),
@@ -1112,6 +1280,30 @@ def test_call_end_v2_flushes_kafka_immediately(server_with_mock_kafka):
 
     mock_producer.produce_call_end.assert_called_once()
     assert mock_producer.produce_call_end.call_args[0][1] is True
+
+
+def test_call_end_adds_expire_at_from_ended_at(server_with_mock_kafka):
+    """call_end adds expire_at = ended_at + retention_days on the end row."""
+    server, _ = server_with_mock_kafka
+    ended_at = dt.datetime(2026, 3, 1, tzinfo=dt.timezone.utc)
+    req = tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+            id=str(uuid.uuid4()),
+            ended_at=ended_at,
+            output={},
+            summary={},
+            exception=None,
+        )
+    )
+
+    expire_index = ALL_CALL_INSERT_COLUMNS.index("expire_at")
+    with (
+        patch.object(chts, "get_project_retention_days", return_value=30),
+        server.call_batch(),
+    ):
+        server.call_end(req)
+        assert server._call_batch[-1][expire_index] == ended_at + dt.timedelta(days=30)
 
 
 def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):
