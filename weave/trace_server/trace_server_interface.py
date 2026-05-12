@@ -2529,6 +2529,11 @@ class EvaluationRunFinishRes(BaseModel):
     )
 
 
+class GenAISpanRef(BaseModel):
+    trace_id: str
+    span_id: str
+
+
 class PredictionCreateBody(BaseModel):
     """Request body for creating a Prediction via REST API.
 
@@ -2541,6 +2546,10 @@ class PredictionCreateBody(BaseModel):
     evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to link this prediction as a child call",
+    )
+    genai_span_ref: GenAISpanRef | None = Field(
+        default=None,
+        description="Optional GenAI span reference produced by this prediction.",
     )
 
 
@@ -2836,6 +2845,7 @@ class EvalResultsTrial(BaseModel):
     model_latency_seconds: float | None = None
     total_tokens: int | None = None
     scorer_call_ids: dict[str, str] = Field(default_factory=dict)
+    genai_span_ref: GenAISpanRef | None = None
 
 
 class EvalResultsRowEvaluation(BaseModel):
