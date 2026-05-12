@@ -1,8 +1,10 @@
 """Tests for base64 content conversion functionality (updated for new API)."""
 
 import base64
+import hashlib
 import json
-from unittest.mock import MagicMock
+import logging
+from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -12,12 +14,16 @@ from weave.trace_server.base64_content_conversion import (
     is_data_uri,
     process_call_req_to_content,
     replace_base64_with_content_objects,
+    restore_content_objects_to_base64,
     store_content_object,
 )
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallStartReq,
     EndedCallSchemaForInsert,
+    FileContentReadReq,
+    FileContentReadRes,
+    FileCreateReq,
     FileCreateRes,
     StartedCallSchemaForInsert,
 )
@@ -351,6 +357,215 @@ class TestStandaloneBase64Detection:
         metadata_call = trace_server.file_create.call_args_list[1][0][0]
         metadata = json.loads(metadata_call.content)
         assert metadata["mimetype"] in {"audio/wav", "audio/x-wav", "audio/wave"}
+
+
+def _make_content_object(
+    content_digest: str = "content_digest",
+    metadata_digest: str = "metadata_digest",
+) -> dict:
+    """Build a minimal CustomWeaveType Content object dict."""
+    return {
+        "_type": "CustomWeaveType",
+        "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
+        "files": {"content": content_digest, "metadata.json": metadata_digest},
+    }
+
+
+def _make_trace_server(raw_bytes: bytes, mimetype: str = "image/png") -> MagicMock:
+    """Build a mock trace server whose file_content_read returns metadata then content."""
+    metadata = json.dumps({"mimetype": mimetype, "size": len(raw_bytes)}).encode()
+    trace_server = MagicMock()
+    trace_server.file_content_read = MagicMock(
+        side_effect=[
+            FileContentReadRes(content=metadata),
+            FileContentReadRes(content=raw_bytes),
+        ]
+    )
+    return trace_server
+
+
+class TestRestoreContentObjectsToBase64:
+    """Tests for restore_content_objects_to_base64."""
+
+    def test_restores_single_content_object_to_data_url(self):
+        """A Content object at the top level is converted back to a data URL."""
+        raw = b"fake-image-bytes"
+        mimetype = "image/png"
+        trace_server = _make_trace_server(raw, mimetype)
+
+        content_obj = _make_content_object(
+            content_digest="content_digest", metadata_digest="metadata_digest"
+        )
+        result = restore_content_objects_to_base64(content_obj, "proj", trace_server)
+
+        expected_b64 = base64.b64encode(raw).decode("ascii")
+        assert result == f"data:{mimetype};base64,{expected_b64}"
+
+        # Verify the correct digests were requested from storage in the right order:
+        # metadata first (to get the mimetype), then the actual content bytes.
+        calls = trace_server.file_content_read.call_args_list
+        assert len(calls) == 2
+        assert calls[0] == call(
+            FileContentReadReq(project_id="proj", digest="metadata_digest")
+        )
+        assert calls[1] == call(
+            FileContentReadReq(project_id="proj", digest="content_digest")
+        )
+
+    def test_restores_content_object_nested_in_dict(self):
+        """Content objects nested inside a dict are restored; other values are unchanged."""
+        raw = b"nested-content"
+        trace_server = _make_trace_server(raw, "image/jpeg")
+
+        data = {
+            "normal": "hello",
+            "image": _make_content_object(),
+        }
+        result = restore_content_objects_to_base64(data, "proj", trace_server)
+
+        assert result["normal"] == "hello"
+        expected_b64 = base64.b64encode(raw).decode("ascii")
+        assert result["image"] == f"data:image/jpeg;base64,{expected_b64}"
+
+    def test_restores_content_objects_in_list(self):
+        """Content objects inside a list are individually restored."""
+        raw1, raw2 = b"bytes-one", b"bytes-two"
+        trace_server = MagicMock()
+        trace_server.file_content_read = MagicMock(
+            side_effect=[
+                FileContentReadRes(
+                    content=json.dumps(
+                        {"mimetype": "image/png", "size": len(raw1)}
+                    ).encode()
+                ),
+                FileContentReadRes(content=raw1),
+                FileContentReadRes(
+                    content=json.dumps(
+                        {"mimetype": "image/gif", "size": len(raw2)}
+                    ).encode()
+                ),
+                FileContentReadRes(content=raw2),
+            ]
+        )
+
+        data = [
+            _make_content_object("digest_a", "meta_a"),
+            _make_content_object("digest_b", "meta_b"),
+            "plain string",
+        ]
+        result = restore_content_objects_to_base64(data, "proj", trace_server)
+
+        assert result[2] == "plain string"
+        assert result[0].startswith("data:image/png;base64,")
+        assert result[1].startswith("data:image/gif;base64,")
+        assert trace_server.file_content_read.call_count == 4
+
+    def test_converts_image_message_format_to_openai_image_url(self):
+        """A {type:'image', image:<content_obj>} message part is converted to image_url format."""
+        raw = b"image-data"
+        trace_server = _make_trace_server(raw, "image/webp")
+
+        message_part = {
+            "type": "image",
+            "image": _make_content_object(),
+        }
+        result = restore_content_objects_to_base64(message_part, "proj", trace_server)
+
+        expected_b64 = base64.b64encode(raw).decode("ascii")
+        assert result == {
+            "type": "image_url",
+            "image_url": {"url": f"data:image/webp;base64,{expected_b64}"},
+        }
+
+    def test_image_message_format_nested_in_messages_list(self):
+        """Image message parts inside a messages list are fully converted."""
+        raw = b"img"
+        trace_server = _make_trace_server(raw, "image/png")
+
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "image", "image": _make_content_object()}],
+            },
+        ]
+        result = restore_content_objects_to_base64(messages, "proj", trace_server)
+
+        expected_b64 = base64.b64encode(raw).decode("ascii")
+        part = result[0]["content"][0]
+        assert part["type"] == "image_url"
+        assert part["image_url"]["url"] == f"data:image/png;base64,{expected_b64}"
+
+    def test_missing_files_returns_original_object(self):
+        """A Content object missing required file digests is returned unchanged."""
+        trace_server = MagicMock()
+        incomplete = {
+            "_type": "CustomWeaveType",
+            "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
+            "files": {},  # no content or metadata.json
+        }
+        result = restore_content_objects_to_base64(incomplete, "proj", trace_server)
+
+        assert result is incomplete
+        trace_server.file_content_read.assert_not_called()
+
+    def test_read_failure_returns_original_object(
+        self, caplog: pytest.LogCaptureFixture
+    ):
+        """When file_content_read raises, the original Content object is returned and a warning is logged."""
+        trace_server = MagicMock()
+        trace_server.file_content_read.side_effect = RuntimeError("storage unavailable")
+
+        content_obj = _make_content_object()
+        with caplog.at_level(logging.WARNING):
+            result = restore_content_objects_to_base64(
+                content_obj, "proj", trace_server
+            )
+
+        assert result == content_obj
+        assert "Failed to restore Content object to data URL" in caplog.text
+
+    def test_non_content_primitives_pass_through(self):
+        """Non-Content primitive values are returned unchanged."""
+        trace_server = MagicMock()
+        for val in (42, 3.14, True, None, "plain string"):
+            assert restore_content_objects_to_base64(val, "proj", trace_server) == val
+        trace_server.file_content_read.assert_not_called()
+
+    def test_roundtrip_data_url_replace_then_restore(self):
+        """replace_base64_with_content_objects followed by restore gives back the original data URL.
+
+        Uses a shared in-memory store so the restore server only has access to
+        what replace actually wrote — verifying the two functions are genuine inverses.
+        """
+        raw = b"A" * LARGE_TEST_DATA_SIZE
+        mimetype = "image/png"
+        b64 = base64.b64encode(raw).decode("ascii")
+        data_url = f"data:{mimetype};base64,{b64}"
+
+        # Shared in-memory blob store keyed by content-addressed digest
+        storage: dict[str, bytes] = {}
+
+        def _file_create(req: FileCreateReq) -> FileCreateRes:
+            digest = hashlib.sha256(req.content).hexdigest()
+            storage[digest] = req.content
+            return FileCreateRes(digest=digest)
+
+        def _file_content_read(req: FileContentReadReq) -> FileContentReadRes:
+            return FileContentReadRes(content=storage[req.digest])
+
+        server = MagicMock()
+        server.file_create.side_effect = _file_create
+        server.file_content_read.side_effect = _file_content_read
+
+        replaced = replace_base64_with_content_objects(
+            {"url": data_url}, "proj", server
+        )
+        assert isinstance(replaced["url"], dict), "Data URL should have been replaced"
+
+        # Restore reads from the same storage that replace wrote to
+        restored = restore_content_objects_to_base64(replaced, "proj", server)
+
+        assert restored["url"] == data_url
 
 
 if __name__ == "__main__":

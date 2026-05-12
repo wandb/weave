@@ -80,6 +80,8 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
+    replace_base64_with_content_objects,
+    restore_content_objects_to_base64,
 )
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
@@ -6184,6 +6186,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         model_name = completion_model_info.model_name
 
+        # Restore any CustomWeaveType Content objects in messages back to data URLs
+        # so the LLM receives raw base64 it can understand.
+        req.inputs.messages = restore_content_objects_to_base64(
+            req.inputs.messages, req.project_id, self
+        )
+
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
 
@@ -6209,7 +6217,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
+        # Use initial_messages for storage (preserves existing Content objects and
+        # converts any new raw base64 to Content objects rather than re-storing data).
         req.inputs.messages = initial_messages
+        stored_inputs = {
+            **req.inputs.model_dump(exclude_none=True, exclude={"vertex_credentials"})
+        }
+        stored_inputs = replace_base64_with_content_objects(
+            stored_inputs, req.project_id, self
+        )
+        stored_output = replace_base64_with_content_objects(
+            res.response, req.project_id, self
+        )
+
         call_id = generate_id()
         trace_id = req.trace_id or generate_id()
         parent_id = req.parent_id
@@ -6233,12 +6253,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 started_at=start_time,
                 ended_at=end_time,
                 attributes={},
-                inputs={
-                    **req.inputs.model_dump(
-                        exclude_none=True, exclude={"vertex_credentials"}
-                    )
-                },
-                output=res.response,
+                inputs=stored_inputs,
+                output=stored_output,
                 summary=summary,
                 exception=exception,
                 wb_user_id=req.wb_user_id,
@@ -6255,11 +6271,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=start_time,
-                inputs={
-                    **req.inputs.model_dump(
-                        exclude_none=True, exclude={"vertex_credentials"}
-                    )
-                },
+                inputs=stored_inputs,
                 attributes={},
             )
             start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
@@ -6267,7 +6279,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 id=start_call.id,
                 ended_at=end_time,
-                output=res.response,
+                output=stored_output,
                 summary=summary,
             )
             if exception:
@@ -6359,7 +6371,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 exclude_none=True, exclude={"vertex_credentials"}
             )
             tracked_inputs["model"] = model_name
-            tracked_inputs["messages"] = initial_messages
+            # Use initial_messages for storage: preserves existing Content objects
+            # and converts any new raw base64 to Content objects.
+            tracked_inputs["messages"] = replace_base64_with_content_objects(
+                initial_messages, req.project_id, self
+            )
             if prompt:
                 tracked_inputs["prompt"] = prompt
             if template_vars:
@@ -6383,8 +6399,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             else:
                 self._insert_call(start_call)
 
-        # Set the combined messages (with template vars replaced) for LiteLLM
-        req.inputs.messages = combined_messages
+        # Set the combined messages (with template vars replaced) for LiteLLM,
+        # restoring any CustomWeaveType Content objects back to data URLs first.
+        req.inputs.messages = restore_content_objects_to_base64(
+            combined_messages, req.project_id, self
+        )
 
         # Make a copy for the API call without prompt and template_vars
         api_inputs = req.inputs.model_copy()
