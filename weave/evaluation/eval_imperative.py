@@ -370,9 +370,9 @@ class ScoreLogger:
         self._call_stack_context: (
             contextlib.AbstractContextManager[list[Call]] | None
         ) = None
-        self._eval_prediction_context: contextlib.AbstractContextManager[None] | None = (
-            None
-        )
+        self._eval_prediction_context: (
+            contextlib.AbstractContextManager[None] | None
+        ) = None
 
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
