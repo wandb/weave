@@ -792,7 +792,14 @@ class WeaveClient:
             trace_id = parent.trace_id
             parent_id = parent.id
         else:
-            trace_id = generate_id()
+            # Trace-root invariant: when a caller pre-allocates the call id
+            # via ``_call_id_override``, ``trace_id`` must match. The
+            # frontend's "show me everything in this trace" queries land on
+            # ``trace_id``, so trace roots with ``trace_id != id`` would
+            # leave the trace tree partially / wrongly populated. Without
+            # this, callers needing the invariant have to bypass
+            # ``create_call`` and emit ``call_start`` directly.
+            trace_id = _call_id_override or generate_id()
             parent_id = None
 
         if not attributes:
