@@ -196,6 +196,19 @@ class _StatsQuerySQLParts:
     outer_metric_sql: str
 
 
+@dataclass(frozen=True, slots=True)
+class _SpanSourceFilterSQL:
+    """PREWHERE/WHERE filters for direct reads from the spans table."""
+
+    prewhere: str
+    where: str
+
+    @property
+    def clause(self) -> str:
+        where_sql = f"\n        WHERE {self.where}" if self.where else ""
+        return f"PREWHERE {self.prewhere}{where_sql}"
+
+
 def build_agent_span_stats_query(
     req: AgentSpanStatsReq,
     pb: ParamBuilder,
@@ -204,7 +217,7 @@ def build_agent_span_stats_query(
     start, end = _resolve_time_bounds(req)
     tz = req.timezone or "UTC"
 
-    where = _spans_where(pb, req, start, end)
+    source_filter = _spans_source_filter_sql(pb, req, start, end)
     group_refs = req.group_by or []
     resolved_groups = resolve_group_by(pb, group_refs) if group_refs else []
 
@@ -246,7 +259,7 @@ def build_agent_span_stats_query(
 
     if numeric_bucket is not None:
         raw_sql = _build_numeric_bucket_stats_query(
-            where=where,
+            source_filter=source_filter,
             bucket=numeric_bucket,
             metric_exprs=metric_exprs,
             agg_selects=agg_selects,
@@ -278,7 +291,7 @@ def build_agent_span_stats_query(
         group_limit_slot = pb.add(group_limit, param_type="UInt64")
 
     raw_sql = _build_stats_query(
-        where=where,
+        source_filter=source_filter,
         resolved_groups=resolved_groups,
         metric_exprs=metric_exprs,
         agg_selects=agg_selects,
@@ -356,23 +369,27 @@ def _estimated_bucket_count(
     return max(1, math.ceil(range_seconds / granularity_seconds) + 1)
 
 
-def _spans_where(
+def _spans_source_filter_sql(
     pb: ParamBuilder,
     req: AgentSpanStatsReq,
     start: datetime.datetime,
     end: datetime.datetime,
-) -> str:
+) -> _SpanSourceFilterSQL:
     pid_slot = pb.add(req.project_id, param_type="String")
-    conditions = [f"{_span_col(_COL_PROJECT_ID)} = {pid_slot}"]
+    prewhere_conditions = [f"{_span_col(_COL_PROJECT_ID)} = {pid_slot}"]
     add_time_filters(
-        conditions,
+        prewhere_conditions,
         pb,
         started_after=start,
         started_before=end,
     )
+    where_conditions: list[str] = []
     if req.query is not None:
-        conditions.append(compile_agent_query(req.query, pb))
-    return " AND ".join(conditions)
+        where_conditions.append(compile_agent_query(req.query, pb))
+    return _SpanSourceFilterSQL(
+        prewhere=" AND ".join(prewhere_conditions),
+        where=" AND ".join(where_conditions),
+    )
 
 
 def _response_columns(
@@ -636,7 +653,7 @@ def _group_value_type(group_ref: AgentGroupByRef) -> AgentSpanStatsColumnValueTy
 
 def _build_stats_query(
     *,
-    where: str,
+    source_filter: _SpanSourceFilterSQL,
     resolved_groups: list[tuple[str, str]],
     metric_exprs: list[str],
     agg_selects: list[str],
@@ -664,7 +681,7 @@ def _build_stats_query(
 
     if not resolved_groups:
         return _build_ungrouped_stats_query(
-            where=where,
+            source_filter=source_filter,
             parts=parts,
             group_filters=group_filters,
             pb=pb,
@@ -672,7 +689,7 @@ def _build_stats_query(
 
     assert group_limit_slot is not None
     return _build_grouped_stats_query(
-        where=where,
+        source_filter=source_filter,
         resolved_groups=resolved_groups,
         group_limit_slot=group_limit_slot,
         parts=parts,
@@ -681,7 +698,7 @@ def _build_stats_query(
 
 def _build_numeric_bucket_stats_query(
     *,
-    where: str,
+    source_filter: _SpanSourceFilterSQL,
     bucket: AgentSpanStatsNumericBucketSpec,
     metric_exprs: list[str],
     agg_selects: list[str],
@@ -770,7 +787,7 @@ def _build_numeric_bucket_stats_query(
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
         FROM {_SPANS_TABLE} {_SPAN_ALIAS}
-        WHERE {where}
+        {source_filter.clause}
       ),
       {_CTE_VALUE_ROWS} AS (
         {value_rows_sql}
@@ -849,7 +866,7 @@ def _stats_query_sql_parts(
 
 def _build_ungrouped_stats_query(
     *,
-    where: str,
+    source_filter: _SpanSourceFilterSQL,
     parts: _StatsQuerySQLParts,
     group_filters: list[AgentSpanGroupFilter],
     pb: ParamBuilder,
@@ -864,7 +881,7 @@ def _build_ungrouped_stats_query(
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
         FROM {_SPANS_TABLE} {_SPAN_ALIAS}
-        WHERE {where}
+        {source_filter.clause}
       ){group_filter_ctes},
       {_CTE_AGGREGATED_DATA} AS (
         SELECT
@@ -937,7 +954,7 @@ def _group_filter_ctes(
 
 def _build_grouped_stats_query(
     *,
-    where: str,
+    source_filter: _SpanSourceFilterSQL,
     resolved_groups: list[tuple[str, str]],
     group_limit_slot: str,
     parts: _StatsQuerySQLParts,
@@ -967,7 +984,7 @@ def _build_grouped_stats_query(
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
         FROM {_SPANS_TABLE} {_SPAN_ALIAS}
-        WHERE {where}
+        {source_filter.clause}
       ),
       {_CTE_TOP_GROUPS} AS (
         SELECT {select_group_cols}

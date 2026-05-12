@@ -225,6 +225,12 @@ class SpanMeasureSQL:
     value_type: AgentSpanStatsColumnValueType
 
 
+@dataclass(frozen=True, slots=True)
+class _FilterSQL:
+    prewhere: str
+    where: str
+
+
 # ---------------------------------------------------------------------------
 # Column projections
 # ---------------------------------------------------------------------------
@@ -681,37 +687,38 @@ def _group_filter_bound_slot(
 # ---------------------------------------------------------------------------
 
 
-def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
+def _optional_where_clause(where: str, *, prefix: str = " ") -> str:
+    return f"{prefix}WHERE {where}" if where else ""
+
+
+def _spans_filter_sql(pb: ParamBuilder, req: AgentSpansQueryReq) -> _FilterSQL:
     pid_slot = pb.add(req.project_id, param_type="String")
-    conditions = [f"s.project_id = {pid_slot}"]
+    prewhere_conditions = [f"s.project_id = {pid_slot}"]
     add_time_filters(
-        conditions,
+        prewhere_conditions,
         pb,
         started_after=req.started_after,
         started_before=req.started_before,
     )
+    where_conditions: list[str] = []
     if req.query is not None:
         # Imported lazily to avoid a circular import between this module
         # (used by agent_query_compiler) and the compiler itself.
         from weave.trace_server.query_builder import agent_query_compiler
 
-        conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
-    return " AND ".join(conditions)
+        where_conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
+    return _FilterSQL(
+        prewhere=" AND ".join(prewhere_conditions),
+        where=" AND ".join(where_conditions),
+    )
 
 
 def _agents_where(pb: ParamBuilder, req: AgentsQueryReq) -> str:
-    pid_slot = pb.add(req.project_id, param_type="String")
-    conditions = [f"project_id = {pid_slot}"]
+    conditions: list[str] = []
     if req.filters and req.filters.agent_name:
         aname_slot = pb.add(req.filters.agent_name, param_type="String")
         conditions.append(f"agent_name = {aname_slot}")
     return " AND ".join(conditions)
-
-
-def _agent_versions_where(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
-    pid = pb.add(req.project_id, param_type="String")
-    aname = pb.add(req.agent_name, param_type="String")
-    return f"project_id = {pid} AND agent_name = {aname}"
 
 
 def _normalize_search_roles(roles: Sequence[str]) -> list[str]:
@@ -729,12 +736,14 @@ def _escape_like_pattern(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
-    """Build the WHERE clause for a search against the messages table."""
+def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
+    """Build PREWHERE/WHERE filters for a search against the messages table."""
     pid_slot = pb.add(req.project_id, param_type="String")
     content_slot = pb.add(f"%{_escape_like_pattern(req.query)}%", param_type="String")
-    conditions = [
+    prewhere_conditions = [
         f"project_id = {pid_slot}",
+    ]
+    conditions = [
         f"content LIKE {content_slot}",
     ]
     if req.roles:
@@ -756,11 +765,14 @@ def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
         conditions.append(f"conversation_id = {conv_slot}")
     if req.started_after:
         after_slot = pb.add(req.started_after, param_type="DateTime64(6)")
-        conditions.append(f"started_at >= {after_slot}")
+        prewhere_conditions.append(f"started_at >= {after_slot}")
     if req.started_before:
         before_slot = pb.add(req.started_before, param_type="DateTime64(6)")
-        conditions.append(f"started_at < {before_slot}")
-    return " AND ".join(conditions)
+        prewhere_conditions.append(f"started_at < {before_slot}")
+    return _FilterSQL(
+        prewhere=" AND ".join(prewhere_conditions),
+        where=" AND ".join(conditions),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -791,21 +803,25 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
 
 def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """Count spans matching the request, or count of distinct groups if grouped."""
-    where = _spans_where(pb, req)
+    span_filters = _spans_filter_sql(pb, req)
     if not req.group_by:
-        return f"SELECT count() FROM spans s WHERE {where}"
+        return (
+            f"SELECT count() FROM spans s PREWHERE {span_filters.prewhere}"
+            f"{_optional_where_clause(span_filters.where)}"
+        )
     resolved = resolve_group_by(pb, req.group_by)
     group_exprs = ", ".join(expr for expr, _ in resolved)
-    filters = span_group_filters(
+    group_filters = span_group_filters(
         req.group_filters,
         default_group_by=req.group_by,
     )
-    ensure_group_filters_match(filters, req.group_by, context="spans count")
-    having = group_filters_having_sql(pb, filters)
+    ensure_group_filters_match(group_filters, req.group_by, context="spans count")
+    having = group_filters_having_sql(pb, group_filters)
     having_sql = f" HAVING {having}" if having else ""
     return (
         f"SELECT count() FROM ("
-        f"SELECT {group_exprs} FROM spans s WHERE {where} GROUP BY {group_exprs}"
+        f"SELECT {group_exprs} FROM spans s PREWHERE {span_filters.prewhere}"
+        f"{_optional_where_clause(span_filters.where)} GROUP BY {group_exprs}"
         f"{having_sql}"
         f")"
     )
@@ -813,15 +829,16 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
 
 def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """List spans (ungrouped) or aggregate groups (grouped)."""
-    where = _spans_where(pb, req)
+    span_filters = _spans_filter_sql(pb, req)
     limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
 
     if not req.group_by:
         order_by = build_order_by(req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC")
+        where_sql = _optional_where_clause(span_filters.where, prefix="\n            ")
         return f"""
             SELECT {SPANS_LIST_COLS}
             FROM spans s
-            WHERE {where}
+            PREWHERE {span_filters.prewhere}{where_sql}
             ORDER BY {order_by}
             LIMIT {limit_slot} OFFSET {offset_slot}
         """
@@ -848,19 +865,20 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         f"{measure_sqls[0].alias} DESC" if measure_sqls else "last_seen DESC"
     )
     order_by = build_order_by(req.sort_by, sortable, default_order_by)
-    filters = span_group_filters(
+    group_filters = span_group_filters(
         req.group_filters,
         default_group_by=req.group_by,
     )
-    ensure_group_filters_match(filters, req.group_by, context="spans list")
-    having = group_filters_having_sql(pb, filters)
+    ensure_group_filters_match(group_filters, req.group_by, context="spans list")
+    having = group_filters_having_sql(pb, group_filters)
     having_sql = f"HAVING {having}" if having else ""
+    where_sql = _optional_where_clause(span_filters.where, prefix="\n        ")
 
     return f"""
         SELECT {select_group_cols},
                {aggregate_selects}
         FROM spans s
-        WHERE {where}
+        PREWHERE {span_filters.prewhere}{where_sql}
         GROUP BY {group_by_clause}
         {having_sql}
         ORDER BY {order_by}
@@ -881,8 +899,8 @@ def make_trace_detail_spans_query(
     tid = pb.add(trace_id, param_type="String")
     return f"""
         SELECT {CHAT_VIEW_COLS} FROM spans s
-        WHERE s.project_id = {pid}
-          AND s.trace_id = {tid}
+        PREWHERE s.project_id = {pid}
+        WHERE s.trace_id = {tid}
         ORDER BY s.started_at ASC
     """
 
@@ -893,14 +911,18 @@ def make_trace_detail_spans_query(
 
 
 def make_agents_count_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
+    pid_slot = pb.add(req.project_id, param_type="String")
     where = _agents_where(pb, req)
+    where_sql = _optional_where_clause(where)
     return f"""SELECT count() FROM (
-        SELECT agent_name FROM agents WHERE {where} GROUP BY agent_name
+        SELECT agent_name FROM agents PREWHERE project_id = {pid_slot}{where_sql} GROUP BY agent_name
     )"""
 
 
 def make_agents_list_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
+    pid_slot = pb.add(req.project_id, param_type="String")
     where = _agents_where(pb, req)
+    where_sql = _optional_where_clause(where, prefix="\n        ")
     order_by = build_order_by(
         req.sort_by, AGENT_SORTABLE_COLS, "last_seen DESC, agent_name"
     )
@@ -916,7 +938,7 @@ def make_agents_list_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
                min(first_seen) AS first_seen,
                max(last_seen) AS last_seen
         FROM agents
-        WHERE {where}
+        PREWHERE project_id = {pid_slot}{where_sql}
         GROUP BY agent_name
         ORDER BY {order_by}
         LIMIT {limit_slot} OFFSET {offset_slot}
@@ -926,16 +948,19 @@ def make_agents_list_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
 def make_agent_versions_count_query(
     pb: ParamBuilder, req: AgentVersionsQueryReq
 ) -> str:
-    where = _agent_versions_where(pb, req)
+    pid = pb.add(req.project_id, param_type="String")
+    aname = pb.add(req.agent_name, param_type="String")
     return (
         f"SELECT count() FROM ("
-        f"SELECT agent_version FROM agent_versions WHERE {where} GROUP BY agent_version"
+        f"SELECT agent_version FROM agent_versions PREWHERE project_id = {pid}"
+        f" WHERE agent_name = {aname} GROUP BY agent_version"
         f")"
     )
 
 
 def make_agent_versions_list_query(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
-    where = _agent_versions_where(pb, req)
+    pid = pb.add(req.project_id, param_type="String")
+    aname = pb.add(req.agent_name, param_type="String")
     limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
     return f"""
         SELECT agent_version,
@@ -948,7 +973,8 @@ def make_agent_versions_list_query(pb: ParamBuilder, req: AgentVersionsQueryReq)
                min(first_seen) AS first_seen,
                max(last_seen) AS last_seen
         FROM agent_versions
-        WHERE {where}
+        PREWHERE project_id = {pid}
+        WHERE agent_name = {aname}
         GROUP BY agent_version
         ORDER BY last_seen DESC
         LIMIT {limit_slot} OFFSET {offset_slot}
@@ -969,7 +995,7 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     via GROUP BY when the caller wants unique content rather than unique
     occurrences.
     """
-    where = _search_where(pb, req)
+    filters = _search_filter_sql(pb, req)
     # Bounds (`0 <= limit <= MAX_SEARCH_LIMIT`, `offset >= 0`) are
     # enforced on AgentSearchReq.
     limit_slot = pb.add(req.limit, param_type="UInt64")
@@ -983,7 +1009,8 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
                substring(content, 1, {SEARCH_CONTENT_PREVIEW_CHARS}) AS content,
                lower(hex(content_digest)) AS content_digest, started_at
         FROM messages
-        WHERE {where}
+        PREWHERE {filters.prewhere}
+        WHERE {filters.where}
         ORDER BY started_at DESC
         LIMIT {limit_slot} OFFSET {offset_slot}
     """
@@ -1002,13 +1029,13 @@ def make_conversation_chat_spans_query(
         INNER JOIN (
             SELECT trace_id, min(started_at) AS turn_started_at
             FROM spans
-            WHERE project_id = {pid}
-              AND conversation_id = {cid}
+            PREWHERE project_id = {pid}
+            WHERE conversation_id = {cid}
             GROUP BY trace_id
             ORDER BY turn_started_at DESC, trace_id DESC
             LIMIT {limit_slot} OFFSET {offset_slot}
         ) t ON s.trace_id = t.trace_id
-        WHERE s.project_id = {pid}
+        PREWHERE s.project_id = {pid}
         ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
     """
 
@@ -1023,8 +1050,8 @@ def make_conversation_chat_turns_count_query(
         SELECT count() FROM (
             SELECT trace_id
             FROM spans s
-            WHERE s.project_id = {pid}
-              AND s.conversation_id = {cid}
+            PREWHERE s.project_id = {pid}
+            WHERE s.conversation_id = {cid}
             GROUP BY trace_id
         )
     """
