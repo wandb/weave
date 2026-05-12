@@ -509,8 +509,9 @@ class TestThresholdAndStructuralIdentity:
             )
         )
         processed = process_call_req_to_content(start_req, trace_server)
-        # Pydantic copies inputs into the model on assignment, but the
-        # mapping content must round-trip unchanged.
+        # Pydantic shallow-copies inputs at model construction, so we compare
+        # by value rather than identity here — content must round-trip
+        # unchanged regardless of the SDK copy.
         assert processed.start.inputs == inputs_before
         assert trace_server.file_create.call_count == 0
 
