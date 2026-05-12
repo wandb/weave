@@ -3451,11 +3451,14 @@ def test_object_with_char_limit(client):
     # we sanitize the name
     assert obj.ref.name == name
 
+    # Use a distinct name for the raw obj_create path: re-using `name` would
+    # collide with the SDK publish above (Custom-typed -> untyped), which the
+    # server now rejects (WB-30574).
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
                 "project_id": client.project_id,
-                "object_id": name,
+                "object_id": "r" * CHAR_LIMIT,
                 "val": {"1": 1},
             }
         }
@@ -3476,7 +3479,7 @@ def test_object_with_char_over_limit(client):
         {
             "obj": {
                 "project_id": client.project_id,
-                "object_id": name,
+                "object_id": "r" * (CHAR_LIMIT + 1),
                 "val": {"1": 1},
             }
         }

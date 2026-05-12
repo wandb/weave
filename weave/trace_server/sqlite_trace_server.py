@@ -1882,9 +1882,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # Validate
         object_id_validator(object_id)
 
+        kind = get_kind(processed_val)
         with self.lock:
             if self._obj_exists(cursor, project_id, object_id, digest):
                 return tsi.ObjCreateRes(digest=digest, object_id=object_id)
+
+            self._reject_obj_name_type_collision(
+                cursor=cursor,
+                project_id=project_id,
+                object_id=object_id,
+                kind=kind,
+                new_base_object_class=digest_result.base_object_class,
+            )
 
             # Use IMMEDIATE transaction to acquire write lock immediately, preventing
             # race conditions where concurrent transactions read stale version_index values
@@ -1922,7 +1931,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     project_id,
                     object_id,
                     datetime.datetime.now().isoformat(),
-                    get_kind(processed_val),
+                    kind,
                     digest_result.base_object_class,
                     digest_result.leaf_object_class,
                     json.dumps([]),
@@ -1948,6 +1957,41 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if return_row is None:
             return False
         return return_row[0] > 0
+
+    def _reject_obj_name_type_collision(
+        self,
+        cursor: sqlite3.Cursor,
+        project_id: str,
+        object_id: str,
+        kind: str,
+        new_base_object_class: str | None,
+    ) -> None:
+        """Reject obj_create when (project_id, object_id) already exists with a
+        different base_object_class. Names are bound to one type per project
+        (WB-30574). Weave refs do not carry type, so allowing same-name
+        different-type would make refs ambiguous.
+        """
+        cursor.execute(
+            """
+            SELECT DISTINCT base_object_class
+            FROM objects
+            WHERE project_id = ?
+                AND object_id = ?
+                AND kind = ?
+                AND deleted_at IS NULL
+            """,
+            (project_id, object_id, kind),
+        )
+        for (existing_class,) in cursor.fetchall():
+            if existing_class != new_base_object_class:
+                raise InvalidRequest(
+                    f"Cannot create object {object_id!r} with "
+                    f"base_object_class={new_base_object_class!r}: an object "
+                    f"with this name already exists with "
+                    f"base_object_class={existing_class!r}. Object names are "
+                    f"bound to one type per project. Use a different name, or "
+                    f"delete the existing object first."
+                )
 
     def _mark_existing_objects_as_not_latest(
         self, cursor: sqlite3.Cursor, project_id: str, object_id: str

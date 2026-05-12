@@ -419,3 +419,32 @@ def make_objects_val_query_and_parameters(
         "digests": digests,
     }
     return query, parameters
+
+
+def make_obj_name_type_collision_query(
+    project_id: str, object_id: str, kind: str
+) -> tuple[str, dict[str, Any]]:
+    """Build the query that returns the set of distinct base_object_class
+    values currently bound to a given (project_id, kind, object_id).
+
+    Used by obj_create to enforce that an object_id maps to a single
+    base_object_class for the lifetime of the project (WB-30574).
+
+    The predicate is a perfect prefix match against the table's ORDER BY
+    `(project_id, kind, object_id, digest)`, so this is a primary-key-prefix
+    scan, not a full scan.
+    """
+    query = """
+        SELECT DISTINCT base_object_class
+        FROM object_versions_deduped
+        WHERE project_id = {project_id: String}
+            AND object_id = {object_id: String}
+            AND kind = {kind: String}
+            AND deleted_at IS NULL
+    """
+    parameters = {
+        "project_id": project_id,
+        "object_id": object_id,
+        "kind": kind,
+    }
+    return query, parameters

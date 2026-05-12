@@ -259,6 +259,7 @@ from weave.trace_server.query_builder.obj_tags_query_builder import (
 from weave.trace_server.query_builder.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     format_metadata_objects_from_query_result,
+    make_obj_name_type_collision_query,
     make_objects_val_query_and_parameters,
 )
 from weave.trace_server.query_builder.project_query_builder import (
@@ -1834,11 +1835,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             label=f"obj {req.obj.object_id!r}",
         )
 
+        kind = get_kind(processed_val)
+        self._reject_obj_name_type_collision(
+            project_id=req.obj.project_id,
+            object_id=req.obj.object_id,
+            kind=kind,
+            new_base_object_class=digest_result.base_object_class,
+        )
+
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
             wb_user_id=req.obj.wb_user_id,
-            kind=get_kind(processed_val),
+            kind=kind,
             base_object_class=digest_result.base_object_class,
             leaf_object_class=digest_result.leaf_object_class,
             refs=extract_refs_from_values(processed_val),
@@ -1856,6 +1865,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=digest,
             object_id=req.obj.object_id,
         )
+
+    def _reject_obj_name_type_collision(
+        self,
+        project_id: str,
+        object_id: str,
+        kind: str,
+        new_base_object_class: str | None,
+    ) -> None:
+        """Reject obj_create when (project_id, object_id) already exists with a
+        different base_object_class. Names are bound to one type per project
+        (WB-30574). Weave refs do not carry type, so allowing same-name
+        different-type would make refs ambiguous.
+        """
+        query, parameters = make_obj_name_type_collision_query(
+            project_id=project_id, object_id=object_id, kind=kind
+        )
+        result = self._query(query, parameters)
+        for (existing_class,) in result.result_rows:
+            if existing_class != new_base_object_class:
+                raise InvalidRequest(
+                    f"Cannot create object {object_id!r} with "
+                    f"base_object_class={new_base_object_class!r}: an object "
+                    f"with this name already exists with "
+                    f"base_object_class={existing_class!r}. Object names are "
+                    f"bound to one type per project. Use a different name, or "
+                    f"delete the existing object first."
+                )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
     def obj_create_batch(
