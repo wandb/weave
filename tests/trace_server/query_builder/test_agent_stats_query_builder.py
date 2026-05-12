@@ -8,9 +8,7 @@ from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSpanGroupFilter,
-    AgentSpanGroupNumericFilter,
     AgentSpanMeasureSpec,
-    AgentSpanStatsFieldRef,
     AgentSpanStatsMetricSpec,
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
@@ -50,7 +48,7 @@ def _req(**kwargs) -> AgentSpanStatsReq:
             AgentSpanStatsMetricSpec(
                 alias="input_tokens",
                 value_type="number",
-                field=AgentSpanStatsFieldRef(
+                value=AgentSpanValueRef(
                     source="field",
                     key="usage.input_tokens",
                 ),
@@ -79,14 +77,14 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
             AgentSpanStatsMetricSpec(
                 alias="duration_ms",
                 value_type="number",
-                derived="duration_ms",
+                value=AgentSpanValueRef(source="derived", key="duration_ms"),
                 aggregations=["avg"],
                 percentiles=[95],
             ),
             AgentSpanStatsMetricSpec(
                 alias="errors",
                 value_type="boolean",
-                derived="is_error",
+                value=AgentSpanValueRef(source="derived", key="is_error"),
                 aggregations=["count_true"],
             ),
         ],
@@ -191,7 +189,7 @@ def test_grouped_stats_query_full_sql_shape() -> None:
             AgentSpanStatsMetricSpec(
                 alias="score",
                 value_type="number",
-                field=AgentSpanStatsFieldRef(
+                value=AgentSpanValueRef(
                     source="custom_attrs_float",
                     key="score",
                 ),
@@ -303,14 +301,14 @@ def test_basic_stats_query_uses_query_filter_and_bucket() -> None:
             AgentSpanStatsMetricSpec(
                 alias="duration_ms",
                 value_type="number",
-                derived="duration_ms",
+                value=AgentSpanValueRef(source="derived", key="duration_ms"),
                 aggregations=["avg"],
                 percentiles=[95],
             ),
             AgentSpanStatsMetricSpec(
                 alias="errors",
                 value_type="boolean",
-                derived="is_error",
+                value=AgentSpanValueRef(source="derived", key="is_error"),
                 aggregations=["count_true"],
             ),
         ],
@@ -376,14 +374,14 @@ def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
     req = _req(
         bucket_by=AgentSpanStatsNumericBucketSpec(
             type="number",
-            derived="duration_ms",
+            value=AgentSpanValueRef(source="derived", key="duration_ms"),
             bins=4,
         ),
         metrics=[
             AgentSpanStatsMetricSpec(
                 alias="spans",
                 value_type="boolean",
-                derived="is_error",
+                value=AgentSpanValueRef(source="derived", key="is_error"),
                 aggregations=["count"],
             )
         ],
@@ -554,6 +552,28 @@ def test_numeric_bucket_group_filter_rejects_mismatched_group_by() -> None:
         build_agent_span_stats_query(req, pb)
 
 
+def test_request_validation_rejects_grouped_numeric_bucket_metrics() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="grouped numeric bucket stats do not support explicit metrics",
+    ):
+        _req(
+            bucket_by=AgentSpanStatsNumericBucketSpec(
+                type="number",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measure=AgentSpanMeasureSpec(alias="spans", aggregation="count"),
+            ),
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="input_tokens",
+                    value_type="number",
+                    value=AgentSpanValueRef(source="field", key="usage.input_tokens"),
+                    aggregations=["sum"],
+                )
+            ],
+        )
+
+
 def test_group_by_custom_attr_and_metric_custom_attr() -> None:
     pb = ParamBuilder("genai")
     req = _req(
@@ -568,7 +588,7 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
             AgentSpanStatsMetricSpec(
                 alias="score",
                 value_type="number",
-                field=AgentSpanStatsFieldRef(
+                value=AgentSpanValueRef(
                     source="custom_attrs_float",
                     key="score",
                 ),
@@ -635,19 +655,28 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
     assert result.columns == ["timestamp", "env", "avg_score", "count_score"]
 
 
-def test_time_stats_apply_group_numeric_filters() -> None:
+def test_time_stats_apply_group_filters() -> None:
     pb = ParamBuilder("genai")
     req = _req(
         metrics=[
             AgentSpanStatsMetricSpec(
                 alias="conversations",
                 value_type="string",
-                field=AgentSpanStatsFieldRef(source="field", key="conversation_id"),
+                value=AgentSpanValueRef(source="field", key="conversation_id"),
                 aggregations=["count_distinct"],
             )
         ],
-        group_numeric_filters=[
-            AgentSpanGroupNumericFilter(field="total_tokens", min=10, max=100)
+        group_filters=[
+            AgentSpanGroupFilter(
+                measure=AgentSpanMeasureSpec(
+                    alias="total_tokens",
+                    aggregation="sum",
+                    value=AgentSpanValueRef(source="derived", key="total_tokens"),
+                    value_type="number",
+                ),
+                min=10,
+                max=100,
+            )
         ],
     )
 
@@ -738,7 +767,7 @@ def test_metric_validation_rejects_invalid_type_aggregation() -> None:
         AgentSpanStatsMetricSpec(
             alias="agent",
             value_type="string",
-            field=AgentSpanStatsFieldRef(source="field", key="agent.name"),
+            value=AgentSpanValueRef(source="field", key="agent.name"),
             aggregations=["sum"],
         )
 
@@ -750,7 +779,7 @@ def test_request_validation_rejects_duplicate_aliases() -> None:
                 AgentSpanStatsMetricSpec(
                     alias="tokens",
                     value_type="number",
-                    field=AgentSpanStatsFieldRef(
+                    value=AgentSpanValueRef(
                         source="field",
                         key="usage.input_tokens",
                     ),
@@ -759,7 +788,7 @@ def test_request_validation_rejects_duplicate_aliases() -> None:
                 AgentSpanStatsMetricSpec(
                     alias="tokens",
                     value_type="number",
-                    field=AgentSpanStatsFieldRef(
+                    value=AgentSpanValueRef(
                         source="field",
                         key="usage.output_tokens",
                     ),
@@ -773,7 +802,7 @@ def test_numeric_bucket_validation_rejects_non_numeric_derived_field() -> None:
     with pytest.raises(ValidationError):
         AgentSpanStatsNumericBucketSpec(
             type="number",
-            derived="is_error",
+            value=AgentSpanValueRef(source="derived", key="is_error"),
         )
 
 
@@ -782,7 +811,7 @@ def test_request_validation_rejects_numeric_bucket_group_by() -> None:
         _req(
             bucket_by=AgentSpanStatsNumericBucketSpec(
                 type="number",
-                derived="duration_ms",
+                value=AgentSpanValueRef(source="derived", key="duration_ms"),
             ),
             group_by=[
                 AgentGroupByRef(

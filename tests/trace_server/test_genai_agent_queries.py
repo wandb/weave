@@ -18,10 +18,9 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentGroupByRef,
     AgentSearchReq,
-    AgentSpanGroupNumericFilter,
+    AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
     AgentSpansQueryReq,
-    AgentSpanStatsFieldRef,
     AgentSpanStatsMetricSpec,
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
@@ -271,8 +270,14 @@ def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):
         AgentSpansQueryReq(
             project_id=project_id,
             group_by=[AgentGroupByRef(source="column", key="conversation_id")],
-            group_numeric_filters=[
-                AgentSpanGroupNumericFilter(field="span_count", min=2),
+            group_filters=[
+                AgentSpanGroupFilter(
+                    measure=AgentSpanMeasureSpec(
+                        alias="span_count",
+                        aggregation="count",
+                    ),
+                    min=2,
+                ),
             ],
         )
     )
@@ -375,7 +380,7 @@ def test_agent_span_stats_ungrouped_metrics(ch_server):
                 AgentSpanStatsMetricSpec(
                     alias="input_tokens",
                     value_type="number",
-                    field=AgentSpanStatsFieldRef(
+                    value=AgentSpanValueRef(
                         source="field",
                         key="usage.input_tokens",
                     ),
@@ -384,20 +389,20 @@ def test_agent_span_stats_ungrouped_metrics(ch_server):
                 AgentSpanStatsMetricSpec(
                     alias="duration_ms",
                     value_type="number",
-                    derived="duration_ms",
+                    value=AgentSpanValueRef(source="derived", key="duration_ms"),
                     aggregations=["avg"],
                     percentiles=[95],
                 ),
                 AgentSpanStatsMetricSpec(
                     alias="errors",
                     value_type="boolean",
-                    derived="is_error",
+                    value=AgentSpanValueRef(source="derived", key="is_error"),
                     aggregations=["count_true"],
                 ),
                 AgentSpanStatsMetricSpec(
                     alias="invocations",
                     value_type="boolean",
-                    derived="is_invocation",
+                    value=AgentSpanValueRef(source="derived", key="is_invocation"),
                     aggregations=["count_true"],
                 ),
             ],
@@ -448,7 +453,7 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
             end=start + datetime.timedelta(hours=1),
             bucket_by=AgentSpanStatsNumericBucketSpec(
                 type="number",
-                field=AgentSpanStatsFieldRef(
+                value=AgentSpanValueRef(
                     source="field",
                     key="usage.input_tokens",
                 ),
@@ -458,7 +463,7 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
                 AgentSpanStatsMetricSpec(
                     alias="spans",
                     value_type="boolean",
-                    derived="is_error",
+                    value=AgentSpanValueRef(source="derived", key="is_error"),
                     aggregations=["count"],
                 ),
             ],
@@ -517,11 +522,21 @@ def test_agent_span_stats_conversation_numeric_value_buckets(ch_server):
             end=start + datetime.timedelta(hours=1),
             bucket_by=AgentSpanStatsNumericBucketSpec(
                 type="number",
-                conversation_aggregate="span_count",
                 bins=2,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measure=AgentSpanMeasureSpec(
+                    alias="span_count",
+                    aggregation="count",
+                ),
             ),
-            group_numeric_filters=[
-                AgentSpanGroupNumericFilter(field="span_count", min=2),
+            group_filters=[
+                AgentSpanGroupFilter(
+                    measure=AgentSpanMeasureSpec(
+                        alias="span_count",
+                        aggregation="count",
+                    ),
+                    min=2,
+                ),
             ],
         )
     )
@@ -578,14 +593,22 @@ def test_agent_span_stats_time_buckets_filter_conversation_aggregates(ch_server)
             start=start,
             end=start + datetime.timedelta(hours=2),
             granularity=3600,
-            group_numeric_filters=[
-                AgentSpanGroupNumericFilter(field="total_tokens", min=20)
+            group_filters=[
+                AgentSpanGroupFilter(
+                    measure=AgentSpanMeasureSpec(
+                        alias="total_tokens",
+                        aggregation="sum",
+                        value=AgentSpanValueRef(source="derived", key="total_tokens"),
+                        value_type="number",
+                    ),
+                    min=20,
+                )
             ],
             metrics=[
                 AgentSpanStatsMetricSpec(
                     alias="conversations",
                     value_type="string",
-                    field=AgentSpanStatsFieldRef(
+                    value=AgentSpanValueRef(
                         source="field",
                         key="conversation_id",
                     ),
@@ -714,13 +737,13 @@ def test_agent_span_stats_groups_by_custom_attrs(ch_server):
                 AgentSpanStatsMetricSpec(
                     alias="tokens",
                     value_type="number",
-                    derived="total_tokens",
+                    value=AgentSpanValueRef(source="derived", key="total_tokens"),
                     aggregations=["sum"],
                 ),
                 AgentSpanStatsMetricSpec(
                     alias="score",
                     value_type="number",
-                    field=AgentSpanStatsFieldRef(
+                    value=AgentSpanValueRef(
                         source="custom_attrs_float",
                         key="score",
                     ),

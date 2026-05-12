@@ -71,16 +71,6 @@ AgentSpanValueSource = Literal[
     "custom_attrs_float",
     "custom_attrs_bool",
 ]
-AgentSpanGroupNumericField = Literal[
-    "span_count",
-    "invocation_count",
-    "conversation_count",
-    "total_input_tokens",
-    "total_output_tokens",
-    "total_tokens",
-    "total_duration_ms",
-    "error_count",
-]
 
 _IDENT_RE = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
 AGENT_SPAN_STATS_DERIVED_VALUE_TYPES: dict[
@@ -119,19 +109,6 @@ class AgentSpanValueRef(BaseModel):
         ):
             raise ValueError(f"unknown derived span value: {self.key!r}")
         return self
-
-
-class AgentSpanStatsFieldRef(BaseModel):
-    """Legacy stats field ref kept for existing callers."""
-
-    source: Literal[
-        "field",
-        "custom_attrs_string",
-        "custom_attrs_int",
-        "custom_attrs_float",
-        "custom_attrs_bool",
-    ] = "field"
-    key: str
 
 
 class AgentSpanMeasureSpec(BaseModel):
@@ -179,28 +156,11 @@ class AgentSpanStatsMetricSpec(BaseModel):
     value_type: AgentSpanStatsValueType
     aggregations: list[AgentSpanStatsAggregation] = Field(default_factory=list)
     percentiles: list[float] = Field(default_factory=list)
-    value: AgentSpanValueRef | None = None
-    field: AgentSpanStatsFieldRef | None = None
-    derived: AgentSpanStatsDerivedMetric | None = None
+    value: AgentSpanValueRef
 
     @model_validator(mode="after")
     def validate_metric_spec(self) -> AgentSpanStatsMetricSpec:
-        sources = [
-            self.value is not None,
-            self.field is not None,
-            self.derived is not None,
-        ]
-        if sum(sources) != 1:
-            raise ValueError("exactly one of value, field, or derived must be set")
-
-        if self.derived is not None:
-            expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[self.derived]
-            if self.value_type != expected_type:
-                raise ValueError(
-                    f"derived metric {self.derived!r} has value_type "
-                    f"{expected_type!r}, got {self.value_type!r}"
-                )
-        if self.value is not None and self.value.source == "derived":
+        if self.value.source == "derived":
             expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[
                 self.value.key  # type: ignore[index]
             ]
@@ -248,22 +208,6 @@ class AgentSpanStatsColumn(BaseModel):
     aggregation: str | None = None
 
 
-class AgentSpanGroupNumericFilter(BaseModel):
-    """Numeric range filter over grouped span aggregate rows."""
-
-    field: AgentSpanGroupNumericField
-    min: float | None = None
-    max: float | None = None
-
-    @model_validator(mode="after")
-    def validate_group_numeric_filter(self) -> AgentSpanGroupNumericFilter:
-        if self.min is None and self.max is None:
-            raise ValueError("group numeric filter must set min or max")
-        if self.min is not None and self.max is not None and self.max < self.min:
-            raise ValueError("group numeric filter max must be greater than min")
-        return self
-
-
 class AgentSpanGroupFilter(BaseModel):
     """Range filter over one grouped span measure."""
 
@@ -307,36 +251,22 @@ class AgentSpanStatsNumericBucketSpec(BaseModel):
     min: float | None = None
     max: float | None = None
     value: AgentSpanValueRef | None = None
-    field: AgentSpanStatsFieldRef | None = None
-    derived: AgentSpanStatsDerivedMetric | None = None
     group_by: list[AgentGroupByRef] = Field(default_factory=list)
     measure: AgentSpanMeasureSpec | None = None
-    conversation_aggregate: AgentSpanGroupNumericField | None = None
 
     @model_validator(mode="after")
     def validate_numeric_bucket_spec(self) -> AgentSpanStatsNumericBucketSpec:
         sources = [
             self.value is not None,
-            self.field is not None,
-            self.derived is not None,
             bool(self.group_by) or self.measure is not None,
-            self.conversation_aggregate is not None,
         ]
         if sum(sources) != 1:
             raise ValueError(
-                "exactly one of value, field, derived, group_by/measure, "
-                "or conversation_aggregate must be set"
+                "exactly one of value or group_by/measure must be set"
             )
         if bool(self.group_by) != (self.measure is not None):
             raise ValueError("numeric group bucket must set both group_by and measure")
 
-        if self.derived is not None:
-            expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[self.derived]
-            if expected_type != "number":
-                raise ValueError(
-                    f"derived bucket field {self.derived!r} has value_type "
-                    f"{expected_type!r}, expected 'number'"
-                )
         if self.value is not None:
             if self.value.source == "derived":
                 expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[
@@ -391,9 +321,6 @@ class AgentSpanStatsReq(BaseModel):
     )
     bucket_by: AgentSpanStatsBucketSpec | None = None
     group_filters: list[AgentSpanGroupFilter] = Field(default_factory=list)
-    group_numeric_filters: list[AgentSpanGroupNumericFilter] = Field(
-        default_factory=list
-    )
 
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:
@@ -428,6 +355,10 @@ class AgentSpanStatsReq(BaseModel):
 
         if numeric_bucket is not None and self.group_by:
             raise ValueError("numeric bucket stats do not support group_by")
+        if numeric_bucket is not None and numeric_bucket.group_by and self.metrics:
+            raise ValueError(
+                "grouped numeric bucket stats do not support explicit metrics"
+            )
         if self.group_filters:
             if self.group_by:
                 raise ValueError("group_filters do not support group_by")
@@ -435,18 +366,6 @@ class AgentSpanStatsReq(BaseModel):
                 raise ValueError(
                     "group_filters are only supported for time stats or "
                     "grouped numeric bucket stats"
-                )
-        if self.group_numeric_filters:
-            if self.group_by:
-                raise ValueError("group_numeric_filters do not support group_by")
-            if (
-                numeric_bucket is not None
-                and numeric_bucket.conversation_aggregate is None
-                and not numeric_bucket.group_by
-            ):
-                raise ValueError(
-                    "group_numeric_filters are only supported for time stats "
-                    "or conversation numeric bucket stats"
                 )
         return self
 
@@ -603,9 +522,6 @@ class AgentSpansQueryReq(BaseModel):
     group_by: list[AgentGroupByRef] | None = None
     measures: list[AgentSpanMeasureSpec] = Field(default_factory=list)
     group_filters: list[AgentSpanGroupFilter] = Field(default_factory=list)
-    group_numeric_filters: list[AgentSpanGroupNumericFilter] = Field(
-        default_factory=list
-    )
     sort_by: list[AgentSortBy] | None = None
     limit: int = Field(
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
@@ -616,9 +532,7 @@ class AgentSpansQueryReq(BaseModel):
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
-        if (
-            self.measures or self.group_filters or self.group_numeric_filters
-        ) and not self.group_by:
+        if (self.measures or self.group_filters) and not self.group_by:
             raise ValueError("grouped measures and group filters require group_by")
         aliases = [measure.alias for measure in self.measures]
         duplicate_aliases = sorted(

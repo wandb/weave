@@ -28,7 +28,6 @@ from weave.trace_server.agents.types import (
     AgentSearchReq,
     AgentSortBy,
     AgentSpanGroupFilter,
-    AgentSpanGroupNumericFilter,
     AgentSpanMeasureSpec,
     AgentSpanSchema,
     AgentSpansQueryReq,
@@ -40,7 +39,6 @@ from weave.trace_server.agents.types import (
     AgentsQueryReq,
     AgentVersionsQueryReq,
 )
-from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 
 # ---------------------------------------------------------------------------
@@ -90,19 +88,6 @@ SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
         "error_count",
         "first_seen",
         "last_seen",
-    }
-)
-
-SPAN_GROUP_NUMERIC_FILTER_COLS: frozenset[str] = frozenset(
-    {
-        "span_count",
-        "invocation_count",
-        "conversation_count",
-        "total_input_tokens",
-        "total_output_tokens",
-        "total_tokens",
-        "total_duration_ms",
-        "error_count",
     }
 )
 
@@ -631,87 +616,16 @@ def span_measure_sql(
     )
 
 
-def legacy_span_group_measure(field: str) -> AgentSpanMeasureSpec:
-    """Map legacy grouped aggregate names onto generic measure specs."""
-    if field == "span_count":
-        return AgentSpanMeasureSpec(alias=field, aggregation="count")
-    if field == "invocation_count":
-        return AgentSpanMeasureSpec(
-            alias=field,
-            aggregation="count",
-            filter=_field_eq_query("operation_name", OP_INVOKE_AGENT),
-        )
-    if field == "conversation_count":
-        return AgentSpanMeasureSpec(
-            alias=field,
-            aggregation="count_distinct",
-            value=AgentSpanValueRef(source="field", key="conversation_id"),
-            value_type="string",
-        )
-    if field == "total_input_tokens":
-        return AgentSpanMeasureSpec(
-            alias=field,
-            aggregation="sum",
-            value=AgentSpanValueRef(source="field", key="input_tokens"),
-            value_type="number",
-        )
-    if field == "total_output_tokens":
-        return AgentSpanMeasureSpec(
-            alias=field,
-            aggregation="sum",
-            value=AgentSpanValueRef(source="field", key="output_tokens"),
-            value_type="number",
-        )
-    if field == "total_tokens":
-        return AgentSpanMeasureSpec(
-            alias=field,
-            aggregation="sum",
-            value=AgentSpanValueRef(source="derived", key="total_tokens"),
-            value_type="number",
-        )
-    if field == "total_duration_ms":
-        return AgentSpanMeasureSpec(
-            alias=field,
-            aggregation="sum",
-            value=AgentSpanValueRef(source="derived", key="duration_ms"),
-            value_type="number",
-        )
-    if field == "error_count":
-        return AgentSpanMeasureSpec(
-            alias=field,
-            aggregation="count",
-            filter=_field_eq_query("status_code", _STATUS_CODE_ERROR),
-        )
-    raise ValueError(f"Invalid group numeric filter field: {field!r}")
-
-
-def _field_eq_query(field: str, value: str) -> Query:
-    return Query.model_validate(
-        {"$expr": {"$eq": [{"$getField": field}, {"$literal": value}]}}
-    )
-
-
 def span_group_filters(
     filters: list[AgentSpanGroupFilter],
-    legacy_numeric_filters: list[AgentSpanGroupNumericFilter],
     *,
     default_group_by: list[AgentGroupByRef],
 ) -> list[AgentSpanGroupFilter]:
-    """Normalize current and legacy grouped aggregate filters."""
-    out = [
+    """Fill omitted group_by refs on grouped aggregate filters."""
+    return [
         filter_.model_copy(update={"group_by": filter_.group_by or default_group_by})
         for filter_ in filters
     ]
-    out.extend(
-        AgentSpanGroupFilter(
-            group_by=default_group_by,
-            measure=legacy_span_group_measure(filter_.field),
-            min=filter_.min,
-            max=filter_.max,
-        )
-        for filter_ in legacy_numeric_filters
-    )
-    return out
 
 
 def ensure_group_filters_match(
@@ -875,52 +789,6 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
                max(s.started_at) AS last_seen"""
 
 
-def conversation_aggregate_value_sql(field: str) -> str:
-    """Return the grouped conversation aggregate expression for a numeric field."""
-    if field == "span_count":
-        return "toFloat64(count())"
-    if field == "invocation_count":
-        return "toFloat64(countIf(s.operation_name = 'invoke_agent'))"
-    if field == "conversation_count":
-        return "toFloat64(uniqExact(s.conversation_id))"
-    if field == "total_input_tokens":
-        return "toFloat64(sum(s.input_tokens))"
-    if field == "total_output_tokens":
-        return "toFloat64(sum(s.output_tokens))"
-    if field == "total_tokens":
-        return (
-            "toFloat64(sum(s.input_tokens) + sum(s.output_tokens) + "
-            "sum(s.reasoning_tokens))"
-        )
-    if field == "total_duration_ms":
-        return (
-            "toFloat64(sum(toUnixTimestamp64Milli(s.ended_at) - "
-            "toUnixTimestamp64Milli(s.started_at)))"
-        )
-    if field == "error_count":
-        return "toFloat64(countIf(s.status_code = 'ERROR'))"
-    raise ValueError(f"Invalid group numeric filter field: {field!r}")
-
-
-def group_numeric_filters_having_sql(
-    pb: ParamBuilder,
-    filters: list[AgentSpanGroupNumericFilter],
-) -> str:
-    """Build HAVING conditions for grouped span aggregate numeric filters."""
-    conditions: list[str] = []
-    for filter_ in filters:
-        if filter_.field not in SPAN_GROUP_NUMERIC_FILTER_COLS:
-            raise ValueError(f"Invalid group numeric filter field: {filter_.field!r}")
-        expr = conversation_aggregate_value_sql(filter_.field)
-        if filter_.min is not None:
-            min_slot = pb.add(filter_.min, param_type="Float64")
-            conditions.append(f"{expr} >= {min_slot}")
-        if filter_.max is not None:
-            max_slot = pb.add(filter_.max, param_type="Float64")
-            conditions.append(f"{expr} <= {max_slot}")
-    return " AND ".join(conditions)
-
-
 def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """Count spans matching the request, or count of distinct groups if grouped."""
     where = _spans_where(pb, req)
@@ -930,7 +798,6 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     group_exprs = ", ".join(expr for expr, _ in resolved)
     filters = span_group_filters(
         req.group_filters,
-        req.group_numeric_filters,
         default_group_by=req.group_by,
     )
     ensure_group_filters_match(filters, req.group_by, context="spans count")
@@ -977,10 +844,12 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         if measure_sqls
         else SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases))
     )
-    order_by = build_order_by(req.sort_by, sortable, "last_seen DESC")
+    default_order_by = (
+        f"{measure_sqls[0].alias} DESC" if measure_sqls else "last_seen DESC"
+    )
+    order_by = build_order_by(req.sort_by, sortable, default_order_by)
     filters = span_group_filters(
         req.group_filters,
-        req.group_numeric_filters,
         default_group_by=req.group_by,
     )
     ensure_group_filters_match(filters, req.group_by, context="spans list")

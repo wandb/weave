@@ -27,7 +27,6 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
     AgentSpanStatsValueType,
-    AgentSpanValueRef,
 )
 from weave.trace_server.calls_query_builder.stats_query_base import (
     auto_select_granularity_seconds,
@@ -37,7 +36,6 @@ from weave.trace_server.calls_query_builder.utils import param_slot, safely_form
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     add_time_filters,
-    conversation_aggregate_value_sql,
     ensure_group_filters_match,
     group_by_ref_alias,
     group_filters_having_sql,
@@ -82,14 +80,6 @@ _COL_PROJECT_ID = "project_id"
 _COL_STARTED_AT = "started_at"
 _COL_ENDED_AT = "ended_at"
 _COL_STATUS_CODE = "status_code"
-_COL_INPUT_TOKENS = semconv.CANONICAL_KEY_TO_COLUMN[semconv.USAGE_INPUT_TOKENS.key]
-_COL_OUTPUT_TOKENS = semconv.CANONICAL_KEY_TO_COLUMN[semconv.USAGE_OUTPUT_TOKENS.key]
-_COL_REASONING_TOKENS = semconv.CANONICAL_KEY_TO_COLUMN[
-    semconv.USAGE_REASONING_TOKENS.key
-]
-_COL_OPERATION_NAME = semconv.CANONICAL_KEY_TO_COLUMN[semconv.OPERATION_NAME.key]
-
-_STATUS_CODE_ERROR = "ERROR"
 _AGG_SUM: AgentSpanStatsAggregation = "sum"
 _AGG_AVG: AgentSpanStatsAggregation = "avg"
 _AGG_MIN: AgentSpanStatsAggregation = "min"
@@ -232,7 +222,6 @@ def build_agent_span_stats_query(
     )
     group_filters = span_group_filters(
         req.group_filters,
-        req.group_numeric_filters,
         default_group_by=default_group_by,
     )
     if numeric_bucket is not None and not metric_outputs:
@@ -484,16 +473,7 @@ def _metric_plan(metric: AgentSpanStatsMetricSpec, pb: ParamBuilder) -> _MetricP
 
 def _metric_sql(metric: AgentSpanStatsMetricSpec, pb: ParamBuilder) -> _MetricSQL:
     """Return the per-span value expression and validity guard for a metric."""
-    if metric.value is not None:
-        ref = metric.value
-    elif metric.derived is not None:
-        ref = AgentSpanValueRef(source="derived", key=metric.derived)
-    elif metric.field is not None:
-        ref = AgentSpanValueRef(source=metric.field.source, key=metric.field.key)
-    else:
-        raise ValueError(f"metric {metric.alias!r} must set value, field, or derived")
-
-    resolved = span_value_sql(ref, pb, expected_type=metric.value_type)
+    resolved = span_value_sql(metric.value, pb, expected_type=metric.value_type)
     return _MetricSQL(
         value_sql=resolved.value_sql,
         valid_sql=resolved.valid_sql,
@@ -506,15 +486,9 @@ def _numeric_bucket_sql(
     pb: ParamBuilder,
 ) -> _MetricSQL:
     """Resolve the numeric value expression used for value-range bucketing."""
-    if bucket.value is not None:
-        ref = bucket.value
-    elif bucket.derived is not None:
-        ref = AgentSpanValueRef(source="derived", key=bucket.derived)
-    elif bucket.field is not None:
-        ref = AgentSpanValueRef(source=bucket.field.source, key=bucket.field.key)
-    else:
-        raise ValueError("numeric bucket must set value, field, or derived")
-    resolved = span_value_sql(ref, pb, expected_type=_VALUE_TYPE_NUMBER)
+    if bucket.value is None:
+        raise ValueError("numeric bucket must set value")
+    resolved = span_value_sql(bucket.value, pb, expected_type=_VALUE_TYPE_NUMBER)
     return _MetricSQL(
         value_sql=resolved.value_sql,
         valid_sql=resolved.valid_sql,
@@ -781,7 +755,7 @@ def _build_numeric_bucket_stats_query(
         GROUP BY {group_by_clause}
         {having_sql}
         """
-    elif bucket.conversation_aggregate is None:
+    else:
         bucket_metric = _numeric_bucket_sql(bucket, pb)
         value_rows_sql = f"""
         SELECT
@@ -790,21 +764,6 @@ def _build_numeric_bucket_stats_query(
         WHERE {bucket_metric.valid_sql}
           AND isNotNull({bucket_metric.value_sql})
           AND isFinite({bucket_metric.value_sql})
-        """
-    else:
-        value_expr = conversation_aggregate_value_sql(bucket.conversation_aggregate)
-        ensure_group_filters_match(
-            group_filters, _conversation_group_by(), context="numeric bucket"
-        )
-        having = group_filters_having_sql(pb, group_filters)
-        having_sql = f"HAVING {having}" if having else ""
-        value_rows_sql = f"""
-        SELECT
-          {value_expr} AS bucket_value
-        FROM {_CTE_FILTERED_SPANS} {_SPAN_ALIAS}
-        WHERE {_span_col("conversation_id")} != ''
-        GROUP BY {_span_col("conversation_id")}
-        {having_sql}
         """
     return f"""
     WITH

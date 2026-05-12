@@ -530,7 +530,7 @@ class TestMakeGroupedSpansListQuery:
             FROM spans s
             WHERE s.project_id = {genai_0:String}
             GROUP BY conversation_id
-            ORDER BY last_seen DESC
+            ORDER BY flagged_count DESC
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
         """
         expected_params = {
