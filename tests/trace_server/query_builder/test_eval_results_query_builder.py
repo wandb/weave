@@ -345,6 +345,55 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
     )
 
 
+def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
+    """Red-team for PR #6735: orm.py infers field-side casts from peer
+    literals so feedback / threads / objects don't need an explicit
+    `$convert` to compare a JSON-extracted field against a typed param. The
+    PR promises that any caller of `Select.where(...)` benefits, but
+    `_process_query_to_conditions`'s `GetFieldOperator` branch silently
+    drops the inferred cast when a `field_resolver` is provided. Eval
+    results filtering reaches `_process_query_to_conditions` exactly that
+    way, so a numeric / bool literal without `$convert` should still pick
+    up the typed cast (matching the explicit-`$convert` shape pinned by
+    `test_cte_chain_sort_and_multi_eval_filters`).
+    """
+    pb = ParamBuilder("pb")
+    filters = [
+        tsi.EvalResultsFilter(
+            evaluation_call_id="eval-1",
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$gte": [
+                            {"$getField": "scores.accuracy"},
+                            {"$literal": 0.5},
+                        ]
+                    }
+                }
+            ),
+        ),
+    ]
+    cte = build_eval_results_cte_chain(
+        project_id="proj-1",
+        eval_root_ids=["eval-1"],
+        sort_by=None,
+        filters=filters,
+        require_intersection=False,
+        limit=10,
+        offset=0,
+        pb=pb,
+        read_table="calls_merged",
+    )
+    # The HAVING clause must wrap the per-eval scores aggregate in
+    # `toFloat64OrNull(...)` so the comparison against the `Float64`
+    # parameter type-checks in ClickHouse. Without the fix, the field
+    # comes through as a `String` and CH refuses the comparison with
+    # NO_COMMON_TYPE.
+    assert "toFloat64OrNull(any(CASE WHEN eval_call_id =" in cte, (
+        f"Expected inferred double cast on field side of $gte, got:\n{cte}"
+    )
+
+
 def test_full_query_calls_merged() -> None:
     """Full SQL: lean CTEs + outer SELECT hydrates from calls_merged."""
     pb = ParamBuilder("pb")
