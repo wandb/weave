@@ -6597,27 +6597,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     # observability API is considered stable.
 
     def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
-        return AgentQueryHandler(self._query).spans_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).spans_query(req)
 
     def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
-        return AgentQueryHandler(self._query).spans_stats(req)
+        return AgentQueryHandler(self._query, self.feedback_query).spans_stats(req)
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
-        return AgentQueryHandler(self._query).agents_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).agents_query(req)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
-        return AgentQueryHandler(self._query).agent_versions_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).agent_versions_query(
+            req
+        )
 
     def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
-        return AgentQueryHandler(self._query).search_messages(req)
+        return AgentQueryHandler(self._query, self.feedback_query).search_messages(req)
 
     def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
-        return AgentQueryHandler(self._query).traces_chat(req)
+        return AgentQueryHandler(self._query, self.feedback_query).traces_chat(req)
 
     def agent_conversation_chat(
         self, req: AgentConversationChatReq
     ) -> AgentConversationChatRes:
-        return AgentQueryHandler(self._query).conversation_chat(req)
+        return AgentQueryHandler(self._query, self.feedback_query).conversation_chat(
+            req
+        )
 
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)

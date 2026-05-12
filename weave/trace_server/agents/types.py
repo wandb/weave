@@ -539,12 +539,15 @@ class AgentChatMessage(BaseModel):
             )
         return self
 
+    feedback: list[dict[str, Any]] | None = None
+
 
 class AgentTraceChatReq(BaseModel):
     """Request to get the structured chat / trajectory view for a trace."""
 
     project_id: str
     trace_id: str
+    include_feedback: bool = False
 
 
 class AgentTraceChatRes(BaseModel):
@@ -563,6 +566,7 @@ class AgentTraceChatRes(BaseModel):
         ),
     )
     messages: list[AgentChatMessage] = Field(default_factory=list)
+    feedback: list[dict[str, Any]] | None = None
 
 
 class AgentConversationChatReq(BaseModel):
@@ -584,6 +588,7 @@ class AgentConversationChatReq(BaseModel):
             "chronological order within the selected page."
         ),
     )
+    include_feedback: bool = False
 
 
 class AgentConversationChatRes(BaseModel):
@@ -602,6 +607,7 @@ class AgentConversationChatRes(BaseModel):
     has_more: bool = False
     limit: int = MAX_CONVERSATION_CHAT_TURNS
     offset: int = 0
+    feedback: list[dict[str, Any]] | None = None
 
 
 class AgentSchema(BaseModel):
