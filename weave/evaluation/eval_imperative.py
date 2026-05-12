@@ -720,7 +720,11 @@ class EvaluationLogger:
         self._context_predict_method = MethodType(predict, self.model)
 
         # --- Setup the evaluation object ---
-        @op(name="Evaluation.evaluate", enable_code_capture=False)
+        @op(
+            name="Evaluation.evaluate",
+            enable_code_capture=False,
+            eager_call_start=True,
+        )
         def evaluate(self: Evaluation, model: Model) -> None: ...
 
         @op(name="Evaluation.predict_and_score", enable_code_capture=False)

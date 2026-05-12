@@ -401,6 +401,18 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Get project statistics."""
         return self._send_request("project_stats", req)
 
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
+        """Get project TTL settings."""
+        return self._send_request("project_ttl_settings_read", req)
+
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
+        """Set project TTL settings."""
+        return self._send_request("project_ttl_settings_update", req)
+
     # Streaming method implementations
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Query calls with streaming."""

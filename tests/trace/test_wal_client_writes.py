@@ -17,6 +17,8 @@ import pytest
 from PIL import Image
 
 import weave
+import weave.trace.settings
+from weave.durability.wal_client_id import compute_client_id
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_manager import WALManager
@@ -28,6 +30,7 @@ from weave.durability.wal_sender import (
     create_sender,
 )
 from weave.durability.wal_writer import JSONLWALWriter
+from weave.trace import weave_client
 from weave.trace.settings import UserSettings
 from weave.trace_server import trace_server_interface as tsi
 
@@ -493,3 +496,46 @@ class TestCreateSender:
         sender = create_sender(str(tmp_path), mock_server, poll_interval=0.1)
         sender.start()
         sender.stop()
+
+
+class TestWALClientApiKeyNamespacing:
+    """Verify that WeaveClient threads the api_key through to WALManager."""
+
+    def test_wal_directory_is_namespaced_by_api_key(self, client):
+        """When api_key is provided, the WAL dir includes an HMAC subdirectory."""
+        api_key = "wk-test-key-for-wal-namespacing"
+        settings = UserSettings(enable_wal=True, disable_wal_sender=True)
+        weave.trace.settings.parse_and_apply_settings(settings)
+
+        wc = weave_client.WeaveClient(
+            client.entity,
+            client.project,
+            client.server,
+            ensure_project_exists=False,
+            api_key=api_key,
+        )
+        try:
+            assert wc._wal is not None
+            expected_suffix = compute_client_id(api_key)
+            assert wc._wal.wal_dir.endswith(expected_suffix)
+        finally:
+            wc._wal.close()
+            weave.trace.settings.parse_and_apply_settings(UserSettings())
+
+    def test_wal_directory_not_namespaced_without_api_key(self, client):
+        """When api_key is None, the WAL dir is the flat entity/project path."""
+        settings = UserSettings(enable_wal=True, disable_wal_sender=True)
+        weave.trace.settings.parse_and_apply_settings(settings)
+
+        wc = weave_client.WeaveClient(
+            client.entity,
+            client.project,
+            client.server,
+            ensure_project_exists=False,
+        )
+        try:
+            assert wc._wal is not None
+            assert wc._wal.wal_dir.endswith(wc.project)
+        finally:
+            wc._wal.close()
+            weave.trace.settings.parse_and_apply_settings(UserSettings())

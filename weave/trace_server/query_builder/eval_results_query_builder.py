@@ -18,7 +18,7 @@ from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
 )
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
     ParamBuilder,
@@ -432,6 +432,7 @@ def _build_page_calls_cte(project_id_param: str, read_table: str) -> str:
         any(calls_merged.op_name) AS op_name,
         any(calls_merged.started_at) AS started_at,
         any(calls_merged.ended_at) AS ended_at,
+        any(calls_merged.attributes_dump) AS attributes_dump,
         any(calls_merged.inputs_dump) AS inputs_dump,
         any(calls_merged.output_dump) AS output_dump,
         any(calls_merged.summary_dump) AS summary_dump
@@ -449,6 +450,7 @@ def _build_page_calls_cte(project_id_param: str, read_table: str) -> str:
         calls_complete.op_name,
         calls_complete.started_at,
         calls_complete.ended_at,
+        calls_complete.attributes_dump,
         calls_complete.inputs_dump,
         calls_complete.output_dump,
         calls_complete.summary_dump
@@ -500,6 +502,7 @@ SELECT
     page_calls.op_name,
     page_calls.started_at,
     page_calls.ended_at,
+    page_calls.attributes_dump,
     page_calls.inputs_dump,
     page_calls.output_dump,
     page_calls.summary_dump,
@@ -539,7 +542,7 @@ def build_eval_results_cte_chain(
     deleted_at_sentinel_param = None
     if read_table != "calls_merged":
         deleted_at_sentinel_param = param_slot(
-            pb.add_param(SENTINEL_DATETIME), "DateTime64(3)"
+            pb.add_param(SENTINEL_EPOCH), "DateTime64(3)"
         )
 
     inputs_field = (

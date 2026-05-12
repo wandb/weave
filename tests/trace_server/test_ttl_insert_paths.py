@@ -19,8 +19,9 @@ import pytest
 
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer, get_conn_cursor
 from weave.trace_server.ttl_settings import reset_ttl_cache
@@ -363,3 +364,60 @@ def test_ttl_call_start_v2_end_v2_sets_expire_at(
     )
     assert len(values) == 1
     _assert_expire_at_matches(values, started_at, retention_days, expected_delta)
+
+
+def test_project_ttl_settings_endpoints_round_trip(trace_server):
+    """project_ttl_settings_read/update: default -> set -> clear, plus validation.
+
+    Goes through the external adapter so this exercises both the adapter
+    project/user-id translation and the backend implementation for whichever
+    trace-server backend the test session is configured for.
+    """
+    external_project_id, _ = _make_project("settings_endpoints")
+    read_req = tsi.ProjectTTLSettingsReadReq(project_id=external_project_id)
+
+    # Unset project: read returns retention_days=None (no row).
+    assert trace_server.project_ttl_settings_read(read_req).retention_days is None
+
+    # Update to 30 days: response echoes value, subsequent read sees it.
+    update_30 = trace_server.project_ttl_settings_update(
+        tsi.ProjectTTLSettingsUpdateReq(
+            project_id=external_project_id,
+            retention_days=30,
+            wb_user_id="ttl-user",
+        )
+    )
+    assert update_30.retention_days == 30
+    # Reusing read_req must not double-encode project_id (adapter copies req).
+    assert trace_server.project_ttl_settings_read(read_req).retention_days == 30
+
+    # Update to None: clears retention; subsequent read returns None again.
+    update_none = trace_server.project_ttl_settings_update(
+        tsi.ProjectTTLSettingsUpdateReq(
+            project_id=external_project_id,
+            retention_days=None,
+            wb_user_id="ttl-user",
+        )
+    )
+    assert update_none.retention_days is None
+    assert trace_server.project_ttl_settings_read(read_req).retention_days is None
+
+    # retention_days < 1 (other than None) is rejected.
+    with pytest.raises(InvalidRequest):
+        trace_server.project_ttl_settings_update(
+            tsi.ProjectTTLSettingsUpdateReq(
+                project_id=external_project_id,
+                retention_days=0,
+                wb_user_id="ttl-user",
+            )
+        )
+
+    # wb_user_id is required for the audit trail.
+    with pytest.raises(InvalidRequest):
+        trace_server.project_ttl_settings_update(
+            tsi.ProjectTTLSettingsUpdateReq(
+                project_id=external_project_id,
+                retention_days=30,
+                wb_user_id=None,
+            )
+        )

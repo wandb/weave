@@ -1,0 +1,37 @@
+[project]
+name = "trace_server_mock"
+version = "0.1.0"
+description = "Lightweight in-memory mock of the Weave trace server, for SDK integration tests."
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "pydantic>=2.7.1,<3",
+  # Pulls in the production Pydantic models from
+  # `weave.trace_server.trace_server_interface` so the mock validates
+  # incoming requests against exactly the shape the production server uses.
+  # When production renames or restructures a model, the import or Pydantic
+  # validation fails immediately. That drift signal is the central reason
+  # for this dependency.
+  "weave",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trace_server_mock"]
+
+[tool.uv.sources]
+# Resolve `weave` through the uv workspace declared in the parent
+# `pyproject.toml` rather than from PyPI. This guarantees the mock always
+# binds to the SAME `weave.trace_server.trace_server_interface` checkout
+# the rest of the repo is using — drift detection only works if mock and
+# production come from the same source tree.
+weave = { workspace = true }
+
+[project.scripts]
+trace_server_mock = "trace_server_mock.__main__:main"

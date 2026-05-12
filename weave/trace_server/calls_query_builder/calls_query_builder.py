@@ -28,7 +28,8 @@ Outstanding Optimizations/Work:
 import logging
 import re
 from collections.abc import Callable, KeysView, Sequence
-from typing import Any, Literal, NamedTuple, cast
+from dataclasses import dataclass
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -84,7 +85,8 @@ CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 CTE_ALL_CALLS = "all_calls"
 
 
-class FilterConditionsResult(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class FilterConditionsResult:
     """Result from building filter conditions.
 
     Attributes:
@@ -100,7 +102,8 @@ class FilterConditionsResult(NamedTuple):
     queue_id_filter: str | None
 
 
-class OrderLimitOffsetResult(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class OrderLimitOffsetResult:
     """Result from building ORDER BY, LIMIT, and OFFSET clauses.
 
     Attributes:
@@ -116,7 +119,8 @@ class OrderLimitOffsetResult(NamedTuple):
     needs_feedback: bool
 
 
-class QueryBodyResult(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class QueryBodyResult:
     """Result from building the query body (FROM through OFFSET)."""
 
     sql: str
@@ -1977,6 +1981,9 @@ ALLOWED_CALL_FIELDS = {
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
     "otel_dump": CallsMergedAggField(field="otel_dump", agg_fn="any"),
+    # calls_merged.expire_at is SimpleAggregateFunction(min, DateTime64(3))
+    # (migration 029); use the matching agg_fn so reads agree with storage.
+    "expire_at": CallsMergedAggField(field="expire_at", agg_fn="min"),
 }
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
@@ -1984,7 +1991,7 @@ DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 # Fields that are stored as DateTime64 columns in ClickHouse. When comparing
 # these fields with numeric unix timestamps, the value must be converted to a
 # datetime string so ClickHouse can properly use primary key / ORDER BY indexes.
-DATETIME_COLUMN_FIELDS = {"started_at", "ended_at", "deleted_at"}
+DATETIME_COLUMN_FIELDS = {"started_at", "ended_at", "deleted_at", "expire_at"}
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
@@ -2257,7 +2264,6 @@ def process_query_to_conditions(
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
     raw_fields_used: dict[str, CallsMergedField] = {}
-    use_sentinels = read_table == ReadTable.CALLS_COMPLETE
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -2300,21 +2306,12 @@ def process_query_to_conditions(
                     isinstance(ops[1], tsi_query.LiteralOperation)
                     and ops[1].literal_ is None
                 ):
-                    # For calls_complete, sentinel fields use equality checks
-                    # against the sentinel value instead of IS NULL.
                     field_name = _extract_field_name(ops[0])
-                    sentinel = (
-                        ch_sentinel_values.get_sentinel_value(field_name)
-                        if use_sentinels and field_name
-                        else None
-                    )
-                    if sentinel is not None:
-                        assert field_name is not None
-                        sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
-                        sentinel_slot = param_builder.add(
-                            sentinel, param_type=sentinel_type
+                    if field_name is not None:
+                        null_check = ch_sentinel_values.null_check_sql(
+                            field_name, lhs_part, read_table, param_builder
                         )
-                        cond = f"({lhs_part} = {sentinel_slot})"
+                        cond = f"({null_check})"
                     else:
                         cond = f"({lhs_part} IS NULL)"
                 else:

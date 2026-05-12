@@ -7,7 +7,6 @@ import pytest
 
 from weave.trace_server import ttl_settings
 from weave.trace_server.ttl_settings import (
-    EXPIRE_AT_NEVER,
     REDIS_TTL_EXPIRY_SECS,
     _ttl_cache_key,
     compute_expire_at,
@@ -64,11 +63,10 @@ def _make_ch_client(rows):
 
 
 def test_compute_expire_at():
-    """Zero → sentinel, positive + naive → UTC, positive + aware → preserved, negative → minutes."""
-    # retention_days=0 returns the far-future UTC sentinel
+    """Zero → None, positive + naive → UTC, positive + aware → preserved, negative → minutes."""
+    # retention_days=0 means no TTL in app code; DB adapters sentinelize at write time.
     result_zero = compute_expire_at(0, datetime.datetime(2025, 1, 1))
-    assert result_zero == EXPIRE_AT_NEVER
-    assert result_zero.tzinfo == datetime.timezone.utc
+    assert result_zero is None
 
     # Positive days with naive datetime normalizes to UTC
     result_positive_naive = compute_expire_at(

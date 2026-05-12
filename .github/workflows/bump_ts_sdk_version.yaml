@@ -1,7 +1,13 @@
 name: bump-typescript-sdk-version
 
 # This workflow bumps the version of the Weave TypeScript SDK package.
-# It updates `sdks/node/package.json`, creates a commit, and pushes it.
+# It updates `sdks/node/package.json` and the lockstep constant in
+# `sdks/node/src/utils/packageVersion.ts`, creates a commit, and pushes it.
+#
+# packageVersion.ts is hardcoded (not codegen) so the source compiles cleanly
+# to both CJS and ESM without `__dirname` / `import.meta.url` gymnastics. The
+# tradeoff is that the version lives in two places; this workflow is what keeps
+# them in sync.
 
 on:
   workflow_dispatch:
@@ -27,9 +33,19 @@ jobs:
       contents: write
       id-token: write
     steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.WANDBOT_3000_APP_ID }}
+          private-key: ${{ secrets.WANDBOT_3000_PRIVATE_KEY }}
+          owner: wandb
+          repositories: weave
+          permission-contents: write
+
       - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.WANDBMACHINE_GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -81,6 +97,21 @@ jobs:
           packageJson.version = nextVersion;
           fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
 
+          // Keep src/utils/packageVersion.ts in lockstep with package.json.
+          // The file is owned by this workflow — we rewrite it wholesale on
+          // every bump so the constant cannot silently drift from package.json.
+          const versionTsPath = 'sdks/node/src/utils/packageVersion.ts';
+          const versionTsContent =
+            "// Hardcoded version constant. Kept in lockstep with the `version` field in\n" +
+            "// package.json by the .github/workflows/bump_ts_sdk_version.yaml workflow,\n" +
+            "// which rewrites this whole file on every bump. Do not edit by hand.\n" +
+            "//\n" +
+            "// Lives as a constant — rather than being read from package.json at runtime —\n" +
+            "// so the source compiles cleanly to both CJS and ESM without needing\n" +
+            "// `__dirname` (CJS-only) or `import.meta.url` (ESM-only).\n" +
+            `export const packageVersion = '${nextVersion}';\n`;
+          fs.writeFileSync(versionTsPath, versionTsContent);
+
           fs.appendFileSync(
             process.env.GITHUB_OUTPUT,
             `old_version=${currentVersion}\nnew_version=${nextVersion}\n`
@@ -93,13 +124,13 @@ jobs:
         env:
           NEW_VERSION: ${{ steps.bump_version.outputs.new_version }}
         run: |
-          if git diff --quiet -- sdks/node/package.json; then
+          if git diff --quiet -- sdks/node/package.json sdks/node/src/utils/packageVersion.ts; then
             echo "No version changes detected."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          git add sdks/node/package.json
+          git add sdks/node/package.json sdks/node/src/utils/packageVersion.ts
           git commit -m "chore(weave): bump TSSDK version to ${NEW_VERSION}"
           echo "changed=true" >> "$GITHUB_OUTPUT"
 

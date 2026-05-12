@@ -4,7 +4,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
 )
-from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.project_version.types import ReadTable
 
 
@@ -771,7 +771,7 @@ def test_query_calls_complete_with_costs_light_fields() -> None:
                  started_at
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": ["a", "b"],
             "pb_2": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
             "pb_3": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
@@ -881,7 +881,7 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
                        OR JSONType(ranked_prices.attributes_dump, {pb_1:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, {pb_2:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, {pb_2:String}), 'null'), '')) ASC
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "sort_key",
             "pb_2": '$."sort_key"',
             "pb_3": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
@@ -1002,7 +1002,7 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
                        OR JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_1:String}), {pb_2:String}, {pb_3:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_1:String}), {pb_4:String}), 'null'), '')) DESC, toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_1:String}), {pb_4:String}), 'null'), '')) DESC
         """,
         {
-            "pb_0": SENTINEL_DATETIME,
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "wandb.runnable.my_op",
             "pb_2": "output",
             "pb_3": "score",
@@ -1235,7 +1235,7 @@ def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
         """,
         {
             "pb_0": "",
-            "pb_1": SENTINEL_DATETIME,
+            "pb_1": SENTINEL_EPOCH,
             "pb_2": "",
             "pb_3": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
             "pb_4": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",

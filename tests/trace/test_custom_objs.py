@@ -14,7 +14,7 @@ from weave.trace.serialization.custom_objs import (
 )
 
 
-def test_encode_custom_obj_unknown_type(client):
+def test_encode_custom_obj_unknown_type():
     """No encoding should be done for unregistered types."""
 
     class UnknownType:

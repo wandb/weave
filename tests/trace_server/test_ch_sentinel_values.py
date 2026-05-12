@@ -11,8 +11,10 @@ import pytest
 from weave.trace_server.ch_sentinel_values import (
     ALL_SENTINEL_FIELDS,
     DATETIME_PRECISION,
-    SENTINEL_DATETIME,
+    EXPIRE_AT_NEVER,
     SENTINEL_DATETIME_FIELDS,
+    SENTINEL_DATETIME_VALUES,
+    SENTINEL_EPOCH,
     SENTINEL_INT,
     SENTINEL_INT_FIELDS,
     SENTINEL_STRING,
@@ -35,8 +37,9 @@ NON_SENTINEL_FIELDS = ["op_name", "id", "inputs_dump", "trace_id"]
 def test_constants() -> None:
     """Sentinel constants and field sets are internally consistent."""
     assert SENTINEL_STRING == ""
-    assert SENTINEL_DATETIME == datetime.datetime(
-        1970, 1, 1, tzinfo=datetime.timezone.utc
+    assert SENTINEL_EPOCH == datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+    assert EXPIRE_AT_NEVER == datetime.datetime(
+        2100, 1, 1, tzinfo=datetime.timezone.utc
     )
     assert SENTINEL_INT == 0
     assert ALL_SENTINEL_FIELDS == (
@@ -48,6 +51,9 @@ def test_constants() -> None:
     assert SENTINEL_STRING_FIELDS.isdisjoint(SENTINEL_DATETIME_FIELDS)
     assert SENTINEL_STRING_FIELDS.isdisjoint(SENTINEL_INT_FIELDS)
     assert SENTINEL_DATETIME_FIELDS.isdisjoint(SENTINEL_INT_FIELDS)
+    # Every datetime sentinel field must declare both a value and a precision;
+    # a mismatch breaks sentinel_ch_literal/sentinel_ch_type for that field.
+    assert set(SENTINEL_DATETIME_VALUES) == set(DATETIME_PRECISION)
 
 
 def test_is_sentinel_field() -> None:
@@ -67,9 +73,7 @@ def test_get_sentinel_value() -> None:
         assert get_sentinel_value(field) == "", f"{field} sentinel should be ''"
 
     for field in SENTINEL_DATETIME_FIELDS:
-        assert get_sentinel_value(field) is SENTINEL_DATETIME, (
-            f"{field} sentinel should be SENTINEL_DATETIME"
-        )
+        assert get_sentinel_value(field) is SENTINEL_DATETIME_VALUES[field]
 
     for field in SENTINEL_INT_FIELDS:
         assert get_sentinel_value(field) == 0, f"{field} sentinel should be 0"
@@ -93,6 +97,7 @@ def test_sentinel_ch_type() -> None:
     assert sentinel_ch_type("ended_at") == "DateTime64(6)"
     assert sentinel_ch_type("updated_at") == "DateTime64(3)"
     assert sentinel_ch_type("deleted_at") == "DateTime64(3)"
+    assert sentinel_ch_type("expire_at") == "DateTime64(3)"
 
     for field in SENTINEL_INT_FIELDS:
         assert sentinel_ch_type(field) == "UInt64"
@@ -109,10 +114,13 @@ def test_sentinel_ch_literal() -> None:
     for field in SENTINEL_STRING_FIELDS:
         assert sentinel_ch_literal(field) == "''"
 
-    # Datetime sentinel fields return toDateTime64(0, N).
+    # Datetime sentinel fields return their field-specific sentinel literal.
     assert sentinel_ch_literal("ended_at") == "toDateTime64(0, 6)"
     assert sentinel_ch_literal("updated_at") == "toDateTime64(0, 3)"
     assert sentinel_ch_literal("deleted_at") == "toDateTime64(0, 3)"
+    assert sentinel_ch_literal("expire_at") == (
+        "toDateTime64('2100-01-01 00:00:00', 3)"
+    )
 
     # Int sentinel fields return 0.
     assert sentinel_ch_literal("wb_run_step") == "0"
@@ -134,7 +142,7 @@ def test_to_ch_value() -> None:
         assert to_ch_value(field, "x") == "x"
 
     for field in SENTINEL_DATETIME_FIELDS:
-        assert to_ch_value(field, None) is SENTINEL_DATETIME
+        assert to_ch_value(field, None) is SENTINEL_DATETIME_VALUES[field]
         assert to_ch_value(field, dt) is dt
 
     for field in SENTINEL_INT_FIELDS:
@@ -151,6 +159,7 @@ def test_from_ch_value() -> None:
     """Converts sentinels back to None on read; passes through real values."""
     real_dt = datetime.datetime(2024, 1, 15, 12, 0, 0, tzinfo=datetime.timezone.utc)
     naive_epoch = datetime.datetime(1970, 1, 1)
+    naive_expire_at_never = datetime.datetime(2100, 1, 1)
     naive_real = datetime.datetime(2024, 1, 15, 12, 0, 0)
 
     for field in SENTINEL_STRING_FIELDS:
@@ -159,8 +168,10 @@ def test_from_ch_value() -> None:
         assert from_ch_value(field, "x") == "x"
 
     for field in SENTINEL_DATETIME_FIELDS:
-        assert from_ch_value(field, SENTINEL_DATETIME) is None
-        assert from_ch_value(field, naive_epoch) is None  # timezone-ignoring
+        sentinel = SENTINEL_DATETIME_VALUES[field]
+        naive_sentinel = naive_expire_at_never if field == "expire_at" else naive_epoch
+        assert from_ch_value(field, sentinel) is None
+        assert from_ch_value(field, naive_sentinel) is None  # timezone-ignoring
         assert from_ch_value(field, real_dt) is real_dt
         assert from_ch_value(field, naive_real) is naive_real
         assert from_ch_value(field, None) is None  # CH may return None during migration
@@ -212,6 +223,13 @@ def test_null_check_sql() -> None:
     pb = ParamBuilder("pb")
     result = null_check_sql("wb_run_step", "t.wb_run_step", ReadTable.CALLS_MERGED, pb)
     assert result == "t.wb_run_step IS NULL"
+
+    # calls_merged: expire_at is non-null and uses its sentinel.
+    pb = ParamBuilder("pb")
+    result = null_check_sql("expire_at", "t.expire_at", ReadTable.CALLS_MERGED, pb)
+    assert "=" in result
+    assert "IS NULL" not in result
+    assert "DateTime64(3)" in result
 
     # negate: calls_complete sentinel field uses != sentinel
     pb = ParamBuilder("pb")
@@ -266,6 +284,10 @@ def test_null_check_literal_sql() -> None:
         "ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE, negate=True
     )
     assert result == "t.ended_at != toDateTime64(0, 6)"
+
+    # calls_merged expire_at uses the non-null far-future sentinel.
+    result = null_check_literal_sql("expire_at", "t.expire_at", ReadTable.CALLS_MERGED)
+    assert result == "t.expire_at = toDateTime64('2100-01-01 00:00:00', 3)"
 
     # calls_complete int sentinel field: uses = 0 or != 0.
     result = null_check_literal_sql(
