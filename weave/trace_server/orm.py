@@ -762,6 +762,14 @@ def _process_query_to_conditions(
         elif isinstance(operand, tsi_query.GetFieldOperator):
             if field_resolver is not None:
                 field, fields_used = field_resolver(operand.get_field_, pb)
+                # The default `_transform_external_field_to_internal_field`
+                # path applies the inferred cast inside JSON extraction; the
+                # field_resolver path replaces that with caller-controlled
+                # SQL, so the cast has to be reapplied here for the typed
+                # comparison to type-check in CH. Sqlite drops the cast for
+                # the same reason it's dropped in the JSON extraction path.
+                if cast is not None and pb._database_type == "clickhouse":
+                    field = clickhouse_cast_json_value(field, cast)
             else:
                 (
                     field,
