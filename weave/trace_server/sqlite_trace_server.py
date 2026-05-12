@@ -40,6 +40,7 @@ from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
+    ObjectNameTypeCollision,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -1984,13 +1985,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         for (existing_class,) in cursor.fetchall():
             if existing_class != new_base_object_class:
-                raise InvalidRequest(
-                    f"Cannot create object {object_id!r} with "
-                    f"base_object_class={new_base_object_class!r}: an object "
-                    f"with this name already exists with "
-                    f"base_object_class={existing_class!r}. Object names are "
-                    f"bound to one type per project. Use a different name, or "
-                    f"delete the existing object first."
+                raise ObjectNameTypeCollision(
+                    object_id=object_id,
+                    new_base_object_class=new_base_object_class,
+                    existing_base_object_class=existing_class,
                 )
 
     def _mark_existing_objects_as_not_latest(

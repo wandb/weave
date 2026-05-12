@@ -22,6 +22,7 @@ from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import ObjectNameTypeCollision
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyNestedBaseModel,
 )
@@ -1107,7 +1108,7 @@ def test_obj_create_rejects_name_type_collision(client: WeaveClient):
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
         nested_base_object="weave:///fake/fake/object/fake:fake",
     )
-    with pytest.raises(Exception, match="TestOnlyNestedBaseObject"):
+    with pytest.raises(ObjectNameTypeCollision, match="TestOnlyNestedBaseObject"):
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
                 {

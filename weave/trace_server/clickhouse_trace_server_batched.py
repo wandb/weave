@@ -175,6 +175,7 @@ from weave.trace_server.errors import (
     MissingLLMApiKeyError,
     NotFoundError,
     ObjectDeletedError,
+    ObjectNameTypeCollision,
     RequestTooLarge,
     handle_clickhouse_query_error,
 )
@@ -1884,13 +1885,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self._query(query, parameters)
         for (existing_class,) in result.result_rows:
             if existing_class != new_base_object_class:
-                raise InvalidRequest(
-                    f"Cannot create object {object_id!r} with "
-                    f"base_object_class={new_base_object_class!r}: an object "
-                    f"with this name already exists with "
-                    f"base_object_class={existing_class!r}. Object names are "
-                    f"bound to one type per project. Use a different name, or "
-                    f"delete the existing object first."
+                raise ObjectNameTypeCollision(
+                    object_id=object_id,
+                    new_base_object_class=new_base_object_class,
+                    existing_base_object_class=existing_class,
                 )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
