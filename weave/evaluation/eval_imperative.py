@@ -800,6 +800,8 @@ class EvaluationLogger:
     ) -> EvaluationLogger:
         """Internal factory: build an EvaluationLogger with extra
         `_weave_eval_meta` keys propagated to every emitted call.
+
+        Note: Semi-internal; used by wandb/wandb SDK.
         """
         instance = cls.__new__(cls)
         instance._eval_meta = eval_meta
