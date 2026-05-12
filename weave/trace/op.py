@@ -486,6 +486,12 @@ def _call_sync_func(
         res = func(*args, **kwargs)
         return res, call
 
+    if is_placeholder_call(call):
+        with tracing_disabled():
+            res = func(*args, **kwargs)
+            call.output = res
+            return res, call
+
     # Execute the op and process the result
     client = weave_client_context.require_weave_client()
     has_finished = False
@@ -614,6 +620,12 @@ async def _call_async_func(
         )
         res = await func(*args, **kwargs)
         return res, call
+
+    if is_placeholder_call(call):
+        with tracing_disabled():
+            res = await func(*args, **kwargs)
+            call.output = res
+            return res, call
 
     # Execute the op and process the result
     client = weave_client_context.require_weave_client()
@@ -750,6 +762,17 @@ def _call_sync_gen(
         )
         gen = func(*args, **kwargs)
         return gen, call
+
+    if is_placeholder_call(call):
+        gen = func(*args, **kwargs)
+
+        def untraced_gen() -> Generator[Any]:
+            with tracing_disabled():
+                yield from gen
+
+        wrapped_gen = untraced_gen()
+        call.output = wrapped_gen
+        return wrapped_gen, call
 
     # Execute the op and get the generator
     client = weave_client_context.require_weave_client()
@@ -972,6 +995,18 @@ def _call_async_gen(
         )
         gen = func(*args, **kwargs)
         return gen, call
+
+    if is_placeholder_call(call):
+        gen = func(*args, **kwargs)
+
+        async def untraced_gen() -> AsyncIterator[Any]:
+            with tracing_disabled():
+                async for item in gen:
+                    yield item
+
+        wrapped_gen = untraced_gen()
+        call.output = wrapped_gen
+        return wrapped_gen, call
 
     # Execute the op and get the generator
     client = weave_client_context.require_weave_client()

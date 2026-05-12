@@ -2,6 +2,7 @@ import abc
 from collections.abc import Callable, Iterator
 from typing import Any, TypeVar
 
+from weave.trace.sampling import build_sampling_etag
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
@@ -669,6 +670,44 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(
             self._internal_trace_server.project_ttl_settings_update, req, req.project_id
         )
+
+    def sampling_rules_read(
+        self, req: tsi.SamplingRulesReadReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        req = req.model_copy(deep=True)
+        external_project_id = req.project_id
+        internal_project_id = self._idc.ext_to_int_project_id(external_project_id)
+        req.project_id = internal_project_id
+        res = self._ref_apply(
+            self._internal_trace_server.sampling_rules_read, req, req.project_id
+        )
+        res.project_id = external_project_id
+        for rule in res.rules:
+            if rule.scope == f"project:{internal_project_id}":
+                rule.scope = f"project:{external_project_id}"
+        res.etag = build_sampling_etag(res.rules)
+        return res
+
+    def sampling_rules_update(
+        self, req: tsi.SamplingRulesUpdateReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        req = req.model_copy(deep=True)
+        external_project_id = req.project_id
+        internal_project_id = self._idc.ext_to_int_project_id(external_project_id)
+        req.project_id = internal_project_id
+        if req.scope == f"project:{external_project_id}":
+            req.scope = f"project:{internal_project_id}"
+        if req.wb_user_id is not None and not req.wb_user_id.startswith("monitor:"):
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        res = self._ref_apply(
+            self._internal_trace_server.sampling_rules_update, req, req.project_id
+        )
+        res.project_id = external_project_id
+        for rule in res.rules:
+            if rule.scope == f"project:{internal_project_id}":
+                rule.scope = f"project:{external_project_id}"
+        res.etag = build_sampling_etag(res.rules)
+        return res
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq

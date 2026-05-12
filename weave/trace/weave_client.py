@@ -81,6 +81,13 @@ from weave.trace.registry_links import (
     parse_registry_target_path,
     resolve_prompt_ref,
 )
+from weave.trace.sampling import (
+    SAMPLING_DECISION_ATTRIBUTE,
+    SAMPLING_RULE_OP_PATTERN_ATTRIBUTE,
+    SAMPLING_RULE_SCOPE_ATTRIBUTE,
+    apply_sampling_attributes,
+)
+from weave.trace.sampling_client import SamplingClient
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -408,6 +415,9 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+        self.sampling_client = SamplingClient(self.server, self.project_id)
+        if self.entity != "DISABLED" and self.project != "DISABLED":
+            self.sampling_client.start()
 
         self._wal: WALManager | None = None
         self._wal_pending_call_ids: set[str] = set()
@@ -773,8 +783,6 @@ class WeaveClient:
             op = self._anonymous_ops[op]
 
         unbound_op = maybe_unbind_method(op)
-        op_def_ref = self._save_op(unbound_op)
-
         inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
 
         if op.postprocess_inputs:
@@ -784,9 +792,6 @@ class WeaveClient:
 
         if self.postprocess_inputs:
             inputs_postprocessed = self.postprocess_inputs(inputs_postprocessed)
-
-        self._save_nested_objects(inputs_postprocessed)
-        inputs_with_refs = map_to_refs(inputs_postprocessed)
 
         if parent is None and use_stack:
             parent = call_context.get_current_call()
@@ -813,6 +818,31 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_name", platform.system())
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
+
+        if parent is None:
+            sampling_decision = self.sampling_client.decide_root(
+                trace_id=trace_id,
+                op_name=unbound_op.name,
+                attributes=attributes_dict.unwrap(),
+            )
+            if not sampling_decision.keep:
+                return placeholder_call()
+            apply_sampling_attributes(attributes_dict, sampling_decision)
+        elif parent.attributes:
+            for sampling_attribute in (
+                SAMPLING_DECISION_ATTRIBUTE,
+                SAMPLING_RULE_SCOPE_ATTRIBUTE,
+                SAMPLING_RULE_OP_PATTERN_ATTRIBUTE,
+            ):
+                if sampling_attribute in parent.attributes:
+                    attributes_dict[sampling_attribute] = parent.attributes[
+                        sampling_attribute
+                    ]
+
+        op_def_ref = self._save_op(unbound_op)
+
+        self._save_nested_objects(inputs_postprocessed)
+        inputs_with_refs = map_to_refs(inputs_postprocessed)
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
 
@@ -2613,6 +2643,7 @@ class WeaveClient:
         if self._wal is not None:
             self._wal.close()
             self._wal = None
+        self.sampling_client.close()
 
     def flush(self) -> None:
         """Flushes background asynchronous tasks, safe to call multiple times."""
