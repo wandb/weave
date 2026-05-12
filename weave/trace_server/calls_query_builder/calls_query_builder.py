@@ -63,14 +63,14 @@ from weave.trace_server.calls_query_builder.utils import (
     safely_format_sql,
     timestamp_to_datetime_str,
 )
-from weave.trace_server.interface.query import (
-    infer_literal_filter_cast,
-    infer_shared_literal_filter_cast,
-)
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import MULTI_VALUE_FEEDBACK_TYPES
+from weave.trace_server.interface.query import (
+    infer_literal_filter_cast,
+    infer_shared_literal_filter_cast,
+)
 from weave.trace_server.orm import (
     ParamBuilder,
     clickhouse_cast,
