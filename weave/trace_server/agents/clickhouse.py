@@ -58,6 +58,7 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
+    group_by_ref_alias,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -142,8 +143,9 @@ class AgentQueryHandler:
             spans = [AgentSpanSchema(**normalize_span_row(r)) for r in rows]
             return AgentSpansQueryRes(spans=spans, total_count=total)
 
-        aliases = [ref.alias or ref.key for ref in req.group_by]
-        groups = [_hydrate_group_row(r, aliases) for r in rows]
+        aliases = [group_by_ref_alias(ref) for ref in req.group_by]
+        measure_aliases = [measure.alias for measure in req.measures]
+        groups = [_hydrate_group_row(r, aliases, measure_aliases) for r in rows]
         return AgentSpansQueryRes(groups=groups, total_count=total)
 
     def spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
@@ -156,6 +158,7 @@ class AgentQueryHandler:
             end=query.end,
             granularity=query.granularity_seconds,
             timezone=req.timezone or "UTC",
+            bucket_type=query.bucket_type,
             columns=query.column_metadata,
             rows=_rows_to_dicts(query.columns, result.result_rows),
         )
@@ -588,7 +591,7 @@ def _record_ingest_failure(
 
 
 def _hydrate_group_row(
-    row: ClickHouseRow, group_aliases: list[str]
+    row: ClickHouseRow, group_aliases: list[str], measure_aliases: list[str]
 ) -> AgentSpanGroupRow:
     """Hydrate one aggregate-query result row into an `AgentSpanGroupRow`.
 
@@ -598,6 +601,7 @@ def _hydrate_group_row(
     group dimensions separate from aggregates so callers can iterate either.
     """
     group_keys = {alias: _group_key_value(row.get(alias)) for alias in group_aliases}
+    metrics = {alias: row.get(alias) for alias in measure_aliases}
     return AgentSpanGroupRow(
         group_keys=group_keys,
         span_count=safe_int(row.get("span_count")),
@@ -614,6 +618,7 @@ def _hydrate_group_row(
         conversation_names=unpack_string_array(row.get("conversation_names")),
         first_seen=_datetime_or_none(row.get("first_seen")),
         last_seen=_datetime_or_none(row.get("last_seen")),
+        metrics=metrics,
     )
 
 
