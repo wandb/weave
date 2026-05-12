@@ -219,6 +219,12 @@ npm run test
 3. Update documentation if needed
 4. Check for any breaking changes
 
+### GitHub Actions Authentication
+
+- Prefer native `${{ secrets.GITHUB_TOKEN }}` for repository-local workflow operations that only need the current repo.
+- Use `actions/create-github-app-token@v3` with `vars.WANDBOT_3000_APP_ID` and `secrets.WANDBOT_3000_PRIVATE_KEY` for cross-repository access or bot pushes that must behave like app-authenticated writes.
+- Do not introduce new GitHub PAT secrets in workflows unless there is no viable `GITHUB_TOKEN` or GitHub App alternative.
+
 ## Common Development Patterns
 
 ### Code Organization

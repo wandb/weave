@@ -17,14 +17,16 @@ from weave.trace_server.agents.chat_view import build_trace_chat
 from weave.trace_server.agents.constants import (
     MAX_INGEST_ERRORS_REPORTED,
     NO_CONVERSATION_LABEL,
-    SEARCH_CONTENT_PREVIEW_CHARS,
 )
 from weave.trace_server.agents.helpers import (
     genai_span_to_row,
     normalize_span_row,
     unpack_string_array,
 )
-from weave.trace_server.agents.schema import ALL_SPAN_INSERT_COLUMNS
+from weave.trace_server.agents.schema import (
+    ALL_SPAN_INSERT_COLUMNS,
+    AgentSpanCHInsertable,
+)
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -37,6 +39,9 @@ from weave.trace_server.agents.types import (
     AgentSpanSchema,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
+    AgentSpanStatsCell,
+    AgentSpanStatsReq,
+    AgentSpanStatsRes,
     AgentsQueryReq,
     AgentsQueryRes,
     AgentTraceChatReq,
@@ -64,6 +69,9 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_trace_detail_spans_query,
     safe_int,
     safe_str,
+)
+from weave.trace_server.query_builder.agent_stats_query_builder import (
+    build_agent_span_stats_query,
 )
 
 if TYPE_CHECKING:
@@ -120,6 +128,20 @@ class AgentQueryHandler:
         aliases = [ref.alias or ref.key for ref in req.group_by]
         groups = [_hydrate_group_row(r, aliases) for r in rows]
         return AgentSpansQueryRes(groups=groups, total_count=total)
+
+    def spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
+        """Return chart-ready aggregations over spans."""
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        query = build_agent_span_stats_query(req, pb)
+        result = self._query(query.sql, query.parameters)
+        return AgentSpanStatsRes(
+            start=query.start,
+            end=query.end,
+            granularity=query.granularity_seconds,
+            timezone=req.timezone or "UTC",
+            columns=query.column_metadata,
+            rows=_rows_to_dicts(query.columns, result.result_rows),
+        )
 
     # ------------------------------------------------------------------
     # AMT-backed agents queries
@@ -181,9 +203,7 @@ class AgentQueryHandler:
                     span_id=safe_str(r.get("span_id")),
                     trace_id=safe_str(r.get("trace_id")),
                     role=safe_str(r.get("role")),
-                    content_preview=safe_str(r.get("content"))[
-                        :SEARCH_CONTENT_PREVIEW_CHARS
-                    ],
+                    content_preview=safe_str(r.get("content")),
                     content_digest=safe_str(r.get("content_digest")),
                     started_at=started_at,
                 )
@@ -320,13 +340,15 @@ class AgentWriteHandler:
     # OTel ingest
     # ------------------------------------------------------------------
 
-    def insert_otel_spans(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+    def insert_otel_spans(
+        self, req: GenAIOTelExportReq
+    ) -> tuple[GenAIOTelExportRes, list[AgentSpanCHInsertable]]:
         """Ingest OTel spans into the spans table.
 
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
         """
-        span_rows: list[list[object]] = []
+        span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
         rejected = 0
         errors: list[str] = []
@@ -374,12 +396,14 @@ class AgentWriteHandler:
                         )
                         continue
 
-                    span_rows.append(genai_span_to_row(genai_row))
+                    span_rows.append(genai_row)
                     accepted += 1
 
         if span_rows:
             self._ch_client.insert(
-                "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
+                "spans",
+                data=[genai_span_to_row(s) for s in span_rows],
+                column_names=ALL_SPAN_INSERT_COLUMNS,
             )
 
         if failure_counts:
@@ -393,11 +417,12 @@ class AgentWriteHandler:
         error_msg = "; ".join(errors[:MAX_INGEST_ERRORS_REPORTED])
         if len(errors) > MAX_INGEST_ERRORS_REPORTED:
             error_msg += "; ..."
-        return GenAIOTelExportRes(
+        res = GenAIOTelExportRes(
             accepted_spans=accepted,
             rejected_spans=rejected,
             error_message=error_msg,
         )
+        return res, span_rows
 
 
 # ---------------------------------------------------------------------------
@@ -416,6 +441,13 @@ def _rows_as_dicts(result: QueryResult) -> list[ClickHouseRow]:
         list[ClickHouseRow],
         [dict(zip(col_names, row, strict=True)) for row in result.result_rows],
     )
+
+
+def _rows_to_dicts(
+    columns: list[str], rows: list[tuple[AgentSpanStatsCell, ...]]
+) -> list[dict[str, AgentSpanStatsCell]]:
+    """Zip explicit column names with rows returned by a stats query."""
+    return [dict(zip(columns, row, strict=True)) for row in rows]
 
 
 def _first_cell_int(result: QueryResult) -> int:

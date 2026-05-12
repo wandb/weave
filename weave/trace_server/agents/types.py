@@ -14,8 +14,11 @@ from pydantic import BaseModel, Field, model_validator
 
 from weave.trace_server.agents.constants import (
     DEFAULT_AGENT_QUERY_LIMIT,
+    DEFAULT_AGENT_STATS_GROUP_LIMIT,
     DEFAULT_SEARCH_LIMIT,
     MAX_AGENT_QUERY_LIMIT,
+    MAX_AGENT_STATS_GROUP_LIMIT,
+    MAX_AGENT_STATS_RANGE_DAYS,
     MAX_CONVERSATION_CHAT_TURNS,
     MAX_SEARCH_LIMIT,
 )
@@ -40,6 +43,177 @@ SearchMessageRole = Literal[
     "tool_call",
     "tool_result",
 ]
+
+AgentSpanStatsValueType = Literal["number", "boolean", "string"]
+AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string"]
+AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
+AgentSpanStatsAggregation = Literal[
+    "sum",
+    "avg",
+    "min",
+    "max",
+    "count",
+    "count_distinct",
+    "count_true",
+    "count_false",
+]
+AgentSpanStatsDerivedMetric = Literal[
+    "duration_ms",
+    "total_tokens",
+    "is_error",
+    "is_invocation",
+]
+
+_IDENT_RE = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
+AGENT_SPAN_STATS_DERIVED_VALUE_TYPES: dict[
+    AgentSpanStatsDerivedMetric, AgentSpanStatsValueType
+] = {
+    "duration_ms": "number",
+    "total_tokens": "number",
+    "is_error": "boolean",
+    "is_invocation": "boolean",
+}
+_ALLOWED_AGGS_BY_TYPE: dict[AgentSpanStatsValueType, set[AgentSpanStatsAggregation]] = {
+    "number": {"sum", "avg", "min", "max", "count", "count_distinct"},
+    "boolean": {"count", "count_distinct", "count_true", "count_false"},
+    "string": {"count", "count_distinct"},
+}
+
+
+def _as_utc(dt: datetime.datetime) -> datetime.datetime:
+    if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(datetime.timezone.utc)
+
+
+class AgentSpanStatsFieldRef(BaseModel):
+    """Reference to a span field or typed custom attribute map value."""
+
+    source: Literal[
+        "field",
+        "custom_attrs_string",
+        "custom_attrs_int",
+        "custom_attrs_float",
+        "custom_attrs_bool",
+    ] = "field"
+    key: str
+
+
+class AgentSpanStatsMetricSpec(BaseModel):
+    """Metric to extract from each matching span and aggregate into chart rows."""
+
+    alias: str = Field(pattern=_IDENT_RE)
+    value_type: AgentSpanStatsValueType
+    aggregations: list[AgentSpanStatsAggregation] = Field(default_factory=list)
+    percentiles: list[float] = Field(default_factory=list)
+    field: AgentSpanStatsFieldRef | None = None
+    derived: AgentSpanStatsDerivedMetric | None = None
+
+    @model_validator(mode="after")
+    def validate_metric_spec(self) -> AgentSpanStatsMetricSpec:
+        if (self.field is None) == (self.derived is None):
+            raise ValueError("exactly one of field or derived must be set")
+
+        if self.derived is not None:
+            expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[self.derived]
+            if self.value_type != expected_type:
+                raise ValueError(
+                    f"derived metric {self.derived!r} has value_type "
+                    f"{expected_type!r}, got {self.value_type!r}"
+                )
+
+        allowed = _ALLOWED_AGGS_BY_TYPE[self.value_type]
+        invalid_aggs = [agg for agg in self.aggregations if agg not in allowed]
+        if invalid_aggs:
+            raise ValueError(
+                f"aggregations {invalid_aggs!r} are not valid for "
+                f"value_type {self.value_type!r}"
+            )
+        if len(set(self.aggregations)) != len(self.aggregations):
+            raise ValueError("metric aggregations must be unique")
+
+        if self.percentiles:
+            if self.value_type != "number":
+                raise ValueError("percentiles are only valid for number metrics")
+            invalid_percentiles = [p for p in self.percentiles if p < 0 or p > 100]
+            if invalid_percentiles:
+                raise ValueError(
+                    f"percentiles must be between 0 and 100, got "
+                    f"{invalid_percentiles!r}"
+                )
+            if len(set(self.percentiles)) != len(self.percentiles):
+                raise ValueError("metric percentiles must be unique")
+
+        if not self.aggregations and not self.percentiles:
+            self.aggregations = ["sum"] if self.value_type == "number" else ["count"]
+
+        return self
+
+
+class AgentSpanStatsColumn(BaseModel):
+    """Metadata describing one column in an agent span stats result row."""
+
+    name: str
+    role: Literal["time", "group", "metric"]
+    value_type: AgentSpanStatsColumnValueType
+    metric: str | None = None
+    aggregation: str | None = None
+
+
+class AgentSpanStatsReq(BaseModel):
+    """Request chart-ready aggregations over GenAI agent spans."""
+
+    project_id: str
+    query: Query | None = None
+    start: datetime.datetime
+    end: datetime.datetime | None = None
+    granularity: int | None = Field(default=None, gt=0)
+    timezone: str = "UTC"
+    group_by: list[AgentGroupByRef] = Field(default_factory=list)
+    metrics: list[AgentSpanStatsMetricSpec]
+    group_limit: int = Field(
+        default=DEFAULT_AGENT_STATS_GROUP_LIMIT,
+        ge=1,
+        le=MAX_AGENT_STATS_GROUP_LIMIT,
+    )
+
+    @model_validator(mode="after")
+    def validate_stats_request(self) -> AgentSpanStatsReq:
+        if not self.metrics:
+            raise ValueError("at least one metric is required")
+
+        aliases = [metric.alias for metric in self.metrics]
+        duplicate_aliases = sorted(
+            {alias for alias in aliases if aliases.count(alias) > 1}
+        )
+        if duplicate_aliases:
+            raise ValueError(f"duplicate metric aliases: {duplicate_aliases!r}")
+
+        self.start = _as_utc(self.start)
+        if self.end is not None:
+            self.end = _as_utc(self.end)
+
+        end = self.end or datetime.datetime.now(datetime.timezone.utc)
+        if end < self.start:
+            raise ValueError("AgentSpanStatsReq end must be after start")
+        max_range = datetime.timedelta(days=MAX_AGENT_STATS_RANGE_DAYS)
+        if end - self.start > max_range:
+            raise ValueError(
+                "AgentSpanStatsReq date range cannot exceed "
+                f"{MAX_AGENT_STATS_RANGE_DAYS} days"
+            )
+        return self
+
+
+class AgentSpanStatsRes(BaseModel):
+    """Response containing chart-ready agent span stats rows."""
+
+    start: datetime.datetime
+    end: datetime.datetime
+    granularity: int
+    timezone: str
+    columns: list[AgentSpanStatsColumn] = Field(default_factory=list)
+    rows: list[dict[str, AgentSpanStatsCell]] = Field(default_factory=list)
 
 
 class AgentSpanSchema(BaseModel):
@@ -121,24 +295,25 @@ class AgentSortBy(BaseModel):
 
 
 class AgentGroupByRef(BaseModel):
-    """Reference to a column or map-key that spans should be grouped by.
+    """Reference to a field or map-key that spans should be grouped by.
 
-    `source="column"` targets a named span column (allowlisted server-side).
+    `source="field"` targets a semantic span field (`agent.name`) or direct
+    span column (`agent_name`), allowlisted server-side. `source="column"` is
+    accepted for existing callers.
     The other sources target keys inside the typed custom attribute Map columns,
     which accept arbitrary user-defined keys.
     """
 
     source: Literal[
+        "field",
         "column",
         "custom_attrs_string",
         "custom_attrs_int",
         "custom_attrs_float",
         "custom_attrs_bool",
-    ] = "column"
+    ] = "field"
     key: str
-    alias: str | None = (
-        None  # output key in AgentSpanGroupRow.group_keys (defaults to `key`)
-    )
+    alias: str | None = None  # output key in AgentSpanGroupRow.group_keys
 
 
 class AgentSpanGroupRow(BaseModel):
