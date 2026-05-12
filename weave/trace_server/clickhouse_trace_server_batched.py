@@ -6600,7 +6600,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return AgentQueryHandler(self._query, self.feedback_query).spans_query(req)
 
     def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
-        return AgentQueryHandler(self._query).spans_stats(req)
+        return AgentQueryHandler(self._query, self.feedback_query).spans_stats(req)
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         return AgentQueryHandler(self._query, self.feedback_query).agents_query(req)
