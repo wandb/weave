@@ -5112,9 +5112,7 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
-def _sqlite_text_is_plain_decimal_sql(
-    text_sql: str, *, allow_dot: bool = True
-) -> str:
+def _sqlite_text_is_plain_decimal_sql(text_sql: str, *, allow_dot: bool = True) -> str:
     """SQLite predicate for 'text is a plain numeric string'.
 
     With `allow_dot=True` (default): one or more digits with at most one `.`,
@@ -5124,10 +5122,7 @@ def _sqlite_text_is_plain_decimal_sql(
     diverge from `toInt64OrNull('1.5')` returning NULL on ClickHouse).
     """
     digits = f"replace({text_sql}, '.', '')"
-    base = (
-        f"({text_sql} != '' AND {digits} != '' "
-        f"AND {digits} NOT GLOB '*[^0-9]*'"
-    )
+    base = f"({text_sql} != '' AND {digits} != '' AND {digits} NOT GLOB '*[^0-9]*'"
     if allow_dot:
         dot_count = f"(length({text_sql}) - length({digits}))"
         return f"{base} AND {dot_count} <= 1)"
