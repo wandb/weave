@@ -1028,6 +1028,26 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.ProjectTTLSettingsUpdateRes,
         )
 
+    def sampling_rules_read(
+        self, req: tsi.SamplingRulesReadReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        return self._generic_request(
+            "/sampling/rules/read",
+            req,
+            tsi.SamplingRulesReadReq,
+            tsi.SamplingRulesSnapshotRes,
+        )
+
+    def sampling_rules_update(
+        self, req: tsi.SamplingRulesUpdateReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        return self._generic_request(
+            "/sampling/rules/update",
+            req,
+            tsi.SamplingRulesUpdateReq,
+            tsi.SamplingRulesSnapshotRes,
+        )
+
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:

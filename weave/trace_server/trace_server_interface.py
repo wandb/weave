@@ -1590,6 +1590,60 @@ class ProjectTTLSettingsUpdateRes(BaseModel):
     retention_days: int | None
 
 
+# Sampling API
+# ============
+
+SamplingConsumer = Literal["sdk", "monitor"]
+
+
+class SamplingRuleSchema(BaseModel):
+    scope: str
+    op_pattern: str = ""
+    rate: float
+    updated_at: datetime.datetime
+
+
+class SamplingExemptions(BaseModel):
+    evaluation_trace: bool = True
+    op_patterns: list[str] = Field(default_factory=lambda: ["weave.Evaluation.*"])
+    attribute_keys: list[str] = Field(default_factory=lambda: ["weave.eval"])
+
+
+class SamplingHashSpec(BaseModel):
+    algorithm: str = "xxh64"
+    seed: int = 0
+    identity_fields: list[str] = Field(
+        default_factory=lambda: ["project_id", "scope", "op_pattern"]
+    )
+
+
+class SamplingRulesSnapshotRes(BaseModel):
+    project_id: str
+    rules: list[SamplingRuleSchema] = Field(default_factory=list)
+    exemptions: SamplingExemptions = Field(default_factory=SamplingExemptions)
+    default_rate: float = 1.0
+    hash: SamplingHashSpec = Field(default_factory=SamplingHashSpec)
+    etag: str
+    snapshot_updated_at: datetime.datetime
+    ttl_seconds: int = 300
+    schema_version: int = 1
+
+
+class SamplingRulesReadReq(BaseModelStrict):
+    project_id: str
+    consumer: SamplingConsumer = "sdk"
+    monitor_id: str | None = None
+
+
+class SamplingRulesUpdateReq(BaseModelStrict):
+    project_id: str
+    scope: str
+    op_pattern: str | None = ""
+    rate: float
+    enabled: bool = True
+    wb_user_id: str | None = None
+
+
 # Annotation Queue API
 # =====================
 # These schemas support the queue-based call annotation system.
@@ -3030,6 +3084,15 @@ class TraceServerInterface(Protocol):
     def project_ttl_settings_update(
         self, req: ProjectTTLSettingsUpdateReq
     ) -> ProjectTTLSettingsUpdateRes: ...
+
+    # Sampling API
+    def sampling_rules_read(
+        self, req: SamplingRulesReadReq
+    ) -> SamplingRulesSnapshotRes: ...
+
+    def sampling_rules_update(
+        self, req: SamplingRulesUpdateReq
+    ) -> SamplingRulesSnapshotRes: ...
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...

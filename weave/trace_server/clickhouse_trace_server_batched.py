@@ -273,6 +273,12 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.sampling_rules import (
+    get_sampling_rules_snapshot,
+    invalidate_sampling_rules_cache,
+    query_clickhouse_sampling_rules,
+    validate_sampling_rule_update,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
@@ -2671,6 +2677,58 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.sampling_rules_read")
+    def sampling_rules_read(
+        self, req: tsi.SamplingRulesReadReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        return get_sampling_rules_snapshot(
+            req.project_id,
+            req.consumer,
+            req.monitor_id,
+            self.ch_client,
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.sampling_rules_update")
+    def sampling_rules_update(
+        self, req: tsi.SamplingRulesUpdateReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        try:
+            active_rules = query_clickhouse_sampling_rules(self.ch_client, req.project_id)
+            op_pattern = validate_sampling_rule_update(req, active_rules)
+        except ValueError as exc:
+            raise InvalidRequest(str(exc)) from exc
+
+        self.ch_client.insert(
+            "sampling_rules",
+            data=[
+                [
+                    req.project_id,
+                    req.scope,
+                    op_pattern,
+                    req.rate,
+                    1 if req.enabled else 0,
+                    datetime.datetime.now(datetime.timezone.utc),
+                    req.wb_user_id,
+                ]
+            ],
+            column_names=[
+                "project_id",
+                "scope",
+                "op_pattern",
+                "rate",
+                "enabled",
+                "updated_at",
+                "updated_by",
+            ],
+        )
+        invalidate_sampling_rules_cache(req.project_id)
+        return get_sampling_rules_snapshot(
+            req.project_id,
+            "monitor",
+            None,
+            self.ch_client,
+        )
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq

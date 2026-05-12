@@ -1,13 +1,14 @@
-from typing import Literal, TypeAlias, get_args
+from typing import Any, Literal, TypeAlias, cast, get_args
 
 from pydantic import Field
 from typing_extensions import NotRequired, Self, TypedDict
 
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
-from weave.trace.api import ObjectRef, publish
+from weave.trace.api import ObjectRef, get_client, publish
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 
 DebounceAggregationField: TypeAlias = Literal["trace_id", "thread_id"]
@@ -95,9 +96,14 @@ class Monitor(Object):
         Returns:
             The ref to the monitor.
         """
+        sampling_rate = self._sampling_rate_value()
+        self.sampling_rate = sampling_rate
         self.active = True
         self.ref = None
-        return publish(self)
+        ref = publish(self)
+        self.sampling_rate = sampling_rate
+        self._sync_sampling_rule(ref, sampling_rate)
+        return ref
 
     def deactivate(self) -> ObjectRef:
         """Deactivates the monitor.
@@ -105,9 +111,38 @@ class Monitor(Object):
         Returns:
             The ref to the monitor.
         """
+        sampling_rate = self._sampling_rate_value()
+        self.sampling_rate = sampling_rate
         self.active = False
         self.ref = None
-        return publish(self)
+        ref = publish(self)
+        self.sampling_rate = sampling_rate
+        self._sync_sampling_rule(ref, sampling_rate)
+        return ref
+
+    def _sync_sampling_rule(self, ref: ObjectRef, sampling_rate: float) -> None:
+        client = get_client()
+        if client is None:
+            return
+        try:
+            client.server.sampling_rules_update(
+                tsi.SamplingRulesUpdateReq(
+                    project_id=client.project_id,
+                    scope=f"monitor:{ref.name}",
+                    op_pattern="",
+                    rate=sampling_rate,
+                    enabled=self.active and sampling_rate < 1.0,
+                    wb_user_id=f"monitor:{ref.name}",
+                )
+            )
+        except NotImplementedError:
+            return
+
+    def _sampling_rate_value(self) -> float:
+        value = cast(Any, self.sampling_rate)
+        if isinstance(value, ObjectRef):
+            value = value.get(objectify=False)
+        return float(value)
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:

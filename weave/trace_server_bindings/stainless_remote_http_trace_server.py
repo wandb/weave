@@ -1270,6 +1270,22 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def sampling_rules_read(
+        self, req: tsi.SamplingRulesReadReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        raise NotImplementedError(
+            "sampling_rules_read is not yet implemented in stainless client"
+        )
+
+    @validate_call
+    def sampling_rules_update(
+        self, req: tsi.SamplingRulesUpdateReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        raise NotImplementedError(
+            "sampling_rules_update is not yet implemented in stainless client"
+        )
+
+    @validate_call
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:

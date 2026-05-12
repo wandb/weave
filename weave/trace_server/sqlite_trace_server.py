@@ -63,6 +63,13 @@ from weave.trace_server.methods.sqlite_feedback_stats import (
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import Row, quote_json_path, quote_json_path_parts
+from weave.trace_server.sampling_rules import (
+    build_sampling_rules_snapshot,
+    invalidate_sampling_rules_cache,
+    normalize_op_pattern,
+    validate_glob_pattern,
+    validate_sampling_rule_update,
+)
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
@@ -337,6 +344,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         cursor.execute(TABLE_FEEDBACK.drop_sql())
         cursor.execute("DROP TABLE IF EXISTS calls")
         cursor.execute("DROP TABLE IF EXISTS project_ttl_settings")
+        cursor.execute("DROP TABLE IF EXISTS sampling_rules")
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
         cursor.execute("DROP TABLE IF EXISTS table_rows")
@@ -382,6 +390,19 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             CREATE TABLE IF NOT EXISTS project_ttl_settings (
                 project_id TEXT NOT NULL,
                 retention_days INTEGER NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_by TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sampling_rules (
+                project_id TEXT NOT NULL,
+                scope TEXT NOT NULL,
+                op_pattern TEXT NOT NULL DEFAULT '',
+                rate REAL NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
                 updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_by TEXT NOT NULL DEFAULT ''
             )
@@ -500,6 +521,48 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         row = cursor.fetchone()
         return int(row[0]) if row is not None else RETENTION_DAYS_NO_TTL
+
+    def _get_active_sampling_rules(
+        self, project_id: str
+    ) -> list[tsi.SamplingRuleSchema]:
+        _, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT scope, op_pattern, rate, enabled, updated_at FROM sampling_rules "
+            "WHERE project_id = ? ORDER BY updated_at ASC, rowid ASC",
+            (project_id,),
+        )
+        latest: dict[tuple[str, str], tuple[float, int, str]] = {}
+        for scope, op_pattern, rate, enabled, updated_at in cursor.fetchall():
+            normalized_pattern = normalize_op_pattern(op_pattern)
+            latest[str(scope), normalized_pattern] = (
+                float(rate),
+                int(enabled),
+                str(updated_at),
+            )
+
+        rules: list[tsi.SamplingRuleSchema] = []
+        for (scope, op_pattern), (rate, enabled, updated_at) in latest.items():
+            if enabled != 1:
+                continue
+            try:
+                validate_glob_pattern(op_pattern)
+            except ValueError:
+                logger.exception(
+                    "Dropping invalid sampling rule from snapshot for project=%s scope=%s op_pattern=%s",
+                    project_id,
+                    scope,
+                    op_pattern,
+                )
+                continue
+            rules.append(
+                tsi.SamplingRuleSchema(
+                    scope=scope,
+                    op_pattern=op_pattern,
+                    rate=rate,
+                    updated_at=datetime.datetime.fromisoformat(updated_at),
+                )
+            )
+        return sorted(rules, key=lambda rule: (rule.scope, rule.op_pattern))
 
     def _compute_call_expire_at(
         self, project_id: str, anchor: datetime.datetime
@@ -2891,6 +2954,50 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         conn.commit()
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
+
+    def sampling_rules_read(
+        self, req: tsi.SamplingRulesReadReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        active_rules = self._get_active_sampling_rules(req.project_id)
+        return build_sampling_rules_snapshot(
+            req.project_id,
+            req.consumer,
+            req.monitor_id,
+            active_rules,
+        )
+
+    def sampling_rules_update(
+        self, req: tsi.SamplingRulesUpdateReq
+    ) -> tsi.SamplingRulesSnapshotRes:
+        try:
+            active_rules = self._get_active_sampling_rules(req.project_id)
+            op_pattern = validate_sampling_rule_update(req, active_rules)
+        except ValueError as exc:
+            raise InvalidRequest(str(exc)) from exc
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat(
+            timespec="microseconds"
+        )
+        cursor.execute(
+            "INSERT INTO sampling_rules "
+            "(project_id, scope, op_pattern, rate, enabled, updated_at, updated_by) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                req.project_id,
+                req.scope,
+                op_pattern,
+                req.rate,
+                1 if req.enabled else 0,
+                updated_at,
+                req.wb_user_id,
+            ),
+        )
+        conn.commit()
+        invalidate_sampling_rules_cache(req.project_id)
+        return self.sampling_rules_read(
+            tsi.SamplingRulesReadReq(project_id=req.project_id, consumer="monitor")
+        )
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
