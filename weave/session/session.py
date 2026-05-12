@@ -41,6 +41,7 @@ from weave.session.types import (
     Usage,
     _parse_data_url,
 )
+from weave.trace.op import is_tracing_setting_disabled
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -129,7 +130,7 @@ class _SpanBase(BaseModel):
         OTel span timestamp matches the user-visible start, not the moment
         ``__enter__`` happened to run.
         """
-        if not _OTEL_AVAILABLE:
+        if not _OTEL_AVAILABLE or is_tracing_setting_disabled():
             return
         tracer = otel_trace.get_tracer(_TRACER_NAME)
         kwargs: dict[str, Any] = {}
@@ -901,9 +902,10 @@ def _emit_span_now(
     Used by the batch-logging path (``log_turn`` / ``log_session``) to
     create children of a parent span without attaching them to the calling
     thread's OTel context. Returns the finished Span so the caller can
-    read trace_id / span_id, or None if OTel is unavailable.
+    read trace_id / span_id, or None if OTel is unavailable or tracing is
+    disabled.
     """
-    if not _OTEL_AVAILABLE:
+    if not _OTEL_AVAILABLE or is_tracing_setting_disabled():
         return None
     tracer = otel_trace.get_tracer(_TRACER_NAME)
     kwargs: dict[str, Any] = {}
@@ -1022,7 +1024,7 @@ def log_turn(
     Falls back to the earliest/latest child timestamp, then ``now()``, when
     the turn doesn't supply its own.
     """
-    if not _OTEL_AVAILABLE:
+    if not _OTEL_AVAILABLE or is_tracing_setting_disabled():
         return LogResult(session_id=session_id)
 
     resolved_spans = spans or []
@@ -1103,7 +1105,7 @@ def log_session(
     ``session_id`` if empty. By default each turn gets its own OTel trace.
     """
     sid = session_id or str(uuid.uuid4())
-    if not _OTEL_AVAILABLE:
+    if not _OTEL_AVAILABLE or is_tracing_setting_disabled():
         return LogResult(session_id=sid)
 
     trace_ids: list[str] = []
