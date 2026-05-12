@@ -165,7 +165,7 @@ def test_basic_evaluation(
 def test_meta_attributes_propagate_to_all_calls(
     client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
 ):
-    ev = EvaluationLogger._create_with_meta({"wandb_meta_foo": True})
+    ev = EvaluationLogger._create_with_meta({"foo": True})
 
     for row in user_dataset:
         output = user_model(row["a"], row["b"])
@@ -180,7 +180,7 @@ def test_meta_attributes_propagate_to_all_calls(
     for c in client.get_calls():
         by_op[op_name_from_call(c)].append(c)
 
-    expected_meta = {"imperative": True, "wandb_meta_foo": True}
+    expected_meta = {"imperative": True, "foo": True}
     op_names = [
         "Evaluation.evaluate",
         "Evaluation.predict_and_score",
