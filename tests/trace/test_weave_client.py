@@ -2314,6 +2314,20 @@ def test_calls_query_filter_by_strings(client):
     calls = list(client.get_calls(query=query))
     assert len(calls) == 5
 
+    # Nonnumeric strings should not match numeric scalar filters.
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$eq": [{"$getField": "inputs.name"}, {"$literal": 0}]},
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 0
+
     # Filter with string contains - should return 5 calls (name contains "test")
     query = tsi.Query(
         **{
@@ -2390,6 +2404,28 @@ def test_calls_query_filter_by_strings(client):
         assert call.inputs["test_id"] == test_id
         assert call.output["test_id"] == test_id
         assert call.inputs["value"] > 0
+
+    # Mixed int/float IN lists should still compare dynamic JSON numerically.
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$in": [
+                            {"$getField": "inputs.value"},
+                            [
+                                {"$literal": 100},
+                                {"$literal": 200.0},
+                            ],
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert {call.inputs["name"] for call in calls} == {"alpha_test", "beta_test"}
 
     # Filter with boolean - should return 3 calls (active is true)
     query = tsi.Query(
@@ -3700,35 +3736,171 @@ def test_calls_query_filter_by_root_refs(client):
     calls = client.get_calls(filter={"trace_roots_only": False})
     assert len(calls) == 6
 
-    # trace roots only + inputs query
-    calls = client.get_calls(
-        filter={"trace_roots_only": True},
-        query={
-            "$expr": {
+    root_query_cases = [
+        (
+            "inputs explicit convert",
+            {
                 "$eq": [
                     {"$convert": {"input": {"$getField": "inputs.x"}, "to": "int"}},
                     {"$literal": 1},
                 ]
-            }
-        },
-    )
-    assert len(calls) == 1
-    assert op_name_from_call(calls[0]) == "root_op"
-
-    # trace roots only + output query
-    calls = client.get_calls(
-        filter={"trace_roots_only": True},
-        query={
-            "$expr": {
+            },
+            1,
+        ),
+        (
+            "inputs inferred convert",
+            {"$eq": [{"$getField": "inputs.x"}, {"$literal": 1}]},
+            1,
+        ),
+        (
+            # The JSON dump for `root_op(1)` is `{"x":1}` (no decimal). A float
+            # literal of 1.0 must still match it: the typed comparison is
+            # numerically `1 == 1.0`, which is true. This guards against
+            # backends being stricter than the typed comparison for whole
+            # number floats vs int-encoded JSON.
+            "inputs whole-number float vs int-encoded JSON",
+            {"$eq": [{"$getField": "inputs.x"}, {"$literal": 1.0}]},
+            1,
+        ),
+        (
+            "output explicit convert",
+            {
                 "$eq": [
                     {"$convert": {"input": {"$getField": "output.n"}, "to": "int"}},
                     {"$literal": 2},
                 ],
-            }
-        },
+            },
+            2,
+        ),
+        (
+            "output inferred convert",
+            {"$eq": [{"$getField": "output.n"}, {"$literal": 2}]},
+            2,
+        ),
+    ]
+    for label, expr, expected_x in root_query_cases:
+        calls = client.get_calls(
+            filter={"trace_roots_only": True},
+            query={"$expr": expr},
+        )
+        assert len(calls) == 1, label
+        assert op_name_from_call(calls[0]) == "root_op", label
+        assert calls[0].inputs["x"] == expected_x, label
+
+    # Structured root JSON values should not match scalar numeric filters.
+    # SQLite's CAST('{"x":1}' AS INT) returns 0, so inferred root casts must
+    # not turn object-valued inputs into false positive scalar matches.
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={"$expr": {"$eq": [{"$getField": "inputs"}, {"$literal": 0}]}},
+    )
+    assert len(calls) == 0
+
+    typed_call = client.create_call(
+        "typed_filter_op",
+        {"x": 1},
+        attributes={"rank": 2, "enabled": True},
+    )
+    typed_call.summary = {"score": 0.75}
+    client.finish_call(typed_call, {"n": 5})
+
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$and": [
+                        {"$eq": [{"$getField": "attributes.rank"}, {"$literal": 2}]},
+                        {
+                            "$eq": [
+                                {"$getField": "attributes.enabled"},
+                                {"$literal": True},
+                            ]
+                        },
+                        {"$gt": [{"$getField": "summary.score"}, {"$literal": 0.5}]},
+                    ]
+                }
+            },
+            columns=["id", "attributes", "summary"],
+        )
     )
     assert len(calls) == 1
-    assert op_name_from_call(calls[0]) == "root_op"
+    assert calls[0].attributes["rank"] == 2
+    assert calls[0].attributes["enabled"] is True
+    assert calls[0].summary["score"] == 0.75
+
+    # Plain-decimal numeric strings cast cleanly; non-decimal text becomes NULL
+    # so it doesn't false-positive against a numeric scalar filter.
+    decimal_call = client.create_call(
+        "decimal_filter_op",
+        {"x": "1500"},
+        attributes={"bad_rank_text": "not-a-number"},
+    )
+    client.finish_call(decimal_call, {"n": "5"})
+
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$and": [
+                        {"$gt": [{"$getField": "inputs.x"}, {"$literal": 999.0}]},
+                        {"$eq": [{"$getField": "output.n"}, {"$literal": 5.0}]},
+                    ]
+                }
+            },
+            columns=["id", "inputs", "output"],
+        )
+    )
+    assert len(calls) == 1
+    assert calls[0].inputs["x"] == "1500"
+    assert calls[0].output["n"] == "5"
+
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "attributes.bad_rank_text"},
+                        {"$literal": 0.0},
+                    ]
+                }
+            }
+        )
+    )
+    assert len(calls) == 0
+
+    # A stored decimal-shaped string like "1.5" must not match an int literal.
+    # ClickHouse `toInt64OrNull('1.5')` returns NULL; SQLite's CAST('1.5' AS INT)
+    # truncates to 1, so the inferred-cast plain-decimal predicate must reject
+    # dotted text when the inferred cast is int.
+    dotted_marker = "DOTTED_RED_TEST_MARKER"
+    dotted_text_call = client.create_call(
+        "dotted_text_op",
+        {"x": "1.5", "marker": dotted_marker},
+        attributes={"score_text": "1.5"},
+    )
+    client.finish_call(dotted_text_call, {"n": "1.5"})
+
+    for path in ("inputs.x", "attributes.score_text", "output.n"):
+        matches = list(
+            client.get_calls(
+                query={
+                    "$expr": {
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.marker"},
+                                    {"$literal": dotted_marker},
+                                ]
+                            },
+                            {"$eq": [{"$getField": path}, {"$literal": 1}]},
+                        ]
+                    }
+                }
+            )
+        )
+        assert len(matches) == 0, (
+            f"dotted text on {path} should not match int 1 (saw {len(matches)})"
+        )
 
     # trace roots only + op filter
     calls = client.get_calls(

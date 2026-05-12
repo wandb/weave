@@ -359,6 +359,7 @@ async def populate_feedback(client: WeaveClient) -> None:
             "model_output": output,
             "expected": expected,
             "match": output == expected,
+            "score": x + 0.5,
         }
 
     @weave.op
@@ -506,6 +507,38 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
         found_ids = [c.id for c in calls]
         assert found_ids == gt_ids, (
             f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
+        )
+
+    for field, value, expected_ids in [
+        (
+            "feedback.[wandb.runnable.my_scorer].payload.output.match",
+            True,
+            [ids[0], ids[2]],
+        ),
+        (
+            "feedback.[wandb.runnable.my_scorer].payload.output.score",
+            1.5,
+            [ids[2], ids[3]],
+        ),
+    ]:
+        operation = "$gt" if isinstance(value, float) else "$eq"
+        calls = client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client.project_id,
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
+                query={
+                    "$expr": {
+                        operation: [
+                            {"$getField": field},
+                            {"$literal": value},
+                        ]
+                    }
+                },
+            )
+        )
+        found_ids = [c.id for c in calls]
+        assert found_ids == expected_ids, (
+            f"Typed filtering by {field} with {value} failed, expected {expected_ids}, got {found_ids}"
         )
 
     # Also test $contains on feedback fields (substring matching).
