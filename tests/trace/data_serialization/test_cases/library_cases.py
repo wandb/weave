@@ -306,7 +306,7 @@ library_cases = [
         python_version_code_capture=(3, 13),
     ),
     # Evaluation.predict_and_score introduces a context manager which aids with linking genai spans with evaluation
-    # calls that causes the serialization to change specifically on Python v3.13. This reflects that change 
+    # calls that causes the serialization to change specifically on Python v3.13. This reflects that change
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v5)",
         runtime_object_factory=make_evaluation,
