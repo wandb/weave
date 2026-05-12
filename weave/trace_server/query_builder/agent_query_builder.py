@@ -27,7 +27,6 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
-    AgentSpanFieldsReq,
     AgentSpanGroupFilter,
     AgentSpanGroupNumericFilter,
     AgentSpanMeasureSpec,
@@ -786,22 +785,6 @@ def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     return " AND ".join(conditions)
 
 
-def _span_fields_where(pb: ParamBuilder, req: AgentSpanFieldsReq) -> str:
-    pid_slot = pb.add(req.project_id, param_type="String")
-    conditions = [f"s.project_id = {pid_slot}"]
-    add_time_filters(
-        conditions,
-        pb,
-        started_after=req.started_after,
-        started_before=req.started_before,
-    )
-    if req.query is not None:
-        from weave.trace_server.query_builder import agent_query_compiler
-
-        conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
-    return " AND ".join(conditions)
-
-
 def _agents_where(pb: ParamBuilder, req: AgentsQueryReq) -> str:
     pid_slot = pb.add(req.project_id, param_type="String")
     conditions = [f"project_id = {pid_slot}"]
@@ -1013,61 +996,6 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         {having_sql}
         ORDER BY {order_by}
         LIMIT {limit_slot} OFFSET {offset_slot}
-    """
-
-
-def make_span_fields_query(pb: ParamBuilder, req: AgentSpanFieldsReq) -> str:
-    """Discover observed span fields and typed custom attribute keys."""
-    where = _span_fields_where(pb, req)
-    limit_slot = pb.add(req.limit, param_type="UInt64")
-    selects: list[str] = []
-    for key, value_type in sorted(SPAN_VALUE_TYPES.items()):
-        if key not in AgentSpanSchema.model_fields:
-            continue
-        selects.append(
-            f"""
-            SELECT
-              'field' AS source,
-              '{key}' AS key,
-              '{value_type}' AS value_type,
-              countIf(isNotNull(s.{key})) AS count
-            FROM spans s
-            WHERE {where}
-            HAVING count > 0
-            """
-        )
-
-    custom_sources = [
-        ("custom_attrs_string", "string"),
-        ("custom_attrs_int", "number"),
-        ("custom_attrs_float", "number"),
-        ("custom_attrs_bool", "boolean"),
-    ]
-    for source, custom_value_type in custom_sources:
-        selects.append(
-            f"""
-            SELECT
-              '{source}' AS source,
-              key,
-              '{custom_value_type}' AS value_type,
-              count() AS count
-            FROM (
-              SELECT arrayJoin(mapKeys(s.{source})) AS key
-              FROM spans s
-              WHERE {where}
-            )
-            GROUP BY key
-            """
-        )
-
-    union_sql = "\nUNION ALL\n".join(selects)
-    return f"""
-        SELECT source, key, value_type, count
-        FROM (
-          {union_sql}
-        )
-        ORDER BY count DESC, source ASC, key ASC
-        LIMIT {limit_slot}
     """
 
 

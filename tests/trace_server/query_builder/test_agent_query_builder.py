@@ -17,10 +17,8 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
-    AgentSpanFieldsReq,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
-    AgentSpanSchema,
     AgentSpansQueryReq,
     AgentSpanValueRef,
     AgentsQueryFilters,
@@ -33,7 +31,6 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     CHAT_VIEW_COLS,
     SPAN_SORTABLE_COLS,
-    SPAN_VALUE_TYPES,
     SPANS_LIST_COLS,
     build_order_by,
     make_agent_versions_count_query,
@@ -43,7 +40,6 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
     make_message_search_query,
-    make_span_fields_query,
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
@@ -658,110 +654,6 @@ class TestResolveGroupBy:
             ],
         )
         assert out == [("s.custom_attrs_string[{genai_0:String}]", "spaced_attr")]
-
-
-# ============================================================================
-# field discovery query
-# ============================================================================
-
-
-def test_make_span_fields_query_discovers_custom_attr_keys() -> None:
-    pb = ParamBuilder("genai")
-    query = make_span_fields_query(
-        pb,
-        AgentSpanFieldsReq(
-            project_id="p1",
-            started_after=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-            started_before=datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
-            limit=25,
-        ),
-    )
-    field_selects = []
-    for key, value_type in sorted(SPAN_VALUE_TYPES.items()):
-        if key not in AgentSpanSchema.model_fields:
-            continue
-        field_selects.append(
-            f"""
-            SELECT
-              'field' AS source,
-              '{key}' AS key,
-              '{value_type}' AS value_type,
-              countIf(isNotNull(s.{key})) AS count
-            FROM spans s
-            WHERE s.project_id = {{genai_0:String}} AND s.started_at >= {{genai_1:DateTime64(6)}} AND s.started_at < {{genai_2:DateTime64(6)}}
-            HAVING count > 0
-            """
-        )
-    custom_selects = [
-        """
-            SELECT
-              'custom_attrs_string' AS source,
-              key,
-              'string' AS value_type,
-              count() AS count
-            FROM (
-              SELECT arrayJoin(mapKeys(s.custom_attrs_string)) AS key
-              FROM spans s
-              WHERE s.project_id = {genai_0:String} AND s.started_at >= {genai_1:DateTime64(6)} AND s.started_at < {genai_2:DateTime64(6)}
-            )
-            GROUP BY key
-            """,
-        """
-            SELECT
-              'custom_attrs_int' AS source,
-              key,
-              'number' AS value_type,
-              count() AS count
-            FROM (
-              SELECT arrayJoin(mapKeys(s.custom_attrs_int)) AS key
-              FROM spans s
-              WHERE s.project_id = {genai_0:String} AND s.started_at >= {genai_1:DateTime64(6)} AND s.started_at < {genai_2:DateTime64(6)}
-            )
-            GROUP BY key
-            """,
-        """
-            SELECT
-              'custom_attrs_float' AS source,
-              key,
-              'number' AS value_type,
-              count() AS count
-            FROM (
-              SELECT arrayJoin(mapKeys(s.custom_attrs_float)) AS key
-              FROM spans s
-              WHERE s.project_id = {genai_0:String} AND s.started_at >= {genai_1:DateTime64(6)} AND s.started_at < {genai_2:DateTime64(6)}
-            )
-            GROUP BY key
-            """,
-        """
-            SELECT
-              'custom_attrs_bool' AS source,
-              key,
-              'boolean' AS value_type,
-              count() AS count
-            FROM (
-              SELECT arrayJoin(mapKeys(s.custom_attrs_bool)) AS key
-              FROM spans s
-              WHERE s.project_id = {genai_0:String} AND s.started_at >= {genai_1:DateTime64(6)} AND s.started_at < {genai_2:DateTime64(6)}
-            )
-            GROUP BY key
-            """,
-    ]
-    union_sql = "\nUNION ALL\n".join([*field_selects, *custom_selects])
-    expected = f"""
-        SELECT source, key, value_type, count
-        FROM (
-          {union_sql}
-        )
-        ORDER BY count DESC, source ASC, key ASC
-        LIMIT {{genai_3:UInt64}}
-    """
-    expected_params = {
-        "genai_0": "p1",
-        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
-        "genai_3": 25,
-    }
-    assert_sql(expected, expected_params, query, pb.get_params())
 
 
 # ============================================================================

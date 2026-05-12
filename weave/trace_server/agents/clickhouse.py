@@ -35,9 +35,6 @@ from weave.trace_server.agents.types import (
     AgentSearchMatchedMessage,
     AgentSearchReq,
     AgentSearchRes,
-    AgentSpanFieldInfo,
-    AgentSpanFieldsReq,
-    AgentSpanFieldsRes,
     AgentSpanGroupRow,
     AgentSpanSchema,
     AgentSpansQueryReq,
@@ -68,7 +65,6 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
     make_message_search_query,
-    make_span_fields_query,
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
@@ -148,23 +144,6 @@ class AgentQueryHandler:
             bucket_type=query.bucket_type,
             columns=query.column_metadata,
             rows=_rows_to_dicts(query.columns, result.result_rows),
-        )
-
-    def span_fields(self, req: AgentSpanFieldsReq) -> AgentSpanFieldsRes:
-        """Return observed built-in span fields and custom attribute keys."""
-        pb = ParamBuilder(PARAM_NAMESPACE)
-        query = make_span_fields_query(pb, req)
-        result = self._query(query, pb.get_params())
-        return AgentSpanFieldsRes(
-            fields=[
-                AgentSpanFieldInfo(
-                    source=safe_str(row.get("source")),
-                    key=safe_str(row.get("key")),
-                    value_type=safe_str(row.get("value_type")),
-                    count=safe_int(row.get("count")),
-                )
-                for row in result.named_results()
-            ]
         )
 
     # ------------------------------------------------------------------

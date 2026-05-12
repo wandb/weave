@@ -18,7 +18,6 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentGroupByRef,
     AgentSearchReq,
-    AgentSpanFieldsReq,
     AgentSpanGroupNumericFilter,
     AgentSpanMeasureSpec,
     AgentSpansQueryReq,
@@ -663,45 +662,6 @@ def test_agent_span_stats_buckets_custom_measure_per_conversation(ch_server):
     assert [row["count"] for row in res.rows] == [1, 2]
     assert res.rows[0]["bucket_min"] == 0.2
     assert res.rows[-1]["bucket_max"] == 0.9
-
-
-def test_agent_span_fields_discovers_custom_attrs(ch_server):
-    """Field discovery reports typed custom attribute map keys and counts."""
-    project_id = _make_project_id("fields")
-    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
-    spans = [
-        _make_span(
-            project_id,
-            custom_attrs_string={"env": "prod"},
-            custom_attrs_float={"score": 0.1},
-            custom_attrs_bool={"flagged": True},
-            started_at=start,
-        ),
-        _make_span(
-            project_id,
-            custom_attrs_string={"env": "dev"},
-            custom_attrs_float={"score": 0.4, "quality": 0.8},
-            custom_attrs_bool={"flagged": False},
-            started_at=start + datetime.timedelta(seconds=1),
-        ),
-    ]
-    _insert_spans(ch_server.ch_client, spans)
-
-    res = ch_server.agent_spans_fields(
-        AgentSpanFieldsReq(
-            project_id=project_id,
-            started_after=start,
-            started_before=start + datetime.timedelta(hours=1),
-        )
-    )
-    fields = {(field.source, field.key): field for field in res.fields}
-
-    assert fields["custom_attrs_string", "env"].value_type == "string"
-    assert fields["custom_attrs_string", "env"].count == 2
-    assert fields["custom_attrs_float", "score"].value_type == "number"
-    assert fields["custom_attrs_float", "score"].count == 2
-    assert fields["custom_attrs_float", "quality"].count == 1
-    assert fields["custom_attrs_bool", "flagged"].value_type == "boolean"
 
 
 def test_agent_span_stats_groups_by_custom_attrs(ch_server):

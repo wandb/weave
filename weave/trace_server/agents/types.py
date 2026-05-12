@@ -641,27 +641,6 @@ class AgentSpansQueryRes(BaseModel):
     total_count: int = 0
 
 
-class AgentSpanFieldsReq(BaseModel):
-    """Request observed span fields and custom attributes."""
-
-    project_id: str
-    query: Query | None = None
-    started_after: datetime.datetime | None = None
-    started_before: datetime.datetime | None = None
-    limit: int = Field(default=1000, ge=1, le=MAX_AGENT_QUERY_LIMIT)
-
-
-class AgentSpanFieldInfo(BaseModel):
-    source: AgentSpanValueSource
-    key: str
-    value_type: AgentSpanStatsColumnValueType
-    count: int
-
-
-class AgentSpanFieldsRes(BaseModel):
-    fields: list[AgentSpanFieldInfo] = Field(default_factory=list)
-
-
 # ---------------------------------------------------------------------------
 # Agent full-text search
 # ---------------------------------------------------------------------------
