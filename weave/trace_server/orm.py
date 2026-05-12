@@ -549,43 +549,6 @@ def clickhouse_cast_json_value(
     return clickhouse_cast(json_value_sql, cast)
 
 
-def cast_for_literal_filter(
-    literal: tsi_query.LiteralOperation,
-) -> tsi_query.CastTo | None:
-    """Infer a JSON-field cast from a comparison literal type.
-
-    JSON_VALUE returns strings, so numeric and boolean literals need the field
-    side cast to match the parameter type ClickHouse receives. String, None,
-    and structured literals keep the existing uncast (string) path.
-    """
-    value = literal.literal_
-    if isinstance(value, bool):
-        return "bool"
-    if isinstance(value, int):
-        return "int"
-    if isinstance(value, float):
-        return "double"
-    return None
-
-
-def shared_cast_for_literal_filters(
-    operands: Sequence[tsi_query.Operand],
-) -> tsi_query.CastTo | None:
-    """Return a shared inferred cast for a homogeneous literal list, else None."""
-    cast: tsi_query.CastTo | None = None
-    for operand in operands:
-        if not isinstance(operand, tsi_query.LiteralOperation):
-            return None
-        operand_cast = cast_for_literal_filter(operand)
-        if operand_cast is None:
-            return None
-        if cast is None:
-            cast = operand_cast
-        elif operand_cast != cast:
-            return None
-    return cast
-
-
 def split_escaped_field_path(path: str) -> list[str]:
     r"""Split a field path on dots, respecting backslash-escaped dots.
 
@@ -750,7 +713,7 @@ def _process_query_to_conditions(
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(
                 operation.in_[0],
-                cast=shared_cast_for_literal_filters(operation.in_[1]),
+                cast=tsi_query.infer_shared_literal_filter_cast(operation.in_[1]),
             )
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
             cond = f"({lhs_part} IN ({rhs_part}))"
@@ -780,21 +743,13 @@ def _process_query_to_conditions(
     def process_binary_operands(
         lhs: tsi_query.Operand, rhs: tsi_query.Operand
     ) -> tuple[str, str]:
-        # Each side's cast is inferred from the *peer* literal: a numeric RHS
+        # Each side's cast is inferred from the peer literal: a numeric RHS
         # tells us to cast the LHS field, and vice versa. Without this, a
         # JSON_VALUE-extracted field comes through as a String while the
         # literal is bound as Bool/Int64/Float64, and ClickHouse refuses
         # the comparison (NO_COMMON_TYPE).
-        lhs_cast = (
-            cast_for_literal_filter(rhs)
-            if isinstance(rhs, tsi_query.LiteralOperation)
-            else None
-        )
-        rhs_cast = (
-            cast_for_literal_filter(lhs)
-            if isinstance(lhs, tsi_query.LiteralOperation)
-            else None
-        )
+        lhs_cast = tsi_query.infer_literal_filter_cast(rhs)
+        rhs_cast = tsi_query.infer_literal_filter_cast(lhs)
         return process_operand(lhs, cast=lhs_cast), process_operand(rhs, cast=rhs_cast)
 
     def process_operand(
