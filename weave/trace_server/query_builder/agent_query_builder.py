@@ -692,9 +692,10 @@ def _optional_where_clause(where: str, *, prefix: str = " ") -> str:
 
 
 def _project_filter_sql(column_sql: str, project_slot: str) -> str:
-    # ClickHouse 26.2 can prune internal base64 project ids incorrectly when the
-    # primary-key column is on the left side of the equality.
-    return f"{project_slot} = {column_sql}"
+    # ClickHouse 26.2 can prune internal base64 project ids incorrectly through
+    # the equality predicate read path. A singleton IN predicate keeps primary
+    # key pruning but returns the correct rows.
+    return f"{column_sql} IN ({project_slot})"
 
 
 def _spans_filter_sql(pb: ParamBuilder, req: AgentSpansQueryReq) -> _FilterSQL:

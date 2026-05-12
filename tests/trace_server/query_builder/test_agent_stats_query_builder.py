@@ -120,7 +120,7 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
         filtered_spans AS (
           SELECT *
           FROM spans s
-          PREWHERE {genai_0:String} = s.project_id
+          PREWHERE s.project_id IN ({genai_0:String})
             AND s.started_at >= {genai_1:DateTime64(6)}
             AND s.started_at < {genai_2:DateTime64(6)}
           WHERE (s.agent_name = {genai_3:String})
@@ -229,7 +229,7 @@ def test_grouped_stats_query_full_sql_shape() -> None:
         filtered_spans AS (
           SELECT *
           FROM spans s
-          PREWHERE {genai_0:String} = s.project_id
+          PREWHERE s.project_id IN ({genai_0:String})
             AND s.started_at >= {genai_1:DateTime64(6)}
             AND s.started_at < {genai_2:DateTime64(6)}
         ),
@@ -324,7 +324,7 @@ def test_basic_stats_query_uses_query_filter_and_bucket() -> None:
              filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           PREWHERE s.project_id IN ({genai_0:String})
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)}
            WHERE (s.agent_name = {genai_3:String}) ),
@@ -393,7 +393,7 @@ def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
         WITH filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           PREWHERE s.project_id IN ({genai_0:String})
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              value_rows AS
@@ -473,7 +473,7 @@ def test_numeric_bucket_stats_query_groups_custom_attr_measure() -> None:
         WITH filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           PREWHERE s.project_id IN ({genai_0:String})
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              value_rows AS
@@ -607,7 +607,7 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
              filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           PREWHERE s.project_id IN ({genai_0:String})
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              top_groups AS
@@ -690,7 +690,7 @@ def test_time_stats_apply_group_filters() -> None:
              filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           PREWHERE s.project_id IN ({genai_0:String})
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              qualified_groups_0 AS
