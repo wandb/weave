@@ -47,6 +47,7 @@ _project_ttl_cache: TTLCache[str, int] = TTLCache(
 _project_ttl_cache_lock = threading.Lock()
 
 
+@ddtrace.tracer.wrap(name="ttl_settings.get_project_retention_days")
 def get_project_retention_days(
     project_id: str,
     ch_client: CHClient,

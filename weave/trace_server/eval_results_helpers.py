@@ -13,6 +13,8 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from typing import Any, TypeVar
 
+from pydantic import ValidationError
+
 from weave.shared import refs_internal as ri
 from weave.shared.digest import str_digest
 from weave.trace_server import constants
@@ -287,6 +289,25 @@ def best_effort_scorer_call_ids(
     return result
 
 
+def extract_genai_span_ref(call: tsi.CallSchema | None) -> tsi.GenAISpanRef | None:
+    """Extract an optional GenAI span ref from call attributes."""
+    if call is None or not isinstance(call.attributes, dict):
+        return None
+
+    weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
+    if not isinstance(weave_attrs, dict):
+        return None
+
+    raw_ref = weave_attrs.get(constants.GENAI_SPAN_REF_ATTR_KEY)
+    if not isinstance(raw_ref, dict):
+        return None
+
+    try:
+        return tsi.GenAISpanRef.model_validate(raw_ref)
+    except ValidationError:
+        return None
+
+
 def _build_trial(
     predict_and_score_call: tsi.CallSchema,
     child_by_parent: dict[str, list[tsi.CallSchema]],
@@ -325,6 +346,8 @@ def _build_trial(
             predict_call.summary if predict_call else predict_and_score_call.summary
         ),
         scorer_call_ids=best_effort_scorer_call_ids(scores, trial_children),
+        genai_span_ref=extract_genai_span_ref(predict_call)
+        or extract_genai_span_ref(predict_and_score_call),
     )
 
 

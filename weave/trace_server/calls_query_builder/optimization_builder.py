@@ -710,26 +710,31 @@ def _maybe_use_null_check(
     table_alias: str,
     use_null_check: bool,
 ) -> str | None:
-    """Conditionally append `...OR IS NULL` to a SQL condition.
-    When querying calls_merged, we must pass through certain null values
-    (see `_field_requires_null_check`).
+    """Finalize a heavy-field LIKE condition for the calls pre-filter.
 
-    Returns a wrapped condition e.g. "x LIKE '%y%' OR t.attributes_dump IS NULL";
-    Returns None if the the null check cannot be safely applied (see note below).
+    Two responsibilities:
+    1. Bail entirely when inside a NOT context. Heavy-field LIKE patterns
+       are SUPERSETS of the real predicate (the LIKE can match the literal
+       in unrelated JSON keys/values within the dump). Wrapping a superset
+       in NOT produces a SUBSET, which violates the pre-filter contract in
+       `process_query_to_optimization_sql` (must be identical or less
+       restrictive than the post-aggregation HAVING) and drops valid rows.
+       See WB-34043.
+    2. Append `OR ... IS NULL` for start/end fields on calls_merged so
+       unmerged call parts are not filtered out before aggregation.
+
+    Returns None when no safe pre-filter can be emitted.
 
     Args:
-        condition: The condition to wrap with `OR IS NULL`, e.g. "x LIKE '%y%'".
-        field: The column name to add the `IS NULL` check to, e.g. "attributes_dump".
+        condition: The condition to finalize, e.g. "x LIKE '%y%'".
+        field: The column name being filtered, e.g. "inputs_dump".
         table_alias: The table name to use in SQL.
         use_null_check: Whether to add OR IS NULL for start/end fields.
             True for calls_merged (unmerged parts may have NULL fields).
             False for calls_complete (every row is a complete call).
     """
+    if NotContext.is_in_not_context():
+        return None
     if use_null_check and _field_requires_null_check(field):
-        if NotContext.is_in_not_context():
-            # Inside "NOT (...)", adding "OR IS NULL" would invert to "AND IS NOT NULL"
-            # which is the opposite of the intention here. There is no way to safely
-            # include null values inside a "NOT" so we skip the optimization entirely.
-            return None
         return f"({condition} OR {table_alias}.{field} IS NULL)"
     return condition
