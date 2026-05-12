@@ -696,12 +696,12 @@ def test_agent_span_fields_discovers_custom_attrs(ch_server):
     )
     fields = {(field.source, field.key): field for field in res.fields}
 
-    assert fields[("custom_attrs_string", "env")].value_type == "string"
-    assert fields[("custom_attrs_string", "env")].count == 2
-    assert fields[("custom_attrs_float", "score")].value_type == "number"
-    assert fields[("custom_attrs_float", "score")].count == 2
-    assert fields[("custom_attrs_float", "quality")].count == 1
-    assert fields[("custom_attrs_bool", "flagged")].value_type == "boolean"
+    assert fields["custom_attrs_string", "env"].value_type == "string"
+    assert fields["custom_attrs_string", "env"].count == 2
+    assert fields["custom_attrs_float", "score"].value_type == "number"
+    assert fields["custom_attrs_float", "score"].count == 2
+    assert fields["custom_attrs_float", "quality"].count == 1
+    assert fields["custom_attrs_bool", "flagged"].value_type == "boolean"
 
 
 def test_agent_span_stats_groups_by_custom_attrs(ch_server):

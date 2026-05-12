@@ -18,7 +18,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from weave.trace_server.agents import semconv
-from weave.trace_server.agents.constants import OP_INVOKE_AGENT, SEARCH_CONTENT_PREVIEW_CHARS
+from weave.trace_server.agents.constants import (
+    OP_INVOKE_AGENT,
+    SEARCH_CONTENT_PREVIEW_CHARS,
+)
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentGroupByRef,
@@ -236,6 +239,7 @@ class SpanMeasureSQL:
     alias: str
     aggregate_sql: str
     value_type: AgentSpanStatsColumnValueType
+
 
 # ---------------------------------------------------------------------------
 # Column projections
@@ -467,7 +471,9 @@ def span_value_sql(
     pb: ParamBuilder,
     *,
     table_alias: str = "s",
-    expected_type: AgentSpanStatsValueType | AgentSpanStatsColumnValueType | None = None,
+    expected_type: AgentSpanStatsValueType
+    | AgentSpanStatsColumnValueType
+    | None = None,
 ) -> SpanValueSQL:
     """Resolve a value ref to a span-level SQL expression and validity guard."""
     if value.source == _SOURCE_DERIVED:
@@ -571,7 +577,9 @@ def span_measure_sql(
             compile_agent_query,
         )
 
-        valid_parts.append(compile_agent_query(measure.filter, pb, table_alias=table_alias))
+        valid_parts.append(
+            compile_agent_query(measure.filter, pb, table_alias=table_alias)
+        )
     valid_sql = " AND ".join(f"({part})" for part in valid_parts) or "1"
     agg = measure.aggregation
     if value_sql is not None:
@@ -1035,13 +1043,13 @@ def make_span_fields_query(pb: ParamBuilder, req: AgentSpanFieldsReq) -> str:
         ("custom_attrs_float", "number"),
         ("custom_attrs_bool", "boolean"),
     ]
-    for source, value_type in custom_sources:
+    for source, custom_value_type in custom_sources:
         selects.append(
             f"""
             SELECT
               '{source}' AS source,
               key,
-              '{value_type}' AS value_type,
+              '{custom_value_type}' AS value_type,
               count() AS count
             FROM (
               SELECT arrayJoin(mapKeys(s.{source})) AS key

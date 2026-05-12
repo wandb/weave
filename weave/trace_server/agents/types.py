@@ -113,7 +113,10 @@ class AgentSpanValueRef(BaseModel):
 
     @model_validator(mode="after")
     def validate_value_ref(self) -> AgentSpanValueRef:
-        if self.source == "derived" and self.key not in AGENT_SPAN_STATS_DERIVED_VALUE_TYPES:
+        if (
+            self.source == "derived"
+            and self.key not in AGENT_SPAN_STATS_DERIVED_VALUE_TYPES
+        ):
             raise ValueError(f"unknown derived span value: {self.key!r}")
         return self
 
@@ -164,9 +167,7 @@ class AgentSpanMeasureSpec(BaseModel):
                 )
         elif self.aggregation in {"sum", "avg", "min", "max", "count_distinct"}:
             if self.value is None:
-                raise ValueError(
-                    f"aggregation {self.aggregation!r} requires a value"
-                )
+                raise ValueError(f"aggregation {self.aggregation!r} requires a value")
 
         return self
 
@@ -275,8 +276,19 @@ class AgentSpanGroupFilter(BaseModel):
     def validate_group_filter(self) -> AgentSpanGroupFilter:
         if self.min is None and self.max is None:
             raise ValueError("group filter must set min or max")
-        if self.min is not None and self.max is not None and self.max < self.min:
-            raise ValueError("group filter max must be greater than min")
+        if self.min is not None and self.max is not None:
+            min_value = self.min
+            max_value = self.max
+            if isinstance(min_value, datetime.datetime):
+                if not isinstance(max_value, datetime.datetime):
+                    raise TypeError("group filter min and max must use the same type")
+                if max_value < min_value:
+                    raise ValueError("group filter max must be greater than min")
+            else:
+                if isinstance(max_value, datetime.datetime):
+                    raise TypeError("group filter min and max must use the same type")
+                if max_value < min_value:
+                    raise ValueError("group filter max must be greater than min")
         return self
 
 
@@ -604,7 +616,9 @@ class AgentSpansQueryReq(BaseModel):
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
-        if (self.measures or self.group_filters or self.group_numeric_filters) and not self.group_by:
+        if (
+            self.measures or self.group_filters or self.group_numeric_filters
+        ) and not self.group_by:
             raise ValueError("grouped measures and group filters require group_by")
         aliases = [measure.alias for measure in self.measures]
         duplicate_aliases = sorted(

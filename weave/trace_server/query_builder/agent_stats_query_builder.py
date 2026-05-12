@@ -39,8 +39,8 @@ from weave.trace_server.query_builder.agent_query_builder import (
     add_time_filters,
     conversation_aggregate_value_sql,
     ensure_group_filters_match,
-    group_filters_having_sql,
     group_by_ref_alias,
+    group_filters_having_sql,
     resolve_agent_span_field_column,
     resolve_group_by,
     span_group_filters,
@@ -896,9 +896,7 @@ def _build_ungrouped_stats_query(
     pb: ParamBuilder,
 ) -> str:
     """Render one row per time bucket for the full filtered span set."""
-    group_filter_ctes, stats_source_cte = _group_filter_ctes(
-        pb, group_filters
-    )
+    group_filter_ctes, stats_source_cte = _group_filter_ctes(pb, group_filters)
     return f"""
     WITH
       {_CTE_ALL_BUCKETS} AS (

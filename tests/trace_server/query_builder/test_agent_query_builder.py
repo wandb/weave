@@ -20,6 +20,7 @@ from weave.trace_server.agents.types import (
     AgentSpanFieldsReq,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
+    AgentSpanSchema,
     AgentSpansQueryReq,
     AgentSpanValueRef,
     AgentsQueryFilters,
@@ -32,6 +33,7 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     CHAT_VIEW_COLS,
     SPAN_SORTABLE_COLS,
+    SPAN_VALUE_TYPES,
     SPANS_LIST_COLS,
     build_order_by,
     make_agent_versions_count_query,
@@ -461,20 +463,29 @@ class TestMakeGroupedSpansListQuery:
                 sort_by=[AgentSortBy(field="avg_score", direction="desc")],
             ),
         )
-        sql = " ".join(query.split())
 
-        assert "count() AS spans" in sql
-        assert "countIf(((s.operation_name = {genai_3:String}))) AS tool_calls" in sql
-        assert (
-            "avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), "
-            "toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS avg_score"
-        ) in sql
-        assert "HAVING avgOrNull" in sql
-        assert "ORDER BY avg_score desc" in sql
-        assert pb.get_params()["genai_3"] == "execute_tool"
-        assert pb.get_params()["genai_4"] == "score"
-        assert pb.get_params()["genai_5"] == "score"
-        assert pb.get_params()["genai_6"] == 0.5
+        expected = """
+            SELECT s.conversation_id AS conversation_id,
+                   count() AS spans,
+                   countIf(((s.operation_name = {genai_3:String}))) AS tool_calls,
+                   avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS avg_score
+            FROM spans s
+            WHERE s.project_id = {genai_0:String}
+            GROUP BY conversation_id
+            HAVING avgOrNull(if((mapContains(s.custom_attrs_float, {genai_5:String})), toFloat64(s.custom_attrs_float[{genai_5:String}]), NULL)) >= {genai_6:Float64}
+            ORDER BY avg_score desc
+            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "execute_tool",
+            "genai_4": "score",
+            "genai_5": "score",
+            "genai_6": 0.5,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_dynamic_measure_rejects_invalid_resolved_aggregation(self) -> None:
         pb = ParamBuilder("genai")
@@ -516,12 +527,23 @@ class TestMakeGroupedSpansListQuery:
                 ],
             ),
         )
-        sql = " ".join(query.split())
 
-        assert (
-            "countIf((mapContains(s.custom_attrs_bool, {genai_3:String})) "
-            "AND s.custom_attrs_bool[{genai_3:String}] = 1) AS flagged_count"
-        ) in sql
+        expected = """
+            SELECT s.conversation_id AS conversation_id,
+                   countIf((mapContains(s.custom_attrs_bool, {genai_3:String})) AND s.custom_attrs_bool[{genai_3:String}] = 1) AS flagged_count
+            FROM spans s
+            WHERE s.project_id = {genai_0:String}
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "flagged",
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_group_filter_rejects_mismatched_datetime_bound(self) -> None:
         pb = ParamBuilder("genai")
@@ -561,9 +583,7 @@ class TestMakeGroupedSpansListQuery:
                     measures=[AgentSpanMeasureSpec(alias="spans", aggregation="count")],
                     group_filters=[
                         AgentSpanGroupFilter(
-                            group_by=[
-                                AgentGroupByRef(source="column", key="trace_id")
-                            ],
+                            group_by=[AgentGroupByRef(source="column", key="trace_id")],
                             measure=AgentSpanMeasureSpec(
                                 alias="spans",
                                 aggregation="count",
@@ -656,20 +676,92 @@ def test_make_span_fields_query_discovers_custom_attr_keys() -> None:
             limit=25,
         ),
     )
-    sql = " ".join(query.split())
-
-    assert "'field' AS source" in sql
-    assert "'custom_attrs_string' AS source" in sql
-    assert "'custom_attrs_float' AS source" in sql
-    assert "arrayJoin(mapKeys(s.custom_attrs_string)) AS key" in sql
-    assert "arrayJoin(mapKeys(s.custom_attrs_float)) AS key" in sql
-    assert "ORDER BY count DESC, source ASC, key ASC" in sql
-    assert pb.get_params() == {
+    field_selects = []
+    for key, value_type in sorted(SPAN_VALUE_TYPES.items()):
+        if key not in AgentSpanSchema.model_fields:
+            continue
+        field_selects.append(
+            f"""
+            SELECT
+              'field' AS source,
+              '{key}' AS key,
+              '{value_type}' AS value_type,
+              countIf(isNotNull(s.{key})) AS count
+            FROM spans s
+            WHERE s.project_id = {{genai_0:String}} AND s.started_at >= {{genai_1:DateTime64(6)}} AND s.started_at < {{genai_2:DateTime64(6)}}
+            HAVING count > 0
+            """
+        )
+    custom_selects = [
+        """
+            SELECT
+              'custom_attrs_string' AS source,
+              key,
+              'string' AS value_type,
+              count() AS count
+            FROM (
+              SELECT arrayJoin(mapKeys(s.custom_attrs_string)) AS key
+              FROM spans s
+              WHERE s.project_id = {genai_0:String} AND s.started_at >= {genai_1:DateTime64(6)} AND s.started_at < {genai_2:DateTime64(6)}
+            )
+            GROUP BY key
+            """,
+        """
+            SELECT
+              'custom_attrs_int' AS source,
+              key,
+              'number' AS value_type,
+              count() AS count
+            FROM (
+              SELECT arrayJoin(mapKeys(s.custom_attrs_int)) AS key
+              FROM spans s
+              WHERE s.project_id = {genai_0:String} AND s.started_at >= {genai_1:DateTime64(6)} AND s.started_at < {genai_2:DateTime64(6)}
+            )
+            GROUP BY key
+            """,
+        """
+            SELECT
+              'custom_attrs_float' AS source,
+              key,
+              'number' AS value_type,
+              count() AS count
+            FROM (
+              SELECT arrayJoin(mapKeys(s.custom_attrs_float)) AS key
+              FROM spans s
+              WHERE s.project_id = {genai_0:String} AND s.started_at >= {genai_1:DateTime64(6)} AND s.started_at < {genai_2:DateTime64(6)}
+            )
+            GROUP BY key
+            """,
+        """
+            SELECT
+              'custom_attrs_bool' AS source,
+              key,
+              'boolean' AS value_type,
+              count() AS count
+            FROM (
+              SELECT arrayJoin(mapKeys(s.custom_attrs_bool)) AS key
+              FROM spans s
+              WHERE s.project_id = {genai_0:String} AND s.started_at >= {genai_1:DateTime64(6)} AND s.started_at < {genai_2:DateTime64(6)}
+            )
+            GROUP BY key
+            """,
+    ]
+    union_sql = "\nUNION ALL\n".join([*field_selects, *custom_selects])
+    expected = f"""
+        SELECT source, key, value_type, count
+        FROM (
+          {union_sql}
+        )
+        ORDER BY count DESC, source ASC, key ASC
+        LIMIT {{genai_3:UInt64}}
+    """
+    expected_params = {
         "genai_0": "p1",
         "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
         "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
         "genai_3": 25,
     }
+    assert_sql(expected, expected_params, query, pb.get_params())
 
 
 # ============================================================================
@@ -995,13 +1087,27 @@ class TestMakeConversationChatSpansQuery:
             ),
         )
 
-        assert "LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}" in query
-        assert pb.get_params() == {
-            "genai_0": "p1",
-            "genai_1": "c1",
-            "genai_2": 10,
-            "genai_3": 20,
-        }
+        expected = f"""
+            SELECT {", ".join(f"s.{c} AS {c}" for c in CHAT_VIEW_COLS.split(", "))}
+            FROM spans s
+            INNER JOIN (
+                SELECT trace_id, min(started_at) AS turn_started_at
+                FROM spans
+                WHERE project_id = {{genai_0:String}}
+                  AND conversation_id = {{genai_1:String}}
+                GROUP BY trace_id
+                ORDER BY turn_started_at DESC, trace_id DESC
+                LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+            ) t ON s.trace_id = t.trace_id
+            WHERE s.project_id = {{genai_0:String}}
+            ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
+        """
+        assert_sql(
+            expected,
+            {"genai_0": "p1", "genai_1": "c1", "genai_2": 10, "genai_3": 20},
+            query,
+            pb.get_params(),
+        )
 
     def test_limit_rejected_above_max_turns(self) -> None:
         with pytest.raises(ValidationError):
