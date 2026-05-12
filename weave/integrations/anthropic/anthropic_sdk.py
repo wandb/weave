@@ -22,6 +22,7 @@ from anthropic.types.beta import (
 )
 
 import weave
+from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator, _IteratorWrapper
@@ -81,11 +82,6 @@ def anthropic_accumulator(
             acc.usage.output_tokens = value.usage.output_tokens
 
     return acc
-
-
-# Unlike other integrations, streaming is based on input flag
-def should_use_accumulator(inputs: dict) -> bool:
-    return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:

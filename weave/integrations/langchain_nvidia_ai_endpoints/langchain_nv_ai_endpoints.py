@@ -13,6 +13,7 @@ except ImportError:
     import_failed = True
 
 import weave
+from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
@@ -150,10 +151,6 @@ def postprocess_inputs_to_openai_format(
         kwargs=original_kwargs,
         inputs=weave_report,
     )
-
-
-def should_use_accumulator(inputs: dict) -> bool:
-    return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
 def nvidia_ai_endpoints_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
