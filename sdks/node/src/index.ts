@@ -25,6 +25,68 @@ export {
 } from './integrations';
 export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
 export {op} from './op';
+// Session SDK — structured logging for agent conversations.
+// Mirrors the Python `weave.session` API (see `./session/index.ts`).
+export {
+  LLM,
+  LogResult,
+  MediaAttachment,
+  Message,
+  Reasoning,
+  Session,
+  SubAgent,
+  Tool,
+  Turn,
+  Usage,
+  endLlm,
+  endSession,
+  endTurn,
+  executeToolAttributes,
+  getCurrentLlm,
+  getCurrentSession,
+  getCurrentTurn,
+  invokeAgentAttributes,
+  llmAttributes,
+  logSession,
+  logTurn,
+  parseDataUrl,
+  startLlm,
+  startSession,
+  startSubagent,
+  startTool,
+  startTurn,
+  toJsonString,
+  toolCallPart,
+  toolCallResponsePart,
+} from './session';
+export type {
+  BlobPart,
+  ExecuteToolAttributesInput,
+  FilePart,
+  InvokeAgentAttributesInput,
+  JSONStringInput,
+  LLMInit,
+  LLMRecordInput,
+  LlmAttributesInput,
+  LogSessionInput,
+  LogTurnInput,
+  MediaAttachmentInit,
+  MediaKind,
+  MessageInit,
+  MessagePart,
+  MessageRole,
+  ReasoningPart,
+  SessionInit,
+  SpanAttributes,
+  SubAgentInit,
+  TextPart,
+  ToolCallPart,
+  ToolCallResponsePart,
+  ToolInit,
+  TurnInit,
+  UriPart,
+  UsageInit,
+} from './session';
 export * from './types';
 export {WeaveObject, ObjectRef} from './weaveObject';
 export {MessagesPrompt, StringPrompt} from './prompt';
