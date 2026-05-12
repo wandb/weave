@@ -1,7 +1,7 @@
 import contextlib
 import datetime
 import logging
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 
 import sqlparse
 
@@ -36,45 +36,6 @@ def timestamp_to_datetime_str(timestamp: float) -> str:
     return datetime.datetime.fromtimestamp(
         timestamp, tz=datetime.timezone.utc
     ).strftime("%Y-%m-%d %H:%M:%S.%f")
-
-
-def infer_literal_filter_cast(
-    operand: tsi_query.Operand,
-) -> tsi_query.CastTo | None:
-    """Infer a JSON dynamic-field cast from a comparison operand.
-
-    `JSON_VALUE` returns strings, so numeric and boolean literals need the
-    field side cast to match the parameter type the backend receives. String,
-    `None`, and structured literals keep the existing uncast path.
-    """
-    if not isinstance(operand, tsi_query.LiteralOperation):
-        return None
-
-    value = operand.literal_
-    if isinstance(value, bool):
-        return "bool"
-    if isinstance(value, int):
-        return "int"
-    if isinstance(value, float):
-        return "double"
-    return None
-
-
-def infer_shared_literal_filter_cast(
-    operands: Sequence[tsi_query.Operand],
-) -> tsi_query.CastTo | None:
-    """Return a shared inferred cast for compatible literal lists."""
-    casts: set[tsi_query.CastTo] = set()
-    for operand in operands:
-        operand_cast = infer_literal_filter_cast(operand)
-        if operand_cast is None:
-            return None
-        casts.add(operand_cast)
-    if casts == {"int", "double"}:
-        return "double"
-    if len(casts) == 1:
-        return next(iter(casts))
-    return None
 
 
 def parse_string_to_utc_timestamp(value: str) -> float | None:

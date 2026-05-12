@@ -56,14 +56,16 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
-    infer_literal_filter_cast,
-    infer_shared_literal_filter_cast,
     json_dump_field_as_sql,
     param_slot,
     parse_string_to_utc_timestamp,
     safe_alias,
     safely_format_sql,
     timestamp_to_datetime_str,
+)
+from weave.trace_server.interface.query import (
+    infer_literal_filter_cast,
+    infer_shared_literal_filter_cast,
 )
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError

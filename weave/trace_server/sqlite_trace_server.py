@@ -33,10 +33,6 @@ from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
-from weave.trace_server.calls_query_builder.utils import (
-    infer_literal_filter_cast,
-    infer_shared_literal_filter_cast,
-)
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.digest_validation import validate_expected_digest
@@ -1120,7 +1116,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     )
                     cond = f"({lhs_part} <= {rhs_part})"
                 elif isinstance(operation, tsi_query.InOperation):
-                    in_cast = infer_shared_literal_filter_cast(operation.in_[1])
+                    in_cast = tsi_query.infer_shared_literal_filter_cast(
+                        operation.in_[1]
+                    )
                     lhs_field = _process_get_field_with_inferred_cast(
                         operation.in_[0], in_cast
                     )
@@ -1168,8 +1166,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 lhs: tsi_query.Operand,
                 rhs: tsi_query.Operand,
             ) -> tuple[str, str]:
-                lhs_cast = infer_literal_filter_cast(rhs)
-                rhs_cast = infer_literal_filter_cast(lhs)
+                lhs_cast = tsi_query.infer_literal_filter_cast(rhs)
+                rhs_cast = tsi_query.infer_literal_filter_cast(lhs)
                 lhs_field = _process_get_field_with_inferred_cast(lhs, lhs_cast)
                 rhs_field = _process_get_field_with_inferred_cast(rhs, rhs_cast)
                 lhs_part = lhs_field if lhs_field is not None else process_operand(lhs)
@@ -5114,43 +5112,19 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
-def _sqlite_text_without_leading_sign_sql(text_sql: str) -> str:
+def _sqlite_text_is_plain_decimal_sql(text_sql: str) -> str:
+    """SQLite predicate for 'text is a plain decimal string'.
+
+    Plain decimal = one or more digits with at most one `.`, nothing else.
+    No leading sign, no exponent notation. Strings that don't match parse to
+    NULL instead of coercing to 0 (the SQLite CAST default for bad text).
+    """
+    digits = f"replace({text_sql}, '.', '')"
+    dot_count = f"(length({text_sql}) - length({digits}))"
     return (
-        f"(CASE WHEN substr({text_sql}, 1, 1) IN ('-', '+') "
-        f"THEN substr({text_sql}, 2) ELSE {text_sql} END)"
+        f"({text_sql} != '' AND {digits} != '' "
+        f"AND {digits} NOT GLOB '*[^0-9]*' AND {dot_count} <= 1)"
     )
-
-
-def _sqlite_unsigned_text_is_int_sql(unsigned_sql: str) -> str:
-    return f"({unsigned_sql} != '' AND {unsigned_sql} NOT GLOB '*[^0-9]*')"
-
-
-def _sqlite_unsigned_text_is_decimal_sql(unsigned_sql: str) -> str:
-    digits = f"replace({unsigned_sql}, '.', '')"
-    dot_count = f"(length({unsigned_sql}) - length(replace({unsigned_sql}, '.', '')))"
-    return f"({digits} != '' AND {digits} NOT GLOB '*[^0-9]*' AND {dot_count} <= 1)"
-
-
-def _sqlite_json_text_is_int_sql(value_sql: str) -> str:
-    trimmed = f"trim(CAST({value_sql} AS TEXT))"
-    unsigned = _sqlite_text_without_leading_sign_sql(trimmed)
-    return _sqlite_unsigned_text_is_int_sql(unsigned)
-
-
-def _sqlite_json_text_is_float_sql(value_sql: str) -> str:
-    trimmed = f"trim(CAST({value_sql} AS TEXT))"
-    lowered = f"lower({trimmed})"
-    exponent_pos = f"instr({lowered}, 'e')"
-    mantissa = (
-        f"(CASE WHEN {exponent_pos} > 0 THEN substr({lowered}, 1, {exponent_pos} - 1) "
-        f"ELSE {lowered} END)"
-    )
-    exponent = f"substr({lowered}, {exponent_pos} + 1)"
-    unsigned_mantissa = _sqlite_text_without_leading_sign_sql(mantissa)
-    unsigned_exponent = _sqlite_text_without_leading_sign_sql(exponent)
-    mantissa_is_decimal = _sqlite_unsigned_text_is_decimal_sql(unsigned_mantissa)
-    exponent_is_int = _sqlite_unsigned_text_is_int_sql(unsigned_exponent)
-    return f"({mantissa_is_decimal} AND ({exponent_pos} = 0 OR {exponent_is_int}))"
 
 
 def _sqlite_sql_type_for_cast(cast: str) -> str:
@@ -5171,21 +5145,15 @@ def _sqlite_inferred_scalar_cast_sql(
     sql_type: str,
 ) -> str:
     cast_sql = f"CAST({value_sql} AS {sql_type})"
-    if cast == "int":
-        return (
-            f"CASE WHEN {_sqlite_json_text_is_int_sql(value_sql)} "
-            f"THEN {cast_sql} ELSE NULL END"
-        )
-    if cast in {"double", "float"}:
-        return (
-            f"CASE WHEN {_sqlite_json_text_is_float_sql(value_sql)} "
-            f"THEN {cast_sql} ELSE NULL END"
-        )
-    text_value = f"lower(trim(CAST({value_sql} AS TEXT)))"
+    text_sql = f"CAST({value_sql} AS TEXT)"
+    plain_decimal = _sqlite_text_is_plain_decimal_sql(text_sql)
+    if cast in {"int", "double", "float"}:
+        return f"CASE WHEN {plain_decimal} THEN {cast_sql} ELSE NULL END"
+    text_value = f"lower(trim({text_sql}))"
     return (
         f"CASE WHEN {text_value} = 'true' THEN 1 "
         f"WHEN {text_value} = 'false' THEN 0 "
-        f"WHEN {_sqlite_json_text_is_int_sql(value_sql)} THEN {cast_sql} "
+        f"WHEN {plain_decimal} THEN {cast_sql} "
         f"ELSE NULL END"
     )
 
@@ -5197,31 +5165,32 @@ def _sqlite_inferred_json_cast_sql(
     sql_type: str,
 ) -> str:
     # SQLite CAST coerces nonnumeric text and structured JSON to 0. Inferred
-    # casts should instead behave like ClickHouse's to*OrNull family.
+    # casts should instead behave like ClickHouse's to*OrNull family: native
+    # numeric JSON converts, plain-decimal text converts, everything else
+    # (objects, arrays, exponent notation, signed text) becomes NULL.
     cast_sql = f"CAST({json_extract_sql} AS {sql_type})"
+    text_sql = f"CAST({json_extract_sql} AS TEXT)"
+    plain_decimal = _sqlite_text_is_plain_decimal_sql(text_sql)
     if cast == "int":
-        text_is_int = _sqlite_json_text_is_int_sql(json_extract_sql)
         return (
             f"CASE WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
-            f"WHEN {json_type_sql} = 'text' AND {text_is_int} THEN {cast_sql} "
+            f"WHEN {json_type_sql} = 'text' AND {plain_decimal} THEN {cast_sql} "
             f"ELSE NULL END"
         )
     if cast in {"double", "float"}:
-        text_is_float = _sqlite_json_text_is_float_sql(json_extract_sql)
         return (
             f"CASE WHEN {json_type_sql} IN ('integer', 'real') THEN {cast_sql} "
-            f"WHEN {json_type_sql} = 'text' AND {text_is_float} THEN {cast_sql} "
+            f"WHEN {json_type_sql} = 'text' AND {plain_decimal} THEN {cast_sql} "
             f"ELSE NULL END"
         )
-    text_value = f"lower(trim(CAST({json_extract_sql} AS TEXT)))"
-    text_is_int = _sqlite_json_text_is_int_sql(json_extract_sql)
+    text_value = f"lower(trim({text_sql}))"
     return (
         f"CASE WHEN {json_type_sql} = 'true' THEN 1 "
         f"WHEN {json_type_sql} = 'false' THEN 0 "
         f"WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
         f"WHEN {json_type_sql} = 'text' AND {text_value} = 'true' THEN 1 "
         f"WHEN {json_type_sql} = 'text' AND {text_value} = 'false' THEN 0 "
-        f"WHEN {json_type_sql} = 'text' AND {text_is_int} THEN {cast_sql} "
+        f"WHEN {json_type_sql} = 'text' AND {plain_decimal} THEN {cast_sql} "
         f"ELSE NULL END"
     )
 
