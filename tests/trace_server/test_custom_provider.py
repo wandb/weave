@@ -1,13 +1,12 @@
 import os
 import uuid
-from contextlib import contextmanager
 from datetime import datetime
 from unittest.mock import patch
 
 from litellm.types.utils import ModelResponse
 
 from tests.trace.util import client_is_sqlite
-from weave.trace.settings import _context_vars
+from weave.trace.settings import override
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.interface.builtin_object_classes.provider import (
@@ -19,15 +18,6 @@ from weave.trace_server.llm_completion import get_custom_provider_info
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
 )
-
-
-@contextmanager
-def with_tracing_disabled():
-    token = _context_vars["disabled"].set(True)
-    try:
-        yield
-    finally:
-        _context_vars["disabled"].reset(token)
 
 
 class DummySecretFetcher:
@@ -315,7 +305,7 @@ def test_custom_provider_completions_create(client):
     mock_response = create_mock_completion_response(model_name=model_name)
 
     # Run test with tracing disabled to avoid interference
-    with with_tracing_disabled():
+    with override(disabled=True):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
@@ -443,7 +433,7 @@ def test_custom_provider_ollama_model(client):
         prompt_tokens=11,
     )
 
-    with with_tracing_disabled():
+    with override(disabled=True):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
@@ -528,7 +518,7 @@ def test_custom_provider_trailing_slash_normalization(client):
         content="Hello!",
     )
 
-    with with_tracing_disabled():
+    with override(disabled=True):
         mock_secret_fetcher, token = setup_test_environment()
         try:
             with patch(
@@ -622,7 +612,7 @@ def test_error_handling_custom_provider(client):
     def mock_obj_read(req):
         raise NotFoundError("Test error fetching provider")
 
-    with with_tracing_disabled():
+    with override(disabled=True):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
@@ -665,7 +655,7 @@ def test_custom_provider_invalid_model_format(client):
         "messages": [{"role": "user", "content": "Hello, world!"}],
     }
 
-    with with_tracing_disabled():
+    with override(disabled=True):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:

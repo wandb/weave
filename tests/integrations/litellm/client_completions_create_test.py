@@ -1,22 +1,12 @@
 import os
-from contextlib import contextmanager
 from unittest.mock import patch
 
 from litellm.types.utils import ModelResponse
 
 from tests.trace.util import client_is_sqlite
-from weave.trace.settings import _context_vars
+from weave.trace.settings import override
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
-
-
-@contextmanager
-def with_tracing_disabled():
-    token = _context_vars["disabled"].set(True)
-    try:
-        yield
-    finally:
-        _context_vars["disabled"].reset(token)
 
 
 def test_completions_create(client):
@@ -86,7 +76,7 @@ def test_completions_create(client):
 
     # Have to do this since we run the tests in the same process as the server
     # and the inner litellm gets patched!
-    with with_tracing_disabled():
+    with override(disabled=True):
         with secret_fetcher_context(DummySecretFetcher()):
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = ModelResponse.model_validate(

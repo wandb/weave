@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import os
 import time
@@ -15,7 +16,15 @@ from tests.trace.util import (
 )
 from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
 from weave.trace.display.term import configure_logger
-from weave.trace.settings import UserSettings, parse_and_apply_settings
+from weave.trace.settings import (
+    UserSettings,
+    apply,
+    current,
+    override,
+    parse_and_apply_settings,
+    should_disable_weave,
+    should_print_call_link,
+)
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
 
@@ -454,3 +463,196 @@ def test_log_level_env(client_creator):
 
     # Clean up after test
     del os.environ["WEAVE_LOG_LEVEL"]
+
+
+# ---------------------------------------------------------------------------
+# Tests for the deepened settings module: current(), apply(), override(),
+# env-overlay precedence, dict input.
+#
+# Many tests in this file leak WEAVE_* env vars across runs.  These new tests
+# request `clean_settings_env` so they start from a known-clean state.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def clean_settings_env(monkeypatch):
+    """Strip all WEAVE_* env vars and reset settings to defaults for the test."""
+    for key in list(os.environ):
+        if key.startswith("WEAVE_"):
+            monkeypatch.delenv(key, raising=False)
+    apply(None)
+    yield
+    apply(None)
+
+
+def test_current_returns_view_over_snapshot(clean_settings_env):
+    apply(UserSettings(disabled=True, print_call_link=False))
+    view = current()
+    assert view.disabled is True
+    assert view.print_call_link is False
+
+
+def test_apply_replace_all_resets_unmentioned_fields(clean_settings_env):
+    apply(UserSettings(disabled=True, print_call_link=False))
+    # Applying a fresh UserSettings(disabled=True) should NOT preserve
+    # print_call_link=False — replace-all semantics.
+    apply(UserSettings(disabled=True))
+    assert current().disabled is True
+    assert current().print_call_link is True
+
+
+def test_apply_none_resets_to_defaults(clean_settings_env):
+    apply(UserSettings(disabled=True))
+    assert current().disabled is True
+    apply(None)
+    assert current().disabled is False
+
+
+def test_apply_no_args_resets_to_defaults(clean_settings_env):
+    apply(UserSettings(disabled=True))
+    apply()
+    assert current().disabled is False
+
+
+def test_apply_dict_input(clean_settings_env):
+    apply({"disabled": True, "redact_pii": True})
+    assert current().disabled is True
+    assert current().redact_pii is True
+
+
+def test_apply_dict_unknown_field_raises(clean_settings_env):
+    with pytest.raises(TypeError):
+        apply({"definitely_not_a_real_field": True})
+
+
+def test_apply_invalid_type_raises(clean_settings_env):
+    with pytest.raises(TypeError):
+        apply(42)
+
+
+def test_override_scopes_one_field(clean_settings_env):
+    apply(UserSettings(print_call_link=False))
+    assert current().disabled is False
+    with override(disabled=True):
+        assert current().disabled is True
+        # Other fields keep the surrounding snapshot's values
+        assert current().print_call_link is False
+    assert current().disabled is False
+    assert current().print_call_link is False
+
+
+def test_override_nested(clean_settings_env):
+    with override(disabled=True):
+        assert current().disabled is True
+        with override(print_call_link=False):
+            assert current().disabled is True
+            assert current().print_call_link is False
+        assert current().disabled is True
+        assert current().print_call_link is True
+    assert current().disabled is False
+
+
+def test_override_unknown_field_raises(clean_settings_env):
+    with pytest.raises(TypeError):
+        with override(not_a_real_field=True):
+            pass
+
+
+def test_env_var_wins_over_snapshot(clean_settings_env, monkeypatch):
+    apply(UserSettings(disabled=False))
+    assert current().disabled is False
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+    assert current().disabled is True
+    assert should_disable_weave() is True
+
+
+def test_env_var_change_takes_effect_immediately(clean_settings_env, monkeypatch):
+    """Q2 contract: users may flip env vars mid-process and reads pick it up."""
+    assert current().disabled is False
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+    assert current().disabled is True
+    monkeypatch.setenv("WEAVE_DISABLED", "false")
+    assert current().disabled is False
+    monkeypatch.delenv("WEAVE_DISABLED")
+    assert current().disabled is False
+
+
+def test_empty_env_var_falls_through_to_snapshot(clean_settings_env, monkeypatch):
+    """An env var that exists but is empty is treated as unset."""
+    apply(UserSettings(disabled=True))
+    monkeypatch.setenv("WEAVE_DISABLED", "")
+    assert current().disabled is True
+    assert should_disable_weave() is True
+
+
+def test_env_overlay_coerces_int(clean_settings_env, monkeypatch):
+    monkeypatch.setenv("WEAVE_MAX_CALLS_QUEUE_SIZE", "42")
+    assert current().max_calls_queue_size == 42
+
+
+def test_env_overlay_coerces_float(clean_settings_env, monkeypatch):
+    monkeypatch.setenv("WEAVE_HTTP_TIMEOUT", "12.5")
+    assert current().http_timeout == 12.5
+
+
+def test_env_overlay_coerces_list(clean_settings_env, monkeypatch):
+    monkeypatch.setenv("WEAVE_REDACT_PII_FIELDS", "a,b,c")
+    assert current().redact_pii_fields == ["a", "b", "c"]
+
+
+def test_env_overlay_coerces_optional_int(clean_settings_env, monkeypatch):
+    monkeypatch.setenv("WEAVE_CLIENT_PARALLELISM", "7")
+    assert current().client_parallelism == 7
+
+
+def test_accessor_function_matches_current_attr(clean_settings_env):
+    """Back-compat: should_X() returns the same value as current().X."""
+    apply(UserSettings(disabled=True, print_call_link=False))
+    assert should_disable_weave() == current().disabled
+    assert should_print_call_link() == current().print_call_link
+
+
+def test_unknown_field_access_raises_attribute_error(clean_settings_env):
+    view = current()
+    missing_name = "not_a_real_field"
+    with pytest.raises(AttributeError):
+        getattr(view, missing_name)
+
+
+def test_parse_and_apply_settings_is_alias_for_apply(clean_settings_env):
+    """Back-compat: the prior public name still works."""
+    parse_and_apply_settings(UserSettings(disabled=True))
+    assert current().disabled is True
+    parse_and_apply_settings(None)
+    assert current().disabled is False
+
+
+def test_user_settings_is_frozen():
+    settings = UserSettings()
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        settings.disabled = True
+
+
+def test_user_settings_rejects_unknown_kwargs():
+    with pytest.raises(TypeError):
+        UserSettings(not_a_field=True)
+
+
+def test_override_in_async_context_does_not_leak(clean_settings_env):
+    """Each async context gets its own override stack."""
+    import asyncio
+
+    async def child():
+        with override(disabled=True):
+            assert current().disabled is True
+            await asyncio.sleep(0)
+            assert current().disabled is True
+
+    async def parent():
+        # Parent does not override; child should see its own override; parent
+        # should not see leakage.
+        assert current().disabled is False
+        await child()
+        assert current().disabled is False
+
+    asyncio.run(parent())
