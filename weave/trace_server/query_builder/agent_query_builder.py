@@ -14,21 +14,31 @@ from __future__ import annotations
 import datetime
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from weave.trace_server.agents import semconv
-from weave.trace_server.agents.constants import SEARCH_CONTENT_PREVIEW_CHARS
+from weave.trace_server.agents.constants import OP_INVOKE_AGENT, SEARCH_CONTENT_PREVIEW_CHARS
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
+    AgentSpanFieldsReq,
+    AgentSpanGroupFilter,
     AgentSpanGroupNumericFilter,
+    AgentSpanMeasureSpec,
     AgentSpanSchema,
     AgentSpansQueryReq,
+    AgentSpanStatsAggregation,
+    AgentSpanStatsColumnValueType,
+    AgentSpanStatsDerivedMetric,
+    AgentSpanStatsValueType,
+    AgentSpanValueRef,
     AgentsQueryReq,
     AgentVersionsQueryReq,
 )
+from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 
 # ---------------------------------------------------------------------------
@@ -130,6 +140,102 @@ _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
     }
 )
 _FIELD_GROUP_BY_SOURCES: frozenset[str] = frozenset({"field", "column"})
+
+_VALUE_TYPE_STRING: AgentSpanStatsValueType = "string"
+_VALUE_TYPE_NUMBER: AgentSpanStatsValueType = "number"
+_VALUE_TYPE_BOOLEAN: AgentSpanStatsValueType = "boolean"
+_VALUE_TYPE_DATETIME: AgentSpanStatsColumnValueType = "datetime"
+
+_SOURCE_DERIVED = "derived"
+_SOURCE_FIELD = "field"
+_SOURCE_CUSTOM_ATTRS_STRING = "custom_attrs_string"
+_SOURCE_CUSTOM_ATTRS_INT = "custom_attrs_int"
+_SOURCE_CUSTOM_ATTRS_FLOAT = "custom_attrs_float"
+_SOURCE_CUSTOM_ATTRS_BOOL = "custom_attrs_bool"
+
+_AGG_SUM: AgentSpanStatsAggregation = "sum"
+_AGG_AVG: AgentSpanStatsAggregation = "avg"
+_AGG_MIN: AgentSpanStatsAggregation = "min"
+_AGG_MAX: AgentSpanStatsAggregation = "max"
+_AGG_COUNT: AgentSpanStatsAggregation = "count"
+_AGG_COUNT_DISTINCT: AgentSpanStatsAggregation = "count_distinct"
+_AGG_COUNT_TRUE: AgentSpanStatsAggregation = "count_true"
+_AGG_COUNT_FALSE: AgentSpanStatsAggregation = "count_false"
+
+_ALLOWED_MEASURE_AGGS_BY_TYPE: dict[
+    AgentSpanStatsColumnValueType, frozenset[AgentSpanStatsAggregation]
+] = {
+    _VALUE_TYPE_DATETIME: frozenset(
+        {_AGG_MIN, _AGG_MAX, _AGG_COUNT, _AGG_COUNT_DISTINCT}
+    ),
+    _VALUE_TYPE_NUMBER: frozenset(
+        {_AGG_SUM, _AGG_AVG, _AGG_MIN, _AGG_MAX, _AGG_COUNT, _AGG_COUNT_DISTINCT}
+    ),
+    _VALUE_TYPE_BOOLEAN: frozenset(
+        {_AGG_COUNT, _AGG_COUNT_DISTINCT, _AGG_COUNT_TRUE, _AGG_COUNT_FALSE}
+    ),
+    _VALUE_TYPE_STRING: frozenset({_AGG_COUNT, _AGG_COUNT_DISTINCT}),
+}
+
+_DERIVED_DURATION_MS: AgentSpanStatsDerivedMetric = "duration_ms"
+_DERIVED_TOTAL_TOKENS: AgentSpanStatsDerivedMetric = "total_tokens"
+_DERIVED_IS_ERROR: AgentSpanStatsDerivedMetric = "is_error"
+_DERIVED_IS_INVOCATION: AgentSpanStatsDerivedMetric = "is_invocation"
+
+_STATUS_CODE_ERROR = "ERROR"
+
+_CUSTOM_ATTR_VALUE_TYPES: dict[str, AgentSpanStatsValueType] = {
+    _SOURCE_CUSTOM_ATTRS_STRING: _VALUE_TYPE_STRING,
+    _SOURCE_CUSTOM_ATTRS_INT: _VALUE_TYPE_NUMBER,
+    _SOURCE_CUSTOM_ATTRS_FLOAT: _VALUE_TYPE_NUMBER,
+    _SOURCE_CUSTOM_ATTRS_BOOL: _VALUE_TYPE_BOOLEAN,
+}
+
+_CORE_SPAN_VALUE_TYPES: dict[str, AgentSpanStatsColumnValueType] = {
+    "trace_id": _VALUE_TYPE_STRING,
+    "span_id": _VALUE_TYPE_STRING,
+    "parent_span_id": _VALUE_TYPE_STRING,
+    "span_name": _VALUE_TYPE_STRING,
+    "span_kind": _VALUE_TYPE_STRING,
+    "started_at": _VALUE_TYPE_DATETIME,
+    "ended_at": _VALUE_TYPE_DATETIME,
+    "status_code": _VALUE_TYPE_STRING,
+    "status_message": _VALUE_TYPE_STRING,
+    "wb_user_id": _VALUE_TYPE_STRING,
+    "wb_run_id": _VALUE_TYPE_STRING,
+    "wb_run_step": _VALUE_TYPE_NUMBER,
+    "wb_run_step_end": _VALUE_TYPE_NUMBER,
+}
+
+_SEMCONV_TYPE_TO_STATS_TYPE: dict[str, AgentSpanStatsValueType] = {
+    "string": _VALUE_TYPE_STRING,
+    "json": _VALUE_TYPE_STRING,
+    "string[]": _VALUE_TYPE_STRING,
+    "int": _VALUE_TYPE_NUMBER,
+    "float": _VALUE_TYPE_NUMBER,
+}
+
+SPAN_VALUE_TYPES: dict[str, AgentSpanStatsColumnValueType] = {
+    **{
+        column: _SEMCONV_TYPE_TO_STATS_TYPE[semconv.ATTRIBUTES[key].type]
+        for key, column in semconv.CANONICAL_KEY_TO_COLUMN.items()
+    },
+    **_CORE_SPAN_VALUE_TYPES,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class SpanValueSQL:
+    value_sql: str
+    valid_sql: str
+    value_type: AgentSpanStatsColumnValueType
+
+
+@dataclass(frozen=True, slots=True)
+class SpanMeasureSQL:
+    alias: str
+    aggregate_sql: str
+    value_type: AgentSpanStatsColumnValueType
 
 # ---------------------------------------------------------------------------
 # Column projections
@@ -352,6 +458,304 @@ def group_by_ref_alias(ref: AgentGroupByRef) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Span value and grouped measure resolution
+# ---------------------------------------------------------------------------
+
+
+def span_value_sql(
+    value: AgentSpanValueRef,
+    pb: ParamBuilder,
+    *,
+    table_alias: str = "s",
+    expected_type: AgentSpanStatsValueType | AgentSpanStatsColumnValueType | None = None,
+) -> SpanValueSQL:
+    """Resolve a value ref to a span-level SQL expression and validity guard."""
+    if value.source == _SOURCE_DERIVED:
+        out = _derived_value_sql(value.key, pb, table_alias=table_alias)
+    elif value.source == _SOURCE_FIELD:
+        col = resolve_agent_span_field_column(value.key)
+        value_type = SPAN_VALUE_TYPES.get(col)
+        if value_type is None:
+            raise ValueError(f"field {value.key!r} is not aggregatable")
+        value_sql = f"{table_alias}.{col}"
+        if value_type == _VALUE_TYPE_NUMBER:
+            value_sql = f"toFloat64({value_sql})"
+        out = SpanValueSQL(value_sql=value_sql, valid_sql="1", value_type=value_type)
+    elif value.source in _CUSTOM_ATTR_VALUE_TYPES:
+        value_type = _CUSTOM_ATTR_VALUE_TYPES[value.source]
+        key_slot = pb.add(str(value.key), param_type="String")
+        source_column = f"{table_alias}.{value.source}"
+        value_sql = f"{source_column}[{key_slot}]"
+        if value_type == _VALUE_TYPE_NUMBER:
+            value_sql = f"toFloat64({value_sql})"
+        out = SpanValueSQL(
+            value_sql=value_sql,
+            valid_sql=f"mapContains({source_column}, {key_slot})",
+            value_type=value_type,
+        )
+    else:
+        raise ValueError(f"unknown value source: {value.source!r}")
+
+    if expected_type is not None and out.value_type != expected_type:
+        raise ValueError(
+            f"value {value.key!r} has value_type {out.value_type!r}, "
+            f"got {expected_type!r}"
+        )
+    return out
+
+
+def _derived_value_sql(
+    metric: str,
+    pb: ParamBuilder,
+    *,
+    table_alias: str,
+) -> SpanValueSQL:
+    if metric == _DERIVED_DURATION_MS:
+        started_at = f"{table_alias}.started_at"
+        ended_at = f"{table_alias}.ended_at"
+        duration = (
+            f"toFloat64(toUnixTimestamp64Milli({ended_at}) - "
+            f"toUnixTimestamp64Milli({started_at}))"
+        )
+        return SpanValueSQL(
+            value_sql=f"if({ended_at} > {started_at}, {duration}, NULL)",
+            valid_sql=f"{ended_at} > {started_at}",
+            value_type=_VALUE_TYPE_NUMBER,
+        )
+    if metric == _DERIVED_TOTAL_TOKENS:
+        return SpanValueSQL(
+            value_sql=(
+                f"toFloat64({table_alias}.input_tokens + "
+                f"{table_alias}.output_tokens + {table_alias}.reasoning_tokens)"
+            ),
+            valid_sql="1",
+            value_type=_VALUE_TYPE_NUMBER,
+        )
+    if metric == _DERIVED_IS_ERROR:
+        return SpanValueSQL(
+            value_sql=f"{table_alias}.status_code = '{_STATUS_CODE_ERROR}'",
+            valid_sql="1",
+            value_type=_VALUE_TYPE_BOOLEAN,
+        )
+    if metric == _DERIVED_IS_INVOCATION:
+        op_slot = pb.add(OP_INVOKE_AGENT, param_type="String")
+        return SpanValueSQL(
+            value_sql=f"{table_alias}.operation_name = {op_slot}",
+            valid_sql="1",
+            value_type=_VALUE_TYPE_BOOLEAN,
+        )
+    raise ValueError(f"unknown derived metric: {metric!r}")
+
+
+def span_measure_sql(
+    measure: AgentSpanMeasureSpec,
+    pb: ParamBuilder,
+    *,
+    table_alias: str = "s",
+) -> SpanMeasureSQL:
+    """Resolve a grouped measure spec to a ClickHouse aggregate expression."""
+    value_sql: SpanValueSQL | None = None
+    if measure.value is not None:
+        value_sql = span_value_sql(
+            measure.value,
+            pb,
+            table_alias=table_alias,
+            expected_type=measure.value_type,
+        )
+
+    valid_parts: list[str] = []
+    if value_sql is not None:
+        valid_parts.append(value_sql.valid_sql)
+    if measure.filter is not None:
+        from weave.trace_server.query_builder.agent_query_compiler import (
+            compile_agent_query,
+        )
+
+        valid_parts.append(compile_agent_query(measure.filter, pb, table_alias=table_alias))
+    valid_sql = " AND ".join(f"({part})" for part in valid_parts) or "1"
+    agg = measure.aggregation
+    if value_sql is not None:
+        allowed_aggs = _ALLOWED_MEASURE_AGGS_BY_TYPE[value_sql.value_type]
+        if agg not in allowed_aggs:
+            raise ValueError(
+                f"aggregation {agg!r} is not valid for value_type "
+                f"{value_sql.value_type!r}"
+            )
+
+    if agg == _AGG_COUNT:
+        aggregate_sql = "count()" if valid_sql == "1" else f"countIf({valid_sql})"
+        value_type = _VALUE_TYPE_NUMBER
+    else:
+        if value_sql is None:
+            raise ValueError(f"aggregation {agg!r} requires a value")
+        metric_sql = value_sql.value_sql
+        if agg == _AGG_SUM:
+            aggregate_sql = f"sumOrNull(if({valid_sql}, {metric_sql}, NULL))"
+            value_type = _VALUE_TYPE_NUMBER
+        elif agg == _AGG_AVG:
+            aggregate_sql = f"avgOrNull(if({valid_sql}, {metric_sql}, NULL))"
+            value_type = _VALUE_TYPE_NUMBER
+        elif agg == _AGG_MIN:
+            aggregate_sql = f"minOrNull(if({valid_sql}, {metric_sql}, NULL))"
+            value_type = value_sql.value_type
+        elif agg == _AGG_MAX:
+            aggregate_sql = f"maxOrNull(if({valid_sql}, {metric_sql}, NULL))"
+            value_type = value_sql.value_type
+        elif agg == _AGG_COUNT_DISTINCT:
+            aggregate_sql = f"uniqExactIf({metric_sql}, {valid_sql})"
+            value_type = _VALUE_TYPE_NUMBER
+        elif agg == _AGG_COUNT_TRUE:
+            if value_sql.value_type != _VALUE_TYPE_BOOLEAN:
+                raise ValueError("count_true requires a boolean value")
+            aggregate_sql = f"countIf({valid_sql} AND {metric_sql} = 1)"
+            value_type = _VALUE_TYPE_NUMBER
+        elif agg == _AGG_COUNT_FALSE:
+            if value_sql.value_type != _VALUE_TYPE_BOOLEAN:
+                raise ValueError("count_false requires a boolean value")
+            aggregate_sql = f"countIf({valid_sql} AND {metric_sql} = 0)"
+            value_type = _VALUE_TYPE_NUMBER
+        else:
+            raise ValueError(f"unsupported aggregation: {agg!r}")
+
+    return SpanMeasureSQL(
+        alias=measure.alias,
+        aggregate_sql=aggregate_sql,
+        value_type=value_type,
+    )
+
+
+def legacy_span_group_measure(field: str) -> AgentSpanMeasureSpec:
+    """Map legacy grouped aggregate names onto generic measure specs."""
+    if field == "span_count":
+        return AgentSpanMeasureSpec(alias=field, aggregation="count")
+    if field == "invocation_count":
+        return AgentSpanMeasureSpec(
+            alias=field,
+            aggregation="count",
+            filter=_field_eq_query("operation_name", OP_INVOKE_AGENT),
+        )
+    if field == "conversation_count":
+        return AgentSpanMeasureSpec(
+            alias=field,
+            aggregation="count_distinct",
+            value=AgentSpanValueRef(source="field", key="conversation_id"),
+            value_type="string",
+        )
+    if field == "total_input_tokens":
+        return AgentSpanMeasureSpec(
+            alias=field,
+            aggregation="sum",
+            value=AgentSpanValueRef(source="field", key="input_tokens"),
+            value_type="number",
+        )
+    if field == "total_output_tokens":
+        return AgentSpanMeasureSpec(
+            alias=field,
+            aggregation="sum",
+            value=AgentSpanValueRef(source="field", key="output_tokens"),
+            value_type="number",
+        )
+    if field == "total_tokens":
+        return AgentSpanMeasureSpec(
+            alias=field,
+            aggregation="sum",
+            value=AgentSpanValueRef(source="derived", key="total_tokens"),
+            value_type="number",
+        )
+    if field == "total_duration_ms":
+        return AgentSpanMeasureSpec(
+            alias=field,
+            aggregation="sum",
+            value=AgentSpanValueRef(source="derived", key="duration_ms"),
+            value_type="number",
+        )
+    if field == "error_count":
+        return AgentSpanMeasureSpec(
+            alias=field,
+            aggregation="count",
+            filter=_field_eq_query("status_code", _STATUS_CODE_ERROR),
+        )
+    raise ValueError(f"Invalid group numeric filter field: {field!r}")
+
+
+def _field_eq_query(field: str, value: str) -> Query:
+    return Query.model_validate(
+        {"$expr": {"$eq": [{"$getField": field}, {"$literal": value}]}}
+    )
+
+
+def span_group_filters(
+    filters: list[AgentSpanGroupFilter],
+    legacy_numeric_filters: list[AgentSpanGroupNumericFilter],
+    *,
+    default_group_by: list[AgentGroupByRef],
+) -> list[AgentSpanGroupFilter]:
+    """Normalize current and legacy grouped aggregate filters."""
+    out = [
+        filter_.model_copy(update={"group_by": filter_.group_by or default_group_by})
+        for filter_ in filters
+    ]
+    out.extend(
+        AgentSpanGroupFilter(
+            group_by=default_group_by,
+            measure=legacy_span_group_measure(filter_.field),
+            min=filter_.min,
+            max=filter_.max,
+        )
+        for filter_ in legacy_numeric_filters
+    )
+    return out
+
+
+def ensure_group_filters_match(
+    filters: list[AgentSpanGroupFilter],
+    group_by: list[AgentGroupByRef],
+    *,
+    context: str,
+) -> None:
+    """Require HAVING-based group filters to target the active grouping."""
+    for filter_ in filters:
+        if filter_.group_by != group_by:
+            raise ValueError(
+                f"{context} group_filters must use the same group_by as the query"
+            )
+
+
+def group_filters_having_sql(
+    pb: ParamBuilder,
+    filters: list[AgentSpanGroupFilter],
+    *,
+    table_alias: str = "s",
+) -> str:
+    """Build HAVING conditions for grouped span aggregate filters."""
+    conditions: list[str] = []
+    for filter_ in filters:
+        measure = span_measure_sql(filter_.measure, pb, table_alias=table_alias)
+        expr = measure.aggregate_sql
+        if filter_.min is not None:
+            min_slot = _group_filter_bound_slot(pb, filter_.min, measure.value_type)
+            conditions.append(f"{expr} >= {min_slot}")
+        if filter_.max is not None:
+            max_slot = _group_filter_bound_slot(pb, filter_.max, measure.value_type)
+            conditions.append(f"{expr} <= {max_slot}")
+    return " AND ".join(conditions)
+
+
+def _group_filter_bound_slot(
+    pb: ParamBuilder,
+    value: float | datetime.datetime,
+    measure_value_type: AgentSpanStatsColumnValueType,
+) -> str:
+    if isinstance(value, datetime.datetime):
+        if measure_value_type != _VALUE_TYPE_DATETIME:
+            raise ValueError("datetime group filter bounds require a datetime measure")
+        return pb.add(value, param_type="DateTime64(6)")
+    if measure_value_type == _VALUE_TYPE_DATETIME:
+        raise ValueError("datetime measures require datetime group filter bounds")
+    return pb.add(value, param_type="Float64")
+
+
+# ---------------------------------------------------------------------------
 # WHERE builders (private — shared between count + list variants)
 # ---------------------------------------------------------------------------
 
@@ -368,6 +772,22 @@ def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     if req.query is not None:
         # Imported lazily to avoid a circular import between this module
         # (used by agent_query_compiler) and the compiler itself.
+        from weave.trace_server.query_builder import agent_query_compiler
+
+        conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
+    return " AND ".join(conditions)
+
+
+def _span_fields_where(pb: ParamBuilder, req: AgentSpanFieldsReq) -> str:
+    pid_slot = pb.add(req.project_id, param_type="String")
+    conditions = [f"s.project_id = {pid_slot}"]
+    add_time_filters(
+        conditions,
+        pb,
+        started_after=req.started_after,
+        started_before=req.started_before,
+    )
+    if req.query is not None:
         from weave.trace_server.query_builder import agent_query_compiler
 
         conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
@@ -517,7 +937,13 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         return f"SELECT count() FROM spans s WHERE {where}"
     resolved = resolve_group_by(pb, req.group_by)
     group_exprs = ", ".join(expr for expr, _ in resolved)
-    having = group_numeric_filters_having_sql(pb, req.group_numeric_filters)
+    filters = span_group_filters(
+        req.group_filters,
+        req.group_numeric_filters,
+        default_group_by=req.group_by,
+    )
+    ensure_group_filters_match(filters, req.group_by, context="spans count")
+    having = group_filters_having_sql(pb, filters)
     having_sql = f" HAVING {having}" if having else ""
     return (
         f"SELECT count() FROM ("
@@ -547,20 +973,93 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     select_group_cols = ", ".join(f"{expr} AS {alias}" for expr, alias in resolved)
     group_by_clause = ", ".join(aliases)
 
-    sortable = SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases))
+    measure_sqls = [span_measure_sql(measure, pb) for measure in req.measures]
+    aggregate_selects = (
+        ",\n               ".join(
+            f"{measure.aggregate_sql} AS {measure.alias}" for measure in measure_sqls
+        )
+        if measure_sqls
+        else _GROUPED_SPAN_AGGREGATES
+    )
+    sortable = (
+        frozenset(aliases).union(measure.alias for measure in measure_sqls)
+        if measure_sqls
+        else SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases))
+    )
     order_by = build_order_by(req.sort_by, sortable, "last_seen DESC")
-    having = group_numeric_filters_having_sql(pb, req.group_numeric_filters)
+    filters = span_group_filters(
+        req.group_filters,
+        req.group_numeric_filters,
+        default_group_by=req.group_by,
+    )
+    ensure_group_filters_match(filters, req.group_by, context="spans list")
+    having = group_filters_having_sql(pb, filters)
     having_sql = f"HAVING {having}" if having else ""
 
     return f"""
         SELECT {select_group_cols},
-               {_GROUPED_SPAN_AGGREGATES}
+               {aggregate_selects}
         FROM spans s
         WHERE {where}
         GROUP BY {group_by_clause}
         {having_sql}
         ORDER BY {order_by}
         LIMIT {limit_slot} OFFSET {offset_slot}
+    """
+
+
+def make_span_fields_query(pb: ParamBuilder, req: AgentSpanFieldsReq) -> str:
+    """Discover observed span fields and typed custom attribute keys."""
+    where = _span_fields_where(pb, req)
+    limit_slot = pb.add(req.limit, param_type="UInt64")
+    selects: list[str] = []
+    for key, value_type in sorted(SPAN_VALUE_TYPES.items()):
+        if key not in AgentSpanSchema.model_fields:
+            continue
+        selects.append(
+            f"""
+            SELECT
+              'field' AS source,
+              '{key}' AS key,
+              '{value_type}' AS value_type,
+              countIf(isNotNull(s.{key})) AS count
+            FROM spans s
+            WHERE {where}
+            HAVING count > 0
+            """
+        )
+
+    custom_sources = [
+        ("custom_attrs_string", "string"),
+        ("custom_attrs_int", "number"),
+        ("custom_attrs_float", "number"),
+        ("custom_attrs_bool", "boolean"),
+    ]
+    for source, value_type in custom_sources:
+        selects.append(
+            f"""
+            SELECT
+              '{source}' AS source,
+              key,
+              '{value_type}' AS value_type,
+              count() AS count
+            FROM (
+              SELECT arrayJoin(mapKeys(s.{source})) AS key
+              FROM spans s
+              WHERE {where}
+            )
+            GROUP BY key
+            """
+        )
+
+    union_sql = "\nUNION ALL\n".join(selects)
+    return f"""
+        SELECT source, key, value_type, count
+        FROM (
+          {union_sql}
+        )
+        ORDER BY count DESC, source ASC, key ASC
+        LIMIT {limit_slot}
     """
 
 

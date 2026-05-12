@@ -17,7 +17,11 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
+    AgentSpanFieldsReq,
+    AgentSpanGroupFilter,
+    AgentSpanMeasureSpec,
     AgentSpansQueryReq,
+    AgentSpanValueRef,
     AgentsQueryFilters,
     AgentsQueryReq,
     AgentVersionsQueryReq,
@@ -37,6 +41,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
     make_message_search_query,
+    make_span_fields_query,
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
@@ -406,6 +411,169 @@ class TestMakeGroupedSpansListQuery:
         expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_group_by_with_dynamic_measures_filter_and_sort(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measures=[
+                    AgentSpanMeasureSpec(alias="spans", aggregation="count"),
+                    AgentSpanMeasureSpec(
+                        alias="tool_calls",
+                        aggregation="count",
+                        filter=Query.model_validate(
+                            {
+                                "$expr": {
+                                    "$eq": [
+                                        {"$getField": "operation_name"},
+                                        {"$literal": "execute_tool"},
+                                    ]
+                                }
+                            }
+                        ),
+                    ),
+                    AgentSpanMeasureSpec(
+                        alias="avg_score",
+                        aggregation="avg",
+                        value=AgentSpanValueRef(
+                            source="custom_attrs_float",
+                            key="score",
+                        ),
+                        value_type="number",
+                    ),
+                ],
+                group_filters=[
+                    AgentSpanGroupFilter(
+                        measure=AgentSpanMeasureSpec(
+                            alias="avg_score",
+                            aggregation="avg",
+                            value=AgentSpanValueRef(
+                                source="custom_attrs_float",
+                                key="score",
+                            ),
+                            value_type="number",
+                        ),
+                        min=0.5,
+                    )
+                ],
+                sort_by=[AgentSortBy(field="avg_score", direction="desc")],
+            ),
+        )
+        sql = " ".join(query.split())
+
+        assert "count() AS spans" in sql
+        assert "countIf(((s.operation_name = {genai_3:String}))) AS tool_calls" in sql
+        assert (
+            "avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), "
+            "toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS avg_score"
+        ) in sql
+        assert "HAVING avgOrNull" in sql
+        assert "ORDER BY avg_score desc" in sql
+        assert pb.get_params()["genai_3"] == "execute_tool"
+        assert pb.get_params()["genai_4"] == "score"
+        assert pb.get_params()["genai_5"] == "score"
+        assert pb.get_params()["genai_6"] == 0.5
+
+    def test_dynamic_measure_rejects_invalid_resolved_aggregation(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(ValueError, match="not valid for value_type 'string'"):
+            make_spans_list_query(
+                pb,
+                AgentSpansQueryReq(
+                    project_id="p1",
+                    group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                    measures=[
+                        AgentSpanMeasureSpec(
+                            alias="bad_sum",
+                            aggregation="sum",
+                            value=AgentSpanValueRef(
+                                source="custom_attrs_string",
+                                key="score",
+                            ),
+                        )
+                    ],
+                ),
+            )
+
+    def test_dynamic_measure_infers_boolean_count_true(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measures=[
+                    AgentSpanMeasureSpec(
+                        alias="flagged_count",
+                        aggregation="count_true",
+                        value=AgentSpanValueRef(
+                            source="custom_attrs_bool",
+                            key="flagged",
+                        ),
+                    )
+                ],
+            ),
+        )
+        sql = " ".join(query.split())
+
+        assert (
+            "countIf((mapContains(s.custom_attrs_bool, {genai_3:String})) "
+            "AND s.custom_attrs_bool[{genai_3:String}] = 1) AS flagged_count"
+        ) in sql
+
+    def test_group_filter_rejects_mismatched_datetime_bound(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(
+            ValueError,
+            match="datetime group filter bounds require a datetime measure",
+        ):
+            make_spans_list_query(
+                pb,
+                AgentSpansQueryReq(
+                    project_id="p1",
+                    group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                    measures=[AgentSpanMeasureSpec(alias="spans", aggregation="count")],
+                    group_filters=[
+                        AgentSpanGroupFilter(
+                            measure=AgentSpanMeasureSpec(
+                                alias="spans",
+                                aggregation="count",
+                            ),
+                            min=datetime.datetime(2026, 1, 1),
+                        )
+                    ],
+                ),
+            )
+
+    def test_group_filter_rejects_mismatched_group_by(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(
+            ValueError,
+            match="spans list group_filters must use the same group_by",
+        ):
+            make_spans_list_query(
+                pb,
+                AgentSpansQueryReq(
+                    project_id="p1",
+                    group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                    measures=[AgentSpanMeasureSpec(alias="spans", aggregation="count")],
+                    group_filters=[
+                        AgentSpanGroupFilter(
+                            group_by=[
+                                AgentGroupByRef(source="column", key="trace_id")
+                            ],
+                            measure=AgentSpanMeasureSpec(
+                                alias="spans",
+                                aggregation="count",
+                            ),
+                            min=1,
+                        )
+                    ],
+                ),
+            )
+
 
 # ============================================================================
 # resolve_group_by validation
@@ -470,6 +638,38 @@ class TestResolveGroupBy:
             ],
         )
         assert out == [("s.custom_attrs_string[{genai_0:String}]", "spaced_attr")]
+
+
+# ============================================================================
+# field discovery query
+# ============================================================================
+
+
+def test_make_span_fields_query_discovers_custom_attr_keys() -> None:
+    pb = ParamBuilder("genai")
+    query = make_span_fields_query(
+        pb,
+        AgentSpanFieldsReq(
+            project_id="p1",
+            started_after=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+            started_before=datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+            limit=25,
+        ),
+    )
+    sql = " ".join(query.split())
+
+    assert "'field' AS source" in sql
+    assert "'custom_attrs_string' AS source" in sql
+    assert "'custom_attrs_float' AS source" in sql
+    assert "arrayJoin(mapKeys(s.custom_attrs_string)) AS key" in sql
+    assert "arrayJoin(mapKeys(s.custom_attrs_float)) AS key" in sql
+    assert "ORDER BY count DESC, source ASC, key ASC" in sql
+    assert pb.get_params() == {
+        "genai_0": "p1",
+        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_3": 25,
+    }
 
 
 # ============================================================================

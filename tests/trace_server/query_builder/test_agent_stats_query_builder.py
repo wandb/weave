@@ -7,11 +7,14 @@ from pydantic import ValidationError
 from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
+    AgentSpanGroupFilter,
     AgentSpanGroupNumericFilter,
+    AgentSpanMeasureSpec,
     AgentSpanStatsFieldRef,
     AgentSpanStatsMetricSpec,
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
+    AgentSpanValueRef,
 )
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
@@ -381,6 +384,67 @@ def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
     }
 
 
+def test_numeric_bucket_stats_query_groups_custom_attr_measure() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        bucket_by=AgentSpanStatsNumericBucketSpec(
+            type="number",
+            bins=8,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            measure=AgentSpanMeasureSpec(
+                alias="avg_score",
+                aggregation="avg",
+                value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+                value_type="number",
+            ),
+        ),
+        metrics=[],
+    )
+
+    result = build_agent_span_stats_query(req, pb)
+    sql = " ".join(result.sql.split())
+
+    assert "GROUP BY s.conversation_id" in sql
+    assert (
+        "avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), "
+        "toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS bucket_value"
+    ) in sql
+    assert "count() AS count" in sql
+    assert result.columns == ["bucket_index", "bucket_min", "bucket_max", "count"]
+    assert result.bucket_type == "number"
+
+
+def test_numeric_bucket_group_filter_rejects_mismatched_group_by() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        bucket_by=AgentSpanStatsNumericBucketSpec(
+            type="number",
+            bins=8,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            measure=AgentSpanMeasureSpec(
+                alias="avg_score",
+                aggregation="avg",
+                value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+                value_type="number",
+            ),
+        ),
+        group_filters=[
+            AgentSpanGroupFilter(
+                group_by=[AgentGroupByRef(source="column", key="trace_id")],
+                measure=AgentSpanMeasureSpec(alias="spans", aggregation="count"),
+                min=1,
+            )
+        ],
+        metrics=[],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="numeric bucket group_filters must use the same group_by",
+    ):
+        build_agent_span_stats_query(req, pb)
+
+
 def test_group_by_custom_attr_and_metric_custom_attr() -> None:
     pb = ParamBuilder("genai")
     req = _req(
@@ -435,16 +499,16 @@ def test_time_stats_apply_group_numeric_filters() -> None:
     result = build_agent_span_stats_query(req, pb)
     sql = " ".join(result.sql.split())
 
-    assert "qualified_conversations AS" in result.sql
+    assert "qualified_groups_0 AS" in result.sql
     assert "filtered_metric_spans AS" in result.sql
     assert "HAVING" in result.sql
     assert (
-        "toFloat64(sum(s.input_tokens) + sum(s.output_tokens) + "
-        "sum(s.reasoning_tokens)) >= {genai_7:Float64}"
+        "sumOrNull(if((1), toFloat64(s.input_tokens + s.output_tokens + "
+        "s.reasoning_tokens), NULL)) >= {genai_7:Float64}"
     ) in result.sql
     assert (
-        "toFloat64(sum(s.input_tokens) + sum(s.output_tokens) + "
-        "sum(s.reasoning_tokens)) <= {genai_8:Float64}"
+        "sumOrNull(if((1), toFloat64(s.input_tokens + s.output_tokens + "
+        "s.reasoning_tokens), NULL)) <= {genai_8:Float64}"
     ) in result.sql
     assert "FROM filtered_metric_spans s" in sql
     assert result.parameters["genai_7"] == 10.0

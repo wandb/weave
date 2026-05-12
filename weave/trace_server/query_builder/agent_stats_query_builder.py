@@ -16,22 +16,18 @@ from dataclasses import dataclass
 from typing import Any
 
 from weave.trace_server.agents import semconv
-from weave.trace_server.agents.constants import (
-    MAX_AGENT_STATS_RESULT_ROWS,
-    OP_INVOKE_AGENT,
-)
+from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
 from weave.trace_server.agents.types import (
-    AGENT_SPAN_STATS_DERIVED_VALUE_TYPES,
     AgentGroupByRef,
-    AgentSpanGroupNumericFilter,
+    AgentSpanGroupFilter,
     AgentSpanStatsAggregation,
     AgentSpanStatsColumn,
     AgentSpanStatsColumnValueType,
-    AgentSpanStatsDerivedMetric,
     AgentSpanStatsMetricSpec,
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
     AgentSpanStatsValueType,
+    AgentSpanValueRef,
 )
 from weave.trace_server.calls_query_builder.stats_query_base import (
     auto_select_granularity_seconds,
@@ -42,10 +38,14 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     add_time_filters,
     conversation_aggregate_value_sql,
+    ensure_group_filters_match,
+    group_filters_having_sql,
     group_by_ref_alias,
-    group_numeric_filters_having_sql,
     resolve_agent_span_field_column,
     resolve_group_by,
+    span_group_filters,
+    span_measure_sql,
+    span_value_sql,
 )
 from weave.trace_server.query_builder.agent_query_compiler import compile_agent_query
 
@@ -90,11 +90,6 @@ _COL_REASONING_TOKENS = semconv.CANONICAL_KEY_TO_COLUMN[
 _COL_OPERATION_NAME = semconv.CANONICAL_KEY_TO_COLUMN[semconv.OPERATION_NAME.key]
 
 _STATUS_CODE_ERROR = "ERROR"
-_DERIVED_DURATION_MS: AgentSpanStatsDerivedMetric = "duration_ms"
-_DERIVED_TOTAL_TOKENS: AgentSpanStatsDerivedMetric = "total_tokens"
-_DERIVED_IS_ERROR: AgentSpanStatsDerivedMetric = "is_error"
-_DERIVED_IS_INVOCATION: AgentSpanStatsDerivedMetric = "is_invocation"
-
 _AGG_SUM: AgentSpanStatsAggregation = "sum"
 _AGG_AVG: AgentSpanStatsAggregation = "avg"
 _AGG_MIN: AgentSpanStatsAggregation = "min"
@@ -155,6 +150,10 @@ def _span_col(column: str) -> str:
     return f"{_SPAN_ALIAS}.{column}"
 
 
+def _conversation_group_by() -> list[AgentGroupByRef]:
+    return [AgentGroupByRef(source="column", key="conversation_id")]
+
+
 @dataclass(frozen=True, slots=True)
 class AgentSpanStatsQueryBuildResult:
     """Parameterized SQL and response metadata for an agent span stats query."""
@@ -173,6 +172,7 @@ class AgentSpanStatsQueryBuildResult:
 class _MetricSQL:
     value_sql: str
     valid_sql: str
+    value_type: AgentSpanStatsColumnValueType
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +184,7 @@ class _MetricOutput:
     aggregation_label: str
     aggregate_sql: str
     outer_sql: str
+    value_type: AgentSpanStatsColumnValueType
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,6 +225,16 @@ def build_agent_span_stats_query(
     numeric_bucket = (
         bucket_by if isinstance(bucket_by, AgentSpanStatsNumericBucketSpec) else None
     )
+    default_group_by = (
+        numeric_bucket.group_by
+        if numeric_bucket is not None and numeric_bucket.group_by
+        else _conversation_group_by()
+    )
+    group_filters = span_group_filters(
+        req.group_filters,
+        req.group_numeric_filters,
+        default_group_by=default_group_by,
+    )
     if numeric_bucket is not None and not metric_outputs:
         metric_outputs = [_count_metric_output()]
     columns, column_metadata = (
@@ -251,7 +262,7 @@ def build_agent_span_stats_query(
             metric_exprs=metric_exprs,
             agg_selects=agg_selects,
             outer_metric_selects=outer_metric_selects,
-            group_numeric_filters=req.group_numeric_filters,
+            group_filters=group_filters,
             pb=pb,
         )
         return AgentSpanStatsQueryBuildResult(
@@ -289,7 +300,7 @@ def build_agent_span_stats_query(
         bucket_interval_param=bucket_interval_param,
         granularity_seconds=granularity_seconds,
         group_limit_slot=group_limit_slot,
-        group_numeric_filters=req.group_numeric_filters,
+        group_filters=group_filters,
         pb=pb,
     )
 
@@ -406,7 +417,7 @@ def _response_columns(
             AgentSpanStatsColumn(
                 name=output.name,
                 role="metric",
-                value_type=_VALUE_TYPE_NUMBER,
+                value_type=output.value_type,
                 metric=output.metric_alias,
                 aggregation=output.aggregation_label,
             )
@@ -448,7 +459,7 @@ def _numeric_bucket_response_columns(
             AgentSpanStatsColumn(
                 name=output.name,
                 role="metric",
-                value_type=_VALUE_TYPE_NUMBER,
+                value_type=output.value_type,
                 metric=output.metric_alias,
                 aggregation=output.aggregation_label,
             )
@@ -467,57 +478,26 @@ def _metric_plan(metric: AgentSpanStatsMetricSpec, pb: ParamBuilder) -> _MetricP
             f"{metric_sql.value_sql} AS {metric_col}",
             f"toUInt8({metric_sql.valid_sql}) AS {valid_col}",
         ],
-        outputs=_metric_outputs(metric, metric_col, valid_col),
+        outputs=_metric_outputs(metric, metric_col, valid_col, metric_sql.value_type),
     )
 
 
 def _metric_sql(metric: AgentSpanStatsMetricSpec, pb: ParamBuilder) -> _MetricSQL:
     """Return the per-span value expression and validity guard for a metric."""
-    if metric.derived is not None:
-        value_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[metric.derived]
-        if metric.value_type != value_type:
-            raise ValueError(
-                f"metric {metric.alias!r} declares {metric.value_type!r}, "
-                f"but derived metric {metric.derived!r} is {value_type!r}"
-            )
-        return _derived_metric_sql(metric.derived, pb)
+    if metric.value is not None:
+        ref = metric.value
+    elif metric.derived is not None:
+        ref = AgentSpanValueRef(source="derived", key=metric.derived)
+    elif metric.field is not None:
+        ref = AgentSpanValueRef(source=metric.field.source, key=metric.field.key)
+    else:
+        raise ValueError(f"metric {metric.alias!r} must set value, field, or derived")
 
-    if metric.field is None:
-        raise ValueError(f"metric {metric.alias!r} must set field or derived")
-
-    ref = metric.field
-    if ref.source == _SOURCE_FIELD:
-        col = resolve_agent_span_field_column(ref.key)
-        column_value_type = _COLUMN_VALUE_TYPES.get(col)
-        if column_value_type is None:
-            raise ValueError(f"field {ref.key!r} is not stat-aggregatable")
-        if metric.value_type != column_value_type:
-            raise ValueError(
-                f"field {ref.key!r} has value_type {column_value_type!r}, "
-                f"got {metric.value_type!r}"
-            )
-        value_sql = _span_col(col)
-        if column_value_type == _VALUE_TYPE_NUMBER:
-            value_sql = f"toFloat64({value_sql})"
-        return _MetricSQL(
-            value_sql=value_sql,
-            valid_sql="1",
-        )
-
-    value_type = _CUSTOM_ATTR_VALUE_TYPES[ref.source]
-    if metric.value_type != value_type:
-        raise ValueError(
-            f"{ref.source} values have value_type {value_type!r}, "
-            f"got {metric.value_type!r}"
-        )
-    key_slot = pb.add(str(ref.key), param_type="String")
-    source_column = _span_col(ref.source)
-    value_sql = f"{source_column}[{key_slot}]"
-    if value_type == _VALUE_TYPE_NUMBER:
-        value_sql = f"toFloat64({value_sql})"
+    resolved = span_value_sql(ref, pb, expected_type=metric.value_type)
     return _MetricSQL(
-        value_sql=value_sql,
-        valid_sql=f"mapContains({source_column}, {key_slot})",
+        value_sql=resolved.value_sql,
+        valid_sql=resolved.valid_sql,
+        value_type=resolved.value_type,
     )
 
 
@@ -526,66 +506,41 @@ def _numeric_bucket_sql(
     pb: ParamBuilder,
 ) -> _MetricSQL:
     """Resolve the numeric value expression used for value-range bucketing."""
-    return _metric_sql(
-        AgentSpanStatsMetricSpec(
-            alias=bucket.alias,
-            value_type=_VALUE_TYPE_NUMBER,
-            aggregations=[_AGG_COUNT],
-            field=bucket.field,
-            derived=bucket.derived,
-        ),
-        pb,
+    if bucket.value is not None:
+        ref = bucket.value
+    elif bucket.derived is not None:
+        ref = AgentSpanValueRef(source="derived", key=bucket.derived)
+    elif bucket.field is not None:
+        ref = AgentSpanValueRef(source=bucket.field.source, key=bucket.field.key)
+    else:
+        raise ValueError("numeric bucket must set value, field, or derived")
+    resolved = span_value_sql(ref, pb, expected_type=_VALUE_TYPE_NUMBER)
+    return _MetricSQL(
+        value_sql=resolved.value_sql,
+        valid_sql=resolved.valid_sql,
+        value_type=resolved.value_type,
     )
-
-
-def _derived_metric_sql(
-    metric: AgentSpanStatsDerivedMetric,
-    pb: ParamBuilder,
-) -> _MetricSQL:
-    if metric == _DERIVED_DURATION_MS:
-        started_at = _span_col(_COL_STARTED_AT)
-        ended_at = _span_col(_COL_ENDED_AT)
-        duration = (
-            f"toFloat64(toUnixTimestamp64Milli({ended_at}) - "
-            f"toUnixTimestamp64Milli({started_at}))"
-        )
-        return _MetricSQL(
-            value_sql=f"if({ended_at} > {started_at}, {duration}, NULL)",
-            valid_sql=f"{ended_at} > {started_at}",
-        )
-    if metric == _DERIVED_TOTAL_TOKENS:
-        return _MetricSQL(
-            value_sql=(
-                f"toFloat64({_span_col(_COL_INPUT_TOKENS)} + "
-                f"{_span_col(_COL_OUTPUT_TOKENS)} + "
-                f"{_span_col(_COL_REASONING_TOKENS)})"
-            ),
-            valid_sql="1",
-        )
-    if metric == _DERIVED_IS_ERROR:
-        return _MetricSQL(
-            value_sql=f"{_span_col(_COL_STATUS_CODE)} = '{_STATUS_CODE_ERROR}'",
-            valid_sql="1",
-        )
-    if metric == _DERIVED_IS_INVOCATION:
-        op_slot = pb.add(OP_INVOKE_AGENT, param_type="String")
-        return _MetricSQL(
-            value_sql=f"{_span_col(_COL_OPERATION_NAME)} = {op_slot}",
-            valid_sql="1",
-        )
-    raise ValueError(f"unknown derived metric: {metric!r}")
 
 
 def _metric_outputs(
     metric: AgentSpanStatsMetricSpec,
     metric_col: str,
     valid_col: str,
+    metric_value_type: AgentSpanStatsColumnValueType,
 ) -> list[_MetricOutput]:
     """Build all aggregate output columns requested for one metric."""
     outputs: list[_MetricOutput] = []
 
     for agg in metric.aggregations:
-        outputs.append(_aggregation_output(metric.alias, agg, metric_col, valid_col))
+        outputs.append(
+            _aggregation_output(
+                metric.alias,
+                agg,
+                metric_col,
+                valid_col,
+                metric_value_type,
+            )
+        )
 
     for p in metric.percentiles:
         q = round(p / 100.0, 6)
@@ -599,6 +554,7 @@ def _metric_outputs(
                     f"quantileOrNull({q})(if({valid_col}, {metric_col}, NULL))"
                 ),
                 coalesce_empty=False,
+                value_type=_VALUE_TYPE_NUMBER,
             )
         )
 
@@ -612,6 +568,7 @@ def _count_metric_output() -> _MetricOutput:
         aggregation_label="count",
         aggregate_sql="count()",
         outer_sql=f"COALESCE({_CTE_AGGREGATED_DATA}.count, 0)",
+        value_type=_VALUE_TYPE_NUMBER,
     )
 
 
@@ -620,26 +577,35 @@ def _aggregation_output(
     agg: AgentSpanStatsAggregation,
     metric_col: str,
     valid_col: str,
+    metric_value_type: AgentSpanStatsColumnValueType,
 ) -> _MetricOutput:
     name = _output_name(agg, metric_alias)
     coalesce_empty = agg in _ZERO_FILL_AGGREGATIONS
 
     if agg == _AGG_SUM:
         aggregate_sql = f"sumOrNull(if({valid_col}, {metric_col}, NULL))"
+        value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_AVG:
         aggregate_sql = f"avgOrNull(if({valid_col}, {metric_col}, NULL))"
+        value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_MIN:
         aggregate_sql = f"minOrNull(if({valid_col}, {metric_col}, NULL))"
+        value_type = metric_value_type
     elif agg == _AGG_MAX:
         aggregate_sql = f"maxOrNull(if({valid_col}, {metric_col}, NULL))"
+        value_type = metric_value_type
     elif agg == _AGG_COUNT:
         aggregate_sql = f"countIf({valid_col})"
+        value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_DISTINCT:
         aggregate_sql = f"uniqExactIf({metric_col}, {valid_col})"
+        value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_TRUE:
         aggregate_sql = f"countIf({valid_col} AND {metric_col} = 1)"
+        value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_FALSE:
         aggregate_sql = f"countIf({valid_col} AND {metric_col} = 0)"
+        value_type = _VALUE_TYPE_NUMBER
     else:
         raise ValueError(f"unsupported aggregation: {agg!r}")
 
@@ -649,6 +615,7 @@ def _aggregation_output(
         aggregation_label=agg,
         aggregate_sql=aggregate_sql,
         coalesce_empty=coalesce_empty,
+        value_type=value_type,
     )
 
 
@@ -659,6 +626,7 @@ def _metric_output(
     aggregation_label: str,
     aggregate_sql: str,
     coalesce_empty: bool,
+    value_type: AgentSpanStatsColumnValueType,
 ) -> _MetricOutput:
     raw_outer_sql = f"{_CTE_AGGREGATED_DATA}.{name}"
     outer_sql = f"COALESCE({raw_outer_sql}, 0)" if coalesce_empty else raw_outer_sql
@@ -668,6 +636,7 @@ def _metric_output(
         aggregation_label=aggregation_label,
         aggregate_sql=aggregate_sql,
         outer_sql=outer_sql,
+        value_type=value_type,
     )
 
 
@@ -704,7 +673,7 @@ def _build_stats_query(
     bucket_interval_param: str,
     granularity_seconds: int,
     group_limit_slot: str | None,
-    group_numeric_filters: list[AgentSpanGroupNumericFilter],
+    group_filters: list[AgentSpanGroupFilter],
     pb: ParamBuilder,
 ) -> str:
     """Render the appropriate SQL shape for grouped or ungrouped stats."""
@@ -723,7 +692,7 @@ def _build_stats_query(
         return _build_ungrouped_stats_query(
             where=where,
             parts=parts,
-            group_numeric_filters=group_numeric_filters,
+            group_filters=group_filters,
             pb=pb,
         )
 
@@ -743,7 +712,7 @@ def _build_numeric_bucket_stats_query(
     metric_exprs: list[str],
     agg_selects: list[str],
     outer_metric_selects: list[str],
-    group_numeric_filters: list[AgentSpanGroupNumericFilter],
+    group_filters: list[AgentSpanGroupFilter],
     pb: ParamBuilder,
 ) -> str:
     """Render one row per numeric value range over the full filtered span set."""
@@ -767,12 +736,12 @@ def _build_numeric_bucket_stats_query(
     )
     bucket_index_raw_sql = (
         f"if({_CTE_BOUNDS}.bucket_max_bound = {_CTE_BOUNDS}.bucket_min_bound, "
-        "0, "
-        f"least({bins_uint} - 1, toUInt64(floor("
+        "toUInt64(0), "
+        f"toUInt64(least(toFloat64({bins_uint}) - 1.0, floor("
         f"({_CTE_VALUE_ROWS}.bucket_value - {_CTE_BOUNDS}.bucket_min_bound) "
         f"/ {bucket_width_sql}))))"
     )
-    bucket_index_sql = f"toUInt64({bucket_index_raw_sql})"
+    bucket_index_sql = bucket_index_raw_sql
     bucket_min_sql = (
         f"if({_CTE_BOUNDS}.bucket_max_bound = {_CTE_BOUNDS}.bucket_min_bound, "
         f"{_CTE_BOUNDS}.bucket_min_bound, "
@@ -782,7 +751,7 @@ def _build_numeric_bucket_stats_query(
     bucket_max_sql = (
         f"if({_CTE_BOUNDS}.bucket_max_bound = {_CTE_BOUNDS}.bucket_min_bound, "
         f"{_CTE_BOUNDS}.bucket_max_bound, "
-        f"if({_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} = {bins_uint} - 1, "
+        f"if({_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} = {bins_uint} - toUInt64(1), "
         f"{_CTE_BOUNDS}.bucket_max_bound, "
         f"{_CTE_BOUNDS}.bucket_min_bound + "
         f"toFloat64({_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} + 1) * "
@@ -794,7 +763,25 @@ def _build_numeric_bucket_stats_query(
     )
     agg_select_sql = ",\n          ".join(agg_selects)
     outer_metric_sql = ",\n      ".join(outer_metric_selects)
-    if bucket.conversation_aggregate is None:
+    if bucket.group_by and bucket.measure is not None:
+        bucket_measure = span_measure_sql(bucket.measure, pb)
+        if bucket_measure.value_type != _VALUE_TYPE_NUMBER:
+            raise ValueError("numeric group bucket measure must produce a number")
+        resolved_groups = resolve_group_by(pb, bucket.group_by)
+        ensure_group_filters_match(
+            group_filters, bucket.group_by, context="numeric bucket"
+        )
+        group_by_clause = ", ".join(expr for expr, _ in resolved_groups)
+        having = group_filters_having_sql(pb, group_filters)
+        having_sql = f"HAVING {having}" if having else ""
+        value_rows_sql = f"""
+        SELECT
+          {bucket_measure.aggregate_sql} AS bucket_value
+        FROM {_CTE_FILTERED_SPANS} {_SPAN_ALIAS}
+        GROUP BY {group_by_clause}
+        {having_sql}
+        """
+    elif bucket.conversation_aggregate is None:
         bucket_metric = _numeric_bucket_sql(bucket, pb)
         value_rows_sql = f"""
         SELECT
@@ -806,7 +793,10 @@ def _build_numeric_bucket_stats_query(
         """
     else:
         value_expr = conversation_aggregate_value_sql(bucket.conversation_aggregate)
-        having = group_numeric_filters_having_sql(pb, group_numeric_filters)
+        ensure_group_filters_match(
+            group_filters, _conversation_group_by(), context="numeric bucket"
+        )
+        having = group_filters_having_sql(pb, group_filters)
         having_sql = f"HAVING {having}" if having else ""
         value_rows_sql = f"""
         SELECT
@@ -902,12 +892,12 @@ def _build_ungrouped_stats_query(
     *,
     where: str,
     parts: _StatsQuerySQLParts,
-    group_numeric_filters: list[AgentSpanGroupNumericFilter],
+    group_filters: list[AgentSpanGroupFilter],
     pb: ParamBuilder,
 ) -> str:
     """Render one row per time bucket for the full filtered span set."""
-    conversation_filter_ctes, stats_source_cte = _conversation_filter_ctes(
-        pb, group_numeric_filters
+    group_filter_ctes, stats_source_cte = _group_filter_ctes(
+        pb, group_filters
     )
     return f"""
     WITH
@@ -918,7 +908,7 @@ def _build_ungrouped_stats_query(
         SELECT *
         FROM {_SPANS_TABLE} {_SPAN_ALIAS}
         WHERE {where}
-      ){conversation_filter_ctes},
+      ){group_filter_ctes},
       {_CTE_AGGREGATED_DATA} AS (
         SELECT
           {_BUCKET_COLUMN},
@@ -941,31 +931,51 @@ def _build_ungrouped_stats_query(
     """
 
 
-def _conversation_filter_ctes(
+def _group_filter_ctes(
     pb: ParamBuilder,
-    group_numeric_filters: list[AgentSpanGroupNumericFilter],
+    group_filters: list[AgentSpanGroupFilter],
 ) -> tuple[str, str]:
-    if not group_numeric_filters:
+    if not group_filters:
         return "", _CTE_FILTERED_SPANS
 
-    having = group_numeric_filters_having_sql(pb, group_numeric_filters)
-    return (
-        f""",
-      {_CTE_QUALIFIED_CONVERSATIONS} AS (
-        SELECT {_span_col("conversation_id")} AS conversation_id
-        FROM {_CTE_FILTERED_SPANS} {_SPAN_ALIAS}
-        WHERE {_span_col("conversation_id")} != ''
-        GROUP BY {_span_col("conversation_id")}
+    ctes: list[str] = []
+    source_cte = _CTE_FILTERED_SPANS
+    for idx, filter_ in enumerate(group_filters):
+        if not filter_.group_by:
+            raise ValueError("group filters used in stats require group_by")
+        resolved_groups = resolve_group_by(pb, filter_.group_by)
+        select_group_cols = ", ".join(
+            f"{expr} AS {alias}" for expr, alias in resolved_groups
+        )
+        group_by_clause = ", ".join(alias for _, alias in resolved_groups)
+        having = group_filters_having_sql(pb, [filter_])
+        qualified_cte = f"qualified_groups_{idx}"
+        next_source_cte = (
+            _CTE_FILTERED_METRIC_SPANS
+            if idx == len(group_filters) - 1
+            else f"filtered_metric_spans_{idx}"
+        )
+        join_sql = " AND ".join(
+            f"{expr} = q.{alias}" for expr, alias in resolved_groups
+        )
+        ctes.append(
+            f""",
+      {qualified_cte} AS (
+        SELECT {select_group_cols}
+        FROM {source_cte} {_SPAN_ALIAS}
+        GROUP BY {group_by_clause}
         HAVING {having}
       ),
-      {_CTE_FILTERED_METRIC_SPANS} AS (
+      {next_source_cte} AS (
         SELECT {_SPAN_ALIAS}.*
-        FROM {_CTE_FILTERED_SPANS} {_SPAN_ALIAS}
-        INNER JOIN {_CTE_QUALIFIED_CONVERSATIONS} qc
-          ON {_span_col("conversation_id")} = qc.conversation_id
-      )""",
-        _CTE_FILTERED_METRIC_SPANS,
-    )
+        FROM {source_cte} {_SPAN_ALIAS}
+        INNER JOIN {qualified_cte} q
+          ON {join_sql}
+      )"""
+        )
+        source_cte = next_source_cte
+
+    return "".join(ctes), source_cte
 
 
 def _build_grouped_stats_query(

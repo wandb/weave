@@ -18,12 +18,15 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSpanFieldsReq,
     AgentSpanGroupNumericFilter,
+    AgentSpanMeasureSpec,
     AgentSpansQueryReq,
     AgentSpanStatsFieldRef,
     AgentSpanStatsMetricSpec,
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
+    AgentSpanValueRef,
     AgentsQueryReq,
 )
 from weave.trace_server.interface.query import Query
@@ -595,6 +598,110 @@ def test_agent_span_stats_time_buckets_filter_conversation_aggregates(ch_server)
 
     assert res.bucket_type == "time"
     assert [row["count_distinct_conversations"] for row in res.rows] == [1, 1]
+
+
+def test_agent_span_stats_buckets_custom_measure_per_conversation(ch_server):
+    """Numeric stats can bucket an aggregate of custom attrs per conversation."""
+    project_id = _make_project_id("stats_custom_measure_bucket")
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_c = f"conv-{uuid.uuid4().hex[:8]}"
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            custom_attrs_float={"score": 0.2},
+            started_at=start,
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            custom_attrs_float={"score": 0.5},
+            started_at=start + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            custom_attrs_float={"score": 0.7},
+            started_at=start + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_c,
+            custom_attrs_float={"score": 0.9},
+            started_at=start + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=1),
+            bucket_by=AgentSpanStatsNumericBucketSpec(
+                type="number",
+                bins=2,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measure=AgentSpanMeasureSpec(
+                    alias="avg_score",
+                    aggregation="avg",
+                    value=AgentSpanValueRef(
+                        source="custom_attrs_float",
+                        key="score",
+                    ),
+                    value_type="number",
+                ),
+            ),
+            metrics=[],
+        )
+    )
+
+    assert res.bucket_type == "number"
+    assert [row["count"] for row in res.rows] == [1, 2]
+    assert res.rows[0]["bucket_min"] == 0.2
+    assert res.rows[-1]["bucket_max"] == 0.9
+
+
+def test_agent_span_fields_discovers_custom_attrs(ch_server):
+    """Field discovery reports typed custom attribute map keys and counts."""
+    project_id = _make_project_id("fields")
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    spans = [
+        _make_span(
+            project_id,
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_float={"score": 0.1},
+            custom_attrs_bool={"flagged": True},
+            started_at=start,
+        ),
+        _make_span(
+            project_id,
+            custom_attrs_string={"env": "dev"},
+            custom_attrs_float={"score": 0.4, "quality": 0.8},
+            custom_attrs_bool={"flagged": False},
+            started_at=start + datetime.timedelta(seconds=1),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_fields(
+        AgentSpanFieldsReq(
+            project_id=project_id,
+            started_after=start,
+            started_before=start + datetime.timedelta(hours=1),
+        )
+    )
+    fields = {(field.source, field.key): field for field in res.fields}
+
+    assert fields[("custom_attrs_string", "env")].value_type == "string"
+    assert fields[("custom_attrs_string", "env")].count == 2
+    assert fields[("custom_attrs_float", "score")].value_type == "number"
+    assert fields[("custom_attrs_float", "score")].count == 2
+    assert fields[("custom_attrs_float", "quality")].count == 1
+    assert fields[("custom_attrs_bool", "flagged")].value_type == "boolean"
 
 
 def test_agent_span_stats_groups_by_custom_attrs(ch_server):
