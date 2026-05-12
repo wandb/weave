@@ -336,20 +336,6 @@ def wf_clickhouse_disable_lightweight_update() -> bool:
     )
 
 
-def wf_clickhouse_use_async_insert() -> bool:
-    """Whether `ClickHouseTraceServer.from_env` should opt into async inserts.
-
-    Reads the `WEAVE_TRACE_CLICKHOUSE_USE_ASYNC_INSERT` env var (named after the
-    weave-trace service, where it originated) so worker pods that already mount
-    the `weave-trace-shared` configmap pick it up automatically. Defaults to
-    True, matching the trace-server's behavior.
-    """
-    return (
-        os.environ.get("WEAVE_TRACE_CLICKHOUSE_USE_ASYNC_INSERT", "true").lower()
-        == "true"
-    )
-
-
 def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
     """The maximum async insert busy timeout in milliseconds for ClickHouse.
 
