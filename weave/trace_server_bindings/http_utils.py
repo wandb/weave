@@ -1,7 +1,7 @@
 import json
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
 import tenacity
@@ -39,7 +39,7 @@ BatchProcessor = AsyncBatchProcessor
 
 
 def log_dropped_call_batch(
-    batch: list[Union["StartBatchItem", "EndBatchItem"]], e: Exception
+    batch: "list[StartBatchItem | EndBatchItem]", e: Exception
 ) -> None:
     """Log details about a dropped call batch for debugging purposes."""
     logger.error("Error sending batch of %s call events to server", len(batch))

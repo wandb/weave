@@ -48,7 +48,7 @@ where brackets indicate that the data is stored in the table_rows table.
 """
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Optional, get_args
+from typing import TYPE_CHECKING, Any, get_args
 
 from pydantic import BaseModel
 
@@ -99,7 +99,7 @@ class ObjectRefCondition(BaseModel):
                 If False, returns the longest matching expand column.
 
         Returns:
-            Optional[str]: The matching expand column or None if no match found.
+            str | None: The matching expand column or None if no match found.
 
         Examples:
             >>> condition = ObjectRefCondition(field_path="inputs.model.config.temperature", expand_columns=["inputs", "inputs.model"])
@@ -534,7 +534,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
 
     def _extract_field_operand(
         self, operand: "tsi_query.Operand"
-    ) -> tuple[Optional["tsi_query.GetFieldOperator"], str | None]:
+    ) -> tuple["tsi_query.GetFieldOperator | None", str | None]:
         """Extract field operand and conversion type from an operand.
 
         Returns:
@@ -565,7 +565,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
             **kwargs: Additional arguments for ObjectRefCondition
 
         Returns:
-            Optional[str]: CTE-based condition or None if not processable
+            str | None: CTE-based condition or None if not processable
         """
         if len(operands) < 2:
             return None
