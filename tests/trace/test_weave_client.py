@@ -3868,6 +3868,40 @@ def test_calls_query_filter_by_root_refs(client):
     )
     assert len(calls) == 0
 
+    # A stored decimal-shaped string like "1.5" must not match an int literal.
+    # ClickHouse `toInt64OrNull('1.5')` returns NULL; SQLite's CAST('1.5' AS INT)
+    # truncates to 1, so the inferred-cast plain-decimal predicate must reject
+    # dotted text when the inferred cast is int.
+    dotted_marker = "DOTTED_RED_TEST_MARKER"
+    dotted_text_call = client.create_call(
+        "dotted_text_op",
+        {"x": "1.5", "marker": dotted_marker},
+        attributes={"score_text": "1.5"},
+    )
+    client.finish_call(dotted_text_call, {"n": "1.5"})
+
+    for path in ("inputs.x", "attributes.score_text", "output.n"):
+        matches = list(
+            client.get_calls(
+                query={
+                    "$expr": {
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.marker"},
+                                    {"$literal": dotted_marker},
+                                ]
+                            },
+                            {"$eq": [{"$getField": path}, {"$literal": 1}]},
+                        ]
+                    }
+                }
+            )
+        )
+        assert len(matches) == 0, (
+            f"dotted text on {path} should not match int 1 (saw {len(matches)})"
+        )
+
     # trace roots only + op filter
     calls = client.get_calls(
         filter={"trace_roots_only": True, "op_names": [root_op_ref]},
