@@ -5112,19 +5112,26 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
-def _sqlite_text_is_plain_decimal_sql(text_sql: str) -> str:
-    """SQLite predicate for 'text is a plain decimal string'.
+def _sqlite_text_is_plain_decimal_sql(
+    text_sql: str, *, allow_dot: bool = True
+) -> str:
+    """SQLite predicate for 'text is a plain numeric string'.
 
-    Plain decimal = one or more digits with at most one `.`, nothing else.
-    No leading sign, no exponent notation. Strings that don't match parse to
-    NULL instead of coercing to 0 (the SQLite CAST default for bad text).
+    With `allow_dot=True` (default): one or more digits with at most one `.`,
+    nothing else. With `allow_dot=False`: digits only. No leading sign, no
+    exponent notation. Strings that don't match parse to NULL instead of
+    coercing (SQLite's CAST AS INT truncates `'1.5'` to 1, which would
+    diverge from `toInt64OrNull('1.5')` returning NULL on ClickHouse).
     """
     digits = f"replace({text_sql}, '.', '')"
-    dot_count = f"(length({text_sql}) - length({digits}))"
-    return (
+    base = (
         f"({text_sql} != '' AND {digits} != '' "
-        f"AND {digits} NOT GLOB '*[^0-9]*' AND {dot_count} <= 1)"
+        f"AND {digits} NOT GLOB '*[^0-9]*'"
     )
+    if allow_dot:
+        dot_count = f"(length({text_sql}) - length({digits}))"
+        return f"{base} AND {dot_count} <= 1)"
+    return f"{base} AND {digits} = {text_sql})"
 
 
 def _sqlite_sql_type_for_cast(cast: str) -> str:
@@ -5146,7 +5153,11 @@ def _sqlite_inferred_scalar_cast_sql(
 ) -> str:
     cast_sql = f"CAST({value_sql} AS {sql_type})"
     text_sql = f"CAST({value_sql} AS TEXT)"
-    plain_decimal = _sqlite_text_is_plain_decimal_sql(text_sql)
+    # int and bool casts must reject dotted decimal text - `CAST('1.5' AS INT)`
+    # truncates to 1 in SQLite, which would diverge from `toInt64OrNull('1.5')`
+    # returning NULL on ClickHouse. float/double casts keep the dot allowance.
+    allow_dot = cast in {"double", "float"}
+    plain_decimal = _sqlite_text_is_plain_decimal_sql(text_sql, allow_dot=allow_dot)
     if cast in {"int", "double", "float"}:
         return f"CASE WHEN {plain_decimal} THEN {cast_sql} ELSE NULL END"
     text_value = f"lower(trim({text_sql}))"
@@ -5170,7 +5181,11 @@ def _sqlite_inferred_json_cast_sql(
     # (objects, arrays, exponent notation, signed text) becomes NULL.
     cast_sql = f"CAST({json_extract_sql} AS {sql_type})"
     text_sql = f"CAST({json_extract_sql} AS TEXT)"
-    plain_decimal = _sqlite_text_is_plain_decimal_sql(text_sql)
+    # int and bool casts must reject dotted decimal text so SQLite's
+    # truncating `CAST('1.5' AS INT) = 1` doesn't diverge from ClickHouse's
+    # `toInt64OrNull('1.5') = NULL`. Float/double casts keep the dot.
+    allow_dot = cast in {"double", "float"}
+    plain_decimal = _sqlite_text_is_plain_decimal_sql(text_sql, allow_dot=allow_dot)
     if cast == "int":
         return (
             f"CASE WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
