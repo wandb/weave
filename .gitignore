@@ -27,3 +27,6 @@ pyrightconfig.json
 .coverage/
 coverage.xml
 htmlcov/
+
+# Agent eval results
+agent_eval/examples/*/results/
