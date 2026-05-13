@@ -470,3 +470,57 @@ class TestSnapshotPreservesSubclassTypes:
         assert isinstance(snap, list)
         assert type(snap[0]) is Point
         assert snap[0]._asdict() == {"x": 1, "y": 2}
+
+
+class TestSnapshotSharedReferences:
+    """Aliased mutable containers must be snapshotted, not deduped to the original.
+
+    `_snapshot_mutable_containers` uses an `id(obj) in _seen` check for cycle
+    protection. The same check also collapses non-cyclic shared references:
+    the first occurrence of an aliased list/dict gets a fresh copy, but the
+    second occurrence returns the ORIGINAL by identity. A caller mutating the
+    returned value after `finish_call` then leaks into the deferred walk for
+    every alias past the first — exactly the failure mode the snapshot is
+    supposed to close.
+    """
+
+    def test_shared_list_aliased_in_dict_is_fully_snapshotted(self) -> None:
+        shared = [1, 2]
+        out = {"a": shared, "b": shared}
+        snap = _snapshot_mutable_containers(out)
+
+        # Caller mutates the value they got back from `finish_call`.
+        shared.append(99)
+
+        # Both aliases in the snapshot must reflect the pre-mutation value.
+        # Today: `snap["a"]` is a fresh copy and stays `[1, 2]`, but
+        # `snap["b"]` is the original (dedup'd via `_seen`) and is now
+        # `[1, 2, 99]`.
+        assert snap["a"] == [1, 2]
+        assert snap["b"] == [1, 2], (
+            "Aliased reference returned the original instead of a snapshot: "
+            f"snap['b']={snap['b']!r}. The deferred walk would record a "
+            "post-finish_call mutation under the second alias."
+        )
+
+    def test_shared_list_aliased_in_tuple_is_fully_snapshotted(self) -> None:
+        shared = [1, 2]
+        snap = _snapshot_mutable_containers((shared, shared))
+
+        shared.append(99)
+
+        assert snap[0] == [1, 2]
+        assert snap[1] == [1, 2], (
+            f"Aliased reference inside tuple leaked the mutation: snap[1]={snap[1]!r}"
+        )
+
+    def test_shared_dict_aliased_in_list_is_fully_snapshotted(self) -> None:
+        shared = {"x": 1}
+        snap = _snapshot_mutable_containers([shared, shared])
+
+        shared["x"] = 99
+
+        assert snap[0] == {"x": 1}
+        assert snap[1] == {"x": 1}, (
+            f"Aliased dict inside list leaked the mutation: snap[1]={snap[1]!r}"
+        )
