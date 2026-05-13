@@ -97,13 +97,16 @@ spawn this as a subprocess and parse the banner.
 - `POST /call/upsert_batch` — batch start/end recording. Validated against `weave.trace_server.trace_server_interface` types.
 - `POST /calls/stream_query` — NDJSON stream of captured calls for a project.
 
-**Unimplemented (return 501 Not Implemented with a clear body):**
+**Stub endpoints (return canned success — see caveat below):**
 - `/obj/create`, `/obj/read`, `/table/create`, `/table/query`, `/file/create`, `/file/content`, `/feedback/create`, `/call/update`
 
-Hitting one of these means your test exercises a code path the mock
-doesn't model. Either implement the endpoint in `main.py` (also typing
-the request body against the production `tsi.*` model so drift detection
-covers it), or run the test against the real trace server instead.
+These return canned success so the Node SDK's basic op flow (which
+publishes an op via `/obj/create` before emitting call events) doesn't
+exhaust its retry budget. The downside: tests that exercise these
+endpoints will "pass" even though nothing was actually persisted. When
+a test genuinely needs an endpoint to work, implement it for real
+(typed request, typed response, real storage) rather than relying on
+the stub.
 
 **Test-only (not in production):**
 - `GET /test/health` → `{"ok": true}`. Readiness probe.
@@ -129,6 +132,6 @@ The Weave Node SDK's `hostApps` Jest project ([`sdks/node/src/__tests__/hostApps
 ## Caveats (it's a mock — don't expect production fidelity)
 
 - `/calls/stream_query` is a minimal stub — returns all calls for a project as NDJSON, ignoring filter/order/limit. Future tests that need real query semantics can grow the implementation.
-- `/obj/*`, `/table/*`, `/file/*`, `/feedback/*`, `/call/update` return 501 with a clear error body. Tests that touch objects, tables, files, feedback, or call updates will fail loudly. Implement endpoints on demand or run against the real trace server.
+- `/obj/*`, `/table/*`, `/file/*`, `/feedback/*`, `/call/update` return canned success without doing anything. Tests that read back what was "published" through these endpoints will silently fail in confusing ways. Implement endpoints properly on demand if a test needs real round-trip behavior.
 - Auth headers are accepted without validation. Mock is for tests; real auth lives in production.
 - No persistence. No Kafka. No ClickHouse. If your test needs production-fidelity behavior beyond what's listed here, use the real `services/weave-trace` server (see [`tests/trace_server/`](../tests/trace_server) for the existing in-process fixture pattern).
