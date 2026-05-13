@@ -37,6 +37,8 @@ from collections.abc import Iterable
 from functools import wraps
 from typing import Any
 
+from opentelemetry import trace as otel_trace
+
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 
@@ -448,16 +450,9 @@ def _wrap_trace_tool_call(original: Any) -> Any:
         result = original(
             tool, args, function_response_event, error=error, span=span
         )
-        try:
-            # ``trace.get_current_span()`` mirrors ADK's own resolution logic
-            # when the caller doesn't pass ``span`` explicitly.
-            target_span = span
-            if target_span is None:
-                from opentelemetry import trace as otel_trace
-
-                target_span = otel_trace.get_current_span()
-        except Exception:
-            target_span = None
+        # ``trace.get_current_span()`` mirrors ADK's own resolution logic
+        # when the caller doesn't pass ``span`` explicitly.
+        target_span = span if span is not None else otel_trace.get_current_span()
 
         _safe_set_attribute(target_span, GEN_AI_PROVIDER_NAME, _provider_name_from_env())
         _safe_set_attribute(target_span, GEN_AI_TOOL_CALL_ARGUMENTS, _json_dumps(args))
@@ -481,6 +476,15 @@ def _wrap_trace_tool_call(original: Any) -> Any:
 
 
 def _wrap_trace_call_llm(original: Any) -> Any:
+    """Enrich the legacy ``trace_call_llm`` path.
+
+    Pre-ADK-1.36 (and the ``use_generate_content_span`` deprecated path) emit
+    LLM spans via ``trace_call_llm``. The modern runner uses
+    ``use_inference_span`` + ``trace_inference_result`` instead — see
+    ``_wrap_set_common_generate_content_attributes`` and
+    ``_wrap_trace_inference_result`` below.
+    """
+
     @wraps(original)
     def wrapper(
         invocation_context: Any,
@@ -490,14 +494,7 @@ def _wrap_trace_call_llm(original: Any) -> Any:
         span: Any | None = None,
     ) -> Any:
         result = original(invocation_context, event_id, llm_request, llm_response, span=span)
-        try:
-            target_span = span
-            if target_span is None:
-                from opentelemetry import trace as otel_trace
-
-                target_span = otel_trace.get_current_span()
-        except Exception:
-            target_span = None
+        target_span = span if span is not None else otel_trace.get_current_span()
 
         _safe_set_attribute(target_span, GEN_AI_PROVIDER_NAME, _provider_name_from_env())
         _safe_set_attribute(target_span, GEN_AI_OPERATION_NAME, "chat")
@@ -517,6 +514,51 @@ def _wrap_trace_call_llm(original: Any) -> Any:
             _safe_set_attribute(target_span, GEN_AI_CONVERSATION_ID, str(session_id))
 
         _set_llm_request_attributes(target_span, llm_request)
+        _set_llm_response_attributes(target_span, llm_response)
+        return result
+
+    return wrapper
+
+
+def _wrap_set_common_generate_content_attributes(original: Any) -> Any:
+    """Enrich the modern ``use_inference_span`` request-time entry point.
+
+    ADK's ``_set_common_generate_content_attributes`` runs once when the
+    ``generate_content`` span is opened. It sets ``gen_ai.operation.name`` /
+    ``gen_ai.request.model`` but leaves the parts-model messages, system
+    instructions, tool definitions and decoding parameters off the span
+    (they only land in spans when ``OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT``
+    opts in). Weave wants them every time, so we fill them in here.
+    """
+
+    @wraps(original)
+    def wrapper(span: Any, llm_request: Any, common_attributes: Any) -> Any:
+        result = original(span, llm_request, common_attributes)
+        _safe_set_attribute(span, GEN_AI_PROVIDER_NAME, _provider_name_from_env())
+        _set_llm_request_attributes(span, llm_request)
+        return result
+
+    return wrapper
+
+
+def _wrap_trace_inference_result(original: Any) -> Any:
+    """Enrich the modern ``use_inference_span`` response-time entry point.
+
+    ``trace_inference_result`` is ADK's replacement for ``trace_call_llm``'s
+    response-side logic. ADK sets ``finish_reasons`` and the usage tokens
+    here but leaves response model/id, output messages and reasoning/cache
+    tokens off. The Weave OTLv2 columns expect all of those, so we patch.
+    """
+
+    @wraps(original)
+    def wrapper(span: Any, llm_response: Any) -> Any:
+        result = original(span, llm_response)
+        # ADK's helper accepts either a ``Span`` or a ``GenerateContentSpan``;
+        # unwrap so ``set_attribute`` lands on the real span object.
+        target_span = getattr(span, "span", span)
+        _safe_set_attribute(
+            target_span, GEN_AI_PROVIDER_NAME, _provider_name_from_env()
+        )
         _set_llm_response_attributes(target_span, llm_response)
         return result
 
@@ -558,10 +600,23 @@ def get_google_adk_patcher(
                 "trace_tool_call",
                 _wrap_trace_tool_call,
             ),
+            # Legacy LLM-call path (pre-1.36 ``use_generate_content_span``).
             SymbolPatcher(
                 _import_tracing,
                 "trace_call_llm",
                 _wrap_trace_call_llm,
+            ),
+            # Modern LLM-call path (``use_inference_span`` /
+            # ``trace_inference_result``) used by ADK's runner today.
+            SymbolPatcher(
+                _import_tracing,
+                "_set_common_generate_content_attributes",
+                _wrap_set_common_generate_content_attributes,
+            ),
+            SymbolPatcher(
+                _import_tracing,
+                "trace_inference_result",
+                _wrap_trace_inference_result,
             ),
         ]
     )

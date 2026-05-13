@@ -35,6 +35,11 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+from google.adk.telemetry.tracing import (
+    trace_agent_invocation,
+    trace_call_llm,
+    trace_tool_call,
+)
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -539,12 +544,6 @@ def main() -> None:
         )
 
     try:
-        from google.adk.telemetry.tracing import (
-            trace_agent_invocation,
-            trace_call_llm,
-            trace_tool_call,
-        )
-
         tracer = otel_trace.get_tracer("weave-adk-example")
         trace_ids: dict[str, str] = {}
 
