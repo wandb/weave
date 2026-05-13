@@ -56,3 +56,38 @@ def test_client_resolution_from_url(monkeypatch):
         monkeypatch.setenv("WEAVE_REDIS_URL", "redis://redis.example?master=gorilla")
         redis_client.get_redis_client()
         assert mock_sentinel.call_args.args[0] == [("redis.example", 26379)]
+
+
+@pytest.mark.disable_logging_error_check
+@pytest.mark.parametrize(
+    "bad_url",
+    [
+        # K8s manifest interpolation failure -> literal `$(REDIS_PORT)` in port slot.
+        "redis://redis.example:$(REDIS_PORT)$(REDIS_PARAMS)",
+        # Sentinel URL with the same interpolation failure.
+        "redis://redis.example:$(REDIS_PORT)?master=gorilla",
+        # Sentinel branch with no hostname -> our own ValueError.
+        "redis://?master=gorilla",
+        # Outright garbage that urlparse will choke on at port access.
+        "redis://host:not-a-number/0",
+    ],
+)
+def test_construction_failure_returns_none(monkeypatch, caplog, bad_url):
+    """Malformed URL must fall through to None, not raise.
+
+    Callers treat the L2 client as optional; a construction failure here
+    used to bubble up as a 500 on every request that touched
+    ``get_project_retention_days``. Now it's logged once and cached as None.
+    """
+    redis_client.get_redis_client.cache_clear()
+    monkeypatch.setenv("WEAVE_REDIS_URL", bad_url)
+    with caplog.at_level("ERROR", logger="weave.trace_server.redis_client"):
+        assert redis_client.get_redis_client() is None
+    assert any(
+        "Failed to construct Redis client" in rec.message for rec in caplog.records
+    )
+
+    # lru_cache should pin the None so a second call doesn't re-parse.
+    with patch.object(redis_client, "urlparse") as mock_urlparse:
+        assert redis_client.get_redis_client() is None
+        mock_urlparse.assert_not_called()
