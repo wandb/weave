@@ -9,14 +9,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.trace.project_id_resolver import ProjectIdResolver, ResolverDisabledError
-from weave.trace.settings import override
 from weave.trace_server.errors import DigestMismatchError
 
 
 @pytest.fixture(autouse=True)
-def enable_client_side_digests():
-    with override(enable_client_side_digests=True):
-        yield
+def enable_client_side_digests(monkeypatch):
+    monkeypatch.setenv("WEAVE_ENABLE_CLIENT_SIDE_DIGESTS", "true")
 
 
 def _make_resolver(internal_id: str) -> ProjectIdResolver:
