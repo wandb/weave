@@ -33,7 +33,6 @@ File safety:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import signal
@@ -322,10 +321,20 @@ class TraceServerHandlers:
                 _rc: type[BaseModel] = req_cls,
                 _rt: str = record_type,
             ) -> None:
-                # model_validate_json (not model_validate) so that bytes
-                # fields like FileCreateReq.content are base64-decoded
-                # correctly during the WAL round-trip.
-                _m(_rc.model_validate_json(json.dumps(record["req"])))
+                # We already have a parsed dict in ``record["req"]`` (the WAL
+                # consumer json.loads'd the line).  model_validate on the dict
+                # is strictly cheaper than model_validate_json(json.dumps(...)):
+                # one Pydantic validation pass vs. a JSON encode + Pydantic's
+                # internal JSON decode.
+                #
+                # bytes round-trip safety: Pydantic v2's mode="json" dump
+                # represents bytes as utf-8 strings (NOT base64), and
+                # model_validate accepts strings for bytes fields by
+                # re-encoding them as utf-8 — so the round-trip is lossless.
+                # Non-utf8 content can't reach the WAL at all because the
+                # write-side model_dump(mode="json") raises before the record
+                # is persisted.
+                _m(_rc.model_validate(record["req"]))
                 if on_success is not None:
                     on_success(_rt, record)
 
