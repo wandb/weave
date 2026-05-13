@@ -7,6 +7,7 @@ import httpx
 import tenacity
 from typing_extensions import ParamSpec
 
+from weave.telemetry.trace_sentry import SENTRY_AVAILABLE, sentry_sdk
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -214,6 +215,13 @@ def process_batch_with_retry(
                     len(batch),
                     batch_name,
                 )
+            if SENTRY_AVAILABLE:
+                with sentry_sdk.push_scope() as scope:
+                    scope.set_tag("batch_name", batch_name)
+                    scope.set_tag("batch_size", len(batch))
+                    scope.set_tag("drop_reason", "non_retryable_error")
+                    scope.set_level("error")
+                    sentry_sdk.capture_exception(e)
         else:
             # Add items back to the queue for later processing
             logger.warning(
@@ -239,6 +247,13 @@ def process_batch_with_retry(
                     batch_name,
                     len(batch),
                 )
+                if SENTRY_AVAILABLE:
+                    with sentry_sdk.push_scope() as scope:
+                        scope.set_tag("batch_name", batch_name)
+                        scope.set_tag("batch_size", len(batch))
+                        scope.set_tag("drop_reason", "shutdown_during_retry")
+                        scope.set_level("error")
+                        sentry_sdk.capture_exception(e)
 
 
 def handle_response_error(response: httpx.Response, url: str) -> None:
