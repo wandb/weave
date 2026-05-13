@@ -15,7 +15,12 @@ from tests.trace_server.test_project_version import make_project_id
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
-from weave.trace_server.clickhouse.schema_converters import ch_call_to_row
+from weave.trace_server.clickhouse.schema_converters import (
+    ch_call_to_row,
+    complete_call_to_ch_insertable,
+    end_call_for_insert_to_ch_insertable,
+    start_call_insertable_to_complete_start,
+)
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     CallCompleteCHInsertable,
@@ -241,6 +246,63 @@ def test_ch_call_to_row_sentinelizes_expire_at_for_v1_insert_paths():
     explicit_expire = datetime(2025, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
     start_with_ttl = start.model_copy(update={"expire_at": explicit_expire})
     assert ch_call_to_row(start_with_ttl)[expire_at_idx] == explicit_expire
+
+
+def test_clickhouse_insertables_materialize_call_status():
+    started_at = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    ended_at = datetime(2024, 1, 1, 0, 0, 1, tzinfo=timezone.utc)
+    project_id = base64.b64encode(b"test_project").decode("ascii")
+
+    # Running: a calls_complete start row is readable before its end update.
+    start = CallStartCHInsertable(
+        project_id=project_id,
+        id="0193f7a5-1234-7000-8000-000000000010",
+        trace_id="0193f7a5-1234-7000-8000-000000000011",
+        op_name="test_op",
+        started_at=started_at,
+        attributes_dump="{}",
+        inputs_dump="{}",
+    )
+    running = start_call_insertable_to_complete_start(start)
+    assert running.status == tsi.TraceStatus.RUNNING.value
+
+    # Terminal states: success, direct error, and descendant error.
+    success_end = end_call_for_insert_to_ch_insertable(
+        tsi.EndedCallSchemaForInsert(
+            project_id=project_id,
+            id="0193f7a5-1234-7000-8000-000000000012",
+            ended_at=ended_at,
+            summary={},
+        ),
+        retention_days=0,
+    )
+    error_end = end_call_for_insert_to_ch_insertable(
+        tsi.EndedCallSchemaForInsert(
+            project_id=project_id,
+            id="0193f7a5-1234-7000-8000-000000000013",
+            ended_at=ended_at,
+            exception="boom",
+            summary={},
+        ),
+        retention_days=0,
+    )
+    descendant_error = complete_call_to_ch_insertable(
+        tsi.CompletedCallSchemaForInsert(
+            project_id=project_id,
+            id="0193f7a5-1234-7000-8000-000000000014",
+            trace_id="0193f7a5-1234-7000-8000-000000000015",
+            op_name="test_op",
+            started_at=started_at,
+            ended_at=ended_at,
+            attributes={},
+            inputs={},
+            summary={"status_counts": {tsi.TraceStatus.ERROR: 1}},
+        ),
+        retention_days=0,
+    )
+    assert success_end.status == tsi.TraceStatus.SUCCESS.value
+    assert error_end.status == tsi.TraceStatus.ERROR.value
+    assert descendant_error.status == tsi.TraceStatus.DESCENDANT_ERROR.value
 
 
 def test_clickhouse_distributed_mode_properties():

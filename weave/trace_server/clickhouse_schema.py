@@ -17,6 +17,7 @@ class CallBaseCHInsertable(BaseModel):
     id: str
     input_refs: list[str] = Field(default_factory=list)
     output_refs: list[str] = Field(default_factory=list)
+    status: str | None = None
     expire_at: datetime.datetime | None = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
@@ -128,6 +129,7 @@ class CallCompleteCHInsertable(
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
     source: str = "direct"
+    status: str = "running"
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator

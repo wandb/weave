@@ -6680,9 +6680,8 @@ def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
     assert calls[2].id == call4.id
 
     # Test Case 5: summary.weave.status ordering with costs
-    # Regression test: summary.weave.status internally references summary_dump
-    # which is NOT in the GROUP BY in the cost query. The ORDER BY must use
-    # the alias, not re-expand the expression referencing summary_dump.
+    # Regression test: summary.weave.status is computed before the final cost
+    # GROUP BY. The ORDER BY must use the alias, not re-expand the expression.
     sort_by = [{"field": "summary.weave.status", "direction": "asc"}]
     calls = list(
         client.get_calls(

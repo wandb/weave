@@ -648,11 +648,9 @@ def get_cost_final_select(
         order_parts = []
         for of in order_fields:
             if isinstance(of.field, CallsMergedSummaryField):
-                # Summary fields (e.g. summary.weave.status) internally
-                # reference summary_dump which is NOT in the GROUP BY (it's
-                # rebuilt with cost data).  Since the summary field is already
-                # computed as an alias in SELECT/GROUP BY, reference the alias
-                # directly instead of re-expanding the expression.
+                # Summary fields are already computed as aliases in SELECT/GROUP BY.
+                # Reuse that alias here instead of re-expanding the field expression
+                # after summary_dump has been rebuilt with cost data.
                 order_parts.append(f"{safe_alias(of.field.field)} {of.direction}")
             else:
                 # Feedback fields need use_agg_fn=True because they come from a

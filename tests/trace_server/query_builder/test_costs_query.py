@@ -185,39 +185,24 @@ def test_query_with_costs_and_attributes_order() -> None:
         cq,
         """WITH filtered_calls AS
   (SELECT calls_merged.id AS id
-   FROM calls_merged PREWHERE calls_merged.project_id = {pb_5:String}
+   FROM calls_merged PREWHERE calls_merged.project_id = {pb_1:String}
    GROUP BY (calls_merged.project_id,
              calls_merged.id)
    HAVING (((any(calls_merged.deleted_at) IS NULL))
            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
    ORDER BY (NOT (JSONType(any(calls_merged.attributes_dump)) = 'Null'
-                  OR JSONType(any(calls_merged.attributes_dump)) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, CASE
-                                                                                                                                                                                                                                                                                            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-                                                                                                                                                                                                                                                                                            WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                                                                                                                                                                                                                                                                                            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
-                                                                                                                                                                                                                                                                                            ELSE {pb_3:String}
-                                                                                                                                                                                                                                                                                        END ASC),
+                  OR JSONType(any(calls_merged.attributes_dump)) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, ifNull(any(calls_merged.status), {pb_0:String}) ASC),
      all_calls AS
   (SELECT calls_merged.id AS id,
           any(calls_merged.started_at) AS started_at,
           any(calls_merged.attributes_dump) AS attributes_dump,
-          CASE
-              WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-              WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-              WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
-              ELSE {pb_3:String}
-          END AS `summary.weave.status`
-   FROM calls_merged PREWHERE calls_merged.project_id = {pb_5:String}
+          ifNull(any(calls_merged.status), {pb_0:String}) AS `summary.weave.status`
+   FROM calls_merged PREWHERE calls_merged.project_id = {pb_1:String}
    WHERE (calls_merged.id IN filtered_calls)
    GROUP BY (calls_merged.project_id,
              calls_merged.id)
    ORDER BY (NOT (JSONType(any(calls_merged.attributes_dump)) = 'Null'
-                  OR JSONType(any(calls_merged.attributes_dump)) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, CASE
-                                                                                                                                                                                                                                                                                            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-                                                                                                                                                                                                                                                                                            WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                                                                                                                                                                                                                                                                                            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
-                                                                                                                                                                                                                                                                                            ELSE {pb_3:String}
-                                                                                                                                                                                                                                                                                        END ASC),
+                  OR JSONType(any(calls_merged.attributes_dump)) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, ifNull(any(calls_merged.status), {pb_0:String}) ASC),
      llm_usage AS
   (-- From the all_calls we get the usage data for LLMs
  SELECT *,
@@ -265,9 +250,9 @@ def test_query_with_costs_and_attributes_order() -> None:
                                          END, llm_token_prices.effective_date DESC) AS rank
    FROM llm_usage
    LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
-                                  AND ((llm_token_prices.pricing_level_id = {pb_6:String})
-                                       OR (llm_token_prices.pricing_level_id = {pb_7:String})
-                                       OR (llm_token_prices.pricing_level_id = {pb_8:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
+	                                  AND ((llm_token_prices.pricing_level_id = {pb_2:String})
+	                                       OR (llm_token_prices.pricing_level_id = {pb_3:String})
+	                                       OR (llm_token_prices.pricing_level_id = {pb_4:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
 
 SELECT id,
        started_at,
@@ -285,7 +270,7 @@ SELECT id,
                                         '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
                                         '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
 FROM ranked_prices
-WHERE (rank = {pb_9:UInt64})
+WHERE (rank = {pb_5:UInt64})
 GROUP BY id,
          started_at,
          attributes_dump,
@@ -293,16 +278,12 @@ GROUP BY id,
 ORDER BY (NOT (JSONType(ranked_prices.attributes_dump) = 'Null'
                OR JSONType(ranked_prices.attributes_dump) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, '$'), 'null'), '')) ASC, `summary.weave.status` ASC""",
         {
-            "pb_0": '$."status_counts"."error"',
-            "pb_1": "error",
-            "pb_2": "running",
-            "pb_3": "success",
-            "pb_4": "descendant_error",
-            "pb_5": "UHJvamVjdEludGVybmFsSWQ6NDI3Mjk1MTc=",
-            "pb_6": "UHJvamVjdEludGVybmFsSWQ6NDI3Mjk1MTc=",
-            "pb_7": "default",
-            "pb_8": "",
-            "pb_9": 1,
+            "pb_0": "running",
+            "pb_1": "UHJvamVjdEludGVybmFsSWQ6NDI3Mjk1MTc=",
+            "pb_2": "UHJvamVjdEludGVybmFsSWQ6NDI3Mjk1MTc=",
+            "pb_3": "default",
+            "pb_4": "",
+            "pb_5": 1,
         },
     )
 

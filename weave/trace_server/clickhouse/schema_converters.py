@@ -28,7 +28,10 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHObjSchema,
 )
 from weave.trace_server.ids import generate_id
-from weave.trace_server.trace_server_common import make_derived_summary_fields
+from weave.trace_server.trace_server_common import (
+    derive_call_summary_status,
+    make_derived_summary_fields,
+)
 from weave.trace_server.ttl_settings import compute_expire_at
 
 # ---------------------------------------------------------------------------
@@ -192,6 +195,7 @@ def start_call_insertable_to_complete_start(
         wb_run_step=ch_start.wb_run_step,
         wb_run_step_end=None,
         expire_at=ch_start.expire_at,
+        status=tsi.TraceStatus.RUNNING.value,
     )
 
 
@@ -203,17 +207,21 @@ def end_call_for_insert_to_ch_insertable(
     # wrong trace id (one that does not match the parent_id)!
     output = end_call.output
     output_refs = extract_refs_from_values(output)
+    summary = dict(end_call.summary)
 
     return CallEndCHInsertable(
         project_id=end_call.project_id,
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
-        summary_dump=dict_value_to_dump(dict(end_call.summary)),
+        summary_dump=dict_value_to_dump(summary),
         output_dump=any_value_to_dump(output),
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
         expire_at=compute_expire_at(retention_days, end_call.ended_at),
+        status=derive_call_summary_status(
+            summary, end_call.ended_at, end_call.exception
+        ).value,
     )
 
 
@@ -242,6 +250,7 @@ def start_end_calls_to_ch_complete_insertable(
 
     output = end_call.output
     output_refs = extract_refs_from_values(output)
+    summary = dict(end_call.summary)
 
     otel_dump_str = None
     if start_call.otel_dump is not None:
@@ -263,7 +272,7 @@ def start_end_calls_to_ch_complete_insertable(
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),
-        summary_dump=dict_value_to_dump(dict(end_call.summary)),
+        summary_dump=dict_value_to_dump(summary),
         otel_dump=otel_dump_str,
         output_refs=output_refs,
         wb_user_id=start_call.wb_user_id,
@@ -271,6 +280,9 @@ def start_end_calls_to_ch_complete_insertable(
         wb_run_step=start_call.wb_run_step,
         wb_run_step_end=end_call.wb_run_step_end,
         expire_at=compute_expire_at(retention_days, start_call.started_at),
+        status=derive_call_summary_status(
+            summary, end_call.ended_at, end_call.exception
+        ).value,
     )
 
 
@@ -301,6 +313,7 @@ def complete_call_to_ch_insertable(
 
     output = complete_call.output
     output_refs = extract_refs_from_values(output)
+    summary = dict(complete_call.summary)
 
     otel_dump_str = None
     if complete_call.otel_dump is not None:
@@ -322,7 +335,7 @@ def complete_call_to_ch_insertable(
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),
-        summary_dump=dict_value_to_dump(dict(complete_call.summary)),
+        summary_dump=dict_value_to_dump(summary),
         otel_dump=otel_dump_str,
         output_refs=output_refs,
         wb_user_id=complete_call.wb_user_id,
@@ -330,6 +343,9 @@ def complete_call_to_ch_insertable(
         wb_run_step=complete_call.wb_run_step,
         wb_run_step_end=complete_call.wb_run_step_end,
         expire_at=compute_expire_at(retention_days, complete_call.started_at),
+        status=derive_call_summary_status(
+            summary, complete_call.ended_at, complete_call.exception
+        ).value,
     )
 
 
