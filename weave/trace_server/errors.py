@@ -57,8 +57,8 @@ class ObjectNameTypeCollision(InvalidRequest):
     def __init__(
         self,
         object_id: str,
-        new_base_object_class: Optional[str],
-        existing_base_object_class: Optional[str],
+        new_base_object_class: str | None,
+        existing_base_object_class: str | None,
     ):
         self.object_id = object_id
         self.new_base_object_class = new_base_object_class
