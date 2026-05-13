@@ -1516,7 +1516,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     test_settings = settings.UserSettings(
         use_parallel_table_upload=use_parallel_table_upload
     )
-    settings.parse_and_apply_settings(test_settings)
+    settings.replace_settings(test_settings)
 
     num_rows = 16
     rows = list(row_gen(num_rows, 1024))
@@ -4152,7 +4152,7 @@ def test_parallel_table_uploads_digest_consistency(
     test_settings = settings.UserSettings(
         use_parallel_table_upload=use_parallel_table_upload
     )
-    settings.parse_and_apply_settings(test_settings)
+    settings.replace_settings(test_settings)
 
     # Set up the mock before creating the client
     # We'll use a mutable container to control the chunk size dynamically

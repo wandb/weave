@@ -70,10 +70,7 @@ def _redirect_wal_to(client: weave.WeaveClient, wal_dir: str) -> None:
 # directory, so starting a sender there races with parallel xdist workers
 # and has triggered Windows file-handle errors.  Both fixtures redirect
 # to an isolated tmp_path, so no sender needs to run against the default.
-# A fresh UserSettings is built per fixture call because UserSettings.apply()
-# resets the instance to defaults on reuse.
-def _initial_wal_settings() -> UserSettings:
-    return UserSettings(enable_wal=True, disable_wal_sender=True)
+_INITIAL_WAL_SETTINGS = UserSettings(enable_wal=True, disable_wal_sender=True)
 
 
 @pytest.fixture
@@ -83,7 +80,7 @@ def wal_client(client_creator, tmp_path):
     Redirects the WAL to ``tmp_path`` for test isolation.
     """
     wal_dir = str(tmp_path / "wal")
-    with client_creator(settings=_initial_wal_settings()) as client:
+    with client_creator(settings=_INITIAL_WAL_SETTINGS) as client:
         _redirect_wal_to(client, wal_dir)
         yield client
 
@@ -95,7 +92,7 @@ def wal_client_with_sender(client_creator, tmp_path):
     Redirects the WAL to ``tmp_path`` for test isolation.
     """
     wal_dir = str(tmp_path / "wal")
-    with client_creator(settings=_initial_wal_settings()) as client:
+    with client_creator(settings=_INITIAL_WAL_SETTINGS) as client:
         _redirect_wal_to(client, wal_dir)
         # Create sender pointing at the isolated directory.
         client._wal._sender = create_sender(wal_dir, client.server)
