@@ -49,6 +49,7 @@ class AutopatchSettings(BaseModel):
     cerebras: IntegrationSettings | None = None
     cohere: IntegrationSettings | None = None
     google_genai: IntegrationSettings | None = None
+    google_adk: IntegrationSettings | None = None
     vertexai: IntegrationSettings | None = None
     huggingface: IntegrationSettings | None = None
     instructor: IntegrationSettings | None = None

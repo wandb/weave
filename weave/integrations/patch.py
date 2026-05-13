@@ -151,6 +151,22 @@ def patch_vertexai(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_google_adk(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for Google Agent Development Kit (ADK).
+
+    ADK already emits OpenTelemetry spans. This patch enriches them with the
+    full set of GenAI semantic-convention attributes Weave extracts into
+    dedicated columns (see ``weave/trace_server/agents/semconv.py``). Call
+    after ``weave.init()`` so the global OTel ``TracerProvider`` is in place.
+    """
+    _patch_integration(
+        module_path="weave.integrations.google_adk.google_adk_sdk",
+        patcher_func_getter_name="get_google_adk_patcher",
+        triggering_symbols=["google.adk"],
+        settings=settings,
+    )
+
+
 def patch_huggingface(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Hugging Face."""
     _patch_integration(
@@ -334,6 +350,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "google.generativeai": patch_google_genai,
     "google.genai": patch_google_genai,
     "vertexai": patch_vertexai,
+    "google.adk": patch_google_adk,
     "huggingface_hub": patch_huggingface,
     "instructor": patch_instructor,
     "dspy": patch_dspy,
