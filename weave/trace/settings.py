@@ -29,7 +29,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Literal, TypeVar, get_args, get_origin, get_type_hints
+from typing import Any, Literal, TypeVar, cast, get_args, get_origin, get_type_hints
 
 DEFAULT_RETRY_MAX_INTERVAL_SECONDS = 60 * 5  # 5 minutes
 SETTINGS_PREFIX = "WEAVE_"
@@ -351,7 +351,7 @@ def _env_or_default(name: str, default: _T) -> _T:
     to the default — matching the prior helpers' truthy-check semantics.
     """
     if env := os.getenv(_ENV_KEYS[name]):
-        return _parse_env_value(env, _FIELD_TYPES[name])  # type: ignore[no-any-return]
+        return cast(_T, _parse_env_value(env, _FIELD_TYPES[name]))
     return default
 
 
