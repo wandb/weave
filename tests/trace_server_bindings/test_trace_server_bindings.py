@@ -226,7 +226,12 @@ def test_drop_data_when_queue_is_full(server, server_class, log_collector):
     mock_queue.put_nowait.side_effect = Full
     server.call_processor.queue = mock_queue
 
-    server.call_start(tsi.CallStartReq(start=generate_start()))
+    # Send a paired start+end so CallBatchProcessor (default) queues the
+    # complete item. A lone start would sit in `_pending_starts` and never
+    # hit the queue.
+    req_start, req_end = generate_call_start_end_pair(id="test-call-id")
+    server.call_start(req_start)
+    server.call_end(req_end)
 
     # Verify that the put_nowait method was called (meaning we tried to enqueue the item)
     mock_queue.put_nowait.assert_called_once()
