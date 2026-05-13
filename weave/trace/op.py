@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import atexit
 import inspect
 import logging
 import random
@@ -1451,6 +1450,18 @@ ON_AYIELD_MSG = (
 )
 
 
+def _call_on_close_for_wrapper_ref(wrapper_ref: weakref.ReferenceType) -> None:
+    """Process-exit finalizer callback for a weakly referenced wrapper.
+
+    weakref.finalize must not capture self or a bound method here; doing so
+    would keep the wrapper alive and reintroduce the leak. At normal GC time
+    wrapper_ref() may already be None, so __del__ remains the GC cleanup path.
+    """
+    wrapper = wrapper_ref()
+    if wrapper is not None:
+        wrapper._call_on_close_once()
+
+
 class _IteratorWrapper(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
     that this class will be helpful in other contexts and might be moved to a more general location in the future.
@@ -1468,40 +1479,57 @@ class _IteratorWrapper(Generic[V]):
         self._on_error = on_error
         self._on_close = on_close
         self._on_finished_called = False
+        # weakref.finalize handles process-exit cleanup for unfinished wrappers
+        # that are still reachable. It cannot close a wrapper that is already
+        # being garbage-collected because wrapper_ref() is None in that case;
+        # keep __del__ below for normal GC cleanup.
+        self._process_exit_finalizer = weakref.finalize(
+            self, _call_on_close_for_wrapper_ref, weakref.ref(self)
+        )
 
-        atexit.register(weakref.WeakMethod(self._call_on_close_once))
+    def _detach_process_exit_finalizer(self) -> None:
+        if self._process_exit_finalizer.alive:
+            self._process_exit_finalizer.detach()
 
     def _call_on_close_once(self) -> None:
-        if not self._on_finished_called:
-            try:
-                self._on_close()  # type: ignore
-            except Exception as e:
-                # Even if an exception occurs, we need to ensure we clean up the call context
-                current_call = call_context.get_current_call()
-                if current_call is not None:
-                    call_context.pop_call(current_call.id)
+        if self._on_finished_called:
+            self._detach_process_exit_finalizer()
+            return
 
-                if get_raise_on_captured_errors():
-                    raise
-                log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
-            finally:
-                self._on_finished_called = True
+        try:
+            self._on_close()
+        except Exception:
+            # Even if an exception occurs, we need to ensure we clean up the call context
+            current_call = call_context.get_current_call()
+            if current_call is not None:
+                call_context.pop_call(current_call.id)
+
+            if get_raise_on_captured_errors():
+                raise
+            log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
+        finally:
+            self._on_finished_called = True
+            self._detach_process_exit_finalizer()
 
     def _call_on_error_once(self, e: Exception) -> None:
-        if not self._on_finished_called:
-            try:
-                self._on_error(e)
-            except Exception:
-                # Even if an exception occurs, we need to ensure we clean up the call context
-                current_call = call_context.get_current_call()
-                if current_call is not None:
-                    call_context.pop_call(current_call.id)
+        if self._on_finished_called:
+            self._detach_process_exit_finalizer()
+            return
 
-                if get_raise_on_captured_errors():
-                    raise
-                log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
-            finally:
-                self._on_finished_called = True
+        try:
+            self._on_error(e)
+        except Exception:
+            # Even if an exception occurs, we need to ensure we clean up the call context
+            current_call = call_context.get_current_call()
+            if current_call is not None:
+                call_context.pop_call(current_call.id)
+
+            if get_raise_on_captured_errors():
+                raise
+            log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
+        finally:
+            self._on_finished_called = True
+            self._detach_process_exit_finalizer()
 
     def __iter__(self) -> _IteratorWrapper:
         return self
