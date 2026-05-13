@@ -7,9 +7,12 @@ from pydantic import ValidationError
 from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
-    AgentSpanStatsFieldRef,
+    AgentSpanGroupFilter,
+    AgentSpanMeasureSpec,
     AgentSpanStatsMetricSpec,
+    AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
+    AgentSpanValueRef,
 )
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
@@ -45,7 +48,7 @@ def _req(**kwargs) -> AgentSpanStatsReq:
             AgentSpanStatsMetricSpec(
                 alias="input_tokens",
                 value_type="number",
-                field=AgentSpanStatsFieldRef(
+                value=AgentSpanValueRef(
                     source="field",
                     key="usage.input_tokens",
                 ),
@@ -74,14 +77,14 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
             AgentSpanStatsMetricSpec(
                 alias="duration_ms",
                 value_type="number",
-                derived="duration_ms",
+                value=AgentSpanValueRef(source="derived", key="duration_ms"),
                 aggregations=["avg"],
                 percentiles=[95],
             ),
             AgentSpanStatsMetricSpec(
                 alias="errors",
                 value_type="boolean",
-                derived="is_error",
+                value=AgentSpanValueRef(source="derived", key="is_error"),
                 aggregations=["count_true"],
             ),
         ],
@@ -117,10 +120,10 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
         filtered_spans AS (
           SELECT *
           FROM spans s
-          WHERE s.project_id = {genai_0:String}
+          PREWHERE {genai_0:String} = s.project_id
             AND s.started_at >= {genai_1:DateTime64(6)}
             AND s.started_at < {genai_2:DateTime64(6)}
-            AND (s.agent_name = {genai_3:String})
+          WHERE (s.agent_name = {genai_3:String})
         ),
         aggregated_data AS (
           SELECT
@@ -186,7 +189,7 @@ def test_grouped_stats_query_full_sql_shape() -> None:
             AgentSpanStatsMetricSpec(
                 alias="score",
                 value_type="number",
-                field=AgentSpanStatsFieldRef(
+                value=AgentSpanValueRef(
                     source="custom_attrs_float",
                     key="score",
                 ),
@@ -226,7 +229,7 @@ def test_grouped_stats_query_full_sql_shape() -> None:
         filtered_spans AS (
           SELECT *
           FROM spans s
-          WHERE s.project_id = {genai_0:String}
+          PREWHERE {genai_0:String} = s.project_id
             AND s.started_at >= {genai_1:DateTime64(6)}
             AND s.started_at < {genai_2:DateTime64(6)}
         ),
@@ -298,39 +301,277 @@ def test_basic_stats_query_uses_query_filter_and_bucket() -> None:
             AgentSpanStatsMetricSpec(
                 alias="duration_ms",
                 value_type="number",
-                derived="duration_ms",
+                value=AgentSpanValueRef(source="derived", key="duration_ms"),
                 aggregations=["avg"],
                 percentiles=[95],
             ),
             AgentSpanStatsMetricSpec(
                 alias="errors",
                 value_type="boolean",
-                derived="is_error",
+                value=AgentSpanValueRef(source="derived", key="is_error"),
                 aggregations=["count_true"],
             ),
         ],
     )
 
     result = build_agent_span_stats_query(req, pb)
-    sql = " ".join(result.sql.split())
 
-    assert "FROM spans s" in result.sql
-    assert "s.agent_name = {genai_3:String}" in result.sql
-    assert "toStartOfInterval(s.started_at, INTERVAL 3600 SECOND" in result.sql
-    assert "avgOrNull(if(v_duration_ms, m_duration_ms, NULL)) AS avg_duration_ms" in sql
-    assert (
-        "quantileOrNull(0.95)(if(v_duration_ms, m_duration_ms, NULL)) AS p95_duration_ms"
-        in sql
-    )
-    assert "aggregated_data.avg_duration_ms AS avg_duration_ms" in sql
-    assert "COALESCE(aggregated_data.avg_duration_ms, 0)" not in sql
-    assert "countIf(v_errors AND m_errors = 1) AS count_true_errors" in sql
+    expected_sql = """
+        WITH all_buckets AS
+          (SELECT toStartOfInterval(toDateTime({genai_4:Float64}, {genai_6:String}), INTERVAL 3600 SECOND, {genai_6:String}) + toIntervalSecond(number * {genai_7:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_5:Float64}, {genai_6:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_4:Float64}, {genai_6:String}), INTERVAL 3600 SECOND, {genai_6:String}))) / {genai_7:Float64})))
+           WHERE bucket < toDateTime({genai_5:Float64}, {genai_6:String}) ),
+             filtered_spans AS
+          (SELECT *
+           FROM spans s
+           PREWHERE {genai_0:String} = s.project_id
+             AND s.started_at >= {genai_1:DateTime64(6)}
+             AND s.started_at < {genai_2:DateTime64(6)}
+           WHERE (s.agent_name = {genai_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  avgOrNull(if(v_duration_ms, m_duration_ms, NULL)) AS avg_duration_ms,
+                  quantileOrNull(0.95)(if(v_duration_ms, m_duration_ms, NULL)) AS p95_duration_ms,
+                  countIf(v_errors
+                          AND m_errors = 1) AS count_true_errors
+           FROM
+             (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_6:String}) AS bucket,
+                     if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL) AS m_duration_ms,
+                     toUInt8(s.ended_at > s.started_at) AS v_duration_ms,
+                     s.status_code = 'ERROR' AS m_errors,
+                     toUInt8(1) AS v_errors
+              FROM filtered_spans s)
+           GROUP BY bucket)
+        SELECT all_buckets.bucket AS timestamp,
+               aggregated_data.avg_duration_ms AS avg_duration_ms,
+               aggregated_data.p95_duration_ms AS p95_duration_ms,
+               COALESCE(aggregated_data.count_true_errors, 0) AS count_true_errors
+        FROM all_buckets
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        ORDER BY timestamp
+    """
+    expected_params = {
+        "genai_0": "p1",
+        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_3": "agent-a",
+        "genai_4": 1767225600.0,
+        "genai_5": 1767312000.0,
+        "genai_6": "UTC",
+        "genai_7": 3600,
+    }
+    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
     assert result.columns == [
         "timestamp",
         "avg_duration_ms",
         "p95_duration_ms",
         "count_true_errors",
     ]
+
+
+def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        bucket_by=AgentSpanStatsNumericBucketSpec(
+            type="number",
+            value=AgentSpanValueRef(source="derived", key="duration_ms"),
+            bins=4,
+        ),
+        metrics=[
+            AgentSpanStatsMetricSpec(
+                alias="spans",
+                value_type="boolean",
+                value=AgentSpanValueRef(source="derived", key="is_error"),
+                aggregations=["count"],
+            )
+        ],
+    )
+
+    result = build_agent_span_stats_query(req, pb)
+
+    expected_sql = """
+        WITH filtered_spans AS
+          (SELECT *
+           FROM spans s
+           PREWHERE {genai_0:String} = s.project_id
+             AND s.started_at >= {genai_1:DateTime64(6)}
+             AND s.started_at < {genai_2:DateTime64(6)} ),
+             value_rows AS
+          (SELECT if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL) AS bucket_value,
+                  s.status_code = 'ERROR' AS m_spans,
+                  toUInt8(1) AS v_spans
+           FROM filtered_spans s
+           WHERE s.ended_at > s.started_at
+             AND isNotNull(if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL))
+             AND isFinite(if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL)) ),
+             bounds AS
+          (SELECT toFloat64(min(bucket_value)) AS bucket_min_bound,
+                  toFloat64(max(bucket_value)) AS bucket_max_bound,
+                  count() AS value_count
+           FROM value_rows),
+             all_buckets AS
+          (SELECT toUInt64(number) AS bucket
+           FROM numbers({genai_3:UInt64})),
+             aggregated_data AS
+          (SELECT if(bounds.bucket_max_bound = bounds.bucket_min_bound, toUInt64(0), toUInt64(least(toFloat64({genai_3:UInt64}) - 1.0, floor((value_rows.bucket_value - bounds.bucket_min_bound) / if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0))))) AS bucket,
+                  countIf(v_spans) AS count_spans
+           FROM value_rows
+           CROSS JOIN bounds
+           WHERE bounds.value_count > 0
+             AND value_rows.bucket_value >= bounds.bucket_min_bound
+             AND value_rows.bucket_value <= bounds.bucket_max_bound
+           GROUP BY bucket)
+        SELECT all_buckets.bucket AS bucket_index,
+               if(bounds.bucket_max_bound = bounds.bucket_min_bound, bounds.bucket_min_bound, bounds.bucket_min_bound + toFloat64(all_buckets.bucket) * if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0)) AS bucket_min,
+               if(bounds.bucket_max_bound = bounds.bucket_min_bound, bounds.bucket_max_bound, if(all_buckets.bucket = {genai_3:UInt64} - toUInt64(1), bounds.bucket_max_bound, bounds.bucket_min_bound + toFloat64(all_buckets.bucket + 1) * if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0))) AS bucket_max,
+               COALESCE(aggregated_data.count_spans, 0) AS count_spans
+        FROM all_buckets
+        CROSS JOIN bounds
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        WHERE bounds.value_count > 0
+          AND (bounds.bucket_max_bound > bounds.bucket_min_bound
+               OR all_buckets.bucket = 0)
+        ORDER BY bucket_index
+    """
+    expected_params = {
+        "genai_0": "p1",
+        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_3": 4,
+    }
+    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
+    assert result.columns == [
+        "bucket_index",
+        "bucket_min",
+        "bucket_max",
+        "count_spans",
+    ]
+    assert result.granularity_seconds is None
+    assert result.bucket_type == "number"
+
+
+def test_numeric_bucket_stats_query_groups_custom_attr_measure() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        bucket_by=AgentSpanStatsNumericBucketSpec(
+            type="number",
+            bins=8,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            measure=AgentSpanMeasureSpec(
+                alias="avg_score",
+                aggregation="avg",
+                value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+                value_type="number",
+            ),
+        ),
+        metrics=[],
+    )
+
+    result = build_agent_span_stats_query(req, pb)
+
+    expected_sql = """
+        WITH filtered_spans AS
+          (SELECT *
+           FROM spans s
+           PREWHERE {genai_0:String} = s.project_id
+             AND s.started_at >= {genai_1:DateTime64(6)}
+             AND s.started_at < {genai_2:DateTime64(6)} ),
+             value_rows AS
+          (SELECT avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS bucket_value
+           FROM filtered_spans s
+           GROUP BY s.conversation_id),
+             bounds AS
+          (SELECT toFloat64(min(bucket_value)) AS bucket_min_bound,
+                  toFloat64(max(bucket_value)) AS bucket_max_bound,
+                  count() AS value_count
+           FROM value_rows),
+             all_buckets AS
+          (SELECT toUInt64(number) AS bucket
+           FROM numbers({genai_3:UInt64})),
+             aggregated_data AS
+          (SELECT if(bounds.bucket_max_bound = bounds.bucket_min_bound, toUInt64(0), toUInt64(least(toFloat64({genai_3:UInt64}) - 1.0, floor((value_rows.bucket_value - bounds.bucket_min_bound) / if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0))))) AS bucket,
+                  count() AS count
+           FROM value_rows
+           CROSS JOIN bounds
+           WHERE bounds.value_count > 0
+             AND value_rows.bucket_value >= bounds.bucket_min_bound
+             AND value_rows.bucket_value <= bounds.bucket_max_bound
+           GROUP BY bucket)
+        SELECT all_buckets.bucket AS bucket_index,
+               if(bounds.bucket_max_bound = bounds.bucket_min_bound, bounds.bucket_min_bound, bounds.bucket_min_bound + toFloat64(all_buckets.bucket) * if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0)) AS bucket_min,
+               if(bounds.bucket_max_bound = bounds.bucket_min_bound, bounds.bucket_max_bound, if(all_buckets.bucket = {genai_3:UInt64} - toUInt64(1), bounds.bucket_max_bound, bounds.bucket_min_bound + toFloat64(all_buckets.bucket + 1) * if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0))) AS bucket_max,
+               COALESCE(aggregated_data.count, 0) AS count
+        FROM all_buckets
+        CROSS JOIN bounds
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        WHERE bounds.value_count > 0
+          AND (bounds.bucket_max_bound > bounds.bucket_min_bound
+               OR all_buckets.bucket = 0)
+        ORDER BY bucket_index
+    """
+    expected_params = {
+        "genai_0": "p1",
+        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_3": 8,
+        "genai_4": "score",
+    }
+    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
+    assert result.columns == ["bucket_index", "bucket_min", "bucket_max", "count"]
+    assert result.bucket_type == "number"
+
+
+def test_numeric_bucket_group_filter_rejects_mismatched_group_by() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        bucket_by=AgentSpanStatsNumericBucketSpec(
+            type="number",
+            bins=8,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            measure=AgentSpanMeasureSpec(
+                alias="avg_score",
+                aggregation="avg",
+                value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+                value_type="number",
+            ),
+        ),
+        group_filters=[
+            AgentSpanGroupFilter(
+                group_by=[AgentGroupByRef(source="column", key="trace_id")],
+                measure=AgentSpanMeasureSpec(alias="spans", aggregation="count"),
+                min=1,
+            )
+        ],
+        metrics=[],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="numeric bucket group_filters must use the same group_by",
+    ):
+        build_agent_span_stats_query(req, pb)
+
+
+def test_request_validation_rejects_grouped_numeric_bucket_metrics() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="grouped numeric bucket stats do not support explicit metrics",
+    ):
+        _req(
+            bucket_by=AgentSpanStatsNumericBucketSpec(
+                type="number",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measure=AgentSpanMeasureSpec(alias="spans", aggregation="count"),
+            ),
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="input_tokens",
+                    value_type="number",
+                    value=AgentSpanValueRef(source="field", key="usage.input_tokens"),
+                    aggregations=["sum"],
+                )
+            ],
+        )
 
 
 def test_group_by_custom_attr_and_metric_custom_attr() -> None:
@@ -347,7 +588,7 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
             AgentSpanStatsMetricSpec(
                 alias="score",
                 value_type="number",
-                field=AgentSpanStatsFieldRef(
+                value=AgentSpanValueRef(
                     source="custom_attrs_float",
                     key="score",
                 ),
@@ -357,15 +598,138 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
     )
 
     result = build_agent_span_stats_query(req, pb)
-    sql = " ".join(result.sql.split())
 
-    assert "top_groups AS" in result.sql
-    assert "s.custom_attrs_string[{genai_3:String}] AS env" in result.sql
-    assert "s.custom_attrs_float[{genai_4:String}]" in result.sql
-    assert "mapContains(s.custom_attrs_float, {genai_4:String})" in result.sql
-    assert "GROUP BY bucket, env" in sql
-    assert "LIMIT {genai_9:UInt64}" in result.sql
+    expected_sql = """
+        WITH all_buckets AS
+          (SELECT toStartOfInterval(toDateTime({genai_5:Float64}, {genai_7:String}), INTERVAL 3600 SECOND, {genai_7:String}) + toIntervalSecond(number * {genai_8:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_6:Float64}, {genai_7:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_5:Float64}, {genai_7:String}), INTERVAL 3600 SECOND, {genai_7:String}))) / {genai_8:Float64})))
+           WHERE bucket < toDateTime({genai_6:Float64}, {genai_7:String}) ),
+             filtered_spans AS
+          (SELECT *
+           FROM spans s
+           PREWHERE {genai_0:String} = s.project_id
+             AND s.started_at >= {genai_1:DateTime64(6)}
+             AND s.started_at < {genai_2:DateTime64(6)} ),
+             top_groups AS
+          (SELECT s.custom_attrs_string[{genai_3:String}] AS env
+           FROM filtered_spans s
+           GROUP BY env
+           ORDER BY count() DESC
+           LIMIT {genai_9:UInt64}),
+             aggregated_data AS
+          (SELECT bucket,
+                  env,
+                  avgOrNull(if(v_score, m_score, NULL)) AS avg_score,
+                  countIf(v_score) AS count_score
+           FROM
+             (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_7:String}) AS bucket,
+                     s.custom_attrs_string[{genai_3:String}] AS env,
+                     toFloat64(s.custom_attrs_float[{genai_4:String}]) AS m_score,
+                     toUInt8(mapContains(s.custom_attrs_float, {genai_4:String})) AS v_score
+              FROM filtered_spans s)
+           GROUP BY bucket,
+                    env)
+        SELECT all_buckets.bucket AS timestamp,
+               top_groups.env AS env,
+               aggregated_data.avg_score AS avg_score,
+               COALESCE(aggregated_data.count_score, 0) AS count_score
+        FROM all_buckets
+        CROSS JOIN top_groups
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        AND top_groups.env = aggregated_data.env
+        ORDER BY timestamp, env
+    """
+    expected_params = {
+        "genai_0": "p1",
+        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_3": "env",
+        "genai_4": "score",
+        "genai_5": 1767225600.0,
+        "genai_6": 1767312000.0,
+        "genai_7": "UTC",
+        "genai_8": 3600,
+        "genai_9": 50,
+    }
+    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
     assert result.columns == ["timestamp", "env", "avg_score", "count_score"]
+
+
+def test_time_stats_apply_group_filters() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        metrics=[
+            AgentSpanStatsMetricSpec(
+                alias="conversations",
+                value_type="string",
+                value=AgentSpanValueRef(source="field", key="conversation_id"),
+                aggregations=["count_distinct"],
+            )
+        ],
+        group_filters=[
+            AgentSpanGroupFilter(
+                measure=AgentSpanMeasureSpec(
+                    alias="total_tokens",
+                    aggregation="sum",
+                    value=AgentSpanValueRef(source="derived", key="total_tokens"),
+                    value_type="number",
+                ),
+                min=10,
+                max=100,
+            )
+        ],
+    )
+
+    result = build_agent_span_stats_query(req, pb)
+
+    expected_sql = """
+        WITH all_buckets AS
+          (SELECT toStartOfInterval(toDateTime({genai_3:Float64}, {genai_5:String}), INTERVAL 3600 SECOND, {genai_5:String}) + toIntervalSecond(number * {genai_6:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_4:Float64}, {genai_5:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_3:Float64}, {genai_5:String}), INTERVAL 3600 SECOND, {genai_5:String}))) / {genai_6:Float64})))
+           WHERE bucket < toDateTime({genai_4:Float64}, {genai_5:String}) ),
+             filtered_spans AS
+          (SELECT *
+           FROM spans s
+           PREWHERE {genai_0:String} = s.project_id
+             AND s.started_at >= {genai_1:DateTime64(6)}
+             AND s.started_at < {genai_2:DateTime64(6)} ),
+             qualified_groups_0 AS
+          (SELECT s.conversation_id AS conversation_id
+           FROM filtered_spans s
+           GROUP BY conversation_id
+           HAVING sumOrNull(if((1), toFloat64(s.input_tokens + s.output_tokens + s.reasoning_tokens), NULL)) >= {genai_7:Float64}
+           AND sumOrNull(if((1), toFloat64(s.input_tokens + s.output_tokens + s.reasoning_tokens), NULL)) <= {genai_8:Float64}),
+             filtered_metric_spans AS
+          (SELECT s.*
+           FROM filtered_spans s
+           INNER JOIN qualified_groups_0 q ON s.conversation_id = q.conversation_id),
+             aggregated_data AS
+          (SELECT bucket,
+                  uniqExactIf(m_conversations, v_conversations) AS count_distinct_conversations
+           FROM
+             (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_5:String}) AS bucket,
+                     s.conversation_id AS m_conversations,
+                     toUInt8(1) AS v_conversations
+              FROM filtered_metric_spans s)
+           GROUP BY bucket)
+        SELECT all_buckets.bucket AS timestamp,
+               COALESCE(aggregated_data.count_distinct_conversations, 0) AS count_distinct_conversations
+        FROM all_buckets
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        ORDER BY timestamp
+    """
+    expected_params = {
+        "genai_0": "p1",
+        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_3": 1767225600.0,
+        "genai_4": 1767312000.0,
+        "genai_5": "UTC",
+        "genai_6": 3600,
+        "genai_7": 10.0,
+        "genai_8": 100.0,
+    }
+    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
 
 
 def test_group_by_caps_output_rows() -> None:
@@ -403,7 +767,7 @@ def test_metric_validation_rejects_invalid_type_aggregation() -> None:
         AgentSpanStatsMetricSpec(
             alias="agent",
             value_type="string",
-            field=AgentSpanStatsFieldRef(source="field", key="agent.name"),
+            value=AgentSpanValueRef(source="field", key="agent.name"),
             aggregations=["sum"],
         )
 
@@ -415,7 +779,7 @@ def test_request_validation_rejects_duplicate_aliases() -> None:
                 AgentSpanStatsMetricSpec(
                     alias="tokens",
                     value_type="number",
-                    field=AgentSpanStatsFieldRef(
+                    value=AgentSpanValueRef(
                         source="field",
                         key="usage.input_tokens",
                     ),
@@ -424,13 +788,37 @@ def test_request_validation_rejects_duplicate_aliases() -> None:
                 AgentSpanStatsMetricSpec(
                     alias="tokens",
                     value_type="number",
-                    field=AgentSpanStatsFieldRef(
+                    value=AgentSpanValueRef(
                         source="field",
                         key="usage.output_tokens",
                     ),
                     aggregations=["sum"],
                 ),
             ]
+        )
+
+
+def test_numeric_bucket_validation_rejects_non_numeric_derived_field() -> None:
+    with pytest.raises(ValidationError):
+        AgentSpanStatsNumericBucketSpec(
+            type="number",
+            value=AgentSpanValueRef(source="derived", key="is_error"),
+        )
+
+
+def test_request_validation_rejects_numeric_bucket_group_by() -> None:
+    with pytest.raises(ValidationError):
+        _req(
+            bucket_by=AgentSpanStatsNumericBucketSpec(
+                type="number",
+                value=AgentSpanValueRef(source="derived", key="duration_ms"),
+            ),
+            group_by=[
+                AgentGroupByRef(
+                    source="field",
+                    key="agent.name",
+                )
+            ],
         )
 
 
