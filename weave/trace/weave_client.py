@@ -803,7 +803,11 @@ class WeaveClient:
 
         # First create an AttributesDict with the client's default attributes, then update with
         # per-call attributes. Per-call attributes take precedence over the client defaults.
-        attributes_dict = AttributesDict(**zip_dicts(self.attributes, attributes))
+        # Redact sensitive keys uniformly across both layers — `weave.attributes(...)` values
+        # would otherwise be redacted (via dictify in op.py) while `weave.init(attributes=...)`
+        # values flowed through unredacted.
+        merged_attributes = redact_sensitive_keys(zip_dicts(self.attributes, attributes))
+        attributes_dict = AttributesDict(**merged_attributes)
 
         if should_capture_client_info():
             attributes_dict._set_weave_item("client_version", version.VERSION)

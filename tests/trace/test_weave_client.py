@@ -2212,6 +2212,56 @@ def test_client_attributes_with_call_attributes(client_creator):
         assert call.attributes["env"] == "override"
 
 
+def test_attributes_redaction_is_consistent_across_init_and_context(client_creator):
+    """`weave.init(attributes=...)` and `weave.attributes(...)` must treat
+    redact-listed keys (e.g. `api_key`) the same way.
+
+    Both paths converge in `create_call`, which runs `redact_sensitive_keys`
+    on the merged dict so values for keys in the redact set are replaced
+    with `'REDACTED'` regardless of entry point.
+    """
+
+    @weave.op
+    def init_op(a: int) -> int:
+        return a
+
+    @weave.op
+    def ctx_op(a: int) -> int:
+        return a
+
+    with client_creator(attributes={"api_key": "via-init"}) as client:
+        init_op(1)
+        with weave.attributes({"api_key": "via-context"}):
+            ctx_op(1)
+
+        init_call = next(iter(init_op.calls()))
+        ctx_call = next(iter(ctx_op.calls()))
+
+    assert init_call.attributes["api_key"] == "REDACTED"
+    assert ctx_call.attributes["api_key"] == "REDACTED"
+
+
+def test_nested_weave_attributes_deep_merges_nested_dicts(client_creator):
+    """Nested `weave.attributes()` blocks must deep-merge so an outer
+    block's nested subkeys survive when an inner block shares the same
+    top-level key. Both layers use `zip_dicts`, matching the merge depth
+    between client defaults and per-call attrs in `create_call`.
+    """
+
+    @weave.op
+    def my_op(a: int) -> int:
+        return a
+
+    with client_creator() as client:
+        with weave.attributes({"meta": {"outer": "kept"}}):
+            with weave.attributes({"meta": {"inner": "added"}}):
+                my_op(1)
+
+        call = next(iter(my_op.calls()))
+
+    assert call.attributes["meta"] == {"outer": "kept", "inner": "added"}
+
+
 def test_flush_progress_bar(client):
     client.set_autoflush(False)
 

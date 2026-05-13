@@ -31,6 +31,7 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 from weave.trace_server_bindings.link_asset_to_registry import LinkAssetToRegistryRes
 from weave.type_wrappers.Content.content import Content
+from weave.utils.dict_utils import zip_dicts
 
 logger = logging.getLogger(__name__)
 
@@ -467,8 +468,10 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
         print(my_function.call("World"))
     ```
     """
-    cur_attributes = {**call_context.call_attributes.get()}
-    cur_attributes.update(attributes)
+    # Deep-merge so nested blocks compose (e.g. outer `{"meta": {"a": 1}}` and
+    # inner `{"meta": {"b": 2}}` produce `{"meta": {"a": 1, "b": 2}}`), matching
+    # how client-level defaults merge with per-call attrs inside `create_call`.
+    cur_attributes = zip_dicts(call_context.call_attributes.get(), attributes)
 
     token = call_context.call_attributes.set(cur_attributes)
     try:
