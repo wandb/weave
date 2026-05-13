@@ -51,7 +51,7 @@ def test_img(request) -> Image.Image:
         img.close()
 
 
-def test_image_publish(client: WeaveClient, test_img: Image.Image) -> None:
+def test_image_publish(weave_active: WeaveClient, test_img: Image.Image) -> None:
     weave.publish(test_img)
 
     ref = get_ref(test_img)
@@ -194,7 +194,7 @@ def make_random_image(image_size: tuple[int, int] = (64, 64)):
 
 
 @pytest.fixture
-def dataset_ref(client):
+def dataset_ref(weave_active):
     # This fixture represents a saved dataset containing images
     n_rows = 5
     rows = [{"img": make_random_image()} for _ in range(n_rows)]
@@ -205,7 +205,7 @@ def dataset_ref(client):
 
 
 @pytest.mark.asyncio
-async def test_images_in_dataset_for_evaluation(client, dataset_ref):
+async def test_images_in_dataset_for_evaluation(weave_active, dataset_ref):
     dataset = dataset_ref.get()
     evaluation = weave.Evaluation(dataset=dataset)
 
@@ -245,7 +245,7 @@ async def test_many_images_will_consistently_log():
     assert "Task failed" not in res.stderr
 
 
-def test_images_in_load_of_dataset(client):
+def test_images_in_load_of_dataset(weave_active):
     n_rows = 5
     rows = [{"img": make_random_image()} for _ in range(n_rows)]
     dataset = weave.Dataset(rows=rows)
@@ -261,7 +261,7 @@ def test_images_in_load_of_dataset(client):
             gotten_row["img"].close()
 
 
-def test_images_in_dataset_without_client(client):
+def test_images_in_dataset_without_client(weave_active):
     """Regression test for WB-21596: datasets with images should be iterable
     without an active global client (e.g. after ref.get() auto-init cleanup).
     """

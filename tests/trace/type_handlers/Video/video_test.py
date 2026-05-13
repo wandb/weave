@@ -52,7 +52,7 @@ def test_save_invalid_clip(tmp_path: Path, test_video: VideoClip, filename: str)
 
 
 def test_video_with_no_ext_converted(
-    client: WeaveClient, tmp_path: Path, test_video: VideoClip
+    weave_active: WeaveClient, tmp_path: Path, test_video: VideoClip
 ):
     video_path = str(tmp_path / "test.mp4")
     # Save an mp4 video
@@ -95,7 +95,7 @@ def test_weave_op_video(tmp_path: Path, test_video: VideoClip):
     assert os.path.getsize(result) > 0
 
 
-def test_video_publish(client: WeaveClient, test_video: VideoClip) -> None:
+def test_video_publish(weave_active: WeaveClient, test_video: VideoClip) -> None:
     ref = weave.publish(test_video)
     assert ref is not None
 
@@ -194,7 +194,7 @@ def video_as_input_and_output_part(in_video: VideoClip) -> dict:
     return {"out_video": in_video}
 
 
-def test_video_as_call_io(client: WeaveClient, test_video: VideoClip) -> None:
+def test_video_as_call_io(weave_active: WeaveClient, test_video: VideoClip) -> None:
     non_published_video = video_as_solo_output(publish_first=False, video=test_video)
     video_dict = video_as_input_and_output_part(non_published_video)
 
@@ -326,7 +326,7 @@ def make_random_video(video_size: tuple[int, int] = (64, 64), duration: float = 
 
 
 @pytest.fixture
-def dataset_ref(client):
+def dataset_ref(weave_active):
     # This fixture represents a saved dataset containing videos
     n_rows = 3
     rows = weave.Table([{"video": make_random_video()} for _ in range(n_rows)])
@@ -337,7 +337,7 @@ def dataset_ref(client):
 
 
 @pytest.mark.asyncio
-async def test_videos_in_dataset_for_evaluation(client, dataset_ref):
+async def test_videos_in_dataset_for_evaluation(weave_active, dataset_ref):
     dataset = dataset_ref.get()
     evaluation = weave.Evaluation(dataset=dataset)
 
@@ -359,7 +359,7 @@ async def test_videos_in_dataset_for_evaluation(client, dataset_ref):
             row["video"].close()
 
 
-def test_videos_in_load_of_dataset(client):
+def test_videos_in_load_of_dataset(weave_active):
     n_rows = 3
     # Create smaller duration videos to avoid encoding issues
     videos = [make_random_video(duration=0.1) for _ in range(n_rows)]
@@ -418,7 +418,7 @@ def test_video_format_from_filename():
     reason="moviepy library uses /dev/null on Windows which doesn't exist",
 )
 def test_multiple_video_formats(
-    client: WeaveClient, tmp_path: Path, test_video: VideoClip
+    weave_active: WeaveClient, tmp_path: Path, test_video: VideoClip
 ):
     """Test that we can publish videos of different formats in the same session."""
     sample_mp4_path = str(tmp_path / "test.mp4")

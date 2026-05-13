@@ -75,7 +75,7 @@ def test_disabled_env(client):
     )
 
 
-def test_publish_when_disabled(client, monkeypatch):
+def test_publish_when_disabled(weave_active, monkeypatch):
     """Test that weave.publish() returns a dummy ref when WEAVE_DISABLED=true."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
@@ -91,7 +91,7 @@ def test_publish_when_disabled(client, monkeypatch):
     assert ref.digest == "DISABLED"
 
 
-def test_publish_when_disabled_uses_obj_name(client, monkeypatch):
+def test_publish_when_disabled_uses_obj_name(weave_active, monkeypatch):
     """Test that publish uses object's name attribute when no explicit name given."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
@@ -108,7 +108,7 @@ def test_publish_when_disabled_uses_obj_name(client, monkeypatch):
     assert ref.name == "my_obj"
 
 
-def test_publish_when_disabled_uses_class_name(client, monkeypatch):
+def test_publish_when_disabled_uses_class_name(weave_active, monkeypatch):
     """Test that publish uses class name when object has no name attribute."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
@@ -125,7 +125,7 @@ def test_publish_when_disabled_uses_class_name(client, monkeypatch):
     assert ref.name == "MyClass"
 
 
-def test_publish_when_disabled_ignores_tags_aliases(client, monkeypatch):
+def test_publish_when_disabled_ignores_tags_aliases(weave_active, monkeypatch):
     """Tags and aliases should be silently ignored when weave is disabled."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
@@ -177,7 +177,7 @@ def test_print_call_link_env(client):
     del os.environ["WEAVE_PRINT_CALL_LINK"]
 
 
-def test_should_capture_code_setting(client):
+def test_should_capture_code_setting(weave_active):
     replace_settings(UserSettings(capture_code=False))
 
     @weave.op
@@ -203,7 +203,7 @@ def test_should_capture_code_setting(client):
     assert "Code-capture was disabled" not in code3
 
 
-def test_should_capture_code_env(client):
+def test_should_capture_code_env(weave_active):
     os.environ["WEAVE_CAPTURE_CODE"] = "false"
 
     @weave.op

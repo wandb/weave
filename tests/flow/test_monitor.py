@@ -37,7 +37,7 @@ def test_out_of_range_sampling_rate():
         )
 
 
-def test_publish(client: weave_client.WeaveClient):
+def test_publish(weave_active: weave_client.WeaveClient):
     monitor = Monitor(
         name="test_monitor",
         sampling_rate=0.5,
@@ -72,7 +72,7 @@ def test_publish(client: weave_client.WeaveClient):
     )
 
 
-def test_activate(client: weave_client.WeaveClient):
+def test_activate(weave_active: weave_client.WeaveClient):
     monitor = Monitor(
         name="test_monitor",
         sampling_rate=0.5,

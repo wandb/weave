@@ -214,7 +214,7 @@ async def test_async_scorer_obj(client: WeaveClient):
 
 
 @pytest.mark.asyncio
-async def test_scorer_with_weave_scorer_result_output(client: WeaveClient):
+async def test_scorer_with_weave_scorer_result_output(weave_active: WeaveClient):
     @weave.op
     def predict(x):
         return x + 1

@@ -11,7 +11,7 @@ import weave
 from tests.trace.test_utils import FailingSaveType
 
 
-def test_op_output_with_failing_serializer_does_not_raise(client, failing_serializer):
+def test_op_output_with_failing_serializer_does_not_raise(weave_active, failing_serializer):
     """Requirement: Op functions must return their values even when serialization fails
     Interface: @weave.op decorated function returning an object with failing type handler
     Given: An @weave.op function returns an object whose type handler save raises an exception
@@ -31,7 +31,7 @@ def test_op_output_with_failing_serializer_does_not_raise(client, failing_serial
     assert result.value == "hello"
 
 
-def test_op_input_with_failing_serializer_does_not_raise(client, failing_serializer):
+def test_op_input_with_failing_serializer_does_not_raise(weave_active, failing_serializer):
     """Requirement: Op functions must execute normally even when input serialization fails
     Interface: @weave.op decorated function accepting an object with failing type handler
     Given: An @weave.op function accepts an object whose type handler save raises an exception

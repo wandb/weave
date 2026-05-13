@@ -44,7 +44,7 @@ def test_deepcopy_weavelist(client):
     assert id(res) != id(lst)
 
 
-def test_deepcopy_weavelist_e2e(client):
+def test_deepcopy_weavelist_e2e(weave_active):
     lst = [1, 2, 3]
     ref = weave.publish(lst)
     lst2 = ref.get()
@@ -60,7 +60,7 @@ def test_deepcopy_weavedict(client):
     assert id(res) != id(d)
 
 
-def test_deepcopy_weavedict_e2e(client):
+def test_deepcopy_weavedict_e2e(weave_active):
     d = {"a": 1, "b": 2}
     ref = weave.publish(d)
     d2 = ref.get()
@@ -83,7 +83,7 @@ def test_deepcopy_weaveobject(client, example_class):
     assert id(res) != id(o)
 
 
-def test_deepcopy_weaveobject_e2e(client, example_class):
+def test_deepcopy_weaveobject_e2e(weave_active, example_class):
     cls, expected_record = example_class
 
     o = cls()
@@ -110,7 +110,7 @@ def test_deepcopy_boxed(boxed_val):
     assert id(res) != id(boxed_val)
 
 
-def test_deepcopy_boxed_model_e2e(client):
+def test_deepcopy_boxed_model_e2e(weave_active):
     class Model(weave.Model):
         system_prompt: str = "You are a helpful assistant."  # this will get boxed
 

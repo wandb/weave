@@ -369,7 +369,7 @@ class TestWeaveContent:
         content2 = Content.from_bytes(file_bytes, extension="txt", encoding="latin-1")
         assert content2.encoding == "latin-1"
 
-    def test_content_save_and_retrieve(self, image_file, client: WeaveClient):
+    def test_content_save_and_retrieve(self, image_file, weave_active: WeaveClient):
         """Test publishing and retrieving Content objects."""
         content = Content.from_path(image_file)
 
@@ -386,7 +386,7 @@ class TestWeaveContent:
         assert retrieved.size == content.size
 
     def test_content_in_dataset(
-        self, image_file, audio_file, video_file, pdf_file, client: WeaveClient
+        self, image_file, audio_file, video_file, pdf_file, weave_active: WeaveClient
     ):
         """Test Content objects as dataset values."""
         rows = []
@@ -419,7 +419,7 @@ class TestWeaveContent:
             original_data = original_files[row["name"]]
             assert row["content"].data == original_data
 
-    def test_content_postprocessing(self, client: WeaveClient):
+    def test_content_postprocessing(self, weave_active: WeaveClient):
         """Test that Content postprocessing works correctly in ops."""
 
         @weave.op
