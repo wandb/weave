@@ -103,6 +103,19 @@ def filter_body(r: Any) -> Any:
     return r
 
 
+def should_use_accumulator(inputs: dict) -> bool:
+    """Return True when ``inputs`` requests streaming via a truthy ``"stream"`` key.
+
+    This is the canonical predicate for the ``should_accumulate`` argument of
+    :func:`weave.trace.op._add_accumulator` across LLM-provider integrations
+    whose streaming behavior is controlled by an input flag (anthropic, groq,
+    litellm, langchain_nvidia_ai_endpoints). Provider-specific variants
+    (e.g., openai's Stainless raw-response guard) live in the provider
+    module rather than here.
+    """
+    return isinstance(inputs, dict) and bool(inputs.get("stream"))
+
+
 def _make_string_of_length(n: int) -> str:
     return "a" * n
 

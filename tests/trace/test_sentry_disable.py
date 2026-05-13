@@ -5,7 +5,7 @@ The wandb SDK's own Sentry wrapper (`wandb/analytics/sentry.py`) reads
 disable outbound error reporting. The Weave SDK's parallel wrapper must
 behave the same way so that a single env var disables both.
 
-Truthy / falsy semantics match the canonical `_str2bool_truthy` helper in
+Truthy / falsy semantics match the canonical `_parse_bool` helper in
 `weave/trace/settings.py` (i.e. only `yes`, `true`, `1`, `on` keep reporting
 enabled; everything else, including unrecognized values, disables it).
 """
