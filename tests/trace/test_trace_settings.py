@@ -15,7 +15,11 @@ from tests.trace.util import (
 )
 from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
 from weave.trace.display.term import configure_logger
-from weave.trace.settings import UserSettings, parse_and_apply_settings
+from weave.trace.settings import (
+    UserSettings,
+    parse_and_apply_settings,
+    should_log_to_otel_endpoint,
+)
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
 
@@ -209,6 +213,20 @@ def test_should_capture_code_env(client):
     test_func3 = ref2.get()
     code3 = test_func3.get_captured_code()
     assert "Code-capture was disabled" not in code3
+
+
+def test_log_to_otel_endpoint_setting(monkeypatch):
+    parse_and_apply_settings(UserSettings(log_to_otel_endpoint=False))
+    assert should_log_to_otel_endpoint() is False
+
+    parse_and_apply_settings(UserSettings(log_to_otel_endpoint=True))
+    assert should_log_to_otel_endpoint() is True
+
+    monkeypatch.setenv("WEAVE_LOG_TO_OTEL_ENDPOINT", "false")
+    assert should_log_to_otel_endpoint() is False
+
+    monkeypatch.setenv("WEAVE_LOG_TO_OTEL_ENDPOINT", "true")
+    assert should_log_to_otel_endpoint() is True
 
 
 def slow_operation():
