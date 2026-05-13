@@ -30,8 +30,17 @@ DATA_URI_PATTERN = re.compile(r"^data:([^;]+);base64,([A-Za-z0-9+/=]+)$", re.IGN
 # Pattern to match standalone base64 strings
 BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 
-# Minimum size to create a file (to avoid making more data than what the original is)
-AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
+# Minimum string length we'll consider for auto-conversion to a Content object.
+#
+# Lifted from 1 KiB to 8 KiB: under the old threshold every long LLM output,
+# serialized tool-call argument, and large system prompt in the 1-8 KiB range
+# was put through ``is_data_uri`` + ``is_base64`` + (occasionally)
+# ``Content.from_base64`` even though those strings are essentially never
+# real binary payloads. Genuine multimodal blobs (PNG/JPEG/WebP/audio) start
+# comfortably above 8 KiB once base64-encoded; small icons that happen to
+# fall below 8 KiB now stay inline in ClickHouse, which is the pre-feature
+# behaviour and is handled correctly by the existing storage path.
+AUTO_CONVERSION_MIN_SIZE = 8192  # 8 KiB
 
 
 def is_base64(value: str) -> bool:
@@ -123,15 +132,34 @@ def replace_base64_with_content_objects(
         Tuple of (processed_value, list_of_created_refs)
     """
 
+    def _visit_children(items: Any, original: Any, cls: type) -> Any:
+        # Walk one level of a collection's children. We allocate a shallow
+        # copy of ``original`` (via ``cls(original)``) only on the first
+        # child whose subtree returned a new identity, and write subsequent
+        # replacements through that copy. When no child changes, the copy
+        # is never built and we return ``original`` itself — so any clean
+        # no-binary subtree round-trips by identity, not by value.
+        copy = None
+        for k, v in items:
+            new_v = _visit(v)
+            if new_v is not v:
+                if copy is None:
+                    copy = cls(original)
+                copy[k] = new_v
+        return original if copy is None else copy
+
     def _visit(val: Any) -> Any:
+        # Trace payloads are dominated by deeply-nested chat histories with
+        # zero binary content, so the previous "always allocate a fresh
+        # dict/list at every level" path was doing a full structural copy
+        # of every request for no reason. The shared ``_visit_children``
+        # helper keeps the identity-preserving recipe in one place for
+        # both collection shapes.
         if isinstance(val, dict):
-            result = {}
-            for k, v in val.items():
-                result[k] = _visit(v)
-            return result
-        elif isinstance(val, list):
-            return [_visit(v) for v in val]
-        elif isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
+            return _visit_children(val.items(), val, dict)
+        if isinstance(val, list):
+            return _visit_children(enumerate(val), val, list)
+        if isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
             # Check for data URI pattern first
             if is_data_uri(val):
                 try:

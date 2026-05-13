@@ -3,12 +3,27 @@ import datetime
 import json
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator
+from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 
 CallStatus = Literal["running", "completed", "failed"]
+
+FEEDBACK_QUERY_FIELDS = [
+    "id",
+    "feedback_type",
+    "weave_ref",
+    "payload",
+    "creator",
+    "created_at",
+    "wb_user_id",
+    "runnable_ref",
+    "call_ref",
+    "trigger_ref",
+    "annotation_ref",
+]
 
 
 def make_feedback_query_req(
@@ -34,22 +49,78 @@ def make_feedback_query_req(
     )
     feedback_query_req = tsi.FeedbackQueryReq(
         project_id=project_id,
-        fields=[
-            "id",
-            "feedback_type",
-            "weave_ref",
-            "payload",
-            "creator",
-            "created_at",
-            "wb_user_id",
-            "runnable_ref",
-            "call_ref",
-            "trigger_ref",
-            "annotation_ref",
-        ],
+        fields=FEEDBACK_QUERY_FIELDS,
         query=query,
     )
     return feedback_query_req
+
+
+@dataclass(frozen=True)
+class AgentFeedbackByTarget:
+    """Feedback rows grouped by agent target kind + raw identifier.
+
+    Keys are raw trace_id / conversation_id / span_id strings (not ref URIs)
+    so callers can look up by whatever identifier they already have from the
+    spans row.
+    """
+
+    by_trace_id: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    by_conversation_id: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    by_span_id: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+
+
+def make_agent_feedback_query_req(
+    project_id: str,
+    refs: list[str],
+) -> tsi.FeedbackQueryReq:
+    """Build a FeedbackQueryReq that returns feedback for any of `refs`.
+
+    The refs are unioned (OR'd) into a single `$in` over `weave_ref` so
+    the chat-view handler can fetch feedback for a turn plus all of its
+    steps (or a conversation plus all its turns) in one round-trip.
+    """
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$in": [
+                    {"$getField": "weave_ref"},
+                    [{"$literal": ref} for ref in refs],
+                ]
+            }
+        }
+    )
+    return tsi.FeedbackQueryReq(
+        project_id=project_id,
+        fields=FEEDBACK_QUERY_FIELDS,
+        query=query,
+    )
+
+
+def group_agent_feedback_by_target(
+    feedback: tsi.FeedbackQueryRes,
+) -> AgentFeedbackByTarget:
+    """Group feedback rows by agent target kind + raw identifier."""
+    by_trace_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    by_conversation_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    by_span_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
+    for raw in feedback.result:
+        # `FeedbackQueryRes.result` is intentionally `dict[str, Any]` because
+        # callers can request arbitrary fields; this helper always passes
+        # FEEDBACK_QUERY_FIELDS, so the rows match FeedbackDict shape.
+        ref = ri.parse_internal_uri(raw.get("weave_ref", ""))
+        if isinstance(ref, ri.InternalAgentTurnRef):
+            by_trace_id[ref.trace_id].append(raw)
+        elif isinstance(ref, ri.InternalAgentConversationRef):
+            by_conversation_id[ref.conversation_id].append(raw)
+        elif isinstance(ref, ri.InternalAgentSpanRef):
+            by_span_id[ref.span_id].append(raw)
+
+    return AgentFeedbackByTarget(
+        by_trace_id=by_trace_id,
+        by_conversation_id=by_conversation_id,
+        by_span_id=by_span_id,
+    )
 
 
 def hydrate_calls_with_feedback(

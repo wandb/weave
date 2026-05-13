@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import weave
+from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
@@ -90,11 +91,6 @@ def litellm_on_finish_post_processor(value: Any) -> Any:
         value_to_finish = value.model_dump()
 
     return value_to_finish
-
-
-# Unlike other integrations, streaming is based on input flag, not
-def should_use_accumulator(inputs: dict) -> bool:
-    return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
 def make_wrapper(settings: OpSettings) -> Callable:

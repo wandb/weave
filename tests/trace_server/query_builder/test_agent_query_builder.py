@@ -17,7 +17,10 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
+    AgentSpanGroupFilter,
+    AgentSpanMeasureSpec,
     AgentSpansQueryReq,
+    AgentSpanValueRef,
     AgentsQueryFilters,
     AgentsQueryReq,
     AgentVersionsQueryReq,
@@ -109,7 +112,7 @@ class TestMakeSpansCountQuery:
             WHERE s.project_id = {genai_0:String}
               AND s.started_at >= {genai_1:DateTime64(6)}
               AND s.started_at < {genai_2:DateTime64(6)}
-              AND ((s.agent_name = {genai_3:String}) AND (s.custom_attrs_string[{genai_4:String}] = {genai_5:String}))
+            AND ((s.agent_name = {genai_3:String}) AND (s.custom_attrs_string[{genai_4:String}] = {genai_5:String}))
         """
         expected_params = {
             "genai_0": "p1",
@@ -406,6 +409,187 @@ class TestMakeGroupedSpansListQuery:
         expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_group_by_with_dynamic_measures_filter_and_sort(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measures=[
+                    AgentSpanMeasureSpec(alias="spans", aggregation="count"),
+                    AgentSpanMeasureSpec(
+                        alias="tool_calls",
+                        aggregation="count",
+                        filter=Query.model_validate(
+                            {
+                                "$expr": {
+                                    "$eq": [
+                                        {"$getField": "operation_name"},
+                                        {"$literal": "execute_tool"},
+                                    ]
+                                }
+                            }
+                        ),
+                    ),
+                    AgentSpanMeasureSpec(
+                        alias="avg_score",
+                        aggregation="avg",
+                        value=AgentSpanValueRef(
+                            source="custom_attrs_float",
+                            key="score",
+                        ),
+                        value_type="number",
+                    ),
+                ],
+                group_filters=[
+                    AgentSpanGroupFilter(
+                        measure=AgentSpanMeasureSpec(
+                            alias="avg_score",
+                            aggregation="avg",
+                            value=AgentSpanValueRef(
+                                source="custom_attrs_float",
+                                key="score",
+                            ),
+                            value_type="number",
+                        ),
+                        min=0.5,
+                    )
+                ],
+                sort_by=[AgentSortBy(field="avg_score", direction="desc")],
+            ),
+        )
+
+        expected = """
+            SELECT s.conversation_id AS conversation_id,
+                   count() AS spans,
+                   countIf(((s.operation_name = {genai_3:String}))) AS tool_calls,
+                   avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS avg_score
+            FROM spans s
+            WHERE s.project_id = {genai_0:String}
+            GROUP BY conversation_id
+            HAVING avgOrNull(if((mapContains(s.custom_attrs_float, {genai_5:String})), toFloat64(s.custom_attrs_float[{genai_5:String}]), NULL)) >= {genai_6:Float64}
+            ORDER BY avg_score desc
+            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "execute_tool",
+            "genai_4": "score",
+            "genai_5": "score",
+            "genai_6": 0.5,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_dynamic_measure_rejects_invalid_resolved_aggregation(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(ValueError, match="not valid for value_type 'string'"):
+            make_spans_list_query(
+                pb,
+                AgentSpansQueryReq(
+                    project_id="p1",
+                    group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                    measures=[
+                        AgentSpanMeasureSpec(
+                            alias="bad_sum",
+                            aggregation="sum",
+                            value=AgentSpanValueRef(
+                                source="custom_attrs_string",
+                                key="score",
+                            ),
+                        )
+                    ],
+                ),
+            )
+
+    def test_dynamic_measure_infers_boolean_count_true(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measures=[
+                    AgentSpanMeasureSpec(
+                        alias="flagged_count",
+                        aggregation="count_true",
+                        value=AgentSpanValueRef(
+                            source="custom_attrs_bool",
+                            key="flagged",
+                        ),
+                    )
+                ],
+            ),
+        )
+
+        expected = """
+            SELECT s.conversation_id AS conversation_id,
+                   countIf((mapContains(s.custom_attrs_bool, {genai_3:String})) AND s.custom_attrs_bool[{genai_3:String}] = 1) AS flagged_count
+            FROM spans s
+            WHERE s.project_id = {genai_0:String}
+            GROUP BY conversation_id
+            ORDER BY flagged_count DESC
+            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "flagged",
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_group_filter_rejects_mismatched_datetime_bound(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(
+            ValueError,
+            match="datetime group filter bounds require a datetime measure",
+        ):
+            make_spans_list_query(
+                pb,
+                AgentSpansQueryReq(
+                    project_id="p1",
+                    group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                    measures=[AgentSpanMeasureSpec(alias="spans", aggregation="count")],
+                    group_filters=[
+                        AgentSpanGroupFilter(
+                            measure=AgentSpanMeasureSpec(
+                                alias="spans",
+                                aggregation="count",
+                            ),
+                            min=datetime.datetime(2026, 1, 1),
+                        )
+                    ],
+                ),
+            )
+
+    def test_group_filter_rejects_mismatched_group_by(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(
+            ValueError,
+            match="spans list group_filters must use the same group_by",
+        ):
+            make_spans_list_query(
+                pb,
+                AgentSpansQueryReq(
+                    project_id="p1",
+                    group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                    measures=[AgentSpanMeasureSpec(alias="spans", aggregation="count")],
+                    group_filters=[
+                        AgentSpanGroupFilter(
+                            group_by=[AgentGroupByRef(source="column", key="trace_id")],
+                            measure=AgentSpanMeasureSpec(
+                                alias="spans",
+                                aggregation="count",
+                            ),
+                            min=1,
+                        )
+                    ],
+                ),
+            )
+
 
 # ============================================================================
 # resolve_group_by validation
@@ -485,7 +669,7 @@ class TestMakeTraceDetailSpansQuery:
         expected = f"""
             SELECT {CHAT_VIEW_COLS} FROM spans s
             WHERE s.project_id = {{genai_0:String}}
-              AND s.trace_id = {{genai_1:String}}
+            AND s.trace_id = {{genai_1:String}}
             ORDER BY s.started_at ASC
         """
         assert_sql(
@@ -560,7 +744,7 @@ class TestMakeAgentsQueries:
                    max(last_seen) AS last_seen
             FROM agents
             WHERE project_id = {genai_0:String}
-              AND agent_name = {genai_1:String}
+            AND agent_name = {genai_1:String}
             GROUP BY agent_name
             ORDER BY last_seen DESC, agent_name
             LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
@@ -590,7 +774,7 @@ class TestMakeAgentVersionsQueries:
             SELECT count() FROM (
                 SELECT agent_version FROM agent_versions
                 WHERE project_id = {genai_0:String}
-                  AND agent_name = {genai_1:String}
+                AND agent_name = {genai_1:String}
                 GROUP BY agent_version
             )
         """
@@ -619,7 +803,7 @@ class TestMakeAgentVersionsQueries:
                    max(last_seen) AS last_seen
             FROM agent_versions
             WHERE project_id = {genai_0:String}
-              AND agent_name = {genai_1:String}
+            AND agent_name = {genai_1:String}
             GROUP BY agent_version
             ORDER BY last_seen DESC
             LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
@@ -652,7 +836,7 @@ class TestMakeMessageSearchQuery:
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
             WHERE project_id = {genai_0:String}
-              AND content LIKE {genai_1:String}
+            AND content LIKE {genai_1:String}
             ORDER BY started_at DESC
             LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
         """
@@ -684,7 +868,7 @@ class TestMakeMessageSearchQuery:
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
             WHERE project_id = {genai_0:String}
-              AND content LIKE {genai_1:String}
+            AND content LIKE {genai_1:String}
               AND role IN {genai_2:Array(String)}
               AND agent_name = {genai_3:String}
               AND conversation_id = {genai_4:String}
@@ -716,7 +900,7 @@ class TestMakeMessageSearchQuery:
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
             WHERE project_id = {genai_0:String}
-              AND content LIKE {genai_1:String}
+            AND content LIKE {genai_1:String}
               AND role IN {genai_2:Array(String)}
             ORDER BY started_at DESC
             LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
@@ -771,7 +955,7 @@ class TestMakeConversationChatSpansQuery:
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
                 WHERE project_id = {{genai_0:String}}
-                  AND conversation_id = {{genai_1:String}}
+                AND conversation_id = {{genai_1:String}}
                 GROUP BY trace_id
                 ORDER BY turn_started_at DESC, trace_id DESC
                 LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
@@ -795,13 +979,27 @@ class TestMakeConversationChatSpansQuery:
             ),
         )
 
-        assert "LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}" in query
-        assert pb.get_params() == {
-            "genai_0": "p1",
-            "genai_1": "c1",
-            "genai_2": 10,
-            "genai_3": 20,
-        }
+        expected = f"""
+            SELECT {", ".join(f"s.{c} AS {c}" for c in CHAT_VIEW_COLS.split(", "))}
+            FROM spans s
+            INNER JOIN (
+                SELECT trace_id, min(started_at) AS turn_started_at
+                FROM spans
+                WHERE project_id = {{genai_0:String}}
+                AND conversation_id = {{genai_1:String}}
+                GROUP BY trace_id
+                ORDER BY turn_started_at DESC, trace_id DESC
+                LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+            ) t ON s.trace_id = t.trace_id
+            WHERE s.project_id = {{genai_0:String}}
+            ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
+        """
+        assert_sql(
+            expected,
+            {"genai_0": "p1", "genai_1": "c1", "genai_2": 10, "genai_3": 20},
+            query,
+            pb.get_params(),
+        )
 
     def test_limit_rejected_above_max_turns(self) -> None:
         with pytest.raises(ValidationError):
@@ -825,7 +1023,7 @@ class TestMakeConversationChatTurnsCountQuery:
                 SELECT trace_id
                 FROM spans s
                 WHERE s.project_id = {genai_0:String}
-                  AND s.conversation_id = {genai_1:String}
+                AND s.conversation_id = {genai_1:String}
                 GROUP BY trace_id
             )
         """

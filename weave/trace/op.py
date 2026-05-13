@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import atexit
 import inspect
 import logging
 import random
@@ -36,6 +35,11 @@ from typing import (
 from typing_extensions import ParamSpec, Self, TypeIs, Unpack
 
 from weave.trace import box, settings
+from weave.trace.annotation_parser import (
+    ContentAnnotation,
+    parse_content_annotation,
+    parse_from_signature,
+)
 from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import (
     call_attributes,
@@ -81,6 +85,12 @@ CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
 ON_OUTPUT_MSG = "Error capturing call output:\n{}"
 UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log your traces to a project.\n"
+
+# Sentinel for the annotation cache. Decoration writes this when signature
+# introspection or annotation parsing raised, signaling that the runtime
+# handler should retry the parse on the live `sig` instead of treating
+# `None` as "no annotation."
+PARSE_DEFERRED: Any = object()
 
 
 class DisplayNameFuncError(ValueError): ...
@@ -276,18 +286,13 @@ def _is_unbound_method(func: Callable) -> bool:
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
-    # Lazy load so Content modele isn't resolved until necessary
-    from weave.trace.annotation_parser import (
-        ContentAnnotation,
-        parse_content_annotation,
-        parse_from_signature,
-    )
+    # Avoid circular import: Content -> serialization.op_type -> op.
     from weave.type_wrappers import Content
 
     try:
         sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
-    except TypeError as e:
+    except (TypeError, ValueError) as e:
         raise OpCallError(f"Error calling {func.name}: {e}") from e
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
@@ -296,7 +301,9 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # If user defines postprocess_inputs manually, trust it instead of running this
     to_weave_inputs = {}
     if not func.postprocess_inputs:
-        parsed_annotations = parse_from_signature(sig)
+        parsed_annotations = func._weave_cached_parsed_input_annotations  # type: ignore[attr-defined]
+        if parsed_annotations is PARSE_DEFERRED:
+            parsed_annotations = parse_from_signature(sig)
         for param_name, value in inputs_with_defaults.items():
             # Check if we found an annotation which requires substitution
             parsed = parsed_annotations.get(param_name)
@@ -313,8 +320,14 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
     # Annotated return type flow
     # If user defines postprocess_output manually, trust it instead of running this
-    if not func.postprocess_output and sig.return_annotation:
-        parsed = parse_content_annotation(str(sig.return_annotation))
+    if not func.postprocess_output:
+        parsed = func._weave_cached_parsed_return_annotation  # type: ignore[attr-defined]
+        if parsed is PARSE_DEFERRED:
+            return_annotation = sig.return_annotation
+            if return_annotation is not inspect.Signature.empty and return_annotation:
+                parsed = parse_content_annotation(str(return_annotation))
+            else:
+                parsed = None
         if isinstance(parsed, ContentAnnotation):
             func.postprocess_output = lambda x: Content._from_guess(
                 x, mimetype=parsed.mimetype, extension=parsed.extension
@@ -1355,6 +1368,31 @@ def op(
             wrapper.kind = kind  # type: ignore
             wrapper.color = color  # type: ignore
 
+            # Set `__signature__` so future `inspect.signature(wrapper)` calls
+            # short-circuit to this object instead of re-walking `func`.
+            try:
+                cached_sig = inspect.signature(func)
+                wrapper_any = cast(Any, wrapper)
+                wrapper_any.__signature__ = cached_sig
+                wrapper_any._weave_cached_parsed_input_annotations = (
+                    parse_from_signature(cached_sig)
+                )
+
+                return_annotation = cached_sig.return_annotation
+                if (
+                    return_annotation is not inspect.Signature.empty
+                    and return_annotation
+                ):
+                    wrapper_any._weave_cached_parsed_return_annotation = (
+                        parse_content_annotation(str(return_annotation))
+                    )
+                else:
+                    wrapper_any._weave_cached_parsed_return_annotation = None
+            except (TypeError, ValueError):
+                wrapper_any = cast(Any, wrapper)
+                wrapper_any._weave_cached_parsed_input_annotations = PARSE_DEFERRED
+                wrapper_any._weave_cached_parsed_return_annotation = PARSE_DEFERRED
+
             return cast(Op[P, R], wrapper)
 
         # Create the wrapper
@@ -1451,6 +1489,18 @@ ON_AYIELD_MSG = (
 )
 
 
+def _call_on_close_for_wrapper_ref(wrapper_ref: weakref.ReferenceType) -> None:
+    """Process-exit finalizer callback for a weakly referenced wrapper.
+
+    weakref.finalize must not capture self or a bound method here; doing so
+    would keep the wrapper alive and reintroduce the leak. At normal GC time
+    wrapper_ref() may already be None, so __del__ remains the GC cleanup path.
+    """
+    wrapper = wrapper_ref()
+    if wrapper is not None:
+        wrapper._call_on_close_once()
+
+
 class _IteratorWrapper(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
     that this class will be helpful in other contexts and might be moved to a more general location in the future.
@@ -1468,40 +1518,57 @@ class _IteratorWrapper(Generic[V]):
         self._on_error = on_error
         self._on_close = on_close
         self._on_finished_called = False
+        # weakref.finalize handles process-exit cleanup for unfinished wrappers
+        # that are still reachable. It cannot close a wrapper that is already
+        # being garbage-collected because wrapper_ref() is None in that case;
+        # keep __del__ below for normal GC cleanup.
+        self._process_exit_finalizer = weakref.finalize(
+            self, _call_on_close_for_wrapper_ref, weakref.ref(self)
+        )
 
-        atexit.register(weakref.WeakMethod(self._call_on_close_once))
+    def _detach_process_exit_finalizer(self) -> None:
+        if self._process_exit_finalizer.alive:
+            self._process_exit_finalizer.detach()
 
     def _call_on_close_once(self) -> None:
-        if not self._on_finished_called:
-            try:
-                self._on_close()  # type: ignore
-            except Exception as e:
-                # Even if an exception occurs, we need to ensure we clean up the call context
-                current_call = call_context.get_current_call()
-                if current_call is not None:
-                    call_context.pop_call(current_call.id)
+        if self._on_finished_called:
+            self._detach_process_exit_finalizer()
+            return
 
-                if get_raise_on_captured_errors():
-                    raise
-                log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
-            finally:
-                self._on_finished_called = True
+        try:
+            self._on_close()
+        except Exception:
+            # Even if an exception occurs, we need to ensure we clean up the call context
+            current_call = call_context.get_current_call()
+            if current_call is not None:
+                call_context.pop_call(current_call.id)
+
+            if get_raise_on_captured_errors():
+                raise
+            log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
+        finally:
+            self._on_finished_called = True
+            self._detach_process_exit_finalizer()
 
     def _call_on_error_once(self, e: Exception) -> None:
-        if not self._on_finished_called:
-            try:
-                self._on_error(e)
-            except Exception:
-                # Even if an exception occurs, we need to ensure we clean up the call context
-                current_call = call_context.get_current_call()
-                if current_call is not None:
-                    call_context.pop_call(current_call.id)
+        if self._on_finished_called:
+            self._detach_process_exit_finalizer()
+            return
 
-                if get_raise_on_captured_errors():
-                    raise
-                log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
-            finally:
-                self._on_finished_called = True
+        try:
+            self._on_error(e)
+        except Exception:
+            # Even if an exception occurs, we need to ensure we clean up the call context
+            current_call = call_context.get_current_call()
+            if current_call is not None:
+                call_context.pop_call(current_call.id)
+
+            if get_raise_on_captured_errors():
+                raise
+            log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
+        finally:
+            self._on_finished_called = True
+            self._detach_process_exit_finalizer()
 
     def __iter__(self) -> _IteratorWrapper:
         return self
