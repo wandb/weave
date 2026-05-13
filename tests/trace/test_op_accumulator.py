@@ -15,8 +15,6 @@ from weave.trace.op import (
     _IteratorWrapper,
 )
 
-ITERATOR_WRAPPER_LEAK_REPRO_COUNT = 10
-
 
 def assert_no_current_call():
     assert call_context.get_current_call() is None
@@ -30,6 +28,7 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
     stream finished and the wrapper was garbage-collected, CPython's atexit
     callback registry kept growing linearly with stream count.
     """
+    iterator_wrapper_leak_repro_count = 10
     close_count = 0
 
     def on_close():
@@ -49,7 +48,7 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
     baseline_callback_count = atexit._ncallbacks()
     close_count = 0
 
-    for _ in range(ITERATOR_WRAPPER_LEAK_REPRO_COUNT):
+    for _ in range(iterator_wrapper_leak_repro_count):
         wrapper = _IteratorWrapper(
             iter([1]), lambda value: None, lambda error: None, on_close
         )
@@ -58,7 +57,7 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
     del wrapper
     gc.collect()
 
-    assert close_count == ITERATOR_WRAPPER_LEAK_REPRO_COUNT
+    assert close_count == iterator_wrapper_leak_repro_count
     assert atexit._ncallbacks() == baseline_callback_count
 
 
