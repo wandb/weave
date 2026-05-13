@@ -337,7 +337,7 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
-def _snapshot_mutable_containers(obj: Any, _seen: set[int] | None = None) -> Any:
+def _snapshot_mutable_containers(obj: Any, _memo: dict[int, Any] | None = None) -> Any:
     """Return a copy of `obj` with plain `dict`/`list`/`set`/`tuple` containers
     rebuilt at every level, so a caller mutating the original after
     `finish_call` returns cannot reach into the deferred output walk.
@@ -345,7 +345,7 @@ def _snapshot_mutable_containers(obj: Any, _seen: set[int] | None = None) -> Any
     Only EXACT `dict`/`list`/`set`/`tuple` are rebuilt. Subclasses
     (`namedtuple`, `Counter`, `OrderedDict`, dict-subclass dataclasses like
     `huggingface_hub.ChatCompletionOutput`) carry type information the
-    serializer needs and are returned by identity — rebuilding as the bare
+    serializer needs and are returned by identity. Rebuilding as the bare
     type would strip the subclass and silently change saved output shape
     (namedtuple field names lost, typed dict becomes plain dict, etc.).
 
@@ -353,23 +353,44 @@ def _snapshot_mutable_containers(obj: Any, _seen: set[int] | None = None) -> Any
     ObjectRecord, weave Object/Table) are also returned by identity: they
     are either immutable or carry behavior we want preserved
     (e.g. `_save_nested_objects` mutating an Object to attach a ref).
+
+    `_memo` maps `id(original) -> snapshot` so that aliased containers
+    (the same list/dict appearing under multiple keys) get a single shared
+    NEW copy across all aliases, and so that cycles terminate by returning
+    the already-built snapshot on the second visit. Each mutable container
+    is pre-registered in the memo BEFORE its children are walked, which is
+    what makes cycles safe.
     """
-    if _seen is None:
-        _seen = set()
-    if id(obj) in _seen:
-        return obj
+    if _memo is None:
+        _memo = {}
+    cached = _memo.get(id(obj))
+    if cached is not None:
+        return cached
     t = type(obj)
     if t is dict:
-        _seen.add(id(obj))
-        return {k: _snapshot_mutable_containers(v, _seen) for k, v in obj.items()}
+        snap_d: dict = {}
+        _memo[id(obj)] = snap_d
+        for k, v in obj.items():
+            snap_d[k] = _snapshot_mutable_containers(v, _memo)
+        return snap_d
     if t is list:
-        _seen.add(id(obj))
-        return [_snapshot_mutable_containers(v, _seen) for v in obj]
+        snap_l: list = []
+        _memo[id(obj)] = snap_l
+        for v in obj:
+            snap_l.append(_snapshot_mutable_containers(v, _memo))
+        return snap_l
     if t is set:
-        _seen.add(id(obj))
-        return {_snapshot_mutable_containers(v, _seen) for v in obj}
+        snap_s: set = set()
+        _memo[id(obj)] = snap_s
+        for v in obj:
+            snap_s.add(_snapshot_mutable_containers(v, _memo))
+        return snap_s
     if t is tuple:
-        return tuple(_snapshot_mutable_containers(v, _seen) for v in obj)
+        # Tuples are immutable, so a tuple can't be part of a cycle without
+        # going through a mutable container first. We don't pre-register
+        # the tuple result, but the memo still gives aliased mutables inside
+        # the tuple a single shared snapshot.
+        return tuple(_snapshot_mutable_containers(v, _memo) for v in obj)
     return obj
 
 

@@ -524,3 +524,21 @@ class TestSnapshotSharedReferences:
         assert snap[1] == {"x": 1}, (
             f"Aliased dict inside list leaked the mutation: snap[1]={snap[1]!r}"
         )
+
+    def test_cycle_terminates_and_is_independent_of_original(self) -> None:
+        # Snapshot must terminate on a cyclic structure AND the cycle in the
+        # snapshot must not refer back to the original (otherwise post-snapshot
+        # mutations of the original would leak into the cycle).
+        a: list = [1]
+        a.append(a)
+
+        snap = _snapshot_mutable_containers(a)
+
+        a.append("post-snapshot")
+        assert snap[0] == 1
+        assert snap[1] is snap, (
+            "snapshot cycle should close on itself, not the original"
+        )
+        assert "post-snapshot" not in snap, (
+            f"snapshot reflects post-snapshot mutation of the original: {snap!r}"
+        )
