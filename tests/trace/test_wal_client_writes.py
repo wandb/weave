@@ -9,6 +9,7 @@ Covers:
 
 from __future__ import annotations
 
+import datetime
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -469,6 +470,69 @@ class TestTraceServerHandlers:
         handlers["table_create"](record)
 
         mock_server.table_create.assert_called_once()
+
+    def test_file_create_roundtrips_bytes_content(self):
+        """file_create handler must preserve bytes content through replay.
+
+        Regression guard for the model_validate(dict) replay path: Pydantic
+        v2 dumps bytes fields as utf-8 strings under mode="json", and
+        model_validate accepts strings for bytes fields by re-encoding them.
+        The round-trip must be lossless for content that actually reaches
+        the WAL (non-utf8 bytes already fail at write time, so they never
+        reach replay).
+        """
+        mock_server = MagicMock()
+        handlers = TraceServerHandlers(mock_server).as_dict()
+
+        # utf-8-decodable content — this is the only kind that can reach the
+        # WAL today (model_dump(mode="json") rejects non-utf8 bytes at write
+        # time, so non-utf8 content never appears in a replayed record).
+        original_content = "small file body — including non-ascii: café 🎉".encode()
+        req = tsi.FileCreateReq(
+            project_id="e/p",
+            name="note.txt",
+            content=original_content,
+        )
+        # Match the write path exactly: same call as wal_manager.write does.
+        record = {"type": "file_create", "req": req.model_dump(mode="json")}
+        handlers["file_create"](record)
+
+        mock_server.file_create.assert_called_once()
+        call_arg = mock_server.file_create.call_args[0][0]
+        assert isinstance(call_arg, tsi.FileCreateReq)
+        assert call_arg.content == original_content
+
+    def test_call_start_roundtrips_through_handler(self):
+        """call_start handler validates the dict directly (no json.dumps).
+
+        Regression guard for the dominant WAL replay path — every traced
+        op produces a call_start record.  datetime, dict, and string
+        fields must all round-trip correctly via model_validate(dict).
+        """
+        mock_server = MagicMock()
+        handlers = TraceServerHandlers(mock_server).as_dict()
+
+        started = datetime.datetime.now(datetime.timezone.utc)
+        req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id="e/p",
+                op_name="predict",
+                trace_id="t1",
+                started_at=started,
+                attributes={"k": "v"},
+                inputs={"x": 1},
+            )
+        )
+        record = {"type": "call_start", "req": req.model_dump(mode="json")}
+        handlers["call_start"](record)
+
+        mock_server.call_start.assert_called_once()
+        call_arg = mock_server.call_start.call_args[0][0]
+        assert isinstance(call_arg, tsi.CallStartReq)
+        assert call_arg.start.op_name == "predict"
+        assert call_arg.start.started_at == started
+        assert call_arg.start.attributes == {"k": "v"}
+        assert call_arg.start.inputs == {"x": 1}
 
     def test_convenience_function_matches_class(self):
         """build_trace_server_handlers should return the same keys as the class."""

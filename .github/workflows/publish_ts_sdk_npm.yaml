@@ -61,6 +61,13 @@ jobs:
         working-directory: sdks/node
         run: pnpm install --frozen-lockfile
 
+      # The hostApps Jest project (src/__tests__/hostApps/) spawns the
+      # Python Weave trace-server mock via `uv run python -m trace_server_mock`
+      # in its globalSetup. uv is required on PATH; uv handles the Python
+      # toolchain itself.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
       - name: Run tests
         working-directory: sdks/node
         env:

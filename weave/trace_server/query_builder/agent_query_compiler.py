@@ -261,6 +261,18 @@ def _resolve_field(
     if col is not None:
         return f"{alias}.{col}"
 
+    if name == "duration_ms":
+        return (
+            f"if({alias}.ended_at > {alias}.started_at, "
+            f"toFloat64(toUnixTimestamp64Milli({alias}.ended_at) - "
+            f"toUnixTimestamp64Milli({alias}.started_at)), NULL)"
+        )
+    if name == "total_tokens":
+        return (
+            f"toFloat64({alias}.input_tokens + {alias}.output_tokens + "
+            f"{alias}.reasoning_tokens)"
+        )
+
     # (2) Direct column name — OTel-core plus any semconv target column
     if name in _ALL_QUERYABLE_COLUMNS:
         return f"{alias}.{name}"

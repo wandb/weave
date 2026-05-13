@@ -438,6 +438,7 @@ def test_full_query_calls_merged() -> None:
                     any(calls_merged.op_name) AS op_name,
                     any(calls_merged.started_at) AS started_at,
                     any(calls_merged.ended_at) AS ended_at,
+                    any(calls_merged.attributes_dump) AS attributes_dump,
                     any(calls_merged.inputs_dump) AS inputs_dump,
                     any(calls_merged.output_dump) AS output_dump,
                     any(calls_merged.summary_dump) AS summary_dump
@@ -454,6 +455,7 @@ def test_full_query_calls_merged() -> None:
             page_calls.op_name,
             page_calls.started_at,
             page_calls.ended_at,
+            page_calls.attributes_dump,
             page_calls.inputs_dump,
             page_calls.output_dump,
             page_calls.summary_dump,
@@ -562,6 +564,7 @@ def test_full_query_calls_complete() -> None:
                     calls_complete.op_name,
                     calls_complete.started_at,
                     calls_complete.ended_at,
+                    calls_complete.attributes_dump,
                     calls_complete.inputs_dump,
                     calls_complete.output_dump,
                     calls_complete.summary_dump
@@ -577,6 +580,7 @@ def test_full_query_calls_complete() -> None:
             page_calls.op_name,
             page_calls.started_at,
             page_calls.ended_at,
+            page_calls.attributes_dump,
             page_calls.inputs_dump,
             page_calls.output_dump,
             page_calls.summary_dump,
