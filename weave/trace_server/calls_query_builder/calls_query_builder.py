@@ -62,6 +62,7 @@ from weave.trace_server.calls_query_builder.utils import (
     safe_alias,
     safely_format_sql,
     timestamp_to_datetime_str,
+    trace_id_index_expr,
 )
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
@@ -2424,19 +2425,33 @@ def process_op_name_filter_to_sql(
     return " AND " + combine_conditions(or_conditions, "OR")
 
 
+def _trace_id_match_sql(
+    trace_ids: list[str],
+    field_expr: str,
+    param_builder: ParamBuilder,
+) -> str:
+    """Build a `field_expr = ?` or `field_expr IN ?` clause for `trace_ids`.
+
+    Returns "" when `trace_ids` is empty. Single-element lists use equality
+    for performance; multi-element lists use `IN`.
+    """
+    if not trace_ids:
+        return ""
+    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+    if len(trace_ids) == 1:
+        return f"{field_expr} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
+    return f"{field_expr} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
+
+
 def process_trace_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable = ReadTable.CALLS_MERGED,
+    read_table: ReadTable,
 ) -> str:
     """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
         return ""
-
-    trace_ids = hardcoded_filter.filter.trace_ids
-
-    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
 
     trace_id_field = get_field_by_name("trace_id")
     if not isinstance(trace_id_field, CallsMergedAggField):
@@ -2444,25 +2459,12 @@ def process_trace_id_filter_to_sql(
     trace_id_field_sql = trace_id_field.as_sql(
         param_builder, table_alias, use_agg_fn=False
     )
+    field_expr = trace_id_index_expr(trace_id_field_sql, read_table)
 
-    # On calls_merged, trace_id is SimpleAggregateFunction(any, Nullable(String))
-    # and the idx_trace_id_bloom skip-index (migration 031) is built on
-    # `ifNull(trace_id, '')`. Match that expression character-for-character so
-    # the index can prune granules. On calls_complete, trace_id is non-nullable
-    # String with an index on the raw column, so we keep the raw expression.
-    if read_table == ReadTable.CALLS_MERGED:
-        trace_cond_field_sql = f"ifNull({trace_id_field_sql}, '')"
-    elif read_table == ReadTable.CALLS_COMPLETE:
-        trace_cond_field_sql = trace_id_field_sql
-    else:
-        raise ValueError(f"Unhandled read_table: {read_table}")
-
-    # If there's only one trace_id, use an equality condition for performance
-    if len(trace_ids) == 1:
-        trace_cond = f"{trace_cond_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
-    elif len(trace_ids) > 1:
-        trace_cond = f"{trace_cond_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
-    else:
+    trace_cond = _trace_id_match_sql(
+        hardcoded_filter.filter.trace_ids, field_expr, param_builder
+    )
+    if not trace_cond:
         return ""
 
     trace_null = trace_id_field.null_check_sql(
@@ -2478,20 +2480,13 @@ def process_trace_id_filter_to_sql_strict(
 ) -> str:
     """Strict (no `OR IS NULL`) trace_id condition for the candidate-id CTE.
 
-    Wraps the column in `ifNull(trace_id, '')` to match the
-    `idx_trace_id_bloom` skip-index expression from migration 031. The
-    OR-IS-NULL clause we keep in the outer query for unmerged-call-part
-    correctness defeats the bloom filter, so this strict form runs alone
-    inside `filter_candidate_ids` to maximize granule pruning.
-
-    Returns "" when no trace_ids are set (caller decides whether to build
-    the CTE). Only meaningful for calls_merged.
+    The OR-IS-NULL clause that the outer query keeps for unmerged-call-part
+    correctness defeats the bloom filter, so this strict form runs alone inside
+    `filter_candidate_ids` to maximize granule pruning. Returns "" when no
+    trace_ids are set. Only meaningful for calls_merged.
     """
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
         return ""
-
-    trace_ids = hardcoded_filter.filter.trace_ids
-    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
 
     trace_id_field = get_field_by_name("trace_id")
     if not isinstance(trace_id_field, CallsMergedAggField):
@@ -2499,11 +2494,10 @@ def process_trace_id_filter_to_sql_strict(
     trace_id_field_sql = trace_id_field.as_sql(
         param_builder, table_alias, use_agg_fn=False
     )
-    field_expr = f"ifNull({trace_id_field_sql}, '')"
-
-    if len(trace_ids) == 1:
-        return f"{field_expr} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
-    return f"{field_expr} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
+    field_expr = trace_id_index_expr(trace_id_field_sql, ReadTable.CALLS_MERGED)
+    return _trace_id_match_sql(
+        hardcoded_filter.filter.trace_ids, field_expr, param_builder
+    )
 
 
 def process_thread_id_filter_to_sql(
