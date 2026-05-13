@@ -1,9 +1,9 @@
 r"""Run the mock Weave trace server.
 
 Usage:
-    python -m trace_server_mock --port=0       # ephemeral port
-    python -m trace_server_mock --port=6346    # fixed port
-    python -m trace_server_mock --host=0.0.0.0 --port=6346
+    python -m in_memory_trace_server --port=0       # ephemeral port
+    python -m in_memory_trace_server --port=6346    # fixed port
+    python -m in_memory_trace_server --host=0.0.0.0 --port=6346
 
 The server prints exactly one ready-banner line to stdout before uvicorn
 starts, in the form:
@@ -31,7 +31,7 @@ import sys
 
 import uvicorn
 
-from trace_server_mock.main import create_app
+from in_memory_trace_server.main import create_app
 
 
 def main() -> None:

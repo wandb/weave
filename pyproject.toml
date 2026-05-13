@@ -539,7 +539,7 @@ conflicts = [
 # other and on the root by name; uv resolves those to the local workspace
 # checkout instead of querying PyPI.
 [tool.uv.workspace]
-members = ["trace_server_mock"]
+members = ["in_memory_trace_server"]
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]

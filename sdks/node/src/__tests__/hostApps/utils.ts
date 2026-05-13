@@ -1,6 +1,6 @@
 /**
  * Per-test helpers for the hostApps Jest project. Tests resolve the
- * Weave trace_server_mock URL from a sentinel JSON file written by
+ * Weave in_memory_trace_server URL from a sentinel JSON file written by
  * `jest.global-setup.cjs` (parallel workers don't inherit globalThis or
  * env mutations from globalSetup). They generate a fresh project_id per
  * test, launch a host application via `launchAppFrom()`, then query the
