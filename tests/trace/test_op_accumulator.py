@@ -3,6 +3,7 @@ import gc
 import subprocess
 import sys
 import textwrap
+import weakref
 
 import pytest
 
@@ -65,6 +66,31 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
     assert atexit._ncallbacks() == baseline_callback_count
 
 
+def test_unfinished_iterator_wrapper_does_not_keep_wrapper_alive():
+    """The process-exit finalizer must not strongly retain unfinished wrappers.
+
+    Capturing ``self`` or a bound method in ``weakref.finalize`` would keep an
+    abandoned unfinished wrapper alive until process exit. Normal GC cleanup is
+    supposed to run through ``__del__`` instead.
+    """
+    close_count = 0
+
+    def on_close():
+        nonlocal close_count
+        close_count += 1
+
+    wrapper = _IteratorWrapper(
+        iter([1]), lambda value: None, lambda error: None, on_close
+    )
+    wrapper_ref = weakref.ref(wrapper)
+
+    del wrapper
+    gc.collect()
+
+    assert wrapper_ref() is None
+    assert close_count == 1
+
+
 def test_process_exit_finalizer_is_idempotent_for_unfinished_iterator_wrapper():
     """The wrapper-owned process-exit finalizer should close an unfinished stream once.
 
@@ -103,6 +129,10 @@ def test_process_exit_closes_unfinished_iterator_wrapper(tmp_path):
         from pathlib import Path
 
         from weave.trace.op import _IteratorWrapper
+
+        # This test is specifically about weakref.finalize/atexit wiring, not
+        # the normal GC ``__del__`` cleanup path.
+        _IteratorWrapper.__del__ = lambda self: None
 
         marker_path = Path(sys.argv[1])
 
