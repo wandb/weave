@@ -11,6 +11,8 @@ import pytest
 
 import weave.integrations.patch as patch_module
 from weave.integrations.patch import (
+    PatchingLoader,
+    WeaveImportHook,
     _PATCHED_INTEGRATIONS,
     _patch_if_needed,
     _patch_integration,
@@ -115,8 +117,6 @@ def test_import_hook_patches_on_import(setup_env, monkeypatch):
         {"openai": mock_patch_func},
     ):
         _inject_fake_module(monkeypatch, "openai")
-        from weave.integrations.patch import _patch_if_needed
-
         _patch_if_needed("openai")
         mock_patch_func.assert_called_once()
 
@@ -401,3 +401,350 @@ def test_patch_integration_multi(setup_env, success):
         assert ("symbol1" in patch_module._PATCHED_INTEGRATIONS) is success
         assert ("symbol2" in patch_module._PATCHED_INTEGRATIONS) is success
         assert ("symbol3" in patch_module._PATCHED_INTEGRATIONS) is success
+
+
+# =============================================================================
+# WeaveImportHook Tests
+# =============================================================================
+
+
+class TestWeaveImportHook:
+    """Tests for the WeaveImportHook class.
+
+    Requirement: Import hook intercepts supported integration imports and wraps
+    their loaders to enable automatic patching after module load.
+    Interface: Python's import system (sys.meta_path finder protocol)
+    """
+
+    def test_find_spec_returns_wrapped_loader_for_supported_root_module(
+        self, setup_env, monkeypatch
+    ):
+        """
+        Requirement: Import hook wraps loader for supported integrations
+        Interface: WeaveImportHook.find_spec()
+        Given: Import hook is registered, "test_integration" is in INTEGRATION_MODULE_MAPPING
+        When: find_spec is called for "test_integration"
+        Then: Returns a spec with loader wrapped by PatchingLoader
+        """
+        # Create a fake module spec with a loader
+        mock_loader = MagicMock()
+        mock_spec = MagicMock()
+        mock_spec.loader = mock_loader
+
+        # Create a fake finder that will return our spec
+        mock_finder = MagicMock()
+        mock_finder.find_spec.return_value = mock_spec
+
+        hook = WeaveImportHook()
+
+        monkeypatch.setattr(sys, "meta_path", [mock_finder])
+
+        with patch.dict(
+            "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+            {"test_integration": MagicMock()},
+        ):
+            result = hook.find_spec("test_integration", None, None)
+
+            assert result is not None
+            assert isinstance(result.loader, PatchingLoader)
+            assert result.loader.original_loader is mock_loader
+            assert result.loader.module_name == "test_integration"
+
+    def test_find_spec_returns_none_for_submodules(self, setup_env, monkeypatch):
+        """
+        Requirement: Import hook only intercepts root modules, not submodules
+        Interface: WeaveImportHook.find_spec()
+        Given: Import hook exists, "openai" is in INTEGRATION_MODULE_MAPPING
+        When: find_spec is called for "openai.types.chat"
+        Then: Returns None (lets normal import proceed without wrapping)
+        """
+        hook = WeaveImportHook()
+
+        with patch.dict(
+            "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+            {"openai": MagicMock()},
+        ):
+            # Submodule should not be intercepted
+            result = hook.find_spec("openai.types.chat", None, None)
+            assert result is None
+
+    def test_find_spec_returns_none_for_unsupported_modules(self, setup_env):
+        """
+        Requirement: Import hook ignores modules not in INTEGRATION_MODULE_MAPPING
+        Interface: WeaveImportHook.find_spec()
+        Given: Import hook exists
+        When: find_spec is called for "json" (not a supported integration)
+        Then: Returns None
+        """
+        hook = WeaveImportHook()
+
+        # Use empty mapping to ensure "json" is not supported
+        with patch.dict(
+            "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+            {},
+            clear=True,
+        ):
+            result = hook.find_spec("json", None, None)
+            assert result is None
+
+    def test_find_spec_returns_none_for_already_patched_modules(
+        self, setup_env, monkeypatch
+    ):
+        """
+        Requirement: Import hook does not re-wrap already patched modules
+        Interface: WeaveImportHook.find_spec()
+        Given: Import hook exists, "openai" is already in _PATCHED_INTEGRATIONS
+        When: find_spec is called for "openai"
+        Then: Returns None (no need to wrap, already patched)
+        """
+        # Mark openai as already patched
+        patch_module._PATCHED_INTEGRATIONS.add("openai")
+
+        hook = WeaveImportHook()
+
+        with patch.dict(
+            "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+            {"openai": MagicMock()},
+        ):
+            result = hook.find_spec("openai", None, None)
+            assert result is None
+
+    def test_find_module_returns_none_for_backwards_compatibility(self, setup_env):
+        """
+        Requirement: Legacy find_module method returns None for backwards compatibility
+        Interface: WeaveImportHook.find_module()
+        Given: Import hook instance
+        When: find_module is called with any module name
+        Then: Returns None
+        """
+        hook = WeaveImportHook()
+
+        assert hook.find_module("anything") is None
+        assert hook.find_module("openai", path="/some/path") is None
+
+
+# =============================================================================
+# PatchingLoader Tests
+# =============================================================================
+
+
+class TestPatchingLoader:
+    """Tests for the PatchingLoader class.
+
+    Requirement: PatchingLoader wraps original loaders and patches integrations
+    after module execution completes.
+    Interface: Python's import system (loader protocol)
+    """
+
+    def test_exec_module_calls_original_and_patches(self, setup_env):
+        """
+        Requirement: exec_module executes original loader then patches integration
+        Interface: PatchingLoader.exec_module()
+        Given: PatchingLoader wrapping an original loader
+        When: exec_module is called
+        Then: Original loader's exec_module is called, then patch function is invoked
+        """
+        mock_original_loader = MagicMock()
+        mock_patch_func = MagicMock()
+
+        loader = PatchingLoader(mock_original_loader, "test_module")
+
+        mock_module = MagicMock()
+        mock_module.__name__ = "test_module"
+
+        with patch.dict(
+            "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+            {"test_module": mock_patch_func},
+        ):
+            loader.exec_module(mock_module)
+
+            # Original loader should be called first
+            mock_original_loader.exec_module.assert_called_once_with(mock_module)
+            # Then patch function should be called
+            mock_patch_func.assert_called_once()
+
+    def test_load_module_calls_original_and_patches(self, setup_env, monkeypatch):
+        """
+        Requirement: Legacy load_module executes original loader then patches
+        Interface: PatchingLoader.load_module()
+        Given: PatchingLoader wrapping a loader with load_module method
+        When: load_module is called
+        Then: Original loader's load_module is called, then patch function is invoked
+        """
+        mock_original_loader = MagicMock()
+        mock_module = MagicMock()
+        mock_original_loader.load_module.return_value = mock_module
+        mock_patch_func = MagicMock()
+
+        loader = PatchingLoader(mock_original_loader, "test_module")
+
+        with patch.dict(
+            "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+            {"test_module": mock_patch_func},
+        ):
+            result = loader.load_module("test_module")
+
+            mock_original_loader.load_module.assert_called_once_with("test_module")
+            mock_patch_func.assert_called_once()
+            assert result is mock_module
+
+    def test_load_module_fallback_when_no_load_module(self, setup_env, monkeypatch):
+        """
+        Requirement: load_module falls back to sys.modules when original has no load_module
+        Interface: PatchingLoader.load_module()
+        Given: PatchingLoader wrapping a loader without load_module method
+        When: load_module is called and module is in sys.modules
+        Then: Returns the module from sys.modules
+        """
+        # Create a loader without load_module
+        mock_original_loader = MagicMock(spec=[])  # Empty spec = no methods
+        mock_patch_func = MagicMock()
+
+        loader = PatchingLoader(mock_original_loader, "test_module")
+
+        # Put a fake module in sys.modules
+        fake_module = types.ModuleType("test_module")
+        monkeypatch.setitem(sys.modules, "test_module", fake_module)
+
+        with patch.dict(
+            "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+            {"test_module": mock_patch_func},
+        ):
+            result = loader.load_module("test_module")
+
+            assert result is fake_module
+            mock_patch_func.assert_called_once()
+
+    def test_create_module_delegates_to_original(self, setup_env):
+        """
+        Requirement: create_module delegates to original loader
+        Interface: PatchingLoader.create_module()
+        Given: PatchingLoader wrapping a loader with create_module method
+        When: create_module is called
+        Then: Original loader's create_module is called and result returned
+        """
+        mock_original_loader = MagicMock()
+        mock_spec = MagicMock()
+        mock_created_module = MagicMock()
+        mock_original_loader.create_module.return_value = mock_created_module
+
+        loader = PatchingLoader(mock_original_loader, "test_module")
+
+        result = loader.create_module(mock_spec)
+
+        mock_original_loader.create_module.assert_called_once_with(mock_spec)
+        assert result is mock_created_module
+
+    def test_create_module_returns_none_when_original_lacks_method(self, setup_env):
+        """
+        Requirement: create_module returns None when original has no create_module
+        Interface: PatchingLoader.create_module()
+        Given: PatchingLoader wrapping a loader without create_module method
+        When: create_module is called
+        Then: Returns None (default behavior)
+        """
+        # Create a loader without create_module
+        mock_original_loader = MagicMock(spec=[])
+
+        loader = PatchingLoader(mock_original_loader, "test_module")
+
+        result = loader.create_module(MagicMock())
+
+        assert result is None
+
+    def test_getattr_delegates_to_original(self, setup_env):
+        """
+        Requirement: Unknown attributes are delegated to original loader
+        Interface: PatchingLoader.__getattr__()
+        Given: PatchingLoader wrapping a loader with custom attributes
+        When: Accessing an attribute not defined on PatchingLoader
+        Then: Returns the attribute from the original loader
+        """
+        mock_original_loader = MagicMock()
+        mock_original_loader.custom_attribute = "custom_value"
+        mock_original_loader.some_method.return_value = "method_result"
+
+        loader = PatchingLoader(mock_original_loader, "test_module")
+
+        assert loader.custom_attribute == "custom_value"
+        assert loader.some_method() == "method_result"
+
+
+# =============================================================================
+# Integration Test - End-to-end Import Hook
+# =============================================================================
+
+
+def test_import_hook_end_to_end(setup_env, monkeypatch, tmp_path):
+    """
+    Requirement: The full import hook chain patches modules imported after registration
+    Interface: Python's import system (import statement -> sys.meta_path -> WeaveImportHook
+               -> PatchingLoader.exec_module -> _patch_if_needed -> patch function)
+    Given: Import hook registered, a real importable module mapped to a mock patcher
+    When: The module is imported via importlib.import_module
+    Then: The patch function is called exactly once
+    """
+    import importlib
+
+    # Create a real Python module file on disk
+    module_name = "_weave_test_hook_e2e"
+    module_file = tmp_path / f"{module_name}.py"
+    module_file.write_text("VALUE = 42\n")
+
+    # Make it importable by adding tmp_path to sys.path
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    # Ensure it's not already imported
+    if module_name in sys.modules:
+        del sys.modules[module_name]
+
+    patch_calls = []
+
+    def mock_patch_func():
+        patch_calls.append(1)
+
+    register_import_hook()
+
+    with patch.dict(
+        "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+        {module_name: mock_patch_func},
+    ):
+        # Actually import the module through Python's import system
+        mod = importlib.import_module(module_name)
+
+        # The module should have been loaded correctly
+        assert mod.VALUE == 42
+
+        # The patch function should have been called exactly once
+        assert len(patch_calls) == 1
+
+        # The module should be marked as patched
+        assert module_name in patch_module._PATCHED_INTEGRATIONS
+
+
+def test_import_hook_skips_self_in_meta_path(setup_env, monkeypatch):
+    """
+    Requirement: Import hook does not recurse infinitely by skipping itself
+    Interface: WeaveImportHook.find_spec()
+    Given: Import hook is in sys.meta_path alongside other finders
+    When: find_spec iterates through meta_path looking for a spec
+    Then: It skips itself to avoid infinite recursion, delegates to other finders
+    """
+    hook = WeaveImportHook()
+    mock_finder = MagicMock()
+    mock_spec = MagicMock()
+    mock_spec.loader = MagicMock()
+    mock_finder.find_spec.return_value = mock_spec
+
+    # Put hook first in meta_path, then mock finder
+    monkeypatch.setattr(sys, "meta_path", [hook, mock_finder])
+
+    with patch.dict(
+        "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+        {"test_module": MagicMock()},
+    ):
+        result = hook.find_spec("test_module", None, None)
+
+        # Should get result from mock_finder, not recurse into hook
+        assert result is not None
+        mock_finder.find_spec.assert_called_once()
