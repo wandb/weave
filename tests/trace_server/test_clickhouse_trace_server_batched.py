@@ -1493,7 +1493,7 @@ def test_concurrent_queries_on_one_client_vs_session_autogeneration(
 
 def test_obj_create_batch_writes_latest_alias(ch_server):
     """obj_create_batch should write a 'latest' alias for every object in the batch."""
-    project_id = _make_project_id("alias")
+    project_id = make_project_id("alias")
     batch = [
         tsi.ObjSchemaForInsert(
             project_id=project_id, object_id=f"batch_obj_{i}", val={"v": i}
@@ -1516,7 +1516,7 @@ def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
     Documents the CH best-effort partial-failure contract for the
     (object_versions insert, aliases insert) pair.
     """
-    project_id = _make_project_id("alias")
+    project_id = make_project_id("alias")
     obj_id = "alias_failure"
 
     # Establish a prior latest.
