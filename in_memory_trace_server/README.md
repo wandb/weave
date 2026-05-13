@@ -20,12 +20,6 @@ the request — drift detection is the central reason for this dependency.
 
 ## Use from Python SDK tests
 
-Import the `InMemoryTraceServer` class and use it as a context manager.
-It spawns `python -m in_memory_trace_server --port=0` as a subprocess
-(using the current interpreter so the child binds to the same `weave`
-checkout as the test), waits for the `READY=` banner, polls
-`/test/health` until live, and tears the subprocess down on exit.
-
 ```python
 import os
 from in_memory_trace_server import InMemoryTraceServer
@@ -39,7 +33,16 @@ def test_emits_a_call():
         server.reset(project_id="test/proj")
 ```
 
-Methods on the class:
+`InMemoryTraceServer` runs uvicorn in a background daemon thread, bound
+to a real localhost port. The SDK's `httpx.Client` hits that port like
+any other URL — no production-side plumbing changes needed. Fast startup
+(~10ms), full stack traces into the server on failure, debugger steps
+straight into the handlers.
+
+The class exposes a small surface, **deliberately the same surface the
+subprocess variant and the Node test driver use** — assertions go
+through the public `/test/*` HTTP endpoints rather than reaching into
+server-side internals, so Python and Node test patterns stay consistent:
 
 - `start()` / `stop()` — explicit lifecycle (the context manager calls these).
 - `url` — base URL once started (e.g. `http://127.0.0.1:NNNN`).
@@ -49,9 +52,30 @@ Methods on the class:
 
 Per-test isolation comes from each test using a unique `project_id`.
 
-## CLI usage
+### When to use `SubprocessTraceServer` instead
 
-From the `in_memory_trace_server` directory:
+```python
+from in_memory_trace_server import SubprocessTraceServer
+
+with SubprocessTraceServer() as server:
+    ...
+```
+
+Same surface as `InMemoryTraceServer`, but spawns `python -m
+in_memory_trace_server --port=N` as a separate process. Reach for it
+when you specifically need real process isolation:
+
+- Signal-handling tests (the in-thread variant intentionally suppresses
+  uvicorn's signal handlers, since `signal.signal()` only works on the
+  main thread).
+- Auth-proxy or real connection-pool experiments where the SDK's HTTP
+  client behavior in a fresh process matters.
+- Cases where you want the server to crash without taking the test
+  process down with it.
+
+For most tests, prefer `InMemoryTraceServer`.
+
+## CLI usage (for non-Python consumers)
 
 ```
 uv run python -m in_memory_trace_server --port=0          # ephemeral port; prints URL
@@ -72,7 +96,14 @@ spawn this as a subprocess and parse the banner.
 **Production-shaped (real Weave API):**
 - `POST /call/upsert_batch` — batch start/end recording. Validated against `weave.trace_server.trace_server_interface` types.
 - `POST /calls/stream_query` — NDJSON stream of captured calls for a project.
-- Several stub endpoints (`/obj/*`, `/table/*`, `/file/*`, `/feedback/*`, `/call/update`) return canned success without action. Implement on demand as future tests need them.
+
+**Unimplemented (return 501 Not Implemented with a clear body):**
+- `/obj/create`, `/obj/read`, `/table/create`, `/table/query`, `/file/create`, `/file/content`, `/feedback/create`, `/call/update`
+
+Hitting one of these means your test exercises a code path the mock
+doesn't model. Either implement the endpoint in `main.py` (also typing
+the request body against the production `tsi.*` model so drift detection
+covers it), or run the test against the real trace server instead.
 
 **Test-only (not in production):**
 - `GET /test/health` → `{"ok": true}`. Readiness probe.
@@ -85,6 +116,12 @@ In-memory only. Keyed by `project_id`. Lost on process exit. Concurrent tests
 running with different `project_id`s don't see each other's data — that's
 the isolation strategy.
 
+The `CallStore` instance is intentionally captured by route handlers via
+closure and never assigned to `app.state`. There's no public handle on
+the store from outside the route handlers — even in-process consumers
+must go through `/test/getCalls` / `/test/reset` to interact with it,
+matching what out-of-process consumers see.
+
 ## Use from Node SDK tests
 
 The Weave Node SDK's `hostApps` Jest project ([`sdks/node/src/__tests__/hostApps`](../sdks/node/src/__tests__/hostApps)) spawns this server in `globalSetup`, points the SDK at it via `WF_TRACE_SERVER_URL`, runs fixtures, and queries `/test/getCalls` to assert on captured traces.
@@ -92,6 +129,6 @@ The Weave Node SDK's `hostApps` Jest project ([`sdks/node/src/__tests__/hostApps
 ## Caveats (it's a mock — don't expect production fidelity)
 
 - `/calls/stream_query` is a minimal stub — returns all calls for a project as NDJSON, ignoring filter/order/limit. Future tests that need real query semantics can grow the implementation.
-- `/obj/*`, `/table/*`, `/file/*`, `/feedback/*`, `/call/update` are no-op stubs returning canned success. Tests that read back what was written through these endpoints will not work as-is.
+- `/obj/*`, `/table/*`, `/file/*`, `/feedback/*`, `/call/update` return 501 with a clear error body. Tests that touch objects, tables, files, feedback, or call updates will fail loudly. Implement endpoints on demand or run against the real trace server.
 - Auth headers are accepted without validation. Mock is for tests; real auth lives in production.
 - No persistence. No Kafka. No ClickHouse. If your test needs production-fidelity behavior beyond what's listed here, use the real `services/weave-trace` server (see [`tests/trace_server/`](../tests/trace_server) for the existing in-process fixture pattern).

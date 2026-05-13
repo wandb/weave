@@ -6,12 +6,7 @@ normal dependency — when the production interface evolves, the mock's
 imports break loudly or Pydantic validation rejects an incoming request.
 That's the drift signal we want.
 
-CLI usage:
-
-    python -m in_memory_trace_server --port=0       # ephemeral port; URL printed
-    python -m in_memory_trace_server --port=6346
-
-Python usage (for SDK integration tests):
+Python test usage:
 
     from in_memory_trace_server import InMemoryTraceServer
 
@@ -21,12 +16,23 @@ Python usage (for SDK integration tests):
         calls = server.get_calls(project_id="test/proj")
         server.reset(project_id="test/proj")
 
-The mock is consumed by the Node SDK's host-app integration tests
-(sdks/node/src/__tests__/hostApps/) via subprocess spawn. It is also
-intended for Python SDK integration tests — same HTTP contract, same
-Pydantic types, language-agnostic.
+`InMemoryTraceServer` is the default — uvicorn in a background thread,
+same Python process, real localhost port. Fast startup, full stack
+traces, no subprocess management.
+
+`SubprocessTraceServer` is the opt-in — `python -m in_memory_trace_server`
+as a child process. Use when you need real process isolation (signal
+handling, auth-proxy testing, real connection-pool behavior) or when
+your test driver isn't Python (the Node SDK consumes the mock this way
+via the CLI entry point).
+
+CLI usage (for non-Python consumers):
+
+    python -m in_memory_trace_server --port=0       # ephemeral port; URL printed
+    python -m in_memory_trace_server --port=6346
 """
 
-from in_memory_trace_server.client import InMemoryTraceServer
+from in_memory_trace_server.in_memory_server import InMemoryTraceServer
+from in_memory_trace_server.subprocess_server import SubprocessTraceServer
 
-__all__ = ["InMemoryTraceServer"]
+__all__ = ["InMemoryTraceServer", "SubprocessTraceServer"]

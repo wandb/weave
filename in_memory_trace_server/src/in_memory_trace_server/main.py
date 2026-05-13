@@ -13,7 +13,8 @@ Endpoints implemented (production-shaped):
   * POST /call/upsert_batch     — record start/end events
   * POST /calls/stream_query    — return captured calls as NDJSON
 
-Stub endpoints (return empty success; flesh out as future tests need them):
+Unimplemented endpoints (return 501 Not Implemented with a clear body so
+silent failures become loud). Implement on demand as future tests need them:
   * POST /obj/create, /obj/read
   * POST /table/create, /table/query
   * POST /file/create, /file/content
@@ -32,7 +33,7 @@ import json
 from typing import Any
 
 from fastapi import FastAPI, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
@@ -69,10 +70,16 @@ class CallCreateBatchRes(BaseModel):
 
 
 def create_app() -> FastAPI:
-    """Build the FastAPI app. Each call gets a fresh in-memory store."""
+    """Build the FastAPI app. Each call gets a fresh in-memory store.
+
+    The `store` is intentionally captured via closure by the route handlers
+    and never assigned to `app.state`. Keeping it unreachable from outside
+    the route handlers forces in-process test consumers to assert through
+    the public `/test/*` endpoints — the same surface out-of-process
+    consumers use — so test patterns stay consistent across transports.
+    """
     app = FastAPI(title="in_memory_trace_server", version="0.1.0")
     store = CallStore()
-    app.state.store = store
 
     # ----- Production-shaped endpoints -----
 
@@ -109,39 +116,59 @@ def create_app() -> FastAPI:
 
         return StreamingResponse(_gen(), media_type="application/jsonl")
 
-    # ----- Stub endpoints (return canned success) -----
+    # ----- Unimplemented endpoints -----
+    #
+    # Return 501 with a clear body rather than canned success. A "lying" mock
+    # that silently accepts /obj/create + returns a fake digest causes tests
+    # to pass for the wrong reason; explicit 501 surfaces the gap.
+    # Implement on demand as future tests need them — when you do, also type
+    # the request body against the production `tsi.*` model so drift detection
+    # covers the endpoint.
+
+    def _unimplemented(endpoint: str) -> JSONResponse:
+        return JSONResponse(
+            status_code=501,
+            content={
+                "error": (
+                    f"{endpoint} is not implemented in the in-memory mock. "
+                    "Implement it in in_memory_trace_server/main.py or run "
+                    "your test against the real trace server."
+                ),
+                "endpoint": endpoint,
+            },
+        )
 
     @app.post("/call/update")
-    def call_update(req: dict[str, Any]) -> dict[str, Any]:
-        return {}
+    def call_update() -> JSONResponse:
+        return _unimplemented("/call/update")
 
     @app.post("/obj/create")
-    def obj_create(req: dict[str, Any]) -> dict[str, Any]:
-        return {"digest": generate_id()}
+    def obj_create() -> JSONResponse:
+        return _unimplemented("/obj/create")
 
     @app.post("/obj/read")
-    def obj_read(req: dict[str, Any]) -> dict[str, Any]:
-        return {"obj": None}
+    def obj_read() -> JSONResponse:
+        return _unimplemented("/obj/read")
 
     @app.post("/table/create")
-    def table_create(req: dict[str, Any]) -> dict[str, Any]:
-        return {"digest": generate_id()}
+    def table_create() -> JSONResponse:
+        return _unimplemented("/table/create")
 
     @app.post("/table/query")
-    def table_query(req: dict[str, Any]) -> dict[str, Any]:
-        return {"rows": []}
+    def table_query() -> JSONResponse:
+        return _unimplemented("/table/query")
 
     @app.post("/file/create")
-    def file_create(req: dict[str, Any]) -> dict[str, Any]:
-        return {"digest": generate_id()}
+    def file_create() -> JSONResponse:
+        return _unimplemented("/file/create")
 
     @app.post("/file/content")
-    def file_content(req: dict[str, Any]) -> dict[str, Any]:
-        return {"content": ""}
+    def file_content() -> JSONResponse:
+        return _unimplemented("/file/content")
 
     @app.post("/feedback/create")
-    def feedback_create(req: dict[str, Any]) -> dict[str, Any]:
-        return {"id": generate_id()}
+    def feedback_create() -> JSONResponse:
+        return _unimplemented("/feedback/create")
 
     # ----- Test-only endpoints -----
 
