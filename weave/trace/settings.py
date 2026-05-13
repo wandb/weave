@@ -526,9 +526,7 @@ def redact_pii_exclude_fields() -> list[str]:
 
 
 def use_server_cache() -> bool:
-    return _env_or_default(
-        "use_server_cache", _current_settings.get().use_server_cache
-    )
+    return _env_or_default("use_server_cache", _current_settings.get().use_server_cache)
 
 
 def server_cache_size_limit() -> int:
@@ -538,9 +536,7 @@ def server_cache_size_limit() -> int:
 
 
 def server_cache_dir() -> str | None:
-    return _env_or_default(
-        "server_cache_dir", _current_settings.get().server_cache_dir
-    )
+    return _env_or_default("server_cache_dir", _current_settings.get().server_cache_dir)
 
 
 def scorers_dir() -> str:
