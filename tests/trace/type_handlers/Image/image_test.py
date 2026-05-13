@@ -51,7 +51,7 @@ def test_img(request) -> Image.Image:
         img.close()
 
 
-def test_image_publish(weave_active: WeaveClient, test_img: Image.Image) -> None:
+def test_image_publish(weave_active, test_img: Image.Image) -> None:
     weave.publish(test_img)
 
     ref = get_ref(test_img)

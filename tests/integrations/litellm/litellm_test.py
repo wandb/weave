@@ -240,7 +240,7 @@ async def test_litellm_quickstart_stream_async(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_model_predict(
-    weave_active: weave.trace.weave_client.WeaveClient, patch_litellm: None
+    weave_active, patch_litellm: None
 ) -> None:
     class TranslatorModel(weave.Model):
         model: str
