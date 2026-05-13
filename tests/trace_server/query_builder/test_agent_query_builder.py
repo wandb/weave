@@ -71,9 +71,7 @@ class TestMakeSpansCountQuery:
         pb = ParamBuilder("genai")
         query = make_spans_count_query(pb, AgentSpansQueryReq(project_id="p1"))
 
-        expected = (
-            "SELECT count() FROM spans s WHERE s.project_id = {genai_0:String}"
-        )
+        expected = "SELECT count() FROM spans s WHERE s.project_id = {genai_0:String}"
         assert_sql(expected, {"genai_0": "p1"}, query, pb.get_params())
 
     def test_with_query_and_time(self) -> None:
