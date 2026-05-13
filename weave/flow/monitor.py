@@ -1,11 +1,12 @@
 from typing import Literal, TypeAlias, get_args
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from typing_extensions import NotRequired, Self, TypedDict
 
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
 from weave.trace.api import ObjectRef, publish
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
@@ -109,9 +110,64 @@ class Monitor(Object):
         self.ref = None
         return publish(self)
 
+    @field_validator("op_names", mode="before")
+    @classmethod
+    def _coerce_op_refs_to_str(cls, value: object) -> object:
+        """Stored monitors deserialize op refs as `OpRef`/`ObjectRef` instances
+        (weave auto-resolves URI strings into ref objects when reading). The
+        field type is `list[str]`, so coerce ref objects back to their URI
+        strings before type validation.
+        """
+        if not isinstance(value, list):
+            return value
+        coerced: list[object] = []
+        for item in value:
+            uri_fn = getattr(item, "uri", None)
+            coerced.append(uri_fn() if callable(uri_fn) else item)
+        return coerced
+
+    @model_validator(mode="after")
+    def _resolve_op_names(self) -> Self:
+        """Rewrite short op names in `op_names` to fully-qualified op refs.
+
+        Users may pass short op names (e.g. `"my_op"`) per the docstring example, but
+        the backend and UI key off fully-qualified refs like
+        `weave:///entity/project/op/my_op:digest`. The trace server's calls query
+        treats `:*` as a "latest version" wildcard (LIKE `...:%`), and the frontend's
+        `parseRef` accepts it too, so we construct the ref synchronously from the
+        current weave client's entity/project without a network call. Names that
+        already look like refs or are predeclared agent-span op names pass through
+        unchanged.
+
+        If no weave client is active at construction time, op_names are left as-is.
+        This is intentional: a Monitor is only useful in a weave-initialized context
+        (publish/activate require a client), and validators on `from_obj` reads
+        should not raise when reconstructing already-stored refs.
+        """
+        if not self.op_names:
+            return self
+        client = get_weave_client()
+        if client is None:
+            return self
+        entity = client.entity
+        project = client.project
+        resolved: list[str] = []
+        for name in self.op_names:
+            if _looks_like_ref(name) or name in AGENT_SPAN_OP_NAMES:
+                resolved.append(name)
+                continue
+            resolved.append(f"weave:///{entity}/{project}/op/{name}:*")
+        self.op_names = resolved
+        return self
+
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
         return cls.model_validate(obj.unwrap())
+
+
+def _looks_like_ref(name: str) -> bool:
+    """True if `name` is already a weave object/op ref URI."""
+    return name.startswith("weave:///")
 
 
 _OP_CALL_CLASSIFIER_PROMPT_HEADER = "\n".join(

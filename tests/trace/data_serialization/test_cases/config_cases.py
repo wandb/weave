@@ -86,11 +86,16 @@ config_cases = [
     # ),
     SerializationTestCase(
         id="Monitor",
+        # The Monitor model_validator rewrites short op names to fully-qualified
+        # refs at construction. This serialization test focuses on the Monitor
+        # field shape; op-name resolution is covered by test_monitor.py. Using
+        # an empty op_names list avoids the test framework's "every weave:// ref
+        # in JSON must exist as an exp_object" check for a synthetic wildcard ref.
         runtime_object_factory=lambda: Monitor(
             name="test_monitor",
             sampling_rate=0.5,
             scorers=[],
-            op_names=["example_op_name"],
+            op_names=[],
             query={
                 "$expr": {
                     "$gt": [
@@ -113,7 +118,7 @@ config_cases = [
             "description": None,
             "sampling_rate": 0.5,
             "scorers": [],
-            "op_names": ["example_op_name"],
+            "op_names": [],
             "query": {
                 "_type": "Query",
                 "$expr": {
@@ -282,11 +287,12 @@ config_cases = [
     ),
     SerializationTestCase(
         id="ClassifierMonitor",
+        # See "Monitor" case above re: why op_names is empty here.
         runtime_object_factory=lambda: ClassifierMonitor(
             name="test_classifier_monitor",
             sampling_rate=0.75,
             scorers=[],
-            op_names=["classify_op"],
+            op_names=[],
             is_traced=False,
         ),
         inline_call_param=False,
@@ -297,7 +303,7 @@ config_cases = [
             "description": None,
             "sampling_rate": 0.75,
             "scorers": [],
-            "op_names": ["classify_op"],
+            "op_names": [],
             "query": None,
             "is_traced": False,
             "active": False,
