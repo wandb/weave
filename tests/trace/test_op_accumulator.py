@@ -43,6 +43,8 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
     )
     warmup_wrapper.close()
     del warmup_wrapper
+    # Force GC so weakref.finalize bookkeeping settles before measuring the
+    # process-level atexit callback count.
     gc.collect()
 
     baseline_callback_count = atexit._ncallbacks()
@@ -55,6 +57,8 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
         assert list(wrapper) == [1]
 
     del wrapper
+    # Force GC after dropping the last wrapper reference so the assertion below
+    # measures retained exit callbacks, not pending collection.
     gc.collect()
 
     assert close_count == iterator_wrapper_leak_repro_count
