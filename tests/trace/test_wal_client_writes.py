@@ -30,7 +30,7 @@ from weave.durability.wal_sender import (
 )
 from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace import weave_client
-from weave.trace.settings import UserSettings, override
+from weave.trace.settings import UserSettings, override_settings
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -503,7 +503,7 @@ class TestWALClientApiKeyNamespacing:
     def test_wal_directory_is_namespaced_by_api_key(self, client):
         """When api_key is provided, the WAL dir includes an HMAC subdirectory."""
         api_key = "wk-test-key-for-wal-namespacing"
-        with override(enable_wal=True, disable_wal_sender=True):
+        with override_settings(enable_wal=True, disable_wal_sender=True):
             wc = weave_client.WeaveClient(
                 client.entity,
                 client.project,
@@ -520,7 +520,7 @@ class TestWALClientApiKeyNamespacing:
 
     def test_wal_directory_not_namespaced_without_api_key(self, client):
         """When api_key is None, the WAL dir is the flat entity/project path."""
-        with override(enable_wal=True, disable_wal_sender=True):
+        with override_settings(enable_wal=True, disable_wal_sender=True):
             wc = weave_client.WeaveClient(
                 client.entity,
                 client.project,

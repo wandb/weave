@@ -4,7 +4,7 @@ The settings module exposes a process-level configuration value, scoped per
 async-context via a single :class:`ContextVar`.  Read settings via the
 field-named accessor functions (e.g. :func:`should_disable_weave`).  Mutate
 via :func:`replace_settings` (replace-all snapshot install, used at init) or
-:func:`override` (scoped partial change for the current async context).
+:func:`override_settings` (scoped partial change for the current async context).
 
 Each field's environment variable is ``WEAVE_<FIELD_NAME>`` (uppercased), e.g.
 ``WEAVE_DISABLED`` for the ``disabled`` field.  Environment variables override
@@ -71,7 +71,7 @@ class UserSettings:
     is environment variables > ``UserSettings`` instance > defaults.
 
     KEEP IN SYNC WITH :class:`_SettingsOverrides` below.  Each field added,
-    removed, or retyped here must be mirrored there so :func:`override`'s
+    removed, or retyped here must be mirrored there so :func:`override_settings`'s
     typed kwargs stay accurate.  The :func:`test_settings_overrides_matches_user_settings`
     test fails on drift.
     """
@@ -316,13 +316,13 @@ class UserSettings:
 
 
 class _SettingsOverrides(TypedDict, total=False):
-    """Typed kwargs accepted by :func:`override`.
+    """Typed kwargs accepted by :func:`override_settings`.
 
     KEEP IN SYNC WITH :class:`UserSettings` above.  This TypedDict mirrors
     every field on ``UserSettings``; mypy needs the field list spelled out
     statically (it can't introspect through ``get_type_hints(UserSettings)``
     or a dict comprehension).  All keys are optional (``total=False``) so
-    ``override`` can accept any subset of fields.
+    ``override_settings`` can accept any subset of fields.
 
     The :func:`test_settings_overrides_matches_user_settings` test asserts
     that this TypedDict and ``UserSettings`` declare exactly the same
@@ -424,7 +424,7 @@ def replace_settings(
 
     Pass a :class:`UserSettings` instance, a dict (constructed via
     ``UserSettings(**d)``), or None to reset to defaults.  This wipes every
-    field — to change a subset, use :func:`override` instead.
+    field — to change a subset, use :func:`override_settings` instead.
     """
     if settings is None:
         snapshot = UserSettings()
@@ -444,12 +444,14 @@ parse_and_apply_settings = replace_settings
 
 
 @contextmanager
-def override(**fields: Unpack[_SettingsOverrides]) -> Iterator[UserSettings]:
+def override_settings(
+    **fields: Unpack[_SettingsOverrides],
+) -> Iterator[UserSettings]:
     """Scope a partial settings change to the current async context.
 
     Example::
 
-        with override(disabled=True):
+        with override_settings(disabled=True):
             ...
 
     Only valid :class:`UserSettings` field names are accepted, and each value

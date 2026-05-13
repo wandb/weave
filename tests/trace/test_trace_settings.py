@@ -24,7 +24,7 @@ from weave.trace.settings import (
     client_parallelism,
     http_timeout,
     max_calls_queue_size,
-    override,
+    override_settings,
     parse_and_apply_settings,
     redact_pii_fields,
     replace_settings,
@@ -524,11 +524,11 @@ class TestReplaceSettings:
 
 
 @pytest.mark.usefixtures("clean_settings_env")
-class TestOverride:
+class TestOverrideSettings:
     def test_scopes_one_field(self):
         replace_settings(UserSettings(print_call_link=False))
         assert should_disable_weave() is False
-        with override(disabled=True):
+        with override_settings(disabled=True):
             assert should_disable_weave() is True
             # Other fields keep the surrounding snapshot's values
             assert should_print_call_link() is False
@@ -536,9 +536,9 @@ class TestOverride:
         assert should_print_call_link() is False
 
     def test_nested(self):
-        with override(disabled=True):
+        with override_settings(disabled=True):
             assert should_disable_weave() is True
-            with override(print_call_link=False):
+            with override_settings(print_call_link=False):
                 assert should_disable_weave() is True
                 assert should_print_call_link() is False
             assert should_disable_weave() is True
@@ -546,14 +546,14 @@ class TestOverride:
         assert should_disable_weave() is False
 
     def test_unknown_field_raises(self):
-        with pytest.raises(TypeError), override(not_a_real_field=True):
+        with pytest.raises(TypeError), override_settings(not_a_real_field=True):
             pass
 
     def test_async_context_does_not_leak(self):
         """Each async context gets its own override stack."""
 
         async def child():
-            with override(disabled=True):
+            with override_settings(disabled=True):
                 assert should_disable_weave() is True
                 await asyncio.sleep(0)
                 assert should_disable_weave() is True
@@ -630,9 +630,9 @@ class TestUserSettingsValue:
             UserSettings(not_a_field=True)
 
     def test_settings_overrides_typeddict_matches_user_settings(self):
-        """The _SettingsOverrides TypedDict that types override(**fields) must
-        mirror UserSettings exactly (same names, same types).  Drift means the
-        types lie to callers.
+        """The _SettingsOverrides TypedDict that types override_settings(**fields)
+        must mirror UserSettings exactly (same names, same types).  Drift means
+        the types lie to callers.
         """
         user_settings_hints = typing.get_type_hints(UserSettings)
         overrides_hints = typing.get_type_hints(_SettingsOverrides)

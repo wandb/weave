@@ -4,7 +4,7 @@ from unittest.mock import patch
 from litellm.types.utils import ModelResponse
 
 from tests.trace.util import client_is_sqlite
-from weave.trace.settings import override
+from weave.trace.settings import override_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
@@ -77,7 +77,7 @@ def test_completions_create(client):
     # Have to do this since we run the tests in the same process as the server
     # and the inner litellm gets patched!
     with (
-        override(disabled=True),
+        override_settings(disabled=True),
         secret_fetcher_context(DummySecretFetcher()),
         patch("litellm.completion") as mock_completion,
     ):

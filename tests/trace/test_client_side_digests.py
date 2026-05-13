@@ -20,7 +20,7 @@ from weave.shared.digest import (
 )
 from weave.trace.settings import (
     UserSettings,
-    override,
+    override_settings,
     parse_and_apply_settings,
 )
 from weave.trace.weave_client import (
@@ -383,7 +383,7 @@ class TestConvertRefsToInternal:
 
         # Ensure the setting is off so the resolver returns None
         with (
-            override(enable_client_side_digests=False),
+            override_settings(enable_client_side_digests=False),
             pytest.raises(NoInternalProjectIDError),
         ):
             client._convert_refs_to_internal(json_val)
