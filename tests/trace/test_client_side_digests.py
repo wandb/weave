@@ -20,6 +20,7 @@ from weave.shared.digest import (
 )
 from weave.trace.settings import (
     UserSettings,
+    override,
     parse_and_apply_settings,
 )
 from weave.trace.weave_client import (
@@ -376,15 +377,14 @@ class TestConvertRefsToInternal:
         is disabled — get_internal_project_id returns None.
         """
         # Ensure the setting is off so the resolver returns None
-        parse_and_apply_settings(UserSettings(enable_client_side_digests=False))
+        with override(enable_client_side_digests=False):
+            json_val = {
+                "key": "value",
+                "ref": f"weave:///{client.entity}/{client.project}/object/foo:abc123",
+            }
 
-        json_val = {
-            "key": "value",
-            "ref": f"weave:///{client.entity}/{client.project}/object/foo:abc123",
-        }
-
-        with pytest.raises(NoInternalProjectIDError):
-            client._convert_refs_to_internal(json_val)
+            with pytest.raises(NoInternalProjectIDError):
+                client._convert_refs_to_internal(json_val)
 
     def test_raises_for_cross_project_ref(
         self, client: WeaveClient, fast_path: None

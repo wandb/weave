@@ -1,11 +1,10 @@
 """Settings for Weave.
 
 The settings module exposes a process-level configuration value, scoped per
-async-context via a single :class:`ContextVar`.  Read settings via
-:func:`current` (returns a :class:`SettingsView` with environment-variable
-overlay) or one of the back-compat accessor functions (e.g.
-:func:`should_disable_weave`).  Mutate via :func:`apply` (replace-all) or
-:func:`override` (scoped patch).
+async-context via a single :class:`ContextVar`.  Read settings via the
+field-named accessor functions (e.g. :func:`should_disable_weave`).  Mutate
+via :func:`replace_settings` (replace-all snapshot install, used at init) or
+:func:`override` (scoped partial change for the current async context).
 
 Each field's environment variable is ``WEAVE_<FIELD_NAME>`` (uppercased), e.g.
 ``WEAVE_DISABLED`` for the ``disabled`` field.  Environment variables override
@@ -30,7 +29,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Literal, get_args, get_origin, get_type_hints
+from typing import Any, Literal, TypeVar, get_args, get_origin, get_type_hints
 
 DEFAULT_RETRY_MAX_INTERVAL_SECONDS = 60 * 5  # 5 minutes
 SETTINGS_PREFIX = "WEAVE_"
@@ -45,7 +44,9 @@ CALLS_COMPLETE_ENTITY_ALLOWLIST: frozenset[str] = frozenset({"wandb"})
 # Attention Devs:
 # To add a new setting:
 # 1. Add a new field to `UserSettings`
-# 2. Add a thin accessor (e.g. `def should_xyz() -> bool: return current().xyz`)
+# 2. Add a thin accessor (e.g.
+#    `def should_xyz() -> bool:
+#         return _env_or_default("xyz", _current_settings.get().xyz)`)
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,6 +299,9 @@ class UserSettings:
 # Resolve string annotations once at import; used for env-var coercion.
 _FIELD_TYPES: dict[str, Any] = get_type_hints(UserSettings)
 _FIELD_NAMES: frozenset[str] = frozenset(_FIELD_TYPES)
+_ENV_KEYS: dict[str, str] = {
+    name: f"{SETTINGS_PREFIX}{name.upper()}" for name in _FIELD_NAMES
+}
 
 # UserSettings is a frozen dataclass, so this instance is immutable and safe
 # to share as the ContextVar default.
@@ -310,10 +314,6 @@ _current_settings: ContextVar[UserSettings] = ContextVar(
 
 def _parse_bool(v: str) -> bool:
     return v.lower() in {"yes", "true", "1", "on"}
-
-
-# Back-compat alias for callers outside this module.
-_str2bool_truthy = _parse_bool
 
 
 def _parse_env_value(raw: str, annotation: Any) -> Any:
@@ -340,37 +340,29 @@ def _parse_env_value(raw: str, annotation: Any) -> Any:
     return raw
 
 
-class SettingsView:
-    """Read-only view over a :class:`UserSettings` snapshot, with env overlay.
+_T = TypeVar("_T")
 
-    For every field, an environment variable named ``WEAVE_<FIELD_NAME>``
-    overrides the snapshot's value when set to a truthy string (an empty env
-    var falls through to the snapshot, matching the prior helpers' behavior).
+
+def _env_or_default(name: str, default: _T) -> _T:
+    """Return the env-var value for *name* if set, else *default*.
+
+    The field's runtime type annotation is looked up from :data:`_FIELD_TYPES`
+    and used to coerce the env-var string.  Empty env-var strings fall through
+    to the default — matching the prior helpers' truthy-check semantics.
     """
-
-    __slots__ = ("_snapshot",)
-
-    def __init__(self, snapshot: UserSettings) -> None:
-        self._snapshot = snapshot
-
-    def __getattr__(self, name: str) -> Any:
-        if name not in _FIELD_NAMES:
-            raise AttributeError(f"UserSettings has no field {name!r}")
-        if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
-            return _parse_env_value(env, _FIELD_TYPES[name])
-        return getattr(self._snapshot, name)
+    if env := os.getenv(_ENV_KEYS[name]):
+        return _parse_env_value(env, _FIELD_TYPES[name])  # type: ignore[no-any-return]
+    return default
 
 
-def current() -> SettingsView:
-    """Return a view over the current settings snapshot."""
-    return SettingsView(_current_settings.get())
-
-
-def apply(settings: UserSettings | dict[str, Any] | None = None) -> None:
-    """Replace the current settings snapshot.
+def replace_settings(
+    settings: UserSettings | dict[str, Any] | None = None,
+) -> None:
+    """Replace the current settings snapshot wholesale.
 
     Pass a :class:`UserSettings` instance, a dict (constructed via
-    ``UserSettings(**d)``), or None to reset to defaults.
+    ``UserSettings(**d)``), or None to reset to defaults.  This wipes every
+    field — to change a subset, use :func:`override` instead.
     """
     if settings is None:
         snapshot = UserSettings()
@@ -386,12 +378,12 @@ def apply(settings: UserSettings | dict[str, Any] | None = None) -> None:
 
 
 # Back-compat alias for the prior public API.
-parse_and_apply_settings = apply
+parse_and_apply_settings = replace_settings
 
 
 @contextmanager
-def override(**fields: Any) -> Iterator[SettingsView]:
-    """Scope a partial settings override to the current async context.
+def override(**fields: Any) -> Iterator[UserSettings]:
+    """Scope a partial settings change to the current async context.
 
     Example::
 
@@ -401,130 +393,148 @@ def override(**fields: Any) -> Iterator[SettingsView]:
     new_snapshot = replace(_current_settings.get(), **fields)
     token = _current_settings.set(new_snapshot)
     try:
-        yield SettingsView(new_snapshot)
+        yield new_snapshot
     finally:
         _current_settings.reset(token)
 
 
 # ---------------------------------------------------------------------------
-# Accessor functions (back-compat).  New code can call `current().<field>`.
+# Accessor functions — the public read API.  Each reads from the env-var
+# overlay first, then from the current snapshot.
 # ---------------------------------------------------------------------------
 
 
 def should_disable_weave() -> bool:
-    return current().disabled
+    return _env_or_default("disabled", _current_settings.get().disabled)
 
 
 def should_print_call_link() -> bool:
-    return current().print_call_link
+    return _env_or_default("print_call_link", _current_settings.get().print_call_link)
 
 
 def log_level() -> str:
-    return current().log_level or "INFO"
+    return _env_or_default("log_level", _current_settings.get().log_level)
 
 
 def display_viewer() -> str:
-    """Returns the configured display viewer.
-
-    Returns:
-        The display viewer to use (auto, rich, or print).
-    """
-    return current().display_viewer or "auto"
+    """Returns the configured display viewer (auto, rich, or print)."""
+    return _env_or_default("display_viewer", _current_settings.get().display_viewer)
 
 
 def should_capture_code() -> bool:
-    return current().capture_code
+    return _env_or_default("capture_code", _current_settings.get().capture_code)
 
 
 def should_capture_client_info() -> bool:
-    return current().capture_client_info
+    return _env_or_default(
+        "capture_client_info", _current_settings.get().capture_client_info
+    )
 
 
 def should_capture_system_info() -> bool:
-    return current().capture_system_info
+    return _env_or_default(
+        "capture_system_info", _current_settings.get().capture_system_info
+    )
 
 
 def client_parallelism() -> int | None:
-    return current().client_parallelism
+    return _env_or_default(
+        "client_parallelism", _current_settings.get().client_parallelism
+    )
 
 
 def should_redact_pii() -> bool:
-    return current().redact_pii
+    return _env_or_default("redact_pii", _current_settings.get().redact_pii)
 
 
 def redact_pii_fields() -> list[str]:
-    return current().redact_pii_fields
+    return _env_or_default(
+        "redact_pii_fields", _current_settings.get().redact_pii_fields
+    )
 
 
 def redact_pii_exclude_fields() -> list[str]:
-    return current().redact_pii_exclude_fields
+    return _env_or_default(
+        "redact_pii_exclude_fields",
+        _current_settings.get().redact_pii_exclude_fields,
+    )
 
 
 def use_server_cache() -> bool:
-    return current().use_server_cache
+    return _env_or_default(
+        "use_server_cache", _current_settings.get().use_server_cache
+    )
 
 
 def server_cache_size_limit() -> int:
-    return current().server_cache_size_limit or 1_000_000_000
+    return _env_or_default(
+        "server_cache_size_limit", _current_settings.get().server_cache_size_limit
+    )
 
 
 def server_cache_dir() -> str | None:
-    return current().server_cache_dir
+    return _env_or_default(
+        "server_cache_dir", _current_settings.get().server_cache_dir
+    )
 
 
 def scorers_dir() -> str:
-    return current().scorers_dir
+    return _env_or_default("scorers_dir", _current_settings.get().scorers_dir)
 
 
 def max_calls_queue_size() -> int:
-    value = current().max_calls_queue_size
-    if value is None:
-        return 100_000
-    return value
+    return _env_or_default(
+        "max_calls_queue_size", _current_settings.get().max_calls_queue_size
+    )
 
 
 def retry_max_attempts() -> int:
     """Returns the maximum number of retry attempts."""
-    value = current().retry_max_attempts
-    if value is None:
-        return 3
-    return value
+    return _env_or_default(
+        "retry_max_attempts", _current_settings.get().retry_max_attempts
+    )
 
 
 def retry_max_interval() -> float:
     """Returns the maximum interval between retries in seconds."""
-    value = current().retry_max_interval
-    if value is None:
-        return DEFAULT_RETRY_MAX_INTERVAL_SECONDS
-    return value
+    return _env_or_default(
+        "retry_max_interval", _current_settings.get().retry_max_interval
+    )
 
 
 def should_enable_disk_fallback() -> bool:
     """Returns whether disk fallback should be enabled for dropped items."""
-    return current().enable_disk_fallback
+    return _env_or_default(
+        "enable_disk_fallback", _current_settings.get().enable_disk_fallback
+    )
 
 
 def should_use_parallel_table_upload() -> bool:
     """Returns whether parallel table upload chunking should be used."""
-    return current().use_parallel_table_upload
+    return _env_or_default(
+        "use_parallel_table_upload",
+        _current_settings.get().use_parallel_table_upload,
+    )
 
 
 def should_implicitly_patch_integrations() -> bool:
     """Returns whether implicit patching of integrations is enabled."""
-    return current().implicitly_patch_integrations
+    return _env_or_default(
+        "implicitly_patch_integrations",
+        _current_settings.get().implicitly_patch_integrations,
+    )
 
 
 def http_timeout() -> float:
     """Returns the HTTP request timeout in seconds."""
-    value = current().http_timeout
-    if value is None:
-        return 30.0
-    return value
+    return _env_or_default("http_timeout", _current_settings.get().http_timeout)
 
 
 def should_use_stainless_server() -> bool:
     """Returns whether the stainless-generated HTTP client should be used."""
-    return current().use_stainless_server
+    return _env_or_default(
+        "use_stainless_server", _current_settings.get().use_stainless_server
+    )
 
 
 def should_use_calls_complete(entity: str | None = None) -> bool:
@@ -533,21 +543,28 @@ def should_use_calls_complete(entity: str | None = None) -> bool:
     True if the `use_calls_complete` setting/env var is enabled, OR if
     `entity` is in `CALLS_COMPLETE_ENTITY_ALLOWLIST` (dogfood gate).
     """
-    if current().use_calls_complete:
+    if _env_or_default(
+        "use_calls_complete", _current_settings.get().use_calls_complete
+    ):
         return True
     return entity is not None and entity in CALLS_COMPLETE_ENTITY_ALLOWLIST
 
 
 def should_enable_client_side_digests() -> bool:
     """Returns whether client-side digest computation should be used."""
-    return current().enable_client_side_digests
+    return _env_or_default(
+        "enable_client_side_digests",
+        _current_settings.get().enable_client_side_digests,
+    )
 
 
 def should_enable_wal() -> bool:
     """Returns whether the Write-Ahead Log should be used."""
-    return current().enable_wal
+    return _env_or_default("enable_wal", _current_settings.get().enable_wal)
 
 
 def should_disable_wal_sender() -> bool:
     """Returns whether the WAL sender thread should be disabled."""
-    return current().disable_wal_sender
+    return _env_or_default(
+        "disable_wal_sender", _current_settings.get().disable_wal_sender
+    )
