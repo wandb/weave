@@ -11,6 +11,7 @@ import clickhouse_connect
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
+from tests.trace_server.test_project_version import make_project_id
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
@@ -1364,11 +1365,6 @@ def test_file_batch_clears_on_insert_failure():
 # ── version_index ordering with MV-backed _first_created_at ─────────
 
 
-def _make_project_id(prefix: str) -> str:
-    raw = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
-    return base64.b64encode(raw.encode()).decode()
-
-
 def _obj_create(server, project_id, obj_id, val):
     return server.obj_create(
         tsi.ObjCreateReq(
@@ -1393,7 +1389,7 @@ def test_version_index_stable_on_republish(ch_server):
     to its original creation time, so re-inserting digest A doesn't push
     it to the end of the version ordering.
     """
-    project_id = _make_project_id("vidx")
+    project_id = make_project_id("vidx")
     obj_id = "vidx_obj"
 
     r0 = _obj_create(ch_server, project_id, obj_id, {"v": "A"})
@@ -1415,7 +1411,7 @@ def test_version_index_stable_on_republish(ch_server):
 
 def test_delete_preserves_version_index_gaps(ch_server):
     """Deleting a version should leave a gap, not shift indices."""
-    project_id = _make_project_id("vidx")
+    project_id = make_project_id("vidx")
     obj_id = "vidx_gap"
 
     digests = []

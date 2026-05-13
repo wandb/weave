@@ -66,6 +66,8 @@ from weave.trace_server.agents.types import (
     AgentSearchRes,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
+    AgentSpanStatsReq,
+    AgentSpanStatsRes,
     AgentsQueryReq,
     AgentsQueryRes,
     AgentTraceChatReq,
@@ -448,7 +450,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._thread_local.calls_complete_batch = value
 
     @classmethod
-    def from_env(cls, use_async_insert: bool = False, **kwargs: Any) -> Self:
+    def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
         return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
@@ -4541,6 +4543,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             PredictionCreateRes with the prediction_id
         """
         prediction_id = generate_id()
+        genai_span_ref = (
+            req.genai_span_ref.model_dump(exclude_none=True)
+            if req.genai_span_ref is not None
+            else None
+        )
 
         # Determine trace_id and parent_id based on evaluation_run_id
         if req.evaluation_run_id:
@@ -4575,6 +4582,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 version=predict_and_score_op_res.digest,
             )
 
+            predict_and_score_weave_attrs = {
+                constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
+            }
+            if genai_span_ref is not None:
+                predict_and_score_weave_attrs[constants.GENAI_SPAN_REF_ATTR_KEY] = (
+                    genai_span_ref
+                )
+
             # Create the predict_and_score call as a child of the evaluation run
             predict_and_score_start_req = tsi.CallStartReq(
                 start=tsi.StartedCallSchemaForInsert(
@@ -4585,9 +4600,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     op_name=predict_and_score_op_ref.uri,
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={
-                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                            constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
-                        }
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: predict_and_score_weave_attrs
                     },
                     inputs={
                         "self": evaluation_ref,
@@ -6630,24 +6643,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     # observability API is considered stable.
 
     def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
-        return AgentQueryHandler(self._query).spans_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).spans_query(req)
+
+    def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
+        return AgentQueryHandler(self._query, self.feedback_query).spans_stats(req)
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
-        return AgentQueryHandler(self._query).agents_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).agents_query(req)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
-        return AgentQueryHandler(self._query).agent_versions_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).agent_versions_query(
+            req
+        )
 
     def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
-        return AgentQueryHandler(self._query).search_messages(req)
+        return AgentQueryHandler(self._query, self.feedback_query).search_messages(req)
 
     def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
-        return AgentQueryHandler(self._query).traces_chat(req)
+        return AgentQueryHandler(self._query, self.feedback_query).traces_chat(req)
 
     def agent_conversation_chat(
         self, req: AgentConversationChatReq
     ) -> AgentConversationChatRes:
-        return AgentQueryHandler(self._query).conversation_chat(req)
+        return AgentQueryHandler(self._query, self.feedback_query).conversation_chat(
+            req
+        )
 
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)

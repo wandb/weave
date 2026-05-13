@@ -1091,7 +1091,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     operand_part = process_operand(operation.not_[0])
                     cond = f"(NOT ({operand_part}))"
                 elif isinstance(operation, tsi_query.EqOperation):
-                    lhs_part = process_operand(operation.eq_[0])
                     is_multi_value_feedback = _is_multi_value_feedback_operand(
                         operation.eq_[0]
                     )
@@ -1099,32 +1098,50 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         isinstance(operation.eq_[1], tsi_query.LiteralOperation)
                         and operation.eq_[1].literal_ is None
                     ):
+                        lhs_part = process_operand(operation.eq_[0])
                         cond = f"({lhs_part} IS NULL)"
                     elif is_multi_value_feedback:
                         # Multi-value: GROUP_CONCAT result, use INSTR to find value
+                        lhs_part = process_operand(operation.eq_[0])
                         rhs_part = process_operand(operation.eq_[1])
                         cond = f"instr({lhs_part}, {rhs_part})"
                     else:
-                        rhs_part = process_operand(operation.eq_[1])
+                        lhs_part, rhs_part = _process_binary_operands(
+                            operation.eq_[0], operation.eq_[1]
+                        )
                         cond = f"({lhs_part} = {rhs_part})"
                 elif isinstance(operation, tsi_query.GtOperation):
-                    lhs_part = process_operand(operation.gt_[0])
-                    rhs_part = process_operand(operation.gt_[1])
+                    lhs_part, rhs_part = _process_binary_operands(
+                        operation.gt_[0], operation.gt_[1]
+                    )
                     cond = f"({lhs_part} > {rhs_part})"
                 elif isinstance(operation, tsi_query.LtOperation):
-                    lhs_part = process_operand(operation.lt_[0])
-                    rhs_part = process_operand(operation.lt_[1])
+                    lhs_part, rhs_part = _process_binary_operands(
+                        operation.lt_[0], operation.lt_[1]
+                    )
                     cond = f"({lhs_part} < {rhs_part})"
                 elif isinstance(operation, tsi_query.GteOperation):
-                    lhs_part = process_operand(operation.gte_[0])
-                    rhs_part = process_operand(operation.gte_[1])
+                    lhs_part, rhs_part = _process_binary_operands(
+                        operation.gte_[0], operation.gte_[1]
+                    )
                     cond = f"({lhs_part} >= {rhs_part})"
                 elif isinstance(operation, tsi_query.LteOperation):
-                    lhs_part = process_operand(operation.lte_[0])
-                    rhs_part = process_operand(operation.lte_[1])
+                    lhs_part, rhs_part = _process_binary_operands(
+                        operation.lte_[0], operation.lte_[1]
+                    )
                     cond = f"({lhs_part} <= {rhs_part})"
                 elif isinstance(operation, tsi_query.InOperation):
-                    lhs_part = process_operand(operation.in_[0])
+                    in_cast = tsi_query.infer_shared_literal_filter_cast(
+                        operation.in_[1]
+                    )
+                    lhs_field = _process_get_field_with_inferred_cast(
+                        operation.in_[0], in_cast
+                    )
+                    lhs_part = (
+                        lhs_field
+                        if lhs_field is not None
+                        else process_operand(operation.in_[0])
+                    )
                     rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
                     cond = f"({lhs_part} IN ({rhs_part}))"
                 elif isinstance(operation, tsi_query.ContainsOperation):
@@ -1138,6 +1155,39 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     raise TypeError(f"Unknown operation type: {operation}")
 
                 return cond
+
+            def _process_get_field_with_inferred_cast(
+                operand: tsi_query.Operand,
+                cast: tsi_query.CastTo | None,
+            ) -> str | None:
+                if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
+                    return None
+                field = operand.get_field_
+                if field.startswith("feedback."):
+                    if field.startswith(
+                        "feedback.[*]"
+                    ) or _is_multi_value_feedback_operand(operand):
+                        return None
+                    return _sqlite_inferred_scalar_cast_sql(
+                        _build_feedback_subquery(field),
+                        cast,
+                        _sqlite_sql_type_for_cast(cast),
+                    )
+                return _transform_external_calls_field_to_internal_calls_field(
+                    field, cast
+                )
+
+            def _process_binary_operands(
+                lhs: tsi_query.Operand,
+                rhs: tsi_query.Operand,
+            ) -> tuple[str, str]:
+                lhs_cast = tsi_query.infer_literal_filter_cast(rhs)
+                rhs_cast = tsi_query.infer_literal_filter_cast(lhs)
+                lhs_field = _process_get_field_with_inferred_cast(lhs, lhs_cast)
+                rhs_field = _process_get_field_with_inferred_cast(rhs, rhs_cast)
+                lhs_part = lhs_field if lhs_field is not None else process_operand(lhs)
+                rhs_part = rhs_field if rhs_field is not None else process_operand(rhs)
+                return lhs_part, rhs_part
 
             def process_operand(operand: tsi_query.Operand) -> str:
                 if isinstance(operand, tsi_query.LiteralOperation):
@@ -4106,6 +4156,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             PredictionCreateRes with the prediction_id
         """
         prediction_id = generate_id()
+        genai_span_ref = (
+            req.genai_span_ref.model_dump(exclude_none=True)
+            if req.genai_span_ref is not None
+            else None
+        )
 
         # Determine trace_id and parent_id based on evaluation_run_id
         if req.evaluation_run_id:
@@ -4140,6 +4195,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 version=predict_and_score_op_res.digest,
             )
 
+            predict_and_score_weave_attrs = {
+                constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
+            }
+            if genai_span_ref is not None:
+                predict_and_score_weave_attrs[constants.GENAI_SPAN_REF_ATTR_KEY] = (
+                    genai_span_ref
+                )
+
             # Create the predict_and_score call as a child of the evaluation run
             predict_and_score_start_req = tsi.CallStartReq(
                 start=tsi.StartedCallSchemaForInsert(
@@ -4150,9 +4213,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     op_name=predict_and_score_op_ref.uri,
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={
-                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                            constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
-                        }
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: predict_and_score_weave_attrs
                     },
                     inputs={
                         "self": evaluation_ref,
@@ -5086,6 +5147,99 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
+def _sqlite_text_is_plain_decimal_sql(text_sql: str, *, allow_dot: bool = True) -> str:
+    """SQLite predicate for 'text is a plain numeric string'.
+
+    With `allow_dot=True` (default): one or more digits with at most one `.`,
+    nothing else. With `allow_dot=False`: digits only. No leading sign, no
+    exponent notation. Strings that don't match parse to NULL instead of
+    coercing (SQLite's CAST AS INT truncates `'1.5'` to 1, which would
+    diverge from `toInt64OrNull('1.5')` returning NULL on ClickHouse).
+    """
+    digits = f"replace({text_sql}, '.', '')"
+    base = f"({text_sql} != '' AND {digits} != '' AND {digits} NOT GLOB '*[^0-9]*'"
+    if allow_dot:
+        dot_count = f"(length({text_sql}) - length({digits}))"
+        return f"{base} AND {dot_count} <= 1)"
+    return f"{base} AND {digits} = {text_sql})"
+
+
+def _sqlite_sql_type_for_cast(cast: str) -> str:
+    if cast == "int":
+        return "INT"
+    if cast in {"double", "float"}:
+        return "FLOAT"
+    if cast == "bool":
+        return "BOOL"
+    if cast in {"str", "string"}:
+        return "TEXT"
+    raise ValueError(f"Unknown cast: {cast}")
+
+
+def _sqlite_inferred_scalar_cast_sql(
+    value_sql: str,
+    cast: str,
+    sql_type: str,
+) -> str:
+    cast_sql = f"CAST({value_sql} AS {sql_type})"
+    text_sql = f"CAST({value_sql} AS TEXT)"
+    # int and bool casts must reject dotted decimal text - `CAST('1.5' AS INT)`
+    # truncates to 1 in SQLite, which would diverge from `toInt64OrNull('1.5')`
+    # returning NULL on ClickHouse. float/double casts keep the dot allowance.
+    allow_dot = cast in {"double", "float"}
+    plain_decimal = _sqlite_text_is_plain_decimal_sql(text_sql, allow_dot=allow_dot)
+    if cast in {"int", "double", "float"}:
+        return f"CASE WHEN {plain_decimal} THEN {cast_sql} ELSE NULL END"
+    text_value = f"lower(trim({text_sql}))"
+    return (
+        f"CASE WHEN {text_value} = 'true' THEN 1 "
+        f"WHEN {text_value} = 'false' THEN 0 "
+        f"WHEN {plain_decimal} THEN {cast_sql} "
+        f"ELSE NULL END"
+    )
+
+
+def _sqlite_inferred_json_cast_sql(
+    json_extract_sql: str,
+    json_type_sql: str,
+    cast: str,
+    sql_type: str,
+) -> str:
+    # SQLite CAST coerces nonnumeric text and structured JSON to 0. Inferred
+    # casts should instead behave like ClickHouse's to*OrNull family: native
+    # numeric JSON converts, plain-decimal text converts, everything else
+    # (objects, arrays, exponent notation, signed text) becomes NULL.
+    cast_sql = f"CAST({json_extract_sql} AS {sql_type})"
+    text_sql = f"CAST({json_extract_sql} AS TEXT)"
+    # int and bool casts must reject dotted decimal text so SQLite's
+    # truncating `CAST('1.5' AS INT) = 1` doesn't diverge from ClickHouse's
+    # `toInt64OrNull('1.5') = NULL`. Float/double casts keep the dot.
+    allow_dot = cast in {"double", "float"}
+    plain_decimal = _sqlite_text_is_plain_decimal_sql(text_sql, allow_dot=allow_dot)
+    if cast == "int":
+        return (
+            f"CASE WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
+            f"WHEN {json_type_sql} = 'text' AND {plain_decimal} THEN {cast_sql} "
+            f"ELSE NULL END"
+        )
+    if cast in {"double", "float"}:
+        return (
+            f"CASE WHEN {json_type_sql} IN ('integer', 'real') THEN {cast_sql} "
+            f"WHEN {json_type_sql} = 'text' AND {plain_decimal} THEN {cast_sql} "
+            f"ELSE NULL END"
+        )
+    text_value = f"lower(trim({text_sql}))"
+    return (
+        f"CASE WHEN {json_type_sql} = 'true' THEN 1 "
+        f"WHEN {json_type_sql} = 'false' THEN 0 "
+        f"WHEN {json_type_sql} = 'integer' THEN {cast_sql} "
+        f"WHEN {json_type_sql} = 'text' AND {text_value} = 'true' THEN 1 "
+        f"WHEN {json_type_sql} = 'text' AND {text_value} = 'false' THEN 0 "
+        f"WHEN {json_type_sql} = 'text' AND {plain_decimal} THEN {cast_sql} "
+        f"ELSE NULL END"
+    )
+
+
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: str | None = None,
@@ -5136,27 +5290,21 @@ def _transform_external_calls_field_to_internal_calls_field(
         field = "summary"
 
     if json_path is not None:
+        json_column = field
         sql_type = "TEXT"
         if cast is not None:
-            if cast == "int":
-                sql_type = "INT"
-            elif cast == "float":
-                sql_type = "FLOAT"
-            elif cast == "bool":
-                sql_type = "BOOL"
-            elif cast == "str":
-                sql_type = "TEXT"
-            else:
-                raise ValueError(f"Unknown cast: {cast}")
-        field = (
-            "CAST(json_extract("
-            + json.dumps(field)
-            + ", '"
-            + json_path
-            + "') AS "
-            + sql_type
-            + ")"
+            sql_type = _sqlite_sql_type_for_cast(cast)
+        json_extract_sql = (
+            "json_extract(" + json.dumps(json_column) + ", '" + json_path + "')"
         )
+        field = f"CAST({json_extract_sql} AS {sql_type})"
+        if cast in {"int", "double", "bool"}:
+            json_type_sql = (
+                "json_type(" + json.dumps(json_column) + ", '" + json_path + "')"
+            )
+            field = _sqlite_inferred_json_cast_sql(
+                json_extract_sql, json_type_sql, cast, sql_type
+            )
 
     return field
 

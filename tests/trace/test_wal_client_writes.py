@@ -9,6 +9,7 @@ Covers:
 
 from __future__ import annotations
 
+import datetime
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -17,7 +18,6 @@ import pytest
 from PIL import Image
 
 import weave
-import weave.trace.settings
 from weave.durability.wal_client_id import compute_client_id
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
@@ -31,7 +31,7 @@ from weave.durability.wal_sender import (
 )
 from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace import weave_client
-from weave.trace.settings import UserSettings
+from weave.trace.settings import UserSettings, override_settings
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -470,6 +470,69 @@ class TestTraceServerHandlers:
 
         mock_server.table_create.assert_called_once()
 
+    def test_file_create_roundtrips_bytes_content(self):
+        """file_create handler must preserve bytes content through replay.
+
+        Regression guard for the model_validate(dict) replay path: Pydantic
+        v2 dumps bytes fields as utf-8 strings under mode="json", and
+        model_validate accepts strings for bytes fields by re-encoding them.
+        The round-trip must be lossless for content that actually reaches
+        the WAL (non-utf8 bytes already fail at write time, so they never
+        reach replay).
+        """
+        mock_server = MagicMock()
+        handlers = TraceServerHandlers(mock_server).as_dict()
+
+        # utf-8-decodable content — this is the only kind that can reach the
+        # WAL today (model_dump(mode="json") rejects non-utf8 bytes at write
+        # time, so non-utf8 content never appears in a replayed record).
+        original_content = "small file body — including non-ascii: café 🎉".encode()
+        req = tsi.FileCreateReq(
+            project_id="e/p",
+            name="note.txt",
+            content=original_content,
+        )
+        # Match the write path exactly: same call as wal_manager.write does.
+        record = {"type": "file_create", "req": req.model_dump(mode="json")}
+        handlers["file_create"](record)
+
+        mock_server.file_create.assert_called_once()
+        call_arg = mock_server.file_create.call_args[0][0]
+        assert isinstance(call_arg, tsi.FileCreateReq)
+        assert call_arg.content == original_content
+
+    def test_call_start_roundtrips_through_handler(self):
+        """call_start handler validates the dict directly (no json.dumps).
+
+        Regression guard for the dominant WAL replay path — every traced
+        op produces a call_start record.  datetime, dict, and string
+        fields must all round-trip correctly via model_validate(dict).
+        """
+        mock_server = MagicMock()
+        handlers = TraceServerHandlers(mock_server).as_dict()
+
+        started = datetime.datetime.now(datetime.timezone.utc)
+        req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id="e/p",
+                op_name="predict",
+                trace_id="t1",
+                started_at=started,
+                attributes={"k": "v"},
+                inputs={"x": 1},
+            )
+        )
+        record = {"type": "call_start", "req": req.model_dump(mode="json")}
+        handlers["call_start"](record)
+
+        mock_server.call_start.assert_called_once()
+        call_arg = mock_server.call_start.call_args[0][0]
+        assert isinstance(call_arg, tsi.CallStartReq)
+        assert call_arg.start.op_name == "predict"
+        assert call_arg.start.started_at == started
+        assert call_arg.start.attributes == {"k": "v"}
+        assert call_arg.start.inputs == {"x": 1}
+
     def test_convenience_function_matches_class(self):
         """build_trace_server_handlers should return the same keys as the class."""
         mock_server = MagicMock()
@@ -504,38 +567,32 @@ class TestWALClientApiKeyNamespacing:
     def test_wal_directory_is_namespaced_by_api_key(self, client):
         """When api_key is provided, the WAL dir includes an HMAC subdirectory."""
         api_key = "wk-test-key-for-wal-namespacing"
-        settings = UserSettings(enable_wal=True, disable_wal_sender=True)
-        weave.trace.settings.parse_and_apply_settings(settings)
-
-        wc = weave_client.WeaveClient(
-            client.entity,
-            client.project,
-            client.server,
-            ensure_project_exists=False,
-            api_key=api_key,
-        )
-        try:
-            assert wc._wal is not None
-            expected_suffix = compute_client_id(api_key)
-            assert wc._wal.wal_dir.endswith(expected_suffix)
-        finally:
-            wc._wal.close()
-            weave.trace.settings.parse_and_apply_settings(UserSettings())
+        with override_settings(enable_wal=True, disable_wal_sender=True):
+            wc = weave_client.WeaveClient(
+                client.entity,
+                client.project,
+                client.server,
+                ensure_project_exists=False,
+                api_key=api_key,
+            )
+            try:
+                assert wc._wal is not None
+                expected_suffix = compute_client_id(api_key)
+                assert wc._wal.wal_dir.endswith(expected_suffix)
+            finally:
+                wc._wal.close()
 
     def test_wal_directory_not_namespaced_without_api_key(self, client):
         """When api_key is None, the WAL dir is the flat entity/project path."""
-        settings = UserSettings(enable_wal=True, disable_wal_sender=True)
-        weave.trace.settings.parse_and_apply_settings(settings)
-
-        wc = weave_client.WeaveClient(
-            client.entity,
-            client.project,
-            client.server,
-            ensure_project_exists=False,
-        )
-        try:
-            assert wc._wal is not None
-            assert wc._wal.wal_dir.endswith(wc.project)
-        finally:
-            wc._wal.close()
-            weave.trace.settings.parse_and_apply_settings(UserSettings())
+        with override_settings(enable_wal=True, disable_wal_sender=True):
+            wc = weave_client.WeaveClient(
+                client.entity,
+                client.project,
+                client.server,
+                ensure_project_exists=False,
+            )
+            try:
+                assert wc._wal is not None
+                assert wc._wal.wal_dir.endswith(wc.project)
+            finally:
+                wc._wal.close()

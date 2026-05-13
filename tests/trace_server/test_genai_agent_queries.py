@@ -4,10 +4,10 @@ Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
 Migration 030 creates the genai tables automatically.
 """
 
-import base64
 import datetime
 import uuid
 
+from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
@@ -18,15 +18,16 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSpanGroupFilter,
+    AgentSpanMeasureSpec,
     AgentSpansQueryReq,
+    AgentSpanStatsMetricSpec,
+    AgentSpanStatsNumericBucketSpec,
+    AgentSpanStatsReq,
+    AgentSpanValueRef,
     AgentsQueryReq,
 )
 from weave.trace_server.interface.query import Query
-
-
-def _make_project_id(prefix: str) -> str:
-    raw = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
-    return base64.b64encode(raw.encode()).decode()
 
 
 def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
@@ -238,6 +239,50 @@ def test_group_by_conversation_id(ch_server):
     assert "Beta Chat" in by_conv[conv_b].conversation_names
 
 
+def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):
+    """Grouped conversation queries support server-side aggregate range filters."""
+    project_id = _make_project_id("convs_num")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+
+    spans = [
+        _make_span(project_id, conversation_id=conv_a, started_at=now),
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            group_filters=[
+                AgentSpanGroupFilter(
+                    measure=AgentSpanMeasureSpec(
+                        alias="span_count",
+                        aggregation="count",
+                    ),
+                    min=2,
+                ),
+            ],
+        )
+    )
+
+    by_conv = {g.group_keys["conversation_id"]: g for g in res.groups}
+    assert conv_a in by_conv
+    assert conv_b not in by_conv
+    assert res.total_count == 1
+
+
 # ---------------------------------------------------------------------------
 # Test: group by a custom_attrs_string map key (the new capability)
 # ---------------------------------------------------------------------------
@@ -286,6 +331,430 @@ def test_group_by_custom_attrs(ch_server):
     assert by_env["prod"].total_input_tokens == 300
     assert by_env["staging"].span_count == 1
     assert by_env["staging"].total_input_tokens == 50
+
+
+# ---------------------------------------------------------------------------
+# Test: Agent span stats
+# ---------------------------------------------------------------------------
+
+
+def test_agent_span_stats_ungrouped_metrics(ch_server):
+    """Stats API returns requested token, duration, error, and invocation metrics."""
+    project_id = _make_project_id("stats")
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            input_tokens=100,
+            output_tokens=25,
+            operation_name="invoke_agent",
+            status_code="OK",
+            started_at=start + datetime.timedelta(seconds=10),
+            ended_at=start + datetime.timedelta(seconds=10, milliseconds=100),
+        ),
+        _make_span(
+            project_id,
+            input_tokens=200,
+            output_tokens=50,
+            operation_name="chat",
+            status_code="ERROR",
+            started_at=start + datetime.timedelta(seconds=20),
+            ended_at=start + datetime.timedelta(seconds=20, milliseconds=300),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=1),
+            granularity=3600,
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="input_tokens",
+                    value_type="number",
+                    value=AgentSpanValueRef(
+                        source="field",
+                        key="usage.input_tokens",
+                    ),
+                    aggregations=["sum"],
+                ),
+                AgentSpanStatsMetricSpec(
+                    alias="duration_ms",
+                    value_type="number",
+                    value=AgentSpanValueRef(source="derived", key="duration_ms"),
+                    aggregations=["avg"],
+                    percentiles=[95],
+                ),
+                AgentSpanStatsMetricSpec(
+                    alias="errors",
+                    value_type="boolean",
+                    value=AgentSpanValueRef(source="derived", key="is_error"),
+                    aggregations=["count_true"],
+                ),
+                AgentSpanStatsMetricSpec(
+                    alias="invocations",
+                    value_type="boolean",
+                    value=AgentSpanValueRef(source="derived", key="is_invocation"),
+                    aggregations=["count_true"],
+                ),
+            ],
+        )
+    )
+
+    assert res.granularity == 3600
+    assert len(res.rows) == 1
+    row = res.rows[0]
+    assert row["sum_input_tokens"] == 300
+    assert row["avg_duration_ms"] == 200
+    assert row["p95_duration_ms"] is not None
+    assert row["count_true_errors"] == 1
+    assert row["count_true_invocations"] == 1
+
+
+def test_agent_span_stats_numeric_value_buckets(ch_server):
+    """Stats API can bucket the full filtered span set by numeric value range."""
+    project_id = _make_project_id("stats_hist")
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            input_tokens=10,
+            started_at=start + datetime.timedelta(seconds=10),
+            ended_at=start + datetime.timedelta(seconds=10, milliseconds=100),
+        ),
+        _make_span(
+            project_id,
+            input_tokens=20,
+            started_at=start + datetime.timedelta(seconds=20),
+            ended_at=start + datetime.timedelta(seconds=20, milliseconds=200),
+        ),
+        _make_span(
+            project_id,
+            input_tokens=30,
+            started_at=start + datetime.timedelta(seconds=30),
+            ended_at=start + datetime.timedelta(seconds=30, milliseconds=300),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=1),
+            bucket_by=AgentSpanStatsNumericBucketSpec(
+                type="number",
+                value=AgentSpanValueRef(
+                    source="field",
+                    key="usage.input_tokens",
+                ),
+                bins=2,
+            ),
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="spans",
+                    value_type="boolean",
+                    value=AgentSpanValueRef(source="derived", key="is_error"),
+                    aggregations=["count"],
+                ),
+            ],
+        )
+    )
+
+    assert res.bucket_type == "number"
+    assert res.granularity is None
+    assert [row["count_spans"] for row in res.rows] == [1, 2]
+    assert res.rows[0]["bucket_min"] == 10
+    assert res.rows[-1]["bucket_max"] == 30
+
+
+def test_agent_span_stats_conversation_numeric_value_buckets(ch_server):
+    """Stats API can bucket grouped conversation aggregate values."""
+    project_id = _make_project_id("stats_conv_hist")
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_c = f"conv-{uuid.uuid4().hex[:8]}"
+
+    spans = [
+        _make_span(project_id, conversation_id=conv_a, started_at=start),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            started_at=start + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            started_at=start + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_c,
+            started_at=start + datetime.timedelta(seconds=3),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_c,
+            started_at=start + datetime.timedelta(seconds=4),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_c,
+            started_at=start + datetime.timedelta(seconds=5),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=1),
+            bucket_by=AgentSpanStatsNumericBucketSpec(
+                type="number",
+                bins=2,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measure=AgentSpanMeasureSpec(
+                    alias="span_count",
+                    aggregation="count",
+                ),
+            ),
+            group_filters=[
+                AgentSpanGroupFilter(
+                    measure=AgentSpanMeasureSpec(
+                        alias="span_count",
+                        aggregation="count",
+                    ),
+                    min=2,
+                ),
+            ],
+        )
+    )
+
+    assert res.bucket_type == "number"
+    assert [row["count"] for row in res.rows] == [1, 1]
+    assert res.rows[0]["bucket_min"] == 2
+    assert res.rows[-1]["bucket_max"] == 3
+
+
+def test_agent_span_stats_time_buckets_filter_conversation_aggregates(ch_server):
+    """Time-bucket stats can filter to conversations matching aggregate ranges."""
+    project_id = _make_project_id("stats_conv_time_filter")
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_c = f"conv-{uuid.uuid4().hex[:8]}"
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            input_tokens=5,
+            output_tokens=0,
+            started_at=start + datetime.timedelta(minutes=10),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            input_tokens=10,
+            output_tokens=0,
+            started_at=start + datetime.timedelta(minutes=20),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            input_tokens=20,
+            output_tokens=0,
+            started_at=start + datetime.timedelta(hours=1, minutes=20),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_c,
+            input_tokens=1,
+            output_tokens=0,
+            started_at=start + datetime.timedelta(hours=1, minutes=30),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=2),
+            granularity=3600,
+            group_filters=[
+                AgentSpanGroupFilter(
+                    measure=AgentSpanMeasureSpec(
+                        alias="total_tokens",
+                        aggregation="sum",
+                        value=AgentSpanValueRef(source="derived", key="total_tokens"),
+                        value_type="number",
+                    ),
+                    min=20,
+                )
+            ],
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="conversations",
+                    value_type="string",
+                    value=AgentSpanValueRef(
+                        source="field",
+                        key="conversation_id",
+                    ),
+                    aggregations=["count_distinct"],
+                ),
+            ],
+        )
+    )
+
+    assert res.bucket_type == "time"
+    assert [row["count_distinct_conversations"] for row in res.rows] == [1, 1]
+
+
+def test_agent_span_stats_buckets_custom_measure_per_conversation(ch_server):
+    """Numeric stats can bucket an aggregate of custom attrs per conversation."""
+    project_id = _make_project_id("stats_custom_measure_bucket")
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_c = f"conv-{uuid.uuid4().hex[:8]}"
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            custom_attrs_float={"score": 0.2},
+            started_at=start,
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            custom_attrs_float={"score": 0.5},
+            started_at=start + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            custom_attrs_float={"score": 0.7},
+            started_at=start + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_c,
+            custom_attrs_float={"score": 0.9},
+            started_at=start + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=1),
+            bucket_by=AgentSpanStatsNumericBucketSpec(
+                type="number",
+                bins=2,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measure=AgentSpanMeasureSpec(
+                    alias="avg_score",
+                    aggregation="avg",
+                    value=AgentSpanValueRef(
+                        source="custom_attrs_float",
+                        key="score",
+                    ),
+                    value_type="number",
+                ),
+            ),
+            metrics=[],
+        )
+    )
+
+    assert res.bucket_type == "number"
+    assert [row["count"] for row in res.rows] == [1, 2]
+    assert res.rows[0]["bucket_min"] == 0.2
+    assert res.rows[-1]["bucket_max"] == 0.9
+
+
+def test_agent_span_stats_groups_by_custom_attrs(ch_server):
+    """Stats API can group chart rows by typed custom attribute map keys."""
+    project_id = _make_project_id("stats_cattr")
+    start = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_float={"score": 0.8},
+            input_tokens=100,
+            output_tokens=10,
+            started_at=start + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_float={"score": 0.6},
+            input_tokens=200,
+            output_tokens=20,
+            started_at=start + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            custom_attrs_string={"env": "staging"},
+            custom_attrs_float={"score": 0.4},
+            input_tokens=50,
+            output_tokens=5,
+            started_at=start + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=start + datetime.timedelta(hours=1),
+            granularity=3600,
+            group_by=[
+                AgentGroupByRef(
+                    source="custom_attrs_string",
+                    key="env",
+                    alias="env",
+                )
+            ],
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="tokens",
+                    value_type="number",
+                    value=AgentSpanValueRef(source="derived", key="total_tokens"),
+                    aggregations=["sum"],
+                ),
+                AgentSpanStatsMetricSpec(
+                    alias="score",
+                    value_type="number",
+                    value=AgentSpanValueRef(
+                        source="custom_attrs_float",
+                        key="score",
+                    ),
+                    aggregations=["avg", "count"],
+                ),
+            ],
+        )
+    )
+
+    by_env = {row["env"]: row for row in res.rows}
+    assert by_env["prod"]["sum_tokens"] == 330
+    assert abs(by_env["prod"]["avg_score"] - 0.7) < 1e-9
+    assert by_env["prod"]["count_score"] == 2
+    assert by_env["staging"]["sum_tokens"] == 55
+    assert abs(by_env["staging"]["avg_score"] - 0.4) < 1e-9
+    assert by_env["staging"]["count_score"] == 1
 
 
 # ---------------------------------------------------------------------------
