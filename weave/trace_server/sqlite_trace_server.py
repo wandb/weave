@@ -410,6 +410,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 val_dump TEXT,
                 digest TEXT,
                 version_index INTEGER,
+                -- TODO(WB-32435 follow-up): drop `is_latest`. As of WB-32435
+                -- the "latest" alias in the aliases table is the source of
+                -- truth; this column is written by obj_create but read
+                -- nowhere. Must be dropped in a release after WB-32435 has
+                -- fully baked, otherwise old binaries still rolling will
+                -- crash on the INSERT.
                 is_latest INTEGER,
                 deleted_at TEXT,
                 primary key (project_id, kind, object_id, digest)
@@ -495,23 +501,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             """
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
-        # Backfill "latest" alias for every existing object that doesn't
-        # already have one (legacy data created before the explicit alias
-        # write). INSERT OR IGNORE keeps real alias rows intact. Runs after
-        # all DDL to avoid SQLite's "schema locked" interaction.
-        # Layering note: this is a one-shot data migration colocated in
-        # setup_tables for now because SQLite has no separate migration
-        # framework. It is idempotent under INSERT OR IGNORE; if a real
-        # SQLite migration system gets added later, lift this out.
-        cursor.execute(
-            """
-            INSERT OR IGNORE INTO aliases (project_id, object_id, alias, digest, created_at)
-            SELECT project_id, object_id, 'latest', digest, '1970-01-01 00:00:00'
-            FROM objects
-            WHERE is_latest = 1 AND deleted_at IS NULL
-            """
-        )
-        conn.commit()
 
     def _get_project_retention_days(self, project_id: str) -> int:
         """Return retention_days for a project (RETENTION_DAYS_NO_TTL = no TTL).
