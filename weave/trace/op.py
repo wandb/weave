@@ -1451,6 +1451,12 @@ ON_AYIELD_MSG = (
 
 
 def _call_on_close_for_wrapper_ref(wrapper_ref: weakref.ReferenceType) -> None:
+    """Process-exit finalizer callback for a weakly referenced wrapper.
+
+    weakref.finalize must not capture self or a bound method here; doing so
+    would keep the wrapper alive and reintroduce the leak. At normal GC time
+    wrapper_ref() may already be None, so __del__ remains the GC cleanup path.
+    """
     wrapper = wrapper_ref()
     if wrapper is not None:
         wrapper._call_on_close_once()
@@ -1491,7 +1497,7 @@ class _IteratorWrapper(Generic[V]):
             return
 
         try:
-            self._on_close()  # type: ignore
+            self._on_close()
         except Exception:
             # Even if an exception occurs, we need to ensure we clean up the call context
             current_call = call_context.get_current_call()
