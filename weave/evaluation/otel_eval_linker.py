@@ -42,7 +42,8 @@ def _get_evaluation_name(predict_and_score_call: Call) -> str | None:
     """Walk up from predict_and_score to the parent evaluate call and return the eval display name."""
     for call in reversed(call_context.get_call_stack()):
         if call.func_name == constants.EVALUATION_RUN_OP_NAME:
-            return call.display_name
+            name = call.display_name
+            return name if isinstance(name, str) else None
     return None
 
 
