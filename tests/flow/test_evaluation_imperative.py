@@ -42,6 +42,11 @@ def test_basic_evaluation(
 ):
     ev = EvaluationLogger()
 
+    # The imperative root `Evaluation.evaluate` op must mirror the declarative
+    # path and ship its start eagerly so the eval is visible in the UI before
+    # any predictions or `log_summary()` arrive.
+    assert ev._pseudo_evaluation.evaluate.eager_call_start is True
+
     outputs = []
     score1_results = []
     score2_results = []
@@ -155,6 +160,42 @@ def test_basic_evaluation(
             "total_examples": 3,
         },
     }
+
+
+def test_meta_attributes_propagate_to_all_calls(
+    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
+):
+    ev = EvaluationLogger._create_with_meta({"foo": True})
+
+    for row in user_dataset:
+        output = user_model(row["a"], row["b"])
+        pred = ev.log_prediction(inputs=row, output=output)
+        pred.log_score(scorer="my_score", score=output > 2)
+        pred.finish()
+
+    ev.log_summary({"avg_score": 1.0})
+    client.flush()
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in client.get_calls():
+        by_op[op_name_from_call(c)].append(c)
+
+    expected_meta = {"imperative": True, "foo": True}
+    op_names = [
+        "Evaluation.evaluate",
+        "Evaluation.predict_and_score",
+        "Model.predict",
+        "my_score",
+        "Evaluation.summarize",
+    ]
+    for op_name in op_names:
+        assert by_op[op_name], f"no calls found for {op_name}"
+        for call in by_op[op_name]:
+            meta = call.attributes["_weave_eval_meta"]
+            for k, v in expected_meta.items():
+                assert meta.get(k) == v, (
+                    f"{op_name} call missing {k}={v} in _weave_eval_meta; got {meta!r}"
+                )
 
 
 def test_evaluation_with_custom_models_and_scorers(

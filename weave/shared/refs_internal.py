@@ -200,8 +200,60 @@ class InternalArtifactRef:
         return u
 
 
+@dataclass(frozen=True)
+class InternalAgentTurnRef:
+    project_id: str
+    trace_id: str
+
+    def __post_init__(self) -> None:
+        validate_no_slashes(self.project_id, "project_id")
+        validate_no_slashes(self.trace_id, "trace_id")
+
+    @CallableProperty
+    def uri(self) -> str:
+        return (
+            f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/agent_turn/{self.trace_id}"
+        )
+
+
+@dataclass(frozen=True)
+class InternalAgentConversationRef:
+    project_id: str
+    conversation_id: str
+
+    def __post_init__(self) -> None:
+        validate_no_slashes(self.project_id, "project_id")
+
+    @CallableProperty
+    def uri(self) -> str:
+        return (
+            f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/agent_conversation/"
+            f"{extra_value_quoter(self.conversation_id)}"
+        )
+
+
+@dataclass(frozen=True)
+class InternalAgentSpanRef:
+    project_id: str
+    span_id: str
+
+    def __post_init__(self) -> None:
+        validate_no_slashes(self.project_id, "project_id")
+        validate_no_slashes(self.span_id, "span_id")
+
+    @CallableProperty
+    def uri(self) -> str:
+        return f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/agent_span/{self.span_id}"
+
+
 InternalRef = (
-    InternalObjectRef | InternalTableRef | InternalCallRef | InternalArtifactRef
+    InternalObjectRef
+    | InternalTableRef
+    | InternalCallRef
+    | InternalArtifactRef
+    | InternalAgentTurnRef
+    | InternalAgentConversationRef
+    | InternalAgentSpanRef
 )
 
 
@@ -253,6 +305,21 @@ def parse_internal_uri(
     elif kind == "artifact":
         id_ = remaining[0]
         return InternalArtifactRef(project_id=project_id, id=id_)
+    elif kind in {"agent_turn", "agent_conversation", "agent_span"}:
+        if len(remaining) != 1:
+            raise InvalidInternalRef(
+                f"Invalid URI: {uri}. {kind} ref must have exactly one path "
+                f"segment after the kind; got {len(remaining)}. "
+                f"IDs containing '/' must be URL-encoded."
+            )
+        if kind == "agent_turn":
+            return InternalAgentTurnRef(project_id=project_id, trace_id=remaining[0])
+        if kind == "agent_conversation":
+            return InternalAgentConversationRef(
+                project_id=project_id,
+                conversation_id=urllib.parse.unquote(remaining[0]),
+            )
+        return InternalAgentSpanRef(project_id=project_id, span_id=remaining[0])
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
 

@@ -13,18 +13,21 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
+from weave.shared import refs_internal as ri
 from weave.trace_server.agents.chat_view import build_trace_chat
 from weave.trace_server.agents.constants import (
     MAX_INGEST_ERRORS_REPORTED,
     NO_CONVERSATION_LABEL,
-    SEARCH_CONTENT_PREVIEW_CHARS,
 )
 from weave.trace_server.agents.helpers import (
     genai_span_to_row,
     normalize_span_row,
     unpack_string_array,
 )
-from weave.trace_server.agents.schema import ALL_SPAN_INSERT_COLUMNS
+from weave.trace_server.agents.schema import (
+    ALL_SPAN_INSERT_COLUMNS,
+    AgentSpanCHInsertable,
+)
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -37,6 +40,9 @@ from weave.trace_server.agents.types import (
     AgentSpanSchema,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
+    AgentSpanStatsCell,
+    AgentSpanStatsReq,
+    AgentSpanStatsRes,
     AgentsQueryReq,
     AgentsQueryRes,
     AgentTraceChatReq,
@@ -52,6 +58,7 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
+    group_by_ref_alias,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -65,6 +72,18 @@ from weave.trace_server.query_builder.agent_query_builder import (
     safe_int,
     safe_str,
 )
+from weave.trace_server.query_builder.agent_stats_query_builder import (
+    build_agent_span_stats_query,
+)
+from weave.trace_server.trace_server_common import (
+    AgentFeedbackByTarget,
+    group_agent_feedback_by_target,
+    make_agent_feedback_query_req,
+)
+from weave.trace_server.trace_server_interface import (
+    FeedbackQueryReq,
+    FeedbackQueryRes,
+)
 
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
@@ -76,6 +95,10 @@ logger = logging.getLogger(__name__)
 QueryParams: TypeAlias = dict[str, Any]
 ClickHouseRow: TypeAlias = dict[str, Any]
 QueryFn = Callable[[str, QueryParams], "QueryResult"]
+
+#: Signature of the server's `feedback_query` method.
+FeedbackQueryFn = Callable[[FeedbackQueryReq], FeedbackQueryRes]
+
 PaginatedReqT = TypeVar(
     "PaginatedReqT",
     AgentSpansQueryReq,
@@ -92,10 +115,13 @@ class AgentQueryHandler:
 
     Takes a `query_fn` (typically the server's `_query` method) so queries
     participate in the same logging / ddtrace / error-handling wrapper as the
-    rest of the trace server.
+    rest of the trace server. Also takes a `feedback_query_fn` (the server's
+    `feedback_query` method), invoked only when ``include_feedback=True`` to
+    fold agent-target feedback into the chat response.
     """
 
     _query: QueryFn
+    _feedback_query: FeedbackQueryFn
 
     # ------------------------------------------------------------------
     # Spans query (ungrouped + grouped)
@@ -117,9 +143,25 @@ class AgentQueryHandler:
             spans = [AgentSpanSchema(**normalize_span_row(r)) for r in rows]
             return AgentSpansQueryRes(spans=spans, total_count=total)
 
-        aliases = [ref.alias or ref.key for ref in req.group_by]
-        groups = [_hydrate_group_row(r, aliases) for r in rows]
+        aliases = [group_by_ref_alias(ref) for ref in req.group_by]
+        measure_aliases = [measure.alias for measure in req.measures]
+        groups = [_hydrate_group_row(r, aliases, measure_aliases) for r in rows]
         return AgentSpansQueryRes(groups=groups, total_count=total)
+
+    def spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
+        """Return chart-ready aggregations over spans."""
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        query = build_agent_span_stats_query(req, pb)
+        result = self._query(query.sql, query.parameters)
+        return AgentSpanStatsRes(
+            start=query.start,
+            end=query.end,
+            granularity=query.granularity_seconds,
+            timezone=req.timezone or "UTC",
+            bucket_type=query.bucket_type,
+            columns=query.column_metadata,
+            rows=_rows_to_dicts(query.columns, result.result_rows),
+        )
 
     # ------------------------------------------------------------------
     # AMT-backed agents queries
@@ -181,9 +223,7 @@ class AgentQueryHandler:
                     span_id=safe_str(r.get("span_id")),
                     trace_id=safe_str(r.get("trace_id")),
                     role=safe_str(r.get("role")),
-                    content_preview=safe_str(r.get("content"))[
-                        :SEARCH_CONTENT_PREVIEW_CHARS
-                    ],
+                    content_preview=safe_str(r.get("content")),
                     content_digest=safe_str(r.get("content_digest")),
                     started_at=started_at,
                 )
@@ -218,7 +258,18 @@ class AgentQueryHandler:
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
         spans = self.trace_detail_spans(req.project_id, req.trace_id)
-        return build_trace_chat(spans, req.trace_id)
+        res = build_trace_chat(spans, req.trace_id)
+
+        if req.include_feedback:
+            span_ids = [m.span_id for m in res.messages if m.span_id]
+            groups = self._fetch_agent_feedback(
+                project_id=req.project_id,
+                trace_ids=[req.trace_id],
+                span_ids=span_ids,
+            )
+            _fold_feedback_into_trace_chat(res, groups)
+
+        return res
 
     def conversation_chat(
         self, req: AgentConversationChatReq
@@ -231,7 +282,7 @@ class AgentQueryHandler:
         )
 
         if not rows:
-            return AgentConversationChatRes(
+            res = AgentConversationChatRes(
                 conversation_id=req.conversation_id,
                 turns=[],
                 total_turns=total_turns,
@@ -239,6 +290,13 @@ class AgentQueryHandler:
                 limit=req.limit,
                 offset=req.offset,
             )
+            if req.include_feedback:
+                groups = self._fetch_agent_feedback(
+                    project_id=req.project_id,
+                    conversation_ids=[req.conversation_id],
+                )
+                res.feedback = groups.by_conversation_id.get(req.conversation_id, [])
+            return res
 
         # Group spans by trace_id, preserving insertion order. Weave treats
         # one trace_id as one conversation turn as a product convention based
@@ -255,7 +313,7 @@ class AgentQueryHandler:
             if trace_spans
         ]
 
-        return AgentConversationChatRes(
+        res = AgentConversationChatRes(
             conversation_id=req.conversation_id,
             turns=turns,
             total_turns=total_turns,
@@ -263,6 +321,38 @@ class AgentQueryHandler:
             limit=req.limit,
             offset=req.offset,
         )
+
+        if req.include_feedback:
+            span_ids = [m.span_id for turn in turns for m in turn.messages if m.span_id]
+            groups = self._fetch_agent_feedback(
+                project_id=req.project_id,
+                conversation_ids=[req.conversation_id],
+                trace_ids=[t.trace_id for t in turns],
+                span_ids=span_ids,
+            )
+            res.feedback = groups.by_conversation_id.get(req.conversation_id, [])
+            for turn in res.turns:
+                _fold_feedback_into_trace_chat(turn, groups)
+
+        return res
+
+    def _fetch_agent_feedback(
+        self,
+        project_id: str,
+        trace_ids: list[str] | None = None,
+        conversation_ids: list[str] | None = None,
+        span_ids: list[str] | None = None,
+    ) -> AgentFeedbackByTarget:
+        """Run one feedback query for a batch of agent targets."""
+        refs = _build_agent_target_refs(
+            project_id=project_id,
+            trace_ids=trace_ids,
+            conversation_ids=conversation_ids,
+            span_ids=span_ids,
+        )
+        req = make_agent_feedback_query_req(project_id=project_id, refs=refs)
+        feedback = self._feedback_query(req)
+        return group_agent_feedback_by_target(feedback)
 
     # ------------------------------------------------------------------
     # Query plumbing
@@ -320,13 +410,15 @@ class AgentWriteHandler:
     # OTel ingest
     # ------------------------------------------------------------------
 
-    def insert_otel_spans(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+    def insert_otel_spans(
+        self, req: GenAIOTelExportReq
+    ) -> tuple[GenAIOTelExportRes, list[AgentSpanCHInsertable]]:
         """Ingest OTel spans into the spans table.
 
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
         """
-        span_rows: list[list[object]] = []
+        span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
         rejected = 0
         errors: list[str] = []
@@ -374,12 +466,14 @@ class AgentWriteHandler:
                         )
                         continue
 
-                    span_rows.append(genai_span_to_row(genai_row))
+                    span_rows.append(genai_row)
                     accepted += 1
 
         if span_rows:
             self._ch_client.insert(
-                "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
+                "spans",
+                data=[genai_span_to_row(s) for s in span_rows],
+                column_names=ALL_SPAN_INSERT_COLUMNS,
             )
 
         if failure_counts:
@@ -393,11 +487,12 @@ class AgentWriteHandler:
         error_msg = "; ".join(errors[:MAX_INGEST_ERRORS_REPORTED])
         if len(errors) > MAX_INGEST_ERRORS_REPORTED:
             error_msg += "; ..."
-        return GenAIOTelExportRes(
+        res = GenAIOTelExportRes(
             accepted_spans=accepted,
             rejected_spans=rejected,
             error_message=error_msg,
         )
+        return res, span_rows
 
 
 # ---------------------------------------------------------------------------
@@ -416,6 +511,47 @@ def _rows_as_dicts(result: QueryResult) -> list[ClickHouseRow]:
         list[ClickHouseRow],
         [dict(zip(col_names, row, strict=True)) for row in result.result_rows],
     )
+
+
+def _rows_to_dicts(
+    columns: list[str], rows: list[tuple[AgentSpanStatsCell, ...]]
+) -> list[dict[str, AgentSpanStatsCell]]:
+    """Zip explicit column names with rows returned by a stats query."""
+    return [dict(zip(columns, row, strict=True)) for row in rows]
+
+
+def _build_agent_target_refs(
+    project_id: str,
+    trace_ids: list[str] | None = None,
+    conversation_ids: list[str] | None = None,
+    span_ids: list[str] | None = None,
+) -> list[str]:
+    """Build the union of agent_turn / agent_conversation / agent_span refs."""
+    refs: list[str] = []
+    for trace_id in trace_ids or []:
+        refs.append(
+            ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
+        )
+    for conversation_id in conversation_ids or []:
+        refs.append(
+            ri.InternalAgentConversationRef(
+                project_id=project_id, conversation_id=conversation_id
+            ).uri
+        )
+    for span_id in span_ids or []:
+        refs.append(ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri)
+    return refs
+
+
+def _fold_feedback_into_trace_chat(
+    trace_chat: AgentTraceChatRes,
+    groups: AgentFeedbackByTarget,
+) -> None:
+    """Fold turn-level and step-level feedback into a trace chat response."""
+    trace_chat.feedback = groups.by_trace_id.get(trace_chat.trace_id, [])
+    for message in trace_chat.messages:
+        if message.span_id and message.span_id in groups.by_span_id:
+            message.feedback = groups.by_span_id[message.span_id]
 
 
 def _first_cell_int(result: QueryResult) -> int:
@@ -455,7 +591,7 @@ def _record_ingest_failure(
 
 
 def _hydrate_group_row(
-    row: ClickHouseRow, group_aliases: list[str]
+    row: ClickHouseRow, group_aliases: list[str], measure_aliases: list[str]
 ) -> AgentSpanGroupRow:
     """Hydrate one aggregate-query result row into an `AgentSpanGroupRow`.
 
@@ -465,6 +601,7 @@ def _hydrate_group_row(
     group dimensions separate from aggregates so callers can iterate either.
     """
     group_keys = {alias: _group_key_value(row.get(alias)) for alias in group_aliases}
+    metrics = {alias: row.get(alias) for alias in measure_aliases}
     return AgentSpanGroupRow(
         group_keys=group_keys,
         span_count=safe_int(row.get("span_count")),
@@ -481,6 +618,7 @@ def _hydrate_group_row(
         conversation_names=unpack_string_array(row.get("conversation_names")),
         first_seen=_datetime_or_none(row.get("first_seen")),
         last_seen=_datetime_or_none(row.get("last_seen")),
+        metrics=metrics,
     )
 
 

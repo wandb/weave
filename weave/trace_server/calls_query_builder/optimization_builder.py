@@ -421,27 +421,27 @@ def process_query_to_optimization_sql(
     )
 
 
-def _create_like_pattern_for_value(value: str | float | bool) -> str:
-    """Creates a LIKE pattern for a value based on its type in JSON format.
+def _create_like_patterns_for_value(value: str | float | bool) -> list[str]:
+    """Creates LIKE patterns for a value based on its type in JSON format.
 
-    Args:
-        value: The value to create a pattern for
-
-    Returns:
-        LIKE pattern string appropriate for the value type in JSON
+    Returns a list because a single value can serialize to JSON in more than
+    one shape: a Python float like `1.0` is paired with a typed HAVING cast
+    that matches JSON `1` numerically, so the prefilter must allow both
+    `%1.0%` and `%1%` to avoid being stricter than HAVING. Likewise a bool
+    literal must match both `%true%`/`%false%` and the legacy numeric
+    encodings `%1%`/`%0%` that the HAVING bool cast accepts.
     """
+    # bool must be checked before int since bool is a subclass of int.
+    if isinstance(value, bool):
+        return [f"%{str(value).lower()}%", f"%{1 if value else 0}%"]
     if isinstance(value, str):
-        # Boolean string literals are not wrapped in quotes in JSON payloads
+        # Boolean string literals are not wrapped in quotes in JSON payloads.
         if value in {"true", "false"}:
-            return f"%{value}%"
-        else:
-            return f'%"{value}"%'
-    elif isinstance(value, bool):
-        # Boolean values are serialized as true/false without quotes in JSON
-        return f"%{str(value).lower()}%"
-    else:
-        # Numbers are not quoted in JSON
-        return f"%{value}%"
+            return [f"%{value}%"]
+        return [f'%"{value}"%']
+    if isinstance(value, float) and value.is_integer():
+        return [f"%{value}%", f"%{int(value)}%"]
+    return [f"%{value}%"]
 
 
 def _create_like_condition(
@@ -541,9 +541,15 @@ def _create_like_optimized_eq_condition(
         # Empty/None values are not valid for LIKE optimization
         return None
 
-    like_pattern = _create_like_pattern_for_value(literal_value)
-
-    like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
+    like_patterns = _create_like_patterns_for_value(literal_value)
+    per_pattern = [
+        _create_like_condition(field, p, pb, table_alias) for p in like_patterns
+    ]
+    like_condition = (
+        per_pattern[0]
+        if len(per_pattern) == 1
+        else "(" + " OR ".join(per_pattern) + ")"
+    )
     return _maybe_use_null_check(like_condition, field, table_alias, use_null_check)
 
 
@@ -642,10 +648,11 @@ def _create_like_optimized_in_condition(
         if isinstance(value_operand.literal_, str) and not value_operand.literal_:
             return None
 
-        like_pattern = _create_like_pattern_for_value(value_operand.literal_)
-
-        like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
-        like_conditions.append(like_condition)
+        for like_pattern in _create_like_patterns_for_value(value_operand.literal_):
+            like_condition = _create_like_condition(
+                field, like_pattern, pb, table_alias
+            )
+            like_conditions.append(like_condition)
 
     or_sql = "(" + " OR ".join(like_conditions) + ")"
     return _maybe_use_null_check(or_sql, field, table_alias, use_null_check)
@@ -710,26 +717,31 @@ def _maybe_use_null_check(
     table_alias: str,
     use_null_check: bool,
 ) -> str | None:
-    """Conditionally append `...OR IS NULL` to a SQL condition.
-    When querying calls_merged, we must pass through certain null values
-    (see `_field_requires_null_check`).
+    """Finalize a heavy-field LIKE condition for the calls pre-filter.
 
-    Returns a wrapped condition e.g. "x LIKE '%y%' OR t.attributes_dump IS NULL";
-    Returns None if the the null check cannot be safely applied (see note below).
+    Two responsibilities:
+    1. Bail entirely when inside a NOT context. Heavy-field LIKE patterns
+       are SUPERSETS of the real predicate (the LIKE can match the literal
+       in unrelated JSON keys/values within the dump). Wrapping a superset
+       in NOT produces a SUBSET, which violates the pre-filter contract in
+       `process_query_to_optimization_sql` (must be identical or less
+       restrictive than the post-aggregation HAVING) and drops valid rows.
+       See WB-34043.
+    2. Append `OR ... IS NULL` for start/end fields on calls_merged so
+       unmerged call parts are not filtered out before aggregation.
+
+    Returns None when no safe pre-filter can be emitted.
 
     Args:
-        condition: The condition to wrap with `OR IS NULL`, e.g. "x LIKE '%y%'".
-        field: The column name to add the `IS NULL` check to, e.g. "attributes_dump".
+        condition: The condition to finalize, e.g. "x LIKE '%y%'".
+        field: The column name being filtered, e.g. "inputs_dump".
         table_alias: The table name to use in SQL.
         use_null_check: Whether to add OR IS NULL for start/end fields.
             True for calls_merged (unmerged parts may have NULL fields).
             False for calls_complete (every row is a complete call).
     """
+    if NotContext.is_in_not_context():
+        return None
     if use_null_check and _field_requires_null_check(field):
-        if NotContext.is_in_not_context():
-            # Inside "NOT (...)", adding "OR IS NULL" would invert to "AND IS NOT NULL"
-            # which is the opposite of the intention here. There is no way to safely
-            # include null values inside a "NOT" so we skip the optimization entirely.
-            return None
         return f"({condition} OR {table_alias}.{field} IS NULL)"
     return condition

@@ -18,6 +18,8 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal
 
+from weave.trace.settings import _parse_bool
+
 try:
     import sentry_sdk  # type: ignore
     import sentry_sdk.utils  # type: ignore
@@ -39,6 +41,16 @@ SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us
 SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
 logger = logging.getLogger(__name__)
+
+
+def _error_reporting_enabled() -> bool:
+    """Whether outbound error reporting to Sentry is enabled.
+
+    Honors the wandb-canonical `WANDB_ERROR_REPORTING` environment variable so
+    that customers who already disable error reporting for the `wandb` SDK get
+    the same behavior here. Default is enabled when the variable is unset.
+    """
+    return _parse_bool(os.getenv("WANDB_ERROR_REPORTING", "true"))
 
 
 def _safe_noop(func: Callable) -> Callable:
@@ -69,8 +81,9 @@ class Sentry:
 
         self.scope: Scope | None = None
 
-        # Disable if sentry is not available
-        self._disabled = not SENTRY_AVAILABLE
+        # Disable if sentry is not available, or if the user opted out via
+        # `WANDB_ERROR_REPORTING=false` (matches `wandb/analytics/sentry.py`).
+        self._disabled = (not SENTRY_AVAILABLE) or (not _error_reporting_enabled())
 
         # ensure we always end the Sentry session
         atexit.register(self.end_session)

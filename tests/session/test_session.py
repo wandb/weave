@@ -20,10 +20,9 @@ from weave.session.session import (
     get_current_llm,
     get_current_session,
     get_current_turn,
-    log_session,
-    log_turn,
     start_llm,
     start_session,
+    start_tool,
     start_turn,
 )
 
@@ -147,11 +146,9 @@ class TestLLM:
         assert c.think("Let me consider...") is c
         assert c.reasoning.content == "Let me consider..."
 
-    def test_attach_methods_return_self(self) -> None:
+    def test_attach_media_returns_self(self) -> None:
         c = LLM(model="gpt-4o")
-        assert c.attach_file("file_123") is c
-        assert c.attach_image(b"png_bytes") is c
-        assert c.attach_uri("https://example.com/img.png") is c
+        assert c.attach_media(content=b"png_bytes", mime_type="image/png") is c
 
     def test_context_manager_sets_timestamps(self) -> None:
         with LLM(model="gpt-4o") as c:
@@ -162,6 +159,60 @@ class TestLLM:
         c = LLM(model="gpt-4o")
         c.usage = Usage(input_tokens=100, output_tokens=50, reasoning_tokens=20)
         assert c.usage.input_tokens == 100
+
+
+class TestAttachMedia:
+    def test_attach_inline_image(self) -> None:
+        llm = LLM(model="gpt-4o")
+        result = llm.attach_media(content=b"png_bytes", mime_type="image/png")
+        assert result is llm
+        assert len(llm.media_attachments) == 1
+        att = llm.media_attachments[0]
+        assert att.kind == "blob"
+        assert att.modality == "image"
+        assert att.mime_type == "image/png"
+        assert att.content == b"png_bytes"
+
+    def test_attach_uri(self) -> None:
+        llm = LLM(model="gpt-4o")
+        llm.attach_media(
+            uri="https://example.com/photo.jpg",
+            modality="image",
+            mime_type="image/jpeg",
+        )
+        assert len(llm.media_attachments) == 1
+        att = llm.media_attachments[0]
+        assert att.kind == "uri"
+        assert att.modality == "image"
+        assert att.mime_type == "image/jpeg"
+        assert att.uri == "https://example.com/photo.jpg"
+
+    def test_attach_file_id(self) -> None:
+        llm = LLM(model="gpt-4o")
+        llm.attach_media(file_id="file-abc123", mime_type="audio/wav")
+        assert len(llm.media_attachments) == 1
+        att = llm.media_attachments[0]
+        assert att.kind == "file"
+        assert att.modality == "audio"
+        assert att.mime_type == "audio/wav"
+        assert att.file_id == "file-abc123"
+
+    def test_modality_inferred_from_mime_type(self) -> None:
+        llm = LLM(model="gpt-4o")
+        llm.attach_media(content=b"data", mime_type="audio/wav")
+        assert llm.media_attachments[0].modality == "audio"
+        llm.attach_media(content=b"data", mime_type="video/mp4")
+        assert llm.media_attachments[1].modality == "video"
+
+    def test_rejects_zero_sources(self) -> None:
+        llm = LLM(model="gpt-4o")
+        with pytest.raises(ValueError, match="Exactly one of"):
+            llm.attach_media()
+
+    def test_rejects_multiple_sources(self) -> None:
+        llm = LLM(model="gpt-4o")
+        with pytest.raises(ValueError, match="Exactly one of"):
+            llm.attach_media(content=b"x", uri="http://x")
 
 
 class TestSubAgent:
@@ -411,35 +462,15 @@ class TestContextVars:
         assert get_current_turn() is None
         assert get_current_llm() is None
 
+    def test_start_tool_returns_tool(self) -> None:
+        t = start_tool(name="search", arguments='{"q":"test"}', tool_call_id="tc_1")
+        assert isinstance(t, Tool)
+        assert t.name == "search"
+        assert t.arguments == '{"q":"test"}'
+        assert t.tool_call_id == "tc_1"
 
-class TestBatchLogging:
-    def test_log_turn_returns_log_result(self) -> None:
-        result = log_turn(
-            session_id="sess-123",
-            messages=[{"role": "user", "content": "hi"}],
-            spans=[
-                LLM(
-                    model="gpt-4o",
-                    output_messages=[Message(role="assistant", content="hello")],
-                ),
-                Tool(name="search", result="found"),
-            ],
-            agent_name="bot",
-            model="gpt-4o",
-        )
-        assert isinstance(result, LogResult)
-        assert result.session_id == "sess-123"
-
-    def test_log_session_returns_log_result(self) -> None:
-        result = log_session(
-            turns=[{"messages": [{"role": "user", "content": "hi"}]}],
-            agent_name="bot",
-            model="gpt-4o",
-            session_id="sess-456",
-        )
-        assert isinstance(result, LogResult)
-        assert result.session_id == "sess-456"
-
-    def test_log_session_auto_generates_session_id(self) -> None:
-        result = log_session(turns=[], agent_name="bot")
-        assert result.session_id != ""
+    def test_start_tool_context_manager(self) -> None:
+        with start_tool(name="get_weather", arguments='{"city":"Tokyo"}') as t:
+            t.result = "75F"
+        assert t.result == "75F"
+        assert t.duration_ms >= 0

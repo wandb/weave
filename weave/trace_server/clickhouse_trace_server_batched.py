@@ -57,6 +57,7 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
+from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -64,6 +65,8 @@ from weave.trace_server.agents.types import (
     AgentSearchRes,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
+    AgentSpanStatsReq,
+    AgentSpanStatsRes,
     AgentsQueryReq,
     AgentsQueryRes,
     AgentTraceChatReq,
@@ -125,6 +128,7 @@ from weave.trace_server.clickhouse.utilities import (
     maybe_enqueue_minimal_call_end,
     num_bytes,
     process_parameters,
+    sanitize_invalid_utf8_surrogates,
     should_retry_empty_query,
     string_to_int_in_range,
 )
@@ -287,7 +291,11 @@ from weave.trace_server.trace_server_common import (
     set_nested_key,
     try_parse_json,
 )
-from weave.trace_server.ttl_settings import get_project_retention_days
+from weave.trace_server.ttl_settings import (
+    RETENTION_DAYS_NO_TTL,
+    get_project_retention_days,
+    invalidate_ttl_cache,
+)
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
@@ -449,7 +457,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._thread_local.calls_complete_batch = value
 
     @classmethod
-    def from_env(cls, use_async_insert: bool = False, **kwargs: Any) -> Self:
+    def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
         return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
@@ -2599,6 +2607,48 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             **dict(zip(columns, query_result.result_rows[0], strict=False))
         )
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.project_ttl_settings_read"
+    )
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
+        stored_days = get_project_retention_days(req.project_id, self.ch_client)
+        return tsi.ProjectTTLSettingsReadRes(
+            retention_days=stored_days if stored_days != RETENTION_DAYS_NO_TTL else None
+        )
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.project_ttl_settings_update"
+    )
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
+        if req.retention_days is not None and req.retention_days < 1:
+            raise InvalidRequest(
+                "retention_days must be None (no TTL) or >= 1 (days of retention)"
+            )
+        if not req.wb_user_id:
+            raise InvalidRequest("wb_user_id is required for audit trail")
+
+        stored_days = (
+            RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
+        )
+        self.ch_client.insert(
+            "project_ttl_settings",
+            data=[
+                [
+                    req.project_id,
+                    stored_days,
+                    datetime.datetime.now(datetime.timezone.utc),
+                    req.wb_user_id,
+                ]
+            ],
+            column_names=["project_id", "retention_days", "updated_at", "updated_by"],
+        )
+        invalidate_ttl_cache(req.project_id)
+        return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
+
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
@@ -4424,6 +4474,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             PredictionCreateRes with the prediction_id
         """
         prediction_id = generate_id()
+        genai_span_ref = (
+            req.genai_span_ref.model_dump(exclude_none=True)
+            if req.genai_span_ref is not None
+            else None
+        )
 
         # Determine trace_id and parent_id based on evaluation_run_id
         if req.evaluation_run_id:
@@ -4458,6 +4513,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 version=predict_and_score_op_res.digest,
             )
 
+            predict_and_score_weave_attrs = {
+                constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
+            }
+            if genai_span_ref is not None:
+                predict_and_score_weave_attrs[constants.GENAI_SPAN_REF_ATTR_KEY] = (
+                    genai_span_ref
+                )
+
             # Create the predict_and_score call as a child of the evaluation run
             predict_and_score_start_req = tsi.CallStartReq(
                 start=tsi.StartedCallSchemaForInsert(
@@ -4468,9 +4531,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     op_name=predict_and_score_op_ref.uri,
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={
-                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                            constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
-                        }
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: predict_and_score_weave_attrs
                     },
                     inputs={
                         "self": evaluation_ref,
@@ -6206,9 +6267,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ]
             batch_data = []
             for call in calls:
-                call_dict = call.model_dump()
-                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-                batch_data.append(values)
+                batch_data.append(ch_call_to_row(call))
 
             self._insert_call_batch(batch_data)
 
@@ -6462,9 +6521,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ]
         batch_data = []
         for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
+            batch_data.append(ch_call_to_row(call))
 
         try:
             self._insert_call_batch(batch_data)
@@ -6517,27 +6574,54 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     # observability API is considered stable.
 
     def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
-        return AgentQueryHandler(self._query).spans_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).spans_query(req)
+
+    def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
+        return AgentQueryHandler(self._query, self.feedback_query).spans_stats(req)
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
-        return AgentQueryHandler(self._query).agents_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).agents_query(req)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
-        return AgentQueryHandler(self._query).agent_versions_query(req)
+        return AgentQueryHandler(self._query, self.feedback_query).agent_versions_query(
+            req
+        )
 
     def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
-        return AgentQueryHandler(self._query).search_messages(req)
+        return AgentQueryHandler(self._query, self.feedback_query).search_messages(req)
 
     def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
-        return AgentQueryHandler(self._query).traces_chat(req)
+        return AgentQueryHandler(self._query, self.feedback_query).traces_chat(req)
 
     def agent_conversation_chat(
         self, req: AgentConversationChatReq
     ) -> AgentConversationChatRes:
-        return AgentQueryHandler(self._query).conversation_chat(req)
+        return AgentQueryHandler(self._query, self.feedback_query).conversation_chat(
+            req
+        )
 
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        return AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+        res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+
+        # Return early without emitting kafka events if online eval or agent scoring are disabled
+        if not wf_env.wf_enable_online_eval() or not wf_env.wf_enable_agent_scoring():
+            return res
+
+        # Emit for each row that produces a valid event type
+        for row in span_rows:
+            if event := ScoreAgentSpansEvent.from_row(row):
+                event.emit(self.kafka_producer)
+
+        # Flush kafka producer
+        if span_rows and self.kafka_producer:
+            try:
+                self.kafka_producer.flush(0)
+            except Exception:
+                logger.exception(
+                    "Failed to flush Kafka producer during OTel span ingest"
+                )
+
+        return res
 
     # Private Methods
     @property
@@ -6581,13 +6665,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         client.database = self._database
         return client
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(
         self,
         batch: list,
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,
     ) -> None:
+        # Tags roll up to the parent _flush_calls span instead of creating a
+        # separate intermediate span on every call.
         set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._insert_call_batch.count": str(
@@ -6832,6 +6917,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "clickhouse_trace_server_batched._insert.table": table,
             }
         )
+        set_root_span_dd_tags(
+            {
+                "weave_trace_server.insert.table": table,
+                "weave_trace_server.insert.row_count": len(data),
+            }
+        )
 
         async_insert = self._use_async_insert and not do_sync_insert
         if async_insert:
@@ -6843,11 +6934,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         start = time.monotonic()
+        sanitized_invalid_utf8 = False
         for attempt in range(ch_settings.INSERT_MAX_RETRIES):
             try:
                 result = self.ch_client.insert(
                     table, data=data, column_names=column_names, settings=settings
                 )
+
+            # Invalid client Unicode: sanitize the batch and retry once.
+            except UnicodeEncodeError as e:
+                if (
+                    sanitized_invalid_utf8
+                    or attempt == ch_settings.INSERT_MAX_RETRIES - 1
+                ):
+                    log_and_raise_insert_error(e, table, data)
+                sanitized_invalid_utf8 = True
+                data = sanitize_invalid_utf8_surrogates(data)
+                continue
 
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:
@@ -6878,13 +6981,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 return result
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 
@@ -6901,7 +6999,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._call_batch = []
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_complete")
     def _insert_call_complete(self, ch_call: CallCompleteCHInsertable) -> None:
         """Insert a complete call into the calls_complete batch.
 
@@ -6917,7 +7014,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._flush_immediately:
             self._flush_calls_complete()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_to_v1")
     def _insert_call_to_v1(self, ch_call: CallCompleteCHInsertable) -> None:
         """Insert a complete call into the v1 call_parts table.
 
@@ -6927,17 +7023,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Args:
             ch_call: The complete call to insert.
         """
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._insert_call_complete_batch"
-    )
     def _insert_call_complete_batch(
         self,
         batch: list,
@@ -6951,6 +7040,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings: Optional ClickHouse settings.
             do_sync_insert: If True, use synchronous insert.
         """
+        # Tags roll up to the parent _flush_calls_complete span instead of
+        # creating a separate intermediate span on every call.
         set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._insert_call_complete_batch.count": str(

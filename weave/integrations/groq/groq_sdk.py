@@ -10,6 +10,7 @@ from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
 from groq.types.completion_usage import CompletionUsage
 
 import weave
+from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
@@ -84,10 +85,6 @@ def groq_accumulator(
                 acc.choices[idx].message.tool_call.append(choice.delta.tool_call)
 
     return acc
-
-
-def should_use_accumulator(inputs: dict) -> bool:
-    return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
 def groq_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:

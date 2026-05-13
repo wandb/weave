@@ -650,6 +650,26 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.project_stats, req, req.project_id
         )
 
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.project_ttl_settings_read, req, req.project_id
+        )
+
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(
+            self._internal_trace_server.project_ttl_settings_update, req, req.project_id
+        )
+
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
@@ -1159,6 +1179,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 raise ValueError("Internal Error - Project Mismatch")
             span.project_id = original_project_id
         return res
+
+    def agent_spans_stats(
+        self, req: tsi.agent_types.AgentSpanStatsReq
+    ) -> tsi.agent_types.AgentSpanStatsRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_spans_stats, req, req.project_id
+        )
 
     def agent_agents_query(
         self, req: tsi.agent_types.AgentsQueryReq

@@ -12,13 +12,25 @@ from __future__ import annotations
 from typing import Protocol, overload
 
 from weave.shared.refs_internal import (
+    InternalAgentConversationRef,
+    InternalAgentSpanRef,
+    InternalAgentTurnRef,
     InternalCallRef,
     InternalObjectRef,
     InternalOpRef,
     InternalRef,
     InternalTableRef,
 )
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
+from weave.trace.refs import (
+    AgentConversationRef,
+    AgentSpanRef,
+    AgentTurnRef,
+    CallRef,
+    ObjectRef,
+    OpRef,
+    Ref,
+    TableRef,
+)
 
 
 class ExternalToInternalProjectIdResolver(Protocol):
@@ -49,10 +61,30 @@ def ext_ref_to_internal(ref: OpRef, internal_project_id: str) -> InternalOpRef: 
 def ext_ref_to_internal(
     ref: ObjectRef, internal_project_id: str
 ) -> InternalObjectRef: ...
+@overload
+def ext_ref_to_internal(
+    ref: AgentTurnRef, internal_project_id: str
+) -> InternalAgentTurnRef: ...
+@overload
+def ext_ref_to_internal(
+    ref: AgentConversationRef, internal_project_id: str
+) -> InternalAgentConversationRef: ...
+@overload
+def ext_ref_to_internal(
+    ref: AgentSpanRef, internal_project_id: str
+) -> InternalAgentSpanRef: ...
 
 
 def ext_ref_to_internal(
-    ref: ObjectRef | OpRef | TableRef | CallRef,
+    ref: (
+        ObjectRef
+        | OpRef
+        | TableRef
+        | CallRef
+        | AgentTurnRef
+        | AgentConversationRef
+        | AgentSpanRef
+    ),
     internal_project_id: str,
 ) -> InternalRef:
     """Convert a parsed external Ref to the corresponding Internal*Ref.
@@ -85,6 +117,21 @@ def ext_ref_to_internal(
             name=ref.name,
             version=ref.digest,
             extra=list(ref.extra),
+        )
+    if isinstance(ref, AgentTurnRef):
+        return InternalAgentTurnRef(
+            project_id=internal_project_id,
+            trace_id=ref.trace_id,
+        )
+    if isinstance(ref, AgentConversationRef):
+        return InternalAgentConversationRef(
+            project_id=internal_project_id,
+            conversation_id=ref.conversation_id,
+        )
+    if isinstance(ref, AgentSpanRef):
+        return InternalAgentSpanRef(
+            project_id=internal_project_id,
+            span_id=ref.span_id,
         )
     raise TypeError(f"Unsupported ref type: {type(ref)}")
 

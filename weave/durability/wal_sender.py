@@ -33,7 +33,6 @@ File safety:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import signal
@@ -52,6 +51,7 @@ from weave.durability.wal import (
     WALRecord,
     drain,
 )
+from weave.durability.wal_client_id import WAL_ROOT, compute_client_id
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
@@ -321,10 +321,20 @@ class TraceServerHandlers:
                 _rc: type[BaseModel] = req_cls,
                 _rt: str = record_type,
             ) -> None:
-                # model_validate_json (not model_validate) so that bytes
-                # fields like FileCreateReq.content are base64-decoded
-                # correctly during the WAL round-trip.
-                _m(_rc.model_validate_json(json.dumps(record["req"])))
+                # We already have a parsed dict in ``record["req"]`` (the WAL
+                # consumer json.loads'd the line).  model_validate on the dict
+                # is strictly cheaper than model_validate_json(json.dumps(...)):
+                # one Pydantic validation pass vs. a JSON encode + Pydantic's
+                # internal JSON decode.
+                #
+                # bytes round-trip safety: Pydantic v2's mode="json" dump
+                # represents bytes as utf-8 strings (NOT base64), and
+                # model_validate accepts strings for bytes fields by
+                # re-encoding them as utf-8 — so the round-trip is lossless.
+                # Non-utf8 content can't reach the WAL at all because the
+                # write-side model_dump(mode="json") raises before the record
+                # is persisted.
+                _m(_rc.model_validate(record["req"]))
                 if on_success is not None:
                     on_success(_rt, record)
 
@@ -427,9 +437,13 @@ def main(argv: list[str] | None = None) -> None:
         print("Error: --api-key or WANDB_API_KEY required", file=sys.stderr)
         sys.exit(1)
 
-    wal_dir = args.wal_dir or os.path.join(
-        os.path.expanduser("~"), ".weave", "wal", args.entity, args.project
-    )
+    if args.wal_dir:
+        wal_dir = args.wal_dir
+    else:
+        parts = [WAL_ROOT, args.entity, args.project]
+        if args.api_key:
+            parts.append(compute_client_id(args.api_key))
+        wal_dir = os.path.join(*parts)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 

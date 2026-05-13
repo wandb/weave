@@ -80,8 +80,13 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
     "current_predict_call", default=None
 )
 
-IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
-IMPERATIVE_SCORE_MARKER = {"_weave_eval_meta": {"imperative": True, "score": True}}
+EVAL_META_KEY = "_weave_eval_meta"
+IMPERATIVE_EVAL_META_MARKER = {"imperative": True}
+IMPERATIVE_SCORE_META_MARKER = {"imperative": True, "score": True}
+
+
+def _as_call_attributes(eval_meta: dict[str, Any]) -> dict[str, Any]:
+    return {EVAL_META_KEY: eval_meta}
 
 
 @contextmanager
@@ -359,6 +364,7 @@ class ScoreLogger:
         self.evaluate_call = evaluate_call
         self.predict_call = predict_call
         self.predefined_scorers = predefined_scorers
+        self._score_meta = IMPERATIVE_SCORE_META_MARKER
 
         self._captured_scores: dict[str, ScoreType] = {}
         self._has_finished: bool = False
@@ -366,6 +372,10 @@ class ScoreLogger:
         self._call_stack_context: (
             contextlib.AbstractContextManager[list[Call]] | None
         ) = None
+
+    def _apply_eval_meta(self, eval_meta: dict[str, Any]) -> None:
+        """Internal-only: Merge potential caller-provided fields into the eval meta."""
+        self._score_meta = {**eval_meta, **IMPERATIVE_SCORE_META_MARKER}
 
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
@@ -436,8 +446,7 @@ class ScoreLogger:
 
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
-        # Create the score call with predict_and_score as parent
-        with attributes(IMPERATIVE_SCORE_MARKER):
+        with attributes(_as_call_attributes(self._score_meta)):
             wc = require_weave_client()
             score_call = wc.create_call(
                 as_op(scorer.score),
@@ -578,7 +587,7 @@ class ScoreLogger:
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with attributes(IMPERATIVE_SCORE_MARKER):
+                with attributes(_as_call_attributes(self._score_meta)):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
@@ -666,6 +675,11 @@ class EvaluationLogger:
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
     ) -> None:
+        eval_meta = {}
+        if "_eval_meta" in self.__dict__:
+            eval_meta = self.__dict__["_eval_meta"]
+        self._eval_meta = {**eval_meta, **IMPERATIVE_EVAL_META_MARKER}
+
         self.name = name
         self.scorers = scorers
         self.eval_attributes = eval_attributes if eval_attributes is not None else {}
@@ -720,13 +734,19 @@ class EvaluationLogger:
         self._context_predict_method = MethodType(predict, self.model)
 
         # --- Setup the evaluation object ---
-        @op(name="Evaluation.evaluate", enable_code_capture=False)
+        @op(
+            name="Evaluation.evaluate",
+            enable_code_capture=False,
+            eager_call_start=True,
+        )
         def evaluate(self: Evaluation, model: Model) -> None: ...
+
+        meta_attrs = _as_call_attributes(self._eval_meta)
 
         @op(name="Evaluation.predict_and_score", enable_code_capture=False)
         def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
             predict_method = cast(Op, model.get_infer_method())
-            with attributes(IMPERATIVE_EVAL_MARKER):
+            with attributes(meta_attrs):
                 output, predict_call = predict_method.call(
                     model, example, __require_explicit_finish=True
                 )
@@ -767,13 +787,41 @@ class EvaluationLogger:
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
 
+    @classmethod
+    def _create_with_meta(
+        cls,
+        eval_meta: dict[str, Any],
+        *,
+        name: str | None = None,
+        model: Model | dict | str | None = None,
+        dataset: Dataset | list[dict] | str | None = None,
+        eval_attributes: dict[str, Any] | None = None,
+        scorers: list[str] | None = None,
+    ) -> EvaluationLogger:
+        """Internal factory: build an EvaluationLogger with extra
+        `_weave_eval_meta` keys propagated to every emitted call.
+
+        Note: Semi-internal; used by wandb/wandb SDK.
+        """
+        instance = cls.__new__(cls)
+        instance._eval_meta = eval_meta
+        EvaluationLogger.__init__(
+            instance,
+            name=name,
+            model=model,
+            dataset=dataset,
+            eval_attributes=eval_attributes,
+            scorers=scorers,
+        )
+        return instance
+
     @property
     def ui_url(self) -> str | None:
         return self._evaluate_call.ui_url
 
     @property
     def attributes(self) -> dict[str, Any]:
-        return self.eval_attributes | IMPERATIVE_EVAL_MARKER
+        return self.eval_attributes | _as_call_attributes(self._eval_meta)
 
     def _cleanup_predictions(self) -> None:
         if self._is_finalized:
@@ -844,7 +892,7 @@ class EvaluationLogger:
             with call_context.set_call_stack([self._evaluate_call]):
                 # Make the prediction call
                 with _set_current_output(output):
-                    with attributes(IMPERATIVE_EVAL_MARKER):
+                    with attributes(_as_call_attributes(self._eval_meta)):
                         _, predict_and_score_call = (
                             self._pseudo_evaluation.predict_and_score.call(
                                 self._pseudo_evaluation,
@@ -874,6 +922,7 @@ class EvaluationLogger:
             predict_call=predict_call,
             predefined_scorers=self.scorers,
         )
+        pred._apply_eval_meta(self._eval_meta)
         # Store the output so we can use it when finishing the predict_call
         pred._predict_output = output
         self._accumulated_predictions.append(pred)
@@ -960,7 +1009,7 @@ class EvaluationLogger:
         with call_context.set_call_stack([self._evaluate_call]):
             try:
                 with _set_current_summary(final_summary):
-                    with attributes(IMPERATIVE_EVAL_MARKER):
+                    with attributes(_as_call_attributes(self._eval_meta)):
                         self._pseudo_evaluation.summarize()
             except Exception:
                 logger.exception("Error during execution of summarize op.")

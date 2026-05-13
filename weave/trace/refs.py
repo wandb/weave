@@ -51,6 +51,24 @@ class Ref:
         remaining = tuple(parts[3:])
         if kind == "table":
             return TableRef(entity=entity, project=project, _digest=remaining[0])
+        if kind in {"agent_turn", "agent_conversation", "agent_span"}:
+            if len(remaining) != 1:
+                raise ValueError(
+                    f"Invalid URI: {uri}. {kind} ref must have exactly one path "
+                    f"segment after the kind; got {len(remaining)}. "
+                    f"IDs containing '/' must be URL-encoded."
+                )
+            if kind == "agent_turn":
+                return AgentTurnRef(
+                    entity=entity, project=project, trace_id=remaining[0]
+                )
+            if kind == "agent_conversation":
+                return AgentConversationRef(
+                    entity=entity,
+                    project=project,
+                    conversation_id=urllib.parse.unquote(remaining[0]),
+                )
+            return AgentSpanRef(entity=entity, project=project, span_id=remaining[0])
         extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
         if kind == "call":
             return CallRef(
@@ -330,6 +348,58 @@ class CallRef(RefWithExtra):
 
 
 @dataclass(frozen=True)
+class AgentTurnRef(Ref):
+    entity: str
+    project: str
+    trace_id: str
+
+    @CallableProperty
+    def uri(self) -> str:
+        return f"weave:///{self.entity}/{self.project}/agent_turn/{self.trace_id}"
+
+    @staticmethod
+    def parse_uri(uri: str) -> AgentTurnRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), AgentTurnRef):
+            raise TypeError(f"URI is not for an AgentTurn: {uri}")
+        return parsed
+
+
+@dataclass(frozen=True)
+class AgentConversationRef(Ref):
+    entity: str
+    project: str
+    conversation_id: str
+
+    @CallableProperty
+    def uri(self) -> str:
+        encoded = refs_internal.extra_value_quoter(self.conversation_id)
+        return f"weave:///{self.entity}/{self.project}/agent_conversation/{encoded}"
+
+    @staticmethod
+    def parse_uri(uri: str) -> AgentConversationRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), AgentConversationRef):
+            raise TypeError(f"URI is not for an AgentConversation: {uri}")
+        return parsed
+
+
+@dataclass(frozen=True)
+class AgentSpanRef(Ref):
+    entity: str
+    project: str
+    span_id: str
+
+    @CallableProperty
+    def uri(self) -> str:
+        return f"weave:///{self.entity}/{self.project}/agent_span/{self.span_id}"
+
+    @staticmethod
+    def parse_uri(uri: str) -> AgentSpanRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), AgentSpanRef):
+            raise TypeError(f"URI is not for an AgentSpan: {uri}")
+        return parsed
+
+
+@dataclass(frozen=True)
 class DeletedRef(Ref):
     ref: Ref
     deleted_at: datetime
@@ -343,7 +413,15 @@ class DeletedRef(Ref):
         return self.ref.uri
 
 
-AnyRef = ObjectRef | TableRef | CallRef | OpRef
+AnyRef = (
+    ObjectRef
+    | TableRef
+    | CallRef
+    | OpRef
+    | AgentTurnRef
+    | AgentConversationRef
+    | AgentSpanRef
+)
 
 
 def parse_name_version(name_version: str) -> tuple[str, str]:
