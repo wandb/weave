@@ -14,7 +14,7 @@ DebounceAggregationField: TypeAlias = Literal["trace_id", "thread_id"]
 DebounceAggregationMethod: TypeAlias = Literal["last_message", "all_messages"]
 
 # Monitors can be configured to score agent spans by including an AgentSpanOpName in their `op_names` list.
-AgentSpanOpName: TypeAlias = Literal["weave.genai.turn"]
+AgentSpanOpName: TypeAlias = Literal["weave.genai.turn_ended"]
 AGENT_SPAN_OP_NAMES: frozenset[AgentSpanOpName] = frozenset(get_args(AgentSpanOpName))
 
 # Runtime-valid sets derived from Literals above
@@ -161,11 +161,6 @@ _AGENT_SPAN_CLASSIFIER_PROMPT_HEADER = "\n".join(
         "  {output_messages}",
         "  </output-messages>",
         "</messages>",
-        "<usage>",
-        "  <input-tokens>{input_tokens}</input-tokens>",
-        "  <output-tokens>{output_tokens}</output-tokens>",
-        "  <reasoning-tokens>{reasoning_tokens}</reasoning-tokens>",
-        "</usage>",
         "</agent>",
         "Evaluate the trace above against each classifier below. Base your judgment strictly on the evidence in the trace.",
     ]

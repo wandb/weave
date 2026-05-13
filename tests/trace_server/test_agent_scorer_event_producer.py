@@ -16,7 +16,7 @@ from weave.trace_server.kafka import KafkaProducer
 def _make_event(**overrides) -> ScoreAgentSpansEvent:
     """Minimal valid ScoreAgentSpansEvent for tests; override any field."""
     base = {
-        "event_type": "turn_ended",
+        "event_type": "weave.genai.turn_ended",
         "status_code": "OK",
         "project_id": "p",
         "trace_id": "t",
