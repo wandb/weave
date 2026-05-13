@@ -7,8 +7,8 @@
 -- the down migration can identify them unambiguously. Real obj_create
 -- alias writes never produce this value.
 --
--- External consumer note: any ad-hoc CH query or dashboard that read
--- objects.is_latest directly is now divergent from the API; the API
+-- External consumer note: any ad-hoc CH query or dashboard that reads
+-- objects.is_latest directly is now divergent from the API. The API
 -- derives is_latest from this aliases table, not from object_versions
 -- ordering.
 INSERT INTO aliases (project_id, object_id, alias, digest, wb_user_id, created_at, deleted_at)
