@@ -1,14 +1,124 @@
+import atexit
+import gc
+import subprocess
+import sys
+import textwrap
+
 import pytest
 
 import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
-from weave.trace.op import _add_accumulator
+from weave.trace.op import (
+    _add_accumulator,
+    _IteratorWrapper,
+)
+
+ITERATOR_WRAPPER_LEAK_REPRO_COUNT = 10
 
 
 def assert_no_current_call():
     assert call_context.get_current_call() is None
+
+
+def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
+    """Finished streams must not leave one process-exit callback behind each.
+
+    This is the customer memory-leak regression: the previous implementation
+    registered an atexit callback for every ``_IteratorWrapper``. Even after a
+    stream finished and the wrapper was garbage-collected, CPython's atexit
+    callback registry kept growing linearly with stream count.
+    """
+    close_count = 0
+
+    def on_close():
+        nonlocal close_count
+        close_count += 1
+
+    # Warm up weakref.finalize so its one process-level exit hook is already
+    # reflected in the baseline. The regression was one new atexit callback per
+    # stream, not the stdlib's single finalizer exit hook.
+    warmup_wrapper = _IteratorWrapper(
+        iter([1]), lambda value: None, lambda error: None, on_close
+    )
+    warmup_wrapper.close()
+    del warmup_wrapper
+    gc.collect()
+
+    baseline_callback_count = atexit._ncallbacks()
+    close_count = 0
+
+    for _ in range(ITERATOR_WRAPPER_LEAK_REPRO_COUNT):
+        wrapper = _IteratorWrapper(
+            iter([1]), lambda value: None, lambda error: None, on_close
+        )
+        assert list(wrapper) == [1]
+
+    del wrapper
+    gc.collect()
+
+    assert close_count == ITERATOR_WRAPPER_LEAK_REPRO_COUNT
+    assert atexit._ncallbacks() == baseline_callback_count
+
+
+def test_exit_finalizer_is_idempotent_for_unfinished_iterator_wrapper():
+    """The wrapper-owned finalizer should close an unfinished stream once.
+
+    Finished streams detach their finalizer in the previous test. This covers
+    the finalizer object's idempotency: even if the finalizer is invoked more
+    than once, the stream close callback runs once.
+    """
+    close_count = 0
+
+    def on_close():
+        nonlocal close_count
+        close_count += 1
+
+    wrapper = _IteratorWrapper(
+        iter([1]), lambda value: None, lambda error: None, on_close
+    )
+
+    wrapper._exit_finalizer()
+    wrapper._exit_finalizer()
+
+    assert close_count == 1
+    wrapper.close()
+
+
+def test_process_exit_closes_unfinished_iterator_wrapper(tmp_path):
+    """A real subprocess exit should close an unfinished iterator wrapper.
+
+    This protects the weakref.finalize wiring at interpreter shutdown. A direct
+    finalizer call proves idempotency, but the customer bug was specifically in
+    process-exit cleanup registration.
+    """
+    marker_path = tmp_path / "closed.txt"
+    code = textwrap.dedent(
+        """
+        import sys
+        from pathlib import Path
+
+        from weave.trace.op import _IteratorWrapper
+
+        marker_path = Path(sys.argv[1])
+
+        def on_close():
+            marker_path.write_text("closed", encoding="utf-8")
+
+        wrapper = _IteratorWrapper(iter([1]), lambda value: None, lambda error: None, on_close)
+        """
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", code, str(marker_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert marker_path.read_text(encoding="utf-8") == "closed"
 
 
 @pytest.mark.disable_logging_error_check
