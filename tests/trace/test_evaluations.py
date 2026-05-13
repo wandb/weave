@@ -1110,6 +1110,50 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
+@pytest.mark.asyncio
+async def test_evaluation_with_custom_name_callable(client):
+    dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
+
+    def custom_display_name(call) -> str:
+        return f"callable-{call.op_name.split('/')[-1].split(':')[0]}"
+
+    evaluation = weave.Evaluation(dataset=dataset, evaluation_name=custom_display_name)
+
+    @weave.op
+    def model(input: str) -> str:
+        return "hmmm"
+
+    await evaluation.evaluate(model)
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 1
+    assert calls[0].display_name == "callable-Evaluation.evaluate"
+
+
+@pytest.mark.asyncio
+async def test_evaluation_custom_name_does_not_leak_between_instances(client):
+    dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
+
+    @weave.op
+    def model(input: str) -> str:
+        return "hmmm"
+
+    evaluation_with_custom_name = weave.Evaluation(
+        dataset=dataset, evaluation_name="wow-custom!"
+    )
+    await evaluation_with_custom_name.evaluate(model)
+
+    evaluation_without_custom_name = weave.Evaluation(dataset=dataset)
+    await evaluation_without_custom_name.evaluate(model)
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 2
+
+    display_names = [call.display_name for call in calls]
+    assert display_names.count("wow-custom!") == 1
+    assert any(name and name.startswith("eval-") for name in display_names)
+
+
 def test_get_evaluate_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
