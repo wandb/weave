@@ -309,14 +309,18 @@ CLICKHOUSE_SECURE_PORT = 8443
 # Max error messages to include in OTel export partial success responses
 MAX_OTEL_ERROR_MESSAGES = 20
 
-# OTel placeholder inserts are idempotent (RMT deduplicates), so we use a
-# tight flush timeout to avoid blocking the hot path.  In the future we could
-# go fully fire-and-forget with wait_for_async_insert=0.
-OTEL_ASYNC_INSERT_TIMEOUT_MS = 100
+# OTel placeholder inserts are idempotent (RMT deduplicates), so we cap the
+# adaptive flush window tight to avoid blocking the hot path. Both bounds are
+# pinned locally so this path does not pick up env-driven values meant for
+# general-purpose inserts (which could push min above our max and invalidate
+# the settings).  In the future we could go fully fire-and-forget with
+# wait_for_async_insert=0.
+OTEL_ASYNC_INSERT_TIMEOUT_MIN_MS = 100
+OTEL_ASYNC_INSERT_TIMEOUT_MAX_MS = 200
 
 # In-process dedupe of placeholder op inserts: we skip the CH write when this
 # process has already inserted (project_id, op_name).  RMT dedupes the writes
-# on the server side, so an overflow reset just costs one extra batched
+# on the server side, so an overflow eviction just costs one extra batched
 # (idempotent) write — the bound is purely a memory ceiling.
 INSERTED_OPS_MAX_SIZE = 50_000
 
@@ -524,7 +528,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return "calls_complete"
 
     def _ensure_placeholder_file_exists(self, project_id: str) -> None:
-        """Write the OTEL placeholder source file at most once per project per process."""
+        """Write the OTEL placeholder source file for the project.
+
+        Under contention, two concurrent first-touches can both pass the
+        membership check and both call `file_create` — that is safe because
+        `file_create` is content-addressed (constant placeholder content =>
+        constant digest), so duplicate writes are idempotent at the storage
+        layer (bucket PUT and CH file-chunk insert both dedupe by digest).
+        Steady-state, this method short-circuits after the first call.
+        """
         if project_id in self._placeholder_file_projects:
             return
         self._placeholder_file_projects.add(project_id)
@@ -616,10 +628,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     for op_name in new_ops
                 ]
             )
-            # Sanity cap: clear instead of evicting LRU-style. Re-inserts are
-            # CH-idempotent, so dropping the whole set is harmless.
-            if len(self._inserted_ops) > INSERTED_OPS_MAX_SIZE:
-                self._inserted_ops.clear()
+            # Sanity cap: evict just enough arbitrary entries up front to fit
+            # the new batch, then insert. Keeps the set bounded without
+            # thrashing the whole cache; re-inserts are CH-idempotent, so an
+            # evicted entry just costs one extra (idempotent) batched write
+            # next time it's seen. Clamped to the current size in the unlikely
+            # case `new_ops` alone exceeds the cap.
+            overflow = (
+                len(self._inserted_ops) + len(new_ops) - INSERTED_OPS_MAX_SIZE
+            )
+            for _ in range(min(max(overflow, 0), len(self._inserted_ops))):
+                self._inserted_ops.pop()
             for name in new_ops:
                 self._inserted_ops.add((req.project_id, name))
 
@@ -1836,7 +1855,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=ch_insert_batch,
             column_names=ALL_OBJ_INSERT_COLUMNS,
             settings={
-                "async_insert_busy_timeout_max_ms": OTEL_ASYNC_INSERT_TIMEOUT_MS,
+                "async_insert_busy_timeout_min_ms": OTEL_ASYNC_INSERT_TIMEOUT_MIN_MS,
+                "async_insert_busy_timeout_max_ms": OTEL_ASYNC_INSERT_TIMEOUT_MAX_MS,
             },
         )
 
