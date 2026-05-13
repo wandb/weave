@@ -65,12 +65,12 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
     assert atexit._ncallbacks() == baseline_callback_count
 
 
-def test_exit_finalizer_is_idempotent_for_unfinished_iterator_wrapper():
-    """The wrapper-owned finalizer should close an unfinished stream once.
+def test_process_exit_finalizer_is_idempotent_for_unfinished_iterator_wrapper():
+    """The wrapper-owned process-exit finalizer should close an unfinished stream once.
 
-    Finished streams detach their finalizer in the previous test. This covers
-    the finalizer object's idempotency: even if the finalizer is invoked more
-    than once, the stream close callback runs once.
+    Finished streams detach their process-exit finalizer in the previous test.
+    This covers the finalizer object's idempotency: even if the finalizer is
+    invoked more than once, the stream close callback runs once.
     """
     close_count = 0
 
@@ -82,8 +82,8 @@ def test_exit_finalizer_is_idempotent_for_unfinished_iterator_wrapper():
         iter([1]), lambda value: None, lambda error: None, on_close
     )
 
-    wrapper._exit_finalizer()
-    wrapper._exit_finalizer()
+    wrapper._process_exit_finalizer()
+    wrapper._process_exit_finalizer()
 
     assert close_count == 1
     wrapper.close()

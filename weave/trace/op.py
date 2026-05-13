@@ -1477,17 +1477,17 @@ class _IteratorWrapper(Generic[V]):
         # that are still reachable. It cannot close a wrapper that is already
         # being garbage-collected because wrapper_ref() is None in that case;
         # keep __del__ below for normal GC cleanup.
-        self._exit_finalizer = weakref.finalize(
+        self._process_exit_finalizer = weakref.finalize(
             self, _call_on_close_for_wrapper_ref, weakref.ref(self)
         )
 
-    def _detach_exit_finalizer(self) -> None:
-        if self._exit_finalizer.alive:
-            self._exit_finalizer.detach()
+    def _detach_process_exit_finalizer(self) -> None:
+        if self._process_exit_finalizer.alive:
+            self._process_exit_finalizer.detach()
 
     def _call_on_close_once(self) -> None:
         if self._on_finished_called:
-            self._detach_exit_finalizer()
+            self._detach_process_exit_finalizer()
             return
 
         try:
@@ -1503,11 +1503,11 @@ class _IteratorWrapper(Generic[V]):
             log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
         finally:
             self._on_finished_called = True
-            self._detach_exit_finalizer()
+            self._detach_process_exit_finalizer()
 
     def _call_on_error_once(self, e: Exception) -> None:
         if self._on_finished_called:
-            self._detach_exit_finalizer()
+            self._detach_process_exit_finalizer()
             return
 
         try:
@@ -1523,7 +1523,7 @@ class _IteratorWrapper(Generic[V]):
             log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
         finally:
             self._on_finished_called = True
-            self._detach_exit_finalizer()
+            self._detach_process_exit_finalizer()
 
     def __iter__(self) -> _IteratorWrapper:
         return self
