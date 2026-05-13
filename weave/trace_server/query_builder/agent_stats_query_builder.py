@@ -199,15 +199,13 @@ class _StatsQuerySQLParts:
 
 @dataclass(frozen=True, slots=True)
 class _SpanSourceFilterSQL:
-    """PREWHERE/WHERE filters for direct reads from the spans table."""
+    """WHERE filters for direct reads from the spans table."""
 
-    prewhere: str
     where: str
 
     @property
     def clause(self) -> str:
-        where_sql = f"\n        WHERE {self.where}" if self.where else ""
-        return f"PREWHERE {self.prewhere}{where_sql}"
+        return f"WHERE {self.where}"
 
 
 def build_agent_span_stats_query(
@@ -377,20 +375,16 @@ def _spans_source_filter_sql(
     end: datetime.datetime,
 ) -> _SpanSourceFilterSQL:
     pid_slot = pb.add(req.project_id, param_type="String")
-    prewhere_conditions = [_project_filter_sql(_span_col(_COL_PROJECT_ID), pid_slot)]
+    where_conditions = [_project_filter_sql(_span_col(_COL_PROJECT_ID), pid_slot)]
     add_time_filters(
-        prewhere_conditions,
+        where_conditions,
         pb,
         started_after=start,
         started_before=end,
     )
-    where_conditions: list[str] = []
     if req.query is not None:
         where_conditions.append(compile_agent_query(req.query, pb))
-    return _SpanSourceFilterSQL(
-        prewhere=" AND ".join(prewhere_conditions),
-        where=" AND ".join(where_conditions),
-    )
+    return _SpanSourceFilterSQL(where=" AND ".join(where_conditions))
 
 
 def _response_columns(

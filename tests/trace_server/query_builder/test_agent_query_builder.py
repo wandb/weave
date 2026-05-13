@@ -72,7 +72,7 @@ class TestMakeSpansCountQuery:
         query = make_spans_count_query(pb, AgentSpansQueryReq(project_id="p1"))
 
         expected = (
-            "SELECT count() FROM spans s PREWHERE {genai_0:String} = s.project_id"
+            "SELECT count() FROM spans s WHERE s.project_id = {genai_0:String}"
         )
         assert_sql(expected, {"genai_0": "p1"}, query, pb.get_params())
 
@@ -111,10 +111,10 @@ class TestMakeSpansCountQuery:
 
         expected = """
             SELECT count() FROM spans s
-            PREWHERE {genai_0:String} = s.project_id
+            WHERE s.project_id = {genai_0:String}
               AND s.started_at >= {genai_1:DateTime64(6)}
               AND s.started_at < {genai_2:DateTime64(6)}
-            WHERE ((s.agent_name = {genai_3:String}) AND (s.custom_attrs_string[{genai_4:String}] = {genai_5:String}))
+            AND ((s.agent_name = {genai_3:String}) AND (s.custom_attrs_string[{genai_4:String}] = {genai_5:String}))
         """
         expected_params = {
             "genai_0": "p1",
@@ -181,7 +181,7 @@ class TestMakeSpansListQuery:
         expected = f"""
             SELECT {SPANS_LIST_COLS}
             FROM spans s
-            PREWHERE {{genai_0:String}} = s.project_id
+            WHERE s.project_id = {{genai_0:String}}
             ORDER BY started_at DESC
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
@@ -201,7 +201,7 @@ class TestMakeSpansListQuery:
         expected = f"""
             SELECT {SPANS_LIST_COLS}
             FROM spans s
-            PREWHERE {{genai_0:String}} = s.project_id
+            WHERE s.project_id = {{genai_0:String}}
             ORDER BY input_tokens asc
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
@@ -264,7 +264,7 @@ class TestMakeGroupedSpansCountQuery:
         expected = """
             SELECT count() FROM (
                 SELECT s.trace_id FROM spans s
-                PREWHERE {genai_0:String} = s.project_id
+                WHERE s.project_id = {genai_0:String}
                 GROUP BY s.trace_id
             )
         """
@@ -283,7 +283,7 @@ class TestMakeGroupedSpansCountQuery:
         expected = """
             SELECT count() FROM (
                 SELECT s.custom_attrs_string[{genai_1:String}] FROM spans s
-                PREWHERE {genai_0:String} = s.project_id
+                WHERE s.project_id = {genai_0:String}
                 GROUP BY s.custom_attrs_string[{genai_1:String}]
             )
         """
@@ -311,7 +311,7 @@ class TestMakeGroupedSpansListQuery:
             SELECT s.trace_id AS trace_id,
                    {_GROUPED_AGG_TAIL}
             FROM spans s
-            PREWHERE {{genai_0:String}} = s.project_id
+            WHERE s.project_id = {{genai_0:String}}
             GROUP BY trace_id
             ORDER BY last_seen DESC
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
@@ -339,7 +339,7 @@ class TestMakeGroupedSpansListQuery:
             SELECT s.conversation_id AS conversation_id,
                    {_GROUPED_AGG_TAIL}
             FROM spans s
-            PREWHERE {{genai_0:String}} = s.project_id
+            WHERE s.project_id = {{genai_0:String}}
               AND s.started_at >= {{genai_1:DateTime64(6)}}
               AND s.started_at < {{genai_2:DateTime64(6)}}
             GROUP BY conversation_id
@@ -371,7 +371,7 @@ class TestMakeGroupedSpansListQuery:
             SELECT s.custom_attrs_string[{{genai_3:String}}] AS env,
                    {_GROUPED_AGG_TAIL}
             FROM spans s
-            PREWHERE {{genai_0:String}} = s.project_id
+            WHERE s.project_id = {{genai_0:String}}
             GROUP BY env
             ORDER BY last_seen DESC
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
@@ -403,7 +403,7 @@ class TestMakeGroupedSpansListQuery:
                    s.request_model AS request_model,
                    {_GROUPED_AGG_TAIL}
             FROM spans s
-            PREWHERE {{genai_0:String}} = s.project_id
+            WHERE s.project_id = {{genai_0:String}}
             GROUP BY agent_name, request_model
             ORDER BY agent_name asc
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
@@ -468,7 +468,7 @@ class TestMakeGroupedSpansListQuery:
                    countIf(((s.operation_name = {genai_3:String}))) AS tool_calls,
                    avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS avg_score
             FROM spans s
-            PREWHERE {genai_0:String} = s.project_id
+            WHERE s.project_id = {genai_0:String}
             GROUP BY conversation_id
             HAVING avgOrNull(if((mapContains(s.custom_attrs_float, {genai_5:String})), toFloat64(s.custom_attrs_float[{genai_5:String}]), NULL)) >= {genai_6:Float64}
             ORDER BY avg_score desc
@@ -530,7 +530,7 @@ class TestMakeGroupedSpansListQuery:
             SELECT s.conversation_id AS conversation_id,
                    countIf((mapContains(s.custom_attrs_bool, {genai_3:String})) AND s.custom_attrs_bool[{genai_3:String}] = 1) AS flagged_count
             FROM spans s
-            PREWHERE {genai_0:String} = s.project_id
+            WHERE s.project_id = {genai_0:String}
             GROUP BY conversation_id
             ORDER BY flagged_count DESC
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
@@ -670,8 +670,8 @@ class TestMakeTraceDetailSpansQuery:
 
         expected = f"""
             SELECT {CHAT_VIEW_COLS} FROM spans s
-            PREWHERE {{genai_0:String}} = s.project_id
-            WHERE s.trace_id = {{genai_1:String}}
+            WHERE s.project_id = {{genai_0:String}}
+            AND s.trace_id = {{genai_1:String}}
             ORDER BY s.started_at ASC
         """
         assert_sql(
@@ -695,7 +695,7 @@ class TestMakeAgentsQueries:
         expected = """
             SELECT count() FROM (
                 SELECT agent_name FROM agents
-                PREWHERE {genai_0:String} = project_id
+                WHERE project_id = {genai_0:String}
                 GROUP BY agent_name
             )
         """
@@ -716,7 +716,7 @@ class TestMakeAgentsQueries:
                    min(first_seen) AS first_seen,
                    max(last_seen) AS last_seen
             FROM agents
-            PREWHERE {genai_0:String} = project_id
+            WHERE project_id = {genai_0:String}
             GROUP BY agent_name
             ORDER BY last_seen DESC, agent_name
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
@@ -745,8 +745,8 @@ class TestMakeAgentsQueries:
                    min(first_seen) AS first_seen,
                    max(last_seen) AS last_seen
             FROM agents
-            PREWHERE {genai_0:String} = project_id
-            WHERE agent_name = {genai_1:String}
+            WHERE project_id = {genai_0:String}
+            AND agent_name = {genai_1:String}
             GROUP BY agent_name
             ORDER BY last_seen DESC, agent_name
             LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
@@ -775,8 +775,8 @@ class TestMakeAgentVersionsQueries:
         expected = """
             SELECT count() FROM (
                 SELECT agent_version FROM agent_versions
-                PREWHERE {genai_0:String} = project_id
-                WHERE agent_name = {genai_1:String}
+                WHERE project_id = {genai_0:String}
+                AND agent_name = {genai_1:String}
                 GROUP BY agent_version
             )
         """
@@ -804,8 +804,8 @@ class TestMakeAgentVersionsQueries:
                    min(first_seen) AS first_seen,
                    max(last_seen) AS last_seen
             FROM agent_versions
-            PREWHERE {genai_0:String} = project_id
-            WHERE agent_name = {genai_1:String}
+            WHERE project_id = {genai_0:String}
+            AND agent_name = {genai_1:String}
             GROUP BY agent_version
             ORDER BY last_seen DESC
             LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
@@ -837,8 +837,8 @@ class TestMakeMessageSearchQuery:
                    substring(content, 1, 500) AS content,
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
-            PREWHERE {genai_0:String} = project_id
-            WHERE content LIKE {genai_1:String}
+            WHERE project_id = {genai_0:String}
+            AND content LIKE {genai_1:String}
             ORDER BY started_at DESC
             LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
         """
@@ -869,8 +869,8 @@ class TestMakeMessageSearchQuery:
                    substring(content, 1, 500) AS content,
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
-            PREWHERE {genai_0:String} = project_id
-            WHERE content LIKE {genai_1:String}
+            WHERE project_id = {genai_0:String}
+            AND content LIKE {genai_1:String}
               AND role IN {genai_2:Array(String)}
               AND agent_name = {genai_3:String}
               AND conversation_id = {genai_4:String}
@@ -901,8 +901,8 @@ class TestMakeMessageSearchQuery:
                    substring(content, 1, 500) AS content,
                    lower(hex(content_digest)) AS content_digest, started_at
             FROM messages
-            PREWHERE {genai_0:String} = project_id
-            WHERE content LIKE {genai_1:String}
+            WHERE project_id = {genai_0:String}
+            AND content LIKE {genai_1:String}
               AND role IN {genai_2:Array(String)}
             ORDER BY started_at DESC
             LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
@@ -956,13 +956,13 @@ class TestMakeConversationChatSpansQuery:
             INNER JOIN (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
-                PREWHERE {{genai_0:String}} = project_id
-                WHERE conversation_id = {{genai_1:String}}
+                WHERE project_id = {{genai_0:String}}
+                AND conversation_id = {{genai_1:String}}
                 GROUP BY trace_id
                 ORDER BY turn_started_at DESC, trace_id DESC
                 LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
             ) t ON s.trace_id = t.trace_id
-            PREWHERE {{genai_0:String}} = s.project_id
+            WHERE s.project_id = {{genai_0:String}}
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
         assert_sql(
@@ -987,13 +987,13 @@ class TestMakeConversationChatSpansQuery:
             INNER JOIN (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
-                PREWHERE {{genai_0:String}} = project_id
-                WHERE conversation_id = {{genai_1:String}}
+                WHERE project_id = {{genai_0:String}}
+                AND conversation_id = {{genai_1:String}}
                 GROUP BY trace_id
                 ORDER BY turn_started_at DESC, trace_id DESC
                 LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
             ) t ON s.trace_id = t.trace_id
-            PREWHERE {{genai_0:String}} = s.project_id
+            WHERE s.project_id = {{genai_0:String}}
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
         assert_sql(
@@ -1024,8 +1024,8 @@ class TestMakeConversationChatTurnsCountQuery:
             SELECT count() FROM (
                 SELECT trace_id
                 FROM spans s
-                PREWHERE {genai_0:String} = s.project_id
-                WHERE s.conversation_id = {genai_1:String}
+                WHERE s.project_id = {genai_0:String}
+                AND s.conversation_id = {genai_1:String}
                 GROUP BY trace_id
             )
         """

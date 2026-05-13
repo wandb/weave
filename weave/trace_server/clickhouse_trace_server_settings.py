@@ -89,6 +89,10 @@ if not _disable_query_failure_prediction:
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS: dict[str, int | str] = {
     **CLICKHOUSE_BASE_QUERY_SETTINGS,
     **CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS,
+    # ClickHouse 26.x can reuse incorrect query-condition-cache skip bitmaps
+    # across predicates and silently under-count MergeTree reads.
+    # See https://github.com/ClickHouse/ClickHouse/issues/104781.
+    "use_query_condition_cache": 0,
 }
 CLICKHOUSE_DEFAULT_COMMAND_SETTINGS = CLICKHOUSE_BASE_QUERY_SETTINGS
 

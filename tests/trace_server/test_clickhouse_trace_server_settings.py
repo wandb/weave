@@ -40,6 +40,7 @@ def test_query_settings_apply_prediction_guards(monkeypatch, reload_settings):
         == settings_module.DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED
     )
     assert settings["timeout_overflow_mode"] == "throw"
+    assert settings["use_query_condition_cache"] == 0
 
     # Estimated-time tracks the configured execution-time override.
     monkeypatch.setenv("WF_CLICKHOUSE_MAX_EXECUTION_TIME", "30")
@@ -72,6 +73,7 @@ def test_command_settings_skip_prediction_guards(monkeypatch, reload_settings):
     )
     assert command_settings["max_execution_time"] == 30
     assert command_settings["allow_experimental_lightweight_update"] == 1
+    assert "use_query_condition_cache" not in command_settings
     assert "max_estimated_execution_time" not in command_settings
     assert "timeout_before_checking_execution_speed" not in command_settings
     assert "timeout_overflow_mode" not in command_settings
