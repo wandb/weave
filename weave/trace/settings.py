@@ -29,7 +29,18 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Literal, TypeVar, cast, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Literal,
+    TypedDict,
+    TypeVar,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
+
+from typing_extensions import Unpack
 
 DEFAULT_RETRY_MAX_INTERVAL_SECONDS = 60 * 5  # 5 minutes
 SETTINGS_PREFIX = "WEAVE_"
@@ -44,7 +55,10 @@ CALLS_COMPLETE_ENTITY_ALLOWLIST: frozenset[str] = frozenset({"wandb"})
 # Attention Devs:
 # To add a new setting:
 # 1. Add a new field to `UserSettings`
-# 2. Add a thin accessor (e.g.
+# 2. Mirror the same name/type on `_SettingsOverrides` below (TypedDict can't
+#    be derived from a dataclass while preserving mypy validation).  Drift is
+#    caught by `test_settings_overrides_matches_user_settings`.
+# 3. Add a thin accessor (e.g.
 #    `def should_xyz() -> bool:
 #         return _env_or_default("xyz", _current_settings.get().xyz)`)
 
@@ -55,6 +69,11 @@ class UserSettings:
 
     All configs can be overridden with environment variables.  The precedence
     is environment variables > ``UserSettings`` instance > defaults.
+
+    KEEP IN SYNC WITH :class:`_SettingsOverrides` below.  Each field added,
+    removed, or retyped here must be mirrored there so :func:`override`'s
+    typed kwargs stay accurate.  The :func:`test_settings_overrides_matches_user_settings`
+    test fails on drift.
     """
 
     disabled: bool = False
@@ -296,6 +315,49 @@ class UserSettings:
     """
 
 
+class _SettingsOverrides(TypedDict, total=False):
+    """Typed kwargs accepted by :func:`override`.
+
+    KEEP IN SYNC WITH :class:`UserSettings` above.  This TypedDict mirrors
+    every field on ``UserSettings``; mypy needs the field list spelled out
+    statically (it can't introspect through ``get_type_hints(UserSettings)``
+    or a dict comprehension).  All keys are optional (``total=False``) so
+    ``override`` can accept any subset of fields.
+
+    The :func:`test_settings_overrides_matches_user_settings` test asserts
+    that this TypedDict and ``UserSettings`` declare exactly the same
+    name → type mapping.
+    """
+
+    disabled: bool
+    print_call_link: bool
+    log_level: str
+    display_viewer: Literal["auto", "rich", "print"]
+    capture_code: bool
+    implicitly_patch_integrations: bool
+    redact_pii: bool
+    redact_pii_fields: list[str]
+    redact_pii_exclude_fields: list[str]
+    capture_client_info: bool
+    capture_system_info: bool
+    client_parallelism: int | None
+    use_server_cache: bool
+    server_cache_size_limit: int
+    server_cache_dir: str | None
+    scorers_dir: str
+    max_calls_queue_size: int
+    retry_max_interval: float
+    retry_max_attempts: int
+    enable_disk_fallback: bool
+    use_parallel_table_upload: bool
+    http_timeout: float
+    use_stainless_server: bool
+    use_calls_complete: bool
+    enable_client_side_digests: bool
+    enable_wal: bool
+    disable_wal_sender: bool
+
+
 # Resolve string annotations once at import; used for env-var coercion.
 _FIELD_TYPES: dict[str, Any] = get_type_hints(UserSettings)
 _FIELD_NAMES: frozenset[str] = frozenset(_FIELD_TYPES)
@@ -382,13 +444,16 @@ parse_and_apply_settings = replace_settings
 
 
 @contextmanager
-def override(**fields: Any) -> Iterator[UserSettings]:
+def override(**fields: Unpack[_SettingsOverrides]) -> Iterator[UserSettings]:
     """Scope a partial settings change to the current async context.
 
     Example::
 
         with override(disabled=True):
             ...
+
+    Only valid :class:`UserSettings` field names are accepted, and each value
+    is checked against the field's declared type.
     """
     new_snapshot = replace(_current_settings.get(), **fields)
     token = _current_settings.set(new_snapshot)

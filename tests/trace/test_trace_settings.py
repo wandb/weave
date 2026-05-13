@@ -1,8 +1,10 @@
+import asyncio
 import dataclasses
 import logging
 import os
 import time
 import timeit
+import typing
 from unittest import mock
 
 import pytest
@@ -18,6 +20,7 @@ from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
 from weave.trace.display.term import configure_logger
 from weave.trace.settings import (
     UserSettings,
+    _SettingsOverrides,
     client_parallelism,
     http_timeout,
     max_calls_queue_size,
@@ -625,9 +628,20 @@ def test_user_settings_rejects_unknown_kwargs():
         UserSettings(not_a_field=True)
 
 
+def test_settings_overrides_matches_user_settings():
+    """The _SettingsOverrides TypedDict that types override(**fields) must
+    mirror UserSettings exactly (same names, same types).  Drift means the
+    types lie to callers.
+    """
+    user_settings_hints = typing.get_type_hints(UserSettings)
+    overrides_hints = typing.get_type_hints(_SettingsOverrides)
+    assert user_settings_hints == overrides_hints, (
+        "_SettingsOverrides drift: add/update fields to match UserSettings"
+    )
+
+
 def test_override_in_async_context_does_not_leak(clean_settings_env):
     """Each async context gets its own override stack."""
-    import asyncio
 
     async def child():
         with override(disabled=True):
