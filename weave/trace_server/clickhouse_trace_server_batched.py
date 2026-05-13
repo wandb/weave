@@ -634,9 +634,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # evicted entry just costs one extra (idempotent) batched write
             # next time it's seen. Clamped to the current size in the unlikely
             # case `new_ops` alone exceeds the cap.
-            overflow = (
-                len(self._inserted_ops) + len(new_ops) - INSERTED_OPS_MAX_SIZE
-            )
+            overflow = len(self._inserted_ops) + len(new_ops) - INSERTED_OPS_MAX_SIZE
             for _ in range(min(max(overflow, 0), len(self._inserted_ops))):
                 self._inserted_ops.pop()
             for name in new_ops:
