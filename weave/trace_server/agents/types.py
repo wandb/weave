@@ -553,6 +553,10 @@ class AgentSpansQueryReq(BaseModel):
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
         if (self.measures or self.group_filters) and not self.group_by:
             raise ValueError("grouped measures and group filters require group_by")
+        if self.group_by and self.custom_attr_columns:
+            raise ValueError(
+                "custom_attr_columns are only supported for ungrouped spans"
+            )
         invalid_custom_attr_columns = [
             col.source
             for col in self.custom_attr_columns
