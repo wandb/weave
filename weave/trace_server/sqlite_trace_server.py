@@ -5073,17 +5073,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         digest: str,
     ) -> str | None:
-        """If digest looks like an alias name (not a hash, not version-like,
-        not 'latest'), resolve it to the actual digest. Returns None
-        otherwise.
+        """If digest looks like an alias name, resolve it to the actual digest.
+        Returns None if not an alias or if no live alias row exists (callers
+        fall through to `_make_digest_condition` / the hybrid is_latest
+        expression for "latest").
         """
-        # "latest" is handled by `_make_digest_condition` / the hybrid
-        # is_latest projection, which covers both the explicit alias row
-        # and the column-based fallback when the alias is absent. Version
-        # patterns (v0, v1, …) are handled by the existing obj_read logic;
-        # content hashes are real digests that don't need resolution.
-        if digest == "latest":
-            return None
+        # Version patterns (v0, v1, …) are handled by the existing obj_read
+        # logic; content hashes are real digests that don't need resolution.
         (is_version, _) = digest_is_version_like(digest)
         if is_version:
             return None

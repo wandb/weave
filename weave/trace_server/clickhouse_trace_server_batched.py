@@ -2293,17 +2293,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         digest: str,
     ) -> str | None:
-        """If digest looks like an alias name (not a hash, not version-like,
-        not 'latest'), resolve it to the actual digest via the aliases table.
-        Returns None if not an alias.
+        """If digest looks like an alias name (not a hash, not version-like),
+        resolve it to the actual digest via the aliases table. Returns None
+        if not an alias OR if the resolved alias row has been tombstoned by
+        obj_delete (the HAVING filter excludes tombstones, so callers fall
+        through to the make_metadata_query CTE's hybrid is_latest fallback
+        for "latest").
         """
-        # "latest" is handled by the make_metadata_query CTE's hybrid
-        # is_latest projection (alias row when present, computed
-        # most-recent-surviving rank as fallback). Version patterns
-        # (v0, v1, …) are handled by the existing obj_read logic; content
-        # hashes are real digests that don't need resolution.
-        if digest == "latest":
-            return None
+        # Version patterns (v0, v1, …) are handled by the existing obj_read
+        # logic; content hashes are real digests that don't need resolution.
         (is_version, _) = tsc.digest_is_version_like(digest)
         if is_version:
             return None

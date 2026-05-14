@@ -1639,11 +1639,11 @@ def test_migration_031_alias_shadow_picks_wrong_digest_as_latest(ch_server):
     its history, 'latest' will silently point at the wrong version.
 
     This test seeds two non-deleted versions where the older v0 has a
-    lex-smaller digest than v1, and asserts that 'latest' resolves to
-    v1 (per the PR's claim that 'latest' tracks the most recently
-    published version). Fails today; passes after the migration's WHERE
-    is rewritten to `IS NULL` and the argMax `created_at` reference is
-    disambiguated.
+    lex-smaller digest than v1, then replays the post-fix migration
+    SQL (qualified `ov.*` references + `IS NULL`) and asserts 'latest'
+    resolves to v1 (per the PR's claim that 'latest' tracks the most
+    recently published version). Replaying the pre-fix SQL on this
+    fixture would set 'latest' to v0.
     """
     project_id = make_project_id("mig031_shadow")
     obj_id = "mig031_shadow_obj"
@@ -1700,23 +1700,27 @@ def test_migration_031_alias_shadow_picks_wrong_digest_as_latest(ch_server):
         column_names=cols,
     )
 
-    # Replay migration 031 exactly as authored.
+    # Replay migration 031 (post-fix: qualified ov.* references and
+    # `IS NULL` to dodge the CH analyzer alias-shadow described in the
+    # docstring above). The pre-fix version of this SQL is preserved in
+    # the docstring; running it here would tie all rows in argMax on a
+    # constant and pick lex-smallest by storage order.
     ch_server._query(
         """
         INSERT INTO aliases (project_id, object_id, alias, digest, wb_user_id, created_at, deleted_at)
         SELECT
-            project_id,
-            object_id,
-            'latest' AS alias,
-            argMax(digest, created_at) AS digest,
-            '__weave_backfill_031__' AS wb_user_id,
-            toDateTime64('1970-01-01 00:00:00.001', 3) AS created_at,
-            toDateTime64(0, 3) AS deleted_at
-        FROM object_versions
-        WHERE project_id = {p: String}
-            AND object_id = {o: String}
-            AND deleted_at = toDateTime64(0, 3)
-        GROUP BY project_id, object_id
+            ov.project_id,
+            ov.object_id,
+            'latest',
+            argMax(ov.digest, ov.created_at),
+            '__weave_backfill_031__',
+            toDateTime64('1970-01-01 00:00:00.001', 3),
+            toDateTime64(0, 3)
+        FROM object_versions AS ov
+        WHERE ov.project_id = {p: String}
+            AND ov.object_id = {o: String}
+            AND ov.deleted_at IS NULL
+        GROUP BY ov.project_id, ov.object_id
         """,
         {"p": project_id, "o": obj_id},
     )
