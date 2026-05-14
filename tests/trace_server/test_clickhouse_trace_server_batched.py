@@ -1735,3 +1735,509 @@ def test_migration_031_alias_shadow_picks_wrong_digest_as_latest(ch_server):
         f"`deleted_at IS NULL` and rename the projected alias so argMax "
         f"binds to the real `object_versions.created_at`."
     )
+
+
+def test_migration_031_where_filter_excludes_soft_deleted_versions(ch_server):
+    """Migration 031's WHERE clause must exclude soft-deleted versions.
+
+    Companion to `test_migration_031_alias_shadow_picks_wrong_digest_as_latest`,
+    which targets the argMax-shadow half of the original bug.  This test
+    targets the *WHERE-shadow* half: if `WHERE deleted_at = toDateTime64(0, 3)`
+    is reintroduced (instead of `WHERE ov.deleted_at IS NULL` against the
+    qualified column), CH's analyzer resolves the bare `deleted_at` to the
+    SELECT-projection alias `toDateTime64(0, 3) AS deleted_at` — a constant
+    — making the predicate `toDateTime64(0,3) = toDateTime64(0,3)`, always
+    TRUE.  Soft-deleted rows then participate in argMax and can be backfilled
+    as "latest".
+
+    Adversarial fixture:
+        - live row:  digest='BBB_live',  created_at=t_live  (older)
+        - dead row:  digest='AAA_dead',  created_at=t_dead  (newer), tombstoned
+
+    With WHERE working:
+        - dead row excluded, argMax over the single live row → 'BBB_live'. ✓
+    With WHERE broken (shadow), regardless of argMax state:
+        - both rows participate.  Even with qualified argMax (the post-fix
+          form), max-by-created_at picks the dead row → 'AAA_dead'. ✗
+        - With unqualified argMax (pre-fix), tie-break by storage order
+          also picks 'AAA_dead' (lex-smallest). ✗
+
+    Either way the test fails — pinning the WHERE filter independently of
+    argMax behavior.
+    """
+    project_id = make_project_id("mig031_where")
+    obj_id = "mig031_where_obj"
+    digest_live = "BBB_live"
+    digest_dead = "AAA_dead"
+    t_live = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t_dead = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+    t_tombstoned_at = dt.datetime(2026, 5, 14, 12, 0, 0, tzinfo=dt.timezone.utc)
+
+    cols = [
+        "project_id",
+        "object_id",
+        "kind",
+        "base_object_class",
+        "leaf_object_class",
+        "refs",
+        "val_dump",
+        "digest",
+        "wb_user_id",
+        "created_at",
+        "deleted_at",
+    ]
+    ch_server._insert(
+        "object_versions",
+        data=[
+            [
+                project_id,
+                obj_id,
+                "object",
+                None,
+                None,
+                [],
+                "{}",
+                digest_live,
+                None,
+                t_live,
+                None,
+            ],
+            [
+                project_id,
+                obj_id,
+                "object",
+                None,
+                None,
+                [],
+                "{}",
+                digest_dead,
+                None,
+                t_dead,
+                t_tombstoned_at,
+            ],
+        ],
+        column_names=cols,
+    )
+
+    # Replay migration 031 (post-fix form).  The WHERE filter must exclude
+    # the soft-deleted row so argMax never sees it.
+    ch_server._query(
+        """
+        INSERT INTO aliases (project_id, object_id, alias, digest, wb_user_id, created_at, deleted_at)
+        SELECT
+            ov.project_id,
+            ov.object_id,
+            'latest',
+            argMax(ov.digest, ov.created_at),
+            '__weave_backfill_031__',
+            toDateTime64('1970-01-01 00:00:00.001', 3),
+            toDateTime64(0, 3)
+        FROM object_versions AS ov
+        WHERE ov.project_id = {p: String}
+            AND ov.object_id = {o: String}
+            AND ov.deleted_at IS NULL
+        GROUP BY ov.project_id, ov.object_id
+        """,
+        {"p": project_id, "o": obj_id},
+    )
+
+    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == digest_live, (
+        f"migration 031 backfilled 'latest'={resolved!r}, but the only "
+        f"non-tombstoned version is {digest_live!r}.  The soft-deleted "
+        f"version {digest_dead!r} (deleted_at={t_tombstoned_at.isoformat()}) "
+        f"must be excluded by the WHERE clause; if you're seeing the dead "
+        f"digest here, the WHERE has been rewritten as "
+        f"`deleted_at = toDateTime64(0, 3)` and the CH analyzer is "
+        f"alias-shadowing it to the SELECT-projection constant of the "
+        f"same name (predicate becomes constant-TRUE).  Restore "
+        f"`WHERE ov.deleted_at IS NULL` against the qualified column."
+    )
+
+
+# Common column lists for direct-insert seeding in the tests below.
+_OBJ_VER_COLS = [
+    "project_id",
+    "object_id",
+    "kind",
+    "base_object_class",
+    "leaf_object_class",
+    "refs",
+    "val_dump",
+    "digest",
+    "wb_user_id",
+    "created_at",
+    "deleted_at",
+]
+_ALIAS_COLS = [
+    "project_id",
+    "object_id",
+    "alias",
+    "digest",
+    "wb_user_id",
+    "created_at",
+    "deleted_at",
+]
+_ALIAS_LIVE = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+
+
+def _seed_obj_version(
+    ch_server,
+    project_id: str,
+    obj_id: str,
+    digest: str,
+    created_at: dt.datetime,
+    deleted_at: dt.datetime | None = None,
+) -> None:
+    ch_server._insert(
+        "object_versions",
+        data=[
+            [
+                project_id,
+                obj_id,
+                "object",
+                None,
+                None,
+                [],
+                "{}",
+                digest,
+                None,
+                created_at,
+                deleted_at,
+            ]
+        ],
+        column_names=_OBJ_VER_COLS,
+    )
+
+
+def _seed_alias_row(
+    ch_server,
+    project_id: str,
+    obj_id: str,
+    digest: str,
+    created_at: dt.datetime,
+    wb_user_id: str = "real_user",
+    deleted_at: dt.datetime | None = None,
+) -> None:
+    ch_server._insert(
+        "aliases",
+        data=[
+            [
+                project_id,
+                obj_id,
+                "latest",
+                digest,
+                wb_user_id,
+                created_at,
+                deleted_at if deleted_at is not None else _ALIAS_LIVE,
+            ]
+        ],
+        column_names=_ALIAS_COLS,
+    )
+
+
+_MIGRATION_031_UP_SQL = """
+INSERT INTO aliases (project_id, object_id, alias, digest, wb_user_id, created_at, deleted_at)
+SELECT
+    ov.project_id,
+    ov.object_id,
+    'latest',
+    argMax(ov.digest, ov.created_at),
+    '__weave_backfill_031__',
+    toDateTime64('1970-01-01 00:00:00.001', 3),
+    toDateTime64(0, 3)
+FROM object_versions AS ov
+WHERE ov.project_id = {p: String}
+    AND ov.object_id = {o: String}
+    AND ov.deleted_at IS NULL
+GROUP BY ov.project_id, ov.object_id
+"""
+
+_MIGRATION_031_DOWN_SQL = """
+ALTER TABLE aliases DELETE
+WHERE alias = 'latest'
+  AND wb_user_id = '__weave_backfill_031__'
+  AND created_at = toDateTime64('1970-01-01 00:00:00.001', 3)
+SETTINGS mutations_sync = 2
+"""
+
+
+def test_migration_031_backfill_does_not_clobber_real_alias(ch_server):
+    """Migration 031 inserts backfill rows with `created_at='1970-01-01 00:00:00.001'`.
+    Any real obj_create alias write has a current `created_at` and therefore
+    outranks the backfill under ReplacingMergeTree(created_at).
+
+    Adversarial fixture: a real alias pins 'latest' to the OLDER version's
+    digest.  Migration 031 would naively backfill 'latest' -> the NEWER
+    version's digest (argMax over object_versions picks newest).  Because
+    the migration's INSERT uses epoch `created_at`, the real row wins.
+
+    Catches: anyone removing the epoch `created_at` from the migration's
+    SELECT projection.
+    """
+    project_id = make_project_id("mig031_clobber")
+    obj_id = "mig031_clobber_obj"
+    digest_pinned = "older_pinned_AAA"
+    digest_unpinned = "newer_unpinned_BBB"
+    t_old = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t_new = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+    t_real_alias = dt.datetime(2026, 5, 14, 12, 0, 0, tzinfo=dt.timezone.utc)
+
+    _seed_obj_version(ch_server, project_id, obj_id, digest_pinned, t_old)
+    _seed_obj_version(ch_server, project_id, obj_id, digest_unpinned, t_new)
+    # Real alias pins 'latest' to the OLDER digest with a current created_at.
+    _seed_alias_row(
+        ch_server, project_id, obj_id, digest_pinned, t_real_alias, wb_user_id="user_x"
+    )
+
+    ch_server._query(_MIGRATION_031_UP_SQL, {"p": project_id, "o": obj_id})
+
+    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == digest_pinned, (
+        f"migration 031 backfill clobbered the real alias.  Expected "
+        f"{digest_pinned!r} (real obj_create alias with current created_at), "
+        f"got {resolved!r}.  The migration must insert at "
+        f"`created_at='1970-01-01 00:00:00.001'` so real alias writes win "
+        f"on ReplacingMergeTree(created_at) merge.  Restore the epoch "
+        f"tiebreaker in the SELECT projection."
+    )
+
+
+def test_migration_031_emits_no_row_when_all_versions_tombstoned(ch_server):
+    """Migration 031 must not mint a backfill row for an object whose every
+    version is soft-deleted.
+
+    Without the WHERE filter excluding tombstones (`ov.deleted_at IS NULL`),
+    the GROUP BY yields one row per object — including objects with zero
+    survivors — and argMax over tombstoned rows would produce a phantom
+    'latest' pointing at a deleted version.
+
+    Catches: WHERE-shadow regression on an all-tombstoned object (the live-
+    plus-dead variant is covered by
+    `test_migration_031_where_filter_excludes_soft_deleted_versions`; this
+    variant catches the case where the GROUP BY group becomes empty after
+    the filter — broken WHERE would emit a row anyway).
+    """
+    project_id = make_project_id("mig031_all_dead")
+    obj_id = "mig031_all_dead_obj"
+    t0 = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t1 = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+    t_tomb = dt.datetime(2026, 5, 14, 12, 0, 0, tzinfo=dt.timezone.utc)
+
+    _seed_obj_version(ch_server, project_id, obj_id, "dead0", t0, deleted_at=t_tomb)
+    _seed_obj_version(ch_server, project_id, obj_id, "dead1", t1, deleted_at=t_tomb)
+
+    ch_server._query(_MIGRATION_031_UP_SQL, {"p": project_id, "o": obj_id})
+
+    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved is None, (
+        f"migration 031 emitted a 'latest' backfill row for an object with "
+        f"no live versions.  _maybe_resolve_alias returned {resolved!r}; "
+        f"expected None.  Either the WHERE filter is broken (tombstones "
+        f"included) or the GROUP BY is producing a row for an empty group."
+    )
+
+
+def test_migration_031_down_preserves_real_alias_and_idempotent(ch_server):
+    """End-to-end migration 031 idempotency: up → down → up preserves any
+    real alias row, and successfully removes/re-adds backfill rows.
+
+    The down migration's WHERE is load-bearing — it must filter on the
+    sentinel `wb_user_id = '__weave_backfill_031__'` AND the epoch
+    `created_at` so it never touches real alias writes.  This test
+    seeds a real alias, then exercises the full up/down/up sequence.
+
+    Catches: anyone broadening the down's WHERE (e.g. dropping the
+    sentinel filter), which would silently delete real alias rows on
+    rollback.
+    """
+    project_id = make_project_id("mig031_idem")
+    obj_id = "mig031_idem_obj"
+    digest_real = "real_pin_AAA"
+    digest_other = "newer_unpinned_BBB"
+    t_old = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t_new = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+    t_real_alias = dt.datetime(2026, 5, 14, 12, 0, 0, tzinfo=dt.timezone.utc)
+
+    _seed_obj_version(ch_server, project_id, obj_id, digest_real, t_old)
+    _seed_obj_version(ch_server, project_id, obj_id, digest_other, t_new)
+    _seed_alias_row(
+        ch_server, project_id, obj_id, digest_real, t_real_alias, wb_user_id="user_x"
+    )
+
+    # Up: real alias still wins (epoch loses).
+    ch_server._query(_MIGRATION_031_UP_SQL, {"p": project_id, "o": obj_id})
+    assert (
+        ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == digest_real
+    ), "after first up: real alias should outrank backfill (newer created_at)"
+
+    # Down: backfill rows must be deleted, real alias preserved.
+    ch_server._query(_MIGRATION_031_DOWN_SQL, {})
+    assert (
+        ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == digest_real
+    ), (
+        "down migration deleted the real alias row — sentinel WHERE clause is "
+        "too broad.  Re-confirm the down's WHERE filters on wb_user_id = "
+        "'__weave_backfill_031__' AND created_at = epoch."
+    )
+    # Confirm no backfill row remains by checking aliases for this object.
+    count_backfill = ch_server._query(
+        """
+        SELECT count() FROM aliases
+        WHERE project_id = {p: String}
+            AND object_id = {o: String}
+            AND alias = 'latest'
+            AND wb_user_id = '__weave_backfill_031__'
+        """,
+        {"p": project_id, "o": obj_id},
+    ).result_rows[0][0]
+    assert count_backfill == 0, (
+        f"down migration left {count_backfill} backfill row(s) in place — "
+        f"mutation may not have synced (check SETTINGS mutations_sync = 2)."
+    )
+
+    # Up again: backfill re-added.  Real alias still wins.
+    ch_server._query(_MIGRATION_031_UP_SQL, {"p": project_id, "o": obj_id})
+    assert (
+        ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == digest_real
+    ), (
+        "after second up: real alias should still outrank a freshly-inserted backfill row"
+    )
+
+
+def test_obj_create_batch_duplicate_object_id_last_entry_wins_latest(ch_server):
+    """obj_create_batch with two entries sharing object_id and different vals.
+
+    Both alias-row INSERTs land in one CH batch with effectively the same
+    `now64(3)` created_at — `argMax(digest, created_at)` ties, and CH
+    breaks ties by storage order (per-part insertion order for rows with
+    the same ORDER BY key).  Result: which digest wins 'latest' is
+    undefined by CH spec, and `obj_create_batch` does not reject duplicates.
+
+    This test pins the *expected* behavior — last entry in the batch wins
+    'latest' — and surfaces the non-determinism if it does not hold.  A
+    real fix would either (a) reject duplicate object_ids in the batch
+    or (b) deterministically order alias INSERTs so the last batch entry
+    wins (e.g. by post-processing alias_rows to keep only the last entry
+    per object_id, OR by stamping alias rows with incrementing created_at
+    within the batch).
+    """
+    project_id = make_project_id("alias_batch_dup")
+    obj_id = "batch_dup_obj"
+    batch = [
+        tsi.ObjSchemaForInsert(project_id=project_id, object_id=obj_id, val={"v": "A"}),
+        tsi.ObjSchemaForInsert(project_id=project_id, object_id=obj_id, val={"v": "B"}),
+    ]
+    results = ch_server.obj_create_batch(batch)
+    # Both digests should be returned (they're content-derived).
+    digest_a = results[0].digest
+    digest_b = results[1].digest
+    assert digest_a != digest_b, "fixture invariant: vals must yield distinct digests"
+
+    resolved = _resolve_latest(ch_server, project_id, obj_id)
+    assert resolved == digest_b, (
+        f"obj_create_batch with duplicate object_id resolved 'latest' to "
+        f"{resolved!r}; expected {digest_b!r} (the last entry in the batch).  "
+        f"Both alias rows land at the same now64(3) timestamp; argMax ties "
+        f"and CH breaks the tie by storage order, which is implementation-"
+        f"defined.  Either deduplicate alias_rows in obj_create_batch (keep "
+        f"only the last per object_id) or reject duplicate object_ids in "
+        f"the batch."
+    )
+
+
+def test_legacy_no_alias_row_resolves_latest_via_computed_fallback(ch_server):
+    """An object with a version row but NO 'latest' alias row (legacy data
+    that pre-dates obj_create's alias write, or where migration 031 has not
+    run) must still resolve `obj_read('latest')` via the hybrid CTE's
+    computed fallback.
+
+    Catches: re-introducing the `if digest == "latest": return None`
+    short-circuit in `_maybe_resolve_alias` while simultaneously
+    removing the computed-fallback branch of the is_latest CTE — would
+    leave legacy objects with no way to resolve 'latest'.
+
+    Also catches the inverse: removing the short-circuit but breaking
+    the fallback such that legacy objects only resolve via the alias row.
+    """
+    project_id = make_project_id("legacy_no_alias")
+    obj_id = "legacy_obj"
+    t_old = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t_new = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+
+    _seed_obj_version(ch_server, project_id, obj_id, "legacy_v0", t_old)
+    _seed_obj_version(ch_server, project_id, obj_id, "legacy_v1", t_new)
+    # Note: no alias row inserted.
+
+    # _maybe_resolve_alias returns None (no alias row).  obj_read falls
+    # through to make_metadata_query's CTE, where the computed fallback
+    # (window function ranked by _first_created_at DESC) picks legacy_v1.
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") is None
+    read_res = ch_server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=obj_id, digest="latest")
+    )
+    assert read_res.obj.digest == "legacy_v1", (
+        f"legacy object with no alias row resolved 'latest' to "
+        f"{read_res.obj.digest!r}; expected 'legacy_v1' (most recently "
+        f"published).  The computed fallback in the is_latest CTE is not "
+        f"firing — check that the CTE's IF expression includes the "
+        f"`(project_id, object_id) NOT IN latest_alias_per_object` branch."
+    )
+    # Same answer through the latest_only path.
+    latest_only = ch_server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=True),
+        )
+    ).objs
+    assert [o.digest for o in latest_only] == ["legacy_v1"]
+
+
+def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
+    """When the 'latest' alias points to a digest whose object_versions
+    row has been soft-deleted (a state obj_delete normally prevents by
+    cascading the alias soft-delete, but which can arise from partial
+    failures or external maintenance), `obj_read('latest')` must fail
+    cleanly rather than return a ghost record.
+
+    `_maybe_resolve_alias` returns the (live) alias digest; the
+    subsequent obj_read filters on `deleted_at IS NULL` and finds no
+    rows.  Expected behavior: raise NotFoundError / ObjectDeletedError.
+
+    Catches: anyone removing the `deleted_at IS NULL` filter from the
+    object-fetch path, which would surface deleted versions as 'latest'.
+    """
+    project_id = make_project_id("alias_to_tomb")
+    obj_id = "alias_to_tomb_obj"
+    digest_dead = "alias_target_tomb"
+    t_pub = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t_tomb = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+    t_alias = dt.datetime(2026, 5, 14, 12, 0, 0, tzinfo=dt.timezone.utc)
+
+    # Version exists then gets tombstoned, without going through obj_delete
+    # (so the alias cascade does not run).  Then the live alias row points
+    # at the now-tombstoned digest.
+    _seed_obj_version(
+        ch_server, project_id, obj_id, digest_dead, t_pub, deleted_at=t_tomb
+    )
+    _seed_alias_row(ch_server, project_id, obj_id, digest_dead, t_alias)
+
+    # _maybe_resolve_alias resolves to the digest (it only knows about the
+    # aliases table, not whether the target is alive in object_versions).
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == digest_dead
+
+    # obj_read must NOT return the tombstoned version.  Either raises, or
+    # falls through to the CTE's computed fallback — which itself filters
+    # tombstones via `(deleted_at IS NULL) DESC` and would find nothing.
+    with pytest.raises((NotFoundError, Exception)) as exc_info:
+        ch_server.obj_read(
+            tsi.ObjReadReq(project_id=project_id, object_id=obj_id, digest="latest")
+        )
+    # Sanity: the error mentions "not found" or "deleted" — i.e. it's a
+    # NotFoundError-family failure, not an unrelated crash.
+    msg = str(exc_info.value).lower()
+    assert "not found" in msg or "deleted" in msg, (
+        f"obj_read raised an unexpected exception when 'latest' alias "
+        f"pointed at a tombstoned version: {exc_info.value!r}.  Expected a "
+        f"NotFoundError-family error mentioning 'not found' or 'deleted'."
+    )

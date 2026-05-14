@@ -1847,6 +1847,66 @@ def test_hybrid_latest_multi_object_query(client: WeaveClient, monkeypatch):
     assert len(mixed_digests) == 4, f"unexpected rows: {sorted(mixed_digests)}"
 
 
+def test_delete_non_current_version_leaves_latest_unchanged(
+    client: WeaveClient, monkeypatch
+):
+    """Deleting a NON-current version must not move 'latest'.
+
+    Counterpart to `test_delete_current_latest_promotes_prior_surviving_version`
+    — that test exercises the fallback path when the current latest is
+    deleted.  This test exercises the opposite: when a non-current version
+    is deleted, latest must stay put on the alias path.
+
+    Failure modes this catches on each backend:
+        SQLite: an over-eager `obj_delete` UPDATE that re-points
+            `objects.is_latest` based on a buggy subquery (e.g. dropping
+            `LIMIT 1`, or losing the `deleted_at IS NULL` filter so the
+            just-deleted row competes again).
+        CH: an over-eager cascade that soft-deletes the alias row for the
+            current latest instead of only the alias rows tied to the
+            deleted digest.
+
+    Asserts all three surfaces (obj_read, latest_only, aliases=['latest'])
+    agree across the delete.
+    """
+    monkeypatch.setenv("WEAVE_USE_SERVER_CACHE", "false")
+
+    ref_a = weave.publish({"v": "A"}, name="del_non_current")
+    ref_b = weave.publish({"v": "B"}, name="del_non_current")
+    client.flush()
+
+    # Pre-condition: latest is B via the alias path on both backends.
+    assert _resolve_latest_digest(client, "del_non_current") == ref_b.digest
+
+    # Delete the OLDER, non-current version (A).
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client.project_id,
+            object_id="del_non_current",
+            digests=[ref_a.digest],
+        )
+    )
+
+    # Latest must remain B across all resolution paths.
+    assert _resolve_latest_digest(client, "del_non_current") == ref_b.digest, (
+        "deleting a non-current version moved 'latest' — obj_delete may be "
+        "re-pointing too aggressively.  Check the SQLite UPDATE in obj_delete "
+        "(re-points objects.is_latest) and the CH alias-cascade scope."
+    )
+
+    # And B still carries is_latest=1 plus 'latest' in its aliases list.
+    read_b = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client.project_id,
+            object_id="del_non_current",
+            digest=ref_b.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert read_b.obj.is_latest == 1
+    assert "latest" in read_b.obj.aliases
+
+
 # ---------------------------------------------------------------------------
 # Full end-to-end lifecycle
 # ---------------------------------------------------------------------------
