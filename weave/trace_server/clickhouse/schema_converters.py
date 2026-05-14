@@ -111,11 +111,14 @@ def ch_call_to_row(ch_call: CallCHInsertable | CallCompleteCHInsertable) -> list
     in `_insert_call_to_v1`, used when a project has not yet migrated to the
     calls_complete schema.
     """
-    call_dict = ch_call.model_dump()
+    # Read fields via getattr instead of model_dump() to avoid allocating an
+    # intermediate dict on every insert; model_dump in the default python mode
+    # passes through native datetime/list/str values unchanged, so the values
+    # going into ClickHouse are identical.
     return [
-        ch_sentinel_values.to_ch_value(col, call_dict.get(col))
+        ch_sentinel_values.to_ch_value(col, getattr(ch_call, col, None))
         if col in ch_sentinel_values.SENTINEL_IN_CALLS_MERGED_FIELDS
-        else call_dict.get(col)
+        else getattr(ch_call, col, None)
         for col in ALL_CALL_INSERT_COLUMNS
     ]
 
@@ -276,9 +279,9 @@ def start_end_calls_to_ch_complete_insertable(
 
 def ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
     """Convert a CallCompleteCHInsertable to a row for batch insertion."""
-    call_dict = ch_call.model_dump()
+    # See `ch_call_to_row` for why we skip `model_dump()` here.
     return [
-        ch_sentinel_values.to_ch_value(col, call_dict.get(col))
+        ch_sentinel_values.to_ch_value(col, getattr(ch_call, col, None))
         for col in ALL_CALL_COMPLETE_INSERT_COLUMNS
     ]
 
