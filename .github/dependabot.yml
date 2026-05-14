@@ -185,12 +185,6 @@ updates:
         patterns:
           - "boto3*"
 
-      # Development dependencies
-      dev:
-        patterns:
-          - "tomlkit*"
-          - "python-multipart*"
-
       # Pandas testing
       pandas_test:
         patterns:

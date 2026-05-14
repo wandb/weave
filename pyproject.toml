@@ -408,9 +408,6 @@ disable = ["fixit.rules"]
 
 [dependency-groups]
 dev = [
-  # codegen
-  "tomlkit",
-  "python-multipart",
   # linting
   "prek",
   "jupyter",
