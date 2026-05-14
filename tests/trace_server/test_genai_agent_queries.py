@@ -5,7 +5,6 @@ Migration 030 creates the genai tables automatically.
 """
 
 import datetime
-import time
 import uuid
 
 import pytest
@@ -513,7 +512,6 @@ def test_agent_span_stats_conversation_numeric_value_buckets(ch_server):
         ),
     ]
     _insert_spans(ch_server.ch_client, spans)
-    time.sleep(0.2)
 
     res = ch_server.agent_spans_stats(
         AgentSpanStatsReq(
