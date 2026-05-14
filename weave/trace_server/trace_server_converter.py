@@ -1,5 +1,24 @@
+"""Helpers for converting trace refs with copy-on-write traversal.
+
+Trace request payloads pass through this module on every call_start /
+call_end so external `weave:///...` refs can be rewritten to internal
+`weave-trace-internal:///...` form (and vice versa). The naive recursion
+that used to live here cloned every container on every request, which
+dominated the hot path under load even when no refs were present.
+
+The traversal here is copy-on-write: subtrees that contain no rewrites
+return the original object, and a parent only allocates a new container
+once one of its children has actually changed. For ref-free payloads
+zero new objects are allocated.
+
+Pydantic models with nested dataclasses inside `Any` fields fall back to
+the legacy `model_dump` / `model_validate` round-trip, since Pydantic
+does not round-trip dataclasses safely through getattr / setattr.
+"""
+
+import dataclasses
 from collections.abc import Callable
-from typing import TypeVar, cast
+from typing import Any, NamedTuple, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -146,24 +165,149 @@ def universal_int_to_ext_ref_converter(
 
 
 E = TypeVar("E")
-F = TypeVar("F")
+
+
+class _MapResult(NamedTuple):
+    """Outcome of a single copy-on-write traversal step.
+
+    value:           the (possibly new) value at this node.
+    changed:         True if this subtree was rewritten; ancestors must clone.
+    fast_path_safe:  False once we have seen a nested dataclass inside an
+                     `Any` field. Models containing one have to fall back to
+                     the legacy model_dump / model_validate path because
+                     Pydantic does not round-trip dataclasses through
+                     getattr / setattr.
+    """
+
+    value: Any
+    changed: bool
+    fast_path_safe: bool
 
 
 def _map_values(obj: E, func: Callable[[E], E]) -> E:
+    """Apply `func` to every scalar in `obj`, reusing untouched subtrees."""
+    return cast(E, _walk(obj, cast(Callable[[Any], Any], func)).value)
+
+
+def _walk(obj: Any, func: Callable[[Any], Any]) -> _MapResult:
+    """Recursive copy-on-write dispatcher; one container kind per arm."""
     if isinstance(obj, BaseModel):
-        # `by_alias` is required since we have Mongo-style properties in the
-        # query models that are aliased to conform to start with `$`. Without
-        # this, the model_dump will use the internal property names which are
-        # not valid for the `model_validate` step.
-        orig = obj.model_dump(by_alias=True)
-        new = _map_values(orig, func)
-        return obj.model_validate(new)
+        return _walk_model(obj, func)
     if isinstance(obj, dict):
-        return cast(E, {k: _map_values(v, func) for k, v in obj.items()})
+        return _walk_mapping(obj, func)
     if isinstance(obj, list):
-        return cast(E, [_map_values(v, func) for v in obj])
+        return _walk_sequence(obj, func, rebuild=list)
     if isinstance(obj, tuple):
-        return cast(E, tuple(_map_values(v, func) for v in obj))
+        return _walk_sequence(obj, func, rebuild=tuple)
     if isinstance(obj, set):
-        return cast(E, {_map_values(v, func) for v in obj})
-    return func(obj)
+        return _walk_set(obj, func)
+
+    # Scalar leaf: ask the mapper for a replacement. Dataclasses are leaves
+    # too, but trip the fast-path flag so any ancestor model knows to
+    # round-trip via model_dump.
+    new_obj = func(obj)
+    if new_obj is not obj:
+        return _MapResult(new_obj, True, True)
+    return _MapResult(obj, False, not dataclasses.is_dataclass(obj))
+
+
+def _walk_mapping(obj: dict, func: Callable[[Any], Any]) -> _MapResult:
+    # Allocate a copy only on the first changed child, then write through it.
+    clone: dict | None = None
+    fast_path_safe = True
+    for key, value in obj.items():
+        result = _walk(value, func)
+        if result.changed:
+            if clone is None:
+                clone = dict(obj)
+            clone[key] = result.value
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+    if clone is None:
+        return _MapResult(obj, False, fast_path_safe)
+    return _MapResult(clone, True, fast_path_safe)
+
+
+def _walk_sequence(
+    obj: Any,
+    func: Callable[[Any], Any],
+    rebuild: Callable[[list[Any]], Any],
+) -> _MapResult:
+    # Lists and tuples share an identical walk; only the final constructor
+    # differs (`list` returns the buffer, `tuple` freezes it).
+    clone: list[Any] | None = None
+    fast_path_safe = True
+    for index, value in enumerate(obj):
+        result = _walk(value, func)
+        if result.changed:
+            if clone is None:
+                clone = list(obj)
+            clone[index] = result.value
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+    if clone is None:
+        return _MapResult(obj, False, fast_path_safe)
+    return _MapResult(rebuild(clone), True, fast_path_safe)
+
+
+def _walk_set(obj: set, func: Callable[[Any], Any]) -> _MapResult:
+    # Sets have no useful index to write through, so we collect into a list
+    # and rebuild only when something changed.
+    values: list[Any] = []
+    changed = False
+    fast_path_safe = True
+    for value in obj:
+        result = _walk(value, func)
+        values.append(result.value)
+        changed = changed or result.changed
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+    if not changed:
+        return _MapResult(obj, False, fast_path_safe)
+    return _MapResult(set(values), True, fast_path_safe)
+
+
+def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
+    """Rewrite model fields in place when safe; round-trip when not.
+
+    The fast path reads each field via getattr, walks it, and (if anything
+    changed) either mutates the model in place or, for `frozen=True`
+    models, uses `model_copy(update=...)`. Either way the resulting model
+    is re-validated, so callers that bypassed validation via
+    `model_construct(...)` still see the same shape they would have from
+    the legacy round-trip.
+    """
+    updates: dict[str, Any] = {}
+    fast_path_safe = True
+    for field_name, field_info in obj.__class__.model_fields.items():
+        if field_info.exclude is True:
+            continue
+        current = getattr(obj, field_name)
+        result = _walk(current, func)
+        if result.changed:
+            updates[field_name] = result.value
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+
+    if not fast_path_safe:
+        return _MapResult(_model_via_roundtrip(obj, func), True, True)
+
+    if not updates:
+        return _MapResult(obj.__class__.model_validate(obj), False, True)
+
+    if obj.__class__.model_config.get("frozen"):
+        updated = obj.model_copy(update=updates)
+        return _MapResult(updated.__class__.model_validate(updated), True, True)
+
+    # Non-frozen: mutate in place. The outer model keeps its identity and
+    # only the rewritten fields are replaced.
+    for field_name, new_value in updates.items():
+        setattr(obj, field_name, new_value)
+    return _MapResult(obj.__class__.model_validate(obj), True, True)
+
+
+def _model_via_roundtrip(obj: BaseModel, func: Callable[[Any], Any]) -> BaseModel:
+    """Legacy path used when a model contains a nested dataclass.
+
+    `by_alias=True` is required: query models have Mongo-style aliased fields
+    (e.g. `$gt`) whose internal property names cannot round-trip without it.
+    """
+    orig = obj.model_dump(by_alias=True)
+    walked = _walk(orig, func)
+    return obj.model_validate(walked.value)
