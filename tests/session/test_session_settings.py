@@ -173,3 +173,60 @@ def test_redact_system_instructions():
 def test_redact_system_instructions_none_passthrough():
     assert _redaction.redact_system_instructions(None) is None
     assert _redaction.redact_system_instructions([]) == []
+
+
+# ---------------------------------------------------------------------------
+# redact_pii — Tool
+# ---------------------------------------------------------------------------
+
+
+def test_tool_redacts_arguments_and_result(otel_spans: InMemorySpanExporter):
+    """With redact_pii=True, Tool.arguments and Tool.result are redacted on emit."""
+    with override_settings(redact_pii=True):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=lambda s: s.replace("alice@example.com", "<EMAIL>"),
+        ):
+            with start_session(session_id="s") as sess, sess.start_turn() as t:
+                with t.tool(name="lookup") as tool:
+                    tool.arguments = '{"email":"alice@example.com"}'
+                    tool.result = "found alice@example.com"
+
+    tool_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("execute_tool")
+    ]
+    assert len(tool_spans) == 1
+    attrs = tool_spans[0].attributes
+    assert "<EMAIL>" in attrs["gen_ai.tool.call.arguments"]
+    assert "alice@example.com" not in attrs["gen_ai.tool.call.arguments"]
+    assert "<EMAIL>" in attrs["gen_ai.tool.call.result"]
+
+
+def test_tool_no_redaction_when_setting_off(otel_spans: InMemorySpanExporter):
+    """Default: redact_pii=False → content passes through unchanged."""
+    with start_session(session_id="s") as sess, sess.start_turn() as t:
+        with t.tool(name="lookup") as tool:
+            tool.arguments = '{"email":"alice@example.com"}'
+
+    tool_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("execute_tool")
+    ]
+    assert "alice@example.com" in tool_spans[0].attributes["gen_ai.tool.call.arguments"]
+
+
+def test_tool_skip_presidio_when_include_content_false(
+    otel_spans: InMemorySpanExporter,
+):
+    """include_content=False drops content at source; Presidio is never called."""
+    with override_settings(redact_pii=True):
+        with patch("weave.session._redaction.redact_pii") as mock_redact:
+            with start_session(session_id="s", include_content=False) as sess:
+                with sess.start_turn() as t:
+                    with t.tool(name="lookup") as tool:
+                        tool.arguments = '{"email":"alice@example.com"}'
+
+    mock_redact.assert_not_called()
+    tool_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("execute_tool")
+    ]
+    assert "gen_ai.tool.call.arguments" not in tool_spans[0].attributes
