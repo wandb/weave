@@ -25,7 +25,7 @@ try:
     from weave.utils.pii_redaction import redact_pii
 except ImportError:  # pragma: no cover — exercised in environments without presidio
 
-    def redact_pii(data):  # type: ignore[no-redef]
+    def redact_pii(data: dict[str, Any] | str) -> dict[str, Any] | str:  # type: ignore[no-redef]
         raise ImportError(
             "presidio is required for PII redaction. "
             "Install with `pip install 'weave[presidio]'`."
