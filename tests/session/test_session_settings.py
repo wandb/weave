@@ -17,9 +17,11 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from weave.session import _redaction
 from weave.session.session import (
+    LLM,
     Message,
     Reasoning,
     TextPart,
+    Tool,
     ToolCallPart,
     Turn,
     get_current_llm,
@@ -385,4 +387,109 @@ def test_turn_skip_presidio_when_include_content_false(
             with start_session(session_id="s", include_content=False) as sess:
                 with sess.start_turn(user_message="alice@example.com"):
                     pass
+    mock_redact.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# redact_pii — batch (log_turn / log_session / _attrs_for_span)
+# ---------------------------------------------------------------------------
+
+
+def test_log_turn_redacts_turn_messages(otel_spans: InMemorySpanExporter):
+    with override_settings(redact_pii=True):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=_make_redact_substitutor({"alice@example.com": "<EMAIL>"}),
+        ):
+            log_turn(
+                session_id="s",
+                agent_name="a",
+                messages=[Message(role="user", content="alice@example.com")],
+            )
+
+    turn_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("invoke_agent")
+    ]
+    assert len(turn_spans) == 1
+    assert "alice@example.com" not in turn_spans[0].attributes["gen_ai.input.messages"]
+    assert "<EMAIL>" in turn_spans[0].attributes["gen_ai.input.messages"]
+
+
+def test_log_turn_redacts_child_llm(otel_spans: InMemorySpanExporter):
+    with override_settings(redact_pii=True):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=_make_redact_substitutor({"alice@example.com": "<EMAIL>"}),
+        ):
+            log_turn(
+                session_id="s",
+                agent_name="a",
+                spans=[
+                    LLM(
+                        model="gpt-4o",
+                        input_messages=[
+                            Message(role="user", content="alice@example.com")
+                        ],
+                    ),
+                ],
+            )
+
+    chat_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("chat")
+    ]
+    assert len(chat_spans) == 1
+    assert "alice@example.com" not in chat_spans[0].attributes["gen_ai.input.messages"]
+
+
+def test_log_turn_redacts_child_tool(otel_spans: InMemorySpanExporter):
+    with override_settings(redact_pii=True):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=_make_redact_substitutor({"alice@example.com": "<EMAIL>"}),
+        ):
+            log_turn(
+                session_id="s",
+                agent_name="a",
+                spans=[
+                    Tool(name="lookup", arguments='{"email":"alice@example.com"}'),
+                ],
+            )
+
+    tool_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("execute_tool")
+    ]
+    assert "<EMAIL>" in tool_spans[0].attributes["gen_ai.tool.call.arguments"]
+
+
+def test_log_turn_include_content_false_drops_reasoning(
+    otel_spans: InMemorySpanExporter,
+):
+    """Regression test: batch path reasoning gating fix."""
+    log_turn(
+        session_id="s",
+        agent_name="a",
+        include_content=False,
+        spans=[
+            LLM(model="gpt-4o", reasoning=Reasoning(content="sensitive")),
+        ],
+    )
+    chat_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("chat")
+    ]
+    attrs = dict(chat_spans[0].attributes)
+    assert "gen_ai.output.messages" not in attrs
+
+
+def test_log_turn_skip_presidio_when_include_content_false(
+    otel_spans: InMemorySpanExporter,
+):
+    with override_settings(redact_pii=True):
+        with patch("weave.session._redaction.redact_pii") as mock_redact:
+            log_turn(
+                session_id="s",
+                agent_name="a",
+                include_content=False,
+                messages=[Message(role="user", content="alice@example.com")],
+                spans=[Tool(name="lookup", arguments='{"email":"alice@example.com"}')],
+            )
     mock_redact.assert_not_called()
