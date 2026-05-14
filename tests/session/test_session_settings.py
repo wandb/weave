@@ -17,6 +17,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from weave.session import _redaction
 from weave.session.session import (
     Message,
+    Reasoning,
     TextPart,
     ToolCallPart,
     Turn,
@@ -230,3 +231,121 @@ def test_tool_skip_presidio_when_include_content_false(
         s for s in otel_spans.get_finished_spans() if s.name.startswith("execute_tool")
     ]
     assert "gen_ai.tool.call.arguments" not in tool_spans[0].attributes
+
+
+# ---------------------------------------------------------------------------
+# redact_pii — LLM
+# ---------------------------------------------------------------------------
+
+
+def _get_llm_attrs(otel_spans: InMemorySpanExporter) -> dict[str, Any]:
+    llm_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("chat")
+    ]
+    assert len(llm_spans) == 1, f"expected 1 chat span, got {len(llm_spans)}"
+    return dict(llm_spans[0].attributes)
+
+
+def test_llm_redacts_input_and_output_messages(otel_spans: InMemorySpanExporter):
+    with override_settings(redact_pii=True):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=lambda d: (
+                d.replace("alice@example.com", "<EMAIL>")
+                if isinstance(d, str)
+                else {
+                    k: (
+                        v.replace("alice@example.com", "<EMAIL>")
+                        if isinstance(v, str)
+                        else v
+                    )
+                    for k, v in d.items()
+                }
+                if isinstance(d, dict)
+                else [
+                    (
+                        x.replace("alice@example.com", "<EMAIL>")
+                        if isinstance(x, str)
+                        else x
+                    )
+                    for x in d
+                ]
+                if isinstance(d, list)
+                else d
+            ),
+        ):
+            with start_session(session_id="s") as sess, sess.start_turn() as t:
+                with t.llm(model="gpt-4o") as llm:
+                    llm.input_messages = [
+                        Message(role="user", content="alice@example.com")
+                    ]
+                    llm.output_messages = [
+                        Message(role="assistant", content="hi alice@example.com")
+                    ]
+
+    attrs = _get_llm_attrs(otel_spans)
+    assert "alice@example.com" not in attrs["gen_ai.input.messages"]
+    assert "<EMAIL>" in attrs["gen_ai.input.messages"]
+    assert "alice@example.com" not in attrs["gen_ai.output.messages"]
+
+
+def test_llm_redacts_system_instructions(otel_spans: InMemorySpanExporter):
+    with override_settings(redact_pii=True):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=lambda s: (
+                s.replace("alice@example.com", "<EMAIL>") if isinstance(s, str) else s
+            ),
+        ):
+            with start_session(session_id="s") as sess, sess.start_turn() as t:
+                with t.llm(
+                    model="gpt-4o",
+                    system_instructions=["contact alice@example.com"],
+                ):
+                    pass
+
+    attrs = _get_llm_attrs(otel_spans)
+    assert "alice@example.com" not in attrs["gen_ai.system_instructions"]
+    assert "<EMAIL>" in attrs["gen_ai.system_instructions"]
+
+
+def test_llm_redacts_reasoning(otel_spans: InMemorySpanExporter):
+    with override_settings(redact_pii=True):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=lambda s: (
+                s.replace("alice@example.com", "<EMAIL>") if isinstance(s, str) else s
+            ),
+        ):
+            with start_session(session_id="s") as sess, sess.start_turn() as t:
+                with t.llm(model="gpt-4o") as llm:
+                    llm.reasoning = Reasoning(content="think about alice@example.com")
+                    llm.output_messages = [Message(role="assistant", content="ok")]
+
+    attrs = _get_llm_attrs(otel_spans)
+    assert "alice@example.com" not in attrs["gen_ai.output.messages"]
+
+
+def test_llm_include_content_false_drops_reasoning(otel_spans: InMemorySpanExporter):
+    """Regression test for pre-existing leak: reasoning bypassed include_content."""
+    with start_session(session_id="s", include_content=False) as sess:
+        with sess.start_turn() as t:
+            with t.llm(model="gpt-4o") as llm:
+                llm.reasoning = Reasoning(content="sensitive reasoning")
+
+    attrs = _get_llm_attrs(otel_spans)
+    # gen_ai.output.messages should be absent (no messages, no reasoning carries through)
+    assert "gen_ai.output.messages" not in attrs
+
+
+def test_llm_skip_presidio_when_include_content_false(otel_spans: InMemorySpanExporter):
+    with override_settings(redact_pii=True):
+        with patch("weave.session._redaction.redact_pii") as mock_redact:
+            with start_session(session_id="s", include_content=False) as sess:
+                with sess.start_turn() as t:
+                    with t.llm(model="gpt-4o") as llm:
+                        llm.input_messages = [
+                            Message(role="user", content="alice@example.com")
+                        ]
+                        llm.reasoning = Reasoning(content="think")
+    mock_redact.assert_not_called()

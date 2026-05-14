@@ -408,16 +408,33 @@ class LLM(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
+        input_messages = self.input_messages if include else None
+        output_messages = self.output_messages if include else None
+        system_instructions = self.system_instructions if include else None
+        media_attachments = self.media_attachments if include else None
+        reasoning = self.reasoning if include else None
+
+        if include and should_redact_pii():
+            input_messages = _redaction.redact_messages(input_messages)
+            output_messages = _redaction.redact_messages(output_messages)
+            system_instructions = _redaction.redact_system_instructions(
+                system_instructions
+            )
+            if reasoning is not None and reasoning.content:
+                reasoning = Reasoning(
+                    content=_redaction.redact_string(reasoning.content)
+                )
+
         attrs = llm_attributes(
             model=self.model,
             provider_name=self.provider_name,
             conversation_id=session.session_id if session else "",
-            input_messages=self.input_messages if include else None,
-            output_messages=self.output_messages if include else None,
-            media_attachments=self.media_attachments if include else None,
-            system_instructions=self.system_instructions if include else None,
+            input_messages=input_messages,
+            output_messages=output_messages,
+            media_attachments=media_attachments,
+            system_instructions=system_instructions,
             usage=self.usage,
-            reasoning=self.reasoning,
+            reasoning=reasoning,
             finish_reasons=self.finish_reasons,
             response_id=self.response_id,
             response_model=self.response_model,
