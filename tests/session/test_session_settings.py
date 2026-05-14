@@ -83,6 +83,59 @@ def _make_redact_substitutor(substitutions: dict[str, str]) -> Callable[[Any], A
     return _walk
 
 
+def _exercise_tool() -> None:
+    """Streaming Tool span path with PII-bearing content."""
+    with start_session(session_id="s", include_content=False) as sess:
+        with sess.start_turn() as t:
+            with t.tool(name="lookup") as tool:
+                tool.arguments = '{"email":"alice@example.com"}'
+
+
+def _exercise_llm() -> None:
+    """Streaming LLM span path with PII-bearing content."""
+    with start_session(session_id="s", include_content=False) as sess:
+        with sess.start_turn() as t:
+            with t.llm(model="gpt-4o") as llm:
+                llm.input_messages = [Message(role="user", content="alice@example.com")]
+                llm.reasoning = Reasoning(content="think")
+
+
+def _exercise_turn() -> None:
+    """Streaming Turn span path with PII-bearing user_message."""
+    with start_session(session_id="s", include_content=False) as sess:
+        with sess.start_turn(user_message="alice@example.com"):
+            pass
+
+
+def _exercise_log_turn() -> None:
+    """Batch log_turn path with PII-bearing content."""
+    log_turn(
+        session_id="s",
+        agent_name="a",
+        include_content=False,
+        messages=[Message(role="user", content="alice@example.com")],
+        spans=[Tool(name="lookup", arguments='{"email":"alice@example.com"}')],
+    )
+
+
+def _exercise_llm_with_reasoning() -> None:
+    """Streaming LLM path that sets reasoning (regression for reasoning leak)."""
+    with start_session(session_id="s", include_content=False) as sess:
+        with sess.start_turn() as t:
+            with t.llm(model="gpt-4o") as llm:
+                llm.reasoning = Reasoning(content="sensitive reasoning")
+
+
+def _exercise_log_turn_with_reasoning() -> None:
+    """Batch log_turn path that sets reasoning (regression for reasoning leak)."""
+    log_turn(
+        session_id="s",
+        agent_name="a",
+        include_content=False,
+        spans=[LLM(model="gpt-4o", reasoning=Reasoning(content="sensitive"))],
+    )
+
+
 # ---------------------------------------------------------------------------
 # disabled
 # ---------------------------------------------------------------------------
@@ -151,9 +204,19 @@ def test_redact_string_routes_through_redact_pii():
     mock.assert_called_once_with("alice@example.com")
 
 
-def test_redact_messages_none_passthrough():
-    assert _redaction.redact_messages(None) is None
-    assert _redaction.redact_messages([]) == []
+@pytest.mark.parametrize(
+    ("fn", "empty"),
+    [
+        pytest.param(_redaction.redact_messages, [], id="messages"),
+        pytest.param(
+            _redaction.redact_system_instructions, [], id="system_instructions"
+        ),
+    ],
+)
+def test_redact_collection_helpers_passthrough_none_and_empty(fn, empty):
+    """Collection helpers passthrough None → None and empty → empty."""
+    assert fn(None) is None
+    assert fn(empty) == empty
 
 
 def test_redact_messages_dump_redact_revalidate():
@@ -200,11 +263,6 @@ def test_redact_system_instructions():
     assert out == ["<REDACTED>"]
 
 
-def test_redact_system_instructions_none_passthrough():
-    assert _redaction.redact_system_instructions(None) is None
-    assert _redaction.redact_system_instructions([]) == []
-
-
 # ---------------------------------------------------------------------------
 # redact_pii — Tool
 # ---------------------------------------------------------------------------
@@ -242,24 +300,6 @@ def test_tool_no_redaction_when_setting_off(otel_spans: InMemorySpanExporter):
         s for s in otel_spans.get_finished_spans() if s.name.startswith("execute_tool")
     ]
     assert "alice@example.com" in tool_spans[0].attributes["gen_ai.tool.call.arguments"]
-
-
-def test_tool_skip_presidio_when_include_content_false(
-    otel_spans: InMemorySpanExporter,
-):
-    """include_content=False drops content at source; Presidio is never called."""
-    with override_settings(redact_pii=True):
-        with patch("weave.session._redaction.redact_pii") as mock_redact:
-            with start_session(session_id="s", include_content=False) as sess:
-                with sess.start_turn() as t:
-                    with t.tool(name="lookup") as tool:
-                        tool.arguments = '{"email":"alice@example.com"}'
-
-    mock_redact.assert_not_called()
-    tool_spans = [
-        s for s in otel_spans.get_finished_spans() if s.name.startswith("execute_tool")
-    ]
-    assert "gen_ai.tool.call.arguments" not in tool_spans[0].attributes
 
 
 # ---------------------------------------------------------------------------
@@ -333,31 +373,6 @@ def test_llm_redacts_reasoning(otel_spans: InMemorySpanExporter):
     assert "alice@example.com" not in attrs["gen_ai.output.messages"]
 
 
-def test_llm_include_content_false_drops_reasoning(otel_spans: InMemorySpanExporter):
-    """Regression test for pre-existing leak: reasoning bypassed include_content."""
-    with start_session(session_id="s", include_content=False) as sess:
-        with sess.start_turn() as t:
-            with t.llm(model="gpt-4o") as llm:
-                llm.reasoning = Reasoning(content="sensitive reasoning")
-
-    attrs = _get_llm_attrs(otel_spans)
-    # gen_ai.output.messages should be absent (no messages, no reasoning carries through)
-    assert "gen_ai.output.messages" not in attrs
-
-
-def test_llm_skip_presidio_when_include_content_false(otel_spans: InMemorySpanExporter):
-    with override_settings(redact_pii=True):
-        with patch("weave.session._redaction.redact_pii") as mock_redact:
-            with start_session(session_id="s", include_content=False) as sess:
-                with sess.start_turn() as t:
-                    with t.llm(model="gpt-4o") as llm:
-                        llm.input_messages = [
-                            Message(role="user", content="alice@example.com")
-                        ]
-                        llm.reasoning = Reasoning(content="think")
-    mock_redact.assert_not_called()
-
-
 # ---------------------------------------------------------------------------
 # redact_pii — Turn
 # ---------------------------------------------------------------------------
@@ -380,17 +395,6 @@ def test_turn_redacts_messages(otel_spans: InMemorySpanExporter):
     attrs = dict(turn_spans[0].attributes)
     assert "alice@example.com" not in attrs.get("gen_ai.input.messages", "")
     assert "<EMAIL>" in attrs["gen_ai.input.messages"]
-
-
-def test_turn_skip_presidio_when_include_content_false(
-    otel_spans: InMemorySpanExporter,
-):
-    with override_settings(redact_pii=True):
-        with patch("weave.session._redaction.redact_pii") as mock_redact:
-            with start_session(session_id="s", include_content=False) as sess:
-                with sess.start_turn(user_message="alice@example.com"):
-                    pass
-    mock_redact.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -464,38 +468,49 @@ def test_log_turn_redacts_child_tool(otel_spans: InMemorySpanExporter):
     assert "<EMAIL>" in tool_spans[0].attributes["gen_ai.tool.call.arguments"]
 
 
-def test_log_turn_include_content_false_drops_reasoning(
+# ---------------------------------------------------------------------------
+# include_content=False — cross-path invariants
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "exercise_path",
+    [
+        pytest.param(_exercise_tool, id="tool"),
+        pytest.param(_exercise_llm, id="llm"),
+        pytest.param(_exercise_turn, id="turn"),
+        pytest.param(_exercise_log_turn, id="log_turn"),
+    ],
+)
+def test_skip_presidio_when_include_content_false(
+    exercise_path: Callable[[], None],
     otel_spans: InMemorySpanExporter,
 ):
-    """Regression test: batch path reasoning gating fix."""
-    log_turn(
-        session_id="s",
-        agent_name="a",
-        include_content=False,
-        spans=[
-            LLM(model="gpt-4o", reasoning=Reasoning(content="sensitive")),
-        ],
-    )
+    """include_content=False drops content at source; Presidio is never called."""
+    with override_settings(redact_pii=True):
+        with patch("weave.session._redaction.redact_pii") as mock_redact:
+            exercise_path()
+    mock_redact.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "exercise_path",
+    [
+        pytest.param(_exercise_llm_with_reasoning, id="streaming"),
+        pytest.param(_exercise_log_turn_with_reasoning, id="batch"),
+    ],
+)
+def test_include_content_false_drops_reasoning(
+    exercise_path: Callable[[], None],
+    otel_spans: InMemorySpanExporter,
+):
+    """Regression test for the pre-existing leak: LLM.reasoning bypassed include_content."""
+    exercise_path()
     chat_spans = [
         s for s in otel_spans.get_finished_spans() if s.name.startswith("chat")
     ]
     attrs = dict(chat_spans[0].attributes)
     assert "gen_ai.output.messages" not in attrs
-
-
-def test_log_turn_skip_presidio_when_include_content_false(
-    otel_spans: InMemorySpanExporter,
-):
-    with override_settings(redact_pii=True):
-        with patch("weave.session._redaction.redact_pii") as mock_redact:
-            log_turn(
-                session_id="s",
-                agent_name="a",
-                include_content=False,
-                messages=[Message(role="user", content="alice@example.com")],
-                spans=[Tool(name="lookup", arguments='{"email":"alice@example.com"}')],
-            )
-    mock_redact.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
