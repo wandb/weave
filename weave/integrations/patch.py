@@ -374,40 +374,43 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
 
 
 class WeaveImportHook(MetaPathFinder):
-    """Import hook that automatically patches supported integrations when they are imported."""
+    """Import hook that automatically patches supported integrations when they are imported.
+
+    Matches on the exact fullname against ``INTEGRATION_MODULE_MAPPING`` so
+    dotted entries like ``google.adk`` and ``google.genai`` trigger when
+    those submodules are imported. The mapping never contains a plain
+    ``google`` key, so importing the namespace package alone does not
+    accidentally fire any integration.
+    """
 
     def find_spec(self, fullname, path, target=None):  # type: ignore
         """Called by Python's import system to find a module spec.
 
-        We don't actually find or load modules - we just detect when a supported
-        integration is being imported and schedule it for patching after import.
+        We don't actually find or load modules — we just detect when a
+        supported integration is being imported and schedule it for
+        patching after import.
         """
-        # Check if this is a root module we support (not a submodule)
-        root_module = fullname.split(".")[0]
-
-        # If this is one of our supported integrations and not yet patched,
-        # we'll patch it after it's imported
         if (
-            root_module in INTEGRATION_MODULE_MAPPING
-            and root_module not in _PATCHED_INTEGRATIONS
+            fullname not in INTEGRATION_MODULE_MAPPING
+            or fullname in _PATCHED_INTEGRATIONS
         ):
-            # We don't actually find the spec - let the normal import system do that
-            # But we'll use a Loader wrapper to patch after import
-            spec = None
-            for finder in sys.meta_path:
-                if finder is self:
-                    continue
-                if hasattr(finder, "find_spec"):
-                    spec = finder.find_spec(fullname, path, target)
-                    if spec is not None:
-                        break
+            return None
 
-            if spec is not None and fullname == root_module:
-                # Wrap the loader to patch after import
-                spec.loader = PatchingLoader(spec.loader, root_module)
-                return spec
+        # Let the normal import machinery find the real spec, then wrap the
+        # loader so we can run the patch after exec_module / load_module.
+        spec = None
+        for finder in sys.meta_path:
+            if finder is self:
+                continue
+            if hasattr(finder, "find_spec"):
+                spec = finder.find_spec(fullname, path, target)
+                if spec is not None:
+                    break
 
-        # Not our concern, let other finders handle it
+        if spec is not None:
+            spec.loader = PatchingLoader(spec.loader, fullname)
+            return spec
+
         return None
 
     def find_module(self, fullname, path=None):  # type: ignore
@@ -431,7 +434,6 @@ class PatchingLoader:
             # Fallback for loaders that don't have load_module
             module = sys.modules.get(fullname)
 
-        # Now patch it if it's the root module
         if fullname == self.module_name:
             _patch_if_needed(self.module_name)
 
@@ -443,7 +445,6 @@ class PatchingLoader:
         if hasattr(self.original_loader, "exec_module"):
             self.original_loader.exec_module(module)
 
-        # Now patch it if it's the root module
         if module.__name__ == self.module_name:
             _patch_if_needed(self.module_name)
 
