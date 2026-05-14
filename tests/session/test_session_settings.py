@@ -562,3 +562,40 @@ def test_capture_info_off(otel_spans: InMemorySpanExporter):
     attrs = dict(turn_spans[0].attributes)
     assert "weave.client_version" not in attrs
     assert "weave.os_name" not in attrs
+
+
+# ---------------------------------------------------------------------------
+# Independence + defaults
+# ---------------------------------------------------------------------------
+
+
+def test_settings_independence(otel_spans: InMemorySpanExporter):
+    """redact_pii=True, capture_client_info=False produces redacted content
+    without weave.client_version. Confirms settings don't bleed into each other.
+    """
+    with override_settings(
+        redact_pii=True, capture_client_info=False, capture_system_info=False
+    ):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=_make_redact_substitutor({"alice@example.com": "<EMAIL>"}),
+        ):
+            with start_session(session_id="s") as sess, sess.start_turn() as t:
+                with t.tool(name="lookup") as tool:
+                    tool.arguments = "alice@example.com"
+
+    tool_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("execute_tool")
+    ]
+    attrs = dict(tool_spans[0].attributes)
+    assert "<EMAIL>" in attrs["gen_ai.tool.call.arguments"]
+    assert "weave.client_version" not in attrs
+
+
+def test_all_settings_default_off_redaction(otel_spans: InMemorySpanExporter):
+    """With defaults, redaction does not run. Sanity check."""
+    with patch("weave.session._redaction.redact_pii") as mock_redact:
+        with start_session(session_id="s") as sess, sess.start_turn() as t:
+            with t.tool(name="x") as tool:
+                tool.arguments = "alice@example.com"
+    mock_redact.assert_not_called()
