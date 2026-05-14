@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
+    AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
@@ -39,6 +40,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_agents_list_query,
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
+    make_custom_attrs_schema_query,
     make_message_search_query,
     make_spans_count_query,
     make_spans_list_query,
@@ -112,7 +114,7 @@ class TestMakeSpansCountQuery:
             WHERE s.project_id = {genai_0:String}
               AND s.started_at >= {genai_1:DateTime64(6)}
               AND s.started_at < {genai_2:DateTime64(6)}
-            AND ((s.agent_name = {genai_3:String}) AND (s.custom_attrs_string[{genai_4:String}] = {genai_5:String}))
+            AND ((s.agent_name = {genai_3:String}) AND (if(mapContains(s.custom_attrs_string, {genai_4:String}), s.custom_attrs_string[{genai_4:String}], NULL) = {genai_5:String}))
         """
         expected_params = {
             "genai_0": "p1",
@@ -206,6 +208,37 @@ class TestMakeSpansListQuery:
         expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_projects_and_sorts_selected_custom_attr_columns(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                custom_attr_columns=[
+                    AgentSpanValueRef(source="custom_attrs_float", key="score")
+                ],
+                sort_by=[
+                    AgentSortBy(field="custom_attrs_float.score", direction="desc")
+                ],
+            ),
+        )
+
+        expected = f"""
+            SELECT {SPANS_LIST_COLS}, mapFilter((k, v) -> has({{genai_4:Array(String)}}, k), s.custom_attrs_float) AS custom_attrs_float
+            FROM spans s
+            WHERE s.project_id = {{genai_0:String}}
+            ORDER BY if(mapContains(s.custom_attrs_float, {{genai_3:String}}), toFloat64(s.custom_attrs_float[{{genai_3:String}}]), NULL) desc
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "score",
+            "genai_4": ["score"],
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
     def test_limit_rejected_when_above_max(self) -> None:
         with pytest.raises(ValidationError):
             AgentSpansQueryReq(project_id="p1", limit=99999)
@@ -280,9 +313,9 @@ class TestMakeGroupedSpansCountQuery:
 
         expected = """
             SELECT count() FROM (
-                SELECT s.custom_attrs_string[{genai_1:String}] FROM spans s
+                SELECT if(mapContains(s.custom_attrs_string, {genai_1:String}), s.custom_attrs_string[{genai_1:String}], NULL) FROM spans s
                 WHERE s.project_id = {genai_0:String}
-                GROUP BY s.custom_attrs_string[{genai_1:String}]
+                GROUP BY if(mapContains(s.custom_attrs_string, {genai_1:String}), s.custom_attrs_string[{genai_1:String}], NULL)
             )
         """
         expected_params = {"genai_0": "p1", "genai_1": "env"}
@@ -366,7 +399,7 @@ class TestMakeGroupedSpansListQuery:
         )
 
         expected = f"""
-            SELECT s.custom_attrs_string[{{genai_3:String}}] AS env,
+            SELECT if(mapContains(s.custom_attrs_string, {{genai_3:String}}), s.custom_attrs_string[{{genai_3:String}}], NULL) AS env,
                    {_GROUPED_AGG_TAIL}
             FROM spans s
             WHERE s.project_id = {{genai_0:String}}
@@ -639,7 +672,13 @@ class TestResolveGroupBy:
         out = resolve_group_by(
             pb, [AgentGroupByRef(source="custom_attrs_string", key="env")]
         )
-        assert out == [("s.custom_attrs_string[{genai_0:String}]", "env")]
+        assert out == [
+            (
+                "if(mapContains(s.custom_attrs_string, {genai_0:String}), "
+                "s.custom_attrs_string[{genai_0:String}], NULL)",
+                "env",
+            )
+        ]
 
     def test_custom_alias_used_when_key_non_identifier(self) -> None:
         pb = ParamBuilder("genai")
@@ -653,7 +692,13 @@ class TestResolveGroupBy:
                 )
             ],
         )
-        assert out == [("s.custom_attrs_string[{genai_0:String}]", "spaced_attr")]
+        assert out == [
+            (
+                "if(mapContains(s.custom_attrs_string, {genai_0:String}), "
+                "s.custom_attrs_string[{genai_0:String}], NULL)",
+                "spaced_attr",
+            )
+        ]
 
 
 # ============================================================================
@@ -754,6 +799,107 @@ class TestMakeAgentsQueries:
             "genai_1": "my-agent",
             "genai_2": 100,
             "genai_3": 0,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+
+# ============================================================================
+# make_custom_attrs_schema_query
+# ============================================================================
+
+
+class TestMakeCustomAttrsSchemaQuery:
+    def test_basic(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_custom_attrs_schema_query(
+            pb,
+            AgentCustomAttrsSchemaReq(project_id="p1"),
+        )
+
+        expected = """
+            SELECT tupleElement(attr, 1) AS source,
+                   tupleElement(attr, 2) AS key,
+                   tupleElement(attr, 3) AS value_type,
+                   count() AS span_count
+            FROM (
+                SELECT s.custom_attrs_string.keys AS custom_attrs_string_keys,
+                       s.custom_attrs_int.keys AS custom_attrs_int_keys,
+                       s.custom_attrs_float.keys AS custom_attrs_float_keys,
+                       s.custom_attrs_bool.keys AS custom_attrs_bool_keys
+                FROM spans s
+                WHERE s.project_id = {genai_0:String}
+            ) filtered
+            ARRAY JOIN arrayConcat(
+                arrayMap(k -> tuple('custom_attrs_string', k, 'string'), filtered.custom_attrs_string_keys),
+                arrayMap(k -> tuple('custom_attrs_int', k, 'int'), filtered.custom_attrs_int_keys),
+                arrayMap(k -> tuple('custom_attrs_float', k, 'float'), filtered.custom_attrs_float_keys),
+                arrayMap(k -> tuple('custom_attrs_bool', k, 'bool'), filtered.custom_attrs_bool_keys)
+            ) AS attr
+            GROUP BY source, key, value_type
+            ORDER BY span_count DESC, key ASC, source ASC
+            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
+        """
+        assert_sql(
+            expected,
+            {"genai_0": "p1", "genai_1": 201, "genai_2": 0},
+            query,
+            pb.get_params(),
+        )
+
+    def test_reuses_spans_filters(self) -> None:
+        pb = ParamBuilder("genai")
+        start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        query = make_custom_attrs_schema_query(
+            pb,
+            AgentCustomAttrsSchemaReq(
+                project_id="p1",
+                query=Query.model_validate(
+                    {
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "agent.name"},
+                                {"$literal": "bot"},
+                            ]
+                        }
+                    }
+                ),
+                started_after=start,
+                limit=10,
+                offset=20,
+            ),
+        )
+
+        expected = """
+            SELECT tupleElement(attr, 1) AS source,
+                   tupleElement(attr, 2) AS key,
+                   tupleElement(attr, 3) AS value_type,
+                   count() AS span_count
+            FROM (
+                SELECT s.custom_attrs_string.keys AS custom_attrs_string_keys,
+                       s.custom_attrs_int.keys AS custom_attrs_int_keys,
+                       s.custom_attrs_float.keys AS custom_attrs_float_keys,
+                       s.custom_attrs_bool.keys AS custom_attrs_bool_keys
+                FROM spans s
+                WHERE s.project_id = {genai_0:String}
+                AND s.started_at >= {genai_1:DateTime64(6)}
+                AND (s.agent_name = {genai_2:String})
+            ) filtered
+            ARRAY JOIN arrayConcat(
+                arrayMap(k -> tuple('custom_attrs_string', k, 'string'), filtered.custom_attrs_string_keys),
+                arrayMap(k -> tuple('custom_attrs_int', k, 'int'), filtered.custom_attrs_int_keys),
+                arrayMap(k -> tuple('custom_attrs_float', k, 'float'), filtered.custom_attrs_float_keys),
+                arrayMap(k -> tuple('custom_attrs_bool', k, 'bool'), filtered.custom_attrs_bool_keys)
+            ) AS attr
+            GROUP BY source, key, value_type
+            ORDER BY span_count DESC, key ASC, source ASC
+            LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": start,
+            "genai_2": "bot",
+            "genai_3": 11,
+            "genai_4": 20,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
