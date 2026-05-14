@@ -981,16 +981,31 @@ def _attrs_for_span(
 ) -> tuple[str, dict[str, Any]]:
     """Build (otel_span_name, attribute_dict) for a child span."""
     if isinstance(span, LLM):
+        input_messages = span.input_messages if include_content else None
+        output_messages = span.output_messages if include_content else None
+        system_instructions = span.system_instructions if include_content else None
+        media_attachments = span.media_attachments if include_content else None
+        reasoning = span.reasoning if include_content else None
+        if include_content and should_redact_pii():
+            input_messages = _redaction.redact_messages(input_messages)
+            output_messages = _redaction.redact_messages(output_messages)
+            system_instructions = _redaction.redact_system_instructions(
+                system_instructions
+            )
+            if reasoning is not None and reasoning.content:
+                reasoning = Reasoning(
+                    content=_redaction.redact_string(reasoning.content)
+                )
         attrs = llm_attributes(
             model=span.model,
             provider_name=span.provider_name,
             conversation_id=session_id,
-            input_messages=span.input_messages if include_content else None,
-            output_messages=span.output_messages if include_content else None,
-            media_attachments=span.media_attachments if include_content else None,
-            system_instructions=span.system_instructions if include_content else None,
+            input_messages=input_messages,
+            output_messages=output_messages,
+            media_attachments=media_attachments,
+            system_instructions=system_instructions,
             usage=span.usage,
-            reasoning=span.reasoning,
+            reasoning=reasoning,
             finish_reasons=span.finish_reasons,
             response_id=span.response_id,
             response_model=span.response_model,
@@ -1006,11 +1021,16 @@ def _attrs_for_span(
         )
         return f"chat {span.model}", attrs
     if isinstance(span, Tool):
+        arguments = span.arguments if include_content else ""
+        result = span.result if include_content else ""
+        if include_content and should_redact_pii():
+            arguments = _redaction.redact_string(arguments)
+            result = _redaction.redact_string(result)
         attrs = execute_tool_attributes(
             tool_name=span.name,
             conversation_id=session_id,
-            tool_call_arguments=span.arguments if include_content else "",
-            tool_call_result=span.result if include_content else "",
+            tool_call_arguments=arguments,
+            tool_call_result=result,
             tool_call_id=span.tool_call_id,
             tool_type=span.tool_type,
             tool_description=span.tool_description,
@@ -1072,12 +1092,16 @@ def log_turn(
         continue_parent_trace=continue_parent_trace,
     )
 
+    turn_messages = turn.messages if include_content else None
+    if include_content and should_redact_pii():
+        turn_messages = _redaction.redact_messages(turn_messages)
+
     turn_attrs = invoke_agent_attributes(
         agent_name=turn.agent_name,
         conversation_id=session_id,
         conversation_name=session_name,
         model=turn.model,
-        input_messages=turn.messages if include_content else None,
+        input_messages=turn_messages,
         agent_id=turn.agent_id,
         agent_description=turn.agent_description,
         agent_version=turn.agent_version,
