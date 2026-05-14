@@ -7,10 +7,11 @@
 -- the down migration can identify them unambiguously. Real obj_create
 -- alias writes never produce this value.
 --
--- External consumer note: any ad-hoc CH query or dashboard that reads
--- objects.is_latest directly is now divergent from the API. The API
--- derives is_latest from this aliases table, not from object_versions
--- ordering.
+-- The backfill is not required for correctness — the API's hybrid
+-- is_latest projection falls back to a computed window-function rank
+-- over object_versions when no live alias row exists — but it puts all
+-- objects on the same code path (alias-based) by default, which is
+-- easier to reason about for ad-hoc queries and dashboards.
 INSERT INTO aliases (project_id, object_id, alias, digest, wb_user_id, created_at, deleted_at)
 SELECT
     project_id,

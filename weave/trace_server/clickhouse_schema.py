@@ -209,11 +209,11 @@ class SelectableCHObjSchema(BaseModel):
     leaf_object_class: str | None
     digest: str
     version_index: int
-    # TODO(WB-32435 follow-up): drop `is_latest`. As of WB-32435 it is
-    # projected from the aliases-table CTE in make_metadata_query, not
-    # from a real column on object_versions. The field is kept here as
-    # a transitional shim so external consumers of ObjSchema don't break;
-    # remove in a release after WB-32435 has fully baked.
+    # `is_latest` is hybrid in the read path: projected from
+    # latest_alias_per_object when present, otherwise from the computed
+    # most-recent-surviving window function. It is not a real column on
+    # object_versions; the schema's ObjSchema field surfaces the CTE
+    # projection.
     is_latest: int
     deleted_at: datetime.datetime | None = None
     size_bytes: int | None = None

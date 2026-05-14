@@ -2293,11 +2293,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         digest: str,
     ) -> str | None:
-        """If digest looks like an alias name (not a hash, not version-like),
-        resolve it to the actual digest via the aliases table. Returns None if not an alias.
+        """If digest looks like an alias name (not a hash, not version-like,
+        not 'latest'), resolve it to the actual digest via the aliases table.
+        Returns None if not an alias.
         """
-        # Version patterns (v0, v1, …) are handled by the existing obj_read
-        # logic; content hashes are real digests that don't need resolution.
+        # "latest" is handled by the make_metadata_query CTE's hybrid
+        # is_latest projection (alias row when present, computed
+        # most-recent-surviving rank as fallback). Version patterns
+        # (v0, v1, …) are handled by the existing obj_read logic; content
+        # hashes are real digests that don't need resolution.
+        if digest == "latest":
+            return None
         (is_version, _) = tsc.digest_is_version_like(digest)
         if is_version:
             return None
@@ -2322,10 +2328,32 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
 
+        # Read-skew guard: the metadata query and the aliases-map query are
+        # two separate reads of the `aliases` table. If a concurrent write
+        # moves "latest" to a different digest between them, we can see
+        # is_latest=1 on the old digest (from the first read) while the
+        # aliases map already credits "latest" to the new digest. Skip
+        # synthesizing "latest" on any digest whose object_id already has
+        # an explicit "latest" alias in the just-fetched map.
+        object_ids_with_alias_latest = {
+            oid for (oid, _), aliases in aliases_map.items() if "latest" in aliases
+        }
+
         for obj in objs:
             key = (obj.object_id, obj.digest)
             obj.tags = sorted(tags_map.get(key, []))
-            obj.aliases = aliases_map.get(key, [])
+            aliases = aliases_map.get(key, [])
+            # "latest" is virtual when the explicit alias row is missing
+            # (e.g. obj_delete tombstoned it and is_latest is now coming
+            # from the computed fallback). Synthesize it so the surface
+            # stays consistent with obj.is_latest.
+            if (
+                obj.is_latest == 1
+                and "latest" not in aliases
+                and obj.object_id not in object_ids_with_alias_latest
+            ):
+                aliases = ["latest", *aliases]
+            obj.aliases = aliases
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []

@@ -190,9 +190,18 @@ object_versions_with_index AS (
         count(*) OVER (
             PARTITION BY project_id, kind, object_id
         ) AS version_count,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
+        ) AS _computed_latest_rank,
         if(
             (project_id, object_id, digest) IN
-                (SELECT project_id, object_id, digest FROM latest_alias_per_object),
+                (SELECT project_id, object_id, digest FROM latest_alias_per_object)
+            OR (
+                _computed_latest_rank = 1
+                AND (project_id, object_id) NOT IN
+                    (SELECT project_id, object_id FROM latest_alias_per_object)
+            ),
             1, 0
         ) AS is_latest
     FROM latest_row_per_digest

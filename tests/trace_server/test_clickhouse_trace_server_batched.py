@@ -1491,6 +1491,19 @@ def test_concurrent_queries_on_one_client_vs_session_autogeneration(
 # API (CH-only) and the partial-failure contract on the alias write.
 
 
+def _resolve_latest(ch_server, project_id: str, object_id: str) -> str:
+    """Resolve 'latest' for an object via the public obj_read API.
+
+    Used to probe alias state in tests: with the hybrid is_latest model,
+    obj_read('latest') returns the alias-pointed digest when the explicit
+    'latest' alias row is live, and falls back to the computed
+    most-recent-surviving digest when the alias is absent or tombstoned.
+    """
+    return ch_server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=object_id, digest="latest")
+    ).obj.digest
+
+
 def test_obj_create_batch_writes_latest_alias(ch_server):
     """obj_create_batch should write a 'latest' alias for every object in the batch."""
     project_id = make_project_id("alias")
@@ -1503,10 +1516,7 @@ def test_obj_create_batch_writes_latest_alias(ch_server):
     results = ch_server.obj_create_batch(batch)
 
     for obj_in, res in zip(batch, results, strict=True):
-        resolved = ch_server._maybe_resolve_alias(
-            project_id, obj_in.object_id, "latest"
-        )
-        assert resolved == res.digest
+        assert _resolve_latest(ch_server, project_id, obj_in.object_id) == res.digest
 
 
 def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
@@ -1521,9 +1531,12 @@ def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
 
     # Establish a prior latest.
     r1 = _obj_create(ch_server, project_id, obj_id, {"v": 1})
-    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
+    assert _resolve_latest(ch_server, project_id, obj_id) == r1.digest
 
-    # Simulate failure on the alias write for the next obj_create.
+    # Simulate failure on the alias write for the next obj_create. We use
+    # direct setattr + `del` rather than monkeypatch.setattr because the
+    # latter leaves a residual instance attribute on the session-scoped
+    # ch_server after undo() — caught by test_reset_server_state_covers_all_attrs.
     def failing_insert_aliases(*args, **kwargs):
         raise RuntimeError("simulated alias write failure")
 
@@ -1532,22 +1545,18 @@ def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
         with pytest.raises(RuntimeError, match="simulated alias write failure"):
             _obj_create(ch_server, project_id, obj_id, {"v": 2})
     finally:
-        # `del` removes the instance attribute so attribute access falls back
-        # to the class method — leaves __dict__ clean (see
-        # test_reset_server_state_covers_all_attrs).
         del ch_server._insert_aliases
 
-    # The version row landed (object_versions insert is unconditional in CH).
-    # The new digest is reachable directly, but 'latest' still resolves to v1
-    # because the alias write never completed.
-    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
+    # The version row landed (object_versions insert is unconditional in CH),
+    # but 'latest' still resolves to v1 because the alias write never
+    # completed. The explicit alias row pointing at v1 wins the hybrid
+    # is_latest projection over the (otherwise-newer) v2 row.
+    assert _resolve_latest(ch_server, project_id, obj_id) == r1.digest
 
     # A retry of the same content takes the dedup path, succeeds, and
     # promotes 'latest' to the new digest — the documented recovery flow.
     r2_retry = _obj_create(ch_server, project_id, obj_id, {"v": 2})
-    assert (
-        ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r2_retry.digest
-    )
+    assert _resolve_latest(ch_server, project_id, obj_id) == r2_retry.digest
 
 
 def test_delete_current_latest_promotes_prior_surviving_version(ch_server):

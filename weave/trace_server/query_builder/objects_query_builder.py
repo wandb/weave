@@ -164,9 +164,10 @@ class ObjectMetadataQueryBuilder:
         """
         if digest == "latest":
             # `is_latest` here refers to the CTE-derived column in
-            # make_objects_query, which is itself a projection of the
-            # `latest` alias from the aliases table. It is not a column
-            # on object_versions on disk.
+            # make_objects_query. That column is the hybrid of the
+            # explicit "latest" alias and a computed window-function
+            # rank used as fallback. It is not a column on
+            # object_versions on disk.
             return "is_latest = 1"
 
         (is_version, version_index) = digest_is_version_like(digest)
@@ -218,8 +219,9 @@ class ObjectMetadataQueryBuilder:
 
     def add_is_latest_condition(self) -> None:
         # `is_latest` here is the CTE-derived projection in make_objects_query
-        # (1 iff (project_id, object_id, digest) matches the current "latest"
-        # alias row). It is not a column on object_versions on disk.
+        # (hybrid: explicit "latest" alias when present, computed
+        # most-recent-surviving rank as fallback). It is not a column on
+        # object_versions on disk.
         self._conditions.append("is_latest = 1")
 
     def add_is_op_condition(self, is_op: bool) -> None:
@@ -265,18 +267,38 @@ class ObjectMetadataQueryBuilder:
         self.parameters["filter_tags"] = tags
 
     def add_aliases_condition(self, aliases: list[str]) -> None:
+        """Filter object versions by alias name(s).
+
+        Routing note: `"latest"` is special — it is NOT treated as a literal
+        alias name lookup. Instead it routes through the hybrid `is_latest`
+        column projected by make_metadata_query, which unions the explicit
+        `"latest"` alias row with a computed most-recent-surviving fallback.
+        This is intentional: a raw alias-table subquery would miss objects
+        whose alias row was tombstoned by obj_delete and which now rely on
+        the computed fallback. Non-`"latest"` aliases use the raw
+        alias-table subquery as before.
+        """
+        non_latest = [a for a in aliases if a != "latest"]
+        has_latest = "latest" in aliases
         t = self._main_table_alias
-        self._conditions.append(f"""
-            ({t}.project_id, {t}.object_id, {t}.digest) IN (
-                SELECT project_id, object_id, argMax(digest, created_at) AS digest
-                FROM aliases
-                PREWHERE project_id = {{project_id: String}}
-                WHERE alias IN {{filter_aliases: Array(String)}}
-                GROUP BY project_id, object_id, alias
-                HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-            )
-        """)
-        self.parameters["filter_aliases"] = aliases
+        if non_latest:
+            alias_subquery = f"""
+                ({t}.project_id, {t}.object_id, {t}.digest) IN (
+                    SELECT project_id, object_id, argMax(digest, created_at) AS digest
+                    FROM aliases
+                    PREWHERE project_id = {{project_id: String}}
+                    WHERE alias IN {{filter_aliases: Array(String)}}
+                    GROUP BY project_id, object_id, alias
+                    HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+                )
+            """
+            self.parameters["filter_aliases"] = non_latest
+            if has_latest:
+                self._conditions.append(f"(is_latest = 1 OR {alias_subquery})")
+            else:
+                self._conditions.append(alias_subquery)
+        elif has_latest:
+            self._conditions.append("is_latest = 1")
 
     def add_order(self, field: str, direction: str) -> None:
         direction = direction.lower()
@@ -332,10 +354,13 @@ class ObjectMetadataQueryBuilder:
         #
         # object_versions_with_index: For each object, number its versions
         # 0, 1, 2, ... ordered by when each digest was first published
-        # (_first_created_at).  is_latest is derived from the aliases table
-        # (the "latest" alias is the source of truth, written on every
-        # obj_create); it is 1 iff (project_id, object_id, digest) matches
-        # the current "latest" alias row for that object.
+        # (_first_created_at).  is_latest is hybrid: the explicit "latest"
+        # alias row wins when present (this is what makes dedup-republish
+        # promote the re-published digest to latest, WB-32435).  When the
+        # alias is absent or tombstoned — most commonly because obj_delete
+        # removed the version that held it — fall back to a computed rank
+        # by (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC,
+        # so the surviving most-recent version inherits is_latest.
         query = f"""
 WITH latest_row_per_digest AS (
     SELECT
@@ -382,9 +407,18 @@ object_versions_with_index AS (
         count(*) OVER (
             PARTITION BY project_id, kind, object_id
         ) AS version_count,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
+        ) AS _computed_latest_rank,
         if(
             (project_id, object_id, digest) IN
-                (SELECT project_id, object_id, digest FROM latest_alias_per_object),
+                (SELECT project_id, object_id, digest FROM latest_alias_per_object)
+            OR (
+                _computed_latest_rank = 1
+                AND (project_id, object_id) NOT IN
+                    (SELECT project_id, object_id FROM latest_alias_per_object)
+            ),
             1, 0
         ) AS is_latest
     FROM latest_row_per_digest

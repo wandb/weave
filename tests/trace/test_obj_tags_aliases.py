@@ -7,7 +7,7 @@ import weave
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import NotFoundError
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.trace_server_common import digest_is_content_hash
 
 
@@ -1626,6 +1626,225 @@ def test_republish_promotes_to_latest(client: WeaveClient, monkeypatch):
     )
     assert len(query_res.objs) == 1
     assert query_res.objs[0].digest == ref_a.digest
+
+
+# ---------------------------------------------------------------------------
+# Hybrid `is_latest` — exhaustive coverage across both backends
+#
+# These tests pin the contract for the hybrid is_latest projection:
+#   - explicit "latest" alias row wins when present (dedup-republish promote)
+#   - falls back to most-recent surviving (CH computed window / SQLite column
+#     re-pointed by obj_delete)
+#   - "latest" disappears when the object has no surviving versions
+# Both backends are covered via the parameterized `client` fixture.
+# ---------------------------------------------------------------------------
+
+
+def _resolve_latest_digest(client: WeaveClient, object_id: str) -> str | None:
+    """Return the digest currently resolving to "latest", or None if absent.
+
+    Cross-checks obj_read('latest'), objs_query(latest_only=True), and
+    objs_query(aliases=['latest']) for self-consistency.
+    """
+    try:
+        read_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client.project_id,
+                object_id=object_id,
+                digest="latest",
+                include_tags_and_aliases=True,
+            )
+        )
+    except (NotFoundError, ObjectDeletedError):
+        # Confirm all three paths agree: no latest exists.
+        latest_only = client.server.objs_query(
+            tsi.ObjQueryReq(
+                project_id=client.project_id,
+                filter=tsi.ObjectVersionFilter(
+                    object_ids=[object_id], latest_only=True
+                ),
+            )
+        ).objs
+        alias_filt = client.server.objs_query(
+            tsi.ObjQueryReq(
+                project_id=client.project_id,
+                filter=tsi.ObjectVersionFilter(
+                    object_ids=[object_id], aliases=["latest"]
+                ),
+            )
+        ).objs
+        assert latest_only == [], (
+            f"obj_read raised but latest_only returned {latest_only}"
+        )
+        assert alias_filt == [], (
+            f"obj_read raised but aliases=['latest'] returned {alias_filt}"
+        )
+        return None
+
+    digest = read_res.obj.digest
+    assert read_res.obj.is_latest == 1
+    assert "latest" in read_res.obj.aliases, (
+        f"obj_read returned digest={digest} with is_latest=1 but aliases={read_res.obj.aliases}"
+    )
+
+    latest_only = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id], latest_only=True),
+        )
+    ).objs
+    latest_only_digests = [o.digest for o in latest_only]
+    assert latest_only_digests == [digest], (
+        f"obj_read returned {digest} but latest_only returned {latest_only_digests}"
+    )
+
+    alias_filt = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id], aliases=["latest"]),
+        )
+    ).objs
+    alias_filt_digests = [o.digest for o in alias_filt]
+    assert alias_filt_digests == [digest], (
+        f"obj_read returned {digest} but aliases=['latest'] returned {alias_filt_digests}"
+    )
+
+    return digest
+
+
+def test_hybrid_latest_full_lifecycle(client: WeaveClient, monkeypatch):
+    """Walk the full hybrid lifecycle: linear publish/delete, dedup-republish-
+    then-delete, terminal delete-all, and self-heal on the next publish.
+
+    Each step asserts all three "latest" surfaces agree:
+    obj_read('latest'), objs_query(latest_only=True), objs_query(aliases=['latest']).
+    """
+    monkeypatch.setenv("WEAVE_USE_SERVER_CACHE", "false")
+
+    # publish v0 (A), v1 (B), v2 (C). latest = C via alias path.
+    ref_a = weave.publish({"v": "A"}, name="hybrid_obj")
+    ref_b = weave.publish({"v": "B"}, name="hybrid_obj")
+    ref_c = weave.publish({"v": "C"}, name="hybrid_obj")
+    client.flush()
+    assert _resolve_latest_digest(client, "hybrid_obj") == ref_c.digest
+
+    # Linear delete current latest: latest should fall back to B.
+    # (CH: computed window function. SQLite: column re-pointed by obj_delete.)
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client.project_id,
+            object_id="hybrid_obj",
+            digests=[ref_c.digest],
+        )
+    )
+    assert _resolve_latest_digest(client, "hybrid_obj") == ref_b.digest
+
+    # Dedup-republish A. Explicit alias moves to A; alias path wins over the
+    # computed/column fallback that would otherwise pick B.
+    weave.publish({"v": "A"}, name="hybrid_obj")
+    client.flush()
+    assert _resolve_latest_digest(client, "hybrid_obj") == ref_a.digest
+
+    # Delete A. Alias row cascades; fallback kicks in. B is the surviving
+    # most-recent (A is older than B by first_created_at).
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client.project_id,
+            object_id="hybrid_obj",
+            digests=[ref_a.digest],
+        )
+    )
+    assert _resolve_latest_digest(client, "hybrid_obj") == ref_b.digest
+
+    # Delete B too. No surviving versions; latest must disappear cleanly.
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client.project_id,
+            object_id="hybrid_obj",
+            digests=[ref_b.digest],
+        )
+    )
+    assert _resolve_latest_digest(client, "hybrid_obj") is None
+
+    # Self-heal: a new publish re-establishes latest via the alias path.
+    ref_d = weave.publish({"v": "D"}, name="hybrid_obj")
+    client.flush()
+    assert _resolve_latest_digest(client, "hybrid_obj") == ref_d.digest
+
+
+def test_hybrid_latest_multi_object_query(client: WeaveClient, monkeypatch):
+    """objs_query with latest_only=True and aliases=["latest"|"prod"] across
+    multiple objects where one object uses the alias path and another uses
+    the fallback path.
+
+    Covers the `add_aliases_condition(["latest", "prod"])` mixed-routing path.
+    """
+    monkeypatch.setenv("WEAVE_USE_SERVER_CACHE", "false")
+
+    # Object 1: alias path. Has an explicit "latest" alias from publish.
+    ref_1a = weave.publish({"v": 1}, name="multi_alias")
+    weave.publish({"v": 2}, name="multi_alias")  # latest moves to v2
+    ref_1c = weave.publish({"v": 3}, name="multi_alias")  # latest moves to v3
+
+    # Object 2: fallback path. Publish two versions then delete the latest so
+    # the explicit alias row is gone and only the computed/column fallback
+    # can identify latest.
+    ref_2a = weave.publish({"v": "x"}, name="multi_fallback")
+    ref_2b = weave.publish({"v": "y"}, name="multi_fallback")
+    client.flush()
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client.project_id,
+            object_id="multi_fallback",
+            digests=[ref_2b.digest],
+        )
+    )
+
+    # Object 3: has a non-"latest" alias "prod" set explicitly.
+    ref_3a = weave.publish({"v": "p1"}, name="multi_prod")
+    weave.publish({"v": "p2"}, name="multi_prod")
+    client.flush()
+    client.set_aliases(ref_3a, "prod")  # prod -> v0 of multi_prod (digest ref_3a)
+
+    object_ids = ["multi_alias", "multi_fallback", "multi_prod"]
+
+    # latest_only=True returns the latest of each object — alias path for 1,
+    # fallback for 2, and the most-recent version (not "prod"-pinned) for 3.
+    latest_only = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=object_ids, latest_only=True),
+        )
+    ).objs
+    latest_by_object = {o.object_id: o.digest for o in latest_only}
+    assert latest_by_object["multi_alias"] == ref_1c.digest
+    assert latest_by_object["multi_fallback"] == ref_2a.digest  # fallback survivor
+    assert len(latest_only) == 3, (
+        f"expected exactly one latest per object, got {[(o.object_id, o.digest) for o in latest_only]}"
+    )
+
+    # Mixed alias filter: aliases=["latest", "prod"] should match the
+    # latest-of-each (covered by alias path or fallback) PLUS multi_prod's
+    # ref_3a (explicitly tagged "prod"). The "latest" portion routes through
+    # `is_latest = 1`; the "prod" portion uses the raw alias subquery; the
+    # two are OR'd.
+    mixed = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(
+                object_ids=object_ids, aliases=["latest", "prod"]
+            ),
+        )
+    ).objs
+    mixed_digests = {(o.object_id, o.digest) for o in mixed}
+    # Three latest-of-each + the prod-tagged v0 of multi_prod (which is not
+    # the latest of multi_prod, so it's an additional row).
+    assert ("multi_alias", ref_1c.digest) in mixed_digests
+    assert ("multi_fallback", ref_2a.digest) in mixed_digests
+    assert ("multi_prod", ref_3a.digest) in mixed_digests  # via "prod"
+    # 3 latest-of-each (with multi_prod's latest being the most recent v=p2,
+    # not ref_3a) plus ref_3a via "prod" = 4 distinct (object_id, digest) rows.
+    assert len(mixed_digests) == 4, f"unexpected rows: {sorted(mixed_digests)}"
 
 
 # ---------------------------------------------------------------------------
