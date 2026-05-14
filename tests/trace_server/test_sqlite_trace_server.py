@@ -436,23 +436,6 @@ def _make_obj_create_req(
     )
 
 
-class _CursorProxy:
-    """Wraps a sqlite3.Cursor and raises on execute() when sql matches `fail_on`."""
-
-    def __init__(self, real_cursor, fail_on: str, error: Exception):
-        self._real = real_cursor
-        self._fail_on = fail_on
-        self._error = error
-
-    def execute(self, sql, *args, **kwargs):
-        if self._fail_on in sql:
-            raise self._error
-        return self._real.execute(sql, *args, **kwargs)
-
-    def __getattr__(self, item):
-        return getattr(self._real, item)
-
-
 def test_obj_create_atomic_on_alias_failure(sqlite_db_path):
     """obj_create's IMMEDIATE TRANSACTION must roll back the version row when
     the alias INSERT fails — neither the new objects row nor the alias row lands.
@@ -466,16 +449,19 @@ def test_obj_create_atomic_on_alias_failure(sqlite_db_path):
     # Establish a prior version so we can verify "latest" is unchanged.
     r1 = server.obj_create(_make_obj_create_req(project_id, object_id, {"v": 1}))
 
-    # Replace the cached cursor with a proxy that raises on the alias INSERT.
-    # The version-row INSERT and the alias INSERT both run inside
-    # `BEGIN IMMEDIATE TRANSACTION`, so a failure before `conn.commit()`
-    # should roll back both.
+    # Replace the cached cursor with a Mock that wraps the real cursor and
+    # raises on the alias INSERT. The version-row INSERT and the alias
+    # INSERT both run inside `BEGIN IMMEDIATE TRANSACTION`, so a failure
+    # before `conn.commit()` should roll back both.
     real_conn, real_cursor = slts.get_conn_cursor(sqlite_db_path)
-    proxy = _CursorProxy(
-        real_cursor,
-        fail_on="INSERT OR REPLACE INTO aliases",
-        error=RuntimeError("simulated alias write failure"),
-    )
+
+    def _execute_or_fail(sql, *args, **kwargs):
+        if "INSERT OR REPLACE INTO aliases" in sql:
+            raise RuntimeError("simulated alias write failure")
+        return real_cursor.execute(sql, *args, **kwargs)
+
+    proxy = Mock(wraps=real_cursor)
+    proxy.execute = _execute_or_fail
     conn_map = slts._get_conn_map()
     saved = conn_map[sqlite_db_path]
     conn_map[sqlite_db_path] = slts.ConnCursor(real_conn, proxy)

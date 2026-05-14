@@ -1533,19 +1533,16 @@ def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
     r1 = _obj_create(ch_server, project_id, obj_id, {"v": 1})
     assert _resolve_latest(ch_server, project_id, obj_id) == r1.digest
 
-    # Simulate failure on the alias write for the next obj_create. We use
-    # direct setattr + `del` rather than monkeypatch.setattr because the
-    # latter leaves a residual instance attribute on the session-scoped
-    # ch_server after undo() — caught by test_reset_server_state_covers_all_attrs.
+    # Simulate failure on the alias write for the next obj_create.
+    # `mock.patch.object` correctly delattrs on exit when the original was
+    # a class method (not an instance attribute) — leaves ch_server.__dict__
+    # clean for test_reset_server_state_covers_all_attrs.
     def failing_insert_aliases(*args, **kwargs):
         raise RuntimeError("simulated alias write failure")
 
-    ch_server._insert_aliases = failing_insert_aliases  # type: ignore[method-assign]
-    try:
+    with patch.object(ch_server, "_insert_aliases", failing_insert_aliases):
         with pytest.raises(RuntimeError, match="simulated alias write failure"):
             _obj_create(ch_server, project_id, obj_id, {"v": 2})
-    finally:
-        del ch_server._insert_aliases
 
     # The version row landed (object_versions insert is unconditional in CH),
     # but 'latest' still resolves to v1 because the alias write never

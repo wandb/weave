@@ -1880,7 +1880,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
             )
 
-        alias_rows: list[tuple[str, str, str, str]] = []
+        ch_alias_rows: list[list[Any]] = []
         for obj in batch:
             digest_result = compute_object_digest_result(
                 obj.val,
@@ -1900,14 +1900,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 val_dump=json_val,
                 digest=digest,
             )
-            insert_data = list(ch_obj.model_dump().values())
-            # Add the data to be inserted
-            ch_insert_batch.append(insert_data)
-            alias_rows.append(
-                (obj.project_id, obj.object_id, digest, obj.wb_user_id or "")
+            ch_insert_batch.append(list(ch_obj.model_dump().values()))
+            ch_alias_rows.append(
+                list(
+                    AliasCHInsertable(
+                        project_id=obj.project_id,
+                        object_id=obj.object_id,
+                        alias="latest",
+                        digest=digest,
+                        wb_user_id=obj.wb_user_id or "",
+                    )
+                    .model_dump()
+                    .values()
+                )
             )
-
-            # Record the inserted data
             obj_results.append(
                 tsi.ObjCreateRes(
                     digest=digest,
@@ -1922,21 +1928,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Batch-write the "latest" alias for every row, matching obj_create.
-        if alias_rows:
-            ch_alias_rows = [
-                list(
-                    AliasCHInsertable(
-                        project_id=project_id,
-                        object_id=object_id,
-                        alias="latest",
-                        digest=digest,
-                        wb_user_id=wb_user_id,
-                    )
-                    .model_dump()
-                    .values()
-                )
-                for (project_id, object_id, digest, wb_user_id) in alias_rows
-            ]
+        if ch_alias_rows:
             self._insert(
                 "aliases",
                 data=ch_alias_rows,
