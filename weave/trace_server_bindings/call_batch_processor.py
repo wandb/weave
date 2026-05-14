@@ -41,8 +41,11 @@ DEFAULT_MAX_PENDING_CALLS = 10_000
 MAX_BATCH_SIZE = 1000
 # TTL for eager call IDs (24 hours in seconds)
 EAGER_CALL_ID_TTL_SECONDS = 24 * 60 * 60
-# Timeout for flush: wait this long for in-flight calls to complete before dropping
-FLUSH_TIMEOUT_SECONDS = 60
+# Timeout for flush: wait this long for in-flight calls to pair before falling
+# back to the eager v2 start/end endpoints. Real-world ops (LLM streams, evals,
+# multi-step agents) routinely exceed a minute between start and end, so this
+# is sized to cover those without losing the call.
+FLUSH_TIMEOUT_SECONDS = 5 * 60
 # Default max queue size for ready-to-send items
 DEFAULT_MAX_QUEUE_SIZE = 10_000
 # How often to poll during flush while waiting for pending items to pair
@@ -170,13 +173,11 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
     def stop_accepting_new_work_and_flush_queue(self) -> None:
         """Stop accepting work and flush the queue.
 
-        Waits up to FLUSH_TIMEOUT_SECONDS for in-flight calls to complete
-        (starts to pair with their ends) and for the queue to drain. This
-        supports the common pattern of calling client.finish() at the end
-        of execution when operations may still be completing (example: large
-        payloads are still serializing, but user proc has completed).
-
-        Drops unpaired starts and ends after the timeout expires.
+        Waits up to FLUSH_TIMEOUT_SECONDS for in-flight calls to pair (start
+        meets end). Anything still unpaired after the deadline is sent via
+        the eager v2 start/end endpoints so the call is preserved instead of
+        being silently dropped, e.g. when the process exits mid-op or a long
+        op exceeds the flush window.
         """
         # Wait for pending items to pair (in-flight calls completing)
         # Don't set stop event yet - processing thread needs to keep running
@@ -190,39 +191,38 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                 break
             time.sleep(FLUSH_POLL_INTERVAL_SECONDS)
 
-        # Shutdown, processing thread will drain queue then exit
-        self.stop_accepting_work_event.set()
-
-        # Drop any remaining unpaired items with warnings
+        # Push any remaining unpaired items onto the queue so the processing
+        # thread sends them via the eager v2 endpoints (start->/call/start,
+        # end->/call/end). _queue_item handles Full -> disk fallback. Do this
+        # BEFORE setting the stop event so the processing thread drains them.
         with self.lock:
             if self._pending_starts:
                 logger.warning(
-                    "Flush timeout: dropping %s calls "
-                    "that did not complete within %ss.",
+                    "Flush timeout: sending %s unpaired starts via the eager v2 "
+                    "endpoint (did not pair within %ss).",
                     len(self._pending_starts),
                     FLUSH_TIMEOUT_SECONDS,
                 )
-                for call_id, start_item in self._pending_starts.items():
-                    self._write_item_to_disk(
-                        start_item,
-                        f"Unpaired start dropped after flush timeout: {call_id}",
-                    )
+                for start_item in self._pending_starts.values():
+                    self._queue_item(start_item)
                 self._pending_starts.clear()
 
             if self._pending_ends:
                 logger.warning(
-                    "Flush timeout: dropping %s orphaned "
-                    "call ends that did not pair within %ss.",
+                    "Flush timeout: sending %s unpaired ends via the eager v2 "
+                    "endpoint (did not pair within %ss).",
                     len(self._pending_ends),
                     FLUSH_TIMEOUT_SECONDS,
                 )
-                for call_id, end_item in self._pending_ends.items():
-                    self._write_item_to_disk(
-                        end_item, f"Unpaired end dropped after flush timeout: {call_id}"
-                    )
+                for end_item in self._pending_ends.values():
+                    self._queue_item(end_item)
                 self._pending_ends.clear()
 
             self._eager_call_ids.clear()
+
+        # Shutdown, processing thread will drain queue (including the orphans
+        # we just queued) then exit
+        self.stop_accepting_work_event.set()
 
         # The processing thread will process all remaining queue items before
         # exiting; this may take longer than the timeout if the queue is large,
