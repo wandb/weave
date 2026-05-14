@@ -7,6 +7,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 
+import {_currentTurn} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
 import {GEN_AI_ATTR, WEAVE_GENAI_TRACER_NAME} from './semconv';
@@ -21,6 +22,7 @@ export interface TurnInit {
 
 export class Turn {
   private _ended = false;
+  private readonly _previousTurn: Turn | undefined;
 
   private constructor(
     private readonly span: Span,
@@ -28,7 +30,10 @@ export class Turn {
     private readonly conversationId: string,
     public readonly agentName: string,
     public readonly model: string
-  ) {}
+  ) {
+    this._previousTurn = _currentTurn.getStore();
+    _currentTurn.enterWith(this);
+  }
 
   static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
@@ -98,5 +103,6 @@ export class Turn {
       });
     }
     this.span.end();
+    _currentTurn.enterWith(this._previousTurn);
   }
 }

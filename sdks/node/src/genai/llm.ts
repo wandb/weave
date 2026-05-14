@@ -7,6 +7,7 @@ import {
 } from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
+import {_currentLLM} from './context';
 import {getWeaveTracer} from './provider';
 import {GEN_AI_ATTR, WEAVE_GENAI_TRACER_NAME} from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
@@ -27,6 +28,7 @@ export class LLM {
   reasoning?: Reasoning;
 
   private _ended = false;
+  private readonly _previousLLM: LLM | undefined;
 
   private constructor(
     private readonly span: Span,
@@ -35,7 +37,10 @@ export class LLM {
     public readonly model: string,
     public readonly providerName: string,
     public readonly systemInstructions: string[]
-  ) {}
+  ) {
+    this._previousLLM = _currentLLM.getStore();
+    _currentLLM.enterWith(this);
+  }
 
   static create(opts: LLMInit & ChildSpanContext): LLM {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
@@ -139,5 +144,6 @@ export class LLM {
       });
     }
     this.span.end();
+    _currentLLM.enterWith(this._previousLLM);
   }
 }
