@@ -1591,3 +1591,134 @@ def test_delete_current_latest_promotes_prior_surviving_version(ch_server):
         tsi.ObjReadReq(project_id=project_id, object_id=obj_id, digest="latest")
     )
     assert read_res.obj.digest == r0.digest
+
+
+def test_migration_031_alias_shadow_picks_wrong_digest_as_latest(ch_server):
+    """Migration 031 backfills the wrong digest as 'latest' for any
+    legacy object whose most-recently-published version's digest does
+    not happen to be lexicographically smallest.
+
+    Two CH analyzer rewrites compound to produce the bug. The migration:
+
+        INSERT INTO aliases (...)
+        SELECT
+            project_id, object_id, 'latest' AS alias,
+            argMax(digest, created_at) AS digest,
+            ...
+            toDateTime64('1970-01-01 00:00:00.001', 3) AS created_at,
+            toDateTime64(0, 3) AS deleted_at
+        FROM object_versions
+        WHERE deleted_at = toDateTime64(0, 3)
+        GROUP BY project_id, object_id
+
+    1. WHERE alias-shadow: CH resolves `deleted_at` in WHERE to the
+       SELECT-projection alias `toDateTime64(0, 3) AS deleted_at` — a
+       constant. The predicate becomes `toDateTime64(0,3) = toDateTime64(0,3)`,
+       always TRUE. Soft-deleted rows are included.
+    2. argMax alias-shadow: `created_at` inside `argMax(digest, created_at)`
+       resolves to the SELECT alias `toDateTime64('1970-01-01 00:00:00.001', 3)
+       AS created_at` — also a constant. So the second argument of argMax is
+       a constant for every row, all rows tie, and CH breaks the tie by
+       table-storage order. With `ORDER BY (project_id, kind, object_id,
+       digest)` on object_versions, the tie-winner is the
+       lexicographically-smallest digest.
+
+    Combined effect: the migration sets 'latest' to the
+    lex-smallest digest of every row in object_versions — regardless of
+    when it was published or whether it was deleted. For any object
+    whose newest version's content hash is not the lex-smallest among
+    its history, 'latest' will silently point at the wrong version.
+
+    This test seeds two non-deleted versions where the older v0 has a
+    lex-smaller digest than v1, and asserts that 'latest' resolves to
+    v1 (per the PR's claim that 'latest' tracks the most recently
+    published version). Fails today; passes after the migration's WHERE
+    is rewritten to `IS NULL` and the argMax `created_at` reference is
+    disambiguated.
+    """
+    project_id = make_project_id("mig031_shadow")
+    obj_id = "mig031_shadow_obj"
+    # v0 published first, has lex-smaller digest. v1 published later,
+    # has lex-larger digest. argMax with shadow ties picks v0.
+    digest_v0 = "AAA_legacy_v0_older"
+    digest_v1 = "ZZZ_legacy_v1_newer"
+    t0 = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t1 = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+
+    cols = [
+        "project_id",
+        "object_id",
+        "kind",
+        "base_object_class",
+        "leaf_object_class",
+        "refs",
+        "val_dump",
+        "digest",
+        "wb_user_id",
+        "created_at",
+        "deleted_at",
+    ]
+    ch_server._insert(
+        "object_versions",
+        data=[
+            [
+                project_id,
+                obj_id,
+                "object",
+                None,
+                None,
+                [],
+                "{}",
+                digest_v0,
+                None,
+                t0,
+                None,
+            ],
+            [
+                project_id,
+                obj_id,
+                "object",
+                None,
+                None,
+                [],
+                "{}",
+                digest_v1,
+                None,
+                t1,
+                None,
+            ],
+        ],
+        column_names=cols,
+    )
+
+    # Replay migration 031 exactly as authored.
+    ch_server._query(
+        """
+        INSERT INTO aliases (project_id, object_id, alias, digest, wb_user_id, created_at, deleted_at)
+        SELECT
+            project_id,
+            object_id,
+            'latest' AS alias,
+            argMax(digest, created_at) AS digest,
+            '__weave_backfill_031__' AS wb_user_id,
+            toDateTime64('1970-01-01 00:00:00.001', 3) AS created_at,
+            toDateTime64(0, 3) AS deleted_at
+        FROM object_versions
+        WHERE project_id = {p: String}
+            AND object_id = {o: String}
+            AND deleted_at = toDateTime64(0, 3)
+        GROUP BY project_id, object_id
+        """,
+        {"p": project_id, "o": obj_id},
+    )
+
+    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == digest_v1, (
+        f"migration 031 backfilled 'latest'={resolved!r}, but the most "
+        f"recently published version is {digest_v1!r} (published at {t1.isoformat()}). "
+        f"The WHERE and argMax in the migration both alias-shadow source "
+        f"columns to SELECT-projection constants, so argMax ties are broken "
+        f"by storage order (lex-smallest digest wins). Rewrite the WHERE as "
+        f"`deleted_at IS NULL` and rename the projected alias so argMax "
+        f"binds to the real `object_versions.created_at`."
+    )
