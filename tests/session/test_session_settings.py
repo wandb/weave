@@ -5,6 +5,7 @@ See spec: rgao/superpowers/specs/2026-05-13-session-sdk-respects-global-settings
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -13,8 +14,11 @@ from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from weave.session import _redaction
 from weave.session.session import (
     Message,
+    TextPart,
+    ToolCallPart,
     Turn,
     get_current_llm,
     get_current_session,
@@ -97,3 +101,75 @@ def test_disabled_at_init_skips_tracer_provider(monkeypatch: pytest.MonkeyPatch)
         with patch("opentelemetry.trace.set_tracer_provider") as mock_set:
             _setup_session_tracing("entity", "project", api_key="dummy")
     mock_set.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _redaction.py helpers
+# ---------------------------------------------------------------------------
+
+
+def test_redact_string_empty_skips_presidio():
+    with patch("weave.session._redaction.redact_pii") as mock:
+        assert _redaction.redact_string("") == ""
+    mock.assert_not_called()
+
+
+def test_redact_string_routes_through_redact_pii():
+    with patch("weave.session._redaction.redact_pii", return_value="REDACTED") as mock:
+        result = _redaction.redact_string("alice@example.com")
+    assert result == "REDACTED"
+    mock.assert_called_once_with("alice@example.com")
+
+
+def test_redact_messages_none_passthrough():
+    assert _redaction.redact_messages(None) is None
+    assert _redaction.redact_messages([]) == []
+
+
+def test_redact_messages_dump_redact_revalidate():
+    """The dump → redact → revalidate round-trip should preserve typed parts."""
+    msgs = [
+        Message(role="user", content="email me at alice@example.com"),
+        Message(
+            role="assistant",
+            parts=[
+                TextPart(content="ok"),
+                ToolCallPart(id="c1", name="search", arguments='{"q":"alice"}'),
+            ],
+        ),
+    ]
+
+    def fake_redact(data: Any) -> Any:
+        """Echo input but uppercase string values for assertion ease."""
+        if isinstance(data, str):
+            return data.upper()
+        if isinstance(data, dict):
+            return {k: fake_redact(v) for k, v in data.items()}
+        if isinstance(data, list):
+            return [fake_redact(x) for x in data]
+        return data
+
+    with patch("weave.session._redaction.redact_pii", side_effect=fake_redact):
+        out = _redaction.redact_messages(msgs)
+
+    assert out is not None
+    assert len(out) == 2
+    assert out[0].content == "EMAIL ME AT ALICE@EXAMPLE.COM"
+    assert out[0].role == "user"  # role is a Literal — preserved by validation
+    assert out[1].parts[0].content == "OK"
+    # ToolCallPart.arguments goes through JSONString coercion
+    assert "ALICE" in out[1].parts[1].arguments
+
+
+def test_redact_system_instructions():
+    with patch(
+        "weave.session._redaction.redact_pii",
+        side_effect=lambda s: "<REDACTED>" if s else s,
+    ):
+        out = _redaction.redact_system_instructions(["secret instruction"])
+    assert out == ["<REDACTED>"]
+
+
+def test_redact_system_instructions_none_passthrough():
+    assert _redaction.redact_system_instructions(None) is None
+    assert _redaction.redact_system_instructions([]) == []
