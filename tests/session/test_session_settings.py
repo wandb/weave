@@ -5,6 +5,7 @@ See spec: rgao/superpowers/specs/2026-05-13-session-sdk-respects-global-settings
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 from unittest.mock import patch
 
@@ -52,6 +53,29 @@ def otel_spans(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
     yield exporter
     provider.shutdown()
+
+
+def _make_redact_substitutor(substitutions: dict[str, str]) -> Callable[[Any], Any]:
+    """Build a recursive redaction mock that substitutes substrings in strings.
+
+    Walks dicts, lists, and dataclasses (matches the real ``redact_pii``
+    shape) and applies each ``old → new`` substitution to every string
+    encountered. Used as ``side_effect`` for patching
+    ``weave.session._redaction.redact_pii`` in tests.
+    """
+
+    def _walk(value: Any) -> Any:
+        if isinstance(value, str):
+            for old, new in substitutions.items():
+                value = value.replace(old, new)
+            return value
+        if isinstance(value, dict):
+            return {k: _walk(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_walk(x) for x in value]
+        return value
+
+    return _walk
 
 
 # ---------------------------------------------------------------------------
@@ -250,29 +274,7 @@ def test_llm_redacts_input_and_output_messages(otel_spans: InMemorySpanExporter)
     with override_settings(redact_pii=True):
         with patch(
             "weave.session._redaction.redact_pii",
-            side_effect=lambda d: (
-                d.replace("alice@example.com", "<EMAIL>")
-                if isinstance(d, str)
-                else {
-                    k: (
-                        v.replace("alice@example.com", "<EMAIL>")
-                        if isinstance(v, str)
-                        else v
-                    )
-                    for k, v in d.items()
-                }
-                if isinstance(d, dict)
-                else [
-                    (
-                        x.replace("alice@example.com", "<EMAIL>")
-                        if isinstance(x, str)
-                        else x
-                    )
-                    for x in d
-                ]
-                if isinstance(d, list)
-                else d
-            ),
+            side_effect=_make_redact_substitutor({"alice@example.com": "<EMAIL>"}),
         ):
             with start_session(session_id="s") as sess, sess.start_turn() as t:
                 with t.llm(model="gpt-4o") as llm:
