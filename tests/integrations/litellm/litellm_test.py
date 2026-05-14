@@ -239,9 +239,7 @@ async def test_litellm_quickstart_stream_async(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_model_predict(
-    weave_active, patch_litellm: None
-) -> None:
+def test_model_predict(weave_active, patch_litellm: None) -> None:
     class TranslatorModel(weave.Model):
         model: str
         temperature: float

@@ -297,7 +297,9 @@ async def test_resilience_to_accumulator_accumulation_errors_async(
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_accumulator_should_accumulate_errors(weave_active, log_collector):
+def test_resilience_to_accumulator_should_accumulate_errors(
+    weave_active, log_collector
+):
     def do_test():
         @weave.op
         def simple_op():

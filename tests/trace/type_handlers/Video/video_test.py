@@ -417,9 +417,7 @@ def test_video_format_from_filename():
     sys.platform == "win32",
     reason="moviepy library uses /dev/null on Windows which doesn't exist",
 )
-def test_multiple_video_formats(
-    weave_active, tmp_path: Path, test_video: VideoClip
-):
+def test_multiple_video_formats(weave_active, tmp_path: Path, test_video: VideoClip):
     """Test that we can publish videos of different formats in the same session."""
     sample_mp4_path = str(tmp_path / "test.mp4")
     sample_gif_path = str(tmp_path / "test.gif")
