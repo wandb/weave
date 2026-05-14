@@ -1,5 +1,6 @@
 import dataclasses
 import random
+import time
 from typing import Any
 
 import pydantic
@@ -322,6 +323,24 @@ def with_empty_feedback(obj: Any) -> Any:
         new_dict["weave"] = {**new_dict["weave"], "feedback": []}
         return new_dict
     return obj
+
+
+def calls_query_with_feedback(
+    client, req: tsi.CallsQueryReq, timeout_seconds: float = 2
+) -> tsi.CallsQueryRes:
+    # Poll the calls_query until hydrated feedback shows up. The score path
+    # defers feedback_create onto future_executor; the test client flushes
+    # before each `client.server.*` call, but on loaded CI runners the
+    # include_feedback hydration can still see zero rows immediately after
+    # the drain.
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        calls = client.server.calls_query(req)
+        if any(call.summary.get("weave", {}).get("feedback") for call in calls.calls):
+            return calls
+        if time.monotonic() >= deadline:
+            return calls
+        time.sleep(0.05)
 
 
 @pytest.mark.asyncio
@@ -1005,12 +1024,14 @@ async def test_feedback_is_correctly_linked(client):
         scorers=[score],
     )
     res = await eval.evaluate(predict)
-    calls = client.server.calls_query(
+    client.flush()
+    calls = calls_query_with_feedback(
+        client,
         tsi.CallsQueryReq(
             project_id=client.project_id,
             include_feedback=True,
             filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
-        )
+        ),
     )
     assert len(calls.calls) == 1
     assert calls.calls[0].summary["weave"]["feedback"]
@@ -1047,12 +1068,14 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
         scorers=[scorer],
     )
     res = await eval.evaluate(predict)
-    calls = client.server.calls_query(
+    client.flush()
+    calls = calls_query_with_feedback(
+        client,
         tsi.CallsQueryReq(
             project_id=client.project_id,
             include_feedback=True,
             filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
-        )
+        ),
     )
     assert len(calls.calls) == 1
     assert calls.calls[0].summary["weave"]["feedback"]
