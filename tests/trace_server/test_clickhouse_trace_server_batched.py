@@ -1548,3 +1548,46 @@ def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
     assert (
         ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r2_retry.digest
     )
+
+
+def test_delete_current_latest_promotes_prior_surviving_version(ch_server):
+    """Deleting the version that currently holds 'latest' must promote the
+    next surviving version to 'latest'.
+
+    Pre-WB-32435, is_latest was a window function over object_versions
+    ranked by `(deleted_at IS NULL) DESC, _first_created_at DESC` so a
+    soft-deleted latest naturally yielded the slot to the next surviving
+    version. Post-WB-32435, is_latest is projected from the aliases-table
+    CTE; obj_delete cascades a soft-delete onto the 'latest' alias row
+    but never re-points it. Without a fix, obj_read('latest') and
+    objs_query(latest_only=True) both go silent for an object that still
+    has a surviving version — a regression the existing test suite does
+    not cover because the public Python client's delete_object_versions
+    flow only ever exercises 'delete by alias name' or 'delete all'.
+    """
+    project_id = make_project_id("alias_delete_latest")
+    obj_id = "delete_latest_advances"
+
+    r0 = _obj_create(ch_server, project_id, obj_id, {"v": 0})
+    r1 = _obj_create(ch_server, project_id, obj_id, {"v": 1})
+
+    ch_server.obj_delete(
+        tsi.ObjDeleteReq(project_id=project_id, object_id=obj_id, digests=[r1.digest])
+    )
+
+    # objs_query(latest_only=True) should surface the surviving v0 row.
+    latest = ch_server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=True),
+        )
+    ).objs
+    assert len(latest) == 1
+    assert latest[0].digest == r0.digest
+    assert latest[0].is_latest == 1
+
+    # obj_read(digest='latest') must resolve to the surviving v0.
+    read_res = ch_server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=obj_id, digest="latest")
+    )
+    assert read_res.obj.digest == r0.digest
