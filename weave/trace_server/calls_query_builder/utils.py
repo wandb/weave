@@ -6,7 +6,11 @@ from collections.abc import Generator
 import sqlparse
 
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import ParamBuilder, clickhouse_cast, quote_json_path_parts
+from weave.trace_server.orm import (
+    ParamBuilder,
+    clickhouse_cast_json_value,
+    quote_json_path_parts,
+)
 
 
 def safe_alias(field_name: str) -> str:
@@ -175,16 +179,7 @@ def json_dump_field_as_sql(
             param_name = pb.add_param(quote_json_path_parts(extra_path))
             path_str = param_slot(param_name, "String")
         val = f"coalesce(nullIf(JSON_VALUE({root_field_sanitized}, {path_str}), 'null'), '')"
-        if cast == "bool":
-            # JSON_VALUE on a JSON bool emits the literal strings 'true'/
-            # 'false', which `toUInt8OrNull` would turn into NULL. Match those
-            # first; fall back to `toUInt8OrNull` for legacy rows that stored
-            # 1/0 (or any numeric-string) so a plain Bool comparison still
-            # works in CH.
-            return (
-                f"multiIf({val} = 'true', 1, {val} = 'false', 0, toUInt8OrNull({val}))"
-            )
-        return clickhouse_cast(val, cast)
+        return clickhouse_cast_json_value(val, cast)
     else:
         # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
         # This workaround helps to handle these cases.
