@@ -1,6 +1,8 @@
 import datetime
 import json
 
+from pydantic import BaseModel, ConfigDict
+
 from weave.trace.refs import ObjectRef
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
@@ -145,3 +147,33 @@ def test_universal_ext_to_int_ref_converter_roundtrips_models_with_any_payloads(
 
     assert isinstance(converted.obj.val["ref"], dict)
     json.dumps(converted.obj.val)
+
+
+def test_universal_ext_to_int_ref_converter_rewrites_refs_in_model_extras():
+    """Refs stored on a `extra='allow'` BaseModel must still be rewritten.
+
+    The legacy converter walked the `model_dump(by_alias=True)` output,
+    which includes fields collected into `model_extra`. The COW fast path
+    iterates `model_fields` only, so extras are silently skipped unless
+    `_walk_model` also walks them.
+    """
+    project_id = "entity/project"
+    internal_project_id = "internal-project"
+    external_ref = f"weave:///{project_id}/op/some-op:latest"
+    internal_ref = f"weave-trace-internal:///{internal_project_id}/op/some-op:latest"
+
+    class ExtraAllowed(BaseModel):
+        model_config = ConfigDict(extra="allow")
+        declared: str
+
+    model = ExtraAllowed.model_validate(
+        {"declared": "plain", "extra_ref": external_ref}
+    )
+
+    converted = universal_ext_to_int_ref_converter(
+        model, lambda project: internal_project_id
+    )
+
+    assert converted.declared == "plain"
+    extras = converted.model_extra or {}
+    assert extras.get("extra_ref") == internal_ref
