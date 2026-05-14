@@ -10,6 +10,8 @@ attributes when used as context managers.
 
 from __future__ import annotations
 
+import platform
+import sys
 import types
 import uuid
 from contextvars import ContextVar, Token
@@ -42,7 +44,13 @@ from weave.session.types import (
     Usage,
     _parse_data_url,
 )
-from weave.trace.settings import should_disable_weave, should_redact_pii
+from weave.trace.settings import (
+    should_capture_client_info,
+    should_capture_system_info,
+    should_disable_weave,
+    should_redact_pii,
+)
+from weave.version import VERSION
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -107,6 +115,24 @@ __all__ = [
 
 # OTel tracer name — identifies the Session SDK as the source of these spans.
 _TRACER_NAME = "weave.session"
+
+
+def _capture_info_attrs() -> dict[str, Any]:
+    """Build weave.* client / system info attrs, gated by settings.
+
+    Per-span (not Resource) so env-var toggles take effect on every span,
+    matching @op semantics in weave_client.py:805-812.
+    """
+    attrs: dict[str, Any] = {}
+    if should_capture_client_info():
+        attrs["weave.client_version"] = VERSION
+        attrs["weave.source"] = "python-sdk"
+        attrs["weave.sys_version"] = sys.version
+    if should_capture_system_info():
+        attrs["weave.os_name"] = platform.system()
+        attrs["weave.os_version"] = platform.version()
+        attrs["weave.os_release"] = platform.release()
+    return attrs
 
 
 class _SpanBase(BaseModel):
@@ -226,6 +252,7 @@ class Tool(_SpanBase):
             tool_description=self.tool_description,
             tool_definitions=self.tool_definitions,
         )
+        attrs.update(_capture_info_attrs())
         self._end_otel_span(attrs)
 
     def __enter__(self) -> Self:
@@ -448,6 +475,7 @@ class LLM(_SpanBase):
             request_stop_sequences=self.request_stop_sequences,
             request_choice_count=self.request_choice_count,
         )
+        attrs.update(_capture_info_attrs())
 
         if self._token is not None:
             _current_llm.reset(self._token)
@@ -534,6 +562,7 @@ class SubAgent(_SpanBase):
             agent_description=self.agent_description,
             agent_version=self.agent_version,
         )
+        attrs.update(_capture_info_attrs())
         self._end_otel_span(attrs)
 
     def __enter__(self) -> Self:
@@ -641,6 +670,7 @@ class Turn(_SpanBase):
             agent_description=self.agent_description,
             agent_version=self.agent_version,
         )
+        attrs.update(_capture_info_attrs())
 
         if self._token is not None:
             _current_turn.reset(self._token)
@@ -1019,6 +1049,7 @@ def _attrs_for_span(
             request_stop_sequences=span.request_stop_sequences,
             request_choice_count=span.request_choice_count,
         )
+        attrs.update(_capture_info_attrs())
         return f"chat {span.model}", attrs
     if isinstance(span, Tool):
         arguments = span.arguments if include_content else ""
@@ -1036,6 +1067,7 @@ def _attrs_for_span(
             tool_description=span.tool_description,
             tool_definitions=span.tool_definitions,
         )
+        attrs.update(_capture_info_attrs())
         return f"execute_tool {span.name}", attrs
     # SubAgent
     attrs = invoke_agent_attributes(
@@ -1047,6 +1079,7 @@ def _attrs_for_span(
         agent_description=span.agent_description,
         agent_version=span.agent_version,
     )
+    attrs.update(_capture_info_attrs())
     return f"invoke_agent {span.name}", attrs
 
 
@@ -1106,6 +1139,7 @@ def log_turn(
         agent_description=turn.agent_description,
         agent_version=turn.agent_version,
     )
+    turn_attrs.update(_capture_info_attrs())
 
     parent_ctx = Context() if not continue_parent_trace else None
     turn_span = _emit_span_now(
