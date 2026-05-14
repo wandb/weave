@@ -273,6 +273,11 @@ def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
     is re-validated, so callers that bypassed validation via
     `model_construct(...)` still see the same shape they would have from
     the legacy round-trip.
+
+    Fields stashed by `extra='allow'` live in `model_extra` rather than
+    `model_fields`, so they are walked separately. `model_extra` is None
+    for models without `extra='allow'`, which makes the extras loop a
+    no-op in the common case.
     """
     updates: dict[str, Any] = {}
     fast_path_safe = True
@@ -283,6 +288,12 @@ def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
         result = _walk(current, func)
         if result.changed:
             updates[field_name] = result.value
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+
+    for extra_name, extra_value in (obj.model_extra or {}).items():
+        result = _walk(extra_value, func)
+        if result.changed:
+            updates[extra_name] = result.value
         fast_path_safe = fast_path_safe and result.fast_path_safe
 
     if not fast_path_safe:
