@@ -31,6 +31,9 @@ from weave.trace_server.agents.schema import (
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
+    AgentCustomAttrSchemaItem,
+    AgentCustomAttrsSchemaReq,
+    AgentCustomAttrsSchemaRes,
     AgentSchema,
     AgentSearchConversationResult,
     AgentSearchMatchedMessage,
@@ -65,6 +68,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_agents_list_query,
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
+    make_custom_attrs_schema_query,
     make_message_search_query,
     make_spans_count_query,
     make_spans_list_query,
@@ -161,6 +165,29 @@ class AgentQueryHandler:
             bucket_type=query.bucket_type,
             columns=query.column_metadata,
             rows=_rows_to_dicts(query.columns, result.result_rows),
+        )
+
+    def custom_attrs_schema(
+        self, req: AgentCustomAttrsSchemaReq
+    ) -> AgentCustomAttrsSchemaRes:
+        """Return typed custom attribute keys available on matching spans."""
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_custom_attrs_schema_query(pb, req)
+        rows = _rows_as_dicts(self._query(sql, pb.get_params()))
+        attrs = [
+            AgentCustomAttrSchemaItem(
+                source=safe_str(r.get("source")),
+                key=safe_str(r.get("key")),
+                value_type=safe_str(r.get("value_type")),
+                span_count=safe_int(r.get("span_count")),
+            )
+            for r in rows[: req.limit]
+        ]
+        return AgentCustomAttrsSchemaRes(
+            attributes=attrs,
+            limit=req.limit,
+            offset=req.offset,
+            has_more=len(rows) > req.limit,
         )
 
     # ------------------------------------------------------------------
