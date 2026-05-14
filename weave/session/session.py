@@ -329,11 +329,11 @@ class LLM(_SpanBase):
                 "media_attachments": None,
                 "reasoning": None,
             }
-        input_messages = self.input_messages
-        output_messages = self.output_messages
-        system_instructions = self.system_instructions
-        media_attachments = self.media_attachments
-        reasoning = self.reasoning
+        input_messages: list[Message] | None = self.input_messages
+        output_messages: list[Message] | None = self.output_messages
+        system_instructions: list[str] | None = self.system_instructions
+        media_attachments: list[MediaAttachment] | None = self.media_attachments
+        reasoning: Reasoning | None = self.reasoning
         if redact:
             input_messages = _redaction.redact_messages(input_messages)
             output_messages = _redaction.redact_messages(output_messages)
@@ -639,17 +639,17 @@ class Turn(_SpanBase):
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
 
-    def _content_fields(
-        self, *, include_content: bool, redact: bool
-    ) -> dict[str, list[Message] | None]:
+    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, Any]:
         """Return Turn content fields shaped for ``invoke_agent_attributes(**...)``.
 
         The Turn's ``messages`` map to the attribute builder's
-        ``input_messages`` kwarg.
+        ``input_messages`` kwarg. Return type is ``dict[str, Any]`` so the
+        spread into ``invoke_agent_attributes(**...)`` typechecks against
+        the builder's heterogeneous kwarg types (most are ``str``).
         """
         if not include_content:
             return {"input_messages": None}
-        messages = self.messages
+        messages: list[Message] | None = self.messages
         if redact:
             messages = _redaction.redact_messages(messages)
         return {"input_messages": messages}
