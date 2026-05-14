@@ -35,12 +35,11 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
-from weave.integrations.google_adk import google_adk_sdk as adk_sdk
-from weave.integrations.google_adk.google_adk_sdk import (
-    _set_llm_request_attributes,
-    _set_llm_response_attributes,
-    get_google_adk_patcher,
+from weave.integrations.google_adk.extractors import (
+    set_llm_request_attributes,
+    set_llm_response_attributes,
 )
+from weave.integrations.google_adk.google_adk_sdk import get_google_adk_patcher
 
 # --------------------------------------------------------------------------
 # Mock fixtures for the unit tests. These shapes mirror the duck-typed
@@ -140,7 +139,7 @@ def test_unit_set_llm_request_attributes_full_payload() -> None:
         ),
     )
 
-    _set_llm_request_attributes(span, llm_request)
+    set_llm_request_attributes(span, llm_request)
 
     a = span.attributes
     assert a["gen_ai.request.temperature"] == 0.4
@@ -177,13 +176,14 @@ def test_unit_set_llm_response_attributes_full_payload() -> None:
         model_version="gemini-2.0-flash-2025-01",
     )
 
-    _set_llm_response_attributes(span, llm_response)
+    set_llm_response_attributes(span, llm_response)
 
     a = span.attributes
     assert a["gen_ai.response.id"] == "resp-9988"
     assert a["gen_ai.response.model"] == "gemini-2.0-flash-2025-01"
     assert a["gen_ai.output.type"] == "text"
-    assert a["gen_ai.usage.reasoning_tokens"] == 8
+    # Canonical OTel name from semantic-conventions#3383 (merged 2026-04-27).
+    assert a["gen_ai.usage.reasoning.output_tokens"] == 8
     assert a["gen_ai.usage.cache_read.input_tokens"] == 15
     assert a["gen_ai.usage.cache_creation.input_tokens"] == 5
 
@@ -195,7 +195,7 @@ def test_unit_set_llm_response_attributes_full_payload() -> None:
 def test_unit_set_llm_response_attributes_skips_empty_fields() -> None:
     """Empty optional fields don't leak as attributes on the span."""
     span = _AttrSpan()
-    _set_llm_response_attributes(
+    set_llm_response_attributes(
         span, _MockLlmResponse(content=None, model_version="m"),
     )
     assert "gen_ai.response.id" not in span.attributes
@@ -276,15 +276,12 @@ def adk_provider_and_exporter() -> (
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     otel_trace.set_tracer_provider(provider)
 
-    # Force re-evaluation of cached patcher state between tests.
-    adk_sdk._google_adk_patcher = None
     patcher = get_google_adk_patcher()
     assert patcher.attempt_patch()
     try:
         yield provider, exporter
     finally:
         patcher.undo_patch()
-        adk_sdk._google_adk_patcher = None
         otel_trace.set_tracer_provider(prev_provider)
 
 

@@ -9,15 +9,27 @@ This module provides:
 from __future__ import annotations
 
 import importlib
+import logging
 import sys
+import threading
 from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
 from weave.trace.autopatch import IntegrationSettings
 
+logger = logging.getLogger(__name__)
+
 # Global set to track which integrations have been patched
-# This prevents double-patching when libraries are imported multiple times
+# This prevents double-patching when libraries are imported multiple times.
+# Reads and writes go through ``_PATCH_LOCK`` so concurrent import-hook
+# loaders and direct ``patch_*()`` calls don't race into half-patched state.
 _PATCHED_INTEGRATIONS: set[str] = set()
+
+# Serialises the check-and-add around ``_PATCHED_INTEGRATIONS`` so that the
+# import hook (running under Python's per-module import lock) and a direct
+# ``patch_*()`` call from a different thread cannot both see "not patched"
+# and both call ``attempt_patch`` against the same target.
+_PATCH_LOCK = threading.Lock()
 
 # Global reference to the import hook, so we can unregister it if needed
 _IMPORT_HOOK: WeaveImportHook | None = None
@@ -38,19 +50,23 @@ def _patch_integration(
         triggering_symbols: Symbols to add to _PATCHED_INTEGRATIONS on success (e.g. ["openai"])
         settings: Optional integration settings
     """
-    # If symbols are already patched, don't patch again
-    if any(name in _PATCHED_INTEGRATIONS for name in triggering_symbols):
-        return
+    # Single check-and-add critical section. Without the lock, two threads
+    # (e.g. one in the import hook holding ``google.adk``'s import lock,
+    # another calling ``patch_google_adk()`` directly) could both see "not
+    # patched" and both run ``attempt_patch`` against the same target.
+    with _PATCH_LOCK:
+        if any(name in _PATCHED_INTEGRATIONS for name in triggering_symbols):
+            return
 
-    if settings is None:
-        settings = IntegrationSettings()
+        if settings is None:
+            settings = IntegrationSettings()
 
-    module = importlib.import_module(module_path)
-    patcher_func = getattr(module, patcher_func_getter_name)
+        module = importlib.import_module(module_path)
+        patcher_func = getattr(module, patcher_func_getter_name)
 
-    if patcher_func(settings).attempt_patch():
-        for name in triggering_symbols:
-            _PATCHED_INTEGRATIONS.add(name)
+        if patcher_func(settings).attempt_patch():
+            for name in triggering_symbols:
+                _PATCHED_INTEGRATIONS.add(name)
 
 
 def patch_openai(settings: IntegrationSettings | None = None) -> None:
@@ -461,18 +477,20 @@ class PatchingLoader:
 
 def _patch_if_needed(module_name: str) -> None:
     """Apply patching for a module if it hasn't been patched yet."""
-    if (
-        module_name not in _PATCHED_INTEGRATIONS
-        and module_name in INTEGRATION_MODULE_MAPPING
-    ):
+    if module_name not in INTEGRATION_MODULE_MAPPING:
+        return
+    with _PATCH_LOCK:
+        if module_name in _PATCHED_INTEGRATIONS:
+            return
         patch_func = INTEGRATION_MODULE_MAPPING[module_name]
         try:
             patch_func()
             _PATCHED_INTEGRATIONS.add(module_name)
         except Exception:
-            # Silently skip if patching fails - this maintains backward compatibility
-            # and doesn't break existing code if an integration can't be patched
-            pass
+            # Log and continue: backward-compat with old behaviour that
+            # swallowed failures, but make the failure visible to anyone
+            # who turns on debug logging when traces stop appearing.
+            logger.debug("Failed to patch %s", module_name, exc_info=True)
 
 
 def implicit_patch() -> None:
@@ -492,15 +510,16 @@ def implicit_patch() -> None:
         return
 
     for module_name, patch_func in INTEGRATION_MODULE_MAPPING.items():
-        # Check if the module is already imported and not yet patched
-        if module_name in sys.modules and module_name not in _PATCHED_INTEGRATIONS:
+        if module_name not in sys.modules:
+            continue
+        with _PATCH_LOCK:
+            if module_name in _PATCHED_INTEGRATIONS:
+                continue
             try:
                 patch_func()
                 _PATCHED_INTEGRATIONS.add(module_name)
             except Exception:
-                # Silently skip if patching fails - this maintains backward compatibility
-                # and doesn't break existing code if an integration can't be patched
-                pass
+                logger.debug("Failed to patch %s", module_name, exc_info=True)
 
 
 def register_import_hook() -> None:
