@@ -493,3 +493,77 @@ def test_log_turn_skip_presidio_when_include_content_false(
                 spans=[Tool(name="lookup", arguments='{"email":"alice@example.com"}')],
             )
     mock_redact.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# capture_client_info / capture_system_info
+# ---------------------------------------------------------------------------
+
+
+def test_capture_client_info_on(otel_spans: InMemorySpanExporter):
+    import sys
+
+    from weave import version
+
+    with override_settings(capture_client_info=True, capture_system_info=False):
+        with start_session(session_id="s") as sess:
+            with sess.start_turn() as t:
+                with t.tool(name="x"):
+                    pass
+
+    spans = otel_spans.get_finished_spans()
+    assert len(spans) >= 2  # turn + tool
+    for span in spans:
+        attrs = dict(span.attributes)
+        assert attrs.get("weave.client_version") == version.VERSION
+        assert attrs.get("weave.source") == "python-sdk"
+        assert attrs.get("weave.sys_version") == sys.version
+        assert "weave.os_name" not in attrs
+
+
+def test_capture_system_info_on(otel_spans: InMemorySpanExporter):
+    import platform
+
+    with override_settings(capture_system_info=True, capture_client_info=False):
+        with start_session(session_id="s") as sess:
+            with sess.start_turn():
+                pass
+
+    turn_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("invoke_agent")
+    ]
+    attrs = dict(turn_spans[0].attributes)
+    assert attrs["weave.os_name"] == platform.system()
+    assert "weave.os_release" in attrs
+    assert "weave.client_version" not in attrs
+
+
+def test_capture_info_on_batch_path(otel_spans: InMemorySpanExporter):
+    from weave import version
+
+    with override_settings(capture_client_info=True):
+        log_turn(
+            session_id="s",
+            agent_name="a",
+            spans=[LLM(model="gpt-4o")],
+        )
+
+    spans = otel_spans.get_finished_spans()
+    assert len(spans) == 2  # turn + child llm
+    for s in spans:
+        assert s.attributes.get("weave.client_version") == version.VERSION
+
+
+def test_capture_info_off(otel_spans: InMemorySpanExporter):
+    """When both settings are explicitly off, weave.* attrs are absent."""
+    with override_settings(capture_client_info=False, capture_system_info=False):
+        with start_session(session_id="s") as sess:
+            with sess.start_turn():
+                pass
+
+    turn_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("invoke_agent")
+    ]
+    attrs = dict(turn_spans[0].attributes)
+    assert "weave.client_version" not in attrs
+    assert "weave.os_name" not in attrs
