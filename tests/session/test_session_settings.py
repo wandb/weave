@@ -351,3 +351,38 @@ def test_llm_skip_presidio_when_include_content_false(otel_spans: InMemorySpanEx
                         ]
                         llm.reasoning = Reasoning(content="think")
     mock_redact.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# redact_pii — Turn
+# ---------------------------------------------------------------------------
+
+
+def test_turn_redacts_messages(otel_spans: InMemorySpanExporter):
+    with override_settings(redact_pii=True):
+        with patch(
+            "weave.session._redaction.redact_pii",
+            side_effect=_make_redact_substitutor({"alice@example.com": "<EMAIL>"}),
+        ):
+            with start_session(session_id="s") as sess:
+                with sess.start_turn(user_message="alice@example.com"):
+                    pass
+
+    turn_spans = [
+        s for s in otel_spans.get_finished_spans() if s.name.startswith("invoke_agent")
+    ]
+    assert len(turn_spans) == 1
+    attrs = dict(turn_spans[0].attributes)
+    assert "alice@example.com" not in attrs.get("gen_ai.input.messages", "")
+    assert "<EMAIL>" in attrs["gen_ai.input.messages"]
+
+
+def test_turn_skip_presidio_when_include_content_false(
+    otel_spans: InMemorySpanExporter,
+):
+    with override_settings(redact_pii=True):
+        with patch("weave.session._redaction.redact_pii") as mock_redact:
+            with start_session(session_id="s", include_content=False) as sess:
+                with sess.start_turn(user_message="alice@example.com"):
+                    pass
+    mock_redact.assert_not_called()

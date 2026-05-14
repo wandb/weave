@@ -627,12 +627,16 @@ class Turn(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
+        messages = self.messages if include else None
+        if include and should_redact_pii():
+            messages = _redaction.redact_messages(messages)
+
         attrs = invoke_agent_attributes(
             agent_name=self.agent_name,
             conversation_id=session.session_id if session else "",
             conversation_name=session.session_name if session else "",
             model=self.model,
-            input_messages=self.messages if include else None,
+            input_messages=messages,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
