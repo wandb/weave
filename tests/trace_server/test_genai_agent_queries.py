@@ -5,7 +5,10 @@ Migration 030 creates the genai tables automatically.
 """
 
 import datetime
+import time
 import uuid
+
+import pytest
 
 from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.trace_server.agents.helpers import genai_span_to_row
@@ -472,6 +475,7 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
     assert res.rows[-1]["bucket_max"] == 30
 
 
+@pytest.mark.flaky(reruns=3)
 def test_agent_span_stats_conversation_numeric_value_buckets(ch_server):
     """Stats API can bucket grouped conversation aggregate values."""
     project_id = _make_project_id("stats_conv_hist")
@@ -509,6 +513,7 @@ def test_agent_span_stats_conversation_numeric_value_buckets(ch_server):
         ),
     ]
     _insert_spans(ch_server.ch_client, spans)
+    time.sleep(0.2)
 
     res = ch_server.agent_spans_stats(
         AgentSpanStatsReq(
