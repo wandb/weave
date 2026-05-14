@@ -2816,9 +2816,10 @@ def test_trace_id_filter_eq():
 
 def test_trace_id_filter_calls_complete_no_candidate_cte() -> None:
     """On calls_complete, trace_id is non-nullable String with a bloom filter
-    on the raw column. The query must keep raw `trace_id =` (no `ifNull` wrap)
-    and must NOT emit a `filter_candidate_ids` CTE — that CTE is only for
-    pruning the calls_merged Nullable trace_id index.
+    on the raw column. The query must keep raw `trace_id =` (no `ifNull` wrap),
+    must NOT include `OR trace_id IS NULL` (the column is non-nullable), and
+    must NOT emit a `filter_candidate_ids` CTE - that CTE is only for pruning
+    the calls_merged Nullable trace_id index.
     """
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
@@ -2830,8 +2831,7 @@ def test_trace_id_filter_calls_complete_no_candidate_cte() -> None:
             calls_complete.id AS id
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_2:String}
-        WHERE (calls_complete.trace_id = {pb_1:String}
-                OR calls_complete.trace_id IS NULL)
+        WHERE calls_complete.trace_id = {pb_1:String}
         AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
@@ -3588,8 +3588,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         PREWHERE calls_complete.project_id = {pb_12:String}
         WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
                 OR (calls_complete.op_name IS NULL))
-            AND (calls_complete.trace_id = {pb_4:String}
-                OR calls_complete.trace_id IS NULL)
+            AND calls_complete.trace_id = {pb_4:String}
         AND (
             ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')) > {pb_1:Int64}))
             AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))

@@ -2467,6 +2467,12 @@ def process_trace_id_filter_to_sql(
     if not trace_cond:
         return ""
 
+    # `calls_complete.trace_id` is non-nullable `String`, so the OR-IS-NULL
+    # arm only applies to `calls_merged`, where unmerged call parts can have
+    # a NULL aggregated trace_id.
+    if read_table != ReadTable.CALLS_MERGED:
+        return f" AND {trace_cond}"
+
     trace_null = trace_id_field.null_check_sql(
         param_builder, table_alias, read_table, use_agg_fn=False
     )
