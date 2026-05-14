@@ -10,9 +10,11 @@ import pytest
 import weave
 from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
+from weave.trace import weave_client as weave_client_module
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 
 
 class ExampleRow(TypedDict):
@@ -1215,3 +1217,57 @@ def test_evaluation_logger_with_weave_disabled(client, monkeypatch):
     pred.finish()
     ev.log_summary({"avg_score": 0.9})
     ev.finish()
+
+
+def test_root_call_link_prints_once_under_calls_complete(
+    client,
+    monkeypatch,
+    user_dataset: list[ExampleRow],
+    user_model: Callable[[int, int], int],
+):
+    """Regression: under the calls_complete path, the root `Evaluation.evaluate`
+    link was printed twice. `Evaluation.evaluate` is declared with
+    `eager_call_start=True`, so its start ships immediately and `create_call`
+    prints the link. The imperative logger then calls
+    `wc.finish_call(_evaluate_call)` without re-supplying `op=`; finish_call's
+    `uses_calls_complete_path = ... and not (op is not None and op.eager_call_start)`
+    short-circuited to True with op=None, causing on_end_complete to print
+    the same link a second time. Fix adds `op is not None` to the gate.
+    """
+    # Attach a CallBatchProcessor to the client so `finish_call` enters the
+    # calls_complete branch. Data still flows through `client.server`
+    # (sqlite/clickhouse); only the gating decision is exercised here.
+    processor = CallBatchProcessor(
+        complete_processor_fn=lambda batch: None,
+        eager_processor_fn=lambda batch: None,
+        min_batch_interval=0,
+    )
+    monkeypatch.setattr(client, "_server_call_processor", processor)
+
+    print_count = 0
+
+    def counting_print(call) -> None:
+        nonlocal print_count
+        print_count += 1
+
+    monkeypatch.setattr(weave_client_module, "print_call_link", counting_print)
+
+    try:
+        ev = EvaluationLogger()
+        pred = ev.log_prediction(
+            inputs=user_dataset[0], output=user_model(**user_dataset[0])
+        )
+        pred.log_score("greater_than_2_scorer", True)
+        pred.finish()
+        ev.log_summary({"avg_score": 1.0})
+        client.flush()
+    finally:
+        processor.stop_accepting_new_work_and_flush_queue()
+
+    # Exactly one print for the root Evaluation.evaluate call. Predictions
+    # and scorers are children (parent_id is not None) and never print.
+    assert print_count == 1, (
+        f"Expected exactly one root link print, got {print_count}. "
+        "Likely duplicate from finish_call recomputing the calls_complete "
+        "branch without the create-time decision."
+    )
