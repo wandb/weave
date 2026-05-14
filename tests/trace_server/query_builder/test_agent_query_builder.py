@@ -256,6 +256,22 @@ class TestMakeSpansListQuery:
         make_spans_list_query(pb, AgentSpansQueryReq(project_id="p1", limit=0))
         assert pb.get_params()["genai_1"] == 0
 
+    def test_custom_attr_columns_rejected_with_group_by(self) -> None:
+        """custom_attr_columns project per-span maps and are silently dropped in
+        the grouped path. The validator should reject this combination instead
+        of accepting it and quietly ignoring the projection, symmetric with
+        the existing rule that grouped-only fields (measures, group_filters)
+        require group_by.
+        """
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="agent_name")],
+                custom_attr_columns=[
+                    AgentSpanValueRef(source="custom_attrs_string", key="env")
+                ],
+            )
+
 
 # ============================================================================
 # make_spans_count_query (grouped)
