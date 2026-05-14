@@ -5,6 +5,8 @@ See spec: rgao/superpowers/specs/2026-05-13-session-sdk-respects-global-settings
 
 from __future__ import annotations
 
+import platform
+import sys
 from collections.abc import Callable
 from typing import Any
 from unittest.mock import patch
@@ -15,6 +17,7 @@ from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from weave import version
 from weave.session import _redaction
 from weave.session.session import (
     LLM,
@@ -501,10 +504,6 @@ def test_log_turn_skip_presidio_when_include_content_false(
 
 
 def test_capture_client_info_on(otel_spans: InMemorySpanExporter):
-    import sys
-
-    from weave import version
-
     with override_settings(capture_client_info=True, capture_system_info=False):
         with start_session(session_id="s") as sess:
             with sess.start_turn() as t:
@@ -522,8 +521,6 @@ def test_capture_client_info_on(otel_spans: InMemorySpanExporter):
 
 
 def test_capture_system_info_on(otel_spans: InMemorySpanExporter):
-    import platform
-
     with override_settings(capture_system_info=True, capture_client_info=False):
         with start_session(session_id="s") as sess:
             with sess.start_turn():
@@ -539,8 +536,6 @@ def test_capture_system_info_on(otel_spans: InMemorySpanExporter):
 
 
 def test_capture_info_on_batch_path(otel_spans: InMemorySpanExporter):
-    from weave import version
-
     with override_settings(capture_client_info=True):
         log_turn(
             session_id="s",
