@@ -41,8 +41,8 @@ def test_cte_chain_calls_merged() -> None:
                         ELSE hex(SHA256(JSONExtractRaw(any(calls_merged.inputs_dump), 'example')))
                     END AS row_digest
                 FROM calls_merged
-                PREWHERE calls_merged.project_id = {pb_0:String}
-                WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
+                WHERE calls_merged.project_id = {pb_0:String}
+                    AND (calls_merged.parent_id IN {pb_1:Array(String)}
                     OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
                     AND (position(calls_merged.op_name, {pb_2:String}) > 0
@@ -84,8 +84,8 @@ def test_cte_chain_calls_merged() -> None:
             page_resolved_inputs AS (
                 SELECT digest, any(val_dump) AS val_dump
                 FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
+                WHERE project_id = {pb_0:String}
+                    AND digest IN (SELECT row_digest FROM page_digests)
                 GROUP BY digest
             ),
 
@@ -139,8 +139,8 @@ def test_cte_chain_calls_complete() -> None:
                         ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
                     END AS row_digest
                 FROM calls_complete
-                PREWHERE calls_complete.project_id = {pb_0:String}
-                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
+                WHERE calls_complete.project_id = {pb_0:String}
+                    AND calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND (position(calls_complete.op_name, {pb_2:String}) > 0
                         OR position(calls_complete.op_name, {pb_3:String}) > 0)
@@ -174,8 +174,8 @@ def test_cte_chain_calls_complete() -> None:
             page_resolved_inputs AS (
                 SELECT digest, any(val_dump) AS val_dump
                 FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
+                WHERE project_id = {pb_0:String}
+                    AND digest IN (SELECT row_digest FROM page_digests)
                 GROUP BY digest
             ),
 
@@ -274,8 +274,8 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                         ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
                     END AS row_digest
                 FROM calls_complete
-                PREWHERE calls_complete.project_id = {pb_0:String}
-                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
+                WHERE calls_complete.project_id = {pb_0:String}
+                    AND calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND (position(calls_complete.op_name, {pb_2:String}) > 0
                         OR position(calls_complete.op_name, {pb_3:String}) > 0)
@@ -312,8 +312,8 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
             page_resolved_inputs AS (
                 SELECT digest, any(val_dump) AS val_dump
                 FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
+                WHERE project_id = {pb_0:String}
+                    AND digest IN (SELECT row_digest FROM page_digests)
                 GROUP BY digest
             ),
 
@@ -373,8 +373,8 @@ def test_full_query_calls_merged() -> None:
                         ELSE hex(SHA256(JSONExtractRaw(any(calls_merged.inputs_dump), 'example')))
                     END AS row_digest
                 FROM calls_merged
-                PREWHERE calls_merged.project_id = {pb_0:String}
-                WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
+                WHERE calls_merged.project_id = {pb_0:String}
+                    AND (calls_merged.parent_id IN {pb_1:Array(String)}
                     OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
                     AND (position(calls_merged.op_name, {pb_2:String}) > 0
@@ -415,8 +415,8 @@ def test_full_query_calls_merged() -> None:
             page_resolved_inputs AS (
                 SELECT digest, any(val_dump) AS val_dump
                 FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
+                WHERE project_id = {pb_0:String}
+                    AND digest IN (SELECT row_digest FROM page_digests)
                 GROUP BY digest
             ),
 
@@ -443,8 +443,8 @@ def test_full_query_calls_merged() -> None:
                     any(calls_merged.output_dump) AS output_dump,
                     any(calls_merged.summary_dump) AS summary_dump
                 FROM calls_merged
-                PREWHERE calls_merged.project_id = {pb_4:String}
-                WHERE calls_merged.id IN (SELECT call_id FROM page_rows)
+                WHERE calls_merged.project_id = {pb_4:String}
+                    AND calls_merged.id IN (SELECT call_id FROM page_rows)
                 GROUP BY (calls_merged.project_id, calls_merged.id)
             )
         SELECT
@@ -506,8 +506,8 @@ def test_full_query_calls_complete() -> None:
                         ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
                     END AS row_digest
                 FROM calls_complete
-                PREWHERE calls_complete.project_id = {pb_0:String}
-                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
+                WHERE calls_complete.project_id = {pb_0:String}
+                    AND calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND (position(calls_complete.op_name, {pb_2:String}) > 0
                         OR position(calls_complete.op_name, {pb_3:String}) > 0)
@@ -541,8 +541,8 @@ def test_full_query_calls_complete() -> None:
             page_resolved_inputs AS (
                 SELECT digest, any(val_dump) AS val_dump
                 FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
+                WHERE project_id = {pb_0:String}
+                    AND digest IN (SELECT row_digest FROM page_digests)
                 GROUP BY digest
             ),
 
