@@ -1687,31 +1687,20 @@ class CallsQuery(BaseModel):
         if self.read_table == ReadTable.CALLS_MERGED:
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
 
-        # Use PREWHERE for project_id to filter data before reading from disk
-        # This is a ClickHouse optimization for high-selectivity filters
-        where_filters_sql = where_filters.to_sql()
-        # Strip leading "AND " from where_filters since PREWHERE handles the first condition
-        where_filters_stripped = re.sub(r"^\s*AND\s+", "", where_filters_sql)
+        # TODO(weave): revert to PREWHERE once CH bug is patched. CH 26.2's
+        # query_condition_cache returns wrong (under-counted) results for
+        # `PREWHERE pk-prefix WHERE non-pk IN [array]`; writing project_id in
+        # WHERE dodges the bug. `optimize_move_to_prewhere=1` still hoists it
+        # physically, so perf is preserved.
         where_clause = (
-            f"WHERE {where_filters_stripped}" if where_filters_stripped else ""
+            f"WHERE {table_alias}.project_id = {param_slot(project_param, 'String')}"
+            f"\n        {where_filters.to_sql()}"
         )
-
-        # Fix where_clause when empty but we have filter_sql
-        # For calls_complete, filter_sql starts with "AND "
-        # If where_clause is empty, set it to "WHERE 1" so filter_sql can append naturally
-        # TODO: optimize it further to make this condition builder smarter
-        if (
-            not where_clause
-            and filter_result.filter_sql
-            and self.read_table == ReadTable.CALLS_COMPLETE
-        ):
-            where_clause = "WHERE 1"
 
         having_sql = filter_result.filter_sql
 
         sql = f"""FROM {table_alias}
         {joins.to_sql()}
-        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         {where_clause}
         {group_by_sql}
         {having_sql}

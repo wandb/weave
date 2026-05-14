@@ -39,7 +39,7 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
         expected_query = f"""
             SELECT {expected_table}.id AS id
             FROM {expected_table}
-            PREWHERE {expected_table}.project_id = {{pb_0:String}}
+            WHERE {expected_table}.project_id = {{pb_0:String}}
             GROUP BY ({expected_table}.project_id, {expected_table}.id)
             HAVING (
                 ((
@@ -57,8 +57,7 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
         expected_query = f"""
             SELECT {expected_table}.id AS id
             FROM {expected_table}
-            PREWHERE {expected_table}.project_id = {{pb_1:String}}
-            WHERE 1
+            WHERE {expected_table}.project_id = {{pb_1:String}}
               AND ({expected_table}.deleted_at = {{pb_0:DateTime64(3)}})
         """
     if read_table == ReadTable.CALLS_MERGED:
@@ -82,7 +81,7 @@ def test_query_light_column() -> None:
             calls_merged.id AS id,
             any(calls_merged.started_at) AS started_at
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -111,7 +110,7 @@ def test_query_heavy_column() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -147,8 +146,8 @@ def test_query_heavy_column_simple_filter() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_1:String}
-            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+            WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
                     OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
@@ -160,8 +159,8 @@ def test_query_heavy_column_simple_filter() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {"pb_0": ["a", "b"], "pb_1": "project"},
@@ -187,8 +186,8 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_1:String}
-            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+            WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
                     OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
@@ -201,8 +200,8 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
@@ -230,8 +229,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_1:String}
-            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+            WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
                     OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
@@ -246,8 +245,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
@@ -301,8 +300,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_9:String}
-            WHERE ((calls_merged.op_name IN {pb_5:Array(String)})
+            WHERE calls_merged.project_id = {pb_9:String}
+                AND ((calls_merged.op_name IN {pb_5:Array(String)})
                     OR (calls_merged.op_name IS NULL))
                 AND (calls_merged.trace_id = {pb_6:String}
                     OR calls_merged.trace_id IS NULL)
@@ -327,8 +326,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_9:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_9:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
@@ -365,7 +364,7 @@ def test_query_with_simple_feedback_sort() -> None:
                 {pb_4:String},
                 '/call/',
                 calls_merged.id))
-            PREWHERE
+            WHERE
                 calls_merged.project_id = {pb_4:String}
             GROUP BY
                 (calls_merged.project_id,
@@ -424,9 +423,9 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
                 {pb_5:String},
                 '/call/',
                 calls_merged.id))
-            PREWHERE
+            WHERE
                 calls_merged.project_id = {pb_5:String}
-            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
                     OR (calls_merged.op_name IS NULL))
         GROUP BY
             (calls_merged.project_id,
@@ -461,9 +460,9 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
                 {pb_5:String},
                 '/call/',
                 calls_merged.id))
-            PREWHERE
+            WHERE
                 calls_merged.project_id = {pb_5:String}
-            WHERE (calls_merged.id IN filtered_calls)
+                AND (calls_merged.id IN filtered_calls)
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -525,7 +524,7 @@ def test_query_with_simple_feedback_filter() -> None:
             {pb_3:String},
             '/call/',
             calls_merged.id))
-        PREWHERE
+        WHERE
             calls_merged.project_id = {pb_3:String}
         GROUP BY
             (calls_merged.project_id,
@@ -576,7 +575,7 @@ def test_query_with_wildcard_feedback_filter() -> None:
             {pb_2:String},
             '/call/',
             calls_merged.id))
-        PREWHERE
+        WHERE
             calls_merged.project_id = {pb_2:String}
         GROUP BY
             (calls_merged.project_id,
@@ -624,7 +623,7 @@ def test_query_with_wildcard_feedback_filter_no_extra_path() -> None:
             {pb_1:String},
             '/call/',
             calls_merged.id))
-        PREWHERE
+        WHERE
             calls_merged.project_id = {pb_1:String}
         GROUP BY
             (calls_merged.project_id,
@@ -671,7 +670,7 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             {pb_6:String},
             '/call/',
             calls_merged.id))
-        PREWHERE
+        WHERE
             calls_merged.project_id = {pb_6:String}
         GROUP BY
             (calls_merged.project_id,
@@ -742,9 +741,8 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
             {pb_4:String},
             '/call/',
             calls_complete.id))
-        PREWHERE
+        WHERE
             calls_complete.project_id = {pb_4:String}
-        WHERE 1
         AND
             (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
@@ -782,7 +780,7 @@ def test_calls_query_multiple_select_columns() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -828,8 +826,8 @@ def test_calls_query_with_predicate_filters() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_4:String}
-            WHERE ((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump IS NULL))
+            WHERE calls_merged.project_id = {pb_4:String}
+                AND ((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
@@ -842,8 +840,8 @@ def test_calls_query_with_predicate_filters() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_4:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
@@ -873,7 +871,7 @@ def test_query_with_summary_weave_status_sort() -> None:
             any(calls_merged.exception) AS exception,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
+        WHERE calls_merged.project_id = {pb_5:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -935,7 +933,7 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
             any(calls_merged.exception) AS exception,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
+        WHERE calls_merged.project_id = {pb_5:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
                 WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
@@ -998,8 +996,8 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_7:String}
-            WHERE ((calls_merged.inputs_dump LIKE {pb_5:String} OR calls_merged.inputs_dump IS NULL)
+            WHERE calls_merged.project_id = {pb_7:String}
+                AND ((calls_merged.inputs_dump LIKE {pb_5:String} OR calls_merged.inputs_dump IS NULL)
                     AND (calls_merged.output_dump LIKE {pb_6:String} OR calls_merged.output_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
@@ -1017,8 +1015,8 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_7:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_7:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
@@ -1068,8 +1066,8 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_6:String}
-        WHERE (((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL)
+        WHERE calls_merged.project_id = {pb_6:String}
+            AND (((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL)
                 OR (calls_merged.output_dump LIKE {pb_5:String} OR calls_merged.output_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
@@ -1148,8 +1146,8 @@ def test_calls_query_with_complex_heavy_filters() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_12:String}
-            WHERE (
+            WHERE calls_merged.project_id = {pb_12:String}
+                AND (
                 (calls_merged.inputs_dump LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL)
                 AND ((calls_merged.output_dump LIKE {pb_10:String} OR calls_merged.output_dump IS NULL)
                     OR (lower(calls_merged.inputs_dump) LIKE {pb_11:String} OR calls_merged.inputs_dump IS NULL)))
@@ -1171,8 +1169,8 @@ def test_calls_query_with_complex_heavy_filters() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_12:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_12:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
@@ -1214,8 +1212,8 @@ def test_calls_query_with_like_optimization() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+        WHERE calls_merged.project_id = {pb_3:String}
+            AND ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
@@ -1254,8 +1252,8 @@ def test_calls_query_with_like_optimization_contains() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((lower(calls_merged.inputs_dump) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+        WHERE calls_merged.project_id = {pb_3:String}
+            AND ((lower(calls_merged.inputs_dump) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
@@ -1293,8 +1291,8 @@ def test_query_with_json_value_in_condition() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
-        WHERE (((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump LIKE {pb_4:String})
+        WHERE calls_merged.project_id = {pb_5:String}
+            AND (((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump LIKE {pb_4:String})
                 OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
@@ -1340,8 +1338,8 @@ def test_calls_query_with_like_optimization_calls_complete() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_4:String}
-        WHERE (calls_complete.inputs_dump LIKE {pb_3:String})
+        WHERE calls_complete.project_id = {pb_4:String}
+            AND (calls_complete.inputs_dump LIKE {pb_3:String})
         AND
             (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') = {pb_1:String}))
                  AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
@@ -1378,8 +1376,8 @@ def test_calls_query_with_like_optimization_contains_calls_complete() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_4:String}
-        WHERE (lower(calls_complete.inputs_dump) LIKE {pb_3:String})
+        WHERE calls_complete.project_id = {pb_4:String}
+            AND (lower(calls_complete.inputs_dump) LIKE {pb_3:String})
         AND
             ((positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
                  AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
@@ -1415,8 +1413,8 @@ def test_calls_query_with_like_optimization_in_calls_complete() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_6:String}
-        WHERE ((calls_complete.inputs_dump LIKE {pb_4:String} OR calls_complete.inputs_dump LIKE {pb_5:String}))
+        WHERE calls_complete.project_id = {pb_6:String}
+            AND ((calls_complete.inputs_dump LIKE {pb_4:String} OR calls_complete.inputs_dump LIKE {pb_5:String}))
         AND
             (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
                  AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
@@ -1488,8 +1486,8 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_12:String}
-            WHERE ((calls_merged.op_name IN {pb_7:Array(String)})
+            WHERE calls_merged.project_id = {pb_12:String}
+                AND ((calls_merged.op_name IN {pb_7:Array(String)})
                     OR (calls_merged.op_name IS NULL))
                 AND ((calls_merged.attributes_dump LIKE {pb_8:String} OR calls_merged.attributes_dump IS NULL)
                     AND (lower(calls_merged.inputs_dump) LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL)
@@ -1511,8 +1509,8 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             any(calls_merged.attributes_dump) AS attributes_dump,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_12:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_12:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
@@ -1555,7 +1553,7 @@ def test_calls_query_with_unoptimizable_or_condition() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
+        WHERE calls_merged.project_id = {pb_5:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((
             (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String})
@@ -1609,7 +1607,7 @@ def test_dynamic_json_filters_infer_casts_from_literals() -> None:
         """
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_12:String}
+        WHERE calls_merged.project_id = {pb_12:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((
             (toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '')) > {pb_1:Int64})
@@ -1669,7 +1667,7 @@ def test_literal_inferred_casts_cover_feedback_and_mixed_numeric_in() -> None:
             {pb_3:String},
             '/call/',
             calls_merged.id))
-        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE calls_merged.project_id = {pb_3:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
@@ -1704,8 +1702,8 @@ def test_literal_inferred_casts_cover_feedback_and_mixed_numeric_in() -> None:
         """
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_6:String}
-        WHERE (((calls_merged.inputs_dump LIKE {pb_3:String}
+        WHERE calls_merged.project_id = {pb_6:String}
+            AND (((calls_merged.inputs_dump LIKE {pb_3:String}
             OR calls_merged.inputs_dump LIKE {pb_4:String}
             OR calls_merged.inputs_dump LIKE {pb_5:String})
             OR calls_merged.inputs_dump IS NULL))
@@ -1752,8 +1750,8 @@ def test_whole_number_float_eq_emits_int_form_like_prefilter() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_4:String}
-        WHERE (((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump LIKE {pb_3:String}) OR calls_merged.inputs_dump IS NULL))
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump LIKE {pb_3:String}) OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '')) = {pb_1:Float64}))
@@ -1795,8 +1793,8 @@ def test_bool_eq_emits_numeric_form_like_prefilter() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_4:String}
-        WHERE (((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump LIKE {pb_3:String}) OR calls_merged.inputs_dump IS NULL))
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump LIKE {pb_3:String}) OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((multiIf(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = 'true', 1, coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = 'false', 0, toUInt8OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''))) = {pb_1:Bool}))
@@ -1832,7 +1830,7 @@ def test_calls_query_filter_by_empty_string() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE calls_merged.project_id = {pb_2:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
@@ -1865,7 +1863,7 @@ def test_query_with_summary_weave_latency_ms_sort() -> None:
             any(calls_merged.started_at) AS started_at,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -1910,7 +1908,7 @@ def test_query_with_summary_weave_latency_ms_filter() -> None:
             any(calls_merged.started_at) AS started_at,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE calls_merged.project_id = {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
               WHEN any(calls_merged.ended_at) IS NULL THEN NULL
@@ -1969,7 +1967,7 @@ def test_summary_weave_field_select_backtick_quoting(
                     ELSE (toUnixTimestamp64Milli(any({expected_table}.ended_at)) - toUnixTimestamp64Milli(any({expected_table}.started_at)))
                 END AS `summary.weave.latency_ms`
             FROM {expected_table}
-            PREWHERE {expected_table}.project_id = {{pb_5:String}}
+            WHERE {expected_table}.project_id = {{pb_5:String}}
             GROUP BY ({expected_table}.project_id, {expected_table}.id)
             HAVING (
                 ((any({expected_table}.deleted_at) IS NULL))
@@ -2009,8 +2007,7 @@ def test_summary_weave_field_select_backtick_quoting(
                     ELSE (toUnixTimestamp64Milli({expected_table}.ended_at) - toUnixTimestamp64Milli({expected_table}.started_at))
                 END AS `summary.weave.latency_ms`
             FROM {expected_table}
-            PREWHERE {expected_table}.project_id = {{pb_10:String}}
-            WHERE 1
+            WHERE {expected_table}.project_id = {{pb_10:String}}
               AND ({expected_table}.deleted_at = {{pb_9:DateTime64(3)}})
             """,
             {
@@ -2046,7 +2043,7 @@ def test_query_with_summary_weave_trace_name_sort() -> None:
             any(calls_merged.op_name) AS op_name,
             argMaxMerge(calls_merged.display_name) AS display_name
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -2098,7 +2095,7 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
             any(calls_merged.op_name) AS op_name,
             argMaxMerge(calls_merged.display_name) AS display_name
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE calls_merged.project_id = {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
                 WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL AND argMaxMerge(calls_merged.display_name) != '' THEN argMaxMerge(calls_merged.display_name)
@@ -2169,7 +2166,7 @@ def test_storage_size_fields():
         FROM calls_merged_stats
         WHERE project_id = {pb_0:String}
         GROUP BY id) AS storage_size_tbl ON calls_merged.id = storage_size_tbl.id
-        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -2207,8 +2204,8 @@ def test_total_storage_size(with_filter: bool):
                 SELECT
                     calls_merged.id AS id
                 FROM calls_merged
-                PREWHERE calls_merged.project_id = {pb_1:String}
-                WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                WHERE calls_merged.project_id = {pb_1:String}
+                    AND ((calls_merged.op_name IN {pb_0:Array(String)})
                     OR (calls_merged.op_name IS NULL))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -2236,8 +2233,8 @@ def test_total_storage_size(with_filter: bool):
             )
             GROUP BY trace_id) AS rolled_up_cms
             ON calls_merged.trace_id = rolled_up_cms.trace_id
-            PREWHERE calls_merged.project_id = {pb_1:String}
-            WHERE (calls_merged.id IN filtered_calls)
+            WHERE calls_merged.project_id = {pb_1:String}
+                AND (calls_merged.id IN filtered_calls)
             GROUP BY (calls_merged.project_id, calls_merged.id)
             """,
             {"pb_0": ["a", "b"], "pb_1": "test/project"},
@@ -2262,7 +2259,7 @@ def test_total_storage_size(with_filter: bool):
             WHERE project_id = {pb_0:String}
             GROUP BY trace_id) AS rolled_up_cms
             ON calls_merged.trace_id = rolled_up_cms.trace_id
-            PREWHERE calls_merged.project_id = {pb_0:String}
+            WHERE calls_merged.project_id = {pb_0:String}
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
@@ -2309,8 +2306,8 @@ def test_datetime_optimization_simple() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.sortable_datetime > {pb_1:String})
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.sortable_datetime > {pb_1:String})
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.started_at) > {pb_0:String}))
@@ -2347,8 +2344,8 @@ def test_datetime_optimization_lt_simple() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.sortable_datetime < {pb_1:String})
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.sortable_datetime < {pb_1:String})
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.started_at) < {pb_0:String}))
@@ -2390,8 +2387,8 @@ def test_datetime_optimization_not_operation() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (NOT (calls_merged.sortable_datetime >= {pb_1:String}))
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (NOT (calls_merged.sortable_datetime >= {pb_1:String}))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
             (NOT ((any(calls_merged.started_at) >= {pb_0:String}))))
@@ -2474,8 +2471,8 @@ def test_datetime_optimization_multiple_conditions() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_4:String}
-        WHERE (calls_merged.sortable_datetime > {pb_2:String}
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (calls_merged.sortable_datetime > {pb_2:String}
             AND NOT (calls_merged.sortable_datetime > {pb_3:String}))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.started_at) > {pb_0:String}))
@@ -2530,7 +2527,7 @@ def test_datetime_optimization_invalid_field() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE calls_merged.project_id = {pb_2:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.wb_user_id) > {pb_0:Int64}))
@@ -2706,8 +2703,8 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
             (SELECT calls_merged.id AS id
             FROM calls_merged
                             LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_8:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
-            PREWHERE calls_merged.project_id = {pb_8:String}
-            WHERE (calls_merged.sortable_datetime > {pb_7:String})
+            WHERE calls_merged.project_id = {pb_8:String}
+                AND (calls_merged.sortable_datetime > {pb_7:String})
                 AND ((calls_merged.inputs_dump LIKE {pb_6:String}
                     OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id,
@@ -2719,8 +2716,8 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_8:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_8:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
         """,
@@ -2750,8 +2747,8 @@ def test_trace_id_filter_in():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.trace_id IN {pb_0:Array(String)}
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.trace_id IN {pb_0:Array(String)}
                 OR calls_merged.trace_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -2776,8 +2773,8 @@ def test_trace_id_filter_eq():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND ((calls_merged.op_name IN {pb_0:Array(String)})
                 OR (calls_merged.op_name IS NULL))
             AND (calls_merged.trace_id = {pb_1:String}
                 OR calls_merged.trace_id IS NULL)
@@ -2803,8 +2800,8 @@ def test_wb_run_id_filter_eq():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.wb_run_id IN {pb_1:Array(String)}
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.wb_run_id IN {pb_1:Array(String)}
                 OR calls_merged.wb_run_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -2835,8 +2832,8 @@ def test_trace_roots_only_filter_with_condition():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.parent_id IS NULL)
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.parent_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.wb_user_id) = {pb_0:Int64}))
             AND ((any(calls_merged.deleted_at) IS NULL))
@@ -2858,8 +2855,8 @@ def test_parent_id_filter():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.parent_id IN {pb_1:Array(String)}
                 OR calls_merged.parent_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -2889,8 +2886,8 @@ def test_input_output_refs_filter():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_4:String}
-        WHERE (((hasAny(calls_merged.input_refs, {pb_2:Array(String)})
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (((hasAny(calls_merged.input_refs, {pb_2:Array(String)})
                 OR length(calls_merged.input_refs) = 0)
             AND (hasAny(calls_merged.output_refs, {pb_3:Array(String)})
                 OR length(calls_merged.output_refs) = 0)))
@@ -2936,8 +2933,8 @@ def test_input_output_refs_filter_with_wildcards():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_6:String}
-        WHERE (((((hasAny(calls_merged.input_refs, {pb_4:Array(String)}))
+        WHERE calls_merged.project_id = {pb_6:String}
+            AND (((((hasAny(calls_merged.input_refs, {pb_4:Array(String)}))
                 OR (arrayExists(x -> startsWith(x, {pb_1:String}), calls_merged.input_refs)))
                 OR length(calls_merged.input_refs) = 0)
             AND (((hasAny(calls_merged.output_refs, {pb_5:Array(String)}))
@@ -2986,8 +2983,8 @@ def test_all_optimization_filters():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_12:String}
-        WHERE (calls_merged.parent_id IN {pb_11:Array(String)}
+        WHERE calls_merged.project_id = {pb_12:String}
+            AND (calls_merged.parent_id IN {pb_11:Array(String)}
                 OR calls_merged.parent_id IS NULL)
             AND ((calls_merged.op_name IN {pb_5:Array(String)})
                 OR (calls_merged.op_name IS NULL))
@@ -3199,8 +3196,8 @@ def test_thread_id_filter_eq():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.thread_id = {pb_1:String}
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.thread_id = {pb_1:String}
                 OR calls_merged.thread_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -3224,8 +3221,8 @@ def test_thread_id_filter_in():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.thread_id IN {pb_1:Array(String)}
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.thread_id IN {pb_1:Array(String)}
                 OR calls_merged.thread_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -3251,8 +3248,8 @@ def test_turn_id_filter_eq():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.turn_id = {pb_1:String}
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.turn_id = {pb_1:String}
                 OR calls_merged.turn_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -3274,8 +3271,8 @@ def test_turn_id_filter_in():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.turn_id IN {pb_1:Array(String)}
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.turn_id IN {pb_1:Array(String)}
                 OR calls_merged.turn_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -3306,8 +3303,8 @@ def test_thread_id_and_turn_id_filter_combined():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_4:String}
-        WHERE (calls_merged.thread_id IN {pb_2:Array(String)}
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (calls_merged.thread_id IN {pb_2:Array(String)}
                 OR calls_merged.thread_id IS NULL)
             AND (calls_merged.turn_id IN {pb_3:Array(String)}
                 OR calls_merged.turn_id IS NULL)
@@ -3354,8 +3351,8 @@ def test_query_with_optimization_and_attributes_order() -> None:
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_1:String}
-            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+            WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
                     OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
@@ -3368,8 +3365,8 @@ def test_query_with_optimization_and_attributes_order() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.id IN filtered_calls)
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) ASC
         """,
@@ -3407,8 +3404,8 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
         """
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((calls_merged.output_dump LIKE {pb_2:String}
+        WHERE calls_merged.project_id = {pb_3:String}
+            AND ((calls_merged.output_dump LIKE {pb_2:String}
                 OR calls_merged.output_dump IS NULL))
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
@@ -3463,8 +3460,7 @@ def test_calls_complete_with_light_filter_and_order() -> None:
             calls_complete.started_at AS started_at,
             calls_complete.op_name AS op_name
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_3:String}
-        WHERE 1
+        WHERE calls_complete.project_id = {pb_3:String}
           AND (
             ((calls_complete.started_at > {pb_0:String}))
             AND ((calls_complete.wb_user_id = {pb_1:String}))
@@ -3529,8 +3525,8 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.exception AS exception,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_12:String}
-        WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
+        WHERE calls_complete.project_id = {pb_12:String}
+            AND ((calls_complete.op_name IN {pb_3:Array(String)})
                 OR (calls_complete.op_name IS NULL))
             AND (calls_complete.trace_id = {pb_4:String}
                 OR calls_complete.trace_id IS NULL)
@@ -3588,9 +3584,8 @@ def test_query_with_simple_feedback_sort_calls_complete() -> None:
                 {pb_5:String},
                 '/call/',
                 calls_complete.id))
-            PREWHERE
+            WHERE
                 calls_complete.project_id = {pb_5:String}
-            WHERE 1
               AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
             ORDER BY
                 (NOT (JSONType(CASE WHEN feedback.feedback_type = {pb_1:String}
@@ -3646,8 +3641,8 @@ def test_calls_complete_with_refs_filter() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_6:String}
-        WHERE (((((hasAny(calls_complete.input_refs, {pb_4:Array(String)}))
+        WHERE calls_complete.project_id = {pb_6:String}
+            AND (((((hasAny(calls_complete.input_refs, {pb_4:Array(String)}))
                 OR (arrayExists(x -> startsWith(x, {pb_2:String}), calls_complete.input_refs)))
                 OR length(calls_complete.input_refs) = 0)
             AND (hasAny(calls_complete.output_refs, {pb_5:Array(String)})
@@ -3705,9 +3700,8 @@ def test_calls_complete_with_feedback_filter() -> None:
             {pb_4:String},
             '/call/',
             calls_complete.id))
-        PREWHERE
+        WHERE
             calls_complete.project_id = {pb_4:String}
-        WHERE 1
           AND (((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
             THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '')) > {pb_2:Float64}))
@@ -3759,8 +3753,8 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         """
         SELECT
             calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_10:String}
-        WHERE 1
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_10:String}
           AND (
             (((CASE
                 WHEN calls_complete.exception != {pb_5:String} THEN {pb_1:String}
@@ -3915,7 +3909,7 @@ def test_query_with_queue_filter_calls_merged() -> None:
         ) AS annotation_queue_items ON (
             annotation_queue_items.project_id = calls_merged.project_id
             AND annotation_queue_items.call_id = calls_merged.id)
-        PREWHERE
+        WHERE
             calls_merged.project_id = {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
@@ -3960,9 +3954,8 @@ def test_query_with_queue_filter_calls_complete() -> None:
         ) AS annotation_queue_items ON (
             annotation_queue_items.project_id = calls_complete.project_id
             AND annotation_queue_items.call_id = calls_complete.id)
-        PREWHERE
+        WHERE
             calls_complete.project_id = {pb_2:String}
-        WHERE 1
           AND (((annotation_queue_items.queue_id = {pb_0:String}))
        AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)})))
         """,
@@ -4065,8 +4058,7 @@ def test_stats_query_calls_complete_flat_count() -> None:
         """
         SELECT count() AS count
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_1:String}
-        WHERE 1
+        WHERE calls_complete.project_id = {pb_1:String}
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
@@ -4088,8 +4080,8 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
         """
         SELECT count() AS count
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_2:String}
-        WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
+        WHERE calls_complete.project_id = {pb_2:String}
+            AND ((calls_complete.op_name IN {pb_1:Array(String)})
                OR (calls_complete.op_name IS NULL))
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
@@ -4125,8 +4117,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
             WHERE project_id = {pb_1:String}
             GROUP BY trace_id
         ) AS rolled_up_cms ON calls_complete.trace_id = rolled_up_cms.trace_id
-        PREWHERE calls_complete.project_id = {pb_1:String}
-        WHERE 1
+        WHERE calls_complete.project_id = {pb_1:String}
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
@@ -4172,8 +4163,7 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
             {pb_4:String},
             '/call/',
             calls_complete.id))
-        PREWHERE calls_complete.project_id = {pb_4:String}
-        WHERE 1
+        WHERE calls_complete.project_id = {pb_4:String}
           AND (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
             THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') = {pb_2:String}))
@@ -4200,7 +4190,7 @@ def test_stats_query_calls_merged_uses_subquery() -> None:
         FROM (
             SELECT calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_0:String}
+            WHERE calls_merged.project_id = {pb_0:String}
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
@@ -4240,8 +4230,7 @@ def test_latency_ms_sort_calls_complete_uses_sentinel_for_ended_at() -> None:
             calls_complete.started_at AS started_at,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_2:String}
-        WHERE 1
+        WHERE calls_complete.project_id = {pb_2:String}
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         ORDER BY CASE
             WHEN calls_complete.ended_at = {pb_1:DateTime64(6)} THEN NULL
@@ -4276,8 +4265,7 @@ def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
             calls_complete.started_at AS started_at,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_3:String}
-        WHERE 1
+        WHERE calls_complete.project_id = {pb_3:String}
           AND (((CASE
               WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
               ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
@@ -4302,8 +4290,9 @@ def test_trace_roots_only_filter_calls_complete() -> None:
         cq,
         """
         SELECT calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
-            WHERE (calls_complete.parent_id = {pb_1:String})
+        FROM calls_complete
+            WHERE calls_complete.project_id = {pb_2:String}
+                AND (calls_complete.parent_id = {pb_1:String})
               AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
@@ -4334,8 +4323,8 @@ def test_trace_name_filter_calls_complete_uses_sentinel() -> None:
         """
         SELECT calls_complete.id AS id,
                calls_complete.display_name AS display_name
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_3:String}
-        WHERE 1
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_3:String}
           AND (((CASE
                      WHEN calls_complete.display_name != {pb_0:String} THEN calls_complete.display_name
                      WHEN calls_complete.op_name IS NOT NULL
@@ -4377,8 +4366,8 @@ def test_not_eq_none_display_name_calls_complete() -> None:
         """
         SELECT calls_complete.id AS id,
                calls_complete.display_name AS display_name
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
-        WHERE 1
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_2:String}
           AND (((NOT ((calls_complete.display_name = {pb_0:String}))))
                AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)})))
         """,
@@ -4409,8 +4398,9 @@ def test_hardcoded_filters_calls_complete() -> None:
         cq,
         """
         SELECT calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_14:String}
-        WHERE (calls_complete.id IN {pb_13:Array(String)})
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_14:String}
+            AND (calls_complete.id IN {pb_13:Array(String)})
           AND (calls_complete.wb_run_id IN {pb_9:Array(String)}
                OR calls_complete.wb_run_id = {pb_10:String})
           AND (calls_complete.parent_id IN {pb_11:Array(String)}
@@ -4454,8 +4444,8 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
         cq,
         """
         SELECT calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_8:String}
-        WHERE 1
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_8:String}
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         ORDER BY CASE
                      WHEN calls_complete.exception != {pb_6:String} THEN {pb_2:String}
@@ -4506,7 +4496,7 @@ def test_query_with_reaction_eq_filter_calls_merged() -> None:
             {pb_3:String},
             '/call/',
             calls_merged.id))
-        PREWHERE
+        WHERE
             calls_merged.project_id = {pb_3:String}
         GROUP BY
             (calls_merged.project_id,
@@ -4558,7 +4548,7 @@ def test_query_with_note_contains_filter_calls_merged() -> None:
             {pb_3:String},
             '/call/',
             calls_merged.id))
-        PREWHERE
+        WHERE
             calls_merged.project_id = {pb_3:String}
         GROUP BY
             (calls_merged.project_id,
@@ -4610,7 +4600,7 @@ def test_query_with_annotation_filter_still_uses_anyif() -> None:
             {pb_3:String},
             '/call/',
             calls_merged.id))
-        PREWHERE
+        WHERE
             calls_merged.project_id = {pb_3:String}
         GROUP BY
             (calls_merged.project_id,

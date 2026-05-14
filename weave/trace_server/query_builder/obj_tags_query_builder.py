@@ -23,12 +23,13 @@ def make_obj_version_exists_query(
     Returns:
         A tuple of (sql_query, parameters).
     """
+    # TODO(weave): revert to PREWHERE after CH #104781 patched.
     query = """
         SELECT 1
         FROM object_versions
-        PREWHERE project_id = {project_id: String}
+        WHERE project_id = {project_id: String}
             AND object_id = {object_id: String}
-        WHERE digest = {digest: String}
+            AND digest = {digest: String}
         GROUP BY project_id, object_id, digest
         HAVING argMax(deleted_at, created_at) IS NULL
         LIMIT 1
@@ -54,10 +55,11 @@ def make_get_tags_query(
     Returns:
         A tuple of (sql_query, parameters).
     """
+    # TODO(weave): revert to PREWHERE after CH #104781 patched.
     query = """
         SELECT object_id, digest, tag
         FROM tags
-        PREWHERE project_id = {project_id: String}
+        WHERE project_id = {project_id: String}
             AND object_id IN {object_ids: Array(String)}
         GROUP BY project_id, object_id, digest, tag
         HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
@@ -86,10 +88,11 @@ def make_get_aliases_query(
     Returns:
         A tuple of (sql_query, parameters).
     """
+    # TODO(weave): revert to PREWHERE after CH #104781 patched.
     query = """
         SELECT object_id, argMax(digest, created_at) AS digest, alias
         FROM aliases
-        PREWHERE project_id = {project_id: String}
+        WHERE project_id = {project_id: String}
             AND object_id IN {object_ids: Array(String)}
         GROUP BY project_id, object_id, alias
         HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
@@ -112,10 +115,11 @@ def make_list_tags_query(
     Returns:
         A tuple of (sql_query, parameters).
     """
+    # TODO(weave): revert to PREWHERE after CH #104781 patched.
     query = """
         SELECT tag
         FROM tags
-        PREWHERE project_id = {project_id: String}
+        WHERE project_id = {project_id: String}
         GROUP BY project_id, tag
         HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
         ORDER BY tag
@@ -137,10 +141,11 @@ def make_list_aliases_query(
     Returns:
         A tuple of (sql_query, parameters).
     """
+    # TODO(weave): revert to PREWHERE after CH #104781 patched.
     query = """
         SELECT alias
         FROM aliases
-        PREWHERE project_id = {project_id: String}
+        WHERE project_id = {project_id: String}
         GROUP BY project_id, alias
         HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
         ORDER BY alias
@@ -166,12 +171,13 @@ def make_resolve_alias_query(
     Returns:
         A tuple of (sql_query, parameters).
     """
+    # TODO(weave): revert to PREWHERE after CH #104781 patched.
     query = """
         SELECT argMax(digest, created_at) AS digest
         FROM aliases
-        PREWHERE project_id = {project_id: String}
+        WHERE project_id = {project_id: String}
             AND object_id = {object_id: String}
-        WHERE alias = {alias: String}
+            AND alias = {alias: String}
         GROUP BY project_id, object_id, alias
         HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
         LIMIT 1

@@ -245,12 +245,13 @@ class ObjectMetadataQueryBuilder:
 
     def add_tags_condition(self, tags: list[str]) -> None:
         t = self._main_table_alias
+        # TODO(weave): revert to PREWHERE after CH #104781 patched.
         self._conditions.append(f"""
             ({t}.project_id, {t}.object_id, {t}.digest) IN (
                 SELECT project_id, object_id, digest
                 FROM tags
-                PREWHERE project_id = {{project_id: String}}
-                WHERE tag IN {{filter_tags: Array(String)}}
+                WHERE project_id = {{project_id: String}}
+                    AND tag IN {{filter_tags: Array(String)}}
                 GROUP BY project_id, object_id, digest, tag
                 HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
             )
@@ -261,11 +262,12 @@ class ObjectMetadataQueryBuilder:
         t = self._main_table_alias
         non_latest = [a for a in aliases if a != "latest"]
         has_latest = "latest" in aliases
+        # TODO(weave): revert to PREWHERE after CH #104781 patched.
         alias_subquery = f"""({t}.project_id, {t}.object_id, {t}.digest) IN (
                     SELECT project_id, object_id, argMax(digest, created_at) AS digest
                     FROM aliases
-                    PREWHERE project_id = {{project_id: String}}
-                    WHERE alias IN {{filter_aliases: Array(String)}}
+                    WHERE project_id = {{project_id: String}}
+                        AND alias IN {{filter_aliases: Array(String)}}
                     GROUP BY project_id, object_id, alias
                     HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
                 )"""

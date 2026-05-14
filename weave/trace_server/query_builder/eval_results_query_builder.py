@@ -104,8 +104,8 @@ def build_predict_and_score_calls_cte(
         any(calls_merged.output_dump) AS output_dump,
         {row_digest_expr} AS row_digest
     FROM calls_merged
-    PREWHERE calls_merged.project_id = {project_id_param}
-    WHERE (
+    WHERE calls_merged.project_id = {project_id_param}
+    AND (
         calls_merged.parent_id IN {eval_root_ids_param}
         OR calls_merged.parent_id IS NULL
     )
@@ -132,8 +132,8 @@ def build_predict_and_score_calls_cte(
         calls_complete.output_dump,
         {row_digest_expr} AS row_digest
     FROM calls_complete
-    PREWHERE calls_complete.project_id = {project_id_param}
-    WHERE calls_complete.parent_id IN {eval_root_ids_param}
+    WHERE calls_complete.project_id = {project_id_param}
+      AND calls_complete.parent_id IN {eval_root_ids_param}
       AND calls_complete.id NOT IN {eval_root_ids_param}
       AND ({op_match_calls_complete})
       AND calls_complete.deleted_at = {deleted_at_sentinel_param}
@@ -166,8 +166,8 @@ def build_predict_and_score_calls_resolved_cte(
     LEFT JOIN (
         SELECT project_id, digest, any(val_dump) AS val_dump
         FROM table_rows
-        PREWHERE project_id = {project_id_param}
-        WHERE digest IN (SELECT row_digest FROM predict_and_score_calls)
+        WHERE project_id = {project_id_param}
+            AND digest IN (SELECT row_digest FROM predict_and_score_calls)
         GROUP BY project_id, digest
     ) AS tr ON tr.digest = predict_and_score_calls.row_digest
 )"""
@@ -392,11 +392,12 @@ page_digests AS (
 
 def build_page_resolved_inputs_cte(project_id_param: str) -> str:
     """Hydrate dataset-row val_dump for just the page's digests."""
+    # TODO(weave): revert to PREWHERE after CH #104781 patched.
     return f"""page_resolved_inputs AS (
     SELECT digest, any(val_dump) AS val_dump
     FROM table_rows
-    PREWHERE project_id = {project_id_param}
-    WHERE digest IN (SELECT row_digest FROM page_digests)
+    WHERE project_id = {project_id_param}
+        AND digest IN (SELECT row_digest FROM page_digests)
     GROUP BY digest
 )"""
 
@@ -437,8 +438,8 @@ def _build_page_calls_cte(project_id_param: str, read_table: str) -> str:
         any(calls_merged.output_dump) AS output_dump,
         any(calls_merged.summary_dump) AS summary_dump
     FROM calls_merged
-    PREWHERE calls_merged.project_id = {project_id_param}
-    WHERE calls_merged.id IN (SELECT call_id FROM page_rows)
+    WHERE calls_merged.project_id = {project_id_param}
+        AND calls_merged.id IN (SELECT call_id FROM page_rows)
     GROUP BY (calls_merged.project_id, calls_merged.id)
 )"""
     else:

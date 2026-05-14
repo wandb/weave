@@ -250,10 +250,11 @@ def make_table_rows_read_batch_query(
     """
     project_param = pb.add(project_id, None, "String")
     digests_param = pb.add(digests, None, "Array(String)")
+    # TODO(weave): revert to PREWHERE after CH #104781 patched.
     return f"""
         SELECT digest, any(val_dump) AS val_dump
         FROM table_rows
-        PREWHERE project_id = {project_param}
-        WHERE digest IN {digests_param}
+        WHERE project_id = {project_param}
+            AND digest IN {digests_param}
         GROUP BY project_id, digest
     """
