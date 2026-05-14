@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 from typing_extensions import Self
 
+from weave.session import _redaction
 from weave.session.session_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
@@ -41,7 +42,7 @@ from weave.session.types import (
     Usage,
     _parse_data_url,
 )
-from weave.trace.settings import should_disable_weave
+from weave.trace.settings import should_disable_weave, should_redact_pii
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -209,11 +210,17 @@ class Tool(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
+        arguments = self.arguments if include else ""
+        result = self.result if include else ""
+        if include and should_redact_pii():
+            arguments = _redaction.redact_string(arguments)
+            result = _redaction.redact_string(result)
+
         attrs = execute_tool_attributes(
             tool_name=self.name,
             conversation_id=session.session_id if session else "",
-            tool_call_arguments=self.arguments if include else "",
-            tool_call_result=self.result if include else "",
+            tool_call_arguments=arguments,
+            tool_call_result=result,
             tool_call_id=self.tool_call_id,
             tool_type=self.tool_type,
             tool_description=self.tool_description,
