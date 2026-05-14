@@ -265,27 +265,44 @@ def _walk_set(obj: set, func: Callable[[Any], Any]) -> _MapResult:
 
 
 def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
-    """Rewrite model fields in place when safe; round-trip when not.
+    """Walk a pydantic model with copy-on-write semantics.
 
-    The fast path reads each field via getattr, walks it, and (if anything
-    changed) either mutates the model in place or, for `frozen=True`
-    models, uses `model_copy(update=...)`. Either way the resulting model
-    is re-validated, so callers that bypassed validation via
-    `model_construct(...)` still see the same shape they would have from
-    the legacy round-trip.
+    Three outcomes, in order:
+      1. A subtree tripped `fast_path_safe=False` (nested dataclass that
+         getattr/setattr can't round-trip cleanly) -> fall back to the
+         legacy model_dump / _walk / model_validate path.
+      2. Nothing changed -> return obj as-is, with one revalidation pass
+         so `model_construct`-bypassed instances still get the same
+         shape the legacy round-trip would have produced.
+      3. Something changed -> apply updates and revalidate.
+    """
+    updates, fast_path_safe = _collect_model_updates(obj, func)
 
-    Fields stashed by `extra='allow'` live in `model_extra` rather than
-    `model_fields`, so they are walked separately. `model_extra` is None
-    for models without `extra='allow'`, which makes the extras loop a
-    no-op in the common case.
+    if not fast_path_safe:
+        return _MapResult(_model_via_roundtrip(obj, func), True, True)
+    if not updates:
+        return _MapResult(obj.__class__.model_validate(obj), False, True)
+    return _MapResult(_apply_model_updates(obj, updates), True, True)
+
+
+def _collect_model_updates(
+    obj: BaseModel, func: Callable[[Any], Any]
+) -> tuple[dict[str, Any], bool]:
+    """Walk every declared field + every extra; collect what changed.
+
+    `model_fields` covers declared fields. `model_extra` covers anything
+    stashed by `extra='allow'` and is None for other models (so that
+    loop is a no-op in the common case). Both sets of keys are merged
+    into `updates` because setattr / model_copy(update=...) accept extra
+    keys for `extra='allow'` models.
     """
     updates: dict[str, Any] = {}
     fast_path_safe = True
+
     for field_name, field_info in obj.__class__.model_fields.items():
         if field_info.exclude is True:
             continue
-        current = getattr(obj, field_name)
-        result = _walk(current, func)
+        result = _walk(getattr(obj, field_name), func)
         if result.changed:
             updates[field_name] = result.value
         fast_path_safe = fast_path_safe and result.fast_path_safe
@@ -296,28 +313,33 @@ def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
             updates[extra_name] = result.value
         fast_path_safe = fast_path_safe and result.fast_path_safe
 
-    if not fast_path_safe:
-        return _MapResult(_model_via_roundtrip(obj, func), True, True)
+    return updates, fast_path_safe
 
-    if not updates:
-        return _MapResult(obj.__class__.model_validate(obj), False, True)
 
+def _apply_model_updates(obj: BaseModel, updates: dict[str, Any]) -> BaseModel:
+    """Apply `updates` to `obj`. Frozen models get a copy; others mutate.
+
+    Mutating in place preserves the outer model's identity so callers
+    that hold the reference see the rewrite without an extra allocation.
+    Either branch ends with model_validate so any pre-validation bypass
+    via model_construct still gets the shape the legacy round-trip would
+    have produced.
+    """
     if obj.__class__.model_config.get("frozen"):
         updated = obj.model_copy(update=updates)
-        return _MapResult(updated.__class__.model_validate(updated), True, True)
+        return updated.__class__.model_validate(updated)
 
-    # Non-frozen: mutate in place. The outer model keeps its identity and
-    # only the rewritten fields are replaced.
     for field_name, new_value in updates.items():
         setattr(obj, field_name, new_value)
-    return _MapResult(obj.__class__.model_validate(obj), True, True)
+    return obj.__class__.model_validate(obj)
 
 
 def _model_via_roundtrip(obj: BaseModel, func: Callable[[Any], Any]) -> BaseModel:
-    """Legacy path used when a model contains a nested dataclass.
+    """Fallback used when a model contains a nested dataclass.
 
-    `by_alias=True` is required: query models have Mongo-style aliased fields
-    (e.g. `$gt`) whose internal property names cannot round-trip without it.
+    `by_alias=True` is required: query models have Mongo-style aliased
+    fields (e.g. `$gt`) whose internal property names cannot round-trip
+    without it.
     """
     orig = obj.model_dump(by_alias=True)
     walked = _walk(orig, func)
