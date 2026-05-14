@@ -42,9 +42,7 @@ MAX_BATCH_SIZE = 1000
 # TTL for eager call IDs (24 hours in seconds)
 EAGER_CALL_ID_TTL_SECONDS = 24 * 60 * 60
 # Timeout for flush: wait this long for in-flight calls to pair before falling
-# back to the eager v2 start/end endpoints. Real-world ops (LLM streams, evals,
-# multi-step agents) routinely exceed a minute between start and end, so this
-# is sized to cover those without losing the call.
+# back to the eager v2 start/end endpoints.
 FLUSH_TIMEOUT_SECONDS = 5 * 60
 # Default max queue size for ready-to-send items
 DEFAULT_MAX_QUEUE_SIZE = 10_000
@@ -174,10 +172,8 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         """Stop accepting work and flush the queue.
 
         Waits up to FLUSH_TIMEOUT_SECONDS for in-flight calls to pair (start
-        meets end). Anything still unpaired after the deadline is sent via
-        the eager v2 start/end endpoints so the call is preserved instead of
-        being silently dropped, e.g. when the process exits mid-op or a long
-        op exceeds the flush window.
+        meets end). Anything still unpaired is sent via the eager v2
+        start/end endpoints.
         """
         # Wait for pending items to pair (in-flight calls completing)
         # Don't set stop event yet - processing thread needs to keep running
