@@ -224,6 +224,22 @@ class Tool(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
+    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, str]:
+        """Return Tool content fields shaped for ``execute_tool_attributes(**...)``.
+
+        Single chokepoint so the streaming (``Tool.end``) and batch
+        (``_attrs_for_span``) paths produce byte-identical content. Empty
+        strings when ``include_content`` is False (matches the prior gate).
+        """
+        if not include_content:
+            return {"tool_call_arguments": "", "tool_call_result": ""}
+        arguments = self.arguments
+        result = self.result
+        if redact:
+            arguments = _redaction.redact_string(arguments)
+            result = _redaction.redact_string(result)
+        return {"tool_call_arguments": arguments, "tool_call_result": result}
+
     def end(self) -> None:
         if self._ended:
             return
@@ -236,17 +252,10 @@ class Tool(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
-        arguments = self.arguments if include else ""
-        result = self.result if include else ""
-        if include and should_redact_pii():
-            arguments = _redaction.redact_string(arguments)
-            result = _redaction.redact_string(result)
-
         attrs = execute_tool_attributes(
             tool_name=self.name,
             conversation_id=session.session_id if session else "",
-            tool_call_arguments=arguments,
-            tool_call_result=result,
+            **self._content_fields(include_content=include, redact=should_redact_pii()),
             tool_call_id=self.tool_call_id,
             tool_type=self.tool_type,
             tool_description=self.tool_description,
@@ -302,6 +311,46 @@ class LLM(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[LLM | None] | None = PrivateAttr(default=None)
+
+    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, Any]:
+        """Return LLM content fields shaped for ``llm_attributes(**...)``.
+
+        Single chokepoint so the streaming (``LLM.end``) and batch
+        (``_attrs_for_span``) paths produce byte-identical content. All
+        five content fields are None when ``include_content`` is False —
+        notably this includes ``reasoning``, fixing a pre-existing leak
+        where reasoning bypassed include_content.
+        """
+        if not include_content:
+            return {
+                "input_messages": None,
+                "output_messages": None,
+                "system_instructions": None,
+                "media_attachments": None,
+                "reasoning": None,
+            }
+        input_messages = self.input_messages
+        output_messages = self.output_messages
+        system_instructions = self.system_instructions
+        media_attachments = self.media_attachments
+        reasoning = self.reasoning
+        if redact:
+            input_messages = _redaction.redact_messages(input_messages)
+            output_messages = _redaction.redact_messages(output_messages)
+            system_instructions = _redaction.redact_system_instructions(
+                system_instructions
+            )
+            if reasoning is not None and reasoning.content:
+                reasoning = Reasoning(
+                    content=_redaction.redact_string(reasoning.content)
+                )
+        return {
+            "input_messages": input_messages,
+            "output_messages": output_messages,
+            "system_instructions": system_instructions,
+            "media_attachments": media_attachments,
+            "reasoning": reasoning,
+        }
 
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
@@ -435,33 +484,12 @@ class LLM(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
-        input_messages = self.input_messages if include else None
-        output_messages = self.output_messages if include else None
-        system_instructions = self.system_instructions if include else None
-        media_attachments = self.media_attachments if include else None
-        reasoning = self.reasoning if include else None
-
-        if include and should_redact_pii():
-            input_messages = _redaction.redact_messages(input_messages)
-            output_messages = _redaction.redact_messages(output_messages)
-            system_instructions = _redaction.redact_system_instructions(
-                system_instructions
-            )
-            if reasoning is not None and reasoning.content:
-                reasoning = Reasoning(
-                    content=_redaction.redact_string(reasoning.content)
-                )
-
         attrs = llm_attributes(
             model=self.model,
             provider_name=self.provider_name,
             conversation_id=session.session_id if session else "",
-            input_messages=input_messages,
-            output_messages=output_messages,
-            media_attachments=media_attachments,
-            system_instructions=system_instructions,
+            **self._content_fields(include_content=include, redact=should_redact_pii()),
             usage=self.usage,
-            reasoning=reasoning,
             finish_reasons=self.finish_reasons,
             response_id=self.response_id,
             response_model=self.response_model,
@@ -611,6 +639,21 @@ class Turn(_SpanBase):
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
 
+    def _content_fields(
+        self, *, include_content: bool, redact: bool
+    ) -> dict[str, list[Message] | None]:
+        """Return Turn content fields shaped for ``invoke_agent_attributes(**...)``.
+
+        The Turn's ``messages`` map to the attribute builder's
+        ``input_messages`` kwarg.
+        """
+        if not include_content:
+            return {"input_messages": None}
+        messages = self.messages
+        if redact:
+            messages = _redaction.redact_messages(messages)
+        return {"input_messages": messages}
+
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
@@ -656,16 +699,12 @@ class Turn(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
-        messages = self.messages if include else None
-        if include and should_redact_pii():
-            messages = _redaction.redact_messages(messages)
-
         attrs = invoke_agent_attributes(
             agent_name=self.agent_name,
             conversation_id=session.session_id if session else "",
             conversation_name=session.session_name if session else "",
             model=self.model,
-            input_messages=messages,
+            **self._content_fields(include_content=include, redact=should_redact_pii()),
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
@@ -1011,31 +1050,14 @@ def _attrs_for_span(
 ) -> tuple[str, dict[str, Any]]:
     """Build (otel_span_name, attribute_dict) for a child span."""
     if isinstance(span, LLM):
-        input_messages = span.input_messages if include_content else None
-        output_messages = span.output_messages if include_content else None
-        system_instructions = span.system_instructions if include_content else None
-        media_attachments = span.media_attachments if include_content else None
-        reasoning = span.reasoning if include_content else None
-        if include_content and should_redact_pii():
-            input_messages = _redaction.redact_messages(input_messages)
-            output_messages = _redaction.redact_messages(output_messages)
-            system_instructions = _redaction.redact_system_instructions(
-                system_instructions
-            )
-            if reasoning is not None and reasoning.content:
-                reasoning = Reasoning(
-                    content=_redaction.redact_string(reasoning.content)
-                )
         attrs = llm_attributes(
             model=span.model,
             provider_name=span.provider_name,
             conversation_id=session_id,
-            input_messages=input_messages,
-            output_messages=output_messages,
-            media_attachments=media_attachments,
-            system_instructions=system_instructions,
+            **span._content_fields(
+                include_content=include_content, redact=should_redact_pii()
+            ),
             usage=span.usage,
-            reasoning=reasoning,
             finish_reasons=span.finish_reasons,
             response_id=span.response_id,
             response_model=span.response_model,
@@ -1052,16 +1074,12 @@ def _attrs_for_span(
         attrs.update(_capture_info_attrs())
         return f"chat {span.model}", attrs
     if isinstance(span, Tool):
-        arguments = span.arguments if include_content else ""
-        result = span.result if include_content else ""
-        if include_content and should_redact_pii():
-            arguments = _redaction.redact_string(arguments)
-            result = _redaction.redact_string(result)
         attrs = execute_tool_attributes(
             tool_name=span.name,
             conversation_id=session_id,
-            tool_call_arguments=arguments,
-            tool_call_result=result,
+            **span._content_fields(
+                include_content=include_content, redact=should_redact_pii()
+            ),
             tool_call_id=span.tool_call_id,
             tool_type=span.tool_type,
             tool_description=span.tool_description,
@@ -1125,16 +1143,14 @@ def log_turn(
         continue_parent_trace=continue_parent_trace,
     )
 
-    turn_messages = turn.messages if include_content else None
-    if include_content and should_redact_pii():
-        turn_messages = _redaction.redact_messages(turn_messages)
-
     turn_attrs = invoke_agent_attributes(
         agent_name=turn.agent_name,
         conversation_id=session_id,
         conversation_name=session_name,
         model=turn.model,
-        input_messages=turn_messages,
+        **turn._content_fields(
+            include_content=include_content, redact=should_redact_pii()
+        ),
         agent_id=turn.agent_id,
         agent_description=turn.agent_description,
         agent_version=turn.agent_version,
