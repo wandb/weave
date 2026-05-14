@@ -24,6 +24,19 @@ export {
   createOtelExtension,
 } from './integrations';
 export {flushOTel} from './genai/flush';
+export {
+  endLLM,
+  endSession,
+  endTurn,
+  getCurrentLLM,
+  getCurrentSession,
+  getCurrentTurn,
+  startLLM,
+  startSession,
+  startSubagent,
+  startTool,
+  startTurn,
+} from './genai';
 // Type-only: consumers can name these in their own signatures, but the
 // runtime values aren't reachable — construction is private to the SDK's
 // top-level entry-point functions.

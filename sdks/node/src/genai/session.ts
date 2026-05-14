@@ -1,5 +1,6 @@
 import {uuidv7} from 'uuidv7';
 
+import {_currentSession} from './context';
 import {Turn, type TurnInit} from './turn';
 
 export interface SessionInit {
@@ -15,11 +16,17 @@ export interface SessionInit {
  * itself an OTel span — children stamp the conversation id onto theirs.
  */
 export class Session {
+  private _ended = false;
+  private readonly _previousSession: Session | undefined;
+
   private constructor(
     public readonly agentName: string,
     public readonly model: string,
     public readonly sessionId: string
-  ) {}
+  ) {
+    this._previousSession = _currentSession.getStore();
+    _currentSession.enterWith(this);
+  }
 
   static create(opts: SessionInit = {}): Session {
     return new Session(
@@ -38,7 +45,11 @@ export class Session {
   }
 
   end(): void {
-    // Session emits no span; this exists only to mirror the start/end
-    // symmetry of the other classes.
+    if (this._ended) {
+      return;
+    }
+    this._ended = true;
+    // Session emits no span — only the AsyncLocalStorage restore is meaningful here.
+    _currentSession.enterWith(this._previousSession);
   }
 }
