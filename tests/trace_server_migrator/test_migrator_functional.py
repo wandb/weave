@@ -468,14 +468,8 @@ def test_all_production_migrations_replicated(ch_client):
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
 
 
-@pytest.mark.flaky(reruns=3)
 def test_all_production_migrations_distributed(ch_client):
-    """All production migrations apply cleanly in distributed mode.
-
-    Marked flaky: distributed DDL goes through the embedded Keeper's task
-    queue, which can hit transient KEEPER_EXCEPTION (code 999) under load.
-    The migrator's tenacity retry only covers code 517.
-    """
+    """All production migrations apply cleanly in distributed mode."""
     mgmt_db = _unique_name("db_mgmt_prod_dist")
     target_db = _unique_name("prod_dist")
     ch_client.track_db(mgmt_db)
@@ -531,14 +525,8 @@ def test_all_production_down_migrations_replicated(ch_client):
     migrator.apply_migrations(target_db, target_version=0)
 
 
-@pytest.mark.flaky(reruns=3)
 def test_all_production_down_migrations_distributed(ch_client):
-    """All production down migrations apply cleanly in distributed mode.
-
-    Marked flaky: distributed DDL goes through the embedded Keeper's task
-    queue, which can hit transient KEEPER_EXCEPTION (code 999) under load.
-    The migrator's tenacity retry only covers code 517.
-    """
+    """All production down migrations apply cleanly in distributed mode."""
     mgmt_db = _unique_name("db_mgmt_down_dist")
     target_db = _unique_name("down_dist")
     ch_client.track_db(mgmt_db)
