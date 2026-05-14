@@ -86,8 +86,25 @@ def provider_name_from_env() -> str:
 def _system_instructions_to_text(config: Any) -> list[str]:
     """Collect plain text from ``LlmRequest.config.system_instruction``.
 
-    ADK accepts ``str``, ``Content``, or ``list[Content]``. Flatten to
-    a list of strings so it serialises cleanly into the GenAI parts model.
+    ADK's ``system_instruction`` field is polymorphic: it can be a bare
+    ``str``, a ``google.genai.types.Content``, or a ``list[Content]``. We
+    flatten all three shapes to a list of strings so they serialise into
+    the GenAI parts-model on the span.
+
+    ADK does have its own typed helper (``_to_system_instructions`` in
+    ``google.adk.telemetry._experimental_semconv``) but it's a private
+    symbol in a private module, and the surrounding
+    ``set_operation_details_attributes_from_request`` pipeline that calls
+    it only fires when the user has set both
+    ``OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`` and
+    ``OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT={SPAN_ONLY,
+    SPAN_AND_EVENT}``. Weave needs the field populated in every code
+    path, so we duck-type it here.
+
+    Both AgentOps' and OpenInference Arize's ADK integrations make the
+    same trade-off and re-implement this extraction inline. The cleaner
+    long-term home is a shared ``weave.genai.parts`` module consumed by
+    every Weave OTel integration (tracked separately).
     """
     instruction = config.system_instruction
     if not instruction:
