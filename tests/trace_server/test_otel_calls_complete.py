@@ -18,7 +18,6 @@ import uuid
 from binascii import hexlify
 
 import pytest
-from cachetools import TTLCache
 from opentelemetry.proto.common.v1.common_pb2 import (
     InstrumentationScope,
     KeyValue,
@@ -32,7 +31,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 
 from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
-from weave.shared import refs_internal as ri
+from weave.trace_server import object_creation_utils
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.errors import CallsCompleteModeRequired
@@ -351,20 +350,12 @@ def test_otel_export_data_integrity(trace_server, clickhouse_trace_server):
     assert call.attributes["custom"]["value"] == 42
 
 
-def test_otel_export_recovers_after_placeholder_create_failure_and_cache_expiry(
+def test_otel_export_recovers_after_placeholder_create_failure(
     trace_server, clickhouse_trace_server, monkeypatch
 ):
-    """Failed writes must be retried, and expired cache entries must re-resolve from storage."""
+    """Failed writes must be retried on the next export since the op won't be in _inserted_ops."""
     project_id = f"{TEST_ENTITY}/otel_retry_after_failed_create"
-    internal_project_id = b64(project_id)
     op_name = "retry_me"
-    clock = {"now": 0}
-
-    monkeypatch.setattr(
-        clickhouse_trace_server,
-        "_op_ref_cache",
-        TTLCache(maxsize=50_000, ttl=300, timer=lambda: clock["now"]),
-    )
 
     original_obj_create_batch = clickhouse_trace_server.obj_create_batch
     attempts = 0
@@ -380,11 +371,13 @@ def test_otel_export_recovers_after_placeholder_create_failure_and_cache_expiry(
         clickhouse_trace_server, "obj_create_batch", flaky_obj_create_batch
     )
 
+    # First attempt fails — op is NOT added to _inserted_ops
     with pytest.raises(RuntimeError, match="synthetic obj_create_batch failure"):
         trace_server.otel_export(
             _create_otel_export_req(project_id, [_create_otel_span(op_name)])
         )
 
+    # Second attempt succeeds — op is retried because it wasn't in _inserted_ops
     trace_server.otel_export(
         _create_otel_export_req(project_id, [_create_otel_span(op_name)])
     )
@@ -400,41 +393,16 @@ def test_otel_export_recovers_after_placeholder_create_failure_and_cache_expiry(
     ).obj
     assert obj.object_id == op_name
     assert obj.digest == op_digest
-    first_ref = calls[0].op_name
-
-    clickhouse_trace_server._op_ref_cache[internal_project_id, op_name] = (
-        ri.InternalOpRef(
-            project_id=internal_project_id,
-            name=op_name,
-            version="stale_digest",
-        ).uri
-    )
-    clock["now"] = 301
-
-    original_objs_query = clickhouse_trace_server.objs_query
-    lookup_count = 0
-
-    def counting_objs_query(req):
-        nonlocal lookup_count
-        lookup_count += 1
-        return original_objs_query(req)
-
-    monkeypatch.setattr(clickhouse_trace_server, "objs_query", counting_objs_query)
-
-    trace_server.otel_export(
-        _create_otel_export_req(project_id, [_create_otel_span(op_name)])
-    )
-
-    calls = _fetch_calls_stream(trace_server, project_id)
-    assert len(calls) == 2
-    assert attempts == 2
-    assert lookup_count == 1
-    assert calls[-1].op_name == first_ref
-    assert "stale_digest" not in calls[-1].op_name
 
 
-def test_otel_export_reuses_existing_real_op(trace_server, clickhouse_trace_server):
-    """An OTel span name collision should resolve to the existing op version."""
+def test_otel_export_uses_placeholder_even_with_existing_real_op(
+    trace_server, clickhouse_trace_server
+):
+    """OTel always uses the deterministic placeholder digest, even when a real op exists.
+
+    This is by design: OTel ingest is write-only (no CH reads) for performance.
+    The placeholder op version is inserted idempotently alongside the real one.
+    """
     project_id = f"{TEST_ENTITY}/otel_existing_op_collision"
     op_name = "existing_op"
 
@@ -452,7 +420,12 @@ def test_otel_export_reuses_existing_real_op(trace_server, clickhouse_trace_serv
 
     calls = _fetch_calls_stream(trace_server, project_id)
     assert len(calls) == 1
-    assert f"/op/{op_name}:{real_op.digest}" in calls[0].op_name
+    # OTel uses the placeholder digest, not the real op's digest
+    assert (
+        f"/op/{op_name}:{object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST}"
+        in calls[0].op_name
+    )
+    assert real_op.digest != object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST
 
     objs = trace_server.objs_query(
         tsi.ObjQueryReq(
@@ -460,8 +433,35 @@ def test_otel_export_reuses_existing_real_op(trace_server, clickhouse_trace_serv
             filter=tsi.ObjectVersionFilter(object_ids=[op_name], latest_only=False),
         )
     ).objs
-    assert len(objs) == 1
-    assert objs[0].digest == real_op.digest
+    # Both the real op and the placeholder op exist as separate versions
+    assert len(objs) == 2
+    digests = {o.digest for o in objs}
+    assert real_op.digest in digests
+    assert object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST in digests
+
+    # `latest_only=True` returns the placeholder, since OTel inserts after the
+    # real op.  Callers that resolve calls.op_name see the placeholder digest
+    # explicitly (asserted above), so latest-resolution does not affect call
+    # rendering — but operators querying "latest version of <op>" will see
+    # the placeholder, which is the documented trade-off in obj_create_batch.
+    latest_objs = trace_server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[op_name], latest_only=True),
+        )
+    ).objs
+    assert len(latest_objs) == 1
+    assert latest_objs[0].digest == object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST
+
+    # The real op is still readable by its original digest — no data loss.
+    real_obj = trace_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=project_id,
+            object_id=op_name,
+            digest=real_op.digest,
+        )
+    ).obj
+    assert real_obj.digest == real_op.digest
 
 
 def test_v1_api_raises_error_for_otel_established_project(
@@ -590,7 +590,7 @@ def test_otel_and_calls_complete_api_interoperability(
 
 
 # =============================================================================
-# Op Ref Cache Tests
+# Op Idempotent Insert Tests
 # =============================================================================
 
 

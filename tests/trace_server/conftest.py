@@ -162,8 +162,8 @@ def _reset_server_state(server: ClickHouseTraceServer) -> None:
     you must reset it here too — otherwise it will leak between tests and cause
     hard-to-debug order-dependent failures.
     """
-    # Clear op ref cache
-    server._op_ref_cache.clear()
+    # Clear inserted-ops dedupe set
+    server._inserted_ops.clear()
     # Clear placeholder file projects set
     server._placeholder_file_projects.clear()
     # Reset table routing resolver to None so it's lazily re-created
