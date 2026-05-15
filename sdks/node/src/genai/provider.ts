@@ -20,12 +20,16 @@ import {WEAVE_RESOURCE_ATTR} from './weaveResource';
 const SDK_LANGUAGE = 'node';
 const GENAI_OTLP_PATH = '/agents/otel/v1/traces';
 
+/** Key for the dual-package-hazard-safe singleton holder routed through
+ *  `globalThis`. Exported so tests can reset the holder via `Symbol.for`. */
+export const PROVIDER_HOLDER_SYMBOL_NAME = '_weave_genai_provider';
+
 // Dual-package-hazard-safe: routed through globalThis so CJS and ESM copies
 // of this module share one provider instance per process.
 const _providerHolder = globalSingleton<{
   provider: BasicTracerProvider | null;
   beforeExitRegistered: boolean;
-}>('_weave_genai_provider', () => ({
+}>(PROVIDER_HOLDER_SYMBOL_NAME, () => ({
   provider: null,
   beforeExitRegistered: false,
 }));
