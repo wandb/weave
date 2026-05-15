@@ -107,11 +107,12 @@ def universal_ext_to_int_ref_converter(
 
 
 C = TypeVar("C")
+T = TypeVar("T")
 
 
 def make_int_to_ext_ref_mapper(
     convert_int_to_ext_project_id: Callable[[str], str | None],
-) -> Callable[[Any], Any]:
+) -> Callable[[T], T]:
     """Build a reusable internal-to-external ref mapper.
 
     The returned callable rewrites a single object's internal refs to
@@ -122,6 +123,12 @@ def make_int_to_ext_ref_mapper(
 
     For one-shot conversions, prefer `universal_int_to_ext_ref_converter`,
     which is a thin wrapper that builds and applies a mapper in one call.
+
+    The returned callable is generic on its input type: callers that pass
+    `obj: B` get back `B`, preserving the static type through the
+    converter. `scalar_mapper` is kept loosely typed because it walks
+    individual leaf values, which may be strings, primitives, or
+    container fragments that the type checker cannot pin in advance.
     """
     int_to_ext_project_cache: dict[str, str | None] = {}
 
@@ -156,8 +163,8 @@ def make_int_to_ext_ref_mapper(
                 raise InvalidInternalRef("Encountered unexpected ref format.")
         return obj
 
-    def apply(obj: Any) -> Any:
-        return _map_values(obj, scalar_mapper)
+    def apply(obj: T) -> T:
+        return cast(T, _map_values(obj, scalar_mapper))
 
     return apply
 

@@ -128,6 +128,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             for item in res:
                 yield mapper(item)
         finally:
+            # `mapper` (and the int_to_ext_project_cache it closes over) is
+            # a local in this generator's frame; closing the frame drops
+            # both. The previous explicit `.clear()` was a redundant
+            # eager-free that GC already handles.
             if hasattr(res, "close"):
                 res.close()
 

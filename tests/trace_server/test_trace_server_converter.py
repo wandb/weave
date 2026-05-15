@@ -257,3 +257,27 @@ def test_make_int_to_ext_ref_mapper_shares_cache_across_items():
     out_a3 = mapper(item_a3)
     assert out_a3 == {"ref": f"weave:///{ext_a}/op/qux:v4"}
     assert resolver_calls == [int_a, int_b, int_private]
+
+    # Item 7: BaseModel input. _map_values walks model fields via COW;
+    # ref-bearing model rewrites the ref and returns a (re-validated) new
+    # instance, while a ref-free model returns its input by identity.
+    # Resolver remains untouched on the cached hit.
+
+    class Item(BaseModel):
+        op_name: str
+        attributes: dict[str, str]
+
+    model_with_ref = Item(
+        op_name=f"weave-trace-internal:///{int_a}/op/from-model:v1",
+        attributes={"status": "ok"},
+    )
+    out_model = mapper(model_with_ref)
+    assert out_model.op_name == f"weave:///{ext_a}/op/from-model:v1"
+    assert out_model.attributes == {"status": "ok"}
+    assert resolver_calls == [int_a, int_b, int_private]
+
+    plain_model = Item(op_name="plain-op", attributes={"k": "v"})
+    out_plain_model = mapper(plain_model)
+    assert out_plain_model.op_name == "plain-op"
+    assert out_plain_model.attributes is plain_model.attributes
+    assert resolver_calls == [int_a, int_b, int_private]
