@@ -29,9 +29,11 @@ from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
 )
 from weave.trace_server.agents.types import (
+    AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
     AgentConversationChatReq,
     AgentConversationChatRes,
     AgentCustomAttrSchemaItem,
+    AgentCustomAttrSource,
     AgentCustomAttrsSchemaReq,
     AgentCustomAttrsSchemaRes,
     AgentSchema,
@@ -39,6 +41,9 @@ from weave.trace_server.agents.types import (
     AgentSearchMatchedMessage,
     AgentSearchReq,
     AgentSearchRes,
+    AgentSpanGroupDistributionBin,
+    AgentSpanGroupDistributionItem,
+    AgentSpanGroupDistributionValue,
     AgentSpanGroupRow,
     AgentSpanSchema,
     AgentSpansQueryReq,
@@ -71,11 +76,16 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_chat_turns_count_query,
     make_custom_attrs_schema_query,
     make_message_search_query,
+    make_span_group_categorical_distributions_query,
+    make_span_group_distribution_counts_query,
+    make_span_group_numeric_distributions_query,
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
+    safe_float,
     safe_int,
     safe_str,
+    span_group_distribution_key,
 )
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
@@ -151,6 +161,8 @@ class AgentQueryHandler:
         aliases = [group_by_ref_alias(ref) for ref in req.group_by]
         measure_aliases = [measure.alias for measure in req.measures]
         groups = [_hydrate_group_row(r, aliases, measure_aliases) for r in rows]
+        if req.group_distributions:
+            self._hydrate_group_distributions(req, groups, aliases[0])
         return AgentSpansQueryRes(groups=groups, total_count=total)
 
     def spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
@@ -190,6 +202,108 @@ class AgentQueryHandler:
             offset=req.offset,
             has_more=len(rows) > req.limit,
         )
+
+    def _hydrate_group_distributions(
+        self,
+        req: AgentSpansQueryReq,
+        groups: list[AgentSpanGroupRow],
+        group_alias: str,
+    ) -> None:
+        """Attach requested custom attribute distributions to returned groups."""
+        # TODO: Split item setup and row hydration into smaller testable helpers.
+        if not groups:
+            return
+
+        groups_by_key = {
+            span_group_distribution_key(group.group_keys.get(group_alias)): group
+            for group in groups
+        }
+        group_values = [group.group_keys.get(group_alias) for group in groups]
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        counts_sql = make_span_group_distribution_counts_query(pb, req, group_values)
+        total_counts = {
+            safe_str(row.get("group_key")): safe_int(row.get("total_count"))
+            for row in _rows_as_dicts(self._query(counts_sql, pb.get_params()))
+        }
+
+        items: dict[tuple[str, str], AgentSpanGroupDistributionItem] = {}
+        for group_key, group in groups_by_key.items():
+            for spec in req.group_distributions:
+                total_count = total_counts.get(group_key, 0)
+                source = cast("AgentCustomAttrSource", spec.value.source)
+                item = AgentSpanGroupDistributionItem(
+                    alias=spec.alias,
+                    source=source,
+                    key=spec.value.key,
+                    value_type=AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES[source],
+                    total_count=total_count,
+                    # Start at total_count; distribution rows below subtract
+                    # present values for groups where the custom attr exists.
+                    missing_count=total_count,
+                )
+                items[group_key, spec.alias] = item
+                group.distributions[spec.alias] = item
+
+        numeric_specs = [
+            spec
+            for spec in req.group_distributions
+            if spec.value.source in {"custom_attrs_int", "custom_attrs_float"}
+        ]
+        if numeric_specs:
+            pb = ParamBuilder(PARAM_NAMESPACE)
+            sql = make_span_group_numeric_distributions_query(
+                pb, req, group_values, numeric_specs
+            )
+            for row in _rows_as_dicts(self._query(sql, pb.get_params())):
+                key = (safe_str(row.get("group_key")), safe_str(row.get("alias")))
+                distribution_item = items.get(key)
+                if distribution_item is None:
+                    continue
+                distribution_item.present_count = safe_int(row.get("present_count"))
+                distribution_item.missing_count = max(
+                    0,
+                    distribution_item.total_count - distribution_item.present_count,
+                )
+                distribution_item.bins.append(
+                    AgentSpanGroupDistributionBin(
+                        index=safe_int(row.get("bucket_index")),
+                        min=safe_float(row.get("bucket_min")),
+                        max=safe_float(row.get("bucket_max")),
+                        count=safe_int(row.get("count")),
+                    )
+                )
+
+        categorical_specs = [
+            spec
+            for spec in req.group_distributions
+            if spec.value.source in {"custom_attrs_string", "custom_attrs_bool"}
+        ]
+        if categorical_specs:
+            pb = ParamBuilder(PARAM_NAMESPACE)
+            sql = make_span_group_categorical_distributions_query(
+                pb, req, group_values, categorical_specs
+            )
+            for row in _rows_as_dicts(self._query(sql, pb.get_params())):
+                key = (safe_str(row.get("group_key")), safe_str(row.get("alias")))
+                distribution_item = items.get(key)
+                if distribution_item is None:
+                    continue
+                distribution_item.present_count = safe_int(row.get("present_count"))
+                distribution_item.missing_count = max(
+                    0,
+                    distribution_item.total_count - distribution_item.present_count,
+                )
+                distribution_item.values.append(
+                    AgentSpanGroupDistributionValue(
+                        value=safe_str(row.get("value")),
+                        count=safe_int(row.get("count")),
+                    )
+                )
+
+        for item in items.values():
+            if item.values:
+                top_count = sum(value.count for value in item.values)
+                item.other_count = max(0, item.present_count - top_count)
 
     # ------------------------------------------------------------------
     # AMT-backed agents queries

@@ -18,6 +18,7 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
+    AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
     AgentSpansQueryReq,
@@ -42,6 +43,8 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_chat_turns_count_query,
     make_custom_attrs_schema_query,
     make_message_search_query,
+    make_span_group_categorical_distributions_query,
+    make_span_group_numeric_distributions_query,
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
@@ -514,6 +517,7 @@ class TestMakeGroupedSpansListQuery:
 
         expected = """
             SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL},
                    count() AS spans,
                    countIf(((s.operation_name = {genai_3:String}))) AS tool_calls,
                    avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS avg_score
@@ -524,6 +528,7 @@ class TestMakeGroupedSpansListQuery:
             ORDER BY avg_score desc
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
         """
+        expected = expected.replace("{_GROUPED_AGG_TAIL}", _GROUPED_AGG_TAIL)
         expected_params = {
             "genai_0": "p1",
             "genai_1": 100,
@@ -578,6 +583,7 @@ class TestMakeGroupedSpansListQuery:
 
         expected = """
             SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL},
                    countIf((mapContains(s.custom_attrs_bool, {genai_3:String})) AND s.custom_attrs_bool[{genai_3:String}] = 1) AS flagged_count
             FROM spans s
             WHERE s.project_id = {genai_0:String}
@@ -585,6 +591,7 @@ class TestMakeGroupedSpansListQuery:
             ORDER BY flagged_count DESC
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
         """
+        expected = expected.replace("{_GROUPED_AGG_TAIL}", _GROUPED_AGG_TAIL)
         expected_params = {
             "genai_0": "p1",
             "genai_1": 100,
@@ -592,6 +599,41 @@ class TestMakeGroupedSpansListQuery:
             "genai_3": "flagged",
         }
         assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_dynamic_measure_rejects_fixed_field_alias_collision(self) -> None:
+        with pytest.raises(
+            ValidationError,
+            match="measure aliases collide with grouped row fields: \\['span_count'\\]",
+        ):
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measures=[
+                    AgentSpanMeasureSpec(
+                        alias="span_count",
+                        aggregation="count",
+                    )
+                ],
+            )
+
+    def test_dynamic_measure_rejects_group_key_alias_collision(self) -> None:
+        with pytest.raises(
+            ValidationError,
+            match=(
+                "measure aliases collide with grouped row fields: "
+                "\\['conversation_id'\\]"
+            ),
+        ):
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measures=[
+                    AgentSpanMeasureSpec(
+                        alias="conversation_id",
+                        aggregation="count",
+                    )
+                ],
+            )
 
     def test_group_filter_rejects_mismatched_datetime_bound(self) -> None:
         pb = ParamBuilder("genai")
@@ -641,6 +683,204 @@ class TestMakeGroupedSpansListQuery:
                     ],
                 ),
             )
+
+
+# ============================================================================
+# make_span_group_*_distribution_query
+# ============================================================================
+
+
+class TestMakeSpanGroupDistributionQueries:
+    def test_numeric_distributions_query_batches_specs(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_span_group_numeric_distributions_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            ),
+            ["conv-a", None, 12],
+            [
+                AgentSpanGroupDistributionSpec(
+                    alias="score_distribution",
+                    value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+                    bins=4,
+                ),
+                AgentSpanGroupDistributionSpec(
+                    alias="latency_distribution",
+                    value=AgentSpanValueRef(source="custom_attrs_int", key="latency"),
+                    bins=3,
+                ),
+            ],
+        )
+
+        expected = """
+            WITH
+              value_rows AS (
+                SELECT group_key,
+                       alias,
+                       bins,
+                       value
+                FROM (
+                  SELECT toString(s.conversation_id) AS group_key,
+                         tupleElement(spec, 1) AS alias,
+                         tupleElement(spec, 4) AS bins,
+                         multiIf(tupleElement(spec, 2) = 'custom_attrs_int', toFloat64(s.custom_attrs_int[tupleElement(spec, 3)]), tupleElement(spec, 2) = 'custom_attrs_float', toFloat64(s.custom_attrs_float[tupleElement(spec, 3)]), NULL) AS value
+                  FROM spans s
+                  ARRAY JOIN array(tuple({genai_2:String}, {genai_3:String}, {genai_4:String}, {genai_5:UInt64}), tuple({genai_6:String}, {genai_7:String}, {genai_8:String}, {genai_9:UInt64})) AS spec
+                  WHERE s.project_id = {genai_0:String}
+                    AND toString(s.conversation_id) IN {genai_1:Array(String)}
+                    AND multiIf(tupleElement(spec, 2) = 'custom_attrs_int', mapContains(s.custom_attrs_int, tupleElement(spec, 3)), tupleElement(spec, 2) = 'custom_attrs_float', mapContains(s.custom_attrs_float, tupleElement(spec, 3)), false)
+                )
+                WHERE isNotNull(value)
+                  AND isFinite(value)
+              ),
+              bounds AS (
+                SELECT group_key,
+                       alias,
+                       bins,
+                       min(value) AS min_value,
+                       max(value) AS max_value,
+                       count() AS present_count
+                FROM value_rows
+                GROUP BY group_key, alias, bins
+              ),
+              all_buckets AS (
+                SELECT group_key,
+                       alias,
+                       bins,
+                       toUInt64(bucket_index) AS bucket_index
+                FROM bounds
+                ARRAY JOIN range(bins) AS bucket_index
+              ),
+              aggregated AS (
+                SELECT value_rows.group_key AS group_key,
+                       value_rows.alias AS alias,
+                       if(bounds.max_value = bounds.min_value, toUInt64(0), toUInt64(least(toFloat64(bounds.bins) - 1.0, floor((value_rows.value - bounds.min_value) / if(bounds.max_value > bounds.min_value, (bounds.max_value - bounds.min_value) / toFloat64(bounds.bins), 1.0))))) AS bucket_index,
+                       count() AS bin_count
+                FROM value_rows
+                INNER JOIN bounds
+                  ON value_rows.group_key = bounds.group_key
+                 AND value_rows.alias = bounds.alias
+                GROUP BY group_key, alias, bucket_index
+              )
+            SELECT bounds.group_key AS group_key,
+                   bounds.alias AS alias,
+                   all_buckets.bucket_index AS bucket_index,
+                   if(bounds.max_value = bounds.min_value, bounds.min_value, bounds.min_value + toFloat64(all_buckets.bucket_index) * if(bounds.max_value > bounds.min_value, (bounds.max_value - bounds.min_value) / toFloat64(bounds.bins), 1.0)) AS bucket_min,
+                   if(bounds.max_value = bounds.min_value, bounds.max_value, if(all_buckets.bucket_index = bounds.bins - toUInt64(1), bounds.max_value, bounds.min_value + toFloat64(all_buckets.bucket_index + 1) * if(bounds.max_value > bounds.min_value, (bounds.max_value - bounds.min_value) / toFloat64(bounds.bins), 1.0))) AS bucket_max,
+                   ifNull(aggregated.bin_count, 0) AS count,
+                   bounds.present_count AS present_count
+            FROM bounds
+            INNER JOIN all_buckets
+              ON all_buckets.group_key = bounds.group_key
+             AND all_buckets.alias = bounds.alias
+            LEFT JOIN aggregated
+              ON aggregated.group_key = bounds.group_key
+             AND aggregated.alias = bounds.alias
+             AND aggregated.bucket_index = all_buckets.bucket_index
+            WHERE bounds.present_count > 0
+              AND (
+                bounds.max_value > bounds.min_value
+                OR all_buckets.bucket_index = 0
+              )
+            ORDER BY group_key ASC, alias ASC, bucket_index ASC
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": ["conv-a", "", "12"],
+            "genai_2": "score_distribution",
+            "genai_3": "custom_attrs_float",
+            "genai_4": "score",
+            "genai_5": 4,
+            "genai_6": "latency_distribution",
+            "genai_7": "custom_attrs_int",
+            "genai_8": "latency",
+            "genai_9": 3,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_categorical_distributions_query_batches_specs(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_span_group_categorical_distributions_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            ),
+            ["conv-a"],
+            [
+                AgentSpanGroupDistributionSpec(
+                    alias="env_distribution",
+                    value=AgentSpanValueRef(source="custom_attrs_string", key="env"),
+                    top_n=2,
+                ),
+                AgentSpanGroupDistributionSpec(
+                    alias="cached_distribution",
+                    value=AgentSpanValueRef(source="custom_attrs_bool", key="cached"),
+                    top_n=2,
+                ),
+            ],
+        )
+
+        expected = """
+            WITH
+              value_counts AS (
+                SELECT group_key,
+                       alias,
+                       raw_value,
+                       top_n,
+                       count() AS value_count
+                FROM (
+                  SELECT toString(s.conversation_id) AS group_key,
+                         tupleElement(spec, 1) AS alias,
+                         tupleElement(spec, 4) AS top_n,
+                         multiIf(tupleElement(spec, 2) = 'custom_attrs_bool', if(s.custom_attrs_bool[tupleElement(spec, 3)] = 1, 'true', 'false'), tupleElement(spec, 2) = 'custom_attrs_string', toString(s.custom_attrs_string[tupleElement(spec, 3)]), '') AS raw_value
+                  FROM spans s
+                  ARRAY JOIN array(tuple({genai_2:String}, {genai_3:String}, {genai_4:String}, {genai_5:UInt64}), tuple({genai_6:String}, {genai_7:String}, {genai_8:String}, {genai_9:UInt64})) AS spec
+                  WHERE s.project_id = {genai_0:String}
+                    AND toString(s.conversation_id) IN {genai_1:Array(String)}
+                    AND multiIf(tupleElement(spec, 2) = 'custom_attrs_string', mapContains(s.custom_attrs_string, tupleElement(spec, 3)), tupleElement(spec, 2) = 'custom_attrs_bool', mapContains(s.custom_attrs_bool, tupleElement(spec, 3)), false)
+                )
+                GROUP BY group_key, alias, raw_value, top_n
+              ),
+              ranked AS (
+                SELECT group_key,
+                       alias,
+                       raw_value,
+                       top_n,
+                       value_count,
+                       sum(value_count) OVER (
+                         PARTITION BY group_key, alias
+                       ) AS present_count,
+                       row_number() OVER (
+                         PARTITION BY group_key, alias
+                         ORDER BY value_count DESC, raw_value ASC
+                       ) AS value_rank
+                FROM value_counts
+              )
+            SELECT group_key,
+                   alias,
+                   substring(raw_value, 1, 256) AS value,
+                   value_count AS count,
+                   present_count
+            FROM ranked
+            WHERE value_rank <= top_n
+            ORDER BY group_key ASC, alias ASC, count DESC, raw_value ASC
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": ["conv-a"],
+            "genai_2": "env_distribution",
+            "genai_3": "custom_attrs_string",
+            "genai_4": "env",
+            "genai_5": 2,
+            "genai_6": "cached_distribution",
+            "genai_7": "custom_attrs_bool",
+            "genai_8": "cached",
+            "genai_9": 2,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
 
 
 # ============================================================================
