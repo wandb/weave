@@ -199,9 +199,9 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                     len(self._pending_starts),
                     FLUSH_TIMEOUT_SECONDS,
                 )
-                for start_item in self._pending_starts.values():
+                while self._pending_starts:
+                    _, start_item = self._pending_starts.popitem()
                     self._queue_item(start_item)
-                self._pending_starts.clear()
 
             if self._pending_ends:
                 logger.warning(
@@ -210,9 +210,9 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                     len(self._pending_ends),
                     FLUSH_TIMEOUT_SECONDS,
                 )
-                for end_item in self._pending_ends.values():
+                while self._pending_ends:
+                    _, end_item = self._pending_ends.popitem()
                     self._queue_item(end_item)
-                self._pending_ends.clear()
 
             self._eager_call_ids.clear()
 
