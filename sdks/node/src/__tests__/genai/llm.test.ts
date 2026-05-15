@@ -90,4 +90,192 @@ describe('LLM (via Turn.llm)', () => {
       llmSpan.attributes[GEN_AI_ATTR.GEN_AI_USAGE_INPUT_TOKENS]
     ).toBeUndefined();
   });
+
+  // ---------------------------------------------------------------------------
+  // Enrichment surface
+  // ---------------------------------------------------------------------------
+
+  describe('enrichment', () => {
+    it('output(content) appends a new assistant message', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.output('Hello!');
+      llm.end();
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      expect(
+        JSON.parse(
+          llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES] as string
+        )
+      ).toEqual([{role: 'assistant', content: 'Hello!'}]);
+    });
+
+    it('each output() call adds its own assistant message', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.output('first').output('second');
+      llm.end();
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const messages = JSON.parse(
+        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES] as string
+      );
+      expect(messages).toEqual([
+        {role: 'assistant', content: 'first'},
+        {role: 'assistant', content: 'second'},
+      ]);
+    });
+
+    it('think(content) accumulates into the reasoning field', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.think('First, ').think('I need to check the weather.');
+      expect(llm.reasoning).toEqual({
+        content: 'First, I need to check the weather.',
+      });
+      llm.end();
+      turn.end();
+    });
+
+    it('end() folds reasoning into the last assistant message as a ReasoningPart', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.output('hello').think('thinking out loud');
+      llm.end();
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const messages = JSON.parse(
+        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES] as string
+      );
+      expect(messages).toHaveLength(1);
+      // output() produced {role:'assistant', content:'hello'}; end() promoted
+      // it to parts and appended the ReasoningPart.
+      expect(messages[0].parts).toEqual([
+        {type: 'text', content: 'hello'},
+        {type: 'reasoning', content: 'thinking out loud'},
+      ]);
+    });
+
+    it('attachMedia({content, mimeType, modality}) appends a blob part to the last input message', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.inputMessages = [{role: 'user', content: 'Listen to this:'}];
+      llm.attachMedia({
+        content: 'base64data',
+        mimeType: 'audio/mp3',
+        modality: 'audio',
+      });
+      llm.end();
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const messages = JSON.parse(
+        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
+      );
+      expect(messages).toHaveLength(1);
+      expect(messages[0].role).toBe('user');
+      expect(messages[0].parts).toEqual([
+        {type: 'text', content: 'Listen to this:'},
+        {
+          type: 'blob',
+          content: 'base64data',
+          mimeType: 'audio/mp3',
+          modality: 'audio',
+        },
+      ]);
+    });
+
+    it('attachMedia({uri, modality}) appends a uri part', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.attachMedia({uri: 'https://example.com/a.png', modality: 'image'});
+      llm.end();
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const messages = JSON.parse(
+        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
+      );
+      expect(messages[0].parts).toEqual([
+        {type: 'uri', uri: 'https://example.com/a.png', modality: 'image'},
+      ]);
+    });
+
+    it('attachMedia({fileId, modality, mimeType}) appends a file part', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.attachMedia({
+        fileId: 'f-123',
+        modality: 'document',
+        mimeType: 'application/pdf',
+      });
+      llm.end();
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const messages = JSON.parse(
+        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
+      );
+      expect(messages[0].parts).toEqual([
+        {
+          type: 'file',
+          fileId: 'f-123',
+          modality: 'document',
+          mimeType: 'application/pdf',
+        },
+      ]);
+    });
+
+    it('attachMediaUrl(url, opts) delegates to the uri form', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.attachMediaUrl('https://example.com/v.mp4', {modality: 'video'});
+      llm.end();
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const messages = JSON.parse(
+        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
+      );
+      expect(messages[0].parts).toEqual([
+        {type: 'uri', uri: 'https://example.com/v.mp4', modality: 'video'},
+      ]);
+    });
+
+    it('record(opts) replaces the data fields', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.inputMessages = [{role: 'user', content: 'will be replaced'}];
+      llm.record({
+        inputMessages: [{role: 'user', content: 'hi'}],
+        outputMessages: [{role: 'assistant', content: 'hello'}],
+        usage: {inputTokens: 7, outputTokens: 3},
+        reasoning: {content: 'thinking'},
+      });
+      expect(llm.inputMessages).toEqual([{role: 'user', content: 'hi'}]);
+      expect(llm.outputMessages).toEqual([
+        {role: 'assistant', content: 'hello'},
+      ]);
+      expect(llm.usage).toEqual({inputTokens: 7, outputTokens: 3});
+      expect(llm.reasoning).toEqual({content: 'thinking'});
+      llm.end();
+      turn.end();
+    });
+
+    it('chains: output / think / attachMedia / record all return `this`', () => {
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      const result = llm
+        .output('hi')
+        .think('thoughts')
+        .attachMediaUrl('https://example.com/a.png', {modality: 'image'})
+        .record({usage: {inputTokens: 1}});
+      expect(result).toBe(llm);
+      llm.end();
+      turn.end();
+    });
+  });
 });
