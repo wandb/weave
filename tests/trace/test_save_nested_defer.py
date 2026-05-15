@@ -248,6 +248,78 @@ def test_call_end_error_is_logged(
     ), f"Expected 'Task failed' log with our error; got: {messages}"
 
 
+class _ObjCreateRaisingServer:
+    """Server proxy that raises `RuntimeError` from `obj_create`.
+
+    Same forwarding pattern as `_CallEndRaisingServer`: plain class so
+    `__getattr__` reaches the inner server for every other method.
+    """
+
+    def __init__(self, inner: tsi.TraceServerInterface) -> None:
+        self._inner = inner
+
+    def __getattr__(self, item: str) -> Any:
+        return getattr(self._inner, item)
+
+    def obj_create(self, *args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("simulated obj_create failure")
+
+
+@pytest.mark.disable_logging_error_check
+def test_obj_create_error_does_not_hang_flush(
+    client: WeaveClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """An `obj_create` failure inside the deferred output-save path must not
+    hang `_flush()` and must surface as a logged error.
+
+    The deferred `schedule_send` walks the output, calls `_save_object_basic`
+    on any nested `weave.Object` (which schedules `obj_create` on the
+    executor), then gates `finalize_send` on the resulting digest futures via
+    `then(pending, ...)`. If a pending digest future fails, `finalize_send`
+    is never invoked. The barrier future (`end_complete_future`) must still
+    resolve (with the underlying exception) so that `flush` returns and the
+    error reaches `_track_future`'s logger.
+    """
+
+    class Out(weave.Object):  # type: ignore[name-defined]
+        x: int = 0
+
+    @weave.op
+    def f() -> Out:
+        return Out(x=1)
+
+    original = client.server
+    client.server = _ObjCreateRaisingServer(original)
+
+    flush_done = threading.Event()
+    flush_error: dict[str, BaseException] = {}
+
+    def do_flush() -> None:
+        try:
+            client._flush()
+        except BaseException as e:
+            flush_error["err"] = e
+        finally:
+            flush_done.set()
+
+    try:
+        with caplog.at_level(logging.ERROR):
+            f()
+            flush_thread = threading.Thread(target=do_flush, daemon=True)
+            flush_thread.start()
+            assert flush_done.wait(timeout=10.0), (
+                "_flush hung after obj_create failure (deferred barrier never resolved)"
+            )
+    finally:
+        client.server = original
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert any(
+        "Task failed" in m and "simulated obj_create failure" in m for m in messages
+    ), f"Expected 'Task failed' log with obj_create error; got: {messages}"
+
+
 def test_finish_call_returns_before_send(client: WeaveClient) -> None:
     """`finish_call` should not block on the deferred work.
 
