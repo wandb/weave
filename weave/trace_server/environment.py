@@ -165,6 +165,11 @@ def wf_scoring_worker_remote_scorer_bearer_token() -> str | None:
 
 
 DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS = 30.0
+REMOTE_SCORER_ALLOWED_HOSTS_ENV = "WF_SCORING_WORKER_REMOTE_SCORER_ALLOWED_HOSTS"
+REMOTE_SCORER_VALIDATE_HOSTS_ENV = "WF_SCORING_WORKER_REMOTE_SCORER_VALIDATE_HOSTS"
+REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV = (
+    "WF_SCORING_WORKER_REMOTE_SCORER_ALLOW_INSECURE_HTTP"
+)
 
 
 def wf_scoring_worker_remote_scorer_enabled() -> bool:
@@ -193,6 +198,40 @@ def wf_scoring_worker_remote_scorer_http_timeout_seconds() -> float:
     except ValueError:
         return DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
     return value if value > 0 else DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+
+
+def wf_scoring_worker_remote_scorer_allowed_hosts() -> list[str]:
+    """Hosts allowed for outbound remote scorer HTTP requests.
+
+    Values are comma-separated exact ``host``, ``host:port``, or URL origin
+    entries. Empty and whitespace-only entries are ignored. The worker fails
+    closed when this list is empty and remote scoring attempts to make an
+    outbound request.
+    """
+    raw = os.environ.get(REMOTE_SCORER_ALLOWED_HOSTS_ENV)
+    if raw is None:
+        return []
+    return [entry.strip() for entry in raw.split(",") if entry.strip()]
+
+
+def wf_scoring_worker_remote_scorer_validate_hosts() -> bool:
+    """Whether the worker enforces remote scorer host allowlist validation.
+
+    Defaults to true. Set to ``false`` only for controlled development or
+    emergency operational bypasses; HTTPS policy still applies independently.
+    """
+    return os.environ.get(REMOTE_SCORER_VALIDATE_HOSTS_ENV, "true").lower() != "false"
+
+
+def wf_scoring_worker_remote_scorer_allow_insecure_http() -> bool:
+    """Whether remote scorer URLs may use insecure ``http``.
+
+    This is intended as an explicit operator waiver for local/dev testing. The
+    worker still applies the host allowlist when this is enabled.
+    """
+    return (
+        os.environ.get(REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV, "false").lower() == "true"
+    )
 
 
 # Clickhouse Settings
