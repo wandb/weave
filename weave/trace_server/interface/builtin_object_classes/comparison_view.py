@@ -13,8 +13,8 @@ class ComparisonViewDefinition(BaseModel):
     """Definition of a comparison view's configuration.
 
     Args:
-        evaluation_call_ids (List[str]): List of evaluation call IDs being compared.
-        selected_metrics (Optional[List[str]]): List of metrics that are visible in plots.
+        evaluation_call_ids (list[str]): List of evaluation call IDs being compared.
+        selected_metrics (list[str] | None): List of metrics that are visible in plots.
 
     Examples:
         >>> definition = ComparisonViewDefinition(

@@ -138,7 +138,7 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
         model_name (str): The HuggingFace model name/ID.
 
     Returns:
-        Dict[str, Any]: Dictionary containing filtered HuggingFace model information.
+        dict[str, Any]: Dictionary containing filtered HuggingFace model information.
     """
     d = _fetch_hf_model_json(model_name)
     if d is None:

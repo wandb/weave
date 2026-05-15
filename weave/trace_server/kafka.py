@@ -236,7 +236,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
 
     Args:
         group_id (str): The group ID for the consumer.
-        additional_kafka_config (Optional[dict[str, Any]]): Additional Kafka configuration to pass to the consumer.
+        additional_kafka_config (dict[str, Any] | None): Additional Kafka configuration to pass to the consumer.
     """
 
     @classmethod

@@ -409,7 +409,7 @@ def wf_file_storage_project_allow_list() -> list[str] | None:
     """Get the list of project IDs allowed to use file storage.
 
     Returns:
-        Optional[list[str]]: A list of project IDs that are allowed to use file storage.
+        list[str] | None: A list of project IDs that are allowed to use file storage.
             Returns None if no allow list is configured.
 
     Raises:
@@ -478,7 +478,7 @@ def wf_file_storage_project_ramp_pct() -> int | None:
     """The percentage of projects that should use file storage (0-100).
 
     Returns:
-        Optional[int]: The percentage of projects that should use file storage.
+        int | None: The percentage of projects that should use file storage.
             Returns None if not configured.
 
     Raises:
