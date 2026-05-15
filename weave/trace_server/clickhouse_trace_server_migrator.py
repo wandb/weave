@@ -112,10 +112,13 @@ from weave.trace_server.migration_lock import (
 logger = logging.getLogger(__name__)
 
 # Retry configuration for transient ClickHouse errors during migrations.
-# Error 517 (CANNOT_ASSIGN_ALTER) occurs when a replica hasn't caught up with
-# the latest ALTER metadata — common on multi-replica managed ClickHouse clusters
-# when sequential DDL statements run faster than replication can propagate.
-_TRANSIENT_CH_ERROR_CODES = {517}
+# 517 (CANNOT_ASSIGN_ALTER): a replica hasn't caught up with the latest ALTER
+#   metadata. Common on multi-replica managed ClickHouse when sequential DDL
+#   runs faster than replication can propagate.
+# 999 (KEEPER_EXCEPTION): Keeper coordination error (e.g. "Connection loss"
+#   on /clickhouse/task_queue/ddl). Distributed DDL via ON CLUSTER goes through
+#   Keeper's task queue, which can briefly drop the connection under load.
+_TRANSIENT_CH_ERROR_CODES = {517, 999}
 _MAX_RETRIES = 3
 _RETRY_MAX_WAIT_SECONDS = 8
 _COMMAND_PREVIEW_LENGTH = 100
@@ -507,9 +510,10 @@ class BaseClickHouseTraceServerMigrator(ABC):
     def _run_ddl_with_retry(self, command: str) -> None:
         """Execute a DDL command with retry for transient replication errors.
 
-        On multi-replica clusters, sequential DDL can outpace metadata replication
-        causing error 517 (CANNOT_ASSIGN_ALTER). This retries with exponential
-        backoff for those known-transient codes.
+        Retries with exponential backoff for known-transient codes:
+        517 (CANNOT_ASSIGN_ALTER) when replicas lag the latest ALTER metadata,
+        and 999 (KEEPER_EXCEPTION) when ON CLUSTER DDL hits a transient Keeper
+        coordination error.
         """
         self.ch_client.command(command)
 

@@ -1189,6 +1189,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_spans_stats, req, req.project_id
         )
 
+    def agent_custom_attrs_schema(
+        self, req: tsi.agent_types.AgentCustomAttrsSchemaReq
+    ) -> tsi.agent_types.AgentCustomAttrsSchemaRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_custom_attrs_schema,
+            req,
+            req.project_id,
+        )
+
     def agent_agents_query(
         self, req: tsi.agent_types.AgentsQueryReq
     ) -> tsi.agent_types.AgentsQueryRes:

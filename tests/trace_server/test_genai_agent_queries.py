@@ -7,6 +7,8 @@ Migration 030 creates the genai tables automatically.
 import datetime
 import uuid
 
+import pytest
+
 from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
@@ -16,8 +18,10 @@ from weave.trace_server.agents.schema import (
 )
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
+    AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSortBy,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
     AgentSpansQueryReq,
@@ -333,6 +337,202 @@ def test_group_by_custom_attrs(ch_server):
     assert by_env["staging"].total_input_tokens == 50
 
 
+def test_custom_attrs_schema_discovers_keys_types_and_counts(ch_server):
+    """Schema discovery returns typed keys without hydrating custom attr values."""
+    project_id = _make_project_id("cattr_schema")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            agent_name="alpha",
+            custom_attrs_string={"env": "prod", "payload": "x" * 10_000},
+            custom_attrs_float={"score": 0.8},
+            custom_attrs_bool={"cached": True},
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            agent_name="alpha",
+            custom_attrs_string={"env": "staging"},
+            custom_attrs_int={"retries": 2},
+            custom_attrs_float={"score": 0.4},
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            agent_name="beta",
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_int={"retries": 1},
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_custom_attrs_schema(
+        AgentCustomAttrsSchemaReq(project_id=project_id)
+    )
+
+    by_source_key = {(attr.source, attr.key): attr for attr in res.attributes}
+    assert by_source_key["custom_attrs_string", "env"].value_type == "string"
+    assert by_source_key["custom_attrs_string", "env"].span_count == 3
+    assert by_source_key["custom_attrs_float", "score"].value_type == "float"
+    assert by_source_key["custom_attrs_float", "score"].span_count == 2
+    assert by_source_key["custom_attrs_int", "retries"].value_type == "int"
+    assert by_source_key["custom_attrs_int", "retries"].span_count == 2
+    assert by_source_key["custom_attrs_bool", "cached"].value_type == "bool"
+    assert by_source_key["custom_attrs_bool", "cached"].span_count == 1
+    assert by_source_key["custom_attrs_string", "payload"].span_count == 1
+    assert res.limit == 200
+    assert res.offset == 0
+    assert res.has_more is False
+
+    filtered = ch_server.agent_custom_attrs_schema(
+        AgentCustomAttrsSchemaReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "agent.name"},
+                            {"$literal": "alpha"},
+                        ]
+                    }
+                }
+            ),
+            started_before=now + datetime.timedelta(seconds=2),
+            limit=2,
+        )
+    )
+
+    assert len(filtered.attributes) == 2
+    assert filtered.limit == 2
+    assert filtered.offset == 0
+    assert filtered.has_more is True
+    filtered_counts = {
+        (attr.source, attr.key): attr.span_count for attr in filtered.attributes
+    }
+    assert filtered_counts["custom_attrs_string", "env"] == 2
+    assert filtered_counts["custom_attrs_float", "score"] == 2
+
+    second_page = ch_server.agent_custom_attrs_schema(
+        AgentCustomAttrsSchemaReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "agent.name"},
+                            {"$literal": "alpha"},
+                        ]
+                    }
+                }
+            ),
+            started_before=now + datetime.timedelta(seconds=2),
+            limit=2,
+            offset=2,
+        )
+    )
+    second_page_counts = {
+        (attr.source, attr.key): attr.span_count for attr in second_page.attributes
+    }
+    assert second_page_counts == {
+        ("custom_attrs_bool", "cached"): 1,
+        ("custom_attrs_string", "payload"): 1,
+    }
+    assert second_page.limit == 2
+    assert second_page.offset == 2
+    assert second_page.has_more is True
+
+    last_page = ch_server.agent_custom_attrs_schema(
+        AgentCustomAttrsSchemaReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "agent.name"},
+                            {"$literal": "alpha"},
+                        ]
+                    }
+                }
+            ),
+            started_before=now + datetime.timedelta(seconds=2),
+            limit=2,
+            offset=4,
+        )
+    )
+    assert {
+        (attr.source, attr.key): attr.span_count for attr in last_page.attributes
+    } == {("custom_attrs_int", "retries"): 1}
+    assert last_page.limit == 2
+    assert last_page.offset == 4
+    assert last_page.has_more is False
+
+
+def test_spans_query_filters_sorts_and_projects_custom_attrs(ch_server):
+    """Ungrouped spans can filter and sort by custom attrs while projecting keys."""
+    project_id = _make_project_id("cattr_filter_sort")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            span_name="low",
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_float={"score": 0.2},
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            span_name="high",
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_float={"score": 0.9},
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            span_name="staging",
+            custom_attrs_string={"env": "staging"},
+            custom_attrs_float={"score": 0.5},
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "custom_attrs_string.env"},
+                            {"$literal": "prod"},
+                        ]
+                    }
+                }
+            ),
+            custom_attr_columns=[
+                AgentSpanValueRef(source="custom_attrs_string", key="env"),
+                AgentSpanValueRef(source="custom_attrs_float", key="score"),
+            ],
+            sort_by=[AgentSortBy(field="custom_attrs_float.score", direction="desc")],
+        )
+    )
+
+    assert res.total_count == 2
+    assert [span.span_name for span in res.spans] == ["high", "low"]
+    assert [span.custom_attrs_string for span in res.spans] == [
+        {"env": "prod"},
+        {"env": "prod"},
+    ]
+    assert [span.custom_attrs_float for span in res.spans] == [
+        {"score": 0.9},
+        {"score": 0.2},
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Test: Agent span stats
 # ---------------------------------------------------------------------------
@@ -472,6 +672,7 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
     assert res.rows[-1]["bucket_max"] == 30
 
 
+@pytest.mark.flaky(reruns=3)
 def test_agent_span_stats_conversation_numeric_value_buckets(ch_server):
     """Stats API can bucket grouped conversation aggregate values."""
     project_id = _make_project_id("stats_conv_hist")

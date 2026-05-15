@@ -1,12 +1,15 @@
 """Redis client for weave trace server."""
 
 import functools
+import logging
 from urllib.parse import parse_qs, urlparse
 
 import redis
 from redis.sentinel import Sentinel
 
 from weave.trace_server.environment import redis_url
+
+logger = logging.getLogger(__name__)
 
 # Redis here is an optional L2 cache in front of ClickHouse. When it's
 # unreachable we must fall through quickly; without explicit timeouts the
@@ -21,7 +24,12 @@ REDIS_SOCKET_TIMEOUT_SECS = 1
 def get_redis_client() -> redis.Redis | None:
     """Get the Redis client.
 
-    Returns None if Redis is not configured (WEAVE_REDIS_URL not set).
+    Returns None if Redis is not configured (WEAVE_REDIS_URL not set) or
+    if the URL is malformed in any way that prevents client construction.
+    Callers already treat the L2 cache as optional, so a construction
+    failure must fall through to ClickHouse-only rather than 500 every
+    request. The lru_cache means the None is also cached, so a misconfig
+    won't re-parse on every request until the process restarts.
 
     If the URL includes `?master=<name>`, the client is resolved via Redis
     Sentinel at the URL's host:port so writes always route to the current
@@ -32,27 +40,36 @@ def get_redis_client() -> redis.Redis | None:
     if not url:
         return None
 
-    parsed = urlparse(url)
-    master = parse_qs(parsed.query).get("master", [None])[0]
-    if not master:
-        return redis.from_url(
-            url,
+    try:
+        parsed = urlparse(url)
+        master = parse_qs(parsed.query).get("master", [None])[0]
+        if not master:
+            return redis.from_url(
+                url,
+                decode_responses=True,
+                socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
+                socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
+            )
+
+        if not parsed.hostname:
+            raise ValueError(f"WEAVE_REDIS_URL is missing a hostname: {url!r}")
+
+        sentinel = Sentinel(
+            [(parsed.hostname, parsed.port or 26379)],
+            socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
+            socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
+        )
+        return sentinel.master_for(
+            master,
             decode_responses=True,
             socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
             socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
         )
-
-    if not parsed.hostname:
-        raise ValueError(f"WEAVE_REDIS_URL is missing a hostname: {url!r}")
-
-    sentinel = Sentinel(
-        [(parsed.hostname, parsed.port or 26379)],
-        socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
-        socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
-    )
-    return sentinel.master_for(
-        master,
-        decode_responses=True,
-        socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
-        socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
-    )
+    except Exception:
+        # Construction failures (malformed URL, unresolvable sentinel, etc.)
+        # must not take down request handling. Log once and disable L2.
+        logger.exception(
+            "Failed to construct Redis client from WEAVE_REDIS_URL; "
+            "falling through to ClickHouse-only (no L2 cache)"
+        )
+        return None

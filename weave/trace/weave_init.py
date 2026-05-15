@@ -159,6 +159,13 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
         }
     )
     exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
+    # Honor WEAVE_INSECURE_DISABLE_SSL for the OTel exporter too, so
+    # dev environments with self-signed certs can export spans.
+    # OTLPSpanExporter passes _certificate_file to requests.post(verify=...),
+    # but its constructor uses `certificate_file or <env_default>` which
+    # treats False as falsy, so we set it directly after construction.
+    if not env.ssl_verify():
+        exporter._certificate_file = False
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)

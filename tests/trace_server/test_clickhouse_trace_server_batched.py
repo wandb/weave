@@ -12,11 +12,16 @@ import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from tests.trace_server.test_project_version import make_project_id
+from weave.trace_server import ch_sentinel_values
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
-from weave.trace_server.clickhouse.schema_converters import ch_call_to_row
+from weave.trace_server.clickhouse.schema_converters import (
+    ch_call_to_row,
+    ch_complete_call_to_row,
+)
 from weave.trace_server.clickhouse_schema import (
+    ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
     CallCompleteCHInsertable,
     CallStartCHInsertable,
@@ -241,6 +246,61 @@ def test_ch_call_to_row_sentinelizes_expire_at_for_v1_insert_paths():
     explicit_expire = datetime(2025, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
     start_with_ttl = start.model_copy(update={"expire_at": explicit_expire})
     assert ch_call_to_row(start_with_ttl)[expire_at_idx] == explicit_expire
+
+
+def test_ch_row_helpers_match_model_dump_baseline():
+    """ch_call_to_row / ch_complete_call_to_row read fields via getattr instead of
+    model_dump() to skip per-insert dict allocation. The row contents must stay
+    byte-for-byte identical to the previous model_dump-based implementation.
+    """
+    started_at = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    project_id = base64.b64encode(b"test_project").decode("ascii")
+    explicit_expire = datetime(2025, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    start = CallStartCHInsertable(
+        project_id=project_id,
+        id="0193f7a5-1234-7000-8000-000000000010",
+        trace_id="0193f7a5-1234-7000-8000-000000000011",
+        op_name="test_op",
+        display_name="display",
+        started_at=started_at,
+        attributes_dump="{}",
+        inputs_dump="{}",
+        input_refs=[f"weave-trace-internal:///{project_id}/object/name:digest"],
+        output_refs=[],
+        wb_user_id="dXNlci1pZA==",
+        wb_run_id="dXNlci1pZA==:run",
+        wb_run_step=1,
+    )
+    start_with_ttl = start.model_copy(update={"expire_at": explicit_expire})
+    complete = CallCompleteCHInsertable(
+        project_id=project_id,
+        id="0193f7a5-1234-7000-8000-000000000012",
+        trace_id="0193f7a5-1234-7000-8000-000000000013",
+        op_name="test_op",
+        started_at=started_at,
+        ended_at=started_at,
+        attributes_dump="{}",
+        inputs_dump="{}",
+        output_dump="null",
+        summary_dump="{}",
+    )
+
+    for call in (start, start_with_ttl, complete):
+        dumped = call.model_dump()
+        expected = [
+            ch_sentinel_values.to_ch_value(col, dumped.get(col))
+            if col in ch_sentinel_values.SENTINEL_IN_CALLS_MERGED_FIELDS
+            else dumped.get(col)
+            for col in ALL_CALL_INSERT_COLUMNS
+        ]
+        assert ch_call_to_row(call) == expected
+
+    expected_complete = [
+        ch_sentinel_values.to_ch_value(col, complete.model_dump().get(col))
+        for col in ALL_CALL_COMPLETE_INSERT_COLUMNS
+    ]
+    assert ch_complete_call_to_row(complete) == expected_complete
 
 
 def test_clickhouse_distributed_mode_properties():

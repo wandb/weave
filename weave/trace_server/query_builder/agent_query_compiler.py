@@ -34,6 +34,9 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     python_value_to_ch_type,
 )
+from weave.trace_server.query_builder.agent_custom_attrs import (
+    custom_attr_value_or_null,
+)
 
 # Span columns queryable by their literal column name without a corresponding
 # semconv key: OTel-core span identity and W&B plumbing. Columns that are the
@@ -286,7 +289,7 @@ def _resolve_field(
                     f"empty key after {prefix!r} in field name {name!r}"
                 )
             key_slot = pb.add(key, param_type="String")
-            return f"{alias}.{map_col}[{key_slot}]"
+            return custom_attr_value_or_null(alias, map_col, key_slot)
 
     # (3b) Unprefixed custom attr — pick map from sibling literal type
     if sibling_hint is None:
@@ -304,7 +307,7 @@ def _resolve_field(
             f"{sibling_hint.__name__} has no custom attribute map."
         )
     key_slot = pb.add(name, param_type="String")
-    return f"{alias}.{inferred_map}[{key_slot}]"
+    return custom_attr_value_or_null(alias, inferred_map, key_slot)
 
 
 # ---------------------------------------------------------------------------

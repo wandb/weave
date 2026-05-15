@@ -62,6 +62,8 @@ from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
+    AgentCustomAttrsSchemaReq,
+    AgentCustomAttrsSchemaRes,
     AgentSearchReq,
     AgentSearchRes,
     AgentSpansQueryReq,
@@ -600,52 +602,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
-        calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-        ] = []
-        rejected_spans = 0
-        error_messages: list[str] = []
-        for processed_span in req.processed_spans:
-            # Extract wb_run_id from the processed span
-            wb_run_id = processed_span.run_id
-
-            if not isinstance(processed_span.resource_spans, ResourceSpans):
-                raise TypeError(
-                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
-                )
-
-            proto_resource_spans = processed_span.resource_spans
-            resource = Resource.from_proto(proto_resource_spans.resource)
-            for proto_scope_spans in proto_resource_spans.scope_spans:
-                for proto_span in proto_scope_spans.spans:
-                    try:
-                        span = Span.from_proto(proto_span, resource)
-                    except AttributePathConflictError as e:
-                        # Record and skip malformed spans so we can partially accept the batch
-                        rejected_spans += 1
-                        # Use data available on the proto span for context
-                        try:
-                            trace_id = proto_span.trace_id.hex()
-                            span_id = proto_span.span_id.hex()
-                            name = getattr(proto_span, "name", "")
-                        except Exception:
-                            trace_id = ""
-                            span_id = ""
-                            name = ""
-                        span_ident = (
-                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
-                        )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
-                        continue
-
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
-                    )
-
+        calls, rejected_spans, error_messages = self._otel_proto_to_calls(req)
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
 
         obj_id_idx_map = defaultdict(list)
@@ -715,29 +672,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Convert and insert based on write target. All calls in the batch
         # share req.project_id, so we resolve retention once.
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
+        rows = self._otel_build_rows(calls, retention_days, write_target)
         if write_target == WriteTarget.CALLS_COMPLETE:
-            rows = [
-                ch_complete_call_to_row(
-                    start_end_calls_to_ch_complete_insertable(
-                        start, end, retention_days
-                    )
-                )
-                for start, end in calls
-            ]
             self._insert_call_complete_batch(rows)
         else:
-            rows = []
-            for start, end in calls:
-                rows.append(
-                    ch_call_to_row(
-                        start_call_for_insert_to_ch_insertable(start, retention_days)
-                    )
-                )
-                rows.append(
-                    ch_call_to_row(
-                        end_call_for_insert_to_ch_insertable(end, retention_days)
-                    )
-                )
             self._insert_call_batch(rows)
 
         # Run callbacks and flush
@@ -757,6 +695,99 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
             )
         return tsi.OTelExportRes()
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.otel_export.proto_to_calls"
+    )
+    def _otel_proto_to_calls(
+        self, req: tsi.OTelExportReq
+    ) -> tuple[
+        list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
+        int,
+        list[str],
+    ]:
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ] = []
+        rejected_spans = 0
+        error_messages: list[str] = []
+        for processed_span in req.processed_spans:
+            # Extract wb_run_id from the processed span
+            wb_run_id = processed_span.run_id
+
+            if not isinstance(processed_span.resource_spans, ResourceSpans):
+                raise TypeError(
+                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
+                )
+
+            proto_resource_spans = processed_span.resource_spans
+            resource = Resource.from_proto(proto_resource_spans.resource)
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                    except AttributePathConflictError as e:
+                        # Record and skip malformed spans so we can partially accept the batch
+                        rejected_spans += 1
+                        # Use data available on the proto span for context
+                        try:
+                            trace_id = proto_span.trace_id.hex()
+                            span_id = proto_span.span_id.hex()
+                            name = getattr(proto_span, "name", "")
+                        except Exception:
+                            trace_id = ""
+                            span_id = ""
+                            name = ""
+                        span_ident = (
+                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
+
+                    calls.append(
+                        span.to_call(
+                            req.project_id,
+                            wb_user_id=req.wb_user_id,
+                            wb_run_id=wb_run_id,
+                        )
+                    )
+
+        set_current_span_dd_tags({"call_count": len(calls)})
+        return calls, rejected_spans, error_messages
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export.build_rows")
+    def _otel_build_rows(
+        self,
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ],
+        retention_days: int,
+        write_target: WriteTarget,
+    ) -> list:
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            rows = [
+                ch_complete_call_to_row(
+                    start_end_calls_to_ch_complete_insertable(
+                        start, end, retention_days
+                    )
+                )
+                for start, end in calls
+            ]
+        else:
+            rows = []
+            for start, end in calls:
+                rows.append(
+                    ch_call_to_row(
+                        start_call_for_insert_to_ch_insertable(start, retention_days)
+                    )
+                )
+                rows.append(
+                    ch_call_to_row(
+                        end_call_for_insert_to_ch_insertable(end, retention_days)
+                    )
+                )
+        set_current_span_dd_tags({"row_count": len(rows)})
+        return rows
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
@@ -1977,6 +2008,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._enrich_objs_with_tags_and_aliases(req.project_id, [obj_schema])
         return tsi.ObjReadRes(obj=obj_schema)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.objs_query")
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         if req.filter:
@@ -6673,6 +6705,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
         return AgentQueryHandler(self._query, self.feedback_query).spans_stats(req)
+
+    def agent_custom_attrs_schema(
+        self, req: AgentCustomAttrsSchemaReq
+    ) -> AgentCustomAttrsSchemaRes:
+        return AgentQueryHandler(self._query, self.feedback_query).custom_attrs_schema(
+            req
+        )
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         return AgentQueryHandler(self._query, self.feedback_query).agents_query(req)
