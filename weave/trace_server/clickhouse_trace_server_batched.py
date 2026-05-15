@@ -5833,9 +5833,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _insert_file_chunks(
         self, file_chunks: list[FileChunkCreateCHInsertable]
     ) -> None:
-        # No tracer span: in batched mode this is just a list-append, and in
-        # flush-immediately mode the work is captured by the child ``_insert``
-        # span on the same ClickHouse call.
         if not self._flush_immediately:
             self._file_batch.extend(file_chunks)
             return

@@ -57,12 +57,8 @@ def get_project_retention_days(
     (argMax). A fall-through to ClickHouse is a full cache miss; if ClickHouse
     has no row for the project, returns RETENTION_DAYS_NO_TTL.
 
-    Only the cache-miss path is wrapped in a tracer span. L1 hits (the vast
-    majority of calls on the hot path) tag the parent span and return, to keep
-    Datadog span volume down.
-
     Redis client is resolved lazily via get_redis_client() (lru_cached
-    process singleton). ch_client must come from the calling thread, it is
+    process singleton). ch_client must come from the calling thread — it is
     a thread-local resource in ClickHouseTraceServer.
     """
     cached = _l1_get(project_id)
