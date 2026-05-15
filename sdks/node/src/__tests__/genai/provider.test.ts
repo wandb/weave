@@ -7,7 +7,11 @@ import {
 import {setGlobalClient} from '../../clientApi';
 import {Api as TraceServerApi} from '../../generated/traceServerApi';
 import {flushWeaveOTel} from '../../genai/flush';
-import {getWeaveTracer, getWeaveTracerProvider} from '../../genai/provider';
+import {
+  getWeaveTracer,
+  getWeaveTracerProvider,
+  PROVIDER_HOLDER_SYMBOL_NAME,
+} from '../../genai/provider';
 import {WEAVE_RESOURCE_ATTR} from '../../genai/weaveResource';
 import {Settings, type SettingsInit} from '../../settings';
 import {packageVersion} from '../../utils/packageVersion';
@@ -37,16 +41,13 @@ function clearGlobalClient(): void {
   // setGlobalClient is typed for a real client, but the underlying holder
   // accepts null. Tests need this to exercise the "weave.init() not called"
   // branch.
-  setGlobalClient(null as unknown as WeaveClient);
+  setGlobalClient(null);
 }
 
 // Reach into the global singleton's holder directly to reset its state.
-// The symbol key must match the one passed to `globalSingleton` in
-// `src/genai/provider.ts`; if that key changes, this string changes too.
-const PROVIDER_HOLDER_SYMBOL = Symbol.for('_weave_genai_provider');
 function resetProviderSingleton(): void {
   const holder = (globalThis as Record<symbol, unknown>)[
-    PROVIDER_HOLDER_SYMBOL
+    Symbol.for(PROVIDER_HOLDER_SYMBOL_NAME)
   ] as {provider: unknown; beforeExitRegistered: boolean} | undefined;
   if (holder) {
     holder.provider = null;
