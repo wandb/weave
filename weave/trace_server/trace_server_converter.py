@@ -107,26 +107,21 @@ def universal_ext_to_int_ref_converter(
 
 
 C = TypeVar("C")
-D = TypeVar("D")
 
 
-def universal_int_to_ext_ref_converter(
-    obj: C,
+def make_int_to_ext_ref_mapper(
     convert_int_to_ext_project_id: Callable[[str], str | None],
-) -> C:
-    """Takes any object and recursively replaces all internal references with
-    external references. The internal references are expected to be in the
-    format of `weave-trace-internal:///project_id/...` and the external references are
-    expected to be in the format of `weave:///entity/project/...`.
+) -> Callable[[Any], Any]:
+    """Build a reusable internal-to-external ref mapper.
 
-    Args:
-        obj: The object to convert.
-        convert_int_to_ext_project_id: A function that takes an internal
-            project ID and returns the external project ID.
+    The returned callable rewrites a single object's internal refs to
+    external refs. It carries an `int_to_ext_project_cache` scoped to its
+    own closure, so applying the same mapper to a sequence of objects
+    reuses that cache across every call. Use this for streaming paths
+    where the same converter is applied to many items in a row.
 
-    Returns:
-        The object with all internal references replaced with external
-        references.
+    For one-shot conversions, prefer `universal_int_to_ext_ref_converter`,
+    which is a thin wrapper that builds and applies a mapper in one call.
     """
     int_to_ext_project_cache: dict[str, str | None] = {}
 
@@ -147,10 +142,10 @@ def universal_int_to_ext_ref_converter(
             return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
         return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
 
-    def mapper(obj: D) -> D:
+    def scalar_mapper(obj: Any) -> Any:
         if isinstance(obj, str):
             if obj.startswith(weave_internal_prefix):
-                return cast(D, replace_ref(obj))
+                return replace_ref(obj)
             elif obj.startswith(weave_prefix):
                 # It is important to raise here as this would be the result of
                 # incorrectly storing an external ref at the database layer,
@@ -161,7 +156,32 @@ def universal_int_to_ext_ref_converter(
                 raise InvalidInternalRef("Encountered unexpected ref format.")
         return obj
 
-    return _map_values(obj, mapper)
+    def apply(obj: Any) -> Any:
+        return _map_values(obj, scalar_mapper)
+
+    return apply
+
+
+def universal_int_to_ext_ref_converter(
+    obj: C,
+    convert_int_to_ext_project_id: Callable[[str], str | None],
+) -> C:
+    """Takes any object and recursively replaces all internal references with
+    external references. The internal references are expected to be in the
+    format of `weave-trace-internal:///project_id/...` and the external references are
+    expected to be in the format of `weave:///entity/project/...`.
+
+    Args:
+        obj: The object to convert.
+        convert_int_to_ext_project_id: A function that takes an internal
+            project ID and returns the external project ID.
+
+    Returns:
+        The object with all internal references replaced with external
+        references.
+    """
+    mapper = make_int_to_ext_ref_mapper(convert_int_to_ext_project_id)
+    return cast(C, mapper(obj))
 
 
 E = TypeVar("E")

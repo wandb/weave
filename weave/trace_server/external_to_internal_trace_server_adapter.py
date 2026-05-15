@@ -4,6 +4,7 @@ from typing import Any, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
+    make_int_to_ext_ref_mapper,
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
 )
@@ -108,7 +109,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req: A,
         internal_project_id: str,
     ) -> Iterator[B]:
-        """Stream results while converting internal refs to external refs."""
+        """Stream results while converting internal refs to external refs.
+
+        Builds one mapper for the whole stream so the int-to-ext project_id
+        cache and the rewrite closures are reused across every yielded item,
+        instead of being allocated per item.
+        """
         req_conv = universal_ext_to_int_ref_converter(
             req,
             self._idc.ext_to_int_project_id,
@@ -116,22 +122,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
         res = method(req_conv)
 
-        int_to_ext_project_cache: dict[str, str | None] = {}
-
-        def cached_int_to_ext_project_id(project_id: str) -> str | None:
-            if project_id not in int_to_ext_project_cache:
-                int_to_ext_project_cache[project_id] = self._idc.int_to_ext_project_id(
-                    project_id
-                )
-            return int_to_ext_project_cache[project_id]
+        mapper = make_int_to_ext_ref_mapper(self._idc.int_to_ext_project_id)
 
         try:
             for item in res:
-                yield universal_int_to_ext_ref_converter(
-                    item, cached_int_to_ext_project_id
-                )
+                yield mapper(item)
         finally:
-            int_to_ext_project_cache.clear()
             if hasattr(res, "close"):
                 res.close()
 

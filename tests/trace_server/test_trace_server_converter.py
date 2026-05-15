@@ -1,11 +1,16 @@
 import datetime
 import json
 
+import pytest
 from pydantic import BaseModel, ConfigDict
 
 from weave.trace.refs import ObjectRef
 from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
+from weave.trace_server.trace_server_converter import (
+    InvalidInternalRef,
+    make_int_to_ext_ref_mapper,
+    universal_ext_to_int_ref_converter,
+)
 from weave.trace_server.trace_server_interface import (
     CallStartReq,
     ObjCreateReq,
@@ -177,3 +182,78 @@ def test_universal_ext_to_int_ref_converter_rewrites_refs_in_model_extras():
     assert converted.declared == "plain"
     extras = converted.model_extra or {}
     assert extras.get("extra_ref") == internal_ref
+
+
+def test_make_int_to_ext_ref_mapper_shares_cache_across_items():
+    """One mapper applied to N stream items reuses the project_id cache.
+
+    The resolver should be hit exactly once per distinct internal
+    project_id even when the mapper is applied to many items, and the
+    rewrites for each item must land correctly when items reference
+    different projects. Ref-free items must preserve identity (COW
+    behavior inherited from `_map_values`), and a malformed internal ref
+    must raise without poisoning the cache for subsequent items.
+    """
+    int_a, ext_a = "proj-a-internal", "ent-a/proj-a"
+    int_b, ext_b = "proj-b-internal", "ent-b/proj-b"
+    int_private = "proj-private"  # resolver returns None -> rewrites to private scheme
+
+    resolver_calls: list[str] = []
+
+    def resolver(project_id: str) -> str | None:
+        resolver_calls.append(project_id)
+        if project_id == int_a:
+            return ext_a
+        if project_id == int_b:
+            return ext_b
+        return None  # inaccessible -> private scheme
+
+    mapper = make_int_to_ext_ref_mapper(resolver)
+
+    # Item 1: hits project A. Resolver MUST be called.
+    item_a = {"ref": f"weave-trace-internal:///{int_a}/op/foo:v1"}
+    out_a = mapper(item_a)
+    assert out_a == {"ref": f"weave:///{ext_a}/op/foo:v1"}
+    assert resolver_calls == [int_a]
+
+    # Item 2: same project as item 1. Resolver MUST NOT be called again
+    # (this is the whole point of hoisting the mapper out of the loop).
+    item_a2 = {"ref": f"weave-trace-internal:///{int_a}/op/bar:v2"}
+    out_a2 = mapper(item_a2)
+    assert out_a2 == {"ref": f"weave:///{ext_a}/op/bar:v2"}
+    assert resolver_calls == [int_a]
+
+    # Item 3: new project. Resolver called exactly once for B.
+    item_b = {"ref": f"weave-trace-internal:///{int_b}/op/baz:v3"}
+    out_b = mapper(item_b)
+    assert out_b == {"ref": f"weave:///{ext_b}/op/baz:v3"}
+    assert resolver_calls == [int_a, int_b]
+
+    # Item 4: ref-free. Identity preserved (COW inherited), resolver untouched.
+    item_plain: dict[str, object] = {"plain": ["a", "b", {"nested": 1}]}
+    out_plain = mapper(item_plain)
+    assert out_plain is item_plain
+    assert resolver_calls == [int_a, int_b]
+
+    # Item 5: inaccessible project (resolver returns None). Cached None is
+    # honored on the next item without a second resolver call.
+    item_private = {"ref": f"weave-trace-internal:///{int_private}/op/x:v1"}
+    out_private = mapper(item_private)
+    assert out_private == {"ref": "weave-private://///op/x:v1"}
+    assert resolver_calls == [int_a, int_b, int_private]
+
+    item_private2 = {"ref": f"weave-trace-internal:///{int_private}/op/y:v2"}
+    out_private2 = mapper(item_private2)
+    assert out_private2 == {"ref": "weave-private://///op/y:v2"}
+    assert resolver_calls == [int_a, int_b, int_private]
+
+    # Item 6: external ref appearing on the internal->external path is a
+    # corruption signal and must raise. Cache from earlier items survives.
+    item_bad = {"ref": f"weave:///{ext_a}/op/leaked:v1"}
+    with pytest.raises(InvalidInternalRef):
+        mapper(item_bad)
+
+    item_a3 = {"ref": f"weave-trace-internal:///{int_a}/op/qux:v4"}
+    out_a3 = mapper(item_a3)
+    assert out_a3 == {"ref": f"weave:///{ext_a}/op/qux:v4"}
+    assert resolver_calls == [int_a, int_b, int_private]
