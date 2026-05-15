@@ -4,6 +4,9 @@ import pytest
 
 from weave.trace_server.environment import (
     DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS,
+    REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV,
+    REMOTE_SCORER_ALLOWED_HOSTS_ENV,
+    REMOTE_SCORER_VALIDATE_HOSTS_ENV,
     VALID_CALLS_SHARD_KEYS,
     kafka_producer_max_buffer_size,
     wf_clickhouse_calls_shard_key,
@@ -11,9 +14,12 @@ from weave.trace_server.environment import (
     wf_scoring_worker_debounced_scoring_max_call_history,
     wf_scoring_worker_debounced_scoring_max_sampling_rate,
     wf_scoring_worker_kafka_consumer_group_id_override,
+    wf_scoring_worker_remote_scorer_allow_insecure_http,
+    wf_scoring_worker_remote_scorer_allowed_hosts,
     wf_scoring_worker_remote_scorer_bearer_token,
     wf_scoring_worker_remote_scorer_enabled,
     wf_scoring_worker_remote_scorer_http_timeout_seconds,
+    wf_scoring_worker_remote_scorer_validate_hosts,
 )
 
 
@@ -205,3 +211,61 @@ def test_wf_scoring_worker_remote_scorer_http_timeout_seconds(monkeypatch):
     assert wf_scoring_worker_remote_scorer_http_timeout_seconds() == (
         DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
     )
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_allowed_hosts(monkeypatch):
+    """Allowed hosts are comma-separated exact host or host:port strings."""
+    key = REMOTE_SCORER_ALLOWED_HOSTS_ENV
+    monkeypatch.delenv(key, raising=False)
+    assert wf_scoring_worker_remote_scorer_allowed_hosts() == []
+
+    monkeypatch.setenv(key, "")
+    assert wf_scoring_worker_remote_scorer_allowed_hosts() == []
+
+    monkeypatch.setenv(key, "scoring.example.com, api.example.com:8443 ,, localhost ")
+    assert wf_scoring_worker_remote_scorer_allowed_hosts() == [
+        "scoring.example.com",
+        "api.example.com:8443",
+        "localhost",
+    ]
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_validate_hosts(monkeypatch):
+    """Host validation is enabled by default; only case-insensitive false disables it."""
+    key = REMOTE_SCORER_VALIDATE_HOSTS_ENV
+    monkeypatch.delenv(key, raising=False)
+    assert wf_scoring_worker_remote_scorer_validate_hosts() is True
+
+    monkeypatch.setenv(key, "false")
+    assert wf_scoring_worker_remote_scorer_validate_hosts() is False
+    monkeypatch.setenv(key, "False")
+    assert wf_scoring_worker_remote_scorer_validate_hosts() is False
+
+    monkeypatch.setenv(key, "true")
+    assert wf_scoring_worker_remote_scorer_validate_hosts() is True
+    monkeypatch.setenv(key, "")
+    assert wf_scoring_worker_remote_scorer_validate_hosts() is True
+    monkeypatch.setenv(key, "0")
+    assert wf_scoring_worker_remote_scorer_validate_hosts() is True
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_allow_insecure_http(monkeypatch):
+    """Insecure HTTP is disabled by default; only case-insensitive true enables it."""
+    key = REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV
+    monkeypatch.delenv(key, raising=False)
+    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
+
+    monkeypatch.setenv(key, "true")
+    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is True
+    monkeypatch.setenv(key, "True")
+    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is True
+
+    monkeypatch.setenv(key, "false")
+    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
+    monkeypatch.setenv(key, "")
+    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
+    monkeypatch.setenv(key, "1")
+    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False

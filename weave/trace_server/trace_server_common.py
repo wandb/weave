@@ -405,3 +405,43 @@ def try_parse_json(val: Any, default: Any = None) -> Any:
         return json.loads(val)
     except (json.JSONDecodeError, TypeError):
         return default
+
+
+def apply_tags_and_synth_latest_in_place(
+    objs: list[tsi.ObjSchema],
+    tags_map: dict[tuple[str, str], list[str]],
+    aliases_map: dict[tuple[str, str], list[str]],
+) -> None:
+    """Apply tags + aliases onto each obj, synthesizing 'latest' when needed.
+
+    Synthesis covers the computed-fallback branch of the hybrid `is_latest`
+    projection: when obj_delete tombstones the explicit 'latest' alias row,
+    is_latest = 1 is then supplied by the window-function rank over the
+    surviving versions. Surface that virtual 'latest' on read so callers
+    see a view consistent with obj.is_latest.
+
+    Read-skew guard: the projection query and the aliases-map query are two
+    separate reads of the `aliases` table. If a concurrent write moves
+    'latest' to a different digest between them, we can see is_latest=1 on
+    the old digest while the aliases map already credits 'latest' to the
+    new digest. Skip synthesizing 'latest' on any digest whose object_id
+    already has an explicit 'latest' alias in the just-fetched map.
+
+    Shared between ClickHouse and SQLite trace servers, both of which
+    return identically-shaped tags_map / aliases_map keyed by
+    (object_id, digest).
+    """
+    object_ids_with_alias_latest = {
+        oid for (oid, _), aliases in aliases_map.items() if "latest" in aliases
+    }
+    for obj in objs:
+        key = (obj.object_id, obj.digest)
+        obj.tags = sorted(tags_map.get(key, []))
+        aliases = aliases_map.get(key, [])
+        if (
+            obj.is_latest == 1
+            and "latest" not in aliases
+            and obj.object_id not in object_ids_with_alias_latest
+        ):
+            aliases = ["latest", *aliases]
+        obj.aliases = aliases
