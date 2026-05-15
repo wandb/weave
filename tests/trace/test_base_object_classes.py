@@ -1108,7 +1108,7 @@ def test_obj_create_rejects_name_type_collision(client: WeaveClient):
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
         nested_base_object="weave:///fake/fake/object/fake:fake",
     )
-    with pytest.raises(ObjectNameTypeCollision, match="TestOnlyNestedBaseObject"):
+    with pytest.raises(ObjectNameTypeCollision) as excinfo:
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
                 {
@@ -1121,6 +1121,11 @@ def test_obj_create_rejects_name_type_collision(client: WeaveClient):
                 }
             )
         )
+    assert excinfo.value.object_id == shared_object_id
+    assert excinfo.value.kind == "object"
+    assert excinfo.value.new_base_object_class == "TestOnlyExample"
+    assert excinfo.value.existing_base_object_classes == ["TestOnlyNestedBaseObject"]
+    assert "TestOnlyNestedBaseObject" in str(excinfo.value)
 
     # And the original type must still be the only one present for that name.
     time.sleep(0.2)

@@ -1983,13 +1983,15 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             """,
             (project_id, object_id, kind),
         )
-        for (existing_class,) in cursor.fetchall():
-            if existing_class != new_base_object_class:
-                raise ObjectNameTypeCollision(
-                    object_id=object_id,
-                    new_base_object_class=new_base_object_class,
-                    existing_base_object_class=existing_class,
-                )
+        existing_classes = [row[0] for row in cursor.fetchall()]
+        mismatched = [c for c in existing_classes if c != new_base_object_class]
+        if mismatched:
+            raise ObjectNameTypeCollision(
+                object_id=object_id,
+                kind=kind,
+                new_base_object_class=new_base_object_class,
+                existing_base_object_classes=mismatched,
+            )
 
     def _mark_existing_objects_as_not_latest(
         self, cursor: sqlite3.Cursor, project_id: str, object_id: str

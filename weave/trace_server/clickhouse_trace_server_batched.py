@@ -1883,13 +1883,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=project_id, object_id=object_id, kind=kind
         )
         result = self._query(query, parameters)
-        for (existing_class,) in result.result_rows:
-            if existing_class != new_base_object_class:
-                raise ObjectNameTypeCollision(
-                    object_id=object_id,
-                    new_base_object_class=new_base_object_class,
-                    existing_base_object_class=existing_class,
-                )
+        existing_classes = [row[0] for row in result.result_rows]
+        mismatched = [c for c in existing_classes if c != new_base_object_class]
+        if mismatched:
+            raise ObjectNameTypeCollision(
+                object_id=object_id,
+                kind=kind,
+                new_base_object_class=new_base_object_class,
+                existing_base_object_classes=mismatched,
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
     def obj_create_batch(

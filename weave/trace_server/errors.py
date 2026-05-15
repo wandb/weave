@@ -57,19 +57,20 @@ class ObjectNameTypeCollision(InvalidRequest):
     def __init__(
         self,
         object_id: str,
+        kind: str,
         new_base_object_class: str | None,
-        existing_base_object_class: str | None,
+        existing_base_object_classes: list[str | None],
     ):
         self.object_id = object_id
+        self.kind = kind
         self.new_base_object_class = new_base_object_class
-        self.existing_base_object_class = existing_base_object_class
+        self.existing_base_object_classes = existing_base_object_classes
+        existing_str = ", ".join(repr(c) for c in existing_base_object_classes)
         super().__init__(
-            f"Cannot create object {object_id!r} with "
-            f"base_object_class={new_base_object_class!r}: an object "
-            f"with this name already exists with "
-            f"base_object_class={existing_base_object_class!r}. Object names are "
-            f"bound to one type per project. Use a different name, or "
-            f"delete the existing object first."
+            f"Cannot create {kind} {object_id!r} with "
+            f"base_object_class={new_base_object_class!r}: a {kind} with this "
+            f"name already exists with base_object_class in [{existing_str}]. "
+            f"Object names are bound to one type per project."
         )
 
 
