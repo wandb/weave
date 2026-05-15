@@ -9,15 +9,27 @@ This module provides:
 from __future__ import annotations
 
 import importlib
+import logging
 import sys
+import threading
 from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
 from weave.trace.autopatch import IntegrationSettings
 
+logger = logging.getLogger(__name__)
+
 # Global set to track which integrations have been patched
-# This prevents double-patching when libraries are imported multiple times
+# This prevents double-patching when libraries are imported multiple times.
+# Reads and writes go through ``_PATCH_LOCK`` so concurrent import-hook
+# loaders and direct ``patch_*()`` calls don't race into half-patched state.
 _PATCHED_INTEGRATIONS: set[str] = set()
+
+# Serialises the check-and-add around ``_PATCHED_INTEGRATIONS`` so that the
+# import hook (running under Python's per-module import lock) and a direct
+# ``patch_*()`` call from a different thread cannot both see "not patched"
+# and both call ``attempt_patch`` against the same target.
+_PATCH_LOCK = threading.Lock()
 
 # Global reference to the import hook, so we can unregister it if needed
 _IMPORT_HOOK: WeaveImportHook | None = None
@@ -38,19 +50,23 @@ def _patch_integration(
         triggering_symbols: Symbols to add to _PATCHED_INTEGRATIONS on success (e.g. ["openai"])
         settings: Optional integration settings
     """
-    # If symbols are already patched, don't patch again
-    if any(name in _PATCHED_INTEGRATIONS for name in triggering_symbols):
-        return
+    # Single check-and-add critical section. Without the lock, two threads
+    # (e.g. one in the import hook holding ``google.adk``'s import lock,
+    # another calling ``patch_google_adk()`` directly) could both see "not
+    # patched" and both run ``attempt_patch`` against the same target.
+    with _PATCH_LOCK:
+        if any(name in _PATCHED_INTEGRATIONS for name in triggering_symbols):
+            return
 
-    if settings is None:
-        settings = IntegrationSettings()
+        if settings is None:
+            settings = IntegrationSettings()
 
-    module = importlib.import_module(module_path)
-    patcher_func = getattr(module, patcher_func_getter_name)
+        module = importlib.import_module(module_path)
+        patcher_func = getattr(module, patcher_func_getter_name)
 
-    if patcher_func(settings).attempt_patch():
-        for name in triggering_symbols:
-            _PATCHED_INTEGRATIONS.add(name)
+        if patcher_func(settings).attempt_patch():
+            for name in triggering_symbols:
+                _PATCHED_INTEGRATIONS.add(name)
 
 
 def patch_openai(settings: IntegrationSettings | None = None) -> None:
@@ -147,6 +163,22 @@ def patch_vertexai(settings: IntegrationSettings | None = None) -> None:
         module_path="weave.integrations.vertexai.vertexai_sdk",
         patcher_func_getter_name="get_vertexai_patcher",
         triggering_symbols=["vertexai"],
+        settings=settings,
+    )
+
+
+def patch_google_adk(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for Google Agent Development Kit (ADK).
+
+    ADK already emits OpenTelemetry spans. This patch enriches them with the
+    full set of GenAI semantic-convention attributes Weave extracts into
+    dedicated columns (see ``weave/trace_server/agents/semconv.py``). Call
+    after ``weave.init()`` so the global OTel ``TracerProvider`` is in place.
+    """
+    _patch_integration(
+        module_path="weave.integrations.google_adk.google_adk_sdk",
+        patcher_func_getter_name="get_google_adk_patcher",
+        triggering_symbols=["google.adk"],
         settings=settings,
     )
 
@@ -334,6 +366,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "google.generativeai": patch_google_genai,
     "google.genai": patch_google_genai,
     "vertexai": patch_vertexai,
+    "google.adk": patch_google_adk,
     "huggingface_hub": patch_huggingface,
     "instructor": patch_instructor,
     "dspy": patch_dspy,
@@ -357,40 +390,43 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
 
 
 class WeaveImportHook(MetaPathFinder):
-    """Import hook that automatically patches supported integrations when they are imported."""
+    """Import hook that automatically patches supported integrations when they are imported.
+
+    Matches on the exact fullname against ``INTEGRATION_MODULE_MAPPING`` so
+    dotted entries like ``google.adk`` and ``google.genai`` trigger when
+    those submodules are imported. The mapping never contains a plain
+    ``google`` key, so importing the namespace package alone does not
+    accidentally fire any integration.
+    """
 
     def find_spec(self, fullname, path, target=None):  # type: ignore
         """Called by Python's import system to find a module spec.
 
-        We don't actually find or load modules - we just detect when a supported
-        integration is being imported and schedule it for patching after import.
+        We don't actually find or load modules — we just detect when a
+        supported integration is being imported and schedule it for
+        patching after import.
         """
-        # Check if this is a root module we support (not a submodule)
-        root_module = fullname.split(".")[0]
-
-        # If this is one of our supported integrations and not yet patched,
-        # we'll patch it after it's imported
         if (
-            root_module in INTEGRATION_MODULE_MAPPING
-            and root_module not in _PATCHED_INTEGRATIONS
+            fullname not in INTEGRATION_MODULE_MAPPING
+            or fullname in _PATCHED_INTEGRATIONS
         ):
-            # We don't actually find the spec - let the normal import system do that
-            # But we'll use a Loader wrapper to patch after import
-            spec = None
-            for finder in sys.meta_path:
-                if finder is self:
-                    continue
-                if hasattr(finder, "find_spec"):
-                    spec = finder.find_spec(fullname, path, target)
-                    if spec is not None:
-                        break
+            return None
 
-            if spec is not None and fullname == root_module:
-                # Wrap the loader to patch after import
-                spec.loader = PatchingLoader(spec.loader, root_module)
-                return spec
+        # Let the normal import machinery find the real spec, then wrap the
+        # loader so we can run the patch after exec_module / load_module.
+        spec = None
+        for finder in sys.meta_path:
+            if finder is self:
+                continue
+            if hasattr(finder, "find_spec"):
+                spec = finder.find_spec(fullname, path, target)
+                if spec is not None:
+                    break
 
-        # Not our concern, let other finders handle it
+        if spec is not None:
+            spec.loader = PatchingLoader(spec.loader, fullname)
+            return spec
+
         return None
 
     def find_module(self, fullname, path=None):  # type: ignore
@@ -414,7 +450,6 @@ class PatchingLoader:
             # Fallback for loaders that don't have load_module
             module = sys.modules.get(fullname)
 
-        # Now patch it if it's the root module
         if fullname == self.module_name:
             _patch_if_needed(self.module_name)
 
@@ -426,7 +461,6 @@ class PatchingLoader:
         if hasattr(self.original_loader, "exec_module"):
             self.original_loader.exec_module(module)
 
-        # Now patch it if it's the root module
         if module.__name__ == self.module_name:
             _patch_if_needed(self.module_name)
 
@@ -443,18 +477,20 @@ class PatchingLoader:
 
 def _patch_if_needed(module_name: str) -> None:
     """Apply patching for a module if it hasn't been patched yet."""
-    if (
-        module_name not in _PATCHED_INTEGRATIONS
-        and module_name in INTEGRATION_MODULE_MAPPING
-    ):
+    if module_name not in INTEGRATION_MODULE_MAPPING:
+        return
+    with _PATCH_LOCK:
+        if module_name in _PATCHED_INTEGRATIONS:
+            return
         patch_func = INTEGRATION_MODULE_MAPPING[module_name]
         try:
             patch_func()
             _PATCHED_INTEGRATIONS.add(module_name)
         except Exception:
-            # Silently skip if patching fails - this maintains backward compatibility
-            # and doesn't break existing code if an integration can't be patched
-            pass
+            # Log and continue: backward-compat with old behaviour that
+            # swallowed failures, but make the failure visible to anyone
+            # who turns on debug logging when traces stop appearing.
+            logger.debug("Failed to patch %s", module_name, exc_info=True)
 
 
 def implicit_patch() -> None:
@@ -474,15 +510,16 @@ def implicit_patch() -> None:
         return
 
     for module_name, patch_func in INTEGRATION_MODULE_MAPPING.items():
-        # Check if the module is already imported and not yet patched
-        if module_name in sys.modules and module_name not in _PATCHED_INTEGRATIONS:
+        if module_name not in sys.modules:
+            continue
+        with _PATCH_LOCK:
+            if module_name in _PATCHED_INTEGRATIONS:
+                continue
             try:
                 patch_func()
                 _PATCHED_INTEGRATIONS.add(module_name)
             except Exception:
-                # Silently skip if patching fails - this maintains backward compatibility
-                # and doesn't break existing code if an integration can't be patched
-                pass
+                logger.debug("Failed to patch %s", module_name, exc_info=True)
 
 
 def register_import_hook() -> None:

@@ -54,6 +54,9 @@ dependencies = [
   "opentelemetry-api",
   "opentelemetry-sdk",
   "opentelemetry-exporter-otlp-proto-http",
+  # The ADK integration imports GenAI semconv keys (gen_ai.tool.call.arguments,
+  # cache token names, etc.) added in 0.62b1.
+  "opentelemetry-semantic-conventions>=0.62b1",
 ]
 
 [project.optional-dependencies]
