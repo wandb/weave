@@ -287,6 +287,7 @@ from weave.trace_server.trace_server_common import (
     MAX_FILTER_LENGTH,
     DynamicBatchProcessor,
     LRUCache,
+    apply_tags_and_synth_latest_in_place,
     determine_call_status,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -2354,36 +2355,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not objs:
             return
         object_ids = list({obj.object_id for obj in objs})
-
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
-
-        # Read-skew guard: the metadata query and the aliases-map query are
-        # two separate reads of the `aliases` table. If a concurrent write
-        # moves "latest" to a different digest between them, we can see
-        # is_latest=1 on the old digest (from the first read) while the
-        # aliases map already credits "latest" to the new digest. Skip
-        # synthesizing "latest" on any digest whose object_id already has
-        # an explicit "latest" alias in the just-fetched map.
-        object_ids_with_alias_latest = {
-            oid for (oid, _), aliases in aliases_map.items() if "latest" in aliases
-        }
-
-        for obj in objs:
-            key = (obj.object_id, obj.digest)
-            obj.tags = sorted(tags_map.get(key, []))
-            aliases = aliases_map.get(key, [])
-            # "latest" is virtual when the explicit alias row is missing
-            # (e.g. obj_delete tombstoned it and is_latest is now coming
-            # from the computed fallback). Synthesize it so the surface
-            # stays consistent with obj.is_latest.
-            if (
-                obj.is_latest == 1
-                and "latest" not in aliases
-                and obj.object_id not in object_ids_with_alias_latest
-            ):
-                aliases = ["latest", *aliases]
-            obj.aliases = aliases
+        apply_tags_and_synth_latest_in_place(objs, tags_map, aliases_map)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
