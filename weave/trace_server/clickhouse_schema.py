@@ -209,6 +209,11 @@ class SelectableCHObjSchema(BaseModel):
     leaf_object_class: str | None
     digest: str
     version_index: int
+    # `is_latest` is hybrid in the read path: projected from
+    # latest_alias_per_object when present, otherwise from the computed
+    # most-recent-surviving window function. It is not a real column on
+    # object_versions; the schema's ObjSchema field surfaces the CTE
+    # projection.
     is_latest: int
     deleted_at: datetime.datetime | None = None
     size_bytes: int | None = None

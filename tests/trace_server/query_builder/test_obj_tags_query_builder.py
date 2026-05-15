@@ -178,13 +178,18 @@ WHERE (((main.project_id,
 
 
 def test_add_aliases_condition_latest_only():
-    """Filtering by only 'latest' should produce a simple is_latest = 1 condition."""
+    """Filtering by 'latest' alone routes through the hybrid `is_latest` column.
+
+    The CTE-derived `is_latest` covers both the explicit "latest" alias row
+    and the computed most-recent-surviving fallback for objects whose alias
+    row was tombstoned by obj_delete.
+    """
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_aliases_condition(["latest"])
 
     expected_query = """
 WHERE ((is_latest = 1)
-       AND (deleted_at IS NULL))
+   AND (deleted_at IS NULL))
     """
     expected_params = {
         "project_id": "test_project",
@@ -235,7 +240,9 @@ def test_make_list_aliases_query():
 
 
 def test_add_aliases_condition_with_latest():
-    """Filtering by both 'latest' and a real alias should OR them."""
+    """Filtering by both 'latest' and a real alias ORs the hybrid `is_latest`
+    column with the aliases-table subquery for the non-latest names.
+    """
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_aliases_condition(["latest", "production"])
 

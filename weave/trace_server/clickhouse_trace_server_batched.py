@@ -287,6 +287,7 @@ from weave.trace_server.trace_server_common import (
     MAX_FILTER_LENGTH,
     DynamicBatchProcessor,
     LRUCache,
+    apply_tags_and_synth_latest_in_place,
     determine_call_status,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -1821,6 +1822,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        # Partial-failure semantics: ClickHouse cannot atomically write
+        # across object_versions and aliases. We insert the version row
+        # first, then the "latest" alias. If the alias INSERT raises,
+        # the new version is still readable by digest, but "latest"
+        # continues to resolve to the prior version (because is_latest
+        # is derived from the aliases table). The error propagates to
+        # the caller; a retry of obj_create with the same content lands
+        # on the dedup path (the version row already exists) and
+        # re-asserts the alias — that is the documented recovery flow.
+        #
+        # Read-your-own-write: between the version-row insert and the
+        # alias insert there is a window in which obj_read("latest")
+        # returns the PRIOR digest. Callers that need read-your-own-write
+        # on "latest" must wait for obj_create to return successfully.
         digest_result = compute_object_digest_result(
             req.obj.val,
             req.obj.builtin_object_class,
@@ -1852,6 +1867,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             column_names=list(ch_obj.model_fields.keys()),
         )
 
+        # Set "latest" alias on every new version.
+        self._insert_aliases(
+            req.obj.project_id,
+            req.obj.object_id,
+            ["latest"],
+            digest,
+            wb_user_id=req.obj.wb_user_id or "",
+        )
+
         return tsi.ObjCreateRes(
             digest=digest,
             object_id=req.obj.object_id,
@@ -1866,6 +1890,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         performance increase for operations like OTel ingest.
 
         This should **ONLY** be used when we know an object will never have more than one version.
+
+        Partial-failure semantics: same as obj_create.  Version rows are
+        inserted first; if the subsequent batched alias INSERT fails, the
+        new versions exist but their "latest" alias is missing — readers
+        see the prior latest until the alias write succeeds on retry.
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
@@ -1883,6 +1912,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
             )
 
+        alias_rows: list[tuple[str, str, str, str]] = []
         for obj in batch:
             digest_result = compute_object_digest_result(
                 obj.val,
@@ -1905,6 +1935,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             insert_data = list(ch_obj.model_dump().values())
             # Add the data to be inserted
             ch_insert_batch.append(insert_data)
+            alias_rows.append(
+                (obj.project_id, obj.object_id, digest, obj.wb_user_id or "")
+            )
 
             # Record the inserted data
             obj_results.append(
@@ -1919,6 +1952,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=ch_insert_batch,
             column_names=ALL_OBJ_INSERT_COLUMNS,
         )
+
+        # Batch-write the "latest" alias for every row, matching obj_create.
+        if alias_rows:
+            ch_alias_rows = [
+                list(
+                    AliasCHInsertable(
+                        project_id=project_id,
+                        object_id=object_id,
+                        alias="latest",
+                        digest=digest,
+                        wb_user_id=wb_user_id,
+                    )
+                    .model_dump()
+                    .values()
+                )
+                for (project_id, object_id, digest, wb_user_id) in alias_rows
+            ]
+            self._insert(
+                "aliases",
+                data=ch_alias_rows,
+                column_names=list(AliasCHInsertable.model_fields.keys()),
+            )
 
         return obj_results
 
@@ -2271,15 +2326,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         digest: str,
     ) -> str | None:
-        """If digest looks like an alias name (not a hash, not version-like, not 'latest'),
-        resolve it to the actual digest via the aliases table. Returns None if not an alias.
+        """If digest looks like an alias name (not a hash, not version-like),
+        resolve it to the actual digest via the aliases table. Returns None
+        if not an alias OR if the resolved alias row has been tombstoned by
+        obj_delete (the HAVING filter excludes tombstones, so callers fall
+        through to the make_metadata_query CTE's hybrid is_latest fallback
+        for "latest").
         """
-        # Return None for digests that are not alias names, so the caller
-        # falls through to normal digest-based lookup.  "latest" and version
-        # patterns (v0, v1, …) are handled by the existing obj_read logic;
-        # content hashes are real digests that don't need resolution.
-        if digest == "latest":
-            return None
+        # Version patterns (v0, v1, …) are handled by the existing obj_read
+        # logic; content hashes are real digests that don't need resolution.
         (is_version, _) = tsc.digest_is_version_like(digest)
         if is_version:
             return None
@@ -2300,18 +2355,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not objs:
             return
         object_ids = list({obj.object_id for obj in objs})
-
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
-
-        for obj in objs:
-            key = (obj.object_id, obj.digest)
-            obj.tags = sorted(tags_map.get(key, []))
-            aliases = aliases_map.get(key, [])
-            # "latest" is virtual — synthesized from the is_latest window function
-            if obj.is_latest == 1 and "latest" not in aliases:
-                aliases = ["latest"] + aliases
-            obj.aliases = aliases
+        apply_tags_and_synth_latest_in_place(objs, tags_map, aliases_map)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
