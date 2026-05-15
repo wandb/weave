@@ -26,7 +26,7 @@ from weave.trace_server.clickhouse_schema import (
     CallCompleteCHInsertable,
     CallStartCHInsertable,
 )
-from weave.trace_server.errors import NotFoundError
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -2286,7 +2286,7 @@ def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
     # obj_read must NOT return the tombstoned version.  Either raises, or
     # falls through to the CTE's computed fallback — which itself filters
     # tombstones via `(deleted_at IS NULL) DESC` and would find nothing.
-    with pytest.raises((NotFoundError, Exception)) as exc_info:
+    with pytest.raises((NotFoundError, ObjectDeletedError)) as exc_info:
         ch_server.obj_read(
             tsi.ObjReadReq(project_id=project_id, object_id=obj_id, digest="latest")
         )

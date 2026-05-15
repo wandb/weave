@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import sqlite3
 import tempfile
 from unittest.mock import Mock, patch
 
@@ -471,9 +472,12 @@ def test_obj_create_atomic_on_alias_failure(sqlite_db_path):
     finally:
         conn_map[sqlite_db_path] = saved
         # Defensive: clear any lingering open transaction from the failed call.
+        # sqlite raises OperationalError("cannot rollback - no transaction is
+        # active") if the prior BEGIN already auto-rolled back; treat that as
+        # the success case.
         try:
             real_conn.rollback()
-        except Exception:
+        except sqlite3.Error:
             pass
 
     # The version row for v=2 must NOT have landed (transaction rolled back).
