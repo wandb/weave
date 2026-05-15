@@ -206,7 +206,6 @@ def replace_base64_with_content_objects(
 R = TypeVar("R", bound=CallStartReq | CallEndReq | CallEndV2Req)
 
 
-@ddtrace.tracer.wrap(name="process_call_req_to_content")
 def process_call_req_to_content(
     req: R,
     trace_server: TraceServerInterface,
@@ -214,6 +213,9 @@ def process_call_req_to_content(
     """Process call inputs/outputs to replace base64 content.
 
     This is the main entry point for processing trace data before insertion.
+    Not wrapped in a tracer span: most invocations have no base64 payload and
+    do nothing. When base64 content is actually found and uploaded, the inner
+    ``store_content_object`` span surfaces the real work.
 
     Args:
         req: Call request (start, end, or end v2)
@@ -234,12 +236,14 @@ def process_call_req_to_content(
     return req
 
 
-@ddtrace.tracer.wrap(name="process_complete_call_to_content")
 def process_complete_call_to_content(
     complete_call: CompletedCallSchemaForInsert,
     trace_server: TraceServerInterface,
 ) -> CompletedCallSchemaForInsert:
     """Process a complete call to replace base64 content in inputs and outputs.
+
+    Not wrapped in a tracer span. See ``process_call_req_to_content`` for the
+    rationale: real work shows up as a ``store_content_object`` child span.
 
     Args:
         complete_call: Complete call schema with both inputs and outputs.
