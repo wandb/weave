@@ -47,7 +47,6 @@ _project_ttl_cache: TTLCache[str, int] = TTLCache(
 _project_ttl_cache_lock = threading.Lock()
 
 
-@ddtrace.tracer.wrap(name="ttl_settings.get_project_retention_days")
 def get_project_retention_days(
     project_id: str,
     ch_client: CHClient,
@@ -67,24 +66,24 @@ def get_project_retention_days(
         set_current_span_dd_tags({"ttl.cache_hit": "L1"})
         return cached
 
-    redis_client = get_redis_client()
-    if redis_client is not None:
-        redis_val = _l2_get(redis_client, project_id)
-        if redis_val is not None:
-            _l1_set(project_id, redis_val)
-            set_current_span_dd_tags({"ttl.cache_hit": "L2"})
-            return redis_val
+    with ddtrace.tracer.trace("ttl_settings.get_project_retention_days") as span:
+        redis_client = get_redis_client()
+        if redis_client is not None:
+            redis_val = _l2_get(redis_client, project_id)
+            if redis_val is not None:
+                _l1_set(project_id, redis_val)
+                span.set_tag("ttl.cache_hit", "L2")
+                return redis_val
 
-    retention_days = _query_clickhouse(ch_client, project_id)
-    set_current_span_dd_tags(
-        {"ttl.cache_hit": "clickhouse", "ttl.retention_days": retention_days}
-    )
+        retention_days = _query_clickhouse(ch_client, project_id)
+        span.set_tag("ttl.cache_hit", "clickhouse")
+        span.set_tag("ttl.retention_days", retention_days)
 
-    if redis_client is not None:
-        _l2_set(redis_client, project_id, retention_days)
-    _l1_set(project_id, retention_days)
+        if redis_client is not None:
+            _l2_set(redis_client, project_id, retention_days)
+        _l1_set(project_id, retention_days)
 
-    return retention_days
+        return retention_days
 
 
 def compute_expire_at(

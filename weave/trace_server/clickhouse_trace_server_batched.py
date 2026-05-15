@@ -5830,7 +5830,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._file_batch = []
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_file_chunks")
     def _insert_file_chunks(
         self, file_chunks: list[FileChunkCreateCHInsertable]
     ) -> None:
