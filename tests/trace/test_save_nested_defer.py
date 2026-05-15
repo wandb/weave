@@ -14,12 +14,12 @@ import logging
 import threading
 import time
 from concurrent.futures import Future
-from contextlib import contextmanager
 from typing import Any
 
 import pytest
 
 import weave
+from tests.trace.conftest import BlockingTraceServer, paused
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, OpRef, TableRef
 from weave.trace.weave_client import (
@@ -150,49 +150,6 @@ class TestCollectPendingDigests:
 # ---------------------------------------------------------------------------
 
 
-class _BlockingTraceServer(tsi.TraceServerInterface):
-    """Server proxy that holds a lock; while paused, all proxied calls block."""
-
-    def __init__(self, inner: tsi.TraceServerInterface):
-        self._inner = inner
-        self._lock = threading.Lock()
-
-    def pause(self) -> None:
-        self._lock.acquire()
-
-    def resume(self) -> None:
-        self._lock.release()
-
-    def __getattribute__(self, item: str) -> Any:
-        if item in {"_inner", "_lock", "pause", "resume"}:
-            return super().__getattribute__(item)
-        inner = super().__getattribute__("_inner")
-        if item in {"attribute_access_log", "remote_request_bytes_limit"}:
-            return getattr(inner, item)
-
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            with self._lock:
-                return getattr(inner, item)(*args, **kwargs)
-
-        return wrapper
-
-
-@contextmanager
-def _paused(client: WeaveClient):
-    original = client.server
-    client.set_autoflush(False)
-    blocker = _BlockingTraceServer(original)
-    client.server = blocker
-    blocker.pause()
-    try:
-        yield client
-    finally:
-        blocker.resume()
-        client.server = original
-        client._flush()
-        client.set_autoflush(True)
-
-
 def test_paused_server_does_not_deadlock_on_finish(client: WeaveClient) -> None:
     """A traced op finishes while server is paused; flush drains cleanly.
 
@@ -212,10 +169,10 @@ def test_paused_server_does_not_deadlock_on_finish(client: WeaveClient) -> None:
         return {"x": m.x}
 
     m = Model(x=1)
-    with _paused(client) as c:
+    with paused(client) as c:
         out = step(m)
     assert out == {"x": 1}
-    # The flush in `_paused.__exit__` must drain. If we got here, no deadlock.
+    # The flush in `paused.__exit__` must drain. If we got here, no deadlock.
 
 
 @pytest.mark.asyncio
@@ -235,7 +192,7 @@ async def test_concurrent_finishes_drain(client: WeaveClient) -> None:
         return item.i * 2
 
     items = [Item(i=k) for k in range(20)]
-    with _paused(client):
+    with paused(client):
         results = await asyncio.gather(*(do(item) for item in items))
     assert results == [k * 2 for k in range(20)]
 
@@ -303,7 +260,7 @@ def test_finish_call_returns_before_send(client: WeaveClient) -> None:
     def f(x: int) -> int:
         return x + 1
 
-    blocker = _BlockingTraceServer(client.server)
+    blocker = BlockingTraceServer(client.server)
     client.server = blocker
     client.set_autoflush(False)
     blocker.pause()
