@@ -331,9 +331,6 @@ BACKGROUND_PARALLELISM_MIX = 0.5
 MAX_AUTO_PARALLELISM = 32
 # Extra threads beyond CPU count for I/O-bound work
 PARALLELISM_CPU_PADDING = 4
-# This size is correlated with the maximum single row insert size
-# in clickhouse, which is currently unavoidable.
-MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
@@ -814,7 +811,14 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
 
-        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
+        # Skip the future allocation once the op's digest is resolved (any
+        # call after the first). Reading `.uri` directly is a no-op string
+        # build for an already-resolved ref.
+        op_name_future: str | Future[str]
+        if op_def_ref.is_digest_resolved:
+            op_name_future = op_def_ref.uri
+        else:
+            op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
 
         # Get thread_id from context
         thread_id = call_context.get_thread_id()
@@ -908,14 +912,6 @@ class WeaveClient:
                     turn_id=turn_id,
                 )
             )
-
-            bytes_size = len(call_start_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes. Inputs may be dropped.",
-                    bytes_size,
-                    MAX_TRACE_PAYLOAD_SIZE,
-                )
 
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
@@ -1098,13 +1094,6 @@ class WeaveClient:
                     wb_run_step_end=current_wb_run_step_end,
                 )
             )
-            bytes_size = len(call_end_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    "Trace output size (%s bytes) exceeds the maximum allowed size of %s bytes. Output may be dropped.",
-                    bytes_size,
-                    MAX_TRACE_PAYLOAD_SIZE,
-                )
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_end", call_end_req)

@@ -120,10 +120,10 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
         filtered_spans AS (
           SELECT *
           FROM spans s
-          PREWHERE {genai_0:String} = s.project_id
+          WHERE s.project_id = {genai_0:String}
             AND s.started_at >= {genai_1:DateTime64(6)}
             AND s.started_at < {genai_2:DateTime64(6)}
-          WHERE (s.agent_name = {genai_3:String})
+          AND (s.agent_name = {genai_3:String})
         ),
         aggregated_data AS (
           SELECT
@@ -229,12 +229,12 @@ def test_grouped_stats_query_full_sql_shape() -> None:
         filtered_spans AS (
           SELECT *
           FROM spans s
-          PREWHERE {genai_0:String} = s.project_id
+          WHERE s.project_id = {genai_0:String}
             AND s.started_at >= {genai_1:DateTime64(6)}
             AND s.started_at < {genai_2:DateTime64(6)}
         ),
         top_groups AS (
-          SELECT s.custom_attrs_string[{genai_3:String}] AS env
+          SELECT if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env
           FROM filtered_spans s
           GROUP BY env
           ORDER BY count() DESC
@@ -249,7 +249,7 @@ def test_grouped_stats_query_full_sql_shape() -> None:
           FROM (
             SELECT
               toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_7:String}) AS bucket,
-              s.custom_attrs_string[{genai_3:String}] AS env,
+              if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env,
               toFloat64(s.custom_attrs_float[{genai_4:String}]) AS m_score,
               toUInt8(mapContains(s.custom_attrs_float, {genai_4:String})) AS v_score
             FROM filtered_spans s
@@ -324,10 +324,10 @@ def test_basic_stats_query_uses_query_filter_and_bucket() -> None:
              filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           WHERE s.project_id = {genai_0:String}
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)}
-           WHERE (s.agent_name = {genai_3:String}) ),
+           AND (s.agent_name = {genai_3:String}) ),
              aggregated_data AS
           (SELECT bucket,
                   avgOrNull(if(v_duration_ms, m_duration_ms, NULL)) AS avg_duration_ms,
@@ -393,7 +393,7 @@ def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
         WITH filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           WHERE s.project_id = {genai_0:String}
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              value_rows AS
@@ -473,7 +473,7 @@ def test_numeric_bucket_stats_query_groups_custom_attr_measure() -> None:
         WITH filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           WHERE s.project_id = {genai_0:String}
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              value_rows AS
@@ -607,11 +607,11 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
              filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           WHERE s.project_id = {genai_0:String}
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              top_groups AS
-          (SELECT s.custom_attrs_string[{genai_3:String}] AS env
+          (SELECT if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env
            FROM filtered_spans s
            GROUP BY env
            ORDER BY count() DESC
@@ -623,7 +623,7 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
                   countIf(v_score) AS count_score
            FROM
              (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_7:String}) AS bucket,
-                     s.custom_attrs_string[{genai_3:String}] AS env,
+                     if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env,
                      toFloat64(s.custom_attrs_float[{genai_4:String}]) AS m_score,
                      toUInt8(mapContains(s.custom_attrs_float, {genai_4:String})) AS v_score
               FROM filtered_spans s)
@@ -690,7 +690,7 @@ def test_time_stats_apply_group_filters() -> None:
              filtered_spans AS
           (SELECT *
            FROM spans s
-           PREWHERE {genai_0:String} = s.project_id
+           WHERE s.project_id = {genai_0:String}
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              qualified_groups_0 AS

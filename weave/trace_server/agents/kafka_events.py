@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from weave.flow.monitor import AgentSpanOpName
 from weave.trace_server.agents.schema import AgentSpanCHInsertable, StatusCodeLiteral
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH as SENTINEL_EPOCH_UTC
 
@@ -19,13 +20,11 @@ SCORE_AGENT_SPANS_TOPIC = "weave.score_agent_spans"
 
 _SENTINEL_EPOCH_NAIVE = SENTINEL_EPOCH_UTC.replace(tzinfo=None)
 
-ScoreAgentSpansEventType = Literal["turn_ended"]
-
 
 class ScoreAgentSpansEvent(BaseModel):
     """Trigger event for agent scoring."""
 
-    event_type: ScoreAgentSpansEventType
+    event_type: AgentSpanOpName
     status_code: StatusCodeLiteral
     project_id: str
     trace_id: str
@@ -49,10 +48,10 @@ class ScoreAgentSpansEvent(BaseModel):
 
         Currently only "turn_ended" is supported, but the interface is designed to support multiple types.
         """
-        event_type: ScoreAgentSpansEventType | None = None
+        event_type: AgentSpanOpName | None = None
         # A span with no parent is assumed to represent the end of a turn
         if not row.parent_span_id:
-            event_type = "turn_ended"
+            event_type = "weave.genai.turn_ended"
         # Ignore in-progress spans
         if event_type and row.ended_at > _SENTINEL_EPOCH_NAIVE:
             return ScoreAgentSpansEvent(

@@ -18,7 +18,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal
 
-from weave.trace.settings import _str2bool_truthy
+from weave.trace.settings import _parse_bool
 
 try:
     import sentry_sdk  # type: ignore
@@ -50,7 +50,7 @@ def _error_reporting_enabled() -> bool:
     that customers who already disable error reporting for the `wandb` SDK get
     the same behavior here. Default is enabled when the variable is unset.
     """
-    return _str2bool_truthy(os.environ.get("WANDB_ERROR_REPORTING", "true"))
+    return _parse_bool(os.getenv("WANDB_ERROR_REPORTING", "true"))
 
 
 def _safe_noop(func: Callable) -> Callable:
