@@ -4,75 +4,15 @@ import {
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
 
-import {setGlobalClient} from '../../clientApi';
-import {Api as TraceServerApi} from '../../generated/traceServerApi';
 import {flushWeaveOTel} from '../../genai/flush';
-import {
-  getWeaveTracer,
-  getWeaveTracerProvider,
-  PROVIDER_HOLDER_SYMBOL_NAME,
-} from '../../genai/provider';
+import {getWeaveTracer, getWeaveTracerProvider} from '../../genai/provider';
 import {WEAVE_RESOURCE_ATTR} from '../../genai/weaveResource';
-import {Settings, type SettingsInit} from '../../settings';
 import {packageVersion} from '../../utils/packageVersion';
-import {WandbServerApi} from '../../wandb/wandbServerApi';
-import {WeaveClient} from '../../weaveClient';
 
-const TEST_BASE_URL = 'http://localhost:8080';
-const TEST_PROJECT = 'test-entity/test-project';
-
-function installFakeClient(settings: SettingsInit = {}): WeaveClient {
-  const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
-  const client = new WeaveClient(
-    traceServerApi,
-    {} as WandbServerApi,
-    TEST_PROJECT,
-    new Settings(
-      settings.printCallLink ?? true,
-      settings.globalAttributes ?? {},
-      settings.genai ?? {}
-    )
-  );
-  setGlobalClient(client);
-  return client;
-}
-
-function clearGlobalClient(): void {
-  // setGlobalClient is typed for a real client, but the underlying holder
-  // accepts null. Tests need this to exercise the "weave.init() not called"
-  // branch.
-  setGlobalClient(null);
-}
-
-// Reach into the global singleton's holder directly to reset its state.
-function resetProviderSingleton(): void {
-  const holder = (globalThis as Record<symbol, unknown>)[
-    Symbol.for(PROVIDER_HOLDER_SYMBOL_NAME)
-  ] as {provider: unknown; beforeExitRegistered: boolean} | undefined;
-  if (holder) {
-    holder.provider = null;
-    holder.beforeExitRegistered = false;
-  }
-}
+import {installFakeClient, setupGenAITestEnvironment} from './common';
 
 describe('otel/provider', () => {
-  const originalApiKey = process.env.WANDB_API_KEY;
-
-  beforeEach(() => {
-    process.env.WANDB_API_KEY = 'test-api-key';
-    resetProviderSingleton();
-    clearGlobalClient();
-  });
-
-  afterEach(() => {
-    resetProviderSingleton();
-    clearGlobalClient();
-    if (originalApiKey === undefined) {
-      delete process.env.WANDB_API_KEY;
-    } else {
-      process.env.WANDB_API_KEY = originalApiKey;
-    }
-  });
+  setupGenAITestEnvironment();
 
   it('returns a non-recording tracer when weave.init() has not been called', () => {
     const tracer = getWeaveTracer('weave-genai');
