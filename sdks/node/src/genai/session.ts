@@ -21,7 +21,7 @@ export class Session {
     public readonly sessionId: string
   ) {}
 
-  static async create(opts: SessionInit = {}): Promise<Session> {
+  static create(opts: SessionInit = {}): Session {
     return new Session(
       opts.agentName ?? '',
       opts.model ?? '',
@@ -29,7 +29,7 @@ export class Session {
     );
   }
 
-  async startTurn(opts: TurnInit = {}): Promise<Turn> {
+  startTurn(opts: TurnInit = {}): Turn {
     return Turn.create({
       agentName: opts.agentName ?? this.agentName,
       model: opts.model ?? this.model,
@@ -38,7 +38,7 @@ export class Session {
     });
   }
 
-  async end(): Promise<void> {
+  end(): void {
     // Session emits no span; this exists only to mirror the start/end
     // symmetry of the other classes.
   }

@@ -30,9 +30,7 @@ export class Turn {
     public readonly model: string
   ) {}
 
-  static async create(
-    opts: TurnInit & {conversationId?: string} = {}
-  ): Promise<Turn> {
+  static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [GEN_AI_ATTR.GEN_AI_OPERATION_NAME]: 'invoke_agent',
@@ -63,7 +61,7 @@ export class Turn {
     );
   }
 
-  async llm(opts: LLMInit): Promise<LLM> {
+  llm(opts: LLMInit): LLM {
     return LLM.create({
       ...opts,
       parentContext: this.context,
@@ -71,7 +69,7 @@ export class Turn {
     });
   }
 
-  async tool(opts: ToolInit): Promise<Tool> {
+  tool(opts: ToolInit): Tool {
     return Tool.create({
       ...opts,
       parentContext: this.context,
@@ -79,7 +77,7 @@ export class Turn {
     });
   }
 
-  async subagent(opts: SubAgentInit): Promise<SubAgent> {
+  subagent(opts: SubAgentInit): SubAgent {
     return SubAgent.create({
       ...opts,
       parentContext: this.context,
@@ -87,8 +85,10 @@ export class Turn {
     });
   }
 
-  async end(opts?: {error?: Error}): Promise<void> {
-    if (this._ended) return;
+  end(opts?: {error?: Error}): void {
+    if (this._ended) {
+      return;
+    }
     this._ended = true;
     if (opts?.error) {
       this.span.recordException(opts.error);

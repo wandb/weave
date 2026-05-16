@@ -23,7 +23,7 @@ export class Tool {
     public readonly toolCallId: string
   ) {}
 
-  static async create(opts: ToolInit & ChildSpanContext): Promise<Tool> {
+  static create(opts: ToolInit & ChildSpanContext): Tool {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [GEN_AI_ATTR.GEN_AI_OPERATION_NAME]: 'execute_tool',
@@ -46,7 +46,7 @@ export class Tool {
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
   }
 
-  async end(opts?: {error?: Error}): Promise<void> {
+  end(opts?: {error?: Error}): void {
     if (this._ended) {
       return;
     }

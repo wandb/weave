@@ -37,7 +37,7 @@ export class LLM {
     public readonly systemInstructions: string[]
   ) {}
 
-  static async create(opts: LLMInit & ChildSpanContext): Promise<LLM> {
+  static create(opts: LLMInit & ChildSpanContext): LLM {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [GEN_AI_ATTR.GEN_AI_OPERATION_NAME]: 'chat',
@@ -64,7 +64,7 @@ export class LLM {
     );
   }
 
-  async startTool(opts: ToolInit): Promise<Tool> {
+  startTool(opts: ToolInit): Tool {
     return Tool.create({
       ...opts,
       parentContext: this.context,
@@ -72,7 +72,7 @@ export class LLM {
     });
   }
 
-  async startSubagent(opts: SubAgentInit): Promise<SubAgent> {
+  startSubagent(opts: SubAgentInit): SubAgent {
     return SubAgent.create({
       ...opts,
       parentContext: this.context,
@@ -80,8 +80,10 @@ export class LLM {
     });
   }
 
-  async end(opts?: {error?: Error}): Promise<void> {
-    if (this._ended) return;
+  end(opts?: {error?: Error}): void {
+    if (this._ended) {
+      return;
+    }
     this._ended = true;
 
     if (this.inputMessages.length > 0) {

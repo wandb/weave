@@ -13,16 +13,16 @@ describe('Tool', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('attaches to the turn span when started via turn.tool() (flat)', async () => {
-    const turn = await Turn.create({conversationId: 'conv-1'});
-    const tool = await turn.tool({
+  it('attaches to the turn span when started via turn.tool() (flat)', () => {
+    const turn = Turn.create({conversationId: 'conv-1'});
+    const tool = turn.tool({
       name: 'get_weather',
       args: '{"city":"Tokyo"}',
       toolCallId: 'tc-1',
     });
     tool.result = '75F';
-    await tool.end();
-    await turn.end();
+    tool.end();
+    turn.end();
 
     const spans = getExporter().getFinishedSpans();
     const toolSpan = findSpan(spans, 'execute_tool');
@@ -48,13 +48,13 @@ describe('Tool', () => {
     expect(toolSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
   });
 
-  it('attaches to the LLM span when started via llm.startTool() (nested)', async () => {
-    const turn = await Turn.create({});
-    const llm = await turn.llm({model: 'gpt-4o'});
-    const tool = await llm.startTool({name: 'get_weather'});
-    await tool.end();
-    await llm.end();
-    await turn.end();
+  it('attaches to the LLM span when started via llm.startTool() (nested)', () => {
+    const turn = Turn.create({});
+    const llm = turn.llm({model: 'gpt-4o'});
+    const tool = llm.startTool({name: 'get_weather'});
+    tool.end();
+    llm.end();
+    turn.end();
 
     const spans = getExporter().getFinishedSpans();
     const toolSpan = findSpan(spans, 'execute_tool');

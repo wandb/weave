@@ -13,11 +13,11 @@ describe('LLM (via Turn.llm)', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it("emits a 'chat' span as a child of the turn's invoke_agent span", async () => {
-    const turn = await Turn.create({agentName: 'a', conversationId: 'conv-1'});
-    const llm = await turn.llm({model: 'gpt-4o', providerName: 'openai'});
-    await llm.end();
-    await turn.end();
+  it("emits a 'chat' span as a child of the turn's invoke_agent span", () => {
+    const turn = Turn.create({agentName: 'a', conversationId: 'conv-1'});
+    const llm = turn.llm({model: 'gpt-4o', providerName: 'openai'});
+    llm.end();
+    turn.end();
 
     const spans = getExporter().getFinishedSpans();
     const llmSpan = findSpan(spans, 'chat');
@@ -34,9 +34,9 @@ describe('LLM (via Turn.llm)', () => {
     expect(llmSpan.spanContext().traceId).toBe(turnSpan.spanContext().traceId);
   });
 
-  it('serializes input/output messages and usage at end()', async () => {
-    const turn = await Turn.create({});
-    const llm = await turn.llm({model: 'gpt-4o'});
+  it('serializes input/output messages and usage at end()', () => {
+    const turn = Turn.create({});
+    const llm = turn.llm({model: 'gpt-4o'});
     llm.inputMessages = [{role: 'user', content: 'hi'}];
     llm.outputMessages = [{role: 'assistant', content: 'hello'}];
     llm.usage = {
@@ -46,8 +46,8 @@ describe('LLM (via Turn.llm)', () => {
       cacheReadInputTokens: 1,
       cacheCreationInputTokens: 3,
     };
-    await llm.end();
-    await turn.end();
+    llm.end();
+    turn.end();
 
     const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
     expect(
@@ -73,11 +73,11 @@ describe('LLM (via Turn.llm)', () => {
     ).toBe(3);
   });
 
-  it("omits message + usage attributes when fields aren't populated", async () => {
-    const turn = await Turn.create({});
-    const llm = await turn.llm({model: 'gpt-4o'});
-    await llm.end();
-    await turn.end();
+  it("omits message + usage attributes when fields aren't populated", () => {
+    const turn = Turn.create({});
+    const llm = turn.llm({model: 'gpt-4o'});
+    llm.end();
+    turn.end();
 
     const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
     expect(
