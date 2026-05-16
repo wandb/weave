@@ -25,7 +25,7 @@ export type MessagePart =
     }
   | {type: 'tool_result'; toolCallId: string; result?: string}
   | {type: 'file'; fileId: string; mimeType?: string; modality: Modality}
-  | {type: 'image_blob'; content: string; mimeType: string}
+  | {type: 'blob'; content: string; mimeType: string; modality: Modality}
   | {type: 'uri'; uri: string; modality: Modality};
 
 export interface Usage {
