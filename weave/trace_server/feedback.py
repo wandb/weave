@@ -18,12 +18,14 @@ from weave.trace_server.interface.builtin_object_classes.annotation_spec import 
 from weave.trace_server.interface.feedback_types import (
     ANNOTATION_FEEDBACK_TYPE_PREFIX,
     FEEDBACK_PAYLOAD_SCHEMAS,
+    MAX_TYPED_FEEDBACK_LABEL_LENGTH,
     REACTION_FEEDBACK_TYPE,
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     AnnotationPayloadSchema,
     RunnablePayloadSchema,
     feedback_type_is_annotation,
     feedback_type_is_runnable,
+    feedback_type_is_typed,
 )
 from weave.trace_server.orm import Column, Row, Table
 from weave.trace_server.refs_internal_server_util import ensure_ref_is_valid
@@ -48,6 +50,9 @@ TABLE_FEEDBACK = Table(
         Column("call_ref", "string", nullable=True),
         Column("trigger_ref", "string", nullable=True),
         Column("queue_id", "string", nullable=True),
+        Column("label", "string", nullable=True),
+        Column("score", "float", nullable=True),
+        Column("is_success", "bool", nullable=True),
     ],
 )
 
@@ -155,6 +160,26 @@ def validate_feedback_create_req(
     elif req.trigger_ref:
         raise InvalidRequest("trigger_ref is not allowed for non-runnable feedback")
 
+    # Validate the typed columns. At least one of (label, score, is_success)
+    # must be present on `wandb.typed` feedback and they must not appear on
+    # any other feedback type.
+    has_typed_value = (
+        req.label is not None or req.score is not None or req.is_success is not None
+    )
+    if feedback_type_is_typed(req.feedback_type):
+        if not has_typed_value:
+            raise InvalidRequest(
+                "wandb.typed feedback requires at least one of label, score, or is_success"
+            )
+        if req.label is not None and len(req.label) > MAX_TYPED_FEEDBACK_LABEL_LENGTH:
+            raise InvalidRequest(
+                f"label must be at most {MAX_TYPED_FEEDBACK_LABEL_LENGTH} characters"
+            )
+    elif has_typed_value:
+        raise InvalidRequest(
+            "label, score, and is_success are only allowed on wandb.typed feedback"
+        )
+
     # Validate the ref formats (we could even query the DB to ensure they exist and are valid)
     if req.annotation_ref:
         parsed = ensure_ref_is_valid(req.annotation_ref, (ri.InternalObjectRef,))
@@ -257,6 +282,9 @@ def format_feedback_to_row(
         "call_ref": feedback_req.call_ref,
         "trigger_ref": feedback_req.trigger_ref,
         "queue_id": feedback_req.queue_id,
+        "label": feedback_req.label,
+        "score": feedback_req.score,
+        "is_success": feedback_req.is_success,
     }
 
 

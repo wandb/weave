@@ -15,6 +15,11 @@ class FeedbackPayloadNoteReq(BaseModel):
 
 REACTION_FEEDBACK_TYPE = "wandb.reaction.1"
 NOTE_FEEDBACK_TYPE = "wandb.note.1"
+TYPED_FEEDBACK_TYPE = "wandb.typed"
+
+# Max length of the `label` column on typed feedback. Labels are intended to
+# behave like tags, not free-form strings.
+MAX_TYPED_FEEDBACK_LABEL_LENGTH = 128
 
 # Feedback types where multiple entries can exist per call per type.
 # When filtering on these, we use groupArrayIf (collect all values) + has()
@@ -48,6 +53,10 @@ def feedback_type_is_annotation(feedback_type: str) -> bool:
 
 def feedback_type_is_runnable(feedback_type: str) -> bool:
     return feedback_type.startswith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
+
+
+def feedback_type_is_typed(feedback_type: str) -> bool:
+    return feedback_type == TYPED_FEEDBACK_TYPE
 
 
 def runnable_feedback_selector(name: str) -> str:
