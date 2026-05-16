@@ -11,18 +11,18 @@ describe('end-to-end chain', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('session → turn → llm → tool wires the full parent-child trace', async () => {
-    const session = await Session.create({
+  it('session → turn → llm → tool wires the full parent-child trace', () => {
+    const session = Session.create({
       agentName: 'weather-bot',
       sessionId: 'conv-e2e',
     });
-    const turn = await session.startTurn();
-    const llm = await turn.llm({model: 'gpt-4o'});
-    const tool = await llm.startTool({name: 'get_weather'});
-    await tool.end();
-    await llm.end();
-    await turn.end();
-    await session.end();
+    const turn = session.startTurn();
+    const llm = turn.llm({model: 'gpt-4o'});
+    const tool = llm.startTool({name: 'get_weather'});
+    tool.end();
+    llm.end();
+    turn.end();
+    session.end();
 
     const spans = getExporter().getFinishedSpans();
     expect(spans).toHaveLength(3);

@@ -18,9 +18,7 @@ export class SubAgent {
     public readonly model: string
   ) {}
 
-  static async create(
-    opts: SubAgentInit & ChildSpanContext
-  ): Promise<SubAgent> {
+  static create(opts: SubAgentInit & ChildSpanContext): SubAgent {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [GEN_AI_ATTR.GEN_AI_OPERATION_NAME]: 'invoke_agent',
@@ -40,8 +38,10 @@ export class SubAgent {
     return new SubAgent(span, opts.name, opts.model ?? '');
   }
 
-  async end(opts?: {error?: Error}): Promise<void> {
-    if (this._ended) return;
+  end(opts?: {error?: Error}): void {
+    if (this._ended) {
+      return;
+    }
     this._ended = true;
     if (opts?.error) {
       this.span.recordException(opts.error);

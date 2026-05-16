@@ -7,11 +7,11 @@ describe('SubAgent', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('emits a nested invoke_agent span as a child of the turn', async () => {
-    const turn = await Turn.create({agentName: 'parent'});
-    const sub = await turn.subagent({name: 'child-bot', model: 'gpt-4o'});
-    await sub.end();
-    await turn.end();
+  it('emits a nested invoke_agent span as a child of the turn', () => {
+    const turn = Turn.create({agentName: 'parent'});
+    const sub = turn.subagent({name: 'child-bot', model: 'gpt-4o'});
+    sub.end();
+    turn.end();
 
     const spans = getExporter().getFinishedSpans();
     // Two spans, both named 'invoke_agent'. Differentiate by agent name.

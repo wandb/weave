@@ -7,14 +7,14 @@ describe('Session', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('emits no span of its own but propagates sessionId as gen_ai.conversation.id', async () => {
-    const session = await Session.create({
+  it('emits no span of its own but propagates sessionId as gen_ai.conversation.id', () => {
+    const session = Session.create({
       agentName: 'weather-bot',
       sessionId: 's-1',
     });
-    const turn = await session.startTurn();
-    await turn.end();
-    await session.end();
+    const turn = session.startTurn();
+    turn.end();
+    session.end();
 
     const spans = getExporter().getFinishedSpans();
     expect(spans).toHaveLength(1); // only the turn span
@@ -25,8 +25,8 @@ describe('Session', () => {
     );
   });
 
-  it('auto-generates a sessionId when none is supplied', async () => {
-    const session = await Session.create({});
+  it('auto-generates a sessionId when none is supplied', () => {
+    const session = Session.create({});
     expect(session.sessionId).toBeTruthy();
   });
 });
