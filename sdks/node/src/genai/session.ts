@@ -1,6 +1,6 @@
 import {uuidv7} from 'uuidv7';
 
-import {_currentSession} from './context';
+import {_getGenaiState} from './context';
 import {Turn, type TurnInit} from './turn';
 
 export interface SessionInit {
@@ -17,23 +17,27 @@ export interface SessionInit {
  */
 export class Session {
   private _ended = false;
-  private readonly _previousSession: Session | undefined;
 
   private constructor(
     public readonly agentName: string,
     public readonly model: string,
     public readonly sessionId: string
-  ) {
-    this._previousSession = _currentSession.getStore();
-    _currentSession.enterWith(this);
-  }
+  ) {}
 
   static create(opts: SessionInit = {}): Session {
-    return new Session(
+    const state = _getGenaiState();
+    if (state.session !== null) {
+      throw new Error(
+        'A Session is already active in this async chain. End it before starting a new one.'
+      );
+    }
+    const session = new Session(
       opts.agentName ?? '',
       opts.model ?? '',
       opts.sessionId ?? uuidv7()
     );
+    state.session = session;
+    return session;
   }
 
   startTurn(opts: TurnInit = {}): Turn {
@@ -50,7 +54,9 @@ export class Session {
       return;
     }
     this._ended = true;
-    // Session emits no span — only the AsyncLocalStorage restore is meaningful here.
-    _currentSession.enterWith(this._previousSession);
+    const state = _getGenaiState();
+    if (state.session === this) {
+      state.session = null;
+    }
   }
 }

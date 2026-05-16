@@ -5,7 +5,7 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {setGlobalClient} from '../../clientApi';
-import {_currentLLM, _currentSession, _currentTurn} from '../../genai/context';
+import {DEFAULT_STATE_SYMBOL_NAME} from '../../genai/context';
 import {Api as TraceServerApi} from '../../generated/traceServerApi';
 import {PROVIDER_HOLDER_SYMBOL_NAME} from '../../genai/provider';
 import {Settings, type SettingsInit} from '../../settings';
@@ -49,6 +49,19 @@ export function resetProviderSingleton(): void {
   }
 }
 
+// Reach into the GenAI default-state singleton and null out its slots so each
+// test body starts clean even when prior tests in the same worker mutated it.
+export function resetGenaiDefaultState(): void {
+  const state = (globalThis as Record<symbol, unknown>)[
+    Symbol.for(DEFAULT_STATE_SYMBOL_NAME)
+  ] as {session: unknown; turn: unknown; llm: unknown} | undefined;
+  if (state) {
+    state.session = null;
+    state.turn = null;
+    state.llm = null;
+  }
+}
+
 /**
  * Install the standard before/after-each pattern for GenAI tests: stubs
  * `WANDB_API_KEY` (so the provider's OTLP exporter can be built), resets
@@ -62,19 +75,13 @@ export function setupGenAITestEnvironment(): void {
     process.env.WANDB_API_KEY = 'test-api-key';
     resetProviderSingleton();
     clearGlobalClient();
-    // Clear ALS stores so test bodies start without inherited Session/Turn/LLM
-    // state from any prior test in the same async chain.
-    _currentSession.enterWith(undefined);
-    _currentTurn.enterWith(undefined);
-    _currentLLM.enterWith(undefined);
+    resetGenaiDefaultState();
   });
 
   afterEach(() => {
     resetProviderSingleton();
     clearGlobalClient();
-    _currentSession.enterWith(undefined);
-    _currentTurn.enterWith(undefined);
-    _currentLLM.enterWith(undefined);
+    resetGenaiDefaultState();
     if (originalApiKey === undefined) {
       delete process.env.WANDB_API_KEY;
     } else {

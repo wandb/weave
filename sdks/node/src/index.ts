@@ -31,6 +31,7 @@ export {
   getCurrentLLM,
   getCurrentSession,
   getCurrentTurn,
+  runIsolated,
   startLLM,
   startSession,
   startSubagent,
