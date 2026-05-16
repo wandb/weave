@@ -196,6 +196,9 @@ class RefFeedbackQuery(FeedbackQuery):
         payload: dict[str, Any],
         creator: str | None,
         annotation_ref: str | None = None,
+        label: str | None = None,
+        score: float | None = None,
+        is_success: bool | None = None,
     ) -> str:
         freq = tsi.FeedbackCreateReq(
             project_id=to_project_id(self.entity, self.project),
@@ -203,6 +206,9 @@ class RefFeedbackQuery(FeedbackQuery):
             feedback_type=feedback_type,
             payload=payload,
             creator=creator,
+            label=label,
+            score=score,
+            is_success=is_success,
         )
         if annotation_ref:
             try:
@@ -251,6 +257,32 @@ class RefFeedbackQuery(FeedbackQuery):
                 "note": note,
             },
             creator=creator,
+        )
+
+    def add_typed(
+        self,
+        label: str | None = None,
+        score: float | None = None,
+        is_success: bool | None = None,
+        creator: str | None = None,
+    ) -> str:
+        """Add typed feedback (label, score, and/or is_success) to the ref.
+
+        At least one of `label`, `score`, or `is_success` must be provided.
+        Each call creates a single feedback row; callers wanting multiple
+        labels per ref should make multiple calls.
+        """
+        if label is None and score is None and is_success is None:
+            raise ValueError(
+                "add_typed requires at least one of label, score, or is_success"
+            )
+        return self._add(
+            "wandb.typed",
+            {},
+            creator=creator,
+            label=label,
+            score=score,
+            is_success=is_success,
         )
 
     def purge(self, feedback_id: str) -> None:
