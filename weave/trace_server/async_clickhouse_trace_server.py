@@ -16,7 +16,12 @@ completions.
 `acompletions_create` keeps the same shape but yields to the event loop
 during the LLM HTTP round-trip:
 
-  1. `_prepare_completion_request` - sync, fast, no I/O held by a thread.
+  1. `_prepare_completion_request` - sync setup. Fast for the worker's
+     hot path (no `req.inputs.prompt`); when a prompt ref is set it
+     issues an `obj_read` CH round-trip on the event-loop thread before
+     the LLM call. Acceptable today (prompts are not on the LLM-judge
+     hot path); a future caller heavy on prompts could move this onto
+     `ch_executor` too.
   2. `lite_llm_acompletion` - awaits litellm.acompletion. ZERO threads held
      while we wait the ~3s for the provider.
   3. `_log_completion_call` - sync CH insert (~100-300ms), run via
@@ -35,8 +40,14 @@ import datetime
 from concurrent.futures import Executor
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.clickhouse_trace_server_batched import (
+    CLICKHOUSE_DEFAULT_PORT,
+    ClickHouseTraceServer,
+)
 from weave.trace_server.llm_completion import lite_llm_acompletion
+from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
+    EvaluateModelDispatcher,
+)
 
 
 class AsyncClickHouseTraceServer(ClickHouseTraceServer):
@@ -47,9 +58,28 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
     default executor.
     """
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        self._ch_executor: Executor | None = kwargs.pop("ch_executor", None)  # type: ignore[assignment]
-        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+    def __init__(
+        self,
+        *,
+        host: str,
+        port: int = CLICKHOUSE_DEFAULT_PORT,
+        user: str = "default",
+        password: str = "",
+        database: str = "default",
+        use_async_insert: bool = False,
+        evaluate_model_dispatcher: EvaluateModelDispatcher | None = None,
+        ch_executor: Executor | None = None,
+    ) -> None:
+        super().__init__(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=database,
+            use_async_insert=use_async_insert,
+            evaluate_model_dispatcher=evaluate_model_dispatcher,
+        )
+        self._ch_executor: Executor | None = ch_executor
 
     def set_ch_executor(self, executor: Executor | None) -> None:
         """Set the executor used to run the post-LLM CH insert.
