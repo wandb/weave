@@ -2,6 +2,7 @@ import threading
 from collections.abc import Callable, Iterator
 from typing import Any
 
+import litellm
 from cachetools import TTLCache
 from pydantic import BaseModel
 
@@ -276,8 +277,6 @@ def _prepare_litellm_call(
         azure_api_version,
     ) = _setup_provider_credentials_and_model(inputs, provider)
 
-    import litellm
-
     # Drop params that are not supported by the LLM provider.
     litellm.drop_params = True
 
@@ -343,8 +342,6 @@ def lite_llm_completion(
         extra_headers=extra_headers,
         vertex_credentials=vertex_credentials,
     )
-    import litellm
-
     try:
         res = litellm.completion(**plan.kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
@@ -375,8 +372,6 @@ async def lite_llm_acompletion(
         extra_headers=extra_headers,
         vertex_credentials=vertex_credentials,
     )
-    import litellm
-
     try:
         res = await litellm.acompletion(**plan.kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
@@ -651,8 +646,6 @@ def lite_llm_completion_stream(
         azure_api_base,
         azure_api_version,
     ) = _setup_provider_credentials_and_model(inputs, provider)
-
-    import litellm
 
     litellm.drop_params = True
 
