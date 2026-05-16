@@ -12,7 +12,13 @@ export {
   startTool,
   startTurn,
 } from './api';
-export {getCurrentLLM, getCurrentSession, getCurrentTurn} from './context';
+export {
+  getCurrentLLM,
+  getCurrentSession,
+  getCurrentTurn,
+  runIsolated,
+} from './context';
+export {flushOTel} from './flush';
 export {LLM, type LLMInit} from './llm';
 export {Session, type SessionInit} from './session';
 export {SubAgent, type SubAgentInit} from './subagent';

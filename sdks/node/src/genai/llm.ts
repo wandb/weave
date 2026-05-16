@@ -7,7 +7,7 @@ import {
 } from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
-import {_currentLLM} from './context';
+import {_getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
 import {GEN_AI_ATTR, WEAVE_GENAI_TRACER_NAME} from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
@@ -27,7 +27,6 @@ export class LLM {
   reasoning?: Reasoning;
 
   private _ended = false;
-  private readonly _previousLLM: LLM | undefined;
 
   private constructor(
     private readonly span: Span,
@@ -35,12 +34,15 @@ export class LLM {
     private readonly conversationId: string,
     public readonly model: string,
     public readonly providerName: string
-  ) {
-    this._previousLLM = _currentLLM.getStore();
-    _currentLLM.enterWith(this);
-  }
+  ) {}
 
   static create(opts: LLMInit & ChildSpanContext): LLM {
+    const state = _getGenaiState();
+    if (state.llm !== null) {
+      throw new Error(
+        'An LLM is already active in this async chain. End it before starting a new one.'
+      );
+    }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [GEN_AI_ATTR.GEN_AI_OPERATION_NAME]: 'chat',
@@ -57,13 +59,15 @@ export class LLM {
       {kind: SpanKind.CLIENT, attributes},
       opts.parentContext
     );
-    return new LLM(
+    const llm = new LLM(
       span,
       trace.setSpan(opts.parentContext, span),
       opts.conversationId ?? '',
       opts.model,
       opts.providerName ?? ''
     );
+    state.llm = llm;
+    return llm;
   }
 
   startTool(opts: ToolInit): Tool {
@@ -141,6 +145,9 @@ export class LLM {
       });
     }
     this.span.end();
-    _currentLLM.enterWith(this._previousLLM);
+    const state = _getGenaiState();
+    if (state.llm === this) {
+      state.llm = null;
+    }
   }
 }

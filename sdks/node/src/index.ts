@@ -23,14 +23,15 @@ export {
   patchRealtimeSession,
   createOtelExtension,
 } from './integrations';
-export {flushOTel} from './genai/flush';
 export {
   endLLM,
   endSession,
   endTurn,
+  flushOTel,
   getCurrentLLM,
   getCurrentSession,
   getCurrentTurn,
+  runIsolated,
   startLLM,
   startSession,
   startSubagent,
