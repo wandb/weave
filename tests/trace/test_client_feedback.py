@@ -225,6 +225,29 @@ def test_feedback_payload(client):
     assert payload["emoji"] == "🎱"
 
 
+def test_add_typed_feedback_api(client):
+    """Exercise the SDK helper for typed feedback end-to-end."""
+    call = client.create_call("x", {"a": 1})
+    client.finish_call(call, "ok")
+    trace_obj = client.get_call(call.id)
+
+    feedback_id = trace_obj.feedback.add_typed(
+        label="passes_safety_check", score=0.9, is_success=True
+    )
+    assert isinstance(feedback_id, str)
+
+    with pytest.raises(ValueError, match="at least one"):
+        trace_obj.feedback.add_typed()
+
+    feedbacks = list(trace_obj.feedback.refresh())
+    assert len(feedbacks) == 1
+    fb = feedbacks[0]
+    assert fb.feedback_type == "wandb.typed"
+    assert fb.label == "passes_safety_check"
+    assert fb.score == 0.9
+    assert fb.is_success is True
+
+
 def test_feedback_create_too_large(client):
     project_id = client.project_id
 
