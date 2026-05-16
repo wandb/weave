@@ -1,10 +1,23 @@
 /**
  * Weave GenAI session SDK — module entry point.
- *
- * The top-level `weave.startSession` / `startTurn` / ... functions and the
- * AsyncLocalStorage-backed `getCurrent*` accessors land in a later PR.
  */
 
+export {
+  endLLM,
+  endSession,
+  endTurn,
+  startLLM,
+  startSession,
+  startSubagent,
+  startTool,
+  startTurn,
+} from './api';
+export {
+  getCurrentLLM,
+  getCurrentSession,
+  getCurrentTurn,
+  runIsolated,
+} from './context';
 export {LLM, type LLMInit} from './llm';
 export {Session, type SessionInit} from './session';
 export {SubAgent, type SubAgentInit} from './subagent';
