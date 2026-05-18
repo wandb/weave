@@ -149,6 +149,11 @@ class WeaveClientSendFileCache:
         key = self._key(req)
         self.cache.put(key, res)
 
+    def delete(self, req: FileCreateReq) -> None:
+        """Remove a cached entry for a file create request."""
+        key = self._key(req)
+        self.cache.delete(key)
+
     def clear(self) -> None:
         """Clear all items from the cache."""
         self.cache.clear()

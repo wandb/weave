@@ -294,6 +294,21 @@ class TestWeaveClientSendFileCache:
         assert cache.get(req1) is None
         assert cache.get(req2) is None
 
+    def test_delete(self):
+        """Test deleting a cached entry by request."""
+        cache = WeaveClientSendFileCache()
+        req = FileCreateReq(project_id="test", name="file", content=b"content")
+        cache.put(req, FileCreateRes(digest="d"))
+        assert cache.get(req) is not None
+        cache.delete(req)
+        assert cache.get(req) is None
+
+    def test_delete_nonexistent(self):
+        """Deleting a missing entry should not raise."""
+        cache = WeaveClientSendFileCache()
+        req = FileCreateReq(project_id="test", name="missing", content=b"x")
+        cache.delete(req)  # no-op
+
     def test_size(self):
         """Test the size method."""
         cache = WeaveClientSendFileCache()
