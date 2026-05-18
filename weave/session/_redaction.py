@@ -13,23 +13,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from weave.session.types import Message
-
-# ``presidio`` is an optional dependency — only installed when the user
-# opts into PII redaction. Import lazily-shaped (top-level with fallback)
-# so test environments without presidio can still import this module and
-# ``mock.patch`` the ``redact_pii`` symbol for unit tests. Callers must
-# guard with ``should_redact_pii()`` before invoking the helpers below
-# in production; if presidio is missing at that point, the underlying
-# import error will surface clearly.
-try:
-    from weave.utils.pii_redaction import redact_pii
-except ImportError:  # pragma: no cover — exercised in environments without presidio
-
-    def redact_pii(data: dict[str, Any] | str) -> dict[str, Any] | str:  # type: ignore[no-redef]
-        raise ImportError(
-            "presidio is required for PII redaction. "
-            "Install with `pip install 'weave[presidio]'`."
-        )
+from weave.utils.pii_redaction import redact_pii
 
 
 def redact_string(s: str) -> str:

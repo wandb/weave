@@ -1,12 +1,14 @@
 import dataclasses
 from typing import Any
 
-from presidio_analyzer import AnalyzerEngine
-from presidio_anonymizer import AnonymizerEngine
-
 from weave.telemetry import trace_sentry
 from weave.trace.settings import redact_pii_exclude_fields, redact_pii_fields
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
+
+_PRESIDIO_INSTALL_HINT = (
+    "presidio is required for PII redaction. "
+    "Install with `pip install 'weave[presidio]'`."
+)
 
 DEFAULT_REDACTED_FIELDS = [
     "CREDIT_CARD",
@@ -39,6 +41,12 @@ def _get_redaction_entities() -> list[str]:
 def redact_pii(
     data: dict[str, Any] | str,
 ) -> dict[str, Any] | str:
+    try:
+        from presidio_analyzer import AnalyzerEngine
+        from presidio_anonymizer import AnonymizerEngine
+    except ImportError as e:
+        raise ImportError(_PRESIDIO_INSTALL_HINT) from e
+
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
     entities = _get_redaction_entities()
@@ -71,6 +79,12 @@ def redact_pii(
 
 
 def redact_pii_string(data: str) -> str:
+    try:
+        from presidio_analyzer import AnalyzerEngine
+        from presidio_anonymizer import AnonymizerEngine
+    except ImportError as e:
+        raise ImportError(_PRESIDIO_INSTALL_HINT) from e
+
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
     entities = _get_redaction_entities()
