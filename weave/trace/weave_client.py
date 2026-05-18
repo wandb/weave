@@ -68,7 +68,12 @@ from weave.trace.op import (
 from weave.trace.op import op as op_deco
 from weave.trace.op_protocol import Op
 from weave.trace.project_id_resolver import ProjectIdResolver
-from weave.trace.ref_util import get_ref, remove_ref, set_ref
+from weave.trace.ref_util import (
+    clear_refs_on_failure,
+    get_ref,
+    remove_ref,
+    set_ref,
+)
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -1921,6 +1926,11 @@ class WeaveClient:
             # but that might have unintended consequences. As a result, we break the
             # typical pattern and explicitly set the ref here.
             set_ref(obj, ref)
+            # WB-31070: _save_object_basic only cleared obj_rec on failure;
+            # the same ref is now on the user-visible `obj`, so register the
+            # matching cleanup so failure doesn't pin the pydantic payload.
+            if isinstance(ref._digest, Future):
+                clear_refs_on_failure(ref._digest, lambda: remove_ref(obj))
 
         # Case 2: Op:
         # Here we save the op itself.
@@ -2167,18 +2177,12 @@ class WeaveClient:
         try:
             set_ref(orig_val, ref)
         except ValueError:
+            # Primitives without __dict__ can't hold a ref; that's fine.
             pass
 
-        # WB-31070: drop the ref on failure so orig_val stops pinning
-        # the failed future (whose traceback retains json_val).
-        def _clear_ref_on_failure(fut: Future[str]) -> None:
-            if fut.exception() is not None:
-                try:
-                    remove_ref(orig_val)
-                except Exception:
-                    pass
-
-        digest_future.add_done_callback(_clear_ref_on_failure)
+        # WB-31070: drop the ref on failure so orig_val stops pinning the
+        # failed future (whose traceback retains json_val via frame locals).
+        clear_refs_on_failure(digest_future, lambda: remove_ref(orig_val))
 
         return ref
 
@@ -2279,6 +2283,15 @@ class WeaveClient:
 
         if isinstance(table, WeaveTable):
             table.table_ref = table_ref
+
+        # WB-31070: drop refs on failure so the failed digest_future doesn't
+        # pin the user's table via Ref._digest.
+        def _clear_table_refs() -> None:
+            table.ref = None
+            if isinstance(table, WeaveTable):
+                table.table_ref = None
+
+        clear_refs_on_failure(digest_future, _clear_table_refs)
 
         return table_ref
 

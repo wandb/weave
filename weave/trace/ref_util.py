@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from concurrent.futures import Future
 from typing import Any
 
 from weave.trace.refs import ObjectRef, Ref
@@ -40,3 +42,25 @@ def set_ref(obj: Any, ref: Ref | None) -> None:
             raise ValueError(
                 f"Failed to set ref on object of type {type(obj)}"
             ) from None
+
+
+def clear_refs_on_failure(
+    digest_future: Future[str], cleanup: Callable[[], None]
+) -> None:
+    """Run `cleanup` if `digest_future` resolves with an exception.
+
+    A failed digest_future retains the serialized payload via its exception
+    traceback's frame locals — anything still referencing the Ref (whose
+    `_digest` is the future) pins that payload. Callers register a cleanup
+    that breaks the reference path from user objects to the Ref.
+    """
+
+    def _on_done(fut: Future[str]) -> None:
+        if fut.exception() is None:
+            return
+        try:
+            cleanup()
+        except Exception as e:
+            logger.debug("clear_refs_on_failure cleanup raised: %s", e)
+
+    digest_future.add_done_callback(_on_done)
