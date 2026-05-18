@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+import contextvars
 import dataclasses
 import datetime
 import json
@@ -311,7 +312,7 @@ logger.setLevel(logging.INFO)
 T = TypeVar("T")
 
 # ClickHouse connection pool settings
-CH_POOL_MAX_CONNECTIONS = 50
+CH_POOL_MAX_CONNECTIONS = wf_env.wf_clickhouse_pool_max_connections()
 CH_POOL_COUNT = 2
 
 # ClickHouse port defaults
@@ -364,7 +365,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         evaluate_model_dispatcher: EvaluateModelDispatcher | None = None,
     ):
         super().__init__()
+        # Thread-local storage for the ClickHouse client. `clickhouse-connect`
+        # Client instances are not safe to share across threads, so each OS
+        # thread gets its own (all sharing the same underlying HTTP pool).
         self._thread_local = threading.local()
+        # Per-asyncio-task batch state. ContextVars propagate into executor threads
+        # via `asyncio.to_thread`, unlike `threading.local`, so a `with self.call_batch():`
+        # block can safely span an `await`.
+        self._call_batch_var: contextvars.ContextVar[list[list[Any]] | None] = (
+            contextvars.ContextVar("ch_call_batch", default=None)
+        )
+        self._file_batch_var: contextvars.ContextVar[
+            list[FileChunkCreateCHInsertable] | None
+        ] = contextvars.ContextVar("ch_file_batch", default=None)
+        self._calls_complete_batch_var: contextvars.ContextVar[
+            list[list[Any]] | None
+        ] = contextvars.ContextVar("ch_calls_complete_batch", default=None)
+        self._flush_immediately_var: contextvars.ContextVar[bool] = (
+            contextvars.ContextVar("ch_flush_immediately", default=True)
+        )
         self._host = host
         self._port = port
         self._user = user
@@ -416,41 +435,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @property
     def _flush_immediately(self) -> bool:
-        return getattr(self._thread_local, "flush_immediately", True)
+        return self._flush_immediately_var.get()
 
     @_flush_immediately.setter
     def _flush_immediately(self, value: bool) -> None:
-        self._thread_local.flush_immediately = value
+        self._flush_immediately_var.set(value)
 
     @property
     def _call_batch(self) -> list[list[Any]]:
-        if not hasattr(self._thread_local, "call_batch"):
-            self._thread_local.call_batch = []
-        return self._thread_local.call_batch
+        batch = self._call_batch_var.get()
+        if batch is None:
+            batch = []
+            self._call_batch_var.set(batch)
+        return batch
 
     @_call_batch.setter
     def _call_batch(self, value: list[list[Any]]) -> None:
-        self._thread_local.call_batch = value
+        self._call_batch_var.set(value)
 
     @property
     def _file_batch(self) -> list[FileChunkCreateCHInsertable]:
-        if not hasattr(self._thread_local, "file_batch"):
-            self._thread_local.file_batch = []
-        return self._thread_local.file_batch
+        batch = self._file_batch_var.get()
+        if batch is None:
+            batch = []
+            self._file_batch_var.set(batch)
+        return batch
 
     @_file_batch.setter
     def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None:
-        self._thread_local.file_batch = value
+        self._file_batch_var.set(value)
 
     @property
     def _calls_complete_batch(self) -> list[list[Any]]:
-        if not hasattr(self._thread_local, "calls_complete_batch"):
-            self._thread_local.calls_complete_batch = []
-        return self._thread_local.calls_complete_batch
+        batch = self._calls_complete_batch_var.get()
+        if batch is None:
+            batch = []
+            self._calls_complete_batch_var.set(batch)
+        return batch
 
     @_calls_complete_batch.setter
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
-        self._thread_local.calls_complete_batch = value
+        self._calls_complete_batch_var.set(value)
 
     @classmethod
     def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
@@ -799,8 +824,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
-        """Batch call operations and flush them all at the end."""
-        # Not thread safe - do not use across threads
+        """Batch call operations and flush them all at the end.
+
+        Batch state is per-asyncio-task via ContextVars and is safe across
+        `asyncio.to_thread` hops within a single task. Concurrent tasks each
+        observe their own independent batches.
+        """
+        # Bind fresh batches to the current context so we don't inherit a parent
+        # task's mid-flight state and so child contexts are isolated.
+        self._file_batch = []
+        self._call_batch = []
+        self._calls_complete_batch = []
         self._flush_immediately = False
         try:
             yield

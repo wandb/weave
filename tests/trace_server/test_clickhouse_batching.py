@@ -4,6 +4,7 @@ This module verifies that multiple calls are properly batched into a single
 ClickHouse insert operation for performance optimization.
 """
 
+import asyncio
 import base64
 import datetime
 import json
@@ -537,3 +538,68 @@ def test_obj_batch_mixed_projects_errors(trace_server, client):
         match="obj_create_batch only supports updating a single project.",
     ):
         server.obj_create_batch(batch=batch)
+
+
+def test_call_batch_real_writes_are_per_task_and_survive_to_thread():
+    """Concurrent async call batches flush isolated real call_start rows."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+
+    def fake_query(query: str, *args: Any, **kwargs: Any) -> MagicMock:
+        result = MagicMock()
+        if "project_ttl_settings" in query:
+            result.row_count = 0
+            return result
+        result.result_rows = [[0, 1]]  # legacy project: write to call_parts
+        return result
+
+    mock_ch_client.query.side_effect = fake_query
+
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = ClickHouseTraceServer(host="test_host")
+        project_id = base64.b64encode(b"test_entity/contextvars_batch").decode("utf-8")
+
+        def make_req(label: str, suffix: str) -> tsi.CallStartReq:
+            return tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    op_name=f"{label}_{suffix}",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={},
+                    inputs={},
+                )
+            )
+
+        async def write_three_calls(label: str) -> None:
+            with server.call_batch():
+                server.call_start(make_req(label, "a"))
+                # Old threading.local state leaked across concurrent tasks here.
+                await asyncio.sleep(0)
+                server.call_start(make_req(label, "b"))
+                # ContextVar state must also follow blocking work into executor threads.
+                await asyncio.to_thread(server.call_start, make_req(label, "c"))
+
+        async def driver() -> None:
+            await asyncio.gather(write_three_calls("X"), write_three_calls("Y"))
+
+        asyncio.run(driver())
+
+    call_part_inserts = [
+        call
+        for call in mock_ch_client.insert.call_args_list
+        if call.args[0] == "call_parts"
+    ]
+    assert len(call_part_inserts) == 2
+
+    op_name_batches = []
+    for insert_call in call_part_inserts:
+        op_name_idx = insert_call.kwargs["column_names"].index("op_name")
+        op_name_batches.append([row[op_name_idx] for row in insert_call.kwargs["data"]])
+
+    assert sorted(op_name_batches) == [
+        ["X_a", "X_b", "X_c"],
+        ["Y_a", "Y_b", "Y_c"],
+    ]

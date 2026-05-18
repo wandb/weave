@@ -30,11 +30,15 @@ def test_skip_clickhouse_client(
 # _reset_server_state in conftest.py needs to reset it between tests.
 KNOWN_SERVER_ATTRS = frozenset(
     {
+        "_call_batch_var",
+        "_calls_complete_batch_var",
         "_database",
         "_database_ensured",
         "_evaluate_model_dispatcher",
+        "_file_batch_var",
         "_file_storage_client",
         "_file_storage_client_initialized",
+        "_flush_immediately_var",
         "_host",
         "_init_lock",
         "_kafka_producer",
