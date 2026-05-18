@@ -2164,16 +2164,21 @@ class WeaveClient:
         else:
             ref = ObjectRef(self.entity, self.project, name, digest_future)
 
-        # WB-31070: only attach on success. A failed digest_future's
-        # exception traceback retains json_val via frame locals.
-        def _attach_ref_on_success(fut: Future[str]) -> None:
-            if fut.exception() is None:
+        try:
+            set_ref(orig_val, ref)
+        except ValueError:
+            pass
+
+        # WB-31070: drop the ref on failure so orig_val stops pinning
+        # the failed future (whose traceback retains json_val).
+        def _clear_ref_on_failure(fut: Future[str]) -> None:
+            if fut.exception() is not None:
                 try:
-                    set_ref(orig_val, ref)
-                except ValueError:
+                    remove_ref(orig_val)
+                except Exception:
                     pass
 
-        digest_future.add_done_callback(_attach_ref_on_success)
+        digest_future.add_done_callback(_clear_ref_on_failure)
 
         return ref
 
