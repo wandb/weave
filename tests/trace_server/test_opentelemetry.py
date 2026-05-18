@@ -2074,7 +2074,9 @@ def test_otel_attributes_otel_span_filter_legacy_fallback(
                 op_name="legacy_otel_op",
                 attributes={
                     "otel_span": {
-                        "attributes": {"gen_ai": {"response": {"model": "claude-legacy"}}}
+                        "attributes": {
+                            "gen_ai": {"response": {"model": "claude-legacy"}}
+                        }
                     }
                 },
                 inputs={},
