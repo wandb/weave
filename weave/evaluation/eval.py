@@ -95,10 +95,10 @@ def _attach_genai_span_ref_to_call_summary(
     if call.summary is None:
         call.summary = {}
 
-    weave_summary = call.summary.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
-    if not isinstance(weave_summary, dict):
-        weave_summary = {}
-        call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE] = weave_summary
+    if constants.WEAVE_ATTRIBUTES_NAMESPACE not in call.summary:
+        call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE] = {}
+
+    weave_summary = call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE]
 
     weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = genai_span_ref.model_dump()
 
