@@ -18,7 +18,6 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from weave import version
-from weave.session import _redaction
 from weave.session.session import (
     LLM,
     Message,
@@ -36,6 +35,7 @@ from weave.session.session import (
 )
 from weave.trace.settings import override_settings
 from weave.trace.weave_init import _setup_session_tracing
+from weave.utils import pii_redaction
 
 
 @pytest.fixture(autouse=True)
@@ -66,7 +66,7 @@ def _make_redact_substitutor(substitutions: dict[str, str]) -> Callable[[Any], A
     Walks dicts, lists, and dataclasses (matches the real ``redact_pii``
     shape) and applies each ``old → new`` substitution to every string
     encountered. Used as ``side_effect`` for patching
-    ``weave.session._redaction.redact_pii`` in tests.
+    ``weave.utils.pii_redaction.redact_pii`` in tests.
     """
 
     def _walk(value: Any) -> Any:
@@ -190,19 +190,19 @@ def test_disabled_at_init_skips_tracer_provider(monkeypatch: pytest.MonkeyPatch)
 
 
 # ---------------------------------------------------------------------------
-# _redaction.py helpers
+# pii_redaction.py session helpers
 # ---------------------------------------------------------------------------
 
 
 def test_redact_string_empty_skips_presidio():
-    with patch("weave.session._redaction.redact_pii") as mock:
-        assert _redaction.redact_string("") == ""
+    with patch("weave.utils.pii_redaction.redact_pii") as mock:
+        assert pii_redaction.redact_string("") == ""
     mock.assert_not_called()
 
 
 def test_redact_string_routes_through_redact_pii():
-    with patch("weave.session._redaction.redact_pii", return_value="REDACTED") as mock:
-        result = _redaction.redact_string("alice@example.com")
+    with patch("weave.utils.pii_redaction.redact_pii", return_value="REDACTED") as mock:
+        result = pii_redaction.redact_string("alice@example.com")
     assert result == "REDACTED"
     mock.assert_called_once_with("alice@example.com")
 
@@ -210,9 +210,9 @@ def test_redact_string_routes_through_redact_pii():
 @pytest.mark.parametrize(
     ("fn", "empty"),
     [
-        pytest.param(_redaction.redact_messages, [], id="messages"),
+        pytest.param(pii_redaction.redact_messages, [], id="messages"),
         pytest.param(
-            _redaction.redact_system_instructions, [], id="system_instructions"
+            pii_redaction.redact_system_instructions, [], id="system_instructions"
         ),
     ],
 )
@@ -245,8 +245,8 @@ def test_redact_messages_dump_redact_revalidate():
             return [fake_redact(x) for x in data]
         return data
 
-    with patch("weave.session._redaction.redact_pii", side_effect=fake_redact):
-        out = _redaction.redact_messages(msgs)
+    with patch("weave.utils.pii_redaction.redact_pii", side_effect=fake_redact):
+        out = pii_redaction.redact_messages(msgs)
 
     assert out is not None
     assert len(out) == 2
@@ -259,10 +259,10 @@ def test_redact_messages_dump_redact_revalidate():
 
 def test_redact_system_instructions():
     with patch(
-        "weave.session._redaction.redact_pii",
+        "weave.utils.pii_redaction.redact_pii",
         side_effect=lambda s: "<REDACTED>" if s else s,
     ):
-        out = _redaction.redact_system_instructions(["secret instruction"])
+        out = pii_redaction.redact_system_instructions(["secret instruction"])
     assert out == ["<REDACTED>"]
 
 
@@ -275,7 +275,7 @@ def test_tool_redacts_arguments_and_result(otel_spans: InMemorySpanExporter):
     """With redact_pii=True, Tool.arguments and Tool.result are redacted on emit."""
     with override_settings(redact_pii=True):
         with patch(
-            "weave.session._redaction.redact_pii",
+            "weave.utils.pii_redaction.redact_pii",
             side_effect=_email_substitutor(),
         ):
             with start_session(session_id="s") as sess, sess.start_turn() as t:
@@ -316,7 +316,7 @@ def test_llm_redacts_all_content_fields(otel_spans: InMemorySpanExporter):
     """input_messages, output_messages, and system_instructions all route through redact_pii."""
     with override_settings(redact_pii=True):
         with patch(
-            "weave.session._redaction.redact_pii",
+            "weave.utils.pii_redaction.redact_pii",
             side_effect=_email_substitutor(),
         ):
             with start_session(session_id="s") as sess, sess.start_turn() as t:
@@ -345,7 +345,7 @@ def test_llm_redacts_reasoning(otel_spans: InMemorySpanExporter):
     """Regression: reasoning content goes through redact_pii before landing in output.messages."""
     with override_settings(redact_pii=True):
         with patch(
-            "weave.session._redaction.redact_pii",
+            "weave.utils.pii_redaction.redact_pii",
             side_effect=_email_substitutor(),
         ):
             with start_session(session_id="s") as sess, sess.start_turn() as t:
@@ -365,7 +365,7 @@ def test_llm_redacts_reasoning(otel_spans: InMemorySpanExporter):
 def test_turn_redacts_messages(otel_spans: InMemorySpanExporter):
     with override_settings(redact_pii=True):
         with patch(
-            "weave.session._redaction.redact_pii",
+            "weave.utils.pii_redaction.redact_pii",
             side_effect=_email_substitutor(),
         ):
             with start_session(session_id="s") as sess:
@@ -387,7 +387,7 @@ def test_turn_redacts_messages(otel_spans: InMemorySpanExporter):
 def test_log_turn_redacts_turn_messages(otel_spans: InMemorySpanExporter):
     with override_settings(redact_pii=True):
         with patch(
-            "weave.session._redaction.redact_pii",
+            "weave.utils.pii_redaction.redact_pii",
             side_effect=_email_substitutor(),
         ):
             log_turn(
@@ -405,7 +405,7 @@ def test_log_turn_redacts_turn_messages(otel_spans: InMemorySpanExporter):
 def test_log_turn_redacts_child_llm(otel_spans: InMemorySpanExporter):
     with override_settings(redact_pii=True):
         with patch(
-            "weave.session._redaction.redact_pii",
+            "weave.utils.pii_redaction.redact_pii",
             side_effect=_email_substitutor(),
         ):
             log_turn(
@@ -429,7 +429,7 @@ def test_log_turn_redacts_child_llm(otel_spans: InMemorySpanExporter):
 def test_log_turn_redacts_child_tool(otel_spans: InMemorySpanExporter):
     with override_settings(redact_pii=True):
         with patch(
-            "weave.session._redaction.redact_pii",
+            "weave.utils.pii_redaction.redact_pii",
             side_effect=_email_substitutor(),
         ):
             log_turn(
@@ -464,7 +464,7 @@ def test_skip_presidio_when_include_content_false(
 ):
     """include_content=False drops content at source; Presidio is never called."""
     with override_settings(redact_pii=True):
-        with patch("weave.session._redaction.redact_pii") as mock_redact:
+        with patch("weave.utils.pii_redaction.redact_pii") as mock_redact:
             exercise_path()
     mock_redact.assert_not_called()
 
@@ -598,7 +598,7 @@ def test_settings_independence(otel_spans: InMemorySpanExporter):
         redact_pii=True, capture_client_info=False, capture_system_info=False
     ):
         with patch(
-            "weave.session._redaction.redact_pii",
+            "weave.utils.pii_redaction.redact_pii",
             side_effect=_email_substitutor(),
         ):
             with start_session(session_id="s") as sess, sess.start_turn() as t:
@@ -613,7 +613,7 @@ def test_settings_independence(otel_spans: InMemorySpanExporter):
 
 def test_all_settings_default_off_redaction(otel_spans: InMemorySpanExporter):
     """With defaults, redaction does not run. Sanity check."""
-    with patch("weave.session._redaction.redact_pii") as mock_redact:
+    with patch("weave.utils.pii_redaction.redact_pii") as mock_redact:
         with start_session(session_id="s") as sess, sess.start_turn() as t:
             with t.tool(name="x") as tool:
                 tool.arguments = "alice@example.com"
