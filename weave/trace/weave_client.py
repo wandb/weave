@@ -1926,9 +1926,7 @@ class WeaveClient:
             # but that might have unintended consequences. As a result, we break the
             # typical pattern and explicitly set the ref here.
             set_ref(obj, ref)
-            # WB-31070: _save_object_basic only cleared obj_rec on failure;
-            # the same ref is now on the user-visible `obj`, so register the
-            # matching cleanup so failure doesn't pin the pydantic payload.
+            # _save_object_basic cleaned up obj_rec; same ref now lives on obj.
             if isinstance(ref._digest, Future):
                 clear_refs_on_failure(ref._digest, lambda: remove_ref(obj))
 
@@ -2180,8 +2178,6 @@ class WeaveClient:
             # Primitives without __dict__ can't hold a ref; that's fine.
             pass
 
-        # WB-31070: drop the ref on failure so orig_val stops pinning the
-        # failed future (whose traceback retains json_val via frame locals).
         clear_refs_on_failure(digest_future, lambda: remove_ref(orig_val))
 
         return ref
@@ -2284,8 +2280,6 @@ class WeaveClient:
         if isinstance(table, WeaveTable):
             table.table_ref = table_ref
 
-        # WB-31070: drop refs on failure so the failed digest_future doesn't
-        # pin the user's table via Ref._digest.
         def _clear_table_refs() -> None:
             table.ref = None
             if isinstance(table, WeaveTable):
