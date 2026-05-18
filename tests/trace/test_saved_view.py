@@ -235,6 +235,19 @@ def test_saved_view_load(client):
     assert loaded_view.base.definition.cols["attributes.weave.client_version"] is True
 
 
+def test_saved_view_expand_columns_round_trip(client):
+    # A view that filters on `inputs.self.base_model_name` needs `inputs.self`
+    # in `expand_columns` for the trace server to join through the ref at query
+    # time. Persist + reload must preserve the field, otherwise the saved view
+    # reloads with the filter intact but the join missing and returns 0 rows.
+    saved_view = weave.SavedView("traces", "Filter on nested ref")
+    saved_view.base.definition.expand_columns = ["inputs.self"]
+    saved_view.save()
+    uri = saved_view.ref.uri
+    loaded_view = weave.SavedView.load(uri)
+    assert loaded_view.base.definition.expand_columns == ["inputs.self"]
+
+
 def test_saved_view_column_pinning():
     view = weave.SavedView("traces", "My saved view")
 
