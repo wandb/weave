@@ -1293,12 +1293,8 @@ class WeaveClient:
         if self.postprocess_output:
             postprocessed_output = self.postprocess_output(postprocessed_output)
 
-        # `_save_nested_objects` and `map_to_refs` walk the output tree once
-        # each — for ops with nested weave Objects/Tables this dominates the
-        # per-op CPU on the calling thread (the asyncio loop in async
-        # workloads). They are deferred into `send_end_call` below. `call.output`
-        # is set sync so user code reading it immediately after `finish_call`
-        # still observes the postprocessed value (refs may not be attached yet).
+        # Set sync so user code reading `call.output` after `finish_call` sees
+        # the postprocessed value; refs are attached later in `send_end_call`.
         call.output = postprocessed_output
 
         # Summary handling
