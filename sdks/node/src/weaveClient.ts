@@ -69,6 +69,8 @@ export type CallStackEntry = {
   callId: string;
   traceId: string;
   childSummary: Record<string, any>;
+  opName?: string;
+  displayName?: string;
 };
 
 export interface GetCallsOptions {
@@ -154,6 +156,17 @@ export class CallStack {
    */
   pushCall(entry: CallStackEntry): CallStack {
     return new CallStack([...this.stack, entry]);
+  }
+
+  findLastByOpName(opNames: readonly string[]): CallStackEntry | null {
+    const opNameSet = new Set(opNames);
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      const entry = this.stack[i];
+      if (entry.opName && opNameSet.has(entry.opName)) {
+        return entry;
+      }
+    }
+    return null;
   }
 }
 
@@ -971,6 +984,9 @@ export class WeaveClient {
     displayName?: string,
     attributes?: Record<string, any>
   ) {
+    currentCall.opName = isOp(opRef) ? getOpName(opRef) : opRef.objectId;
+    currentCall.displayName = displayName;
+
     const inputs = await this.paramsToCallInputs(
       params,
       thisArg,

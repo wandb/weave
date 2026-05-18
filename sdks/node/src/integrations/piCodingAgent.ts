@@ -39,6 +39,7 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {getGlobalClient} from '../clientApi';
+import {EvalLinkSpanProcessor} from '../evaluationOtelLinker';
 import {getWandbConfigs} from '../wandb/settings';
 
 import {GEN_AI_ATTR, GEN_AI_EVENT, OTEL_ATTR} from './common/genai';
@@ -175,6 +176,7 @@ export class PiCodingAgentOtelAdapter {
               'wandb.project': project,
             }),
             spanProcessors: [
+              new EvalLinkSpanProcessor(),
               new SimpleSpanProcessor(
                 new OTLPTraceExporter({
                   url: endpoint,
