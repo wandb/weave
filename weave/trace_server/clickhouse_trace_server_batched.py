@@ -6235,7 +6235,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _prepare_completion_request(
         self, req: tsi.CompletionsCreateReq
-    ) -> "tuple[list, CompletionModelInfo] | tsi.CompletionsCreateRes":
+    ) -> "tuple[list[dict[str, Any]], CompletionModelInfo] | tsi.CompletionsCreateRes":
         """Resolve prompt + model info, or return a short-circuit error response."""
         # --- Resolve prompt if provided and set messages
         prompt = getattr(req.inputs, "prompt", None)
@@ -6277,7 +6277,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         req: tsi.CompletionsCreateReq,
         completion_model_info: "CompletionModelInfo",
-        initial_messages: list,
+        initial_messages: list[dict[str, Any]],
         res: tsi.CompletionsCreateRes,
         start_time: datetime.datetime,
         end_time: datetime.datetime,
@@ -6387,7 +6387,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             provider=completion_model_info.provider,
             base_url=completion_model_info.base_url,
             extra_headers=completion_model_info.extra_headers,
-            return_type=completion_model_info.return_type,
             vertex_credentials=completion_model_info.vertex_credentials,
         )
 

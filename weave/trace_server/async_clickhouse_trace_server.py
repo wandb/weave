@@ -4,8 +4,14 @@ Only methods on the worker's hot path are async; everything else is inherited
 from `ClickHouseTraceServer`. The point is to stop holding a worker thread for
 the ~3s LLM HTTP wait inside `completions_create` - a 192-thread pool caps a
 pod at ~55 in-flight completions today. `acompletions_create` keeps the same
-shape but awaits `litellm.acompletion` (no thread held) and dispatches the CH
-insert via `run_in_executor`.
+shape but awaits `litellm.acompletion` (no thread held during the network wait)
+and dispatches the CH insert via `run_in_executor`.
+
+Prep (prompt resolve + provider lookup) runs synchronously on the event loop.
+For the scoring-worker shape (messages already resolved, OpenAI/Anthropic
+model) prep is pure-CPU; for requests that supply `prompt` or a `custom::`
+provider, prep makes a CH `obj_read` and will block the loop. Callers in
+that shape should stay on the sync path.
 
 `secret_fetcher_context` is a `ContextVar` and propagates across `await`
 boundaries, so no plumbing change is needed.
@@ -56,10 +62,6 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         )
         self._ch_executor: Executor | None = ch_executor
 
-    def set_ch_executor(self, executor: Executor | None) -> None:
-        """Pin the executor used for the post-LLM CH insert."""
-        self._ch_executor = executor
-
     async def acompletions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
@@ -76,7 +78,6 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             provider=completion_model_info.provider,
             base_url=completion_model_info.base_url,
             extra_headers=completion_model_info.extra_headers,
-            return_type=completion_model_info.return_type,
             vertex_credentials=completion_model_info.vertex_credentials,
         )
         end_time = datetime.datetime.now()

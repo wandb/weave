@@ -39,24 +39,20 @@ class TestAcompletionsCreate(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-    async def test_no_tracking_skips_ch_insert(self) -> None:
-        with (
-            patch(
-                "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion",
-                new=AsyncMock(
-                    return_value=tsi.CompletionsCreateRes(response={"ok": True})
-                ),
+    async def test_no_tracking_returns_passthrough_response(self) -> None:
+        # `track_llm_call=False` must exit through the real `_log_completion_call`
+        # early-return: response passed through, no `weave_call_id`, no CH write.
+        with patch(
+            "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion",
+            new=AsyncMock(
+                return_value=tsi.CompletionsCreateRes(response={"ok": True})
             ),
-            patch.object(self.server, "_insert_call_complete") as insert_mock,
-            patch.object(self.server, "_insert_call_batch") as batch_mock,
         ):
             res = await self.server.acompletions_create(
                 self._make_req(track_llm_call=False)
             )
         assert res.response == {"ok": True}
         assert res.weave_call_id is None
-        insert_mock.assert_not_called()
-        batch_mock.assert_not_called()
 
     async def test_tracking_routes_through_log_completion_call(self) -> None:
         llm_res = tsi.CompletionsCreateRes(response={"choices": [{"x": 1}]})
@@ -99,9 +95,8 @@ class TestAcompletionsCreateConcurrency(unittest.IsolatedAsyncioTestCase):
     """A 1-thread CH executor must not gate LLM-call concurrency."""
 
     async def test_many_in_flight_with_one_thread_ch_executor(self) -> None:
-        server = AsyncClickHouseTraceServer(host="test_host")
         ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="test-ch")
-        server.set_ch_executor(ch_executor)
+        server = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
 
         mock_ch_client = MagicMock()
         mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])

@@ -318,7 +318,6 @@ def lite_llm_completion(
     provider: str | None = None,
     base_url: str | None = None,
     extra_headers: dict[str, str] | None = None,
-    return_type: str | None = None,
     vertex_credentials: str | None = None,
 ) -> tsi.CompletionsCreateRes:
     kwargs = _build_litellm_kwargs(
@@ -337,7 +336,6 @@ async def lite_llm_acompletion(
     provider: str | None = None,
     base_url: str | None = None,
     extra_headers: dict[str, str] | None = None,
-    return_type: str | None = None,
     vertex_credentials: str | None = None,
 ) -> tsi.CompletionsCreateRes:
     """Async twin of `lite_llm_completion`. No thread held during the LLM wait."""
