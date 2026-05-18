@@ -20,9 +20,9 @@ from typing import TYPE_CHECKING
 from weave.evaluation.eval import (
     _attach_genai_span_ref_to_call_summary,
     _current_eval_predict_and_score_call,
+    _find_current_evaluate_call,
     _find_current_predict_and_score_call,
 )
-from weave.trace.context import call_context
 from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 
@@ -38,13 +38,13 @@ logger = logging.getLogger(__name__)
 _GENAI_OPERATION_NAME_ATTR = "gen_ai.operation.name"
 
 
-def _get_evaluation_name(predict_and_score_call: Call) -> str | None:
-    """Walk up from predict_and_score to the parent evaluate call and return the eval display name."""
-    for call in reversed(call_context.get_call_stack()):
-        if call.func_name == constants.EVALUATION_RUN_OP_NAME:
-            name = call.display_name
-            return name if isinstance(name, str) else None
-    return None
+def _get_evaluation_name() -> str | None:
+    """Find the parent evaluate call and return the eval display name."""
+    call = _find_current_evaluate_call()
+    if call is None:
+        return None
+    name = call.display_name
+    return name if isinstance(name, str) else None
 
 
 class EvalLinkSpanProcessor:
@@ -72,12 +72,12 @@ class EvalLinkSpanProcessor:
         if call is None:
             return
 
-        span.set_attribute("weave.eval.predict_and_score_call_id", call.id)
-        span.set_attribute("weave.eval.project_id", call.project_id)
+        span.set_attribute(constants.EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR, call.id)
+        span.set_attribute(constants.EVAL_PROJECT_ID_SPAN_ATTR, call.project_id)
 
-        eval_name = _get_evaluation_name(call)
+        eval_name = _get_evaluation_name()
         if eval_name:
-            span.set_attribute("weave.eval.evaluation_name", eval_name)
+            span.set_attribute(constants.EVAL_EVALUATION_NAME_SPAN_ATTR, eval_name)
 
     def on_end(self, span: ReadableSpan) -> None:
         """Auto-populate GenAISpanRef when a GenAI span ends during an eval."""

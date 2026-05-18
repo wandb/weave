@@ -10,6 +10,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 import weave
 from weave import Evaluation
 from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
+from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -119,8 +120,8 @@ async def test_eval_metadata_injected_onto_spans(client, otel_setup):
     assert len(spans) >= 1
 
     span_attrs = dict(spans[0].attributes)
-    assert "weave.eval.predict_and_score_call_id" in span_attrs
-    assert "weave.eval.project_id" in span_attrs
+    assert constants.EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR in span_attrs
+    assert constants.EVAL_PROJECT_ID_SPAN_ATTR in span_attrs
 
 
 @pytest.mark.asyncio
@@ -148,7 +149,7 @@ async def test_non_genai_span_gets_eval_metadata_but_no_span_ref(client, otel_se
     spans = exporter.get_finished_spans()
     assert len(spans) >= 1
     span_attrs = dict(spans[0].attributes)
-    assert "weave.eval.predict_and_score_call_id" in span_attrs
+    assert constants.EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR in span_attrs
 
     # But the eval results should NOT have a GenAISpanRef
     evaluate_call = next(iter(evaluation.evaluate.calls()))
@@ -171,4 +172,4 @@ async def test_genai_span_outside_eval_does_not_crash(otel_setup):
 
     spans = otel_setup.get_finished_spans()
     assert len(spans) == 1
-    assert "weave.eval.predict_and_score_call_id" not in dict(spans[0].attributes)
+    assert constants.EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR not in dict(spans[0].attributes)

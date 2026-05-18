@@ -118,6 +118,14 @@ def _find_current_predict_and_score_call() -> Call | None:
     return None
 
 
+def _find_current_evaluate_call() -> Call | None:
+    """Walk the weave call stack to find an active Evaluation.evaluate call."""
+    for call in reversed(call_context.get_call_stack()):
+        if call.func_name == constants.EVALUATION_RUN_OP_NAME:
+            return call
+    return None
+
+
 def default_evaluation_display_name(call: Call) -> str:
     date = datetime.now().strftime("%Y-%m-%d")
     unique_name = make_memorable_name()
