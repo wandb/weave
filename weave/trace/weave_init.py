@@ -15,7 +15,6 @@ from weave.telemetry import trace_sentry
 from weave.trace import env, init_message, weave_client
 from weave.trace.context import weave_client_context
 from weave.trace.settings import (
-    should_disable_weave,
     should_redact_pii,
     should_use_stainless_server,
     use_server_cache,
@@ -118,8 +117,6 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
     returns early if opentelemetry is unavailable. Other errors propagate
     so misconfiguration is visible to the user.
     """
-    if should_disable_weave():
-        return
     try:
         from opentelemetry import trace
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (

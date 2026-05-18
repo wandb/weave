@@ -34,7 +34,7 @@ from weave.session.session import (
     start_session,
 )
 from weave.trace.settings import override_settings
-from weave.trace.weave_init import _setup_session_tracing
+from weave.trace.weave_init import init_weave_disabled
 from weave.utils import pii_redaction
 
 
@@ -174,19 +174,20 @@ def test_disabled_batch_emits_no_spans(
     assert otel_spans.get_finished_spans() == ()
 
 
-def test_disabled_at_init_skips_tracer_provider(monkeypatch: pytest.MonkeyPatch):
-    """_setup_session_tracing should no-op when disabled at init time.
-
-    Sets WF_TRACE_SERVER_URL so the function would proceed past its other
-    early-return path (the trace_server_url check) and actually reach the
-    TracerProvider install if the disabled short-circuit weren't there.
+def test_disabled_init_skips_session_tracing():
+    """``init_weave_disabled`` is the path ``weave.init()`` takes under
+    ``WEAVE_DISABLED=true`` (short-circuited in ``api.py`` before
+    ``init_weave``). It must not invoke ``_setup_session_tracing`` —
+    otherwise a global OTel TracerProvider would be installed against
+    the disabled stub server.
     """
-    monkeypatch.setenv("WF_TRACE_SERVER_URL", "https://trace.wandb.ai")
-
-    with override_settings(disabled=True):
-        with patch("opentelemetry.trace.set_tracer_provider") as mock_set:
-            _setup_session_tracing("entity", "project", api_key="dummy")
-    mock_set.assert_not_called()
+    with (
+        patch("weave.trace.weave_init.init_weave_get_server"),
+        patch("weave.trace.weave_init.weave_client.WeaveClient"),
+        patch("weave.trace.weave_init._setup_session_tracing") as mock_setup,
+    ):
+        init_weave_disabled()
+    mock_setup.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
