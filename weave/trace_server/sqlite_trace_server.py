@@ -5302,6 +5302,22 @@ def _transform_external_calls_field_to_internal_calls_field(
         else:
             json_path = quote_json_path(field[len("output.") :])
         field = "output"
+    elif field == "attributes.otel_span" or field.startswith("attributes.otel_span."):
+        # Migration 020 moved OTel data into `otel_dump`. The read path injects
+        # it back as attributes["otel_span"] regardless of where it lives, so
+        # the filter path needs the same affordance: prefer otel_dump, fall
+        # back to attributes.$.otel_span for pre-migration rows.
+        sub = field[len("attributes.otel_span") :].lstrip(".")
+        otel_path = "$" if not sub else quote_json_path(sub)
+        legacy_inner = "otel_span" if not sub else f"otel_span.{sub}"
+        legacy_path = quote_json_path(legacy_inner)
+        sql_type = "TEXT"
+        if cast is not None:
+            sql_type = _sqlite_sql_type_for_cast(cast)
+        otel_extract = f"json_extract(otel_dump, '{otel_path}')"
+        legacy_extract = f"json_extract(attributes, '{legacy_path}')"
+        coalesced = f"coalesce({otel_extract}, {legacy_extract})"
+        return f"CAST({coalesced} AS {sql_type})"
     elif field == "attributes" or field.startswith("attributes."):
         if field == "attributes":
             json_path = "$"

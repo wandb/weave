@@ -258,6 +258,47 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return True
 
 
+class CallsMergedOtelSpanField(CallsMergedField):
+    """OTel span field that reads from `otel_dump` with a legacy fallback.
+
+    Migration 020 moved OTel data into a dedicated `otel_dump` column. Calls
+    ingested before that migration still carry the full span inline at
+    `attributes_dump.$.otel_span.*`. The read path injects either source back
+    into `attributes["otel_span"]` so the client never knows the difference;
+    this field gives filters the same affordance.
+    """
+
+    extra_path: list[str] | None = None
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
+    ) -> str:
+        otel_root = maybe_agg(f"{table_alias}.otel_dump", use_agg_fn)
+        attr_root = maybe_agg(f"{table_alias}.attributes_dump", use_agg_fn)
+        otel_sql = json_dump_field_as_sql(
+            pb, table_alias, otel_root, self.extra_path, cast=None
+        )
+        legacy_path = ["otel_span", *(self.extra_path or [])]
+        attr_sql = json_dump_field_as_sql(
+            pb, table_alias, attr_root, legacy_path, cast=None
+        )
+        sql = f"if({otel_root} IS NULL, {attr_sql}, {otel_sql})"
+        return clickhouse_cast(sql, cast)
+
+    def with_path(self, path: list[str]) -> "CallsMergedOtelSpanField":
+        return CallsMergedOtelSpanField(
+            field=self.field,
+            extra_path=[*(self.extra_path or []), *path],
+        )
+
+    def is_heavy(self) -> bool:
+        return True
+
+
 class CallsMergedSummaryField(CallsMergedField):
     """Field class for computed summary values."""
 
@@ -1842,6 +1883,16 @@ def get_field_by_name(name: str) -> CallsMergedField:
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
             return CallsMergedSummaryField(field=name, summary_field=summary_field)
+        elif name == "attributes.otel_span" or name.startswith("attributes.otel_span."):
+            # OTel span data lives in `otel_dump` post-migration 020 (and
+            # legacy projects keep it under `attributes_dump.$.otel_span.*`).
+            # The read path masks the storage split by re-injecting otel_dump
+            # back as attributes["otel_span"]; do the same on the filter side.
+            sub = name[len("attributes.otel_span") :].lstrip(".")
+            field = CallsMergedOtelSpanField(field="otel_dump")
+            if sub:
+                return field.with_path(split_escaped_field_path(sub))
+            return field
         else:
             field_parts = split_escaped_field_path(name)
             start_part = field_parts[0]
@@ -2276,6 +2327,7 @@ def process_query_to_conditions(
                     CallsMergedAggField,
                     CallsMergedFeedbackPayloadField,
                     CallsMergedQueueItemField,
+                    CallsMergedOtelSpanField,
                 ),
             ):
                 field = structured_field.as_sql(
