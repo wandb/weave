@@ -163,4 +163,6 @@ async def test_genai_span_outside_eval_does_not_crash(otel_setup):
 
     spans = otel_setup.get_finished_spans()
     assert len(spans) == 1
-    assert constants.EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR not in dict(spans[0].attributes)
+    assert constants.EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR not in dict(
+        spans[0].attributes
+    )
