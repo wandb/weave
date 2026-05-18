@@ -192,10 +192,44 @@ jobs:
         run: |
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
 
+  # Python 3.14t (free-threaded / no-GIL) coverage. Kept narrow because many
+  # third-party integrations don't yet ship free-threaded wheels; expand the
+  # shard list as the ecosystem catches up.
+  free-threaded-tests:
+    name: Free-threaded Nightly Tests (3.14t)
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: ["trace_no_server"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
+      - name: Set up Python 3.14 (free-threaded)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          freethreaded: true
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run nox (Non Trace Server)
+        env:
+          CI: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          .github/scripts/retry.sh nox -e "tests-3.14t(shard='${{ matrix.shard }}')" -- \
+            -m "not trace_server"
+
   slack-notification:
     name: Slack Notification
     needs:
       - nightly-tests
+      - free-threaded-tests
 
     runs-on: ubuntu-latest
     if: always()
