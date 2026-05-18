@@ -2534,8 +2534,6 @@ class WeaveClient:
 
         self.send_file_cache.put(req, res)
 
-        # WB-31070: evict on failure so retries hit the network again
-        # instead of getting the cached failed future back.
         def _evict_on_failure(fut: Future[FileCreateRes]) -> None:
             if fut.exception() is not None:
                 self.send_file_cache.delete(req)
