@@ -195,17 +195,20 @@ def test_disabled_init_skips_session_tracing():
 # ---------------------------------------------------------------------------
 
 
-def test_redact_string_empty_skips_presidio():
-    with patch("weave.utils.pii_redaction.redact_pii") as mock:
-        assert pii_redaction.redact_string("") == ""
-    mock.assert_not_called()
-
-
-def test_redact_string_routes_through_redact_pii():
+@pytest.mark.parametrize(
+    ("input_str", "expected_output", "expects_call"),
+    [
+        pytest.param("", "", False, id="empty_skips_presidio"),
+        pytest.param(
+            "alice@example.com", "REDACTED", True, id="routes_through_redact_pii"
+        ),
+    ],
+)
+def test_redact_string(input_str: str, expected_output: str, expects_call: bool):
     with patch("weave.utils.pii_redaction.redact_pii", return_value="REDACTED") as mock:
-        result = pii_redaction.redact_string("alice@example.com")
-    assert result == "REDACTED"
-    mock.assert_called_once_with("alice@example.com")
+        result = pii_redaction.redact_string(input_str)
+    assert result == expected_output
+    assert mock.called is expects_call
 
 
 @pytest.mark.parametrize(
@@ -268,181 +271,141 @@ def test_redact_system_instructions():
 
 
 # ---------------------------------------------------------------------------
-# redact_pii — Tool
+# redact_pii — applied across streaming + batch paths
 # ---------------------------------------------------------------------------
 
 
-def test_tool_redacts_arguments_and_result(otel_spans: InMemorySpanExporter):
-    """With redact_pii=True, Tool.arguments and Tool.result are redacted on emit."""
-    with override_settings(redact_pii=True):
-        with patch(
-            "weave.utils.pii_redaction.redact_pii",
-            side_effect=_email_substitutor(),
-        ):
-            with start_session(session_id="s") as sess, sess.start_turn() as t:
-                with t.tool(name="lookup") as tool:
-                    tool.arguments = '{"email":"alice@example.com"}'
-                    tool.result = "found alice@example.com"
-
-    tool_spans = _spans_with_prefix(otel_spans, "execute_tool")
-    assert len(tool_spans) == 1
-    attrs = tool_spans[0].attributes
-    assert "<EMAIL>" in attrs["gen_ai.tool.call.arguments"]
-    assert "alice@example.com" not in attrs["gen_ai.tool.call.arguments"]
-    assert "<EMAIL>" in attrs["gen_ai.tool.call.result"]
-
-
-def test_tool_no_redaction_when_setting_off(otel_spans: InMemorySpanExporter):
-    """Default: redact_pii=False → content passes through unchanged."""
+def _redact_streaming_tool() -> None:
     with start_session(session_id="s") as sess, sess.start_turn() as t:
         with t.tool(name="lookup") as tool:
             tool.arguments = '{"email":"alice@example.com"}'
-
-    tool_spans = _spans_with_prefix(otel_spans, "execute_tool")
-    assert "alice@example.com" in tool_spans[0].attributes["gen_ai.tool.call.arguments"]
+            tool.result = "found alice@example.com"
 
 
-# ---------------------------------------------------------------------------
-# redact_pii — LLM
-# ---------------------------------------------------------------------------
+def _redact_streaming_llm_messages() -> None:
+    with start_session(session_id="s") as sess, sess.start_turn() as t:
+        with t.llm(
+            model="gpt-4o", system_instructions=["contact alice@example.com"]
+        ) as llm:
+            llm.input_messages = [Message(role="user", content="alice@example.com")]
+            llm.output_messages = [
+                Message(role="assistant", content="hi alice@example.com")
+            ]
 
 
-def _get_llm_attrs(otel_spans: InMemorySpanExporter) -> dict[str, Any]:
-    llm_spans = _spans_with_prefix(otel_spans, "chat")
-    assert len(llm_spans) == 1, f"expected 1 chat span, got {len(llm_spans)}"
-    return dict(llm_spans[0].attributes)
+def _redact_streaming_llm_reasoning() -> None:
+    """Regression case for the pre-existing leak: reasoning bypassing redact_pii."""
+    with start_session(session_id="s") as sess, sess.start_turn() as t:
+        with t.llm(model="gpt-4o") as llm:
+            llm.reasoning = Reasoning(content="think about alice@example.com")
+            llm.output_messages = [Message(role="assistant", content="ok")]
 
 
-def test_llm_redacts_all_content_fields(otel_spans: InMemorySpanExporter):
-    """input_messages, output_messages, and system_instructions all route through redact_pii."""
+def _redact_streaming_turn() -> None:
+    with start_session(session_id="s") as sess:
+        with sess.start_turn(user_message="alice@example.com"):
+            pass
+
+
+def _redact_batch_turn_messages() -> None:
+    log_turn(
+        session_id="s",
+        agent_name="a",
+        messages=[Message(role="user", content="alice@example.com")],
+    )
+
+
+def _redact_batch_child_llm() -> None:
+    log_turn(
+        session_id="s",
+        agent_name="a",
+        spans=[
+            LLM(
+                model="gpt-4o",
+                input_messages=[Message(role="user", content="alice@example.com")],
+            ),
+        ],
+    )
+
+
+def _redact_batch_child_tool() -> None:
+    log_turn(
+        session_id="s",
+        agent_name="a",
+        spans=[Tool(name="lookup", arguments='{"email":"alice@example.com"}')],
+    )
+
+
+@pytest.mark.parametrize(
+    ("exercise", "span_prefix", "checked_keys"),
+    [
+        pytest.param(
+            _redact_streaming_tool,
+            "execute_tool",
+            ("gen_ai.tool.call.arguments", "gen_ai.tool.call.result"),
+            id="streaming_tool",
+        ),
+        pytest.param(
+            _redact_streaming_llm_messages,
+            "chat",
+            (
+                "gen_ai.input.messages",
+                "gen_ai.output.messages",
+                "gen_ai.system_instructions",
+            ),
+            id="streaming_llm_messages",
+        ),
+        pytest.param(
+            _redact_streaming_llm_reasoning,
+            "chat",
+            ("gen_ai.output.messages",),
+            id="streaming_llm_reasoning",
+        ),
+        pytest.param(
+            _redact_streaming_turn,
+            "invoke_agent",
+            ("gen_ai.input.messages",),
+            id="streaming_turn",
+        ),
+        pytest.param(
+            _redact_batch_turn_messages,
+            "invoke_agent",
+            ("gen_ai.input.messages",),
+            id="batch_turn_messages",
+        ),
+        pytest.param(
+            _redact_batch_child_llm,
+            "chat",
+            ("gen_ai.input.messages",),
+            id="batch_child_llm",
+        ),
+        pytest.param(
+            _redact_batch_child_tool,
+            "execute_tool",
+            ("gen_ai.tool.call.arguments",),
+            id="batch_child_tool",
+        ),
+    ],
+)
+def test_redact_pii_applied(
+    exercise: Callable[[], None],
+    span_prefix: str,
+    checked_keys: tuple[str, ...],
+    otel_spans: InMemorySpanExporter,
+):
+    """redact_pii=True applies redaction across streaming + batch paths."""
     with override_settings(redact_pii=True):
         with patch(
-            "weave.utils.pii_redaction.redact_pii",
-            side_effect=_email_substitutor(),
+            "weave.utils.pii_redaction.redact_pii", side_effect=_email_substitutor()
         ):
-            with start_session(session_id="s") as sess, sess.start_turn() as t:
-                with t.llm(
-                    model="gpt-4o",
-                    system_instructions=["contact alice@example.com"],
-                ) as llm:
-                    llm.input_messages = [
-                        Message(role="user", content="alice@example.com")
-                    ]
-                    llm.output_messages = [
-                        Message(role="assistant", content="hi alice@example.com")
-                    ]
+            exercise()
 
-    attrs = _get_llm_attrs(otel_spans)
-    for key in (
-        "gen_ai.input.messages",
-        "gen_ai.output.messages",
-        "gen_ai.system_instructions",
-    ):
+    spans = _spans_with_prefix(otel_spans, span_prefix)
+    assert len(spans) == 1, f"expected 1 {span_prefix} span, got {len(spans)}"
+    attrs = dict(spans[0].attributes)
+    for key in checked_keys:
         assert "alice@example.com" not in attrs[key], key
         assert "<EMAIL>" in attrs[key], key
-
-
-def test_llm_redacts_reasoning(otel_spans: InMemorySpanExporter):
-    """Regression: reasoning content goes through redact_pii before landing in output.messages."""
-    with override_settings(redact_pii=True):
-        with patch(
-            "weave.utils.pii_redaction.redact_pii",
-            side_effect=_email_substitutor(),
-        ):
-            with start_session(session_id="s") as sess, sess.start_turn() as t:
-                with t.llm(model="gpt-4o") as llm:
-                    llm.reasoning = Reasoning(content="think about alice@example.com")
-                    llm.output_messages = [Message(role="assistant", content="ok")]
-
-    attrs = _get_llm_attrs(otel_spans)
-    assert "alice@example.com" not in attrs["gen_ai.output.messages"]
-
-
-# ---------------------------------------------------------------------------
-# redact_pii — Turn
-# ---------------------------------------------------------------------------
-
-
-def test_turn_redacts_messages(otel_spans: InMemorySpanExporter):
-    with override_settings(redact_pii=True):
-        with patch(
-            "weave.utils.pii_redaction.redact_pii",
-            side_effect=_email_substitutor(),
-        ):
-            with start_session(session_id="s") as sess:
-                with sess.start_turn(user_message="alice@example.com"):
-                    pass
-
-    turn_spans = _spans_with_prefix(otel_spans, "invoke_agent")
-    assert len(turn_spans) == 1
-    attrs = dict(turn_spans[0].attributes)
-    assert "alice@example.com" not in attrs.get("gen_ai.input.messages", "")
-    assert "<EMAIL>" in attrs["gen_ai.input.messages"]
-
-
-# ---------------------------------------------------------------------------
-# redact_pii — batch (log_turn / log_session / _attrs_for_span)
-# ---------------------------------------------------------------------------
-
-
-def test_log_turn_redacts_turn_messages(otel_spans: InMemorySpanExporter):
-    with override_settings(redact_pii=True):
-        with patch(
-            "weave.utils.pii_redaction.redact_pii",
-            side_effect=_email_substitutor(),
-        ):
-            log_turn(
-                session_id="s",
-                agent_name="a",
-                messages=[Message(role="user", content="alice@example.com")],
-            )
-
-    turn_spans = _spans_with_prefix(otel_spans, "invoke_agent")
-    assert len(turn_spans) == 1
-    assert "alice@example.com" not in turn_spans[0].attributes["gen_ai.input.messages"]
-    assert "<EMAIL>" in turn_spans[0].attributes["gen_ai.input.messages"]
-
-
-def test_log_turn_redacts_child_llm(otel_spans: InMemorySpanExporter):
-    with override_settings(redact_pii=True):
-        with patch(
-            "weave.utils.pii_redaction.redact_pii",
-            side_effect=_email_substitutor(),
-        ):
-            log_turn(
-                session_id="s",
-                agent_name="a",
-                spans=[
-                    LLM(
-                        model="gpt-4o",
-                        input_messages=[
-                            Message(role="user", content="alice@example.com")
-                        ],
-                    ),
-                ],
-            )
-
-    chat_spans = _spans_with_prefix(otel_spans, "chat")
-    assert len(chat_spans) == 1
-    assert "alice@example.com" not in chat_spans[0].attributes["gen_ai.input.messages"]
-
-
-def test_log_turn_redacts_child_tool(otel_spans: InMemorySpanExporter):
-    with override_settings(redact_pii=True):
-        with patch(
-            "weave.utils.pii_redaction.redact_pii",
-            side_effect=_email_substitutor(),
-        ):
-            log_turn(
-                session_id="s",
-                agent_name="a",
-                spans=[
-                    Tool(name="lookup", arguments='{"email":"alice@example.com"}'),
-                ],
-            )
-
-    tool_spans = _spans_with_prefix(otel_spans, "execute_tool")
-    assert "<EMAIL>" in tool_spans[0].attributes["gen_ai.tool.call.arguments"]
 
 
 # ---------------------------------------------------------------------------
