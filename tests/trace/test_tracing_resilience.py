@@ -7,6 +7,8 @@ We should never be breaking the user's program with an error.
 
 from __future__ import annotations
 
+import gc
+import weakref
 from collections import Counter
 from unittest.mock import MagicMock
 
@@ -16,6 +18,7 @@ import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
+from weave.trace.object_record import ObjectRecord
 from weave.trace.op import _add_accumulator
 
 
@@ -79,6 +82,31 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
         "Task failed: DummyTestException: ('FAILURE - file_create": 1,
         "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
     }
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_obj_create_failure_does_not_pin_payload(
+    client_with_throwing_server,
+):
+    """A failed obj_create must release the user's object.
+
+    Before WB-31070, set_ref attached a failed digest_future whose
+    exception traceback retained the serialized payload via frame locals,
+    pinning orig_val for its lifetime.
+    """
+    obj = ObjectRecord(
+        {"_class_name": "Blob", "_bases": ["Object"], "data": "X" * 4096}
+    )
+    obj_weak = weakref.ref(obj)
+
+    client_with_throwing_server._save_object_basic(obj, name="blob")
+    client_with_throwing_server.future_executor.flush()
+
+    assert getattr(obj, "ref", None) is None
+
+    del obj
+    gc.collect()
+    assert obj_weak() is None
 
 
 @pytest.mark.disable_logging_error_check
