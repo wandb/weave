@@ -61,7 +61,7 @@ async def test_genai_span_ref_attached_to_eval_call(client, otel_setup):
     @weave.op
     async def model_predict(input) -> str:
         _emit_genai_span()
-        return str(eval(input))
+        return input
 
     evaluation = Evaluation(
         dataset=[{"input": "1 + 1"}],
@@ -87,6 +87,8 @@ async def test_genai_span_ref_attached_to_eval_call(client, otel_setup):
 
     trial = res.rows[0].evaluations[0].trials[0]
     assert trial.genai_span_ref is not None
+    # OTel stores trace/span IDs as integers; W3C Trace Context represents them
+    # as zero-padded hex: 32 hex chars for 128-bit trace IDs, 16 for 64-bit span IDs.
     assert trial.genai_span_ref.trace_id == format(
         genai_spans[0].context.trace_id, "032x"
     )
@@ -105,7 +107,7 @@ async def test_eval_metadata_injected_onto_spans(client, otel_setup):
     @weave.op
     async def model_predict(input) -> str:
         _emit_genai_span()
-        return str(eval(input))
+        return input
 
     evaluation = Evaluation(
         dataset=[{"input": "1 + 1"}],
@@ -133,7 +135,7 @@ async def test_non_genai_span_gets_eval_metadata_but_no_span_ref(client, otel_se
         tracer = otel_trace.get_tracer("test")
         span = tracer.start_span("some-other-work")
         span.end()
-        return str(eval(input))
+        return input
 
     evaluation = Evaluation(
         dataset=[{"input": "1 + 1"}],
