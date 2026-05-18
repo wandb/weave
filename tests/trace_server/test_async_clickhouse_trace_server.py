@@ -44,9 +44,7 @@ class TestAcompletionsCreate(unittest.IsolatedAsyncioTestCase):
         # early-return: response passed through, no `weave_call_id`, no CH write.
         with patch(
             "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion",
-            new=AsyncMock(
-                return_value=tsi.CompletionsCreateRes(response={"ok": True})
-            ),
+            new=AsyncMock(return_value=tsi.CompletionsCreateRes(response={"ok": True})),
         ):
             res = await self.server.acompletions_create(
                 self._make_req(track_llm_call=False)
