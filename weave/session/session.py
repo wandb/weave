@@ -16,7 +16,7 @@ import types
 import uuid
 from contextvars import ContextVar, Token
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 from typing_extensions import Self
@@ -115,35 +115,6 @@ __all__ = [
 
 # OTel tracer name — identifies the Session SDK as the source of these spans.
 _TRACER_NAME = "weave.session"
-
-
-# TypedDicts shaped to spread into the matching OTel attribute builder kwargs
-# in ``session_otel.py``. One per span type. The keys / value types match the
-# builder's content kwargs exactly so ``**span._content_fields(...)`` typechecks
-# against the builder signature without a ``dict[str, Any]`` widening.
-
-
-class _ToolContentFields(TypedDict):
-    """Tool content fields, shaped for ``execute_tool_attributes(**...)``."""
-
-    tool_call_arguments: str
-    tool_call_result: str
-
-
-class _LLMContentFields(TypedDict):
-    """LLM content fields, shaped for ``llm_attributes(**...)``."""
-
-    input_messages: list[Message] | None
-    output_messages: list[Message] | None
-    system_instructions: list[str] | None
-    media_attachments: list[MediaAttachment] | None
-    reasoning: Reasoning | None
-
-
-class _TurnContentFields(TypedDict):
-    """Turn content fields, shaped for ``invoke_agent_attributes(**...)``."""
-
-    input_messages: list[Message] | None
 
 
 def _capture_info_attrs() -> dict[str, Any]:
@@ -253,9 +224,7 @@ class Tool(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
-    def _content_fields(
-        self, *, include_content: bool, redact: bool
-    ) -> _ToolContentFields:
+    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, Any]:
         """Return Tool content fields shaped for ``execute_tool_attributes(**...)``.
 
         Single chokepoint so the streaming (``Tool.end``) and batch
@@ -343,9 +312,7 @@ class LLM(_SpanBase):
     _ended: bool = PrivateAttr(default=False)
     _token: Token[LLM | None] | None = PrivateAttr(default=None)
 
-    def _content_fields(
-        self, *, include_content: bool, redact: bool
-    ) -> _LLMContentFields:
+    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, Any]:
         """Return LLM content fields shaped for ``llm_attributes(**...)``.
 
         Single chokepoint so the streaming (``LLM.end``) and batch
@@ -672,9 +639,7 @@ class Turn(_SpanBase):
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
 
-    def _content_fields(
-        self, *, include_content: bool, redact: bool
-    ) -> _TurnContentFields:
+    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, Any]:
         """Return Turn content fields shaped for ``invoke_agent_attributes(**...)``.
 
         The Turn's ``messages`` map to the attribute builder's
