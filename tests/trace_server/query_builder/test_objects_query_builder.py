@@ -172,6 +172,14 @@ WITH latest_row_per_digest AS (
     ) AS fc USING (object_id, digest)
     WHERE {where_clause}
 ),
+latest_alias_per_object AS (
+    SELECT project_id, object_id, argMax(digest, created_at) AS digest
+    FROM aliases
+    PREWHERE project_id = {{project_id: String}}
+    WHERE alias = 'latest'
+    GROUP BY project_id, object_id, alias
+    HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+),
 object_versions_with_index AS (
     SELECT
         *,
@@ -185,8 +193,17 @@ object_versions_with_index AS (
         row_number() OVER (
             PARTITION BY project_id, kind, object_id
             ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
-        ) AS row_num,
-        if (row_num = 1, 1, 0) AS is_latest
+        ) AS _computed_latest_rank,
+        if(
+            (project_id, object_id, digest) IN
+                (SELECT project_id, object_id, digest FROM latest_alias_per_object)
+            OR (
+                _computed_latest_rank = 1
+                AND (project_id, object_id) NOT IN
+                    (SELECT project_id, object_id FROM latest_alias_per_object)
+            ),
+            1, 0
+        ) AS is_latest
     FROM latest_row_per_digest
     WHERE rn = 1
 )

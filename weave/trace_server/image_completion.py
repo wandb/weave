@@ -20,9 +20,9 @@ def _process_image_data_item(
     Args:
         data_item (dict): The image data item from the API response.
         index (int): The index of this item in the data array.
-        trace_server (Optional[Any]): The trace server instance for file storage.
-        project_id (Optional[str]): The project ID for file storage.
-        wb_user_id (Optional[str]): The user ID for object creation.
+        trace_server (Any | None): The trace server instance for file storage.
+        project_id (str | None): The project ID for file storage.
+        wb_user_id (str | None): The user ID for object creation.
 
     Returns:
         dict: The modified data item with Content object references instead of raw data.
@@ -90,14 +90,14 @@ def lite_llm_image_generation(
     """Generate images using LiteLLM image generation.
 
     Args:
-        api_key (Optional[str]): The API key for the LLM provider.
+        api_key (str | None): The API key for the LLM provider.
         inputs (dict[str, Any]): The input parameters for image generation.
-        provider (Optional[str]): The provider name.
-        base_url (Optional[str]): Custom base URL for the API.
-        extra_headers (Optional[dict[str, str]]): Additional headers.
-        trace_server (Optional[Any]): The trace server instance for file storage.
-        project_id (Optional[str]): The project ID for file storage.
-        wb_user_id (Optional[str]): The user ID for object creation.
+        provider (str | None): The provider name.
+        base_url (str | None): Custom base URL for the API.
+        extra_headers (dict[str, str] | None): Additional headers.
+        trace_server (Any | None): The trace server instance for file storage.
+        project_id (str | None): The project ID for file storage.
+        wb_user_id (str | None): The user ID for object creation.
 
     Returns:
         tsi.ImageGenerationCreateRes: The image generation response.

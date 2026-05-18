@@ -206,7 +206,6 @@ def replace_base64_with_content_objects(
 R = TypeVar("R", bound=CallStartReq | CallEndReq | CallEndV2Req)
 
 
-@ddtrace.tracer.wrap(name="process_call_req_to_content")
 def process_call_req_to_content(
     req: R,
     trace_server: TraceServerInterface,
@@ -234,7 +233,6 @@ def process_call_req_to_content(
     return req
 
 
-@ddtrace.tracer.wrap(name="process_complete_call_to_content")
 def process_complete_call_to_content(
     complete_call: CompletedCallSchemaForInsert,
     trace_server: TraceServerInterface,

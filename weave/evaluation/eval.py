@@ -2,7 +2,9 @@ import asyncio
 import json
 import logging
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from itertools import chain, repeat
 from typing import Any, Literal
@@ -28,6 +30,7 @@ from weave.flow.scorer import (
 from weave.flow.util import make_memorable_name, transpose
 from weave.object.obj import Object
 from weave.trace.call import Call, CallsIter
+from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
@@ -37,6 +40,8 @@ from weave.trace.refs import ObjectRef
 from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
+from weave.trace_server import constants
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
 
@@ -46,6 +51,80 @@ INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
+
+
+# Tracks the active predict_and_score call for the imperative eval path
+# (e.g. EvaluationLogger). In the declarative path (e.g. Evaluation.evaluate),
+# predict_and_score is a real @op on the call stack, so a stack walk suffices.
+# In the imperative path, ScoreLogger.__enter__ explicitly sets this ContextVar
+# because predict_and_score is not on the call stack.
+_current_eval_predict_and_score_call: ContextVar[Call | None] = ContextVar(
+    "current_eval_predict_and_score_call", default=None
+)
+
+
+@contextmanager
+def _active_eval_prediction_context(call: Call | None) -> Iterator[None]:
+    """Set _current_eval_predict_and_score_call for the duration of a block.
+
+    This needs to be explicitly set in the imperative path because the EvaluationLogger
+    creates synthetic ops, so there is no call stack to walk to find the actual
+    predict_and_score call.
+    """
+    if call is None:
+        yield
+        return
+
+    token = _current_eval_predict_and_score_call.set(call)
+    try:
+        yield
+    finally:
+        _current_eval_predict_and_score_call.reset(token)
+
+
+def _attach_genai_span_ref_to_call_summary(
+    call: Call,
+    genai_span_ref: tsi.GenAISpanRef,
+) -> None:
+    """Write a GenAISpanRef into call.summary so eval results can find it.
+
+    Our EvalLinkSpanProcessor calls this to attach GenAISpanRef to an Eval
+    call. The trace server can than extract span refs from call summaries
+    by looking for the presence of the GenAISpanRef attribute key.
+    """
+    if call.summary is None:
+        call.summary = {}
+
+    if constants.WEAVE_ATTRIBUTES_NAMESPACE not in call.summary:
+        call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE] = {}
+
+    weave_summary = call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE]
+
+    weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = genai_span_ref.model_dump()
+
+
+def _find_call_on_stack(op_names: str | tuple[str, ...]) -> Call | None:
+    """Walk the weave call stack (bottom-up) to find the first call matching op_names.
+
+    Client-side calls use public refs (weave:///entity/project/op/Name:digest),
+    so we compare against func_name which extracts the short name from the URI.
+    """
+    if isinstance(op_names, str):
+        op_names = (op_names,)
+    for call in reversed(call_context.get_call_stack()):
+        if call.func_name in op_names:
+            return call
+    return None
+
+
+def _find_current_predict_and_score_call() -> Call | None:
+    """Walk the weave call stack to find an active predict_and_score call."""
+    return _find_call_on_stack(constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES)
+
+
+def _find_current_evaluate_call() -> Call | None:
+    """Walk the weave call stack to find an active Evaluation.evaluate call."""
+    return _find_call_on_stack(constants.EVALUATION_RUN_OP_NAME)
 
 
 def default_evaluation_display_name(call: Call) -> str:

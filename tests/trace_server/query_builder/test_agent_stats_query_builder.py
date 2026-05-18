@@ -234,7 +234,7 @@ def test_grouped_stats_query_full_sql_shape() -> None:
             AND s.started_at < {genai_2:DateTime64(6)}
         ),
         top_groups AS (
-          SELECT s.custom_attrs_string[{genai_3:String}] AS env
+          SELECT if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env
           FROM filtered_spans s
           GROUP BY env
           ORDER BY count() DESC
@@ -249,7 +249,7 @@ def test_grouped_stats_query_full_sql_shape() -> None:
           FROM (
             SELECT
               toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_7:String}) AS bucket,
-              s.custom_attrs_string[{genai_3:String}] AS env,
+              if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env,
               toFloat64(s.custom_attrs_float[{genai_4:String}]) AS m_score,
               toUInt8(mapContains(s.custom_attrs_float, {genai_4:String})) AS v_score
             FROM filtered_spans s
@@ -611,7 +611,7 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
              AND s.started_at >= {genai_1:DateTime64(6)}
              AND s.started_at < {genai_2:DateTime64(6)} ),
              top_groups AS
-          (SELECT s.custom_attrs_string[{genai_3:String}] AS env
+          (SELECT if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env
            FROM filtered_spans s
            GROUP BY env
            ORDER BY count() DESC
@@ -623,7 +623,7 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
                   countIf(v_score) AS count_score
            FROM
              (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_7:String}) AS bucket,
-                     s.custom_attrs_string[{genai_3:String}] AS env,
+                     if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env,
                      toFloat64(s.custom_attrs_float[{genai_4:String}]) AS m_score,
                      toUInt8(mapContains(s.custom_attrs_float, {genai_4:String})) AS v_score
               FROM filtered_spans s)

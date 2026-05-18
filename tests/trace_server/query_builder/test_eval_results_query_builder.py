@@ -345,6 +345,137 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
     )
 
 
+def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
+    """Red-team for PR #6735: orm.py infers field-side casts from peer
+    literals so feedback / threads / objects don't need an explicit
+    `$convert` to compare a JSON-extracted field against a typed param. The
+    PR promises that any caller of `Select.where(...)` benefits, but
+    `_process_query_to_conditions`'s `GetFieldOperator` branch silently
+    drops the inferred cast when a `field_resolver` is provided. Eval
+    results filtering reaches `_process_query_to_conditions` exactly that
+    way, so a numeric / bool literal without `$convert` should still pick
+    up the typed cast (matching the explicit-`$convert` shape pinned by
+    `test_cte_chain_sort_and_multi_eval_filters`).
+
+    The HAVING clause on `ranked_digests` must wrap the per-eval scores
+    aggregate in `toFloat64OrNull(...)` so the comparison against the
+    `Float64` parameter type-checks in ClickHouse. Without the fix the
+    field comes through as `String` and CH refuses the comparison with
+    `NO_COMMON_TYPE`.
+    """
+    pb = ParamBuilder("pb")
+    filters = [
+        tsi.EvalResultsFilter(
+            evaluation_call_id="eval-1",
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$gte": [
+                            {"$getField": "scores.accuracy"},
+                            {"$literal": 0.5},
+                        ]
+                    }
+                }
+            ),
+        ),
+    ]
+    cte = build_eval_results_cte_chain(
+        project_id="proj-1",
+        eval_root_ids=["eval-1"],
+        sort_by=None,
+        filters=filters,
+        require_intersection=False,
+        limit=10,
+        offset=0,
+        pb=pb,
+        read_table="calls_merged",
+    )
+    assert_raw_sql(
+        cte,
+        """
+            predict_and_score_calls AS (
+                SELECT calls_merged.id AS call_id,
+                    any(calls_merged.parent_id) AS eval_call_id,
+                    any(calls_merged.inputs_dump) AS inputs_dump,
+                    any(calls_merged.output_dump) AS output_dump,
+                    CASE
+                        WHEN position(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/') > 0
+                            THEN regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/([^/]+)$', 1)
+                        ELSE hex(SHA256(JSONExtractRaw(any(calls_merged.inputs_dump), 'example')))
+                    END AS row_digest
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_0:String}
+                WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
+                    OR calls_merged.parent_id IS NULL)
+                    AND calls_merged.id NOT IN {pb_1:Array(String)}
+                    AND (position(calls_merged.op_name, {pb_2:String}) > 0
+                        OR position(calls_merged.op_name, {pb_3:String}) > 0
+                        OR calls_merged.op_name IS NULL)
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
+                    AND (position(any(calls_merged.op_name), {pb_2:String}) > 0
+                        OR position(any(calls_merged.op_name), {pb_3:String}) > 0)
+                    AND any(calls_merged.deleted_at) IS NULL
+                    AND any(calls_merged.started_at) IS NOT NULL
+            ),
+
+            predict_and_score_calls_resolved AS (
+                SELECT * FROM predict_and_score_calls
+            ),
+
+            ranked_digests AS (
+                SELECT row_digest,
+                    ROW_NUMBER() OVER(ORDER BY row_digest ASC) AS row_order
+                FROM predict_and_score_calls_resolved
+                GROUP BY row_digest
+                HAVING 1=1
+                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_5:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '')) ELSE NULL END)) >= {pb_6:Float64})
+            ),
+
+            ranked_digest_count AS (
+                SELECT count(*) AS total_rows FROM ranked_digests
+            ),
+
+            page_digests AS (
+                SELECT row_digest, row_order
+                FROM ranked_digests
+                ORDER BY row_order
+                LIMIT 10
+                OFFSET 0
+            ),
+
+            page_resolved_inputs AS (
+                SELECT digest, any(val_dump) AS val_dump
+                FROM table_rows
+                PREWHERE project_id = {pb_0:String}
+                WHERE digest IN (SELECT row_digest FROM page_digests)
+                GROUP BY digest
+            ),
+
+            page_rows AS (
+                SELECT predict_and_score_calls_resolved.call_id AS call_id,
+                    predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
+                    predict_and_score_calls_resolved.row_digest AS row_digest,
+                    page_digests.row_order AS row_order,
+                    COALESCE(page_resolved_inputs.val_dump, JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                FROM predict_and_score_calls_resolved
+                INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
+                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
+            )
+            """,
+        pb.get_params(),
+        {
+            "pb_0": "proj-1",
+            "pb_1": ["eval-1"],
+            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+            "pb_4": '$."scores"."accuracy"',
+            "pb_5": "eval-1",
+            "pb_6": 0.5,
+        },
+    )
+
+
 def test_full_query_calls_merged() -> None:
     """Full SQL: lean CTEs + outer SELECT hydrates from calls_merged."""
     pb = ParamBuilder("pb")

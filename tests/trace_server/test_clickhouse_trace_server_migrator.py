@@ -1504,7 +1504,7 @@ def test_ttl_operations_only_on_local_tables_distributed(distributed_migrator):
 
 @patch("tenacity.nap.time.sleep")
 def test_run_ddl_with_retry(mock_sleep, mock_costs):
-    """Verify retry behavior for transient CH errors (e.g. 517 CANNOT_ASSIGN_ALTER)."""
+    """Verify retry behavior for transient CH errors (517, 999)."""
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(ch_client)
     ch_client.command.reset_mock()
@@ -1513,6 +1513,11 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
         "Code: 517. DB::Exception: Looks like this replica doesn't catchup "
         "with latest ALTER query updates: metadata version on replica is 2, "
         "while common metadata is 3. (CANNOT_ASSIGN_ALTER)"
+    )
+    error_999 = DatabaseError(
+        "Code: 999. Coordination::Exception: Coordination error: "
+        "Connection loss, path /clickhouse/task_queue/ddl/query-. "
+        "(KEEPER_EXCEPTION)"
     )
 
     # Succeeds immediately on clean call
@@ -1524,6 +1529,12 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
     ch_client.command.side_effect = [error_517, error_517, None]
     migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
     assert ch_client.command.call_count == 3
+    ch_client.command.reset_mock()
+
+    # Retries on 999 (KEEPER_EXCEPTION), then succeeds
+    ch_client.command.side_effect = [error_999, None]
+    migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
+    assert ch_client.command.call_count == 2
     ch_client.command.reset_mock()
 
     # Gives up after max retries
@@ -1552,6 +1563,13 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
 def test_is_transient_ch_error():
     """Verify transient error detection from ClickHouse DatabaseError messages."""
     assert _is_transient_ch_error(DatabaseError("Code: 517. DB::Exception: ..."))
+    assert _is_transient_ch_error(
+        DatabaseError(
+            "Code: 999. Coordination::Exception: Coordination error: "
+            "Connection loss, path /clickhouse/task_queue/ddl/query-. "
+            "(KEEPER_EXCEPTION)"
+        )
+    )
     assert not _is_transient_ch_error(DatabaseError("Code: 62. DB::Exception: ..."))
     assert not _is_transient_ch_error(DatabaseError("some other error"))
     assert not _is_transient_ch_error(DatabaseError(""))
