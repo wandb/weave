@@ -2,7 +2,6 @@
 
 import pytest
 from opentelemetry import trace as otel_trace
-from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -15,32 +14,24 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.fixture
-def otel_setup():
-    """Add an InMemorySpanExporter and EvalLinkSpanProcessor to the global provider.
+def otel_setup(monkeypatch: pytest.MonkeyPatch):
+    """Install an isolated OTel provider for each test.
 
     OTel only allows set_tracer_provider once per process, so we add our
-    processors to whatever provider is already active and clear the exporter
-    between tests.
+    processors to a temporary provider via monkeypatch instead of mutating
+    whatever provider is already active.
     """
     exporter = InMemorySpanExporter()
+
+    provider = SDKTracerProvider()
     span_processor = SimpleSpanProcessor(exporter)
-    eval_processor = EvalLinkSpanProcessor()
-
-    provider = otel_trace.get_tracer_provider()
-
-    # If no SDK provider exists yet, create one.
-    if not isinstance(provider, SDKTracerProvider):
-        provider = SDKTracerProvider(resource=Resource.create({}))
-        otel_trace.set_tracer_provider(provider)
-
     provider.add_span_processor(span_processor)
-    provider.add_span_processor(eval_processor)
+    provider.add_span_processor(EvalLinkSpanProcessor())
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
 
     yield exporter
 
-    exporter.clear()
-    span_processor.shutdown()
-    eval_processor.shutdown()
+    provider.shutdown()
 
 
 def _emit_genai_span(model: str = "gpt-4o") -> None:
