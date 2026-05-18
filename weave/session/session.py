@@ -224,8 +224,10 @@ class Tool(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
-    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, Any]:
-        """Return Tool content fields shaped for ``execute_tool_attributes(**...)``.
+    def _build_content_kwargs(
+        self, *, include_content: bool, redact: bool
+    ) -> dict[str, Any]:
+        """Build Tool content kwargs for ``execute_tool_attributes(**...)``.
 
         Single chokepoint so the streaming (``Tool.end``) and batch
         (``_attrs_for_span``) paths produce byte-identical content. Empty
@@ -255,7 +257,9 @@ class Tool(_SpanBase):
         attrs = execute_tool_attributes(
             tool_name=self.name,
             conversation_id=session.session_id if session else "",
-            **self._content_fields(include_content=include, redact=should_redact_pii()),
+            **self._build_content_kwargs(
+                include_content=include, redact=should_redact_pii()
+            ),
             tool_call_id=self.tool_call_id,
             tool_type=self.tool_type,
             tool_description=self.tool_description,
@@ -312,8 +316,10 @@ class LLM(_SpanBase):
     _ended: bool = PrivateAttr(default=False)
     _token: Token[LLM | None] | None = PrivateAttr(default=None)
 
-    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, Any]:
-        """Return LLM content fields shaped for ``llm_attributes(**...)``.
+    def _build_content_kwargs(
+        self, *, include_content: bool, redact: bool
+    ) -> dict[str, Any]:
+        """Build LLM content kwargs for ``llm_attributes(**...)``.
 
         Single chokepoint so the streaming (``LLM.end``) and batch
         (``_attrs_for_span``) paths produce byte-identical content. All
@@ -488,7 +494,9 @@ class LLM(_SpanBase):
             model=self.model,
             provider_name=self.provider_name,
             conversation_id=session.session_id if session else "",
-            **self._content_fields(include_content=include, redact=should_redact_pii()),
+            **self._build_content_kwargs(
+                include_content=include, redact=should_redact_pii()
+            ),
             usage=self.usage,
             finish_reasons=self.finish_reasons,
             response_id=self.response_id,
@@ -639,8 +647,10 @@ class Turn(_SpanBase):
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
 
-    def _content_fields(self, *, include_content: bool, redact: bool) -> dict[str, Any]:
-        """Return Turn content fields shaped for ``invoke_agent_attributes(**...)``.
+    def _build_content_kwargs(
+        self, *, include_content: bool, redact: bool
+    ) -> dict[str, Any]:
+        """Build Turn content kwargs for ``invoke_agent_attributes(**...)``.
 
         The Turn's ``messages`` map to the attribute builder's
         ``input_messages`` kwarg.
@@ -702,7 +712,9 @@ class Turn(_SpanBase):
             conversation_id=session.session_id if session else "",
             conversation_name=session.session_name if session else "",
             model=self.model,
-            **self._content_fields(include_content=include, redact=should_redact_pii()),
+            **self._build_content_kwargs(
+                include_content=include, redact=should_redact_pii()
+            ),
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
@@ -1052,7 +1064,7 @@ def _attrs_for_span(
             model=span.model,
             provider_name=span.provider_name,
             conversation_id=session_id,
-            **span._content_fields(
+            **span._build_content_kwargs(
                 include_content=include_content, redact=should_redact_pii()
             ),
             usage=span.usage,
@@ -1075,7 +1087,7 @@ def _attrs_for_span(
         attrs = execute_tool_attributes(
             tool_name=span.name,
             conversation_id=session_id,
-            **span._content_fields(
+            **span._build_content_kwargs(
                 include_content=include_content, redact=should_redact_pii()
             ),
             tool_call_id=span.tool_call_id,
@@ -1146,7 +1158,7 @@ def log_turn(
         conversation_id=session_id,
         conversation_name=session_name,
         model=turn.model,
-        **turn._content_fields(
+        **turn._build_content_kwargs(
             include_content=include_content, redact=should_redact_pii()
         ),
         agent_id=turn.agent_id,
