@@ -36,6 +36,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # GenAI semantic convention attribute that identifies a span as a GenAI operation.
+# It is available as GEN_AI_OPERATION_NAME in opentelemetry.semconv._incubating, but
+# given it's a private module and subject to change, I don't want to depend on it for
+# now.
+# TODO: Use the official semconv when this standard moves out of _incubating
 _GENAI_OPERATION_NAME_ATTR = "gen_ai.operation.name"
 
 
