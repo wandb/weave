@@ -62,6 +62,8 @@ from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
+    AgentCustomAttrsSchemaReq,
+    AgentCustomAttrsSchemaRes,
     AgentSearchReq,
     AgentSearchRes,
     AgentSpansQueryReq,
@@ -285,6 +287,7 @@ from weave.trace_server.trace_server_common import (
     MAX_FILTER_LENGTH,
     DynamicBatchProcessor,
     LRUCache,
+    apply_tags_and_synth_latest_in_place,
     determine_call_status,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -600,52 +603,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
-        calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-        ] = []
-        rejected_spans = 0
-        error_messages: list[str] = []
-        for processed_span in req.processed_spans:
-            # Extract wb_run_id from the processed span
-            wb_run_id = processed_span.run_id
-
-            if not isinstance(processed_span.resource_spans, ResourceSpans):
-                raise TypeError(
-                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
-                )
-
-            proto_resource_spans = processed_span.resource_spans
-            resource = Resource.from_proto(proto_resource_spans.resource)
-            for proto_scope_spans in proto_resource_spans.scope_spans:
-                for proto_span in proto_scope_spans.spans:
-                    try:
-                        span = Span.from_proto(proto_span, resource)
-                    except AttributePathConflictError as e:
-                        # Record and skip malformed spans so we can partially accept the batch
-                        rejected_spans += 1
-                        # Use data available on the proto span for context
-                        try:
-                            trace_id = proto_span.trace_id.hex()
-                            span_id = proto_span.span_id.hex()
-                            name = getattr(proto_span, "name", "")
-                        except Exception:
-                            trace_id = ""
-                            span_id = ""
-                            name = ""
-                        span_ident = (
-                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
-                        )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
-                        continue
-
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
-                    )
-
+        calls, rejected_spans, error_messages = self._otel_proto_to_calls(req)
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
 
         obj_id_idx_map = defaultdict(list)
@@ -715,29 +673,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Convert and insert based on write target. All calls in the batch
         # share req.project_id, so we resolve retention once.
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
+        rows = self._otel_build_rows(calls, retention_days, write_target)
         if write_target == WriteTarget.CALLS_COMPLETE:
-            rows = [
-                ch_complete_call_to_row(
-                    start_end_calls_to_ch_complete_insertable(
-                        start, end, retention_days
-                    )
-                )
-                for start, end in calls
-            ]
             self._insert_call_complete_batch(rows)
         else:
-            rows = []
-            for start, end in calls:
-                rows.append(
-                    ch_call_to_row(
-                        start_call_for_insert_to_ch_insertable(start, retention_days)
-                    )
-                )
-                rows.append(
-                    ch_call_to_row(
-                        end_call_for_insert_to_ch_insertable(end, retention_days)
-                    )
-                )
             self._insert_call_batch(rows)
 
         # Run callbacks and flush
@@ -757,6 +696,99 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
             )
         return tsi.OTelExportRes()
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.otel_export.proto_to_calls"
+    )
+    def _otel_proto_to_calls(
+        self, req: tsi.OTelExportReq
+    ) -> tuple[
+        list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
+        int,
+        list[str],
+    ]:
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ] = []
+        rejected_spans = 0
+        error_messages: list[str] = []
+        for processed_span in req.processed_spans:
+            # Extract wb_run_id from the processed span
+            wb_run_id = processed_span.run_id
+
+            if not isinstance(processed_span.resource_spans, ResourceSpans):
+                raise TypeError(
+                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
+                )
+
+            proto_resource_spans = processed_span.resource_spans
+            resource = Resource.from_proto(proto_resource_spans.resource)
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                    except AttributePathConflictError as e:
+                        # Record and skip malformed spans so we can partially accept the batch
+                        rejected_spans += 1
+                        # Use data available on the proto span for context
+                        try:
+                            trace_id = proto_span.trace_id.hex()
+                            span_id = proto_span.span_id.hex()
+                            name = getattr(proto_span, "name", "")
+                        except Exception:
+                            trace_id = ""
+                            span_id = ""
+                            name = ""
+                        span_ident = (
+                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
+
+                    calls.append(
+                        span.to_call(
+                            req.project_id,
+                            wb_user_id=req.wb_user_id,
+                            wb_run_id=wb_run_id,
+                        )
+                    )
+
+        set_current_span_dd_tags({"call_count": len(calls)})
+        return calls, rejected_spans, error_messages
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export.build_rows")
+    def _otel_build_rows(
+        self,
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ],
+        retention_days: int,
+        write_target: WriteTarget,
+    ) -> list:
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            rows = [
+                ch_complete_call_to_row(
+                    start_end_calls_to_ch_complete_insertable(
+                        start, end, retention_days
+                    )
+                )
+                for start, end in calls
+            ]
+        else:
+            rows = []
+            for start, end in calls:
+                rows.append(
+                    ch_call_to_row(
+                        start_call_for_insert_to_ch_insertable(start, retention_days)
+                    )
+                )
+                rows.append(
+                    ch_call_to_row(
+                        end_call_for_insert_to_ch_insertable(end, retention_days)
+                    )
+                )
+        set_current_span_dd_tags({"row_count": len(rows)})
+        return rows
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
@@ -1790,6 +1822,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        # Partial-failure semantics: ClickHouse cannot atomically write
+        # across object_versions and aliases. We insert the version row
+        # first, then the "latest" alias. If the alias INSERT raises,
+        # the new version is still readable by digest, but "latest"
+        # continues to resolve to the prior version (because is_latest
+        # is derived from the aliases table). The error propagates to
+        # the caller; a retry of obj_create with the same content lands
+        # on the dedup path (the version row already exists) and
+        # re-asserts the alias — that is the documented recovery flow.
+        #
+        # Read-your-own-write: between the version-row insert and the
+        # alias insert there is a window in which obj_read("latest")
+        # returns the PRIOR digest. Callers that need read-your-own-write
+        # on "latest" must wait for obj_create to return successfully.
         digest_result = compute_object_digest_result(
             req.obj.val,
             req.obj.builtin_object_class,
@@ -1821,6 +1867,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             column_names=list(ch_obj.model_fields.keys()),
         )
 
+        # Set "latest" alias on every new version.
+        self._insert_aliases(
+            req.obj.project_id,
+            req.obj.object_id,
+            ["latest"],
+            digest,
+            wb_user_id=req.obj.wb_user_id or "",
+        )
+
         return tsi.ObjCreateRes(
             digest=digest,
             object_id=req.obj.object_id,
@@ -1835,6 +1890,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         performance increase for operations like OTel ingest.
 
         This should **ONLY** be used when we know an object will never have more than one version.
+
+        Partial-failure semantics: same as obj_create.  Version rows are
+        inserted first; if the subsequent batched alias INSERT fails, the
+        new versions exist but their "latest" alias is missing — readers
+        see the prior latest until the alias write succeeds on retry.
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
@@ -1852,6 +1912,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
             )
 
+        alias_rows: list[tuple[str, str, str, str]] = []
         for obj in batch:
             digest_result = compute_object_digest_result(
                 obj.val,
@@ -1874,6 +1935,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             insert_data = list(ch_obj.model_dump().values())
             # Add the data to be inserted
             ch_insert_batch.append(insert_data)
+            alias_rows.append(
+                (obj.project_id, obj.object_id, digest, obj.wb_user_id or "")
+            )
 
             # Record the inserted data
             obj_results.append(
@@ -1888,6 +1952,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=ch_insert_batch,
             column_names=ALL_OBJ_INSERT_COLUMNS,
         )
+
+        # Batch-write the "latest" alias for every row, matching obj_create.
+        if alias_rows:
+            ch_alias_rows = [
+                list(
+                    AliasCHInsertable(
+                        project_id=project_id,
+                        object_id=object_id,
+                        alias="latest",
+                        digest=digest,
+                        wb_user_id=wb_user_id,
+                    )
+                    .model_dump()
+                    .values()
+                )
+                for (project_id, object_id, digest, wb_user_id) in alias_rows
+            ]
+            self._insert(
+                "aliases",
+                data=ch_alias_rows,
+                column_names=list(AliasCHInsertable.model_fields.keys()),
+            )
 
         return obj_results
 
@@ -1923,6 +2009,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._enrich_objs_with_tags_and_aliases(req.project_id, [obj_schema])
         return tsi.ObjReadRes(obj=obj_schema)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.objs_query")
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         if req.filter:
@@ -2239,15 +2326,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         digest: str,
     ) -> str | None:
-        """If digest looks like an alias name (not a hash, not version-like, not 'latest'),
-        resolve it to the actual digest via the aliases table. Returns None if not an alias.
+        """If digest looks like an alias name (not a hash, not version-like),
+        resolve it to the actual digest via the aliases table. Returns None
+        if not an alias OR if the resolved alias row has been tombstoned by
+        obj_delete (the HAVING filter excludes tombstones, so callers fall
+        through to the make_metadata_query CTE's hybrid is_latest fallback
+        for "latest").
         """
-        # Return None for digests that are not alias names, so the caller
-        # falls through to normal digest-based lookup.  "latest" and version
-        # patterns (v0, v1, …) are handled by the existing obj_read logic;
-        # content hashes are real digests that don't need resolution.
-        if digest == "latest":
-            return None
+        # Version patterns (v0, v1, …) are handled by the existing obj_read
+        # logic; content hashes are real digests that don't need resolution.
         (is_version, _) = tsc.digest_is_version_like(digest)
         if is_version:
             return None
@@ -2268,18 +2355,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not objs:
             return
         object_ids = list({obj.object_id for obj in objs})
-
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
-
-        for obj in objs:
-            key = (obj.object_id, obj.digest)
-            obj.tags = sorted(tags_map.get(key, []))
-            aliases = aliases_map.get(key, [])
-            # "latest" is virtual — synthesized from the is_latest window function
-            if obj.is_latest == 1 and "latest" not in aliases:
-                aliases = ["latest"] + aliases
-            obj.aliases = aliases
+        apply_tags_and_synth_latest_in_place(objs, tags_map, aliases_map)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
@@ -5798,7 +5876,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._file_batch = []
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_file_chunks")
     def _insert_file_chunks(
         self, file_chunks: list[FileChunkCreateCHInsertable]
     ) -> None:
@@ -6601,6 +6678,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
         return AgentQueryHandler(self._query, self.feedback_query).spans_stats(req)
+
+    def agent_custom_attrs_schema(
+        self, req: AgentCustomAttrsSchemaReq
+    ) -> AgentCustomAttrsSchemaRes:
+        return AgentQueryHandler(self._query, self.feedback_query).custom_attrs_schema(
+            req
+        )
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         return AgentQueryHandler(self._query, self.feedback_query).agents_query(req)

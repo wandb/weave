@@ -63,9 +63,9 @@ class FutureExecutor:
     object is deleted or when the program exits.
 
     Args:
-        max_workers (Optional[int]): The maximum number of worker threads to use per executor.
-                                     Defaults to None. If set to 0, all tasks will be executed
-                                     directly in the current thread.
+        max_workers (int | None): The maximum number of worker threads to use per executor.
+                                  Defaults to None. If set to 0, all tasks will be executed
+                                  directly in the current thread.
         thread_name_prefix (str): The prefix for thread names. Defaults to "WeaveThreadPool".
     """
 
@@ -174,7 +174,7 @@ class FutureExecutor:
         submitted jobs can enqueue more items if needed to complete.
 
         Args:
-            timeout (Optional[float]): Maximum time to wait in seconds. If None, wait indefinitely.
+            timeout (float | None): Maximum time to wait in seconds. If None, wait indefinitely.
 
         Returns:
             bool: True if all tasks completed

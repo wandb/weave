@@ -978,6 +978,77 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     assert res.result[0]["payload"]["dataset_id_str"] == "94"
 
 
+def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
+    """Regression for WB-33832: /feedback/query 500s on typed payload literals.
+
+    Without inferred field-side casts, ClickHouse refuses `JSON_VALUE(...)`
+    (String) compared against a typed param (Bool / Int64 / Float64) with
+    `Code: 386 NO_COMMON_TYPE`. JSON_VALUE on a JSON boolean emits the
+    literal string `'true'` / `'false'`, so the bool path must coerce
+    those before any numeric fallback.
+
+    Asserts on both backends so the same query shape works through sqlite
+    too (where the cast is silently dropped and sqlite's loose typing
+    handles the comparison).
+    """
+    project_id = client.project_id
+    call_ref = f"weave:///{project_id}/call/call_id_typed_payload"
+
+    client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=call_ref,
+            feedback_type="custom.annotation",
+            payload={"is_positive": True, "score": 0.9, "rank": 1},
+        )
+    )
+    client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=call_ref,
+            feedback_type="custom.annotation",
+            payload={"is_positive": False, "score": 0.1, "rank": 2},
+        )
+    )
+
+    def query(expr: dict) -> list[dict]:
+        return client.server.feedback_query(
+            FeedbackQueryReq(project_id=project_id, query=Query(**{"$expr": expr}))
+        ).result
+
+    # Bool literal: this is the exact shape that was 502'ing in production.
+    rows = query({"$eq": [{"$getField": "payload.is_positive"}, {"$literal": False}]})
+    assert len(rows) == 1
+    assert rows[0]["payload"]["is_positive"] is False
+
+    rows = query({"$eq": [{"$getField": "payload.is_positive"}, {"$literal": True}]})
+    assert len(rows) == 1
+    assert rows[0]["payload"]["is_positive"] is True
+
+    # Int literal: previously fell through to lexicographic string comparison.
+    rows = query({"$eq": [{"$getField": "payload.rank"}, {"$literal": 2}]})
+    assert len(rows) == 1
+    assert rows[0]["payload"]["rank"] == 2
+
+    # Float literal with $gt: same compat note as #6729.
+    rows = query({"$gt": [{"$getField": "payload.score"}, {"$literal": 0.5}]})
+    assert len(rows) == 1
+    assert rows[0]["payload"]["score"] == 0.9
+
+    # AND-wrapped bool comparison: inference is per-binary-op, but this pins
+    # that nesting doesn't regress the lookup.
+    rows = query(
+        {
+            "$and": [
+                {"$eq": [{"$getField": "payload.is_positive"}, {"$literal": False}]},
+                {"$gt": [{"$getField": "payload.rank"}, {"$literal": 1}]},
+            ]
+        }
+    )
+    assert len(rows) == 1
+    assert rows[0]["payload"] == {"is_positive": False, "score": 0.1, "rank": 2}
+
+
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
     if client_is_sqlite(client):

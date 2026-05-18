@@ -63,14 +63,20 @@ class TestFieldResolution:
             {"$eq": [{"$getField": "custom_attrs_string.env"}, {"$literal": "prod"}]}
         )
         # key param added before value param
-        assert "s.custom_attrs_string[{genai_0:String}] = {genai_1:String}" in sql
+        assert (
+            "if(mapContains(s.custom_attrs_string, {genai_0:String}), "
+            "s.custom_attrs_string[{genai_0:String}], NULL) = {genai_1:String}"
+        ) in sql
         assert params == {"genai_0": "env", "genai_1": "prod"}
 
     def test_custom_attr_explicit_prefix_int(self) -> None:
         sql, params = _compile(
             {"$gt": [{"$getField": "custom_attrs_int.retries"}, {"$literal": 3}]}
         )
-        assert "s.custom_attrs_int[{genai_0:String}] > {genai_1:Int64}" in sql
+        assert (
+            "if(mapContains(s.custom_attrs_int, {genai_0:String}), "
+            "s.custom_attrs_int[{genai_0:String}], NULL) > {genai_1:Int64}"
+        ) in sql
         assert params == {"genai_0": "retries", "genai_1": 3}
 
     def test_custom_attr_explicit_prefix_float(self) -> None:
@@ -82,13 +88,19 @@ class TestFieldResolution:
                 ]
             }
         )
-        assert "s.custom_attrs_float[{genai_0:String}] < {genai_1:Float64}" in sql
+        assert (
+            "if(mapContains(s.custom_attrs_float, {genai_0:String}), "
+            "s.custom_attrs_float[{genai_0:String}], NULL) < {genai_1:Float64}"
+        ) in sql
         assert params == {"genai_0": "latency", "genai_1": 1.5}
 
     def test_custom_attr_unprefixed_sibling_int(self) -> None:
         sql, params = _compile({"$gt": [{"$getField": "retries"}, {"$literal": 3}]})
         # Unknown name + int sibling -> custom_attrs_int map
-        assert "s.custom_attrs_int[{genai_0:String}] > {genai_1:Int64}" in sql
+        assert (
+            "if(mapContains(s.custom_attrs_int, {genai_0:String}), "
+            "s.custom_attrs_int[{genai_0:String}], NULL) > {genai_1:Int64}"
+        ) in sql
         assert params == {"genai_0": "retries", "genai_1": 3}
 
     def test_custom_attr_unprefixed_sibling_float(self) -> None:
@@ -108,7 +120,10 @@ class TestFieldResolution:
                 ]
             }
         )
-        assert "s.custom_attrs_bool[{genai_0:String}] = {genai_1:Bool}" in sql
+        assert (
+            "if(mapContains(s.custom_attrs_bool, {genai_0:String}), "
+            "s.custom_attrs_bool[{genai_0:String}], NULL) = {genai_1:Bool}"
+        ) in sql
         assert params == {"genai_0": "is_streaming", "genai_1": True}
 
     def test_custom_attr_unprefixed_sibling_bool(self) -> None:
@@ -258,5 +273,5 @@ class TestOperatorShapes:
                 ]
             }
         )
-        assert "toInt64OrNull(s.custom_attrs_int[" in sql
+        assert "toInt64OrNull(if(mapContains(s.custom_attrs_int" in sql
         assert params["genai_0"] == "retries"
