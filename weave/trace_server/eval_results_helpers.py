@@ -289,16 +289,17 @@ def best_effort_scorer_call_ids(
     return result
 
 
-def extract_genai_span_ref(call: tsi.CallSchema | None) -> tsi.GenAISpanRef | None:
-    """Extract an optional GenAI span ref from call attributes."""
-    if call is None or not isinstance(call.attributes, dict):
+def extract_genai_span_ref_from_weave_namespace(
+    data: dict[str, Any] | tsi.SummaryMap | None,
+) -> tsi.GenAISpanRef | None:
+    if not isinstance(data, dict):
         return None
 
-    weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
-    if not isinstance(weave_attrs, dict):
+    weave_data = data.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
+    if not isinstance(weave_data, dict):
         return None
 
-    raw_ref = weave_attrs.get(constants.GENAI_SPAN_REF_ATTR_KEY)
+    raw_ref = weave_data.get(constants.GENAI_SPAN_REF_ATTR_KEY)
     if not isinstance(raw_ref, dict):
         return None
 
@@ -306,6 +307,16 @@ def extract_genai_span_ref(call: tsi.CallSchema | None) -> tsi.GenAISpanRef | No
         return tsi.GenAISpanRef.model_validate(raw_ref)
     except ValidationError:
         return None
+
+
+def extract_genai_span_ref(call: tsi.CallSchema | None) -> tsi.GenAISpanRef | None:
+    """Extract an optional GenAI span ref from call attributes or summary."""
+    if call is None:
+        return None
+
+    return extract_genai_span_ref_from_weave_namespace(
+        call.attributes
+    ) or extract_genai_span_ref_from_weave_namespace(call.summary)
 
 
 def _build_trial(
