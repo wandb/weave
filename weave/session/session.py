@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 from typing_extensions import Self
 
-from weave.session import _redaction
 from weave.session.session_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
@@ -50,6 +49,7 @@ from weave.trace.settings import (
     should_disable_weave,
     should_redact_pii,
 )
+from weave.utils import pii_redaction
 from weave.version import VERSION
 
 # OTel imports — kept top-level under a try/except guard so the module
@@ -236,8 +236,8 @@ class Tool(_SpanBase):
         arguments = self.arguments
         result = self.result
         if redact:
-            arguments = _redaction.redact_string(arguments)
-            result = _redaction.redact_string(result)
+            arguments = pii_redaction.redact_string(arguments)
+            result = pii_redaction.redact_string(result)
         return {"tool_call_arguments": arguments, "tool_call_result": result}
 
     def end(self) -> None:
@@ -335,14 +335,14 @@ class LLM(_SpanBase):
         media_attachments: list[MediaAttachment] | None = self.media_attachments
         reasoning: Reasoning | None = self.reasoning
         if redact:
-            input_messages = _redaction.redact_messages(input_messages)
-            output_messages = _redaction.redact_messages(output_messages)
-            system_instructions = _redaction.redact_system_instructions(
+            input_messages = pii_redaction.redact_messages(input_messages)
+            output_messages = pii_redaction.redact_messages(output_messages)
+            system_instructions = pii_redaction.redact_system_instructions(
                 system_instructions
             )
             if reasoning is not None and reasoning.content:
                 reasoning = Reasoning(
-                    content=_redaction.redact_string(reasoning.content)
+                    content=pii_redaction.redact_string(reasoning.content)
                 )
         return {
             "input_messages": input_messages,
@@ -649,7 +649,7 @@ class Turn(_SpanBase):
             return {"input_messages": None}
         messages: list[Message] | None = self.messages
         if redact:
-            messages = _redaction.redact_messages(messages)
+            messages = pii_redaction.redact_messages(messages)
         return {"input_messages": messages}
 
     def model_post_init(self, context: Any, /) -> None:
