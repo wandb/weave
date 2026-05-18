@@ -119,7 +119,7 @@ def test_resilience_to_obj_create_failure_does_not_pin_payload(
         pass
     client_with_throwing_server.future_executor.flush()
 
-    assert getattr(obj, "ref", None) is None
+    assert obj.ref is None
 
     del obj
     gc.collect()

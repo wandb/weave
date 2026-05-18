@@ -22,6 +22,22 @@ def remove_ref(obj: Any) -> None:
             obj.ref = None
 
 
+def _try_attach_ref(obj: Any, ref: Ref | None) -> bool:
+    """Attach `ref` to `obj` via attribute assignment or `__dict__`. Returns success."""
+    try:
+        obj.ref = ref
+    except Exception:
+        pass
+    else:
+        return True
+    try:
+        obj.__dict__["ref"] = ref
+    except Exception:
+        return False
+    else:
+        return True
+
+
 def set_ref(obj: Any, ref: Ref | None) -> None:
     """Try to set the ref on "any" object.
 
@@ -29,19 +45,13 @@ def set_ref(obj: Any, ref: Ref | None) -> None:
     to support different kinds of objects. This will still
     fail for python primitives, but those can't be traced anyway.
     """
-    try:
-        obj.ref = ref
-    except Exception:
-        try:
-            obj.__dict__["ref"] = ref
-        except Exception:
-            logger.debug(
-                "set_ref: could not attach ref to object of type %s",
-                type(obj).__name__,
-            )
-            raise ValueError(
-                f"Failed to set ref on object of type {type(obj)}"
-            ) from None
+    if _try_attach_ref(obj, ref):
+        return
+    logger.debug(
+        "set_ref: could not attach ref to object of type %s",
+        type(obj).__name__,
+    )
+    raise ValueError(f"Failed to set ref on object of type {type(obj)}")
 
 
 def clear_refs_on_failure(
