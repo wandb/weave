@@ -103,27 +103,28 @@ def _attach_genai_span_ref_to_call_summary(
     weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = genai_span_ref.model_dump()
 
 
-def _find_current_predict_and_score_call() -> Call | None:
-    """Walk the weave call stack to find an active predict_and_score call.
+def _find_call_on_stack(op_names: str | tuple[str, ...]) -> Call | None:
+    """Walk the weave call stack (bottom-up) to find the first call matching op_names.
 
-    When predict_and_score is a real @op we can simply walk the call stack to
-    find the appropriate predict_and_score call. We walk the stack bottom up,
-    and stop if the call func name matches the predict and score name.
+    Client-side calls use public refs (weave:///entity/project/op/Name:digest),
+    so we compare against func_name which extracts the short name from the URI.
     """
+    if isinstance(op_names, str):
+        op_names = (op_names,)
     for call in reversed(call_context.get_call_stack()):
-        # Client-side calls use public refs (weave:///entity/project/op/Name:digest),
-        # so use func_name which extracts the short name from the URI.
-        if call.func_name in constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES:
+        if call.func_name in op_names:
             return call
     return None
+
+
+def _find_current_predict_and_score_call() -> Call | None:
+    """Walk the weave call stack to find an active predict_and_score call."""
+    return _find_call_on_stack(constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES)
 
 
 def _find_current_evaluate_call() -> Call | None:
     """Walk the weave call stack to find an active Evaluation.evaluate call."""
-    for call in reversed(call_context.get_call_stack()):
-        if call.func_name == constants.EVALUATION_RUN_OP_NAME:
-            return call
-    return None
+    return _find_call_on_stack(constants.EVALUATION_RUN_OP_NAME)
 
 
 def default_evaluation_display_name(call: Call) -> str:
