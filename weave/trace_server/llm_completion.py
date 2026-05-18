@@ -241,34 +241,21 @@ def resolve_and_apply_prompt(
     return combined_messages, initial_messages
 
 
-class _LiteLLMCallPlan(BaseModel):
-    """Resolved kwargs for a litellm call, plus the path it falls into.
-
-    Built once by `_prepare_litellm_call`; consumed by either `lite_llm_completion`
-    (sync) or `lite_llm_acompletion` (async). Splitting plan-build from the
-    litellm dispatch lets the async path skip the sync `litellm.completion`
-    entirely - no `run_in_executor` wrap, no thread held during the LLM wait.
-    """
-
-    kwargs: dict[str, Any]
-    is_custom_provider: bool
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
-def _prepare_litellm_call(
+def _build_litellm_kwargs(
     api_key: str | None,
     inputs: tsi.CompletionsCreateRequestInputs,
     provider: str | None,
     base_url: str | None,
     extra_headers: dict[str, str] | None,
     vertex_credentials: str | None,
-) -> _LiteLLMCallPlan:
+) -> dict[str, Any]:
+    """Resolve credentials + inputs into kwargs for `litellm.[a]completion`."""
     # Normalize base_url to prevent issues with trailing slashes causing redirects
-    # that change POST to GET (HTTP 301/302 redirect behavior).
+    # that change POST to GET (HTTP 301/302 redirect behavior)
     if base_url:
         base_url = base_url.rstrip("/")
 
+    # Setup provider-specific credentials and model modifications
     (
         aws_access_key_id,
         aws_secret_access_key,
@@ -277,33 +264,33 @@ def _prepare_litellm_call(
         azure_api_version,
     ) = _setup_provider_credentials_and_model(inputs, provider)
 
-    # Drop params that are not supported by the LLM provider.
+    # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
 
+    # Exclude weave-specific fields that litellm doesn't understand
     inputs_dict = inputs.model_dump(
         exclude_none=True,
         exclude={"prompt", "template_vars", "vertex_credentials"},
     )
 
+    # Handle custom provider
     if provider == "custom" and base_url:
-        return _LiteLLMCallPlan(
-            kwargs={
-                **inputs_dict,
-                "api_key": api_key,
-                "api_base": base_url,
-                "extra_headers": extra_headers or {},
-            },
-            is_custom_provider=True,
-        )
-    if provider == "custom" and not base_url:
+        return {
+            **inputs_dict,
+            "api_key": api_key,
+            "api_base": base_url,
+            "extra_headers": extra_headers or {},
+        }
+    elif provider == "custom" and not base_url:
         raise InvalidRequest(
             "Invalid provider configuration: must provide base_url if provider is 'custom'"
         )
-    if base_url and provider != "custom":
+    elif base_url and provider != "custom":
         raise InvalidRequest(
             f"Invalid provider configuration: provider '{provider}' must be 'custom' if base_url is provided"
         )
 
+    # For vertex providers, use vertex_credentials when provided instead of api_key
     is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
     api_key_for_call = None if (is_vertex_provider and vertex_credentials) else api_key
     completion_kwargs: dict[str, Any] = {
@@ -317,7 +304,7 @@ def _prepare_litellm_call(
     }
     if is_vertex_provider and vertex_credentials:
         completion_kwargs["vertex_credentials"] = vertex_credentials
-    return _LiteLLMCallPlan(kwargs=completion_kwargs, is_custom_provider=False)
+    return completion_kwargs
 
 
 def _litellm_error_response(e: Exception) -> tsi.CompletionsCreateRes:
@@ -334,16 +321,11 @@ def lite_llm_completion(
     return_type: str | None = None,
     vertex_credentials: str | None = None,
 ) -> tsi.CompletionsCreateRes:
-    plan = _prepare_litellm_call(
-        api_key=api_key,
-        inputs=inputs,
-        provider=provider,
-        base_url=base_url,
-        extra_headers=extra_headers,
-        vertex_credentials=vertex_credentials,
+    kwargs = _build_litellm_kwargs(
+        api_key, inputs, provider, base_url, extra_headers, vertex_credentials
     )
     try:
-        res = litellm.completion(**plan.kwargs)
+        res = litellm.completion(**kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
         return _litellm_error_response(e)
@@ -358,22 +340,12 @@ async def lite_llm_acompletion(
     return_type: str | None = None,
     vertex_credentials: str | None = None,
 ) -> tsi.CompletionsCreateRes:
-    """Async twin of `lite_llm_completion`. Uses `litellm.acompletion`.
-
-    The coroutine yields to the event loop during the LLM HTTP round-trip;
-    no thread is held while we wait for the provider. Otherwise byte-for-byte
-    identical kwarg-building and error-mapping as the sync path.
-    """
-    plan = _prepare_litellm_call(
-        api_key=api_key,
-        inputs=inputs,
-        provider=provider,
-        base_url=base_url,
-        extra_headers=extra_headers,
-        vertex_credentials=vertex_credentials,
+    """Async twin of `lite_llm_completion`. No thread held during the LLM wait."""
+    kwargs = _build_litellm_kwargs(
+        api_key, inputs, provider, base_url, extra_headers, vertex_credentials
     )
     try:
-        res = await litellm.acompletion(**plan.kwargs)
+        res = await litellm.acompletion(**kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
         return _litellm_error_response(e)

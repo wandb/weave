@@ -6236,19 +6236,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _prepare_completion_request(
         self, req: tsi.CompletionsCreateReq
     ) -> "tuple[list, CompletionModelInfo] | tsi.CompletionsCreateRes":
-        """Resolve prompt and set up model info; either branch can return an error.
-
-        Returns the prepared `(initial_messages, completion_model_info)` tuple on
-        success, or a fully-formed error `CompletionsCreateRes` to short-circuit.
-        Both sync `completions_create` and async `acompletions_create` call this
-        once before issuing the LLM request.
-        """
+        """Resolve prompt + model info, or return a short-circuit error response."""
+        # --- Resolve prompt if provided and set messages
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
+
+        # Initialize initial_messages with the original messages
         initial_messages = getattr(req.inputs, "messages", None) or []
 
         if prompt:
             try:
+                # Use helper to resolve prompt, combine messages, and apply template vars
                 combined_messages, initial_messages = resolve_and_apply_prompt(
                     prompt=prompt,
                     messages=getattr(req.inputs, "messages", None),
@@ -6257,12 +6255,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     obj_read_func=self.obj_read,
                 )
                 req.inputs.messages = combined_messages
+
             except Exception as e:
                 logger.exception("Failed to resolve prompt")
                 return tsi.CompletionsCreateRes(
                     response={"error": f"Failed to resolve prompt: {e!s}"}
                 )
 
+        # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
             completion_model_info = _setup_completion_model_info(
@@ -6282,12 +6282,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         start_time: datetime.datetime,
         end_time: datetime.datetime,
     ) -> tsi.CompletionsCreateRes:
-        """Post-LLM-call: build the call insertable and persist it.
-
-        Pure-sync: only the LLM round-trip itself is worth making async.
-        `acompletions_create` calls this via `run_in_executor` so a thread is
-        held for the CH insert (~100-300ms) but not during the LLM wait (~3s).
-        """
+        """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
@@ -6301,15 +6296,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         call_id = generate_id()
         trace_id = req.trace_id or generate_id()
         parent_id = req.parent_id
-
-        summary: tsi.SummaryInsertMap = {}
         model_name = completion_model_info.model_name
+
+        # Build summary with usage info if available
+        summary: tsi.SummaryInsertMap = {}
         if "usage" in res.response:
             summary["usage"] = {model_name: res.response["usage"]}
 
+        # Check for exception
         exception = res.response.get("error")
 
         if write_target == WriteTarget.CALLS_COMPLETE:
+            # Write directly to calls_complete table
             completed = tsi.CompletedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=call_id,
@@ -6332,6 +6330,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_call = complete_call_to_ch_insertable(completed, retention_days)
             self._insert_call_complete(ch_call)
         else:
+            # Write to call_parts/calls_merged via start/end pattern
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=call_id,
@@ -6362,7 +6361,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 start_call,
                 end_call,
             ]
-            batch_data = [ch_call_to_row(call) for call in calls]
+            batch_data = []
+            for call in calls:
+                batch_data.append(ch_call_to_row(call))
+
             self._insert_call_batch(batch_data)
 
         return tsi.CompletionsCreateRes(response=res.response, weave_call_id=call_id)
@@ -6375,7 +6377,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return prep
         initial_messages, completion_model_info = prep
 
+        # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
+
+        # Make the API call
         res = lite_llm_completion(
             api_key=completion_model_info.api_key,
             inputs=req.inputs,
@@ -6385,6 +6390,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return_type=completion_model_info.return_type,
             vertex_credentials=completion_model_info.vertex_credentials,
         )
+
         end_time = datetime.datetime.now()
 
         return self._log_completion_call(
