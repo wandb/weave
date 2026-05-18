@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from weave.trace.refs import ObjectRef, Ref
+
+logger = logging.getLogger(__name__)
 
 
 def get_ref(obj: Any) -> ObjectRef | None:
@@ -26,13 +29,14 @@ def set_ref(obj: Any, ref: Ref | None) -> None:
     """
     try:
         obj.ref = ref
-    except:
+    except Exception:
         try:
-            obj.ref = ref
-        except:
-            try:
-                obj.__dict__["ref"] = ref
-            except:
-                raise ValueError(
-                    f"Failed to set ref on object of type {type(obj)}"
-                ) from None
+            obj.__dict__["ref"] = ref
+        except Exception:
+            logger.debug(
+                "set_ref: could not attach ref to object of type %s",
+                type(obj).__name__,
+            )
+            raise ValueError(
+                f"Failed to set ref on object of type {type(obj)}"
+            ) from None

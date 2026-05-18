@@ -2164,13 +2164,16 @@ class WeaveClient:
         else:
             ref = ObjectRef(self.entity, self.project, name, digest_future)
 
-        # Attach the ref to the object
-        try:
-            set_ref(orig_val, ref)
-        except Exception:
-            # Don't worry if we can't set the ref.
-            # This can happen for primitive types that don't have __dict__
-            pass
+        # WB-31070: only attach on success. A failed digest_future's
+        # exception traceback retains json_val via frame locals.
+        def _attach_ref_on_success(fut: Future[str]) -> None:
+            if fut.exception() is None:
+                try:
+                    set_ref(orig_val, ref)
+                except ValueError:
+                    pass
+
+        digest_future.add_done_callback(_attach_ref_on_success)
 
         return ref
 
