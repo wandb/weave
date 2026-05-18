@@ -173,7 +173,7 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
     # Auto-link GenAI OTel spans to eval predictions and inject eval
     # metadata (call ID, project, evaluation name) onto spans for
     # deep-linking in the agent traces UI.
-    provider.add_span_processor(EvalLinkSpanProcessor())  # type: ignore[arg-type]
+    provider.add_span_processor(EvalLinkSpanProcessor())
     trace.set_tracer_provider(provider)
 
 

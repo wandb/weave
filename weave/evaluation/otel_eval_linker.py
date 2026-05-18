@@ -17,6 +17,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
+
 from weave.evaluation.eval import (
     _attach_genai_span_ref_to_call_summary,
     _current_eval_predict_and_score_call,
@@ -28,7 +30,6 @@ from weave.trace_server import trace_server_interface as tsi
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
-    from opentelemetry.sdk.trace import ReadableSpan, Span
 
     from weave.trace.call import Call
 
@@ -47,7 +48,7 @@ def _get_evaluation_name() -> str | None:
     return name if isinstance(name, str) else None
 
 
-class EvalLinkSpanProcessor:
+class EvalLinkSpanProcessor(SpanProcessor):
     """OTel SpanProcessor that auto-links GenAI spans to eval predictions.
 
     When ``on_start`` the processor injects eval context attributes (call ID,
@@ -98,9 +99,6 @@ class EvalLinkSpanProcessor:
 
         ref = tsi.GenAISpanRef(trace_id=trace_id, span_id=span_id)
         _attach_genai_span_ref_to_call_summary(call, ref)
-
-    def shutdown(self) -> None:
-        pass
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return True
