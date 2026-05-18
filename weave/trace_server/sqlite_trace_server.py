@@ -5311,13 +5311,29 @@ def _transform_external_calls_field_to_internal_calls_field(
         otel_path = "$" if not sub else quote_json_path(sub)
         legacy_inner = "otel_span" if not sub else f"otel_span.{sub}"
         legacy_path = quote_json_path(legacy_inner)
+        # Mirror the ClickHouse `if(otel_dump IS NULL, attr, otel)` dispatch
+        # via a CASE so legacy rows (otel_dump unset) fall through to the
+        # attributes column. We pick the type from the same branch to keep
+        # the inferred-cast pipeline below honest.
+        otel_extract = f"json_extract(otel_dump, '{otel_path}')"
+        legacy_extract = f"json_extract(attributes, '{legacy_path}')"
+        otel_type = f"json_type(otel_dump, '{otel_path}')"
+        legacy_type = f"json_type(attributes, '{legacy_path}')"
+        json_extract_sql = (
+            f"CASE WHEN otel_dump IS NULL THEN {legacy_extract} ELSE {otel_extract} END"
+        )
+        json_type_sql = (
+            f"CASE WHEN otel_dump IS NULL THEN {legacy_type} ELSE {otel_type} END"
+        )
         sql_type = "TEXT"
         if cast is not None:
             sql_type = _sqlite_sql_type_for_cast(cast)
-        otel_extract = f"json_extract(otel_dump, '{otel_path}')"
-        legacy_extract = f"json_extract(attributes, '{legacy_path}')"
-        coalesced = f"coalesce({otel_extract}, {legacy_extract})"
-        return f"CAST({coalesced} AS {sql_type})"
+        result = f"CAST({json_extract_sql} AS {sql_type})"
+        if cast in {"int", "double", "bool"}:
+            result = _sqlite_inferred_json_cast_sql(
+                json_extract_sql, json_type_sql, cast, sql_type
+            )
+        return result
     elif field == "attributes" or field.startswith("attributes."):
         if field == "attributes":
             json_path = "$"

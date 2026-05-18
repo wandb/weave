@@ -2051,3 +2051,81 @@ def test_otel_attributes_otel_span_filter(client: weave_client.WeaveClient):
             wb_user_id=None,
         )
     )
+
+
+def test_otel_attributes_otel_span_filter_legacy_fallback(
+    client: weave_client.WeaveClient,
+):
+    """Pre-migration-020 rows store OTel data at attributes.$.otel_span.
+
+    Filters on attributes.otel_span.* must still find them via the
+    `attributes_dump` fallback when otel_dump is unset.
+    """
+    project_id = client.project_id
+    call_id = str(uuid.uuid4())
+
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=call_id,
+                started_at=datetime.now(),
+                op_name="legacy_otel_op",
+                attributes={
+                    "otel_span": {
+                        "attributes": {"gen_ai": {"response": {"model": "claude-legacy"}}}
+                    }
+                },
+                inputs={},
+                wb_user_id="abcd123",
+            )
+        )
+    )
+
+    matching = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            query={
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$getField": (
+                                "attributes.otel_span.attributes.gen_ai.response.model"
+                            )
+                        },
+                        {"$literal": "claude-legacy"},
+                    ]
+                }
+            },
+        )
+    )
+    assert len(matching.calls) == 1
+    assert matching.calls[0].id == call_id
+
+    miss = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            query={
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$getField": (
+                                "attributes.otel_span.attributes.gen_ai.response.model"
+                            )
+                        },
+                        {"$literal": "gpt-4"},
+                    ]
+                }
+            },
+        )
+    )
+    assert len(miss.calls) == 0
+
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(
+            project_id=project_id,
+            call_ids=[call_id],
+            wb_user_id=None,
+        )
+    )
