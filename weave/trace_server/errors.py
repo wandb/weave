@@ -21,7 +21,25 @@ class ErrorCode:
     identify specific error conditions without parsing human-readable messages.
     """
 
+    BAD_QUERY_PARAMETER = "BAD_QUERY_PARAMETER"
     CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
+    DIGEST_MISMATCH = "DIGEST_MISMATCH"
+    INSERT_TOO_LARGE = "INSERT_TOO_LARGE"
+    INVALID_EXTERNAL_REF = "INVALID_EXTERNAL_REF"
+    INVALID_FIELD = "INVALID_FIELD"
+    INVALID_ID_FORMAT = "INVALID_ID_FORMAT"
+    INVALID_REQUEST = "INVALID_REQUEST"
+    LIGHTWEIGHT_UPDATE_NOT_ALLOWED = "LIGHTWEIGHT_UPDATE_NOT_ALLOWED"
+    MISSING_LLM_API_KEY = "MISSING_LLM_API_KEY"
+    NOT_FOUND = "NOT_FOUND"
+    OBJECT_DELETED = "OBJECT_DELETED"
+    PROJECT_NOT_FOUND = "PROJECT_NOT_FOUND"
+    QUERY_ILLEGAL_TYPE_OF_ARGUMENT = "QUERY_ILLEGAL_TYPE_OF_ARGUMENT"
+    QUERY_MEMORY_LIMIT_EXCEEDED = "QUERY_MEMORY_LIMIT_EXCEEDED"
+    QUERY_NO_COMMON_TYPE = "QUERY_NO_COMMON_TYPE"
+    QUERY_TIMEOUT_EXCEEDED = "QUERY_TIMEOUT_EXCEEDED"
+    REQUEST_TOO_LARGE = "REQUEST_TOO_LARGE"
+    RUN_NOT_FOUND = "RUN_NOT_FOUND"
 
 
 # =============================================================================
@@ -38,13 +56,13 @@ class Error(Exception):
 class RequestTooLarge(Error):
     """Raised when a request is too large."""
 
-    pass
+    error_code: str = ErrorCode.REQUEST_TOO_LARGE
 
 
 class InvalidRequest(Error):
     """Raised when a request is invalid."""
 
-    pass
+    error_code: str = ErrorCode.INVALID_REQUEST
 
 
 class CallsCompleteModeRequired(InvalidRequest):
@@ -75,60 +93,62 @@ class CallsCompleteModeRequired(InvalidRequest):
 class QueryMemoryLimitExceededError(Error):
     """Raised when a query memory limit is exceeded."""
 
-    pass
+    error_code: str = ErrorCode.QUERY_MEMORY_LIMIT_EXCEEDED
 
 
 class QueryNoCommonTypeError(Error):
     """Raised when a query has no common type."""
 
-    pass
+    error_code: str = ErrorCode.QUERY_NO_COMMON_TYPE
 
 
 class QueryIllegalTypeofArgumentError(Error):
     """Raised when a query has an illegal type of argument."""
 
-    pass
+    error_code: str = ErrorCode.QUERY_ILLEGAL_TYPE_OF_ARGUMENT
 
 
 class BadQueryParameterError(Error):
     """Raised when a query parameter is invalid."""
 
-    pass
+    error_code: str = ErrorCode.BAD_QUERY_PARAMETER
 
 
 class QueryTimeoutExceededError(Error):
     """Raised when a query timeout is exceeded."""
 
-    pass
+    error_code: str = ErrorCode.QUERY_TIMEOUT_EXCEEDED
 
 
 class InsertTooLarge(Error):
     """Raised when a single insert is too large."""
 
-    pass
+    error_code: str = ErrorCode.INSERT_TOO_LARGE
 
 
 class LightweightUpdateNotAllowedError(Error):
     """Raised when ClickHouse lightweight updates are not enabled."""
 
-    pass
+    error_code: str = ErrorCode.LIGHTWEIGHT_UPDATE_NOT_ALLOWED
 
 
 # User error
 class InvalidFieldError(Error):
     """Raised when a field is invalid."""
 
-    pass
+    error_code: str = ErrorCode.INVALID_FIELD
 
 
 class NotFoundError(Error):
     """Raised when a general not found error occurs."""
 
-    pass
+    error_code: str = ErrorCode.NOT_FOUND
 
 
 class MissingLLMApiKeyError(Error):
     """Raised when a LLM API key is missing for completion."""
+
+    error_code: str = ErrorCode.MISSING_LLM_API_KEY
 
     def __init__(self, message: str, api_key_name: str):
         self.api_key_name = api_key_name
@@ -138,6 +158,8 @@ class MissingLLMApiKeyError(Error):
 class ObjectDeletedError(Error):
     """Raised when an object has been deleted."""
 
+    error_code: str = ErrorCode.OBJECT_DELETED
+
     def __init__(self, message: str, deleted_at: datetime.datetime):
         self.deleted_at = deleted_at
         super().__init__(message)
@@ -146,27 +168,27 @@ class ObjectDeletedError(Error):
 class InvalidExternalRef(Error):
     """Raised when an external reference is invalid."""
 
-    pass
+    error_code: str = ErrorCode.INVALID_EXTERNAL_REF
 
 
 class DigestMismatchError(Error):
     """Raised when a client-provided digest does not match the server-computed digest."""
 
-    pass
+    error_code: str = ErrorCode.DIGEST_MISMATCH
 
 
 class ProjectNotFound(Error):
     """Raised when a project is not found."""
 
-    pass
+    error_code: str = ErrorCode.PROJECT_NOT_FOUND
 
 
 class InvalidIdFormat(Exception):
-    pass
+    error_code: str = ErrorCode.INVALID_ID_FORMAT
 
 
 class RunNotFound(Exception):
-    pass
+    error_code: str = ErrorCode.RUN_NOT_FOUND
 
 
 def _format_error_to_json_with_extra(
@@ -296,7 +318,14 @@ class ErrorRegistry:
 
         # 413
         self.register(InsertTooLarge, 413)
-        self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
+        self.register(
+            RequestTooLarge,
+            413,
+            lambda exc: {
+                "reason": "Request too large",
+                "error_code": ErrorCode.REQUEST_TOO_LARGE,
+            },
+        )
 
         # 501
         self.register(LightweightUpdateNotAllowedError, 501)
