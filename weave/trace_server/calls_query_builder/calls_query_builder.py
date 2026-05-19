@@ -1007,13 +1007,17 @@ class CallsQuery(BaseModel):
                     return queue_id
         return None
 
-    def _should_optimize(self) -> bool:
-        """Determines if query optimization should be performed.
+    def _should_use_filter_cte(self) -> bool:
+        """Whether to use the filter-then-load two-pass CTE pattern.
 
-        Returns True if the query has heavy fields and predicate pushdown is possible.
+        Returns True if the query has heavy fields AND predicate pushdown is possible.
         Heavy fields are expensive to load into memory (inputs, output, attributes, summary).
         Predicate pushdown is possible when there are light filters, light query conditions,
-        or light order filters that can be pushed down into a subquery.
+        or light order filters that can narrow rows before the heavy load.
+
+        Note: this is a narrow knob covering the two-pass CTE shape only. It does NOT
+        govern other always-on prunes (e.g. the trace_id bloom-filter candidate CTE),
+        which apply independently.
         """
         # First, check if the query has any heavy fields
         table_name = get_calls_table_name(self.read_table)
@@ -1129,7 +1133,7 @@ class CallsQuery(BaseModel):
         # Determine if we should use the two-step filtered_calls CTE pattern.
         # Only relevant for calls_merged (where GROUP BY makes the two-pass
         # approach worthwhile). For calls_complete, we always use single-pass.
-        should_optimize = self._should_optimize()
+        should_use_filter_cte = self._should_use_filter_cte()
 
         # Important: Always inject deleted_at into the query.
         # We use None as the literal for both table types. The sentinel handling
@@ -1182,6 +1186,13 @@ class CallsQuery(BaseModel):
         # uses the strict (no OR-IS-NULL) form so the bloom filter can prune
         # granules; the outer query keeps the OR-IS-NULL form for unmerged-
         # call-part correctness and restricts to `id IN filter_candidate_ids`.
+        #
+        # Always-on: independent of `should_use_filter_cte`, because the bloom
+        # prune pays for itself even on the trivial single-pass path and the
+        # CTE itself is cheap (one extra SELECT, no replicated ordering).
+        # TODO: as_sql is getting long. Follow-up to hoist the early-return
+        # predicate into a named local and extract the single-pass / two-pass
+        # branches into helpers.
         candidate_cte_name: str | None = None
         candidate_cte_sql = self._build_filter_candidate_ids_cte_sql(
             pb, table_alias_resolved
@@ -1190,7 +1201,7 @@ class CallsQuery(BaseModel):
             ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
             candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
 
-        if not should_optimize and not self.include_costs and not object_ref_conditions:
+        if not should_use_filter_cte and not self.include_costs and not object_ref_conditions:
             base_sql = self._as_sql_base_format(
                 pb,
                 table_alias_resolved,
@@ -1205,7 +1216,7 @@ class CallsQuery(BaseModel):
         # For calls_complete (one row per call, no GROUP BY), always use a
         # single-pass query — it's both simpler and significantly faster.
         use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
-            should_optimize or self.include_costs or bool(object_ref_conditions)
+            should_use_filter_cte or self.include_costs or bool(object_ref_conditions)
         )
 
         if use_filter_cte:
@@ -2430,16 +2441,15 @@ def _trace_id_match_sql(
     field_expr: str,
     param_builder: ParamBuilder,
 ) -> str:
-    """Build a `field_expr = ?` or `field_expr IN ?` clause for `trace_ids`.
+    """Build a `field_expr IN ?` clause for `trace_ids`, or "" if empty.
 
-    Returns "" when `trace_ids` is empty. Single-element lists use equality
-    for performance; multi-element lists use `IN`.
+    Always emits `IN`. ClickHouse builds a hashset for `IN` even at N=1 and
+    the bloom-filter index prunes equivalently for `=` and `IN`, so there's
+    no perf cliff worth special-casing.
     """
     if not trace_ids:
         return ""
     assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
-    if len(trace_ids) == 1:
-        return f"{field_expr} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
     return f"{field_expr} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
 
 
@@ -2471,7 +2481,7 @@ def process_trace_id_filter_to_sql(
     # arm only applies to `calls_merged`, where unmerged call parts can have
     # a NULL aggregated trace_id.
     if read_table != ReadTable.CALLS_MERGED:
-        return f" AND {trace_cond}"
+        return f" AND ({trace_cond})"
 
     trace_null = trace_id_field.null_check_sql(
         param_builder, table_alias, read_table, use_agg_fn=False

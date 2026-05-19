@@ -301,7 +301,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             SELECT calls_merged.id AS id
             FROM calls_merged
             PREWHERE calls_merged.project_id = {pb_1:String}
-            WHERE ifNull(calls_merged.trace_id, '') = {pb_0:String}),
+            WHERE ifNull(calls_merged.trace_id, '') IN {pb_0:Array(String)}),
         filtered_calls AS (
             SELECT
                 calls_merged.id AS id
@@ -310,10 +310,10 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             WHERE (calls_merged.id IN filter_candidate_ids)
                 AND ((calls_merged.op_name IN {pb_7:Array(String)})
                     OR (calls_merged.op_name IS NULL))
-                AND (ifNull(calls_merged.trace_id, '') = {pb_0:String}
+                AND (ifNull(calls_merged.trace_id, '') IN {pb_8:Array(String)}
                     OR calls_merged.trace_id IS NULL)
-                AND ((calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL)
-                    AND (calls_merged.inputs_dump LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL))
+                AND ((calls_merged.inputs_dump LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL)
+                    AND (calls_merged.inputs_dump LIKE {pb_10:String} OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                                     ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
@@ -338,7 +338,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         ORDER BY any(calls_merged.started_at) DESC
         """,
         {
-            "pb_0": "111111111111",
+            "pb_0": ["111111111111"],
             "pb_1": "project",
             "pb_2": '$."param"."val"',
             "pb_3": "hello",
@@ -346,8 +346,9 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             "pb_5": "true",
             "pb_6": "my_user_id",
             "pb_7": ["a", "b"],
-            "pb_8": '%"hello"%',
-            "pb_9": "%true%",
+            "pb_8": ["111111111111"],
+            "pb_9": '%"hello"%',
+            "pb_10": "%true%",
         },
     )
 
@@ -2776,7 +2777,7 @@ def test_trace_id_filter_in():
     )
 
 
-def test_trace_id_filter_eq():
+def test_trace_id_filter_single_with_op_names():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
@@ -2792,7 +2793,7 @@ def test_trace_id_filter_eq():
             SELECT calls_merged.id AS id
             FROM calls_merged
             PREWHERE calls_merged.project_id = {pb_1:String}
-            WHERE ifNull(calls_merged.trace_id, '') = {pb_0:String})
+            WHERE ifNull(calls_merged.trace_id, '') IN {pb_0:Array(String)})
         SELECT
             calls_merged.id AS id
         FROM calls_merged
@@ -2800,23 +2801,24 @@ def test_trace_id_filter_eq():
         WHERE (calls_merged.id IN filter_candidate_ids)
             AND ((calls_merged.op_name IN {pb_2:Array(String)})
                 OR (calls_merged.op_name IS NULL))
-            AND (ifNull(calls_merged.trace_id, '') = {pb_0:String}
+            AND (ifNull(calls_merged.trace_id, '') IN {pb_3:Array(String)}
                 OR calls_merged.trace_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
         {
-            "pb_0": "111111111111",
+            "pb_0": ["111111111111"],
             "pb_1": "project",
             "pb_2": ["weave-trace-internal:///%"],
+            "pb_3": ["111111111111"],
         },
     )
 
 
 def test_trace_id_filter_calls_complete_no_candidate_cte() -> None:
     """On calls_complete, trace_id is non-nullable String with a bloom filter
-    on the raw column. The query must keep raw `trace_id =` (no `ifNull` wrap),
+    on the raw column. The query must keep raw `trace_id IN` (no `ifNull` wrap),
     must NOT include `OR trace_id IS NULL` (the column is non-nullable), and
     must NOT emit a `filter_candidate_ids` CTE - that CTE is only for pruning
     the calls_merged Nullable trace_id index.
@@ -2831,12 +2833,12 @@ def test_trace_id_filter_calls_complete_no_candidate_cte() -> None:
             calls_complete.id AS id
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_2:String}
-        WHERE calls_complete.trace_id = {pb_1:String}
+        WHERE (calls_complete.trace_id IN {pb_1:Array(String)})
         AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
             "pb_0": SENTINEL_EPOCH,
-            "pb_1": "111111111111",
+            "pb_1": ["111111111111"],
             "pb_2": "project",
         },
     )
@@ -3588,7 +3590,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         PREWHERE calls_complete.project_id = {pb_12:String}
         WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
                 OR (calls_complete.op_name IS NULL))
-            AND calls_complete.trace_id = {pb_4:String}
+            AND (calls_complete.trace_id IN {pb_4:Array(String)})
         AND (
             ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')) > {pb_1:Int64}))
             AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
@@ -3611,7 +3613,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_1": 1000,
             "pb_2": SENTINEL_EPOCH,
             "pb_3": ["my_op"],
-            "pb_4": "trace_abc",
+            "pb_4": ["trace_abc"],
             "pb_5": '$."status_counts"."error"',
             "pb_6": "error",
             "pb_7": "running",
