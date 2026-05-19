@@ -2092,13 +2092,11 @@
               {"type": "number"},
               {"type": "boolean"},
               {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/LiteralOperation"
-                },
+                "additionalProperties": true,
                 "type": "object"
               },
               {
-                "items": {"$ref": "#/components/schemas/LiteralOperation"},
+                "items": {},
                 "type": "array"
               },
               {"type": "null"}
