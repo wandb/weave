@@ -247,6 +247,12 @@ export interface CallsQueryStatsReq {
 export interface CallsQueryStatsRes {
   /** Count */
   count: number;
+  /**
+   * Has More
+   * True when count saturated the request's limit (caller-supplied or the server's defense-in-depth ceiling). Clients should render the count as e.g. '10,000+'.
+   * @default false
+   */
+  has_more?: boolean;
 }
 
 /** ContainsOperation */
