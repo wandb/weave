@@ -29,7 +29,14 @@ _PATCHED_INTEGRATIONS: set[str] = set()
 # import hook (running under Python's per-module import lock) and a direct
 # ``patch_*()`` call from a different thread cannot both see "not patched"
 # and both call ``attempt_patch`` against the same target.
-_PATCH_LOCK = threading.Lock()
+#
+# This is an ``RLock`` (reentrant) because the lock is taken on two nested
+# levels of the same call chain: ``_patch_if_needed`` and ``implicit_patch``
+# each acquire it and then call the per-integration ``patch_X()`` helper,
+# which itself goes through ``_patch_integration`` and tries to acquire the
+# lock again. A non-reentrant ``Lock`` would deadlock the import-hook
+# auto-patch path on the very thread that's trying to make progress.
+_PATCH_LOCK = threading.RLock()
 
 # Global reference to the import hook, so we can unregister it if needed
 _IMPORT_HOOK: WeaveImportHook | None = None

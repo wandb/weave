@@ -148,6 +148,58 @@ def test_no_double_patching(setup_env, monkeypatch):
         assert mock_patch_func.call_count == 1
 
 
+def test_patch_lock_is_reentrant(setup_env, monkeypatch):
+    """Regression: import hook → ``_patch_if_needed`` → ``patch_X()`` →
+    ``_patch_integration()`` re-enters the patch lock on the same thread.
+
+    A non-reentrant ``threading.Lock`` deadlocked this chain on real
+    ``import google.adk`` calls. The lock must be an ``RLock`` so the
+    same thread can take it again without blocking.
+    """
+    import threading
+
+    _inject_fake_module(monkeypatch, "fake_integration")
+
+    # Simulate a real ``patch_X`` function: it calls ``_patch_integration``
+    # internally, which tries to re-acquire ``_PATCH_LOCK``.
+    def fake_patch_func() -> None:
+        _patch_integration(
+            module_path="fake_integration",
+            patcher_func_getter_name="get_fake_patcher",
+            triggering_symbols=["fake_integration"],
+        )
+
+    # Stub out the patcher module that ``_patch_integration`` will import.
+    fake_module = _inject_fake_module(monkeypatch, "fake_integration")
+    fake_module.get_fake_patcher = lambda settings=None: MagicMock(  # type: ignore[attr-defined]
+        attempt_patch=MagicMock(return_value=True)
+    )
+
+    with patch.dict(
+        "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+        {"fake_integration": fake_patch_func},
+    ):
+        # Run the import-hook entry point on a worker thread so the test
+        # can fail fast with a timeout instead of hanging if the deadlock
+        # ever returns.
+        completed = threading.Event()
+
+        def _drive() -> None:
+            _patch_if_needed("fake_integration")
+            completed.set()
+
+        worker = threading.Thread(target=_drive, daemon=True)
+        worker.start()
+        worker.join(timeout=2.0)
+
+        assert completed.is_set(), (
+            "_patch_if_needed deadlocked — the patch lock must be reentrant"
+        )
+        # ``reset_patched_integrations`` rebinds the module attribute, so
+        # the import-time alias may be stale; read fresh off the module.
+        assert "fake_integration" in patch_module._PATCHED_INTEGRATIONS
+
+
 def test_patch_failure_graceful(setup_env, monkeypatch):
     """Test that patching failures are handled gracefully."""
     _inject_fake_module(monkeypatch, "openai")
