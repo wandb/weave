@@ -1201,7 +1201,11 @@ class CallsQuery(BaseModel):
             ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
             candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
 
-        if not should_use_filter_cte and not self.include_costs and not object_ref_conditions:
+        if (
+            not should_use_filter_cte
+            and not self.include_costs
+            and not object_ref_conditions
+        ):
             base_sql = self._as_sql_base_format(
                 pb,
                 table_alias_resolved,
