@@ -107,7 +107,7 @@ def test_op_versioning_lotsofstuff():
         return np.array(k).mean()
 
 
-def test_op_versioning_inline_import(client):
+def test_op_versioning_inline_import():
     pass
 
 

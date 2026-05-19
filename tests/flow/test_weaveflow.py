@@ -134,7 +134,7 @@ class MyModel(weave.Model):
         return x + 1
 
 
-def test_op_method_name(client):
+def test_op_method_name():
     model = MyModel(a=1)
 
     assert model.predict.name == "MyModel.predict"
