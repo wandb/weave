@@ -86,10 +86,10 @@ def _attach_genai_span_ref_to_call_summary(
     call: Call,
     genai_span_ref: tsi.GenAISpanRef,
 ) -> None:
-    """Write a GenAISpanRef into call.summary so eval results can find it.
+    """Append a GenAISpanRef into call.summary so eval results can find it.
 
     Our EvalLinkSpanProcessor calls this to attach GenAISpanRef to an Eval
-    call. The trace server can than extract span refs from call summaries
+    call. The trace server can then extract span refs from call summaries
     by looking for the presence of the GenAISpanRef attribute key.
     """
     if call.summary is None:
@@ -100,7 +100,14 @@ def _attach_genai_span_ref_to_call_summary(
 
     weave_summary = call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE]
 
-    weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = genai_span_ref.model_dump()
+    new_ref = genai_span_ref.model_dump()
+    existing = weave_summary.get(constants.GENAI_SPAN_REF_ATTR_KEY)
+    if isinstance(existing, list):
+        existing.append(new_ref)
+    elif isinstance(existing, dict):
+        weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = [existing, new_ref]
+    else:
+        weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = [new_ref]
 
 
 def _find_call_on_stack(op_names: str | tuple[str, ...]) -> Call | None:

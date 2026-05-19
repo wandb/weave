@@ -509,7 +509,7 @@ def test_eval_results_query_returns_genai_span_ref_without_children(client):
     assert res.total_rows == 1
     trial = res.rows[0].evaluations[0].trials[0]
     assert trial.predict_call_id is None
-    assert trial.genai_span_ref == genai_span_ref
+    assert trial.genai_span_ref == [genai_span_ref]
 
 
 def test_eval_results_query_nonexistent_eval_root(client):

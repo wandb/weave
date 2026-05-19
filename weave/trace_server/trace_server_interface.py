@@ -3,7 +3,14 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 from typing_extensions import TypedDict
 
 if TYPE_CHECKING:
@@ -2534,6 +2541,9 @@ class GenAISpanRef(BaseModel):
     span_id: str
 
 
+GenAISpanRefValue = GenAISpanRef | list[GenAISpanRef]
+
+
 class PredictionCreateBody(BaseModel):
     """Request body for creating a Prediction via REST API.
 
@@ -2547,9 +2557,9 @@ class PredictionCreateBody(BaseModel):
         None,
         description="Optional evaluation run ID to link this prediction as a child call",
     )
-    genai_span_ref: GenAISpanRef | None = Field(
+    genai_span_ref: GenAISpanRefValue | None = Field(
         default=None,
-        description="Optional GenAI span reference produced by this prediction.",
+        description="Optional GenAI span reference(s) produced by this prediction.",
     )
 
 
@@ -2845,7 +2855,14 @@ class EvalResultsTrial(BaseModel):
     model_latency_seconds: float | None = None
     total_tokens: int | None = None
     scorer_call_ids: dict[str, str] = Field(default_factory=dict)
-    genai_span_ref: GenAISpanRef | None = None
+    genai_span_ref: list[GenAISpanRef] | None = None
+
+    @field_validator("genai_span_ref", mode="before")
+    @classmethod
+    def normalize_genai_span_ref(cls, value: Any) -> Any:
+        if value is None or isinstance(value, list):
+            return value
+        return [value]
 
 
 class EvalResultsRowEvaluation(BaseModel):

@@ -59,10 +59,52 @@ def test_build_eval_rows_returns_genai_span_ref_without_children() -> None:
     )
 
     trial = rows[0].evaluations[0].trials[0]
-    assert trial.genai_span_ref == tsi.GenAISpanRef.model_validate(_genai_span_ref())
+    assert trial.genai_span_ref == [tsi.GenAISpanRef.model_validate(_genai_span_ref())]
 
 
-def test_build_trial_prefers_prediction_genai_span_ref() -> None:
+def test_eval_results_trial_wraps_legacy_single_genai_span_ref() -> None:
+    trial = tsi.EvalResultsTrial.model_validate(
+        {
+            "predict_and_score_call_id": "pas-1",
+            "genai_span_ref": _genai_span_ref(),
+        }
+    )
+
+    assert trial.genai_span_ref == [tsi.GenAISpanRef.model_validate(_genai_span_ref())]
+
+
+def test_build_eval_rows_returns_genai_span_ref_list_without_children() -> None:
+    predict_and_score_call = _call(
+        call_id="pas-1",
+        attributes={
+            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                constants.GENAI_SPAN_REF_ATTR_KEY: [
+                    _genai_span_ref("agent-trace-1"),
+                    _genai_span_ref("agent-trace-2"),
+                ],
+            }
+        },
+        inputs={"example": {"x": 1}, "model": "model://agent"},
+        output={"output": "result", "scores": {}},
+    )
+
+    rows = eval_helpers.build_eval_rows(
+        [predict_and_score_call],
+        ["eval-1"],
+        {"pas-1": "row-1"},
+        include_raw_data_rows=False,
+        include_predict_and_score_children=False,
+    )
+
+    trial = rows[0].evaluations[0].trials[0]
+    assert trial.genai_span_ref is not None
+    assert [ref.trace_id for ref in trial.genai_span_ref] == [
+        "agent-trace-1",
+        "agent-trace-2",
+    ]
+
+
+def test_build_trial_combines_prediction_and_parent_genai_span_refs() -> None:
     predict_and_score_call = _call(
         call_id="pas-1",
         attributes={
@@ -94,7 +136,10 @@ def test_build_trial_prefers_prediction_genai_span_ref() -> None:
 
     trial = next(iter(row_eval_map.values()))["eval-1"].trials[0]
     assert trial.genai_span_ref is not None
-    assert trial.genai_span_ref.trace_id == "predict-trace"
+    assert [ref.trace_id for ref in trial.genai_span_ref] == [
+        "predict-trace",
+        "parent-trace",
+    ]
 
 
 def test_extract_genai_span_ref_ignores_malformed_refs() -> None:
@@ -110,4 +155,4 @@ def test_extract_genai_span_ref_ignores_malformed_refs() -> None:
             }
         )
 
-        assert eval_helpers.extract_genai_span_ref(call) is None
+        assert eval_helpers.extract_genai_span_refs(call) is None
