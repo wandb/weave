@@ -160,8 +160,10 @@ from weave.trace_server.constants import (
 )
 from weave.trace_server.datadog import (
     generator_trace,
+    record_db_insert,
     set_current_span_dd_tags,
     set_root_span_dd_tags,
+    tag_db_insert_path,
 )
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -600,6 +602,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         )
 
+    @tag_db_insert_path("otel_export")
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
@@ -814,6 +817,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except Exception:
             logger.exception("Failed to flush kafka producer")
 
+    @tag_db_insert_path("call_start_batch")
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         with self.call_batch():
             res = []
@@ -826,6 +830,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
 
+    @tag_db_insert_path("call_start")
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         """Creates a new call."""
         # Converts the user-provided call details into a clickhouse schema.
@@ -857,6 +862,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
+    @tag_db_insert_path("call_end")
     def call_end(
         self,
         req: tsi.CallEndReq,
@@ -895,6 +901,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     # === Calls V2 API ===
 
+    @tag_db_insert_path("calls_complete")
     def calls_complete(
         self, req: tsi.CallsUpsertCompleteReq
     ) -> tsi.CallsUpsertCompleteRes:
@@ -951,6 +958,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsUpsertCompleteRes()
 
+    @tag_db_insert_path("call_start_v2")
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
         """Start a single call (v2 API).
 
@@ -977,6 +985,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallStartV2Res(id=ch_start.id, trace_id=ch_start.trace_id)
 
+    @tag_db_insert_path("call_end_v2")
     def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
         """End a single call (v2 API).
 
@@ -1746,6 +1755,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.call_update")
+    @tag_db_insert_path("call_update")
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
@@ -1792,6 +1802,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
+    @tag_db_insert_path("obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         digest_result = compute_object_digest_result(
             req.obj.val,
@@ -1830,6 +1841,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
+    @tag_db_insert_path("obj_create_batch")
     def obj_create_batch(
         self, batch: list[tsi.ObjSchemaForInsert]
     ) -> list[tsi.ObjCreateRes]:
@@ -1973,6 +1985,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._enrich_objs_with_tags_and_aliases(req.project_id, obj_schemas)
         return tsi.ObjQueryRes(objs=obj_schemas)
 
+    @tag_db_insert_path("obj_delete")
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         """Delete object versions by digest, belonging to given object_id.
         All deletion in this method is "soft". Deletion occurs by inserting
@@ -2133,6 +2146,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 column_names=list(AliasCHInsertable.model_fields.keys()),
             )
 
+    @tag_db_insert_path("obj_add_tags")
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
         assert req.wb_user_id, "wb_user_id is required for obj_add_tags"
         self._ensure_obj_version_exists(req.project_id, req.object_id, req.digest)
@@ -2157,6 +2171,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.ObjRemoveTagsRes()
 
+    @tag_db_insert_path("obj_set_aliases")
     def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         assert req.wb_user_id, "wb_user_id is required for obj_set_aliases"
         self._ensure_obj_version_exists(req.project_id, req.object_id, req.digest)
@@ -2284,6 +2299,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 aliases = ["latest"] + aliases
             obj.aliases = aliases
 
+    @tag_db_insert_path("table_create")
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
         for r in req.table.rows:
@@ -2323,6 +2339,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
+    @tag_db_insert_path("table_update")
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         pb = ParamBuilder()
         query = make_table_row_digests_query(
@@ -2398,6 +2415,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
+    @tag_db_insert_path("table_create_from_digests")
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
@@ -2644,6 +2662,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             retention_days=stored_days if stored_days != RETENTION_DAYS_NO_TTL else None
         )
 
+    @tag_db_insert_path("project_ttl_settings_update")
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.project_ttl_settings_update"
     )
@@ -2672,6 +2691,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ],
             column_names=["project_id", "retention_days", "updated_at", "updated_by"],
         )
+        # Bypasses self._insert so we record the counter directly.
+        record_db_insert(table="project_ttl_settings", count=1)
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
@@ -3011,6 +3032,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueDeleteRes(queue=queue)
 
+    @tag_db_insert_path("annotation_queue_add_calls")
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.annotation_queue_add_calls"
     )
@@ -5707,6 +5729,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return [r.val for r in extra_results]
 
+    @tag_db_insert_path("file_create")
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
         validate_expected_digest(
@@ -5932,6 +5955,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.FilesStatsRes(total_size_bytes=result.result_rows[0][0])
 
+    @tag_db_insert_path("cost_create")
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
@@ -6032,6 +6056,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.CostPurgeRes()
 
+    @tag_db_insert_path("feedback_create")
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
@@ -6050,6 +6075,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return format_feedback_to_res(row)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.feedback_create_batch")
+    @tag_db_insert_path("feedback_create_batch")
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
     ) -> tsi.FeedbackCreateBatchRes:
@@ -6548,6 +6574,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             response=res.response, weave_call_id=start_call.id
         )
 
+    @tag_db_insert_path("evaluate_model")
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         if self._evaluate_model_dispatcher is None:
             raise ValueError("Evaluate model dispatcher is not set")
@@ -6608,6 +6635,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> AgentConversationChatRes:
         return AgentQueryHandler(self._query).conversation_chat(req)
 
+    @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)
 
@@ -6919,6 +6947,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
+        record_db_insert(table=table, count=len(data))
         set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._insert.table": table,

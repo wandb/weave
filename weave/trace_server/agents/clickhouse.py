@@ -50,6 +50,7 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportReq,
     GenAIOTelExportRes,
 )
+from weave.trace_server.datadog import record_db_insert
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
@@ -388,6 +389,7 @@ class AgentWriteHandler:
                 data=[genai_span_to_row(s) for s in span_rows],
                 column_names=ALL_SPAN_INSERT_COLUMNS,
             )
+            record_db_insert(table="spans", count=len(span_rows))
 
         if failure_counts:
             logger.warning(
