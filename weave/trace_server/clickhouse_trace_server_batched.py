@@ -6259,10 +6259,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ActionsExecuteBatchRes()
 
-    @tag_db_insert_path("completions_create")
-    def completions_create(
+    def _prepare_completion_request(
         self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
+    ) -> "tuple[list[dict[str, Any]], CompletionModelInfo] | tsi.CompletionsCreateRes":
+        """Resolve prompt + model info, or return a short-circuit error response."""
         # --- Resolve prompt if provided and set messages
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
@@ -6297,24 +6297,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except Exception as e:
             return tsi.CompletionsCreateRes(response={"error": str(e)})
 
-        model_name = completion_model_info.model_name
+        return initial_messages, completion_model_info
 
-        # Now that we have all the fields for both cases, we can make the API call
-        start_time = datetime.datetime.now()
-
-        # Make the API call
-        res = lite_llm_completion(
-            api_key=completion_model_info.api_key,
-            inputs=req.inputs,
-            provider=completion_model_info.provider,
-            base_url=completion_model_info.base_url,
-            extra_headers=completion_model_info.extra_headers,
-            return_type=completion_model_info.return_type,
-            vertex_credentials=completion_model_info.vertex_credentials,
-        )
-
-        end_time = datetime.datetime.now()
-
+    def _log_completion_call(
+        self,
+        req: tsi.CompletionsCreateReq,
+        completion_model_info: "CompletionModelInfo",
+        initial_messages: list[dict[str, Any]],
+        res: tsi.CompletionsCreateRes,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+    ) -> tsi.CompletionsCreateRes:
+        """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
@@ -6328,6 +6322,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         call_id = generate_id()
         trace_id = req.trace_id or generate_id()
         parent_id = req.parent_id
+        model_name = completion_model_info.model_name
 
         # Build summary with usage info if available
         summary: tsi.SummaryInsertMap = {}
@@ -6399,6 +6394,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._insert_call_batch(batch_data)
 
         return tsi.CompletionsCreateRes(response=res.response, weave_call_id=call_id)
+
+    @tag_db_insert_path("completions_create")
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        prep = self._prepare_completion_request(req)
+        if isinstance(prep, tsi.CompletionsCreateRes):
+            return prep
+        initial_messages, completion_model_info = prep
+
+        # Now that we have all the fields for both cases, we can make the API call
+        start_time = datetime.datetime.now()
+
+        # Make the API call
+        res = lite_llm_completion(
+            api_key=completion_model_info.api_key,
+            inputs=req.inputs,
+            provider=completion_model_info.provider,
+            base_url=completion_model_info.base_url,
+            extra_headers=completion_model_info.extra_headers,
+            vertex_credentials=completion_model_info.vertex_credentials,
+        )
+
+        end_time = datetime.datetime.now()
+
+        return self._log_completion_call(
+            req, completion_model_info, initial_messages, res, start_time, end_time
+        )
 
     # -------------------------------------------------------------------
     # Streaming variant
