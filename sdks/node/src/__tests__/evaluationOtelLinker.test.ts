@@ -16,13 +16,14 @@ import {initWithCustomTraceServer} from './clientMock';
 
 const TRACE_ID = '1234567890abcdef1234567890abcdef';
 const SPAN_ID = '1234567890abcdef';
+const SECOND_SPAN_ID = 'fedcba0987654321';
 
-function readableGenAISpan(): ReadableSpan {
+function readableGenAISpan(spanId = SPAN_ID): ReadableSpan {
   return {
     attributes: {'gen_ai.operation.name': 'chat'},
     spanContext: () => ({
       traceId: TRACE_ID,
-      spanId: SPAN_ID,
+      spanId,
       traceFlags: TraceFlags.SAMPLED,
     }),
   } as unknown as ReadableSpan;
@@ -38,7 +39,7 @@ describe('EvalLinkSpanProcessor', () => {
     setEvalLinkClientGetter(() => requireGlobalClient());
   });
 
-  test('injects eval metadata on span start and stores GenAI span ref on end', () => {
+  test('injects eval metadata on span start and stores GenAI span refs on end', () => {
     const client = requireGlobalClient();
     const processor = new EvalLinkSpanProcessor();
     const evaluateEntry: CallStackEntry = {
@@ -61,6 +62,7 @@ describe('EvalLinkSpanProcessor', () => {
       () => {
         processor.onStart(span, ROOT_CONTEXT);
         processor.onEnd(readableGenAISpan());
+        processor.onEnd(readableGenAISpan(SECOND_SPAN_ID));
       }
     );
 
@@ -78,12 +80,54 @@ describe('EvalLinkSpanProcessor', () => {
     );
     expect(predictAndScoreEntry.childSummary).toEqual({
       weave: {
-        genai_span_ref: {
-          trace_id: TRACE_ID,
-          span_id: SPAN_ID,
-        },
+        genai_span_ref: [
+          {
+            trace_id: TRACE_ID,
+            span_id: SPAN_ID,
+          },
+          {
+            trace_id: TRACE_ID,
+            span_id: SECOND_SPAN_ID,
+          },
+        ],
       },
     });
+  });
+
+  test('upgrades existing single GenAI span ref summary and deduplicates refs', () => {
+    const processor = new EvalLinkSpanProcessor();
+    const predictAndScoreEntry: CallStackEntry = {
+      callId: 'predict-and-score-call',
+      traceId: 'weave-trace',
+      childSummary: {
+        weave: {
+          genai_span_ref: {
+            trace_id: TRACE_ID,
+            span_id: SPAN_ID,
+          },
+        },
+      },
+      opName: 'Evaluation.predictAndScore',
+    };
+
+    requireGlobalClient().runWithCallStack(
+      new CallStack([predictAndScoreEntry]),
+      () => {
+        processor.onEnd(readableGenAISpan());
+        processor.onEnd(readableGenAISpan(SECOND_SPAN_ID));
+      }
+    );
+
+    expect(predictAndScoreEntry.childSummary.weave.genai_span_ref).toEqual([
+      {
+        trace_id: TRACE_ID,
+        span_id: SPAN_ID,
+      },
+      {
+        trace_id: TRACE_ID,
+        span_id: SECOND_SPAN_ID,
+      },
+    ]);
   });
 
   test('registers on SDK tracer providers once', () => {
@@ -129,9 +173,11 @@ describe('EvalLinkSpanProcessor', () => {
       c.op_name?.includes('Evaluation.predictAndScore')
     );
 
-    expect(predictAndScoreCall?.summary?.weave?.genai_span_ref).toEqual({
-      trace_id: TRACE_ID,
-      span_id: SPAN_ID,
-    });
+    expect(predictAndScoreCall?.summary?.weave?.genai_span_ref).toEqual([
+      {
+        trace_id: TRACE_ID,
+        span_id: SPAN_ID,
+      },
+    ]);
   });
 });
