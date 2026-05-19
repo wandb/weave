@@ -97,10 +97,30 @@ def test_build_trial_prefers_prediction_genai_span_ref() -> None:
     assert trial.genai_span_ref.trace_id == "predict-trace"
 
 
+def test_extract_genai_span_ref_accepts_multiple_refs() -> None:
+    call = _call(
+        attributes={
+            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                constants.GENAI_SPAN_REF_ATTR_KEY: [
+                    _genai_span_ref("first-trace"),
+                    _genai_span_ref("second-trace"),
+                ],
+            }
+        }
+    )
+
+    refs = eval_helpers.extract_genai_span_refs_from_weave_namespace(call.attributes)
+    assert [ref.trace_id for ref in refs] == ["first-trace", "second-trace"]
+    ref = eval_helpers.extract_genai_span_ref(call)
+    assert ref is not None
+    assert ref.trace_id == "first-trace"
+
+
 def test_extract_genai_span_ref_ignores_malformed_refs() -> None:
     for raw_ref in (
         {"span_id": "missing-trace-id"},
         {"trace_id": "missing-span-id"},
+        [{"span_id": "missing-trace-id"}, {"trace_id": "missing-span-id"}],
     ):
         call = _call(
             attributes={

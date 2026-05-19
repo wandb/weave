@@ -289,17 +289,7 @@ def best_effort_scorer_call_ids(
     return result
 
 
-def extract_genai_span_ref_from_weave_namespace(
-    data: dict[str, Any] | tsi.SummaryMap | None,
-) -> tsi.GenAISpanRef | None:
-    if not isinstance(data, dict):
-        return None
-
-    weave_data = data.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
-    if not isinstance(weave_data, dict):
-        return None
-
-    raw_ref = weave_data.get(constants.GENAI_SPAN_REF_ATTR_KEY)
+def _validate_genai_span_ref(raw_ref: Any) -> tsi.GenAISpanRef | None:
     if not isinstance(raw_ref, dict):
         return None
 
@@ -307,6 +297,30 @@ def extract_genai_span_ref_from_weave_namespace(
         return tsi.GenAISpanRef.model_validate(raw_ref)
     except ValidationError:
         return None
+
+
+def extract_genai_span_refs_from_weave_namespace(
+    data: dict[str, Any] | tsi.SummaryMap | None,
+) -> list[tsi.GenAISpanRef]:
+    if not isinstance(data, dict):
+        return []
+
+    weave_data = data.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
+    if not isinstance(weave_data, dict):
+        return []
+
+    raw_ref = weave_data.get(constants.GENAI_SPAN_REF_ATTR_KEY)
+    raw_refs = raw_ref if isinstance(raw_ref, list) else [raw_ref]
+
+    refs = [_validate_genai_span_ref(ref) for ref in raw_refs]
+    return [ref for ref in refs if ref is not None]
+
+
+def extract_genai_span_ref_from_weave_namespace(
+    data: dict[str, Any] | tsi.SummaryMap | None,
+) -> tsi.GenAISpanRef | None:
+    refs = extract_genai_span_refs_from_weave_namespace(data)
+    return refs[0] if refs else None
 
 
 def extract_genai_span_ref(call: tsi.CallSchema | None) -> tsi.GenAISpanRef | None:

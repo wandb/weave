@@ -55,10 +55,26 @@ export function attachGenAISpanRefToCallSummary(
     !Array.isArray(existingWeaveSummary)
       ? existingWeaveSummary
       : {};
+  const existingGenAISpanRefs = weaveSummary[GENAI_SPAN_REF_ATTR_KEY];
+  const genaiSpanRefs = Array.isArray(existingGenAISpanRefs)
+    ? existingGenAISpanRefs
+    : existingGenAISpanRefs != null
+      ? [existingGenAISpanRefs]
+      : [];
+
+  const alreadyAttached = genaiSpanRefs.some(
+    ref =>
+      ref != null &&
+      typeof ref === 'object' &&
+      ref.trace_id === genaiSpanRef.trace_id &&
+      ref.span_id === genaiSpanRef.span_id
+  );
 
   call.childSummary[WEAVE_ATTRIBUTES_NAMESPACE] = {
     ...weaveSummary,
-    [GENAI_SPAN_REF_ATTR_KEY]: genaiSpanRef,
+    [GENAI_SPAN_REF_ATTR_KEY]: alreadyAttached
+      ? genaiSpanRefs
+      : [...genaiSpanRefs, genaiSpanRef],
   };
 }
 
