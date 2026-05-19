@@ -1293,8 +1293,6 @@ class WeaveClient:
         if self.postprocess_output:
             postprocessed_output = self.postprocess_output(postprocessed_output)
 
-        # Set sync so user code reading `call.output` after `finish_call` sees
-        # the postprocessed value; refs are attached later in `send_end_call`.
         call.output = postprocessed_output
 
         # Summary handling
@@ -1369,9 +1367,7 @@ class WeaveClient:
         # Runs after any output-side digest futures resolve (see Phase 1).
         # Errors are routed to `end_complete_future` so the on_end_complete
         # callback fires once exactly when the whole pipeline finishes.
-        # Tracked in the executor's active set so `_flush()` waits for it,
-        # and `log_exception=True` so a server.call_end failure logs the
-        # same "Task failed" line master does (matches resilience tests).
+        # Tracked in the executor's active set so `_flush()` waits for it.
         end_complete_future: Future[None] = self.future_executor._track_future(
             Future(), log_exception=True
         )
@@ -1417,12 +1413,10 @@ class WeaveClient:
             except Exception as e:
                 end_complete_future.set_exception(e)
 
-        # Snapshot mutable containers so a caller mutating the returned
-        # value after `finish_call` returns can't reach into the deferred
-        # walk (PR #6740 review item). Leaf types (Refs, weave Objects,
-        # pydantic models) are preserved by identity so async ref
-        # attachment via `_save_nested_objects` still surfaces to the
-        # caller's alias.
+        # Snapshot containers so a post-finish_call mutation can't reach the
+        # deferred walk. Leaf types (Refs, weave Objects, pydantic models)
+        # stay by identity so async ref attachment surfaces to the caller's
+        # alias.
         output_for_defer = _snapshot_mutable_containers(postprocessed_output)
 
         # Phase 1: in a worker, save any new nested Objects/Tables/Ops in the
