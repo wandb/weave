@@ -6174,6 +6174,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ActionsExecuteBatchRes()
 
+    @tag_db_insert_path("completions_create")
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
@@ -6317,6 +6318,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     # -------------------------------------------------------------------
     # Streaming variant
     # -------------------------------------------------------------------
+    @tag_db_insert_path("completions_create_stream")
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
@@ -6458,6 +6460,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             end_call_handler=end_call_handler,
         )
 
+    @tag_db_insert_path("image_create")
     def image_create(
         self, req: tsi.ImageGenerationCreateReq
     ) -> tsi.ImageGenerationCreateRes:
