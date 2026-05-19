@@ -226,6 +226,7 @@ from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
+    is_residence_cached,
 )
 from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.query_builder import eval_results_query_builder
@@ -945,24 +946,36 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             {"weave_trace_server.insert_call_count": len(req.batch)}
         )
 
+        # Per-batch cache of (write_target, retention_days) keyed by project_id.
+        # Both lookups are L1-cached but every call still pays the function-call +
+        # lock + cachetools-get + ddtrace span cost (~3-5ms each), which dominates
+        # wall time for batches sharing a project. Hoist to one lookup per unique
+        # project_id. EMPTY-residence projects are intentionally NOT cached here
+        # (resolver skips caching them, see `_get_residence`) so semantics match.
+        batch_lookups: dict[str, tuple[WriteTarget, int]] = {}
+
         with self.call_batch():
             for complete_call in req.batch:
                 processed_complete_call = process_complete_call_to_content(
                     complete_call, self
                 )
 
-                # Determine write target based on project, this should be the same for all
-                # calls in the batch, subsequent calls just hit the in-memory cache. This
-                # is here for technical correctness, in case we relax project_id target
-                # constraints intra-batch
-                write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    processed_complete_call.project_id,
-                    self.ch_client,
-                )
+                project_id = processed_complete_call.project_id
+                cached = batch_lookups.get(project_id)
+                if cached is not None:
+                    write_target, retention_days = cached
+                else:
+                    write_target = self.table_routing_resolver.resolve_v2_write_target(
+                        project_id, self.ch_client
+                    )
+                    retention_days = get_project_retention_days(
+                        project_id, self.ch_client
+                    )
+                    # Skip local caching for EMPTY-residence projects to preserve
+                    # the resolver's existing per-call re-query behavior.
+                    if is_residence_cached(project_id):
+                        batch_lookups[project_id] = (write_target, retention_days)
 
-                retention_days = get_project_retention_days(
-                    processed_complete_call.project_id, self.ch_client
-                )
                 ch_call = complete_call_to_ch_insertable(
                     processed_complete_call, retention_days
                 )

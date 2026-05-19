@@ -41,6 +41,18 @@ def reset_project_residence_cache() -> None:
         _project_residence_cache.clear()
 
 
+def is_residence_cached(project_id: str) -> bool:
+    """Return True iff the project's residence is in the in-process cache.
+
+    EMPTY-residence projects are intentionally not cached (see `_get_residence`),
+    so a False result for a project that was just resolved means residence is
+    EMPTY and callers that hoist per-batch should fall back to per-call lookup
+    to preserve existing semantics.
+    """
+    with _project_residence_cache_lock:
+        return project_id in _project_residence_cache
+
+
 class TableRoutingResolver:
     """Resolver for determining which table to read from or write to based on project data residence.
 

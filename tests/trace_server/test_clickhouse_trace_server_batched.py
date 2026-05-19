@@ -1880,3 +1880,173 @@ def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
         f"pointed at a tombstoned version: {exc_info.value!r}.  Expected a "
         f"NotFoundError-family error mentioning 'not found' or 'deleted'."
     )
+
+
+# ---------------------------------------------------------------------------
+# calls_complete per-batch lookup hoisting
+# ---------------------------------------------------------------------------
+
+
+def _make_complete_call(project_id: str) -> tsi.CompletedCallSchemaForInsert:
+    now = dt.datetime.now(dt.timezone.utc)
+    return tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=str(uuid.uuid4()),
+        trace_id=str(uuid.uuid4()),
+        op_name="test_op",
+        started_at=now,
+        ended_at=now,
+        attributes={},
+        inputs={},
+        output=None,
+        summary={},
+    )
+
+
+def _make_batch_server_with_mocks(residence_rows):
+    """Build a ClickHouseTraceServer with a CH client mocking both residence + TTL queries.
+
+    `residence_rows` is the result_rows returned for the residence query. For
+    `_get_residence`: `[(None, None)]` = EMPTY, `[(1, None)]` = COMPLETE_ONLY.
+    The TTL query (`SELECT argMax(retention_days...)`) always returns 0 rows ->
+    RETENTION_DAYS_NO_TTL. Query routing is done by inspecting the SQL string.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+
+    residence_result = MagicMock()
+    residence_result.result_rows = residence_rows
+    residence_result.row_count = len(residence_rows)
+    residence_result.first_row = residence_rows[0] if residence_rows else None
+
+    ttl_result = MagicMock()
+    ttl_result.result_rows = []
+    ttl_result.row_count = 0
+    ttl_result.first_row = None
+
+    def _route_query(sql, *args, **kwargs):
+        # TTL query selects from project_ttl_settings; residence query joins on
+        # calls_complete + calls_merged.
+        if "project_ttl_settings" in sql:
+            return ttl_result
+        return residence_result
+
+    mock_ch_client.query.side_effect = _route_query
+    return mock_ch_client
+
+
+@pytest.fixture
+def _clear_project_caches():
+    """Clear residence + TTL caches around each test to avoid cross-test leakage."""
+    from weave.trace_server.project_version.project_version import (
+        reset_project_residence_cache,
+    )
+    from weave.trace_server.ttl_settings import reset_ttl_cache
+
+    reset_project_residence_cache()
+    reset_ttl_cache()
+    yield
+    reset_project_residence_cache()
+    reset_ttl_cache()
+
+
+@pytest.mark.parametrize("n_projects", [1, 2, 50])
+@pytest.mark.usefixtures("_clear_project_caches")
+def test_calls_complete_hoists_per_batch_lookups(n_projects):
+    """For N distinct project_ids in a 50-call batch, resolver/TTL are called <=N times.
+
+    Verifies the hoist: cached projects (non-EMPTY residence) get exactly one
+    lookup per unique project_id, not one per call.
+    """
+    batch_size = 50
+    # COMPLETE_ONLY residence so the resolver caches the result -> hoisting kicks in.
+    mock_ch_client = _make_batch_server_with_mocks([(1, None)])
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        # Force AUTO mode so resolver actually invokes _get_residence.
+        from weave.trace_server.project_version.types import CallsStorageServerMode
+
+        server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
+
+        project_ids = [
+            base64.b64encode(f"e/proj_{i}".encode()).decode() for i in range(n_projects)
+        ]
+        batch = [
+            _make_complete_call(project_ids[i % n_projects]) for i in range(batch_size)
+        ]
+
+        with (
+            patch.object(
+                chts.ClickHouseTraceServer, "_insert_call_complete"
+            ) as mock_insert_complete,
+            patch.object(chts.ClickHouseTraceServer, "_insert_call_to_v1"),
+            patch.object(
+                server.table_routing_resolver,
+                "resolve_v2_write_target",
+                wraps=server.table_routing_resolver.resolve_v2_write_target,
+            ) as spy_resolve,
+            patch(
+                "weave.trace_server.clickhouse_trace_server_batched.get_project_retention_days",
+                wraps=chts.get_project_retention_days,
+            ) as spy_ttl,
+        ):
+            server.calls_complete(tsi.CallsUpsertCompleteReq(batch=batch))
+
+        # Each unique project resolved at most once (G1, G2).
+        assert spy_resolve.call_count == n_projects, (
+            f"expected resolve_v2_write_target called {n_projects}x for {n_projects} "
+            f"unique projects in a {batch_size}-call batch, got {spy_resolve.call_count}"
+        )
+        assert spy_ttl.call_count == n_projects, (
+            f"expected get_project_retention_days called {n_projects}x for {n_projects} "
+            f"unique projects, got {spy_ttl.call_count}"
+        )
+        # All inserts happened.
+        assert mock_insert_complete.call_count == batch_size
+
+
+@pytest.mark.usefixtures("_clear_project_caches")
+def test_calls_complete_empty_residence_not_hoisted():
+    """EMPTY-residence projects must NOT cache across the batch (G5).
+
+    `_get_residence` skips caching when residence is EMPTY (project_version.py L73)
+    so subsequent calls re-query ClickHouse. The hoist must preserve this --
+    every call in a 5-call batch over a brand-new (EMPTY) project should
+    re-invoke the resolver.
+    """
+    batch_size = 5
+    # EMPTY residence: both has_complete and has_merged are NULL.
+    mock_ch_client = _make_batch_server_with_mocks([(None, None)])
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        from weave.trace_server.project_version.types import CallsStorageServerMode
+
+        server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
+
+        project_id = base64.b64encode(b"e/brand_new_project").decode()
+        batch = [_make_complete_call(project_id) for _ in range(batch_size)]
+
+        with (
+            patch.object(chts.ClickHouseTraceServer, "_insert_call_complete"),
+            patch.object(chts.ClickHouseTraceServer, "_insert_call_to_v1"),
+            patch.object(
+                server.table_routing_resolver,
+                "resolve_v2_write_target",
+                wraps=server.table_routing_resolver.resolve_v2_write_target,
+            ) as spy_resolve,
+        ):
+            server.calls_complete(tsi.CallsUpsertCompleteReq(batch=batch))
+
+        # EMPTY residence is intentionally not cached at the resolver level,
+        # and the per-batch hoist must respect that -- every call re-resolves.
+        assert spy_resolve.call_count == batch_size, (
+            "EMPTY-residence projects must not be cached by the per-batch hoist; "
+            f"expected {batch_size} resolver calls, got {spy_resolve.call_count}"
+        )
