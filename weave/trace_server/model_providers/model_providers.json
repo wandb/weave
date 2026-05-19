@@ -91,6 +91,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "deepseek-ai/DeepSeek-V4-Pro": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "deepseek-ai/DeepSeek-V4-Flash": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -427,6 +431,10 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "jp.anthropic.claude-sonnet-4-6": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "anthropic.claude-sonnet-4-20250514-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -532,6 +540,38 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/gpt-oss-120b": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.4": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.4-2026-03-05": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.4-pro": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.4-pro-2026-03-05": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.4-mini": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.4-mini-2026-03-17": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.4-nano": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.4-nano-2026-03-17": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -3531,6 +3571,10 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-realtime-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-realtime-2": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },

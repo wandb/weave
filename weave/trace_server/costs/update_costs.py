@@ -15,6 +15,9 @@ COST_FILE = "cost_checkpoint.json"
 url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 # The file that stores costs from modelsBegin.json
 MODELS_BEGIN_FILE = "../model_providers/modelsBegin.json"
+# The file that stores manually curated cost overrides for models that
+# litellm and modelsBegin do not cover (or cover incorrectly).
+MANUAL_COSTS_FILE = "manual_costs.json"
 CW_PREFIX = "coreweave/"
 # Amount of historical costs to store for each model
 HISTORICAL_COSTS = 3
@@ -173,6 +176,53 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
     return costs
 
 
+def fetch_manual_costs() -> dict[str, CostDetails]:
+    """Load manually-curated cost overrides for models litellm is missing or wrong about.
+
+    File format mirrors ``cost_checkpoint.json`` (``dict[str, list[CostDetails]]``)
+    so entries can be copy-pasted between the two. The most recent entry in each
+    list is used as the current cost; the existing historical-merge logic in
+    ``main`` handles rotation.
+
+    Missing or malformed files are tolerated (return ``{}`` and warn) — the rest
+    of the pipeline still runs from litellm + modelsBegin.
+    """
+    path = os.path.join(os.path.dirname(__file__), MANUAL_COSTS_FILE)
+    if not os.path.exists(path):
+        return {}
+
+    try:
+        with open(path) as f:
+            raw = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Failed to read {MANUAL_COSTS_FILE}: {e}")
+        return {}
+
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    costs: dict[str, CostDetails] = {}
+    for llm_id, entries in raw.items():
+        if not isinstance(entries, list) or not entries:
+            print(
+                f"Warning: skipping manual cost for {llm_id} — expected non-empty list"
+            )
+            continue
+        entry = entries[-1]
+        if not isinstance(entry, dict) or "input" not in entry or "output" not in entry:
+            print(f"Warning: skipping malformed manual cost for {llm_id}")
+            continue
+        costs[llm_id] = CostDetails(
+            provider=entry.get("provider", "default"),
+            input=float(Decimal(str(entry["input"]))),
+            output=float(Decimal(str(entry["output"]))),
+            cache_read_input=float(Decimal(str(entry.get("cache_read_input", 0)))),
+            cache_creation_input=float(
+                Decimal(str(entry.get("cache_creation_input", 0)))
+            ),
+            created_at=entry.get("created_at", current_time),
+        )
+    return costs
+
+
 def sum_costs(data: dict[str, list[CostDetails]]) -> int:
     total_costs = 0
     for costs in data.values():
@@ -206,10 +256,19 @@ def main(file_name: str = COST_FILE) -> None:
         print("Failed to fetch modelsBegin costs:", e)
         models_begin_costs = {}
 
-    # Merge litellm costs and modelsBegin costs
-    all_new_costs = {**new_costs, **models_begin_costs}
+    try:
+        manual_costs = fetch_manual_costs()
+        print(f"Fetched {len(manual_costs)} costs from manual_costs.json")
+    except Exception as e:
+        print("Failed to fetch manual costs:", e)
+        manual_costs = {}
+
+    # Manual overrides win over both litellm and modelsBegin.
+    all_new_costs = {**new_costs, **models_begin_costs, **manual_costs}
     print(
-        f"Total costs: {len(all_new_costs)} ({len(new_costs)} from litellm, {len(models_begin_costs)} from modelsBegin.json)"
+        f"Total costs: {len(all_new_costs)} "
+        f"({len(new_costs)} from litellm, {len(models_begin_costs)} from modelsBegin.json, "
+        f"{len(manual_costs)} from manual_costs.json)"
     )
 
     new_costs_count = 0
