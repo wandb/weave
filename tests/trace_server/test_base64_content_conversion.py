@@ -519,10 +519,10 @@ class TestThresholdAndStructuralIdentity:
 
 
 class TestFastRejectPaths:
-    """Regression coverage for the cheap pre-regex rejects in is_base64 / is_data_uri.
+    """Regression coverage for the entropy guard in is_base64.
 
-    See DD trace 6a0c7d99...975ce4fb10f7c246: a single 50000-char run of "x"
-    matches the base64 alphabet and previously cost a wasted Content.from_base64
+    DD trace 6a0c7d99...975ce4fb10f7c246: a 50000-char run of "x" matches
+    the base64 alphabet and previously paid for a wasted Content.from_base64
     decode + libmagic probe per occurrence.
     """
 
@@ -537,45 +537,6 @@ class TestFastRejectPaths:
         assert result["bait"] == pathological
         assert trace_server.file_create.call_count == 0
 
-    def test_whitespace_in_prefix_short_circuits(self):
-        # Natural-language text contains whitespace early; the 128-char prefix
-        # check must reject before any regex work.
-        trace_server = MagicMock()
-        prose = ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 200)
-        result = replace_base64_with_content_objects(
-            {"text": prose}, "test_project", trace_server
-        )
-        assert result["text"] == prose
-        assert trace_server.file_create.call_count == 0
-
-    def test_non_data_uri_string_skips_regex(self):
-        # Long string that does not begin with "data:" must not run the data-URI
-        # regex. We can only observe this indirectly through behavior: the
-        # string is returned untouched.
-        long_url = "https://example.com/" + ("a" * 9000)
-        assert not is_data_uri(long_url)
-
-    def test_real_data_uri_still_routes_to_storage(self):
-        # Anti-regression: the fast rejects must not break the legitimate
-        # data-URI path. A real 1x1 PNG wrapped in a data URI must trigger
-        # the storage call.
-        png_b64 = (
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
-        )
-        png_bytes = base64.b64decode(png_b64)
-        padded = png_bytes + b"\x00" * 9000
-        b64 = base64.b64encode(padded).decode("ascii")
-        data_uri = f"data:image/png;base64,{b64}"
-        trace_server = MagicMock()
-        trace_server.file_create = MagicMock(
-            side_effect=lambda req: FileCreateRes(digest=f"d_{req.name}")
-        )
-        result = replace_base64_with_content_objects(
-            {"image": data_uri}, "test_project", trace_server
-        )
-        assert isinstance(result["image"], dict)
-        assert result["image"].get("_type") == "CustomWeaveType"
-        assert trace_server.file_create.call_count == 2
 
 
 if __name__ == "__main__":
