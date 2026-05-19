@@ -1,15 +1,13 @@
-"""Async layer over `ClickHouseTraceServer` for the scoring worker.
+"""Async layer over `ClickHouseTraceServer`.
 
-Only methods on the worker's hot path are async; everything else is inherited
-from `ClickHouseTraceServer`. The point is to stop holding a worker thread for
-the ~3s LLM HTTP wait inside `completions_create` - a 192-thread pool caps a
-pod at ~55 in-flight completions today. `acompletions_create` keeps the same
-shape but awaits `litellm.acompletion` (no thread held during the network wait)
-and dispatches the CH insert via `run_in_executor`.
+Only methods that benefit from non-blocking I/O are async; everything else
+is inherited from `ClickHouseTraceServer`. `acompletions_create` awaits
+`litellm.acompletion` (no thread held during the network wait) and
+dispatches the CH insert via `run_in_executor`.
 
 Prep (prompt resolve + provider lookup) runs synchronously on the event loop.
-For the scoring-worker shape (messages already resolved, OpenAI/Anthropic
-model) prep is pure-CPU; for requests that supply `prompt` or a `custom::`
+When `inputs.messages` is already resolved and the model is a built-in
+provider, prep is pure-CPU; if the request supplies `prompt` or a `custom::`
 provider, prep makes a CH `obj_read` and will block the loop. Callers in
 that shape should stay on the sync path.
 
@@ -33,7 +31,7 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 
 
 class AsyncClickHouseTraceServer(ClickHouseTraceServer):
-    """`ClickHouseTraceServer` with async methods for the worker's hot path.
+    """`ClickHouseTraceServer` with async methods for I/O-bound work.
 
     `ch_executor` pins the post-LLM CH insert to a specific thread pool; if
     None the running loop's default executor is used.
