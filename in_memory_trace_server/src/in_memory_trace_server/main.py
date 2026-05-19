@@ -13,12 +13,20 @@ Endpoints implemented (production-shaped):
   * POST /call/upsert_batch     — record start/end events
   * POST /calls/stream_query    — return captured calls as NDJSON
 
-Stub endpoints (return empty success; flesh out as future tests need them):
+Stub endpoints (return canned success; flesh out as future tests need them):
   * POST /obj/create, /obj/read
   * POST /table/create, /table/query
   * POST /file/create, /file/content
   * POST /feedback/create
   * POST /call/update
+
+The canned-success stubs exist because the Node SDK's basic op flow
+publishes the op via `/obj/create` (and friends) before emitting call
+events; returning 501 there causes the SDK to exhaust its retry budget
+and time out. The tradeoff: tests that hit these endpoints "pass" even
+though nothing was actually persisted. When a test genuinely needs the
+endpoint to work, implement it for real (typed request, typed response,
+real storage) rather than relying on the canned success.
 
 Test-only endpoints (not in production):
   * GET  /test/health           — readiness probe
@@ -69,10 +77,16 @@ class CallCreateBatchRes(BaseModel):
 
 
 def create_app() -> FastAPI:
-    """Build the FastAPI app. Each call gets a fresh in-memory store."""
-    app = FastAPI(title="trace_server_mock", version="0.1.0")
+    """Build the FastAPI app. Each call gets a fresh in-memory store.
+
+    The `store` is intentionally captured via closure by the route handlers
+    and never assigned to `app.state`. Keeping it unreachable from outside
+    the route handlers forces in-process test consumers to assert through
+    the public `/test/*` endpoints — the same surface out-of-process
+    consumers use — so test patterns stay consistent across transports.
+    """
+    app = FastAPI(title="in_memory_trace_server", version="0.1.0")
     store = CallStore()
-    app.state.store = store
 
     # ----- Production-shaped endpoints -----
 
@@ -110,6 +124,13 @@ def create_app() -> FastAPI:
         return StreamingResponse(_gen(), media_type="application/jsonl")
 
     # ----- Stub endpoints (return canned success) -----
+    #
+    # These exist because the Node SDK's basic op flow publishes an op via
+    # `/obj/create` before emitting call events; returning a real failure
+    # status here causes the SDK to exhaust its retry budget and time out.
+    # They are deliberately "lying" stubs — silent success. When a test
+    # genuinely needs one of these endpoints to work, implement it for
+    # real (typed request, typed response, real storage).
 
     @app.post("/call/update")
     def call_update(req: dict[str, Any]) -> dict[str, Any]:

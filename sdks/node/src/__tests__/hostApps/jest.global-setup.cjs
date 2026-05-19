@@ -9,11 +9,11 @@
  *      tarball via `npm install <tgz> --no-save`. New host apps = new
  *      folders; no driver code change required.
  *   4. Spawn the Python Weave trace-server mock (`python -m
- *      trace_server_mock --port=0`) via `uv run`, parse the
+ *      in_memory_trace_server --port=0`) via `uv run`, parse the
  *      `READY=http://...` banner from stdout, then poll `/test/health`
  *      until it answers.
  *   5. Write a sentinel JSON file at `os.tmpdir()/weave-hostapps-state.json`
- *      containing the trace_server_mock URL, subprocess pid, and
+ *      containing the in_memory_trace_server URL, subprocess pid, and
  *      packDir. Tests (which may run in worker processes that don't
  *      inherit anything from globalSetup) and the teardown step read it.
  *
@@ -31,7 +31,10 @@ const path = require('path');
 
 const SDK_DIR = path.resolve(__dirname, '..', '..', '..');
 const REPO_ROOT = path.resolve(SDK_DIR, '..', '..');
-const TRACE_SERVER_MOCK_PROJECT_DIR = path.join(REPO_ROOT, 'trace_server_mock');
+const IN_MEMORY_TRACE_SERVER_PROJECT_DIR = path.join(
+  REPO_ROOT,
+  'in_memory_trace_server'
+);
 const FIXTURES_DIR = path.resolve(__dirname, 'fixtures');
 const STATE_SENTINEL = path.join(os.tmpdir(), 'weave-hostapps-state.json');
 
@@ -101,10 +104,10 @@ function spawnTraceServerMock() {
     [
       'run',
       '--project',
-      TRACE_SERVER_MOCK_PROJECT_DIR,
+      IN_MEMORY_TRACE_SERVER_PROJECT_DIR,
       'python',
       '-m',
-      'trace_server_mock',
+      'in_memory_trace_server',
       '--port=0',
     ],
     {stdio: ['ignore', 'pipe', 'pipe']}
@@ -112,7 +115,7 @@ function spawnTraceServerMock() {
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', chunk =>
-    process.stderr.write(`[trace_server_mock] ${chunk}`)
+    process.stderr.write(`[in_memory_trace_server] ${chunk}`)
   );
   return child;
 }
