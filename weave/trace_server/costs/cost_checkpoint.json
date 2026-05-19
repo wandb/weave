@@ -25678,5 +25678,45 @@
       "cache_creation_input": 0.0,
       "created_at": "2026-05-07 10:19:33"
     }
+  ],
+  "gemini-3.1-flash-lite": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:13:20"
+    }
+  ],
+  "gemini/gemini-3.1-flash-lite": [
+    {
+      "provider": "gemini",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:13:20"
+    }
+  ],
+  "vertex_ai/gemini-3.1-flash-lite": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:13:20"
+    }
+  ],
+  "openrouter/google/gemini-3.1-flash-lite": [
+    {
+      "provider": "openrouter",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:13:20"
+    }
   ]
 }

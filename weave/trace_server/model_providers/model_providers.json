@@ -2662,6 +2662,10 @@
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
+  "gemini-3.1-flash-lite": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
   "gemini-3.1-flash-lite-preview": {
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
@@ -2866,6 +2870,10 @@
     "deprecated_date": "2026-01-29T21:44:57.324444"
   },
   "gemini/gemini-3-pro-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-3.1-flash-lite": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -4535,6 +4543,10 @@
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
   "vertex_ai/gemini-3.1-flash-image-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-flash-lite": {
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
