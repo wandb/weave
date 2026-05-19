@@ -1176,6 +1176,21 @@ class FeedbackCreateReq(BaseModelStrict):
         description="The annotation queue ID this feedback was created from. References annotation_queues.id. NULL when feedback is created outside of queues.",
         examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
     )
+    label: str | None = Field(
+        default=None,
+        description="Short tag-like string. Only allowed on `wandb.typed` feedback.",
+        examples=["passes_safety_check"],
+    )
+    score: float | None = Field(
+        default=None,
+        description="Numeric score. Only allowed on `wandb.typed` feedback.",
+        examples=[0.87],
+    )
+    is_success: bool | None = Field(
+        default=None,
+        description="Boolean pass/fail. Only allowed on `wandb.typed` feedback.",
+        examples=[True],
+    )
 
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)

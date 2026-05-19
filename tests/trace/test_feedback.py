@@ -197,6 +197,9 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "call_ref": None,
         "trigger_ref": None,
         "queue_id": None,
+        "label": None,
+        "score": None,
+        "is_success": None,
     }
 
 
@@ -348,7 +351,87 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "call_ref": call_ref,
         "trigger_ref": trigger_ref,
         "queue_id": None,
+        "label": None,
+        "score": None,
+        "is_success": None,
     }
+
+
+def test_typed_feedback(client: WeaveClient) -> None:
+    """Test feedback creation with typed (label/score/is_success) columns."""
+    project_id = client.project_id
+    weave_ref = f"weave:///{project_id}/call/cal_id_123"
+
+    # Case 1: wandb.typed requires at least one typed value
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="wandb.typed",
+                payload={},
+            )
+        )
+
+    # Case 2: typed columns are not allowed on non-typed feedback
+    for kwargs in (
+        {"label": "passes"},
+        {"score": 0.5},
+        {"is_success": True},
+    ):
+        with pytest.raises(InvalidRequest):
+            client.server.feedback_create(
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=weave_ref,
+                    feedback_type="custom",
+                    payload={},
+                    **kwargs,
+                )
+            )
+
+    # Case 3: label too long
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="wandb.typed",
+                payload={},
+                label="x" * 200,
+            )
+        )
+
+    # Success cases. Multiple rows per ref are allowed (e.g. one per label).
+    for kwargs in (
+        {"label": "passes_safety_check"},
+        {"score": 0.87},
+        {"is_success": True},
+        {"label": "tone_warm", "score": 0.42, "is_success": False},
+    ):
+        create_res = client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="wandb.typed",
+                payload={},
+                **kwargs,
+            )
+        )
+        assert create_res.id is not None
+
+    query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["feedback_type", "label", "score", "is_success"],
+        )
+    )
+    assert len(query_res.result) == 4
+    assert all(r["feedback_type"] == "wandb.typed" for r in query_res.result)
+    labels = sorted(
+        (r["label"] for r in query_res.result), key=lambda x: (x is None, x)
+    )
+    assert labels == ["passes_safety_check", "tone_warm", None, None]
 
 
 async def populate_feedback(client: WeaveClient) -> None:

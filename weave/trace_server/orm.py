@@ -97,6 +97,7 @@ ColumnType = Literal[
     "datetime",
     "json",  # Represented as string in ClickHouse
     "float",
+    "bool",
 ]
 
 
