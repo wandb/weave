@@ -15,9 +15,16 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
+from weave.session.adapters.anthropic import (
+    message_from_anthropic_input,
+    record_anthropic_message,
+    traced_anthropic_messages_stream,
+)
 from weave.session.adapters.openai import (
     message_from_openai_responses_input,
     reasoning_from_openai_responses,
+    record_openai_responses,
+    traced_openai_responses_stream,
     usage_from_openai_responses,
 )
 from weave.session.session import (
@@ -2313,3 +2320,648 @@ class TestReasoningFromOpenAIResponses:
         )
         assert result is not None
         assert result.content == "kept\nalso kept"
+
+
+# ---------------------------------------------------------------------------
+# record_openai_responses — end-to-end "commit final response" adapter
+# ---------------------------------------------------------------------------
+
+
+def _fake_openai_response(
+    *,
+    output: list[Any] | None = None,
+    response_id: str = "resp_test",
+    model: str = "gpt-test",
+    status: str = "completed",
+    incomplete_reason: str = "",
+    usage: Any = None,
+) -> Any:
+    """Build a duck-typed Responses ``Response`` for adapter tests."""
+    incomplete_details: Any = None
+    if incomplete_reason:
+        incomplete_details = type("D", (), {"reason": incomplete_reason})()
+    return type(
+        "R",
+        (),
+        {
+            "output": list(output or []),
+            "id": response_id,
+            "model": model,
+            "status": status,
+            "incomplete_details": incomplete_details,
+            "usage": usage,
+        },
+    )()
+
+
+def _fake_responses_message_item(text_blocks: list[str]) -> Any:
+    contents = [type("C", (), {"text": t})() for t in text_blocks]
+    return type("M", (), {"type": "message", "content": contents})()
+
+
+def _fake_responses_function_call(call_id: str, name: str, arguments: str) -> Any:
+    return type(
+        "F",
+        (),
+        {
+            "type": "function_call",
+            "call_id": call_id,
+            "name": name,
+            "arguments": arguments,
+        },
+    )()
+
+
+def _fake_responses_reasoning(summary_texts: list[str]) -> Any:
+    summary = [{"text": t} for t in summary_texts]
+
+    class _R:
+        type = "reasoning"
+
+        def model_dump(self, *, exclude_none: bool = False) -> dict[str, Any]:
+            return {"type": "reasoning", "summary": summary}
+
+    return _R()
+
+
+def _fake_responses_usage(
+    *,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    reasoning_tokens: int = 0,
+    cached_tokens: int = 0,
+) -> Any:
+    out_details = type("D", (), {"reasoning_tokens": reasoning_tokens})()
+    in_details = type("D", (), {"cached_tokens": cached_tokens})()
+    return type(
+        "U",
+        (),
+        {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "output_tokens_details": out_details,
+            "input_tokens_details": in_details,
+        },
+    )()
+
+
+class TestRecordOpenAIResponses:
+    """``record_openai_responses`` commits a final Response to an ``LLM`` span.
+
+    Anchored at the OTel attribute boundary — the adapter is meaningful
+    only if every field lands on ``gen_ai.*`` on the emitted chat span.
+    """
+
+    def _record(
+        self,
+        otel_spans: InMemorySpanExporter,
+        *,
+        input_items: list[dict],
+        response: Any,
+    ) -> dict[str, Any]:
+        otel_spans.clear()
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            with start_llm(model="gpt-test", provider_name="openai") as llm:
+                record_openai_responses(llm, input_items=input_items, response=response)
+        chat = [
+            sp for sp in otel_spans.get_finished_spans() if sp.name == "chat gpt-test"
+        ]
+        assert len(chat) == 1
+        return dict(chat[0].attributes or {})
+
+    def test_text_only_response(self, otel_spans: InMemorySpanExporter) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_items=[{"role": "user", "content": "hi"}],
+            response=_fake_openai_response(
+                output=[_fake_responses_message_item(["hello"])],
+                response_id="r1",
+                model="gpt-test-2",
+                usage=_fake_responses_usage(input_tokens=3, output_tokens=2),
+            ),
+        )
+        in_msgs = json.loads(attrs["gen_ai.input.messages"])
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        assert in_msgs == [
+            {"role": "user", "parts": [{"type": "text", "content": "hi"}]}
+        ]
+        assert len(out_msgs) == 1
+        assert out_msgs[0]["role"] == "assistant"
+        assert out_msgs[0]["parts"] == [{"type": "text", "content": "hello"}]
+        assert attrs["gen_ai.response.id"] == "r1"
+        assert attrs["gen_ai.response.model"] == "gpt-test-2"
+        assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
+        assert attrs["gen_ai.usage.input_tokens"] == 3
+        assert attrs["gen_ai.usage.output_tokens"] == 2
+
+    def test_tool_call_response(self, otel_spans: InMemorySpanExporter) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_items=[{"role": "user", "content": "weather?"}],
+            response=_fake_openai_response(
+                output=[
+                    _fake_responses_message_item(["checking..."]),
+                    _fake_responses_function_call(
+                        "c1", "get_weather", '{"city":"NYC"}'
+                    ),
+                ],
+            ),
+        )
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        assert len(out_msgs) == 1
+        parts = out_msgs[0]["parts"]
+        assert parts[0] == {"type": "text", "content": "checking..."}
+        tool_part = parts[1]
+        assert tool_part["type"] == "tool_call"
+        assert tool_part["id"] == "c1"
+        assert tool_part["name"] == "get_weather"
+        assert json.loads(tool_part["arguments"]) == {"city": "NYC"}
+
+    def test_reasoning_lands_on_span(self, otel_spans: InMemorySpanExporter) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_items=[{"role": "user", "content": "go"}],
+            response=_fake_openai_response(
+                output=[
+                    _fake_responses_reasoning(["step1", "step2"]),
+                    _fake_responses_message_item(["done"]),
+                ],
+            ),
+        )
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        # Reasoning is prepended as a ReasoningPart on the assistant message.
+        assert out_msgs[-1]["parts"][0] == {
+            "type": "reasoning",
+            "content": "step1\nstep2",
+        }
+
+    def test_incomplete_response_maps_to_length(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_items=[{"role": "user", "content": "x"}],
+            response=_fake_openai_response(
+                output=[_fake_responses_message_item(["partial"])],
+                status="incomplete",
+                incomplete_reason="max_output_tokens",
+            ),
+        )
+        assert attrs["gen_ai.response.finish_reasons"] == ("length",)
+
+    def test_failed_response_emits_status_as_finish_reason(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_items=[{"role": "user", "content": "x"}],
+            response=_fake_openai_response(output=[], status="failed"),
+        )
+        assert attrs["gen_ai.response.finish_reasons"] == ("failed",)
+
+    def test_empty_output_emits_no_output_messages_attr(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_items=[{"role": "user", "content": "x"}],
+            response=_fake_openai_response(output=[]),
+        )
+        assert "gen_ai.output.messages" not in attrs
+
+
+# ---------------------------------------------------------------------------
+# record_anthropic_message — end-to-end "commit final response" adapter
+# ---------------------------------------------------------------------------
+
+
+def _fake_anthropic_usage(
+    *,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cache_creation_input_tokens: int | None = None,
+    cache_read_input_tokens: int | None = None,
+) -> Any:
+    return type(
+        "U",
+        (),
+        {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cache_creation_input_tokens": cache_creation_input_tokens,
+            "cache_read_input_tokens": cache_read_input_tokens,
+        },
+    )()
+
+
+def _fake_anthropic_message(
+    *,
+    content: list[Any] | None = None,
+    response_id: str = "msg_test",
+    model: str = "claude-test",
+    stop_reason: str | None = "end_turn",
+    usage: Any = None,
+) -> Any:
+    return type(
+        "M",
+        (),
+        {
+            "content": list(content or []),
+            "id": response_id,
+            "model": model,
+            "stop_reason": stop_reason,
+            "usage": usage or _fake_anthropic_usage(),
+        },
+    )()
+
+
+def _fake_anthropic_text_block(text: str) -> Any:
+    return type("T", (), {"type": "text", "text": text})()
+
+
+def _fake_anthropic_tool_use_block(block_id: str, name: str, input_args: Any) -> Any:
+    return type(
+        "TU",
+        (),
+        {"type": "tool_use", "id": block_id, "name": name, "input": input_args},
+    )()
+
+
+class TestRecordAnthropicMessage:
+    """``record_anthropic_message`` commits a final Message to an ``LLM`` span."""
+
+    def _record(
+        self,
+        otel_spans: InMemorySpanExporter,
+        *,
+        input_messages: list[dict],
+        system: str = "",
+        response: Any,
+    ) -> dict[str, Any]:
+        otel_spans.clear()
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            with start_llm(model="claude-test", provider_name="anthropic") as llm:
+                record_anthropic_message(
+                    llm,
+                    input_messages=input_messages,
+                    system=system,
+                    response=response,
+                )
+        chat = [
+            sp
+            for sp in otel_spans.get_finished_spans()
+            if sp.name == "chat claude-test"
+        ]
+        assert len(chat) == 1
+        return dict(chat[0].attributes or {})
+
+    def test_text_only_response(self, otel_spans: InMemorySpanExporter) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_messages=[{"role": "user", "content": "hi"}],
+            system="be helpful",
+            response=_fake_anthropic_message(
+                content=[_fake_anthropic_text_block("hello")],
+                response_id="m1",
+                model="claude-3-5",
+                stop_reason="end_turn",
+                usage=_fake_anthropic_usage(input_tokens=4, output_tokens=2),
+            ),
+        )
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        in_msgs = json.loads(attrs["gen_ai.input.messages"])
+        assert in_msgs == [
+            {"role": "user", "parts": [{"type": "text", "content": "hi"}]}
+        ]
+        assert len(out_msgs) == 1
+        assert out_msgs[0]["role"] == "assistant"
+        assert out_msgs[0]["parts"] == [{"type": "text", "content": "hello"}]
+        assert attrs["gen_ai.response.id"] == "m1"
+        assert attrs["gen_ai.response.model"] == "claude-3-5"
+        assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "be helpful"}
+        ]
+        assert attrs["gen_ai.usage.input_tokens"] == 4
+        assert attrs["gen_ai.usage.output_tokens"] == 2
+
+    def test_tool_use_response(self, otel_spans: InMemorySpanExporter) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_messages=[{"role": "user", "content": "weather?"}],
+            response=_fake_anthropic_message(
+                content=[
+                    _fake_anthropic_text_block("checking..."),
+                    _fake_anthropic_tool_use_block(
+                        "tu1", "get_weather", {"city": "NYC"}
+                    ),
+                ],
+                stop_reason="tool_use",
+            ),
+        )
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        assert len(out_msgs) == 1
+        parts = out_msgs[0]["parts"]
+        assert parts[0] == {"type": "text", "content": "checking..."}
+        assert parts[1]["type"] == "tool_call"
+        assert parts[1]["id"] == "tu1"
+        assert parts[1]["name"] == "get_weather"
+        assert json.loads(parts[1]["arguments"]) == {"city": "NYC"}
+        assert attrs["gen_ai.response.finish_reasons"] == ("tool_calls",)
+
+    def test_max_tokens_maps_to_length(self, otel_spans: InMemorySpanExporter) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_messages=[{"role": "user", "content": "x"}],
+            response=_fake_anthropic_message(
+                content=[_fake_anthropic_text_block("p")],
+                stop_reason="max_tokens",
+            ),
+        )
+        assert attrs["gen_ai.response.finish_reasons"] == ("length",)
+
+    def test_input_with_tool_result_splits_into_tool_message(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        attrs = self._record(
+            otel_spans,
+            input_messages=[
+                {"role": "user", "content": "weather?"},
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "calling tool"},
+                        {
+                            "type": "tool_use",
+                            "id": "tu1",
+                            "name": "get_weather",
+                            "input": {"city": "NYC"},
+                        },
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "tu1",
+                            "content": "sunny",
+                        }
+                    ],
+                },
+            ],
+            response=_fake_anthropic_message(
+                content=[_fake_anthropic_text_block("ok")]
+            ),
+        )
+        in_msgs = json.loads(attrs["gen_ai.input.messages"])
+        roles = [m["role"] for m in in_msgs]
+        assert roles == ["user", "assistant", "tool"]
+
+
+class TestMessageFromAnthropicInput:
+    """``message_from_anthropic_input`` round-trips Anthropic ``messages=`` payloads."""
+
+    def test_flat_user_text(self) -> None:
+        out = message_from_anthropic_input([{"role": "user", "content": "hello"}])
+        assert len(out) == 1
+        assert out[0].role == "user"
+        assert out[0].content == "hello"
+
+    def test_assistant_text_and_tool_use(self) -> None:
+        out = message_from_anthropic_input(
+            [
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "reading..."},
+                        {
+                            "type": "tool_use",
+                            "id": "x",
+                            "name": "y",
+                            "input": {"k": "v"},
+                        },
+                    ],
+                }
+            ]
+        )
+        assert len(out) == 1
+        assert out[0].role == "assistant"
+        kinds = [p.type for p in out[0].parts]
+        assert kinds == ["text", "tool_call"]
+
+    def test_user_tool_result_promotes_to_tool_role(self) -> None:
+        out = message_from_anthropic_input(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "x",
+                            "content": "result",
+                        }
+                    ],
+                }
+            ]
+        )
+        assert len(out) == 1
+        assert out[0].role == "tool"
+        assert len(out[0].parts) == 1
+
+    def test_user_mixed_text_and_tool_result_splits(self) -> None:
+        out = message_from_anthropic_input(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "fyi"},
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "x",
+                            "content": "r",
+                        },
+                    ],
+                }
+            ]
+        )
+        assert [m.role for m in out] == ["user", "tool"]
+
+
+# ---------------------------------------------------------------------------
+# traced_openai_responses_stream / traced_anthropic_messages_stream
+# ---------------------------------------------------------------------------
+
+
+class _FakeOpenAIResponsesStream:
+    """Async-iterable stand-in for the OpenAI Responses streaming context.
+
+    Used as the value yielded by a mocked ``client.responses.stream`` so
+    the helper can iterate it and then call ``get_final_response()``.
+    """
+
+    def __init__(self, events: list[Any], final: Any) -> None:
+        self._events = events
+        self._final = final
+
+    def __aiter__(self) -> _FakeOpenAIResponsesStream:
+        return self
+
+    async def __anext__(self) -> Any:
+        if not self._events:
+            raise StopAsyncIteration
+        return self._events.pop(0)
+
+    async def get_final_response(self) -> Any:
+        return self._final
+
+
+class _FakeOpenAIClient:
+    """Minimal ``AsyncOpenAI`` stand-in routing ``responses.stream`` to a fake."""
+
+    def __init__(self, events: list[Any], final: Any) -> None:
+        self._events = events
+        self._final = final
+        self.received_kwargs: dict[str, Any] = {}
+
+    @property
+    def responses(self) -> _FakeOpenAIClient:
+        return self
+
+    def stream(self, **kwargs: Any) -> Any:
+        self.received_kwargs = dict(kwargs)
+        stream = _FakeOpenAIResponsesStream(list(self._events), self._final)
+        return _async_cm(stream)
+
+
+class _FakeAnthropicMessagesStream:
+    def __init__(self, events: list[Any], final: Any) -> None:
+        self._events = events
+        self._final = final
+
+    def __aiter__(self) -> _FakeAnthropicMessagesStream:
+        return self
+
+    async def __anext__(self) -> Any:
+        if not self._events:
+            raise StopAsyncIteration
+        return self._events.pop(0)
+
+    async def get_final_message(self) -> Any:
+        return self._final
+
+
+class _FakeAnthropicClient:
+    def __init__(self, events: list[Any], final: Any) -> None:
+        self._events = events
+        self._final = final
+        self.received_kwargs: dict[str, Any] = {}
+
+    @property
+    def messages(self) -> _FakeAnthropicClient:
+        return self
+
+    def stream(self, **kwargs: Any) -> Any:
+        self.received_kwargs = dict(kwargs)
+        stream = _FakeAnthropicMessagesStream(list(self._events), self._final)
+        return _async_cm(stream)
+
+
+def _async_cm(value: Any) -> Any:
+    """Wrap a value in an ``async with``-compatible context manager."""
+
+    class _CM:
+        async def __aenter__(self_) -> Any:  # noqa: N805
+            return value
+
+        async def __aexit__(self_, *_exc: object) -> bool:  # noqa: N805
+            return False
+
+    return _CM()
+
+
+class TestTracedOpenAIResponsesStream:
+    """End-to-end: the helper emits one ``chat`` span per call with the
+    final response's attributes populated.
+    """
+
+    @pytest.mark.asyncio
+    async def test_opens_chat_span_and_records_final_response(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        final = _fake_openai_response(
+            output=[_fake_responses_message_item(["hello"])],
+            response_id="r1",
+            model="gpt-test",
+            usage=_fake_responses_usage(input_tokens=2, output_tokens=4),
+        )
+        client = _FakeOpenAIClient(events=["e1", "e2"], final=final)
+        seen_events: list[Any] = []
+        otel_spans.clear()
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            async with traced_openai_responses_stream(
+                client=client,  # type: ignore[arg-type]
+                model="gpt-test",
+                instructions="be helpful",
+                input=[{"role": "user", "content": "hi"}],
+                tools=[{"name": "echo"}],
+            ) as stream:
+                async for event in stream:
+                    seen_events.append(event)
+        assert seen_events == ["e1", "e2"]
+        # Stream kwargs forwarded through to client.responses.stream.
+        assert client.received_kwargs["model"] == "gpt-test"
+        assert client.received_kwargs["instructions"] == "be helpful"
+        assert client.received_kwargs["tools"] == [{"name": "echo"}]
+        chat = [
+            sp for sp in otel_spans.get_finished_spans() if sp.name == "chat gpt-test"
+        ]
+        assert len(chat) == 1
+        attrs = dict(chat[0].attributes or {})
+        assert attrs["gen_ai.response.id"] == "r1"
+        assert attrs["gen_ai.response.model"] == "gpt-test"
+        assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
+        assert attrs["gen_ai.usage.input_tokens"] == 2
+        assert attrs["gen_ai.usage.output_tokens"] == 4
+
+
+class TestTracedAnthropicMessagesStream:
+    @pytest.mark.asyncio
+    async def test_opens_chat_span_and_records_final_message(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        final = _fake_anthropic_message(
+            content=[_fake_anthropic_text_block("hi back")],
+            response_id="m1",
+            model="claude-test",
+            stop_reason="end_turn",
+            usage=_fake_anthropic_usage(input_tokens=5, output_tokens=3),
+        )
+        client = _FakeAnthropicClient(events=["e1"], final=final)
+        seen_events: list[Any] = []
+        otel_spans.clear()
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            async with traced_anthropic_messages_stream(
+                client=client,  # type: ignore[arg-type]
+                model="claude-test",
+                system="be helpful",
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=2048,
+            ) as stream:
+                async for event in stream:
+                    seen_events.append(event)
+        assert seen_events == ["e1"]
+        assert client.received_kwargs["model"] == "claude-test"
+        assert client.received_kwargs["system"] == "be helpful"
+        assert client.received_kwargs["max_tokens"] == 2048
+        chat = [
+            sp
+            for sp in otel_spans.get_finished_spans()
+            if sp.name == "chat claude-test"
+        ]
+        assert len(chat) == 1
+        attrs = dict(chat[0].attributes or {})
+        assert attrs["gen_ai.response.id"] == "m1"
+        assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
+        assert attrs["gen_ai.usage.input_tokens"] == 5
+        assert attrs["gen_ai.usage.output_tokens"] == 3
