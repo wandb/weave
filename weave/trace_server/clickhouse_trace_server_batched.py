@@ -18,7 +18,7 @@ import clickhouse_connect
 import ddtrace
 from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.exceptions import DatabaseError
+from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -127,6 +127,7 @@ from weave.trace_server.clickhouse.utilities import (
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
     find_call_descendants,
+    is_unknown_or_readonly_setting_error,
     log_and_raise_insert_error,
     maybe_enqueue_minimal_call_end,
     num_bytes,
@@ -7031,6 +7032,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             }
         )
 
+        caller_settings = settings
         async_insert = self._use_async_insert and not do_sync_insert
         if async_insert:
             settings = ch_settings.update_settings_for_async_insert(settings)
@@ -7063,6 +7065,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             except ValueError as e:
                 converted = convert_to_insert_too_large(e)
                 log_and_raise_insert_error(converted, table, data)
+
+            # Async-insert settings rejected by the server (unknown or readonly):
+            # disable async_insert for this client and retry the insert without
+            # the async settings. Without this, every insert after a server that
+            # doesn't expose async_insert as a writable setting (older CH, some
+            # CH proxies, restricted clusters) fails permanently.
+            except ProgrammingError as e:
+                if async_insert and is_unknown_or_readonly_setting_error(e):
+                    logger.warning(
+                        "clickhouse_async_insert_unsupported_disabling",
+                        extra={"table": table, "error_str": str(e)},
+                    )
+                    self._use_async_insert = False
+                    async_insert = False
+                    settings = caller_settings
+                    continue
+                log_and_raise_insert_error(e, table, data)
 
             # Empty query error: RETRY (generator was consumed during HTTP retry)
             # We should retry with a fresh generator

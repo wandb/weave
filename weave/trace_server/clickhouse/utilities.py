@@ -14,7 +14,7 @@ from typing import Any, TypeVar, cast
 
 import ddtrace
 import sqlparse
-from clickhouse_connect.driver.exceptions import DatabaseError
+from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
@@ -270,6 +270,19 @@ def convert_to_insert_too_large(e: Exception) -> Exception:
             "the limit. If logging images, save them as `Image.PIL`."
         )
     return e
+
+
+def is_unknown_or_readonly_setting_error(e: Exception) -> bool:
+    """Detect clickhouse-connect's pre-flight setting validation rejection.
+
+    clickhouse-connect validates settings against `system.settings` before
+    issuing a request. If a setting is missing from the server's settings
+    table or marked readonly, it raises `ProgrammingError("Setting <name> is
+    unknown or readonly")` from client.py. This indicates a server/proxy that
+    does not accept the setting (e.g. async_insert against an older or
+    restricted CH cluster), not a problem with the data being inserted.
+    """
+    return isinstance(e, ProgrammingError) and "is unknown or readonly" in str(e)
 
 
 def should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
