@@ -8,6 +8,7 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
+    CallsMergedOtelSpanField,
     CallsQuery,
     HardCodedFilter,
     ParamBuilder,
@@ -16,6 +17,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
+    get_field_by_name,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -4626,6 +4628,59 @@ def test_query_with_annotation_filter_still_uses_anyif() -> None:
             "pb_0": "wandb.annotation.rating",
             "pb_1": '$."value"',
             "pb_2": "good",
+            "pb_3": "project",
+        },
+    )
+
+
+def test_attributes_otel_span_field_resolves_to_otel_span_field() -> None:
+    """`attributes.otel_span[.path]` resolves to CallsMergedOtelSpanField."""
+    bare = get_field_by_name("attributes.otel_span")
+    assert isinstance(bare, CallsMergedOtelSpanField)
+    assert bare.extra_path is None
+
+    nested = get_field_by_name("attributes.otel_span.attributes.gen_ai.model")
+    assert isinstance(nested, CallsMergedOtelSpanField)
+    assert nested.extra_path == ["attributes", "gen_ai", "model"]
+
+
+def test_attributes_otel_span_filter_reads_otel_dump_with_legacy_fallback() -> None:
+    """Filter on `attributes.otel_span.*` reads otel_dump, falling back to
+    attributes_dump.$.otel_span.* for pre-migration-020 rows.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "attributes.otel_span.attributes.gen_ai.model"},
+                    {"$literal": "gpt-4"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((if(any(calls_merged.otel_dump) IS NULL,
+                coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), ''),
+                coalesce(nullIf(JSON_VALUE(any(calls_merged.otel_dump), {pb_0:String}), 'null'), '')) = {pb_2:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."attributes"."gen_ai"."model"',
+            "pb_1": '$."otel_span"."attributes"."gen_ai"."model"',
+            "pb_2": "gpt-4",
             "pb_3": "project",
         },
     )

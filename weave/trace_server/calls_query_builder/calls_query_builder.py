@@ -258,6 +258,57 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return True
 
 
+class CallsMergedOtelSpanField(CallsMergedField):
+    """OTel span field that reads from `otel_dump` with a legacy fallback.
+
+    Migration 020 moved OTel data into a dedicated `otel_dump` column. Calls
+    ingested before that migration still carry the full span inline at
+    `attributes_dump.$.otel_span.*`. The read path injects either source back
+    into `attributes["otel_span"]` so the client never knows the difference;
+    this field gives filters the same affordance.
+    """
+
+    extra_path: list[str] | None = None
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+    ) -> str:
+        otel_root = maybe_agg(f"{table_alias}.otel_dump", use_agg_fn)
+        attr_root = maybe_agg(f"{table_alias}.attributes_dump", use_agg_fn)
+        # Push the cast down into each branch so JSON_VALUE results are
+        # converted with `clickhouse_cast_json_value` semantics (the 'true'/'false'
+        # multiIf for bool, etc.), not the outer `clickhouse_cast` wrapper.
+        otel_sql = json_dump_field_as_sql(
+            pb, table_alias, otel_root, self.extra_path, cast=cast
+        )
+        legacy_path = ["otel_span", *(self.extra_path or [])]
+        attr_sql = json_dump_field_as_sql(
+            pb, table_alias, attr_root, legacy_path, cast=cast
+        )
+        # `otel_dump` is a sentinel field (see ch_sentinel_values.py): on
+        # calls_complete it's non-nullable with `''` as the sentinel, so a raw
+        # `IS NULL` would always be false there. Route through null_check_sql
+        # so the dispatch is correct for both read tables.
+        otel_null_check = ch_sentinel_values.null_check_sql(
+            "otel_dump", otel_root, read_table, pb
+        )
+        return f"if({otel_null_check}, {attr_sql}, {otel_sql})"
+
+    def with_path(self, path: list[str]) -> "CallsMergedOtelSpanField":
+        return CallsMergedOtelSpanField(
+            field=self.field,
+            extra_path=[*(self.extra_path or []), *path],
+        )
+
+    def is_heavy(self) -> bool:
+        return True
+
+
 class CallsMergedSummaryField(CallsMergedField):
     """Field class for computed summary values."""
 
@@ -625,6 +676,7 @@ class OrderField(BaseModel):
                 QueryBuilderDynamicField,
                 CallsMergedDynamicField,
                 CallsMergedFeedbackPayloadField,
+                CallsMergedOtelSpanField,
             ),
         ):
             # Prioritize existence, then cast to double, then str
@@ -687,6 +739,14 @@ class OrderField(BaseModel):
         parts = []
         for cast_to, direction in options:
             if isinstance(self.field, CallsMergedSummaryField):
+                field_sql = self.field.as_sql(
+                    pb,
+                    table_alias,
+                    cast_to,
+                    use_agg_fn=use_agg_fn,
+                    read_table=read_table,
+                )
+            elif isinstance(self.field, CallsMergedOtelSpanField):
                 field_sql = self.field.as_sql(
                     pb,
                     table_alias,
@@ -960,7 +1020,14 @@ class CallsQuery(BaseModel):
             if isinstance(field_obj, CallsMergedFeedbackPayloadField):
                 continue
 
-            if isinstance(
+            if isinstance(field_obj, CallsMergedOtelSpanField):
+                # Order expression coalesces `otel_dump` with `attributes_dump.$.otel_span.*`
+                # so both base columns need to live in the CTE.
+                for base_name in ("otel_dump", "attributes_dump"):
+                    base_field = get_field_by_name(base_name)
+                    if base_field not in select_fields:
+                        select_fields.append(base_field)
+            elif isinstance(
                 field_obj,
                 (CallsMergedDynamicField, QueryBuilderDynamicField),
             ):
@@ -1842,6 +1909,16 @@ def get_field_by_name(name: str) -> CallsMergedField:
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
             return CallsMergedSummaryField(field=name, summary_field=summary_field)
+        elif name == "attributes.otel_span" or name.startswith("attributes.otel_span."):
+            # OTel span data lives in `otel_dump` post-migration 020 (and
+            # legacy projects keep it under `attributes_dump.$.otel_span.*`).
+            # The read path masks the storage split by re-injecting otel_dump
+            # back as attributes["otel_span"]; do the same on the filter side.
+            sub = name[len("attributes.otel_span") :].lstrip(".")
+            field = CallsMergedOtelSpanField(field="otel_dump")
+            if sub:
+                return field.with_path(split_escaped_field_path(sub))
+            return field
         else:
             field_parts = split_escaped_field_path(name)
             start_part = field_parts[0]
@@ -2118,6 +2195,15 @@ def process_query_to_conditions(
                     cast=cast,
                     use_agg_fn=use_agg_fn,
                 )
+            if isinstance(structured_field, CallsMergedOtelSpanField):
+                raw_fields_used[structured_field.field] = structured_field
+                return structured_field.as_sql(
+                    param_builder,
+                    table_alias,
+                    cast=cast,
+                    use_agg_fn=use_agg_fn,
+                    read_table=read_table,
+                )
             if (
                 isinstance(structured_field, CallsMergedFeedbackPayloadField)
                 and structured_field.feedback_type != "*"
@@ -2263,6 +2349,13 @@ def process_query_to_conditions(
             structured_field = get_field_by_name(operand.get_field_)
 
             if isinstance(structured_field, CallsMergedSummaryField):
+                field = structured_field.as_sql(
+                    param_builder,
+                    table_alias,
+                    use_agg_fn=use_agg_fn,
+                    read_table=read_table,
+                )
+            elif isinstance(structured_field, CallsMergedOtelSpanField):
                 field = structured_field.as_sql(
                     param_builder,
                     table_alias,
