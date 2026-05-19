@@ -1190,9 +1190,9 @@ class CallsQuery(BaseModel):
         # Always-on: independent of `should_use_filter_cte`, because the bloom
         # prune pays for itself even on the trivial single-pass path and the
         # CTE itself is cheap (one extra SELECT, no replicated ordering).
-        # TODO: as_sql is getting long. Follow-up to hoist the early-return
-        # predicate into a named local and extract the single-pass / two-pass
-        # branches into helpers.
+        # TODO(WB-34494): as_sql is getting long. Follow-up to hoist the
+        # early-return predicate into a named local and extract the
+        # single-pass / two-pass branches into helpers.
         candidate_cte_name: str | None = None
         candidate_cte_sql = self._build_filter_candidate_ids_cte_sql(
             pb, table_alias_resolved
@@ -2445,15 +2445,16 @@ def _trace_id_match_sql(
     field_expr: str,
     param_builder: ParamBuilder,
 ) -> str:
-    """Build a `field_expr IN ?` clause for `trace_ids`, or "" if empty.
+    """Build a `field_expr = ?` or `field_expr IN ?` clause for `trace_ids`.
 
-    Always emits `IN`. ClickHouse builds a hashset for `IN` even at N=1 and
-    the bloom-filter index prunes equivalently for `=` and `IN`, so there's
-    no perf cliff worth special-casing.
+    Returns "" when `trace_ids` is empty. Single-element lists use equality
+    for performance; multi-element lists use `IN`.
     """
     if not trace_ids:
         return ""
     assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+    if len(trace_ids) == 1:
+        return f"{field_expr} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
     return f"{field_expr} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
 
 
