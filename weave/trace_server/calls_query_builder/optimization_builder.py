@@ -415,11 +415,19 @@ def process_query_to_optimization_sql(
     # Also produce the strict (no OR-IS-NULL) variant for the index-friendly
     # candidate-id CTE. For calls_complete this matches heavy_field_result_sql;
     # ParamBuilder dedupes params by value so this doesn't bloat the parameters.
-    strict_processor = HeavyFieldOptimizationProcessor(
-        param_builder, table_alias, use_null_check=False
-    )
-    strict_result = apply_processor(strict_processor, and_operation)
-    strict_result_sql = strict_processor.finalize_sql(strict_result)
+    #
+    # Gated on the same env flag as the candidate-CTE builder: when off, the
+    # builder returns None before consuming the strict form, so computing it
+    # would be wasted work. Keeping the gate next to the builder's gate keeps
+    # the two in sync as the rollout flag is managed.
+    if wf_env.wf_calls_merged_heavy_indexes_enabled():
+        strict_processor = HeavyFieldOptimizationProcessor(
+            param_builder, table_alias, use_null_check=False
+        )
+        strict_result = apply_processor(strict_processor, and_operation)
+        strict_result_sql = strict_processor.finalize_sql(strict_result)
+    else:
+        strict_result_sql = None
 
     sortable_datetime_result_sql = None
     if config.use_aggregation:
