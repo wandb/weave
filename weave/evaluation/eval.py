@@ -104,8 +104,6 @@ def _attach_genai_span_ref_to_call_summary(
     existing = weave_summary.get(constants.GENAI_SPAN_REF_ATTR_KEY)
     if isinstance(existing, list):
         existing.append(new_ref)
-    elif isinstance(existing, dict):
-        weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = [existing, new_ref]
     else:
         weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = [new_ref]
 

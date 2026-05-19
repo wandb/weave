@@ -299,8 +299,9 @@ def extract_genai_span_refs_from_weave_namespace(
     if not isinstance(weave_data, dict):
         return None
 
-    raw_ref = weave_data.get(constants.GENAI_SPAN_REF_ATTR_KEY)
-    raw_refs = raw_ref if isinstance(raw_ref, list) else [raw_ref]
+    raw_refs = weave_data.get(constants.GENAI_SPAN_REF_ATTR_KEY)
+    if not isinstance(raw_refs, list):
+        return None
 
     refs: list[tsi.GenAISpanRef] = []
     for item in raw_refs:

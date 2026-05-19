@@ -38,41 +38,6 @@ def _genai_span_ref(trace_id: str = "agent-trace-1") -> dict[str, Any]:
     }
 
 
-def test_build_eval_rows_returns_genai_span_ref_without_children() -> None:
-    predict_and_score_call = _call(
-        call_id="pas-1",
-        attributes={
-            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                constants.GENAI_SPAN_REF_ATTR_KEY: _genai_span_ref(),
-            }
-        },
-        inputs={"example": {"x": 1}, "model": "model://agent"},
-        output={"output": "result", "scores": {}},
-    )
-
-    rows = eval_helpers.build_eval_rows(
-        [predict_and_score_call],
-        ["eval-1"],
-        {"pas-1": "row-1"},
-        include_raw_data_rows=False,
-        include_predict_and_score_children=False,
-    )
-
-    trial = rows[0].evaluations[0].trials[0]
-    assert trial.genai_span_ref == [tsi.GenAISpanRef.model_validate(_genai_span_ref())]
-
-
-def test_eval_results_trial_wraps_legacy_single_genai_span_ref() -> None:
-    trial = tsi.EvalResultsTrial.model_validate(
-        {
-            "predict_and_score_call_id": "pas-1",
-            "genai_span_ref": _genai_span_ref(),
-        }
-    )
-
-    assert trial.genai_span_ref == [tsi.GenAISpanRef.model_validate(_genai_span_ref())]
-
-
 def test_build_eval_rows_returns_genai_span_ref_list_without_children() -> None:
     predict_and_score_call = _call(
         call_id="pas-1",
@@ -109,7 +74,9 @@ def test_build_trial_combines_prediction_and_parent_genai_span_refs() -> None:
         call_id="pas-1",
         attributes={
             constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                constants.GENAI_SPAN_REF_ATTR_KEY: _genai_span_ref("parent-trace"),
+                constants.GENAI_SPAN_REF_ATTR_KEY: [
+                    _genai_span_ref("parent-trace"),
+                ],
             }
         },
         inputs={"example": {"x": 1}, "model": "model://agent"},
@@ -121,7 +88,9 @@ def test_build_trial_combines_prediction_and_parent_genai_span_refs() -> None:
         op_name="Agent.predict",
         attributes={
             constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                constants.GENAI_SPAN_REF_ATTR_KEY: _genai_span_ref("predict-trace"),
+                constants.GENAI_SPAN_REF_ATTR_KEY: [
+                    _genai_span_ref("predict-trace"),
+                ],
             }
         },
         inputs={"self": "model://agent", "inputs": {"x": 1}},
@@ -142,17 +111,40 @@ def test_build_trial_combines_prediction_and_parent_genai_span_refs() -> None:
     ]
 
 
-def test_extract_genai_span_ref_ignores_malformed_refs() -> None:
-    for raw_ref in (
-        {"span_id": "missing-trace-id"},
-        {"trace_id": "missing-span-id"},
+def test_extract_genai_span_refs_ignores_malformed_refs() -> None:
+    for raw_refs in (
+        [
+            {"span_id": "missing-trace-id"},
+        ],
+        [
+            {"trace_id": "missing-span-id"},
+        ],
     ):
         call = _call(
             attributes={
                 constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                    constants.GENAI_SPAN_REF_ATTR_KEY: raw_ref,
+                    constants.GENAI_SPAN_REF_ATTR_KEY: raw_refs,
                 }
             }
         )
 
         assert eval_helpers.extract_genai_span_refs(call) is None
+
+
+def test_extract_genai_span_refs_skips_invalid_items() -> None:
+    call = _call(
+        attributes={
+            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                constants.GENAI_SPAN_REF_ATTR_KEY: [
+                    _genai_span_ref("valid-trace"),
+                    "not-a-ref",
+                    {"span_id": "missing-trace-id"},
+                    {"trace_id": "missing-span-id"},
+                ],
+            }
+        }
+    )
+
+    assert eval_helpers.extract_genai_span_refs(call) == [
+        tsi.GenAISpanRef.model_validate(_genai_span_ref("valid-trace"))
+    ]

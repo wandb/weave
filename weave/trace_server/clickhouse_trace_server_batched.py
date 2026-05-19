@@ -4575,13 +4575,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             PredictionCreateRes with the prediction_id
         """
         prediction_id = generate_id()
-        genai_span_ref = None
-        if isinstance(req.genai_span_ref, list):
-            genai_span_ref = [
-                ref.model_dump(exclude_none=True) for ref in req.genai_span_ref
-            ]
-        elif req.genai_span_ref is not None:
-            genai_span_ref = req.genai_span_ref.model_dump(exclude_none=True)
+        genai_span_ref = (
+            [ref.model_dump(exclude_none=True) for ref in req.genai_span_ref]
+            if req.genai_span_ref is not None
+            else None
+        )
 
         # Determine trace_id and parent_id based on evaluation_run_id
         if req.evaluation_run_id:

@@ -488,7 +488,7 @@ def test_eval_results_query_returns_genai_span_ref_without_children(client):
             inputs={"x": 1},
             output="result",
             evaluation_run_id=run.evaluation_run_id,
-            genai_span_ref=genai_span_ref,
+            genai_span_ref=[genai_span_ref],
         )
     )
     client.server.prediction_finish(
