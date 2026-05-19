@@ -62,6 +62,7 @@ from weave.trace_server.calls_query_builder.utils import (
     safe_alias,
     safely_format_sql,
     timestamp_to_datetime_str,
+    trace_id_index_expr,
 )
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
@@ -86,6 +87,7 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1005,13 +1007,17 @@ class CallsQuery(BaseModel):
                     return queue_id
         return None
 
-    def _should_optimize(self) -> bool:
-        """Determines if query optimization should be performed.
+    def _should_use_filter_cte(self) -> bool:
+        """Whether to use the filter-then-load two-pass CTE pattern.
 
-        Returns True if the query has heavy fields and predicate pushdown is possible.
+        Returns True if the query has heavy fields AND predicate pushdown is possible.
         Heavy fields are expensive to load into memory (inputs, output, attributes, summary).
         Predicate pushdown is possible when there are light filters, light query conditions,
-        or light order filters that can be pushed down into a subquery.
+        or light order filters that can narrow rows before the heavy load.
+
+        Note: this is a narrow knob covering the two-pass CTE shape only. It does NOT
+        govern other always-on prunes (e.g. the trace_id bloom-filter candidate CTE),
+        which apply independently.
         """
         # First, check if the query has any heavy fields
         table_name = get_calls_table_name(self.read_table)
@@ -1127,7 +1133,7 @@ class CallsQuery(BaseModel):
         # Determine if we should use the two-step filtered_calls CTE pattern.
         # Only relevant for calls_merged (where GROUP BY makes the two-pass
         # approach worthwhile). For calls_complete, we always use single-pass.
-        should_optimize = self._should_optimize()
+        should_use_filter_cte = self._should_use_filter_cte()
 
         # Important: Always inject deleted_at into the query.
         # We use None as the literal for both table types. The sentinel handling
@@ -1169,19 +1175,52 @@ class CallsQuery(BaseModel):
             table_alias_resolved,
         )
 
-        if not should_optimize and not self.include_costs and not object_ref_conditions:
-            return self._as_sql_base_format(pb, table_alias_resolved)
+        # Build object-ref and candidate-id CTEs up front so all downstream
+        # code paths (early-return, single-pass, two-pass) can reference them.
+        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
+            pb, self.project_id, object_ref_conditions
+        )
+
+        # Pre-narrow rows via the `idx_trace_id_bloom` skip-index when the
+        # query has a hardcoded trace_ids filter on calls_merged. The CTE
+        # uses the strict (no OR-IS-NULL) form so the bloom filter can prune
+        # granules; the outer query keeps the OR-IS-NULL form for unmerged-
+        # call-part correctness and restricts to `id IN filter_candidate_ids`.
+        #
+        # Always-on: independent of `should_use_filter_cte`, because the bloom
+        # prune pays for itself even on the trivial single-pass path and the
+        # CTE itself is cheap (one extra SELECT, no replicated ordering).
+        # TODO(WB-34494): as_sql is getting long. Follow-up to hoist the
+        # early-return predicate into a named local and extract the
+        # single-pass / two-pass branches into helpers.
+        candidate_cte_name: str | None = None
+        candidate_cte_sql = self._build_filter_candidate_ids_cte_sql(
+            pb, table_alias_resolved
+        )
+        if candidate_cte_sql is not None:
+            ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
+            candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
+
+        if (
+            not should_use_filter_cte
+            and not self.include_costs
+            and not object_ref_conditions
+        ):
+            base_sql = self._as_sql_base_format(
+                pb,
+                table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
+            )
+            if ctes.has_ctes():
+                return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
+            return base_sql
 
         # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
         # where it reduces rows before expensive GROUP BY aggregation.
         # For calls_complete (one row per call, no GROUP BY), always use a
         # single-pass query — it's both simpler and significantly faster.
         use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
-            should_optimize or self.include_costs or bool(object_ref_conditions)
-        )
-
-        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
-            pb, self.project_id, object_ref_conditions
+            should_use_filter_cte or self.include_costs or bool(object_ref_conditions)
         )
 
         if use_filter_cte:
@@ -1221,6 +1260,7 @@ class CallsQuery(BaseModel):
             filtered_calls_sql = filter_query._as_sql_base_format(
                 pb,
                 table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
@@ -1310,7 +1350,7 @@ class CallsQuery(BaseModel):
 
         op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_id = process_trace_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, self.read_table
         )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
@@ -1719,6 +1759,39 @@ class CallsQuery(BaseModel):
         {order_result.limit_sql}
         {order_result.offset_sql}"""
         return QueryBodyResult(sql=sql, needs_feedback_join=needs_feedback_join)
+
+    def _build_filter_candidate_ids_cte_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+    ) -> str | None:
+        """Build the `filter_candidate_ids` CTE body, or None if not applicable.
+
+        The CTE pre-narrows rows by trace_id using the strict
+        `ifNull(trace_id, '')` form so the `idx_trace_id_bloom` skip-index
+        from migration 031 can prune granules. The outer query then keeps the
+        OR-IS-NULL form for unmerged-call-part correctness and restricts to
+        `id IN filter_candidate_ids` to inherit the pruning.
+
+        Returns None when the optimization does not apply: non-calls_merged
+        read tables, or no hardcoded trace_ids filter to push down.
+        """
+        if self.read_table != ReadTable.CALLS_MERGED:
+            return None
+        if self.hardcoded_filter is None or not self.hardcoded_filter.filter.trace_ids:
+            return None
+
+        trace_id_strict = process_trace_id_filter_to_sql_strict(
+            self.hardcoded_filter, pb, table_alias
+        )
+        if not trace_id_strict:
+            return None
+
+        project_param = pb.add_param(self.project_id)
+        return f"""SELECT {table_alias}.id AS id
+        FROM {table_alias}
+        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
+        WHERE {trace_id_strict}"""
 
     def _as_sql_base_format(
         self,
@@ -2367,18 +2440,33 @@ def process_op_name_filter_to_sql(
     return " AND " + combine_conditions(or_conditions, "OR")
 
 
+def _trace_id_match_sql(
+    trace_ids: list[str],
+    field_expr: str,
+    param_builder: ParamBuilder,
+) -> str:
+    """Build a `field_expr = ?` or `field_expr IN ?` clause for `trace_ids`.
+
+    Returns "" when `trace_ids` is empty. Single-element lists use equality
+    for performance; multi-element lists use `IN`.
+    """
+    if not trace_ids:
+        return ""
+    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+    if len(trace_ids) == 1:
+        return f"{field_expr} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
+    return f"{field_expr} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
+
+
 def process_trace_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable,
 ) -> str:
     """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
         return ""
-
-    trace_ids = hardcoded_filter.filter.trace_ids
-
-    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
 
     trace_id_field = get_field_by_name("trace_id")
     if not isinstance(trace_id_field, CallsMergedAggField):
@@ -2386,16 +2474,51 @@ def process_trace_id_filter_to_sql(
     trace_id_field_sql = trace_id_field.as_sql(
         param_builder, table_alias, use_agg_fn=False
     )
+    field_expr = trace_id_index_expr(trace_id_field_sql, read_table)
 
-    # If there's only one trace_id, use an equality condition for performance
-    if len(trace_ids) == 1:
-        trace_cond = f"{trace_id_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
-    elif len(trace_ids) > 1:
-        trace_cond = f"{trace_id_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
-    else:
+    trace_cond = _trace_id_match_sql(
+        hardcoded_filter.filter.trace_ids, field_expr, param_builder
+    )
+    if not trace_cond:
         return ""
 
-    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+    # `calls_complete.trace_id` is non-nullable `String`, so the OR-IS-NULL
+    # arm only applies to `calls_merged`, where unmerged call parts can have
+    # a NULL aggregated trace_id.
+    if read_table != ReadTable.CALLS_MERGED:
+        return f" AND ({trace_cond})"
+
+    trace_null = trace_id_field.null_check_sql(
+        param_builder, table_alias, read_table, use_agg_fn=False
+    )
+    return f" AND ({trace_cond} OR {trace_null})"
+
+
+def process_trace_id_filter_to_sql_strict(
+    hardcoded_filter: HardCodedFilter | None,
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Strict (no `OR IS NULL`) trace_id condition for the candidate-id CTE.
+
+    The OR-IS-NULL clause that the outer query keeps for unmerged-call-part
+    correctness defeats the bloom filter, so this strict form runs alone inside
+    `filter_candidate_ids` to maximize granule pruning. Returns "" when no
+    trace_ids are set. Only meaningful for calls_merged.
+    """
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
+        return ""
+
+    trace_id_field = get_field_by_name("trace_id")
+    if not isinstance(trace_id_field, CallsMergedAggField):
+        raise TypeError("trace_id is not an aggregate field")
+    trace_id_field_sql = trace_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+    field_expr = trace_id_index_expr(trace_id_field_sql, ReadTable.CALLS_MERGED)
+    return _trace_id_match_sql(
+        hardcoded_filter.filter.trace_ids, field_expr, param_builder
+    )
 
 
 def process_thread_id_filter_to_sql(
