@@ -44,12 +44,12 @@ def func():
 
 
 def test_disabled_setting(client):
-    parse_and_apply_settings(UserSettings(disabled=True))
+    replace_settings(UserSettings(disabled=True))
     disabled_time = timeit.timeit(func, number=10)
     calls = list(client.get_calls())
     assert len(calls) == 0
 
-    parse_and_apply_settings(UserSettings(disabled=False))
+    replace_settings(UserSettings(disabled=False))
     enabled_time = timeit.timeit(func, number=10)
     calls = list(client.get_calls())
     assert len(calls) == 10
@@ -178,7 +178,7 @@ def test_print_call_link_env(client):
 
 
 def test_should_capture_code_setting(client):
-    parse_and_apply_settings(UserSettings(capture_code=False))
+    replace_settings(UserSettings(capture_code=False))
 
     @weave.op
     def test_func():
@@ -189,7 +189,7 @@ def test_should_capture_code_setting(client):
     code2 = test_func2.get_captured_code()
     assert "Code-capture was disabled" in code2
 
-    parse_and_apply_settings(UserSettings(capture_code=True))
+    replace_settings(UserSettings(capture_code=True))
 
     # TODO: Not safe to change capture_code setting mid-script because the op's ref
     # does not know about the setting change.
@@ -250,14 +250,14 @@ def test_client_parallelism_setting(client_creator):
             assert client.future_executor._max_workers == 4
             assert client.future_executor._executor._max_workers == 4
 
-    parse_and_apply_settings(UserSettings(client_parallelism=1))
+    replace_settings(UserSettings(client_parallelism=1))
     with mock.patch("os.cpu_count", return_value=4):
         with client_creator() as client:
             assert client.future_executor._max_workers == 1
             assert client.future_executor._executor._max_workers == 1
             wait_time_1, queue_time_1 = speed_test(client)
 
-    parse_and_apply_settings(UserSettings(client_parallelism=10))
+    replace_settings(UserSettings(client_parallelism=10))
     with client_creator() as client:
         assert client.future_executor._max_workers == 5
         assert client.future_executor._executor._max_workers == 5
@@ -270,7 +270,7 @@ def test_client_parallelism_setting(client_creator):
     assert wait_time_1 > wait_time_10
 
     # Test explicit None
-    parse_and_apply_settings(UserSettings(client_parallelism=None))
+    replace_settings(UserSettings(client_parallelism=None))
     with mock.patch("os.cpu_count", return_value=4):
         with client_creator() as client:
             assert client.future_executor._max_workers == 4
