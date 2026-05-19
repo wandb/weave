@@ -66,6 +66,22 @@ def wf_enable_agent_scoring() -> bool:
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
 
 
+def wf_calls_merged_heavy_indexes_enabled() -> bool:
+    """Gate for the heavy-LIKE ngram bloom-filter candidate-CTE path on calls_merged.
+
+    When true, `_create_like_condition` emits `ifNull(<dump>, '')` (matching
+    the `idx_<dump>_ngram` index expression from migration 031) and
+    `_build_filter_candidate_ids_cte_sql` emits the strict-LIKE candidate CTE.
+    When false, the query path falls back to the pre-bloom behavior
+    (`<dump> LIKE ?` plus the OR-IS-NULL outer disjunct). The migration is
+    idempotent and safe to apply independently of this flag; the flag only
+    controls whether queries try to use the indexes via the bloom-eligible
+    expression. Operators flip this per-cluster after migration 031 has
+    materialized on enough parts to be useful.
+    """
+    return os.environ.get("WF_CALLS_MERGED_HEAVY_INDEXES", "false").lower() == "true"
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(

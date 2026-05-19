@@ -1271,6 +1271,51 @@ def test_calls_query_with_like_optimization() -> None:
     )
 
 
+def test_calls_query_with_like_optimization_env_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When `WF_CALLS_MERGED_HEAVY_INDEXES` is off, no candidate-CTE is emitted
+    and the heavy LIKE uses the raw column (no `ifNull` wrap).
+    """
+    monkeypatch.delenv("WF_CALLS_MERGED_HEAVY_INDEXES", raising=False)
+
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "inputs.param"},
+                    {"$literal": "hello"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."param"',
+            "pb_1": "hello",
+            "pb_2": '%"hello"%',
+            "pb_3": "project",
+        },
+    )
+
+
 def test_calls_query_with_like_optimization_contains() -> None:
     """Test that contains operations on JSON fields use LIKE optimization."""
     cq = CallsQuery(project_id="project")

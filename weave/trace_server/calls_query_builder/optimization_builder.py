@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from weave.trace_server import environment as wf_env
 from weave.trace_server.calls_query_builder.utils import (
     NotContext,
     param_slot,
@@ -474,12 +475,17 @@ def _create_like_condition(
 ) -> str:
     """Creates a LIKE condition for a JSON field.
 
-    The dump column is wrapped in `ifNull(..., '')` so that the expression
-    matches the `idx_inputs_dump_ngram` ngram bloom filter index on
-    calls_merged (see migration 033), and so that LIKE never returns NULL
-    over Nullable(String) columns.
+    When `WF_CALLS_MERGED_HEAVY_INDEXES` is enabled, the dump column is
+    wrapped in `ifNull(..., '')` so that the expression matches the
+    `idx_<dump>_ngram` ngram bloom filter index expression on calls_merged
+    (see migration 033), and so that LIKE never returns NULL over
+    Nullable(String) columns. When the flag is off, we emit the raw column
+    reference so the query path matches pre-bloom behavior exactly.
     """
-    field_name = f"ifNull({table_alias}.{field}, '')"
+    if wf_env.wf_calls_merged_heavy_indexes_enabled():
+        field_name = f"ifNull({table_alias}.{field}, '')"
+    else:
+        field_name = f"{table_alias}.{field}"
 
     if case_insensitive:
         param_name = pb.add_param(like_pattern.lower())
