@@ -1385,39 +1385,38 @@ wheels = [
 
 [[package]]
 name = "confluent-kafka"
-version = "2.12.2"
+version = "2.14.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c2/cd/18ffb1d2a7e189fee50b4a9597255e1078580d679daf913c25d0d13c3f88/confluent_kafka-2.12.2.tar.gz", hash = "sha256:5a50bfcd24f9dcf34b986f837f80126a71087364d44fcb8b45e8e74080fb6e98", size = 250423, upload-time = "2025-11-07T15:42:32.392Z" }
+dependencies = [
+    { name = "typing-extensions", marker = "(python_full_version < '3.11' and platform_python_implementation == 'CPython') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (python_full_version >= '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version >= '3.11' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/40/52/2c71d8e0b2de51076f90cea05342dc9c20fa14ded11992827680db4bbdfa/confluent_kafka-2.14.0.tar.gz", hash = "sha256:34efddfd06766d1153d10a70c23a98f6035e253a906db8ed04cb0249fc3b0fd2", size = 287868, upload-time = "2026-04-02T11:28:57.862Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8e/93/ebdb133b2c3a84edcaddeb39cb9396ed557467155cce1c8c3a034353f02e/confluent_kafka-2.12.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:8639850b97e199db5c968d01887e0f173c1d3763f851098a64a57e6db06d1d19", size = 3593784, upload-time = "2025-11-07T15:41:21.961Z" },
-    { url = "https://files.pythonhosted.org/packages/ab/68/28078e5c27373c94ba2cf6339e8cffdc87da8b55430029ca5025b84444f4/confluent_kafka-2.12.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:9a85f84483465c302da8c7432078f310e5aa748bb5767f71d5a50c3b4fce8004", size = 3153499, upload-time = "2025-11-07T15:41:24.852Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/29/ccdfbe49518adb46e71525599778ee599a427da42f5a748ea4e81dc860d2/confluent_kafka-2.12.2-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:938e1ec9abdc6104faad07732521960c61644362b43a0af5cd7f149516dc9bd5", size = 3691675, upload-time = "2025-11-07T15:41:26.294Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/b9/df8beebe26d25ba254f2dbff689c53f2551efcda5bf35c8974d788f77983/confluent_kafka-2.12.2-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:c0618ef7f3f70d80a5d2ee94241dde8e59419ea52f003f18ac310135b04b6e4a", size = 3943583, upload-time = "2025-11-07T15:41:28.542Z" },
-    { url = "https://files.pythonhosted.org/packages/73/cd/dab6a1e364cb3a405ec3f8d4da4e5a899bdaff838c87aac5a3fcff3bd690/confluent_kafka-2.12.2-cp310-cp310-win_amd64.whl", hash = "sha256:f62dc98e2059cde47b60eadc80904eaf59f88b283330d3fd93d69b1ac3d75496", size = 4067709, upload-time = "2025-11-07T15:41:31.567Z" },
-    { url = "https://files.pythonhosted.org/packages/13/a5/c4cee390bebcc8761b942484ce4a0bd1ba45d9510c284c5052d53f649bda/confluent_kafka-2.12.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:aa9ecf654cac27cf3dbd234c5109ddf25bf34a581c6fd91a2ad3521f5cb4ff98", size = 3593105, upload-time = "2025-11-07T15:41:33.405Z" },
-    { url = "https://files.pythonhosted.org/packages/ae/0a/620649e9742016ff6f3656a314a005af6b3173d0ce7be966ff750c19cb85/confluent_kafka-2.12.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:bb6a0ac890fc35a2dd6435833cbdc2b81a18a5e0b45640fd0f5fc9f240095a77", size = 3153056, upload-time = "2025-11-07T15:41:34.999Z" },
-    { url = "https://files.pythonhosted.org/packages/bc/64/6b2e9b0041e8b19ba86f37c81f02beaab325d1b09e31eca84170dffe2d95/confluent_kafka-2.12.2-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:bd31a1657e134b02b7ecf2483fc6df82ccbb20f08e8a0fb9dc66a1a2b0072a7a", size = 3691407, upload-time = "2025-11-07T15:41:36.823Z" },
-    { url = "https://files.pythonhosted.org/packages/04/22/c8f9654172129631e7043637c3d9e4885004fbba40dfc26a5c5d4fe1d87a/confluent_kafka-2.12.2-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:f26e107597cacb28b6d3333942b665dcb5a3838a1bc2d7b979c4486d22320d0f", size = 3943049, upload-time = "2025-11-07T15:41:39.931Z" },
-    { url = "https://files.pythonhosted.org/packages/27/c8/4c7a0c93bb4bb43f795fc709b68cffd519d07f57d54eb3bf27bbb162413b/confluent_kafka-2.12.2-cp311-cp311-win_amd64.whl", hash = "sha256:6e36dac6a20a3634ae2c4ec167dbb49c51ea7d4ce11c2deee971237d8d874566", size = 4067711, upload-time = "2025-11-07T15:41:41.703Z" },
-    { url = "https://files.pythonhosted.org/packages/9e/89/f5b31c882927b64f548ca9ceca6a4d60f29f60086fd229838df6900c7fb1/confluent_kafka-2.12.2-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:2b978c407de4f63cf06e659afaae4c14919e665c80e3a65ff3479bb4d42c1ef4", size = 3598735, upload-time = "2025-11-07T15:41:43.326Z" },
-    { url = "https://files.pythonhosted.org/packages/51/9c/51c278db2e37c950c325ee362ed78006ca6e007d38c39f3c35c20e80bcf3/confluent_kafka-2.12.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:bd9ebfd7b47105d1f3981944d47307c10c9fd1fd0b2044904ccdc7c2b8adb75a", size = 3158090, upload-time = "2025-11-07T15:41:44.942Z" },
-    { url = "https://files.pythonhosted.org/packages/63/ab/3d9ff1d6efdd5cc577f92dc24debfebf08dcce46d2fa0dd7cd7094a9cfc8/confluent_kafka-2.12.2-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:d35f5c5b84f6803eb7e974802577aa3a317bd9e44a438c7bd4074b56098467f2", size = 3695809, upload-time = "2025-11-07T15:41:46.552Z" },
-    { url = "https://files.pythonhosted.org/packages/aa/cc/41b8f1bf6bd1ae978baf0928f79913493fbb036a53174d5658212c58cca5/confluent_kafka-2.12.2-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:f189203de0200b986e2243215e052e787d8a426d92df815c440b76150da5b194", size = 3947426, upload-time = "2025-11-07T15:41:48.452Z" },
-    { url = "https://files.pythonhosted.org/packages/5d/eb/8e0b6d6f26eff89549ee6d8729ff011ee040659907a48af9e1c7bfbf0324/confluent_kafka-2.12.2-cp312-cp312-win_amd64.whl", hash = "sha256:90bff1e56f1c382583dafb316bb5171e10659d3eaffcb477f28fa13a6f36fe04", size = 4068381, upload-time = "2025-11-07T15:41:50.054Z" },
-    { url = "https://files.pythonhosted.org/packages/e1/28/b209303f607288c10fcfa5521bbaa56a6e298c088d5ac658b811ff77555d/confluent_kafka-2.12.2-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:e888667c607741af5e4b36014d215c4ad2f214646e3da777505e4cf383ac5375", size = 3163179, upload-time = "2025-11-07T15:41:51.611Z" },
-    { url = "https://files.pythonhosted.org/packages/7e/4c/fee4d5c0f5e907bfbb48d3da329b66ede8c7aa0a3af42a269cee5c3e44d9/confluent_kafka-2.12.2-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:adc98ecfbb2a41a234c72043c0ca46c941d5da61900d998f14f29a30baa2e688", size = 3602455, upload-time = "2025-11-07T15:41:53.216Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/c6/fe09a0683ef0bcf2c3b8df3b6827f1b4a95288c02bac1d93a154cddfb21c/confluent_kafka-2.12.2-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:d0abde08fc133cfe6667226472518c6afbb80e083090c441c4ae4cddcd8ed921", size = 3696185, upload-time = "2025-11-07T15:41:54.633Z" },
-    { url = "https://files.pythonhosted.org/packages/77/ed/23ae84c4ef04a38de36033a760b352fbbd51edee9e81d5c9f7c9eba18f09/confluent_kafka-2.12.2-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:b3065064a86b4494c8c94eff9968845461918a2bc89e5a800a2920f722ed2cb1", size = 3947823, upload-time = "2025-11-07T15:41:56.343Z" },
-    { url = "https://files.pythonhosted.org/packages/96/45/755cfc775d9f42ebd50507ab18ec2459ea06e0fc24be4f0829616c10539a/confluent_kafka-2.12.2-cp313-cp313-win_amd64.whl", hash = "sha256:26b2291694a300b7ff00b46eda835a06b124b4878527d32277d42ca39ee95dd9", size = 4128056, upload-time = "2025-11-07T15:41:57.787Z" },
-    { url = "https://files.pythonhosted.org/packages/50/76/5b093946777976ee7acf46cac73b9f5a648ad81c0b8b2d64684f0ac84962/confluent_kafka-2.12.2-cp314-cp314-macosx_13_0_arm64.whl", hash = "sha256:0101be4b6037ad5a49f71c749bfd9f24e82607774f5fb4424c4dee6bf39a302d", size = 3162999, upload-time = "2025-11-07T15:41:59.645Z" },
-    { url = "https://files.pythonhosted.org/packages/08/c4/67566514acb7ccdf77dd07633c9e47c52f9c087c1676faa6661147c70acc/confluent_kafka-2.12.2-cp314-cp314-macosx_13_0_x86_64.whl", hash = "sha256:27cc33a0c47f167db81b4f46d9e1c59582d9bfd8b3c21129a2ee400f5c93844e", size = 3602261, upload-time = "2025-11-07T15:42:01.571Z" },
-    { url = "https://files.pythonhosted.org/packages/2d/3c/036b78024d93f293f1f09efe093ecc63a8c33d1f202e7126c56bbd3adb79/confluent_kafka-2.12.2-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:38d23cf3f428451fc14c18aa53f5f3f1a37c7d89c44bfaf2862b3d6a5068e45c", size = 3696018, upload-time = "2025-11-07T15:42:03.147Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/f0/2fa9456bdad9585360df5dc3089a70cc03988c9542667a1db123e618929f/confluent_kafka-2.12.2-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:eed1b0e540204c52d0ab40d621c371f52044a788b542f6e28a7756fd8f7a1029", size = 3947575, upload-time = "2025-11-07T15:42:04.727Z" },
-    { url = "https://files.pythonhosted.org/packages/9a/22/ceb0ded4518f58805eff102d6c712809ae61dc0d6cfebcd4dba9246575ff/confluent_kafka-2.12.2-cp314-cp314-win_amd64.whl", hash = "sha256:ef411221bfdaffae944156826965b9a08777a5dff66d765a23108f7d6774706f", size = 4245477, upload-time = "2025-11-07T15:42:06.43Z" },
-    { url = "https://files.pythonhosted.org/packages/2b/d4/fa67b636df3550269e0720416ff9275783c3c5ddb83e7b366518a68501fd/confluent_kafka-2.12.2-cp314-cp314t-macosx_13_0_arm64.whl", hash = "sha256:d04f69f6c269ccf6ec1a2ec327edf977a06e790f631ede18511093c1fe598fef", size = 3161636, upload-time = "2025-11-07T15:42:07.938Z" },
-    { url = "https://files.pythonhosted.org/packages/9b/25/ce8a5d5fbcda376cb55763a399cfec345a50d6e8bde12e135a05f3b6bc37/confluent_kafka-2.12.2-cp314-cp314t-macosx_13_0_x86_64.whl", hash = "sha256:01a0429cac8fe38db49ebb9bda335b0c77f14455da72ccf351d49a51c1bd00a5", size = 3600121, upload-time = "2025-11-07T15:42:09.407Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/91/87f15f79b1b2ca2debf4095e886b6f2d6d9071b30c2ef9d5d6414761d9bb/confluent_kafka-2.12.2-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:82ec5302cf7c9ea06d556ed8e8ea8422d2a60035b607d64579ca63663276fe9b", size = 3694893, upload-time = "2025-11-07T15:42:11.051Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/20/e5d739aa776f4e92ab7a2c58a5250881352f8f0e0270aad0309c48ce33bb/confluent_kafka-2.12.2-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:de9dece5803e6b58d8c101cbceb90fa55ca96e0a5f40f10483a4c8f5f4027a69", size = 3946237, upload-time = "2025-11-07T15:42:14.147Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/05/0b95902dbaa0d2954b94e508df7bfde6b84deb1e44d44512c45dc28a529c/confluent_kafka-2.14.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:a9a5205a90f60895737a671ee1a027813d539aaaa82984b793e7807ca35b24bf", size = 3645460, upload-time = "2026-04-02T11:27:39.88Z" },
+    { url = "https://files.pythonhosted.org/packages/00/1b/67f4e7a51470fa34ee24c21965f9210848c1a2b4df954ea398415b260820/confluent_kafka-2.14.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:f6405feef51d2881aeb6d360176bc1d20ffb1793f10684149bd89bf95483b535", size = 3203672, upload-time = "2026-04-02T11:27:44.382Z" },
+    { url = "https://files.pythonhosted.org/packages/78/0b/c1f68858374bd07d77d88ba8589d158773e3a80a6e2c11732492cda7774c/confluent_kafka-2.14.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:259709101786221211fbe3e5654fef04b0c321066339a4c9e3cdb7dd27a0ad9d", size = 3734843, upload-time = "2026-04-02T11:27:47.717Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/c2/4638ffc26ac106dd036d6d5842ad611ff7be60baba2834966b65a4cadb8e/confluent_kafka-2.14.0-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:f1fa8ed04e1e590c1d5f265aba0f0c03b82b5ee39c44d469f8a45b4f84aadbb9", size = 3991774, upload-time = "2026-04-02T11:27:51.002Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/f5/f97e5fc241e9e74eb4096d17d74c8432a23b8444e1e6b3726a0a10029346/confluent_kafka-2.14.0-cp310-cp310-win_amd64.whl", hash = "sha256:5bf19b0ed1ed7af037b406163264220d560336e62a42adaaaa36a9ca9fc7cec8", size = 4111895, upload-time = "2026-04-02T11:27:53.642Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/87/ae316df6411e87c14acf9d83bff12582a0f45dea76df1b5d2a623701d389/confluent_kafka-2.14.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:21c5ce6f388a5bd5d8f102026250faa528694cf7cf71fb6a1b321dad27874c1c", size = 3645064, upload-time = "2026-04-02T11:27:56.259Z" },
+    { url = "https://files.pythonhosted.org/packages/41/5f/b154300af17a3f03a8fb071d9e3ec857d60b27191560f323b750966272ba/confluent_kafka-2.14.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:2eaeabe10c44f8b4c0b879602e804548f2c49eae9e5d40a6d88e372c4c876810", size = 3203249, upload-time = "2026-04-02T11:27:58.556Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/5e/2d051982b3097e5bee61e2b38d1c95079db78b6c13bafe750d159fcfe6d1/confluent_kafka-2.14.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:163f30cfe49f56d85d208ddf6db50a64cb4156d85ff0d5925cbf53c9c1ff5229", size = 3734511, upload-time = "2026-04-02T11:28:00.939Z" },
+    { url = "https://files.pythonhosted.org/packages/05/fd/17f9982fc7ba905c2f667a6a5b8ce8fd032d42c97235235d35ccee172b70/confluent_kafka-2.14.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:c86583d81b71c097e7fb9b2b7e45aa7e3f43cf23308319e0d6bd6eede3027732", size = 3991298, upload-time = "2026-04-02T11:28:03.375Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/16/069b1d090fa76a62dc3c897f2b081f42208cc8ee3c7dfa75d8e0852c9935/confluent_kafka-2.14.0-cp311-cp311-win_amd64.whl", hash = "sha256:74a9af680de1aab2a701c3a4645275374f556cabbf559fa569450fe4f8c61e25", size = 4111893, upload-time = "2026-04-02T11:28:05.799Z" },
+    { url = "https://files.pythonhosted.org/packages/12/05/f27091396c1e5fb98844e3e8b114ec7b896d1b54209e796e3946649de2cd/confluent_kafka-2.14.0-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:737b63f2389c9d63f3da0923681aa95abad1cb2f96b10f38192ef19ab727c883", size = 3650743, upload-time = "2026-04-02T11:28:07.697Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/49/b9de672412c4290b4719f99ac17b31ff35c64b221e4961a3047f6c1f334f/confluent_kafka-2.14.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:1610aa31880c874bfa3351d898d6e6cdbfab2a0f9443598fd64425bbc815cb06", size = 3207894, upload-time = "2026-04-02T11:28:09.813Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/b6/d892b50a48bbd95e8937d557baf89ffa07fc48bc27f792141476a004334d/confluent_kafka-2.14.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:9cca8929bbc3d68a3299b21239c48def860f04e4661c7a59efe3104ecaea0e08", size = 3739440, upload-time = "2026-04-02T11:28:11.595Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/27/04d0f106820219e2621cf9e9a3ab49e910b7a19e55a72a21768b82031a85/confluent_kafka-2.14.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:4d2e4718371c06579f649835239d1acf6ab5386a88f70e9cb9b839855c83c4a9", size = 3995763, upload-time = "2026-04-02T11:28:14.46Z" },
+    { url = "https://files.pythonhosted.org/packages/64/d9/46258cefee841d65dda31d20ce61d12f7573e07ef8d26f49169edfd0b0fa/confluent_kafka-2.14.0-cp312-cp312-win_amd64.whl", hash = "sha256:c37aff51512e817316edd6eafa8a2e59745052a7d1e61e09931b1caa11803266", size = 4112399, upload-time = "2026-04-02T11:28:16.264Z" },
+    { url = "https://files.pythonhosted.org/packages/26/a3/13ca4b42c580cb8e8d4bc0711467c7c501573f0133dcaf1ed6d7e34abb42/confluent_kafka-2.14.0-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:a6dc0e49e8ac99854bd89ec7ac16c54af4488c7617baa633e615320dfbe44b25", size = 3212698, upload-time = "2026-04-02T11:28:18.351Z" },
+    { url = "https://files.pythonhosted.org/packages/27/f6/3b4744a8d1b7714500e830a615671d27f76bf64c15966740cc6ee1c960f7/confluent_kafka-2.14.0-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:308c972b23f44e4d0eb3e76b987872c9a7d04148a5a4f29313bbbec3841d75b4", size = 3654148, upload-time = "2026-04-02T11:28:20.532Z" },
+    { url = "https://files.pythonhosted.org/packages/48/9b/928775785983a2840c1944a689308e346badb2475765030f8e2a0db21f7a/confluent_kafka-2.14.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:9b0acf2fffa19a6ffc2d6f0b82f3b7f1771f5d3943312438f3532ae69b6f2e83", size = 3739774, upload-time = "2026-04-02T11:28:22.283Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/37/c2d7a24f0c12673c763b25c2b32defe3b47b8458ad54befd842b6a3a0cde/confluent_kafka-2.14.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:0023a941dbd8a2325e9e0d13ed1b2236c7d4ff3279b3d99cf06cf1409ab26d22", size = 3996169, upload-time = "2026-04-02T11:28:24.639Z" },
+    { url = "https://files.pythonhosted.org/packages/be/fe/4c2e517a404110adbb5b560dafb5d0b3ba36c2af47d52b5508c90f65d5b0/confluent_kafka-2.14.0-cp313-cp313-win_amd64.whl", hash = "sha256:3da898df3ebb866f61312365e9108cbadcfe74fb73af8d03add856542e715cfe", size = 4172080, upload-time = "2026-04-02T11:28:26.801Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/07/e217beea9a543c53484144164db337b33ec7f95912cc76f09f03fbc6ee7f/confluent_kafka-2.14.0-cp314-cp314-macosx_13_0_arm64.whl", hash = "sha256:05bbf9745cadb1a6fd3b03508572d2cd5455d8d9960a437537ddac9d3f89ee49", size = 3212541, upload-time = "2026-04-02T11:28:28.882Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/73/cbb44df7afa3ac8746e0ebc37be5f457d0e91e32648c144226da26c5f682/confluent_kafka-2.14.0-cp314-cp314-macosx_13_0_x86_64.whl", hash = "sha256:32a72ff85d7b4428532aa477b8dfa4223a5c69f4e90fecaa64e1924cc99a06b6", size = 3653993, upload-time = "2026-04-02T11:28:31.042Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/49/49d9e62ff70a06e68c96dd65d8e621583e6b51682ccc08051ec585bfdf96/confluent_kafka-2.14.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:4fd75d53e0e36f7ff9c5454f7a3cf4a54790db3bfda169c3b582ddc97111f6f6", size = 3739535, upload-time = "2026-04-02T11:28:32.844Z" },
+    { url = "https://files.pythonhosted.org/packages/33/6a/df467787418c24e063ed0c19e96aedf05c26eabc32d8adc75235d45d830b/confluent_kafka-2.14.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:eb17528ec7b177ec5e38214852f3dadb5d77172e0fb25c7c992c0cbc3dcfbaa2", size = 3995845, upload-time = "2026-04-02T11:28:34.538Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/0a/c5ce2a48ece0ae2dd050ab28d4cd81b9efc610276a4e72f622582f5371d3/confluent_kafka-2.14.0-cp314-cp314-win_amd64.whl", hash = "sha256:578afb532ded604cb98174a14a88847367191bcbe4f52a1661f5238dc5cf75dd", size = 4290326, upload-time = "2026-04-02T11:28:36.679Z" },
 ]
 
 [[package]]
@@ -2071,17 +2070,18 @@ wheels = [
 
 [[package]]
 name = "fastapi"
-version = "0.122.0"
+version = "0.136.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "pydantic", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "starlette", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "typing-extensions", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "typing-inspection", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b2/de/3ee97a4f6ffef1fb70bf20561e4f88531633bb5045dc6cebc0f8471f764d/fastapi-0.122.0.tar.gz", hash = "sha256:cd9b5352031f93773228af8b4c443eedc2ac2aa74b27780387b853c3726fb94b", size = 346436, upload-time = "2025-11-24T19:17:47.95Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5d/45/c130091c2dfa061bbfe3150f2a5091ef1adf149f2a8d2ae769ecaf6e99a2/fastapi-0.136.1.tar.gz", hash = "sha256:7af665ad7acfa0a3baf8983d393b6b471b9da10ede59c60045f49fbc89a0fa7f", size = 397448, upload-time = "2026-04-23T16:49:44.046Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7a/93/aa8072af4ff37b795f6bbf43dcaf61115f40f49935c7dbb180c9afc3f421/fastapi-0.122.0-py3-none-any.whl", hash = "sha256:a456e8915dfc6c8914a50d9651133bd47ec96d331c5b44600baa635538a30d67", size = 110671, upload-time = "2025-11-24T19:17:45.96Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/ff/2e4eca3ade2c22fe1dea7043b8ee9dabe47753349eb1b56a202de8af6349/fastapi-0.136.1-py3-none-any.whl", hash = "sha256:a6e9d7eeada96c93a4d69cb03836b44fa34e2854accb7244a1ece36cd4781c3f", size = 117683, upload-time = "2026-04-23T16:49:42.437Z" },
 ]
 
 [[package]]
@@ -2217,11 +2217,11 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "3.20.3"
+version = "3.29.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1d/65/ce7f1b70157833bf3cb851b556a37d4547ceafc158aa9b34b36782f23696/filelock-3.20.3.tar.gz", hash = "sha256:18c57ee915c7ec61cff0ecf7f0f869936c7c30191bb0cf406f1341778d0834e1", size = 19485, upload-time = "2026-01-09T17:55:05.421Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/fe/997687a931ab51049acce6fa1f23e8f01216374ea81374ddee763c493db5/filelock-3.29.0.tar.gz", hash = "sha256:69974355e960702e789734cb4871f884ea6fe50bd8404051a3530bc07809cf90", size = 57571, upload-time = "2026-04-19T15:39:10.068Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl", hash = "sha256:4b0dda527ee31078689fc205ec4f1c1bf7d56cf88b6dc9426c4f230e46c2dce1", size = 16701, upload-time = "2026-01-09T17:55:04.334Z" },
+    { url = "https://files.pythonhosted.org/packages/81/47/dd9a212ef6e343a6857485ffe25bba537304f1913bdbed446a23f7f592e1/filelock-3.29.0-py3-none-any.whl", hash = "sha256:96f5f6344709aa1572bbf631c640e4ebeeb519e08da902c39a001882f30ac258", size = 39812, upload-time = "2026-04-19T15:39:08.752Z" },
 ]
 
 [[package]]
@@ -2235,7 +2235,7 @@ wheels = [
 
 [[package]]
 name = "flask"
-version = "3.1.2"
+version = "3.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blinker", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
@@ -2245,9 +2245,9 @@ dependencies = [
     { name = "markupsafe", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "werkzeug", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dc/6d/cfe3c0fcc5e477df242b98bfe186a4c34357b4847e87ecaef04507332dab/flask-3.1.2.tar.gz", hash = "sha256:bf656c15c80190ed628ad08cdfd3aaa35beb087855e2f494910aa3774cc4fd87", size = 720160, upload-time = "2025-08-19T21:03:21.205Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/00/35d85dcce6c57fdc871f3867d465d780f302a175ea360f62533f12b27e2b/flask-3.1.3.tar.gz", hash = "sha256:0ef0e52b8a9cd932855379197dd8f94047b359ca0a78695144304cb45f87c9eb", size = 759004, upload-time = "2026-02-19T05:00:57.678Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/f9/7f9263c5695f4bd0023734af91bedb2ff8209e8de6ead162f35d8dc762fd/flask-3.1.2-py3-none-any.whl", hash = "sha256:ca1d8112ec8a6158cc29ea4858963350011b5c846a414cdb7a954aa9e967d03c", size = 103308, upload-time = "2025-08-19T21:03:19.499Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/9c/34f6962f9b9e9c71f6e5ed806e0d0ff03c9d1b0b2340088a0cf4bce09b18/flask-3.1.3-py3-none-any.whl", hash = "sha256:f4bcbefc124291925f1a26446da31a5178f9483862233b23c0c96a20701f670c", size = 103424, upload-time = "2026-02-19T05:00:56.027Z" },
 ]
 
 [[package]]
@@ -8120,7 +8120,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/33/cb/ef7d041dbecfbf47f
 
 [[package]]
 name = "pytest"
-version = "9.0.1"
+version = "9.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "(platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (sys_platform != 'win32' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (sys_platform != 'win32' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (sys_platform != 'win32' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (sys_platform != 'win32' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (sys_platform != 'win32' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (sys_platform != 'win32' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
@@ -8131,9 +8131,9 @@ dependencies = [
     { name = "pygments", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "tomli", marker = "(python_full_version < '3.11' and platform_python_implementation == 'CPython') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (python_full_version >= '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version >= '3.11' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/07/56/f013048ac4bc4c1d9be45afd4ab209ea62822fb1598f40687e6bf45dcea4/pytest-9.0.1.tar.gz", hash = "sha256:3e9c069ea73583e255c3b21cf46b8d3c56f6e3a1a8f6da94ccb0fcf57b9d73c8", size = 1564125, upload-time = "2025-11-12T13:05:09.333Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/0d/549bd94f1a0a402dc8cf64563a117c0f3765662e2e668477624baeec44d5/pytest-9.0.3.tar.gz", hash = "sha256:b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c", size = 1572165, upload-time = "2026-04-07T17:16:18.027Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/8b/6300fb80f858cda1c51ffa17075df5d846757081d11ab4aa35cef9e6258b/pytest-9.0.1-py3-none-any.whl", hash = "sha256:67be0030d194df2dfa7b556f2e56fb3c3315bd5c8822c6951162b92b32ce7dad", size = 373668, upload-time = "2025-11-12T13:05:07.379Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249, upload-time = "2026-04-07T17:16:16.13Z" },
 ]
 
 [[package]]
@@ -8152,16 +8152,16 @@ wheels = [
 
 [[package]]
 name = "pytest-cov"
-version = "7.0.0"
+version = "7.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "coverage", extra = ["toml"], marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "pluggy", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "pytest", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/f7/c933acc76f5208b3b00089573cf6a2bc26dc80a8aece8f52bb7d6b1855ca/pytest_cov-7.0.0.tar.gz", hash = "sha256:33c97eda2e049a0c5298e91f519302a1334c26ac65c1a483d6206fd458361af1", size = 54328, upload-time = "2025-09-09T10:57:02.113Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/51/a849f96e117386044471c8ec2bd6cfebacda285da9525c9106aeb28da671/pytest_cov-7.1.0.tar.gz", hash = "sha256:30674f2b5f6351aa09702a9c8c364f6a01c27aae0c1366ae8016160d1efc56b2", size = 55592, upload-time = "2026-03-21T20:11:16.284Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ee/49/1377b49de7d0c1ce41292161ea0f721913fa8722c19fb9c1e3aa0367eecb/pytest_cov-7.0.0-py3-none-any.whl", hash = "sha256:3b8e9558b16cc1479da72058bdecf8073661c7f57f7d3c5f22a1c23507f2d861", size = 22424, upload-time = "2025-09-09T10:57:00.695Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/7a/d968e294073affff457b041c2be9868a40c1c71f4a35fcc1e45e5493067b/pytest_cov-7.1.0-py3-none-any.whl", hash = "sha256:a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678", size = 22876, upload-time = "2026-03-21T20:11:14.438Z" },
 ]
 
 [[package]]
@@ -8179,15 +8179,15 @@ wheels = [
 
 [[package]]
 name = "pytest-rerunfailures"
-version = "16.1"
+version = "16.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "pytest", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/de/04/71e9520551fc8fe2cf5c1a1842e4e600265b0815f2016b7c27ec85688682/pytest_rerunfailures-16.1.tar.gz", hash = "sha256:c38b266db8a808953ebd71ac25c381cb1981a78ff9340a14bcb9f1b9bff1899e", size = 30889, upload-time = "2025-10-10T07:06:01.238Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/27/fd0209642f3a1069da3e0be3c7e339f942d052d81ccb1fb4eb9b187d3633/pytest_rerunfailures-16.2.tar.gz", hash = "sha256:5f5a32f15674a3d54f7598388fcd3cc1bc5c37284731a4704a44485dcdda5e23", size = 32121, upload-time = "2026-05-13T08:13:26.998Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/54/60eabb34445e3db3d3d874dc1dfa72751bfec3265bd611cb13c8b290adea/pytest_rerunfailures-16.1-py3-none-any.whl", hash = "sha256:5d11b12c0ca9a1665b5054052fcc1084f8deadd9328962745ef6b04e26382e86", size = 14093, upload-time = "2025-10-10T07:06:00.019Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/a5/d8c1ad74529b483044b787ead2d24ecc624bca4084a509002102e4bab8cc/pytest_rerunfailures-16.2-py3-none-any.whl", hash = "sha256:c22a53d2827becc76f057d4ded123c0e726523f2f0e5f0bb4efb31fd59e1f14e", size = 14505, upload-time = "2026-05-13T08:13:25.485Z" },
 ]
 
 [[package]]
@@ -9614,11 +9614,11 @@ asyncio = [
 
 [[package]]
 name = "sqlparse"
-version = "0.5.0"
+version = "0.5.5"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/50/26/5da251cd090ccd580f5cfaa7d36cdd8b2471e49fffce60ed520afc27f4bc/sqlparse-0.5.0.tar.gz", hash = "sha256:714d0a4932c059d16189f58ef5411ec2287a4360f17cdd0edd2d09d4c5087c93", size = 83475, upload-time = "2024-04-13T12:37:09.316Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/76/437d71068094df0726366574cf3432a4ed754217b436eb7429415cf2d480/sqlparse-0.5.5.tar.gz", hash = "sha256:e20d4a9b0b8585fdf63b10d30066c7c94c5d7a7ec47c889a2d83a3caa93ff28e", size = 120815, upload-time = "2025-12-19T07:17:45.073Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/43/5d/a0fdd88fd486b39ae1fd1a75ff75b4e29a0df96c0304d462fd407b82efe0/sqlparse-0.5.0-py3-none-any.whl", hash = "sha256:c204494cd97479d0e39f28c93d46c0b2d5959c7b9ab904762ea6c7af211c8663", size = 43971, upload-time = "2024-04-13T12:37:11.177Z" },
+    { url = "https://files.pythonhosted.org/packages/49/4b/359f28a903c13438ef59ebeee215fb25da53066db67b305c125f1c6d2a25/sqlparse-0.5.5-py3-none-any.whl", hash = "sha256:12a08b3bf3eec877c519589833aed092e2444e68240a3577e8e26148acc7b1ba", size = 46138, upload-time = "2025-12-19T07:17:46.573Z" },
 ]
 
 [[package]]
@@ -10402,16 +10402,16 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.38.0"
+version = "0.47.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "h11", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "typing-extensions", marker = "(python_full_version < '3.11' and platform_python_implementation == 'CPython') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (python_full_version >= '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version >= '3.11' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/ce/f06b84e2697fef4688ca63bdb2fdf113ca0a3be33f94488f2cadb690b0cf/uvicorn-0.38.0.tar.gz", hash = "sha256:fd97093bdd120a2609fc0d3afe931d4d4ad688b6e75f0f929fde1bc36fe0e91d", size = 80605, upload-time = "2025-10-18T13:46:44.63Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/b1/8e7077a8641086aea449e1b5752a570f1b5906c64e0a33cd6d93b63a066b/uvicorn-0.47.0.tar.gz", hash = "sha256:7c9a0ea1a9414106bbab7324609c162d8fa0cdcdcb703060987269d77c7bb533", size = 90582, upload-time = "2026-05-14T18:16:54.455Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ee/d9/d88e73ca598f4f6ff671fb5fde8a32925c2e08a637303a1d12883c7305fa/uvicorn-0.38.0-py3-none-any.whl", hash = "sha256:48c0afd214ceb59340075b4a052ea1ee91c16fbc2a9b1469cca0e54566977b02", size = 68109, upload-time = "2025-10-18T13:46:42.958Z" },
+    { url = "https://files.pythonhosted.org/packages/15/41/ac2dfdbc1f60c7af4f994c7a335cfa7040c01642b605d65f611cecc2a1e4/uvicorn-0.47.0-py3-none-any.whl", hash = "sha256:2c5715bc12d1892d84752049f400cd1c3cb018514967fdfeb97640443a6a9432", size = 71301, upload-time = "2026-05-14T18:16:51.762Z" },
 ]
 
 [package.optional-dependencies]
@@ -11131,7 +11131,7 @@ test = [
     { name = "reportlab" },
     { name = "respx" },
     { name = "rich" },
-    { name = "sqlparse", specifier = "==0.5.0" },
+    { name = "sqlparse", specifier = "==0.5.5" },
     { name = "uvicorn", specifier = ">=0.27.0" },
     { name = "vcrpy", marker = "platform_python_implementation != 'PyPy'", specifier = ">=7.0.0" },
     { name = "weave", extras = ["trace-server"] },
