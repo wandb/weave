@@ -40,6 +40,7 @@ repos:
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-added-large-files
       - id: check-added-large-files
         args: ["--maxkb=2048"]
+        stages: [pre-commit, pre-push]
         priority: 0
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-json
       - id: check-json
@@ -50,6 +51,7 @@ repos:
         priority: 0
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#detect-private-key
       - id: detect-private-key
+        stages: [pre-commit, pre-push]
         priority: 0
   - repo: https://github.com/crate-ci/typos
     rev: v1.44.0
