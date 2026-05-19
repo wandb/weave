@@ -130,12 +130,12 @@ def _time_calls_complete(iterations: int, batch_size: int, mode: str) -> list[fl
             return timings_ms
 
 
-def _summarize(label: str, timings_ms: list[float]) -> dict[str, float]:
+def _summarize(label: str, timings_ms: list[float]) -> dict[str, str | float]:
     s = sorted(timings_ms)
     n = len(s)
     return {
         "label": label,
-        "n": n,
+        "n": float(n),
         "min_ms": s[0],
         "median_ms": s[n // 2],
         "mean_ms": statistics.fmean(s),
@@ -144,15 +144,15 @@ def _summarize(label: str, timings_ms: list[float]) -> dict[str, float]:
     }
 
 
-def _print_markdown(rows: list[dict[str, float]]) -> None:
+def _print_markdown(rows: list[dict[str, str | float]]) -> None:
     print()
     print("| scenario | n | min ms | median ms | mean ms | p95 ms | max ms |")
     print("|---|---:|---:|---:|---:|---:|---:|")
     for r in rows:
         print(
-            f"| {r['label']} | {int(r['n'])} | {r['min_ms']:.2f} | "
-            f"{r['median_ms']:.2f} | {r['mean_ms']:.2f} | "
-            f"{r['p95_ms']:.2f} | {r['max_ms']:.2f} |"
+            f"| {r['label']} | {int(float(r['n']))} | {float(r['min_ms']):.2f} | "
+            f"{float(r['median_ms']):.2f} | {float(r['mean_ms']):.2f} | "
+            f"{float(r['p95_ms']):.2f} | {float(r['max_ms']):.2f} |"
         )
     print()
 
@@ -163,7 +163,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 
-    rows: list[dict[str, float]] = []
+    rows: list[dict[str, str | float]] = []
     for mode in ("warm", "cold"):
         # Reset caches between scenarios so each starts fresh.
         project_version.reset_project_residence_cache()
