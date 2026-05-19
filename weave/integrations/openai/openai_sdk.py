@@ -408,9 +408,9 @@ def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
     and the Responses API nests them under input_tokens_details. This extracts
     them to the top-level canonical field `cache_read_input_tokens`.
     """
-    ptd = usage.get("prompt_tokens_details")
-    if isinstance(ptd, dict) and ptd.get("cached_tokens") is not None:
-        usage.setdefault("cache_read_input_tokens", ptd["cached_tokens"])
+    pdf = usage.get("prompt_tokens_details")
+    if isinstance(pdf, dict) and pdf.get("cached_tokens") is not None:
+        usage.setdefault("cache_read_input_tokens", pdf["cached_tokens"])
     itd = usage.get("input_tokens_details")
     if isinstance(itd, dict) and itd.get("cached_tokens") is not None:
         usage.setdefault("cache_read_input_tokens", itd["cached_tokens"])

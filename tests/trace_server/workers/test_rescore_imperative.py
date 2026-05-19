@@ -339,39 +339,44 @@ def test_rescore_creates_new_pas_tree_and_leaves_source_untouched(client) -> Non
         r"^eval-\d{4}-\d{2}-\d{2}-[a-z]+-[a-z]+$", new_eval_call.display_name
     ), f"unexpected display_name shape: {new_eval_call.display_name!r}"
 
-    # 6. The new eval's ``self`` input points at a NEW Evaluation object
-    # (NEW object_id, not a new version of the source's object_id) whose
-    # scorers field reflects the rescore scorers. The ``-rescored`` suffix
-    # is the deterministic lineage marker — see
-    # ``_publish_rescored_evaluation`` for why we mint a new object_id.
+    # 6. The new eval root's ``inputs.self`` is the SOURCE eval ref —
+    # call_start happens before publish so the frontend sees the eval as
+    # ``running`` immediately, and ``inputs.self`` is immutable after the
+    # call_start (no call_update path for inputs, only display_name).
+    # Tradeoff documented in rescore_worker.rescore_predictions: the eval
+    # root's scorer chip will render the source's scorers. The per-row
+    # predict_and_score calls use the new ref (asserted further below in
+    # other tests) so per-row chips render correctly.
     assert isinstance(new_eval_call.inputs, dict)
     new_self_ref = new_eval_call.inputs.get("self")
-    assert isinstance(new_self_ref, str)
-    assert new_self_ref.startswith(
-        f"weave:///{project_id}/object/source-eval-rescored:"
+    assert new_self_ref == source_eval_ref, (
+        "new eval root's inputs.self must point at the source eval ref "
+        "(call_start runs before publish for visibility)"
     )
-    assert new_self_ref != source_eval_ref, (
-        "new eval must reference a NEW Evaluation, not the source's"
-    )
-    # Read the new Evaluation object back and check its scorers list.
+
+    # The publish step still runs: a new VERSION of the source eval
+    # object_id is created with the rescore scorers swapped in. Lineage
+    # is recorded via the EVALUATION_RUN_SOURCE_ATTR_KEY on the new run's
+    # attributes (asserted on `new_eval_call.attributes` already above).
     from weave.trace.refs import ObjectRef, Ref
 
-    new_eval_obj_ref = Ref.parse_uri(new_self_ref)
-    assert isinstance(new_eval_obj_ref, ObjectRef)
-    new_eval_val = client.server.obj_read(
+    source_ref_parsed = Ref.parse_uri(source_eval_ref)
+    assert isinstance(source_ref_parsed, ObjectRef)
+    # The latest version of the source object_id should have the rescore
+    # scorers (not the source's original scorers).
+    latest_eval_val = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=project_id,
-            object_id=new_eval_obj_ref.name,
-            digest=new_eval_obj_ref.digest,
+            object_id=source_ref_parsed.name,
         )
     ).obj.val
-    assert isinstance(new_eval_val, dict)
-    assert new_eval_val.get("scorers") == [scorer_ref]
+    assert isinstance(latest_eval_val, dict)
+    assert latest_eval_val.get("scorers") == [scorer_ref]
     # Other fields preserved from the source val.
-    assert new_eval_val.get("dataset") == (
+    assert latest_eval_val.get("dataset") == (
         f"weave:///{project_id}/object/dataset-stub:dd"
     )
-    assert new_eval_val.get("trials") == 1
+    assert latest_eval_val.get("trials") == 1
 
 
 # ---------------------------------------------------------------------------

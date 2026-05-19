@@ -12,8 +12,10 @@ Entry points:
 """
 
 import asyncio
+import dataclasses
 import datetime
 import logging
+import os
 from collections.abc import Iterator
 from typing import Any, cast
 
@@ -40,6 +42,51 @@ logger = logging.getLogger(__name__)
 
 RESCORE_WORKER_MARKER = {"_weave_eval_meta": {"rescore_worker": True}}
 PREDICTION_PAGE_SIZE = 100
+DEFAULT_ROW_CONCURRENCY = 8
+
+
+def _get_row_concurrency() -> int:
+    """Max concurrent per-row predict_and_score tasks in the rescore loop.
+
+    Each in-flight row holds one HTTP socket to the trace server for the
+    LLM-judge ``completions_create`` call plus a CallBatchProcessor slot for
+    its pas + scorer calls. Bounded so a row burst can't overwhelm either.
+
+    Override with ``WEAVE_RESCORE_ROW_CONCURRENCY``. Set to 1 to fall back to
+    serial execution. Values <1 are clamped to 1.
+    """
+    try:
+        n = int(os.getenv("WEAVE_RESCORE_ROW_CONCURRENCY", DEFAULT_ROW_CONCURRENCY))
+    except ValueError:
+        n = DEFAULT_ROW_CONCURRENCY
+    return max(1, n)
+
+
+# Pre-built eager Op for the new-eval trace root. Marking the op as
+# ``eager_call_start=True`` tells CallBatchProcessor to send the call_start
+# IMMEDIATELY via the legacy single-record path instead of waiting to pair
+# it with a call_end (see call_batch_processor.py docstring). Without this,
+# ``_start_new_eval_root``'s call_start sits in the in-memory pairing
+# buffer until the (much later) ``client.finish_call(new_eval_call, ...)``
+# arrives — the frontend's /evaluations/status polling sees ``not_found``
+# for the entire run duration and trips its 120s "Eval did not start"
+# timeout when per-row work is slow. An explicit mid-run ``client.flush()``
+# does NOT solve this: flush() blocks waiting for pairs, so calling it
+# right after the start times out at 60s and drops the start as an
+# "unpaired call" — making the call end up as an orphan when the real end
+# arrives. Eager mode is the documented path for "long-running ops that
+# should be visible immediately."
+@weave.op(eager_call_start=True)
+def _new_eval_root_op() -> None:
+    """Marker op for the rescore worker's new-eval trace root.
+
+    Body is intentionally empty — this op is invoked via
+    ``client.create_call(op=_new_eval_root_op, ...)`` for its
+    ``eager_call_start=True`` metadata, never executed directly.
+    """
+
+
+_new_eval_root_op.name = constants.EVALUATION_RUN_OP_NAME
 
 
 def rescore_predictions_sync(args: RescoringArgs) -> None:
@@ -133,21 +180,16 @@ async def rescore_predictions(args: RescoringArgs) -> None:
     source_eval_ref = source_inputs.get("self") or source_inputs.get("this") or ""
     source_model_ref = source_inputs.get("model") or ""
 
-    # Clone the source Evaluation, swap its ``scorers`` for the new refs,
-    # publish as a new version. Without this the new eval's ``self`` would
-    # point at the source Evaluation object whose ``scorers`` list still
-    # references the OLD scorers — list-view and detail-view surfaces show
-    # the source's scorers on the new run, even though per-row scoring was
-    # done with the new ones. Falls back to the source ref on any failure
-    # (best-effort: the rescore itself still produces correct per-row
-    # scores under predict_and_score).
-    new_eval_ref = _publish_rescored_evaluation(
-        client,
-        project_id=project_id,
-        source_eval_ref=source_eval_ref,
-        new_scorer_refs=list(args.scorer_refs),
-        wb_user_id=args.wb_user_id,
-    )
+    # Fail fast BEFORE creating any call if the source eval is unreadable
+    # or its inputs don't carry the refs we need to rescore against. A
+    # later call_start with garbage refs would leave a dangling row that
+    # confuses the listing.
+    if not source_eval_ref:
+        raise ValueError(
+            "Cannot rescore: source eval call has no self/this ref in its "
+            f"inputs (source_evaluation_run_id={args.source_evaluation_run_id!r}). "
+            "The source call may have been deleted or never existed."
+        )
 
     # eval-{date}-{memorable} matches ``default_evaluation_display_name``
     # in eval.py so rescored runs are visually indistinguishable from
@@ -156,109 +198,97 @@ async def rescore_predictions(args: RescoringArgs) -> None:
         f"eval-{datetime.datetime.now().strftime('%Y-%m-%d')}-{make_memorable_name()}"
     )
 
-    # Emit the new-eval call's call_start from THIS client. The rescore
-    # endpoint allocated args.new_evaluation_run_id but deliberately did
-    # NOT call_start the row — that's the worker's job (see the
-    # call-ownership invariant on CallBatchProcessor).
+    # Emit the new-eval call's call_start BEFORE running publish or per-row
+    # work, so the frontend's polling ``/evaluations/status`` sees ``running``
+    # within one tick instead of waiting for publish to complete (or, on
+    # publish failure, indefinitely).
     #
-    # We deliberately bypass ``client.create_call`` here because that
-    # helper generates a fresh random ``trace_id`` for parent=None roots,
-    # which violates the ``trace_id == id`` invariant the frontend expects
-    # for trace roots. evaluation_run_create did ``trace_id=id`` and we
-    # mirror that here. Children below pass ``new_eval_call`` as their
-    # explicit parent, so they inherit ``trace_id=args.new_evaluation_run_id``
-    # — the entire new-eval tree shares one trace_id matching the eval's
-    # id, exactly like a normal Evaluation.evaluate run.
+    # We use ``source_eval_ref`` as the placeholder for ``inputs.self``
+    # because ``inputs`` is immutable after call_start — there is no
+    # ``call_update`` for inputs (only display_name). Tradeoff: the eval
+    # root's scorer chip will resolve to the source eval object's
+    # ``scorers`` field, which still references the OLD scorers — so the
+    # chip on the eval root mislabels. The per-row predict_and_score calls
+    # below use ``new_eval_ref`` (after publish), so the per-row chips ARE
+    # correct. This is the cost of fast-visibility: source-ref-as-self on
+    # the root, new-ref-as-self on every child pas. Drill-down shows the
+    # correct scorers; the listing chip on the root does not.
+    #
+    # The rescore endpoint allocated args.new_evaluation_run_id but
+    # deliberately did NOT call_start the row — that is the worker's job
+    # (see the call-ownership invariant on CallBatchProcessor).
+    # call_start goes out IMMEDIATELY because `_new_eval_root_op` is
+    # marked ``eager_call_start=True``. No explicit ``client.flush()``
+    # here: flush() blocks waiting for the (much later) call_end to pair,
+    # which would time out at 60s and drop the start as unpaired.
     new_eval_call = _start_new_eval_root(
         client,
         new_evaluation_run_id=args.new_evaluation_run_id,
         source_evaluation_run_id=args.source_evaluation_run_id,
-        evaluation_ref=new_eval_ref,
+        evaluation_ref=source_eval_ref,
         model_ref=source_model_ref,
         display_name=display_name,
     )
 
     try:
-        with weave.attributes(RESCORE_WORKER_MARKER):
-            for source in _yield_predict_and_score_sources(
+        # Publish a new VERSION of the source Evaluation with the rescore
+        # scorers swapped in. This runs AFTER the call_start so a publish
+        # failure routes to ``fail_call`` below (visible failed eval)
+        # instead of leaving the worker with no call at all (invisible
+        # pending-then-timeout). The new ref is used for per-row pas
+        # inputs.self below so per-row scorer chips render the new
+        # scorers correctly.
+        new_eval_ref = _publish_rescored_evaluation(
+            client,
+            project_id=project_id,
+            source_eval_ref=source_eval_ref,
+            new_scorer_refs=list(args.scorer_refs),
+            wb_user_id=args.wb_user_id,
+        )
+
+        # Drain the source generator into a list so we can launch all rows
+        # as concurrent tasks. The generator's per-page query latency is
+        # small (one calls_query_stream + one refs_read_batch per 100 rows)
+        # relative to per-row LLM-judge latency, so up-front draining
+        # doesn't materially delay first-row visibility.
+        sources = list(
+            _yield_predict_and_score_sources(
                 client, args, project_id, source_model_ref=source_model_ref
-            ):
-                new_pas_call = client.create_call(
-                    op=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-                    inputs={
-                        "self": new_eval_ref,
-                        "model": source_model_ref,
-                        "example": source.inputs_for_call,
-                    },
-                    parent=new_eval_call,
-                    use_stack=True,
-                )
+            )
+        )
+        row_concurrency = _get_row_concurrency()
+        semaphore = asyncio.Semaphore(row_concurrency)
 
-                # Emit a synthetic ``predict`` subcall whose duration mirrors
-                # the source row's model_latency, so the eval compare table
-                # can display a per-row Latency value. Both the imperative
-                # and non-imperative frontend paths derive model_latency
-                # from ``ended_at - started_at`` of a predict child of pas
-                # — without this subcall the Latency column renders "N/A"
-                # for rescored runs.
-                _emit_synthetic_predict_call(
-                    client,
-                    parent_pas_call=new_pas_call,
-                    model_ref=source_model_ref,
-                    example=source.inputs_for_call,
-                    output=source.output,
-                    model_latency_seconds=source.model_latency,
-                    source_predict=source.source_predict,
+        # asyncio.gather preserves order, so per_row_results[i] corresponds
+        # to sources[i] regardless of which row finishes first. We aggregate
+        # after the gather to keep raw_scores_by_scorer and
+        # row_model_latencies deterministic regardless of completion order.
+        with weave.attributes(RESCORE_WORKER_MARKER):
+            row_tasks = [
+                asyncio.create_task(
+                    _score_one_row(
+                        client,
+                        source,
+                        new_eval_call=new_eval_call,
+                        new_eval_ref=new_eval_ref,
+                        source_model_ref=source_model_ref,
+                        scorers=scorers,
+                        scorer_attributes_list=scorer_attributes_list,
+                        scorer_refs=list(args.scorer_refs),
+                        semaphore=semaphore,
+                    )
                 )
+                for source in sources
+            ]
+            per_row_results = await asyncio.gather(*row_tasks)
 
-                # apply_scorer_async creates op-traced calls; with the new pas
-                # on the call stack (use_stack=True above), each scorer call
-                # parents to it automatically — same shape as a normal eval
-                # where scorers parent to predict_and_score.
-                # return_exceptions=True so one scorer failure doesn't abort
-                # the whole batch.
-                results = await asyncio.gather(
-                    *[
-                        apply_scorer_async(
-                            scorer, source.inputs_for_scorer, source.output
-                        )
-                        for scorer in scorers
-                    ],
-                    return_exceptions=True,
-                )
-
-                scores_dict: dict[str, Any] = {}
-                for i, (result, scorer_ref) in enumerate(
-                    zip(results, args.scorer_refs, strict=True)
-                ):
-                    scorer_name = scorer_attributes_list[i].scorer_name
-                    if isinstance(result, Exception):
-                        logger.warning(
-                            "Scorer %s failed on row in new pas %s: %s",
-                            scorer_ref,
-                            new_pas_call.id,
-                            result,
-                        )
-                        failed_score_counts[i] += 1
-                        scores_dict[scorer_name] = None
-                        continue
-                    raw_value = result.result
-                    scores_dict[scorer_name] = raw_value
-                    raw_scores_by_scorer[i].append(raw_value)
-
-                # Per-row predict_and_score output mirrors what
-                # ``Evaluation.predict_and_score`` returns in eval.py — output
-                # plus the per-scorer score dict plus model_latency. The
-                # frontend reads this shape directly.
-                client.finish_call(
-                    new_pas_call,
-                    output={
-                        "output": source.output,
-                        "scores": scores_dict,
-                        "model_latency": source.model_latency,
-                    },
-                )
-                row_model_latencies.append(source.model_latency)
+        for row in per_row_results:
+            row_model_latencies.append(row.model_latency)
+            for i, val in enumerate(row.per_scorer_values):
+                if val is _SCORER_FAILED:
+                    failed_score_counts[i] += 1
+                else:
+                    raw_scores_by_scorer[i].append(val)
 
         # Per-scorer failure logs — a scorer failing on 50% of rows is
         # invisible without this.
@@ -324,6 +354,14 @@ async def rescore_predictions(args: RescoringArgs) -> None:
         # CallBatchProcessor, sending a single complete record to the
         # trace server.
         client.finish_call(new_eval_call, output=summary)
+        # Force the final call_end through to the trace server before this
+        # subprocess exits. Without this, the end record sits in the
+        # CallBatchProcessor buffer and a hard process exit (timeout, kill,
+        # task cancellation) strands an orphan call_end. An orphan end on
+        # the wire to ``calls_complete`` can land as a sentinel-filled row
+        # that masks the real call's content on subsequent queries —
+        # surfacing to the user as "my evals disappeared."
+        client.flush()
     except Exception as exc:
         # Always finish the new-eval call so it never dangles in "started"
         # state. ``fail_call`` records the exception on the call so the UI
@@ -340,6 +378,138 @@ async def rescore_predictions(args: RescoringArgs) -> None:
                 args.new_evaluation_run_id,
             )
         raise
+    finally:
+        # Belt-and-suspenders: drain the batch buffer on every exit path
+        # (success, raised, asyncio cancellation). Pairs incomplete starts
+        # with their ends in the buffer, sends any leftover records to the
+        # trace server, and prevents the partial-state corruption pattern
+        # where a later rescore's call_start collides with an earlier
+        # rescore's still-buffered call_end.
+        try:
+            client.flush()
+        except Exception:
+            logger.exception(
+                "Final flush failed for evaluation run %s",
+                args.new_evaluation_run_id,
+            )
+
+
+@dataclasses.dataclass(slots=True)
+class _RowResult:
+    """Per-row output collected from one ``_score_one_row`` task.
+
+    ``per_scorer_values[i]`` is either the scorer's raw value (when the
+    scorer succeeded) or the ``_SCORER_FAILED`` sentinel (when it raised).
+    Using a sentinel rather than ``None`` lets the caller distinguish
+    "scorer returned None" — a legitimate score — from "scorer raised".
+    """
+
+    model_latency: float
+    per_scorer_values: list[Any]
+
+
+_SCORER_FAILED = object()
+
+
+async def _score_one_row(
+    client: WeaveClient,
+    source: _RescoreSource,
+    *,
+    new_eval_call: Call,
+    new_eval_ref: str,
+    source_model_ref: str,
+    scorers: list[Scorer],
+    scorer_attributes_list: list[Any],
+    scorer_refs: list[str],
+    semaphore: asyncio.Semaphore,
+) -> _RowResult:
+    """Score one source row as its own asyncio Task.
+
+    Run as a Task so its contextvar context (call stack pushed by
+    ``use_stack=True``, ``weave.attributes`` marker) is forked from the
+    parent at task-creation time and isolated from sibling rows. Each
+    Task's ``create_call(use_stack=True)`` mutates only ITS OWN copy of
+    the call-stack ContextVar, so concurrent rows don't fight over the
+    top of the stack and scorers parent to the correct pas via
+    ``apply_scorer_async``'s op-stack lookup.
+
+    Concurrency bound via ``semaphore`` to cap simultaneous LLM-judge
+    HTTP calls + CallBatchProcessor pressure.
+    """
+    async with semaphore:
+        new_pas_call = client.create_call(
+            op=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+            inputs={
+                "self": new_eval_ref,
+                "model": source_model_ref,
+                "example": source.inputs_for_call,
+            },
+            parent=new_eval_call,
+            use_stack=True,
+        )
+
+        # Emit a synthetic ``predict`` subcall whose duration mirrors
+        # the source row's model_latency, so the eval compare table
+        # can display a per-row Latency value.
+        _emit_synthetic_predict_call(
+            client,
+            parent_pas_call=new_pas_call,
+            model_ref=source_model_ref,
+            example=source.inputs_for_call,
+            output=source.output,
+            model_latency_seconds=source.model_latency,
+            source_predict=source.source_predict,
+        )
+
+        # apply_scorer_async creates op-traced calls; with the new pas
+        # on this task's call stack (use_stack=True above), each scorer
+        # call parents to it automatically. return_exceptions=True so
+        # one scorer failure doesn't abort the whole row.
+        results = await asyncio.gather(
+            *[
+                apply_scorer_async(scorer, source.inputs_for_scorer, source.output)
+                for scorer in scorers
+            ],
+            return_exceptions=True,
+        )
+
+        scores_dict: dict[str, Any] = {}
+        per_scorer_values: list[Any] = []
+        for i, (result, scorer_ref) in enumerate(
+            zip(results, scorer_refs, strict=True)
+        ):
+            scorer_name = scorer_attributes_list[i].scorer_name
+            if isinstance(result, Exception):
+                # Log with exc_info so the chained __cause__ (the real
+                # provider error — HTTP status, timeout, auth) is visible.
+                logger.warning(
+                    "Scorer %s failed on row in new pas %s",
+                    scorer_ref,
+                    new_pas_call.id,
+                    exc_info=result,
+                )
+                scores_dict[scorer_name] = None
+                per_scorer_values.append(_SCORER_FAILED)
+                continue
+            raw_value = result.result
+            scores_dict[scorer_name] = raw_value
+            per_scorer_values.append(raw_value)
+
+        # Per-row predict_and_score output mirrors what
+        # ``Evaluation.predict_and_score`` returns in eval.py.
+        client.finish_call(
+            new_pas_call,
+            output={
+                "output": source.output,
+                "scores": scores_dict,
+                "model_latency": source.model_latency,
+            },
+        )
+
+        return _RowResult(
+            model_latency=source.model_latency,
+            per_scorer_values=per_scorer_values,
+        )
 
 
 def _start_new_eval_root(
@@ -364,9 +534,15 @@ def _start_new_eval_root(
     context, and we don't want the eval root left on the call_context
     stack across the rescore loop. Subsequent ``create_call(parent=...)``
     invocations pass ``new_eval_call`` explicitly.
+
+    Passes the pre-built ``_new_eval_root_op`` (``eager_call_start=True``)
+    instead of the op-name string so CallBatchProcessor sends call_start
+    immediately rather than buffering it in the pairing buffer until the
+    much-later call_end. See the module-level ``_new_eval_root_op``
+    comment for why.
     """
     return client.create_call(
-        op=constants.EVALUATION_RUN_OP_NAME,
+        op=_new_eval_root_op,
         inputs={"self": evaluation_ref, "model": model_ref},
         parent=None,
         attributes={

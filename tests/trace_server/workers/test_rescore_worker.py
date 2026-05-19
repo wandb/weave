@@ -289,9 +289,12 @@ async def test_rescore_predictions_creates_eval_pas_and_summarize_tree():
     expected_creates = 1 + len(pas_calls) + len(pas_calls) + 1
     assert len(create_call_invocations) == expected_creates
 
-    # First create_call is the eval root.
+    # First create_call is the eval root. The op is passed as a pre-built
+    # ``_new_eval_root_op`` (eager_call_start=True) whose ``.name`` is set to
+    # ``EVALUATION_RUN_OP_NAME`` — see rescore_worker.py for why the eager
+    # op is required (frontend status polling visibility).
     eval_root_op, eval_root_inputs, eval_root_kwargs = create_call_invocations[0]
-    assert eval_root_op == constants.EVALUATION_RUN_OP_NAME
+    assert getattr(eval_root_op, "name", eval_root_op) == constants.EVALUATION_RUN_OP_NAME
     assert eval_root_kwargs.get("parent") is None
     assert eval_root_kwargs.get("_call_id_override") == "new-run"
     assert eval_root_kwargs.get("use_stack") is False
