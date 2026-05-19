@@ -87,8 +87,10 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 
-# Defense-in-depth cap for stats counts on calls_merged; protects callers that
-# forgot to set their own limit. UI clients should pass a smaller `limit`.
+# Deferred: server-side defense-in-depth cap for unfiltered calls_merged stats.
+# Wired up in `build_calls_stats_query` but currently commented out; callers
+# without a `limit` still get an exact count. Flip this on when we see real
+# >>1M-count requests in the wild.
 DEFAULT_STATS_MAX_LIMIT = 1_000_000
 
 
@@ -2794,8 +2796,8 @@ def build_calls_stats_query(
         )
         return (query, aggregated_columns.keys(), settings)
 
-    # TODO: re-enable server-side defense-in-depth cap. Disabled for now so
-    # callers without a `limit` get an exact count instead of a silent ceiling.
+    # Deferred (see DEFAULT_STATS_MAX_LIMIT): uncomment to apply the server-side
+    # cap when the caller didn't pass a limit.
     # if req.limit is None and not req.include_total_storage_size:
     #     req = req.model_copy(update={"limit": DEFAULT_STATS_MAX_LIMIT})
     if req.limit is not None:
