@@ -202,7 +202,9 @@ def fetch_manual_costs() -> dict[str, CostDetails]:
     costs: dict[str, CostDetails] = {}
     for llm_id, entries in raw.items():
         if not isinstance(entries, list) or not entries:
-            print(f"Warning: skipping manual cost for {llm_id} — expected non-empty list")
+            print(
+                f"Warning: skipping manual cost for {llm_id} — expected non-empty list"
+            )
             continue
         entry = entries[-1]
         if not isinstance(entry, dict) or "input" not in entry or "output" not in entry:
