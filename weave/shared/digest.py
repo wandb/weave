@@ -18,10 +18,29 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from typing import Any
 
 from weave.shared.object_class_util import process_incoming_object_val
+
+CUSTOM_WEAVE_TYPE = "CustomWeaveType"
+
+
+def _validate_custom_type_file_keys(val: Any) -> None:
+    """Recursively walk val and reject unsafe file path keys in CustomWeaveType nodes."""
+    if isinstance(val, dict):
+        if val.get("_type") == CUSTOM_WEAVE_TYPE:
+            for key in val.get("files", {}):
+                if os.path.isabs(key):
+                    raise ValueError(f"Invalid file path key: {key!r}")
+                if ".." in os.path.normpath(key).split(os.sep):
+                    raise ValueError(f"Invalid file path key: {key!r}")
+        for v in val.values():
+            _validate_custom_type_file_keys(v)
+    elif isinstance(val, list):
+        for item in val:
+            _validate_custom_type_file_keys(item)
 
 
 def bytes_digest(json_val: bytes) -> str:
@@ -51,6 +70,7 @@ def compute_object_digest_result(
     val: Any, builtin_object_class: str | None = None
 ) -> ObjectDigestResult:
     """Compute the object digest using server-equivalent normalization and hashing."""
+    _validate_custom_type_file_keys(val)
     processed_result = process_incoming_object_val(val, builtin_object_class)
     processed_val = processed_result["val"]
     # Keep object digests stable regardless of dictionary insertion order.
