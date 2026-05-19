@@ -10,6 +10,8 @@ attributes when used as context managers.
 
 from __future__ import annotations
 
+import platform
+import sys
 import types
 import uuid
 from contextvars import ContextVar, Token
@@ -41,6 +43,14 @@ from weave.session.types import (
     Usage,
     _parse_data_url,
 )
+from weave.trace.settings import (
+    should_capture_client_info,
+    should_capture_system_info,
+    should_disable_weave,
+    should_redact_pii,
+)
+from weave.utils import pii_redaction
+from weave.version import VERSION
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -107,6 +117,24 @@ __all__ = [
 _TRACER_NAME = "weave.session"
 
 
+def _capture_info_attrs() -> dict[str, Any]:
+    """Build weave.* client / system info attrs, gated by settings.
+
+    Per-span (not Resource) so env-var toggles take effect on every span,
+    matching @op semantics in weave_client.py:805-812.
+    """
+    attrs: dict[str, Any] = {}
+    if should_capture_client_info():
+        attrs["weave.client_version"] = VERSION
+        attrs["weave.source"] = "python-sdk"
+        attrs["weave.sys_version"] = sys.version
+    if should_capture_system_info():
+        attrs["weave.os_name"] = platform.system()
+        attrs["weave.os_version"] = platform.version()
+        attrs["weave.os_release"] = platform.release()
+    return attrs
+
+
 class _SpanBase(BaseModel):
     """Shared config for span classes that use ``model`` as a field name."""
 
@@ -129,7 +157,7 @@ class _SpanBase(BaseModel):
         OTel span timestamp matches the user-visible start, not the moment
         ``__enter__`` happened to run.
         """
-        if not _OTEL_AVAILABLE:
+        if not _OTEL_AVAILABLE or should_disable_weave():
             return
         tracer = otel_trace.get_tracer(_TRACER_NAME)
         kwargs: dict[str, Any] = {}
@@ -196,6 +224,24 @@ class Tool(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
+    def _build_content_kwargs(
+        self, *, include_content: bool, redact: bool
+    ) -> dict[str, Any]:
+        """Build Tool content kwargs for ``execute_tool_attributes(**...)``.
+
+        Single chokepoint so the streaming (``Tool.end``) and batch
+        (``_attrs_for_span``) paths produce byte-identical content. Empty
+        strings when ``include_content`` is False (matches the prior gate).
+        """
+        if not include_content:
+            return {"tool_call_arguments": "", "tool_call_result": ""}
+        arguments = self.arguments
+        result = self.result
+        if redact:
+            arguments = pii_redaction.redact_string(arguments)
+            result = pii_redaction.redact_string(result)
+        return {"tool_call_arguments": arguments, "tool_call_result": result}
+
     def end(self) -> None:
         if self._ended:
             return
@@ -211,13 +257,15 @@ class Tool(_SpanBase):
         attrs = execute_tool_attributes(
             tool_name=self.name,
             conversation_id=session.session_id if session else "",
-            tool_call_arguments=self.arguments if include else "",
-            tool_call_result=self.result if include else "",
+            **self._build_content_kwargs(
+                include_content=include, redact=should_redact_pii()
+            ),
             tool_call_id=self.tool_call_id,
             tool_type=self.tool_type,
             tool_description=self.tool_description,
             tool_definitions=self.tool_definitions,
         )
+        attrs.update(_capture_info_attrs())
         self._end_otel_span(attrs)
 
     def __enter__(self) -> Self:
@@ -267,6 +315,48 @@ class LLM(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[LLM | None] | None = PrivateAttr(default=None)
+
+    def _build_content_kwargs(
+        self, *, include_content: bool, redact: bool
+    ) -> dict[str, Any]:
+        """Build LLM content kwargs for ``llm_attributes(**...)``.
+
+        Single chokepoint so the streaming (``LLM.end``) and batch
+        (``_attrs_for_span``) paths produce byte-identical content. All
+        five content fields are None when ``include_content`` is False —
+        notably this includes ``reasoning``, fixing a pre-existing leak
+        where reasoning bypassed include_content.
+        """
+        if not include_content:
+            return {
+                "input_messages": None,
+                "output_messages": None,
+                "system_instructions": None,
+                "media_attachments": None,
+                "reasoning": None,
+            }
+        input_messages: list[Message] | None = self.input_messages
+        output_messages: list[Message] | None = self.output_messages
+        system_instructions: list[str] | None = self.system_instructions
+        media_attachments: list[MediaAttachment] | None = self.media_attachments
+        reasoning: Reasoning | None = self.reasoning
+        if redact:
+            input_messages = pii_redaction.redact_messages(input_messages)
+            output_messages = pii_redaction.redact_messages(output_messages)
+            system_instructions = pii_redaction.redact_system_instructions(
+                system_instructions
+            )
+            if reasoning is not None and reasoning.content:
+                reasoning = Reasoning(
+                    content=pii_redaction.redact_string(reasoning.content)
+                )
+        return {
+            "input_messages": input_messages,
+            "output_messages": output_messages,
+            "system_instructions": system_instructions,
+            "media_attachments": media_attachments,
+            "reasoning": reasoning,
+        }
 
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
@@ -404,12 +494,10 @@ class LLM(_SpanBase):
             model=self.model,
             provider_name=self.provider_name,
             conversation_id=session.session_id if session else "",
-            input_messages=self.input_messages if include else None,
-            output_messages=self.output_messages if include else None,
-            media_attachments=self.media_attachments if include else None,
-            system_instructions=self.system_instructions if include else None,
+            **self._build_content_kwargs(
+                include_content=include, redact=should_redact_pii()
+            ),
             usage=self.usage,
-            reasoning=self.reasoning,
             finish_reasons=self.finish_reasons,
             response_id=self.response_id,
             response_model=self.response_model,
@@ -423,6 +511,7 @@ class LLM(_SpanBase):
             request_stop_sequences=self.request_stop_sequences,
             request_choice_count=self.request_choice_count,
         )
+        attrs.update(_capture_info_attrs())
 
         if self._token is not None:
             _current_llm.reset(self._token)
@@ -509,6 +598,7 @@ class SubAgent(_SpanBase):
             agent_description=self.agent_description,
             agent_version=self.agent_version,
         )
+        attrs.update(_capture_info_attrs())
         self._end_otel_span(attrs)
 
     def __enter__(self) -> Self:
@@ -556,6 +646,21 @@ class Turn(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
+
+    def _build_content_kwargs(
+        self, *, include_content: bool, redact: bool
+    ) -> dict[str, Any]:
+        """Build Turn content kwargs for ``invoke_agent_attributes(**...)``.
+
+        The Turn's ``messages`` map to the attribute builder's
+        ``input_messages`` kwarg.
+        """
+        if not include_content:
+            return {"input_messages": None}
+        messages: list[Message] | None = self.messages
+        if redact:
+            messages = pii_redaction.redact_messages(messages)
+        return {"input_messages": messages}
 
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
@@ -607,11 +712,14 @@ class Turn(_SpanBase):
             conversation_id=session.session_id if session else "",
             conversation_name=session.session_name if session else "",
             model=self.model,
-            input_messages=self.messages if include else None,
+            **self._build_content_kwargs(
+                include_content=include, redact=should_redact_pii()
+            ),
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
         )
+        attrs.update(_capture_info_attrs())
 
         if self._token is not None:
             _current_turn.reset(self._token)
@@ -903,7 +1011,7 @@ def _emit_span_now(
     thread's OTel context. Returns the finished Span so the caller can
     read trace_id / span_id, or None if OTel is unavailable.
     """
-    if not _OTEL_AVAILABLE:
+    if not _OTEL_AVAILABLE or should_disable_weave():
         return None
     tracer = otel_trace.get_tracer(_TRACER_NAME)
     kwargs: dict[str, Any] = {}
@@ -956,12 +1064,10 @@ def _attrs_for_span(
             model=span.model,
             provider_name=span.provider_name,
             conversation_id=session_id,
-            input_messages=span.input_messages if include_content else None,
-            output_messages=span.output_messages if include_content else None,
-            media_attachments=span.media_attachments if include_content else None,
-            system_instructions=span.system_instructions if include_content else None,
+            **span._build_content_kwargs(
+                include_content=include_content, redact=should_redact_pii()
+            ),
             usage=span.usage,
-            reasoning=span.reasoning,
             finish_reasons=span.finish_reasons,
             response_id=span.response_id,
             response_model=span.response_model,
@@ -975,18 +1081,21 @@ def _attrs_for_span(
             request_stop_sequences=span.request_stop_sequences,
             request_choice_count=span.request_choice_count,
         )
+        attrs.update(_capture_info_attrs())
         return f"chat {span.model}", attrs
     if isinstance(span, Tool):
         attrs = execute_tool_attributes(
             tool_name=span.name,
             conversation_id=session_id,
-            tool_call_arguments=span.arguments if include_content else "",
-            tool_call_result=span.result if include_content else "",
+            **span._build_content_kwargs(
+                include_content=include_content, redact=should_redact_pii()
+            ),
             tool_call_id=span.tool_call_id,
             tool_type=span.tool_type,
             tool_description=span.tool_description,
             tool_definitions=span.tool_definitions,
         )
+        attrs.update(_capture_info_attrs())
         return f"execute_tool {span.name}", attrs
     # SubAgent
     attrs = invoke_agent_attributes(
@@ -998,6 +1107,7 @@ def _attrs_for_span(
         agent_description=span.agent_description,
         agent_version=span.agent_version,
     )
+    attrs.update(_capture_info_attrs())
     return f"invoke_agent {span.name}", attrs
 
 
@@ -1022,6 +1132,8 @@ def log_turn(
     Falls back to the earliest/latest child timestamp, then ``now()``, when
     the turn doesn't supply its own.
     """
+    if should_disable_weave():
+        return LogResult(session_id=session_id)
     if not _OTEL_AVAILABLE:
         return LogResult(session_id=session_id)
 
@@ -1046,11 +1158,14 @@ def log_turn(
         conversation_id=session_id,
         conversation_name=session_name,
         model=turn.model,
-        input_messages=turn.messages if include_content else None,
+        **turn._build_content_kwargs(
+            include_content=include_content, redact=should_redact_pii()
+        ),
         agent_id=turn.agent_id,
         agent_description=turn.agent_description,
         agent_version=turn.agent_version,
     )
+    turn_attrs.update(_capture_info_attrs())
 
     parent_ctx = Context() if not continue_parent_trace else None
     turn_span = _emit_span_now(
@@ -1103,6 +1218,8 @@ def log_session(
     ``session_id`` if empty. By default each turn gets its own OTel trace.
     """
     sid = session_id or str(uuid.uuid4())
+    if should_disable_weave():
+        return LogResult(session_id=sid)
     if not _OTEL_AVAILABLE:
         return LogResult(session_id=sid)
 

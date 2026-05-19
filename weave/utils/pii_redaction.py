@@ -1,12 +1,41 @@
+"""PII redaction — used by both @op tracer and Session SDK.
+
+Two layers:
+
+- ``redact_pii`` / ``redact_pii_string`` are the recursive primitives that
+  walk dicts, lists, and dataclasses applying Presidio.
+- ``redact_string`` / ``redact_messages`` / ``redact_system_instructions``
+  are the Session SDK helpers shaped for typed Message payloads (dump →
+  redact → restore Literal discriminators → revalidate).
+
+``presidio`` is an optional dependency gated by ``WEAVE_REDACT_PII``.
+The top-level guard lets the module import without presidio so tests can
+``mock.patch`` ``redact_pii`` to exercise routing without installing the
+heavy NLP stack.
+"""
+
+from __future__ import annotations
+
 import dataclasses
-from typing import Any
+from typing import Any, cast
 
-from presidio_analyzer import AnalyzerEngine
-from presidio_anonymizer import AnonymizerEngine
-
+from weave.session.types import Message
 from weave.telemetry import trace_sentry
 from weave.trace.settings import redact_pii_exclude_fields, redact_pii_fields
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
+
+try:
+    from presidio_analyzer import AnalyzerEngine
+    from presidio_anonymizer import AnonymizerEngine
+
+    _HAS_PRESIDIO = True
+except ImportError:  # pragma: no cover — exercised when presidio isn't installed
+    _HAS_PRESIDIO = False
+
+_PRESIDIO_INSTALL_HINT = (
+    "presidio is required for PII redaction. "
+    "Install with `pip install 'weave[presidio]'`."
+)
 
 DEFAULT_REDACTED_FIELDS = [
     "CREDIT_CARD",
@@ -39,6 +68,9 @@ def _get_redaction_entities() -> list[str]:
 def redact_pii(
     data: dict[str, Any] | str,
 ) -> dict[str, Any] | str:
+    if not _HAS_PRESIDIO:
+        raise ImportError(_PRESIDIO_INSTALL_HINT)
+
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
     entities = _get_redaction_entities()
@@ -71,12 +103,69 @@ def redact_pii(
 
 
 def redact_pii_string(data: str) -> str:
+    if not _HAS_PRESIDIO:
+        raise ImportError(_PRESIDIO_INSTALL_HINT)
+
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
     entities = _get_redaction_entities()
     results = analyzer.analyze(text=data, language="en", entities=entities)
     redacted = anonymizer.anonymize(text=data, analyzer_results=results)
     return redacted.text
+
+
+def redact_string(s: str) -> str:
+    """Redact PII in a single string. Empty in → empty out (skips Presidio)."""
+    if not s:
+        return s
+    return cast(str, redact_pii(s))
+
+
+def _restore_literals(redacted: dict[str, Any], original: dict[str, Any]) -> None:
+    """Restore structural Literal-typed fields from the original dump.
+
+    The recursive redactor walks every string in the dict, which would
+    corrupt fields whose values are constrained by Pydantic ``Literal``
+    annotations (``role``, part ``type`` discriminators). In production
+    with Presidio, none of those values are detected as PII so this is
+    a no-op. We restore them anyway so the revalidate step is robust to
+    custom recognizers and to keep the redactor focused on user content.
+    """
+    if "role" in original:
+        redacted["role"] = original["role"]
+    orig_parts = original.get("parts") or []
+    red_parts = redacted.get("parts") or []
+    for orig_p, red_p in zip(orig_parts, red_parts, strict=False):
+        if isinstance(orig_p, dict) and isinstance(red_p, dict) and "type" in orig_p:
+            red_p["type"] = orig_p["type"]
+
+
+def redact_messages(msgs: list[Message] | None) -> list[Message] | None:
+    """Redact PII in each Message via dump → redact → revalidate.
+
+    Uses ``Message.model_dump`` / ``model_validate`` so the dict shape
+    walks through the same recursive redactor ``@op`` uses. Preserves
+    discriminated-union parts (TextPart, ToolCallPart, etc.) by
+    restoring ``role`` and part ``type`` from the original dump before
+    revalidation — those are Pydantic ``Literal`` fields and would fail
+    validation if a recognizer happened to alter them.
+    """
+    if not msgs:
+        return msgs
+    out: list[Message] = []
+    for m in msgs:
+        dumped = m.model_dump()
+        redacted = cast(dict[str, Any], redact_pii(dumped))
+        _restore_literals(redacted, dumped)
+        out.append(Message.model_validate(redacted))
+    return out
+
+
+def redact_system_instructions(insts: list[str] | None) -> list[str] | None:
+    """Redact each system instruction. None/empty in → same out."""
+    if not insts:
+        return insts
+    return [redact_string(s) for s in insts]
 
 
 def track_pii_redaction_enabled(
