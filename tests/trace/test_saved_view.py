@@ -134,7 +134,7 @@ def test_filter_op_without_client():
         )
 
 
-def test_filter_op_with_client(client):
+def test_filter_op_with_client(weave_active):
     view = weave.SavedView("traces", "My saved view").filter_op(
         "Evaluation.predict_and_score"
     )
@@ -218,13 +218,13 @@ def test_column_manipulation():
     assert view.base.definition.columns[0].path == ["inputs", "foo"]
 
 
-def test_saved_view_create(client):
+def test_saved_view_create(weave_active):
     view = weave.SavedView("traces", "My saved view").hide_column("feedback").save()
     assert view.label == "My saved view"
     assert isinstance(view.ref, ObjectRef)
 
 
-def test_saved_view_load(client):
+def test_saved_view_load(weave_active):
     saved_view = weave.SavedView("traces", "My saved view")
     saved_view.show_column("attributes.weave.client_version")
     saved_view.save()

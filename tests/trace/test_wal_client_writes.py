@@ -315,12 +315,12 @@ class TestWALDisabled:
         """Default client should have _wal=None."""
         assert client._wal is None
 
-    def test_publish_works_without_wal(self, client):
+    def test_publish_works_without_wal(self, weave_active):
         """publish() should succeed and return a ref when WAL is disabled."""
         ref = weave.publish({"key": "value"}, name="no_wal_obj")
         assert ref is not None
 
-    def test_dataset_publish_works_without_wal(self, client):
+    def test_dataset_publish_works_without_wal(self, weave_active):
         """Dataset publish should succeed when WAL is disabled."""
         ds = weave.Dataset(name="no_wal_ds", rows=[{"x": 1}])
         ref = weave.publish(ds, name="no_wal_ds")

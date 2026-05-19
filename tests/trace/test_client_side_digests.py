@@ -282,7 +282,7 @@ class TestDataCorrectness:
         assert got.size == (32, 32)
         assert got.getpixel((0, 0)) == (255, 0, 0)
 
-    def test_get_without_explicit_flush(self, client: WeaveClient, fast_path: None):
+    def test_get_without_explicit_flush(self, weave_active, fast_path: None):
         """ref.get() must work without an explicit _flush() call.
 
         In production, the FutureExecutor resolves deferred work when the
