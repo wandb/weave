@@ -4192,18 +4192,22 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     )
 
 
-def test_stats_query_calls_merged_caps_at_default_max_limit() -> None:
-    """Caller didn't pass a limit -> cap at DEFAULT_STATS_MAX_LIMIT, emit
-    `has_more`, and request the streaming-aggregate setting.
+def test_stats_query_calls_merged_no_caller_limit_skips_cap() -> None:
+    """No caller-supplied limit -> no server cap, no setting, has_more=0.
+
+    TODO: when the server-side defense-in-depth cap is re-enabled in
+    `build_calls_stats_query`, restore the cap assertions (settings ==
+    {"optimize_aggregation_in_order": 1}, has_more = toUInt8(count() >= 1M),
+    inner LIMIT 1000000).
     """
     req = tsi.CallsQueryStatsReq(project_id="project")
     pb = ParamBuilder("pb")
     query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
-    assert settings == {"optimize_aggregation_in_order": 1}
+    assert settings == {}
     assert_stats_sql(
         req,
         """
-        SELECT count() AS count, toUInt8(count() >= 1000000) AS has_more
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM (
             SELECT calls_merged.id AS id
             FROM calls_merged
@@ -4214,7 +4218,6 @@ def test_stats_query_calls_merged_caps_at_default_max_limit() -> None:
                 AND
                 ((NOT ((any(calls_merged.started_at) IS NULL))))
             )
-            LIMIT 1000000
         )
         """,
         {"pb_0": "project"},

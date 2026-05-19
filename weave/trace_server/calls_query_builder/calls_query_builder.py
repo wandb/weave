@@ -2794,9 +2794,10 @@ def build_calls_stats_query(
         )
         return (query, aggregated_columns.keys(), settings)
 
-    # include_total_storage_size needs every row, so skip the cap there.
-    if req.limit is None and not req.include_total_storage_size:
-        req = req.model_copy(update={"limit": DEFAULT_STATS_MAX_LIMIT})
+    # TODO: re-enable server-side defense-in-depth cap. Disabled for now so
+    # callers without a `limit` get an exact count instead of a silent ceiling.
+    # if req.limit is None and not req.include_total_storage_size:
+    #     req = req.model_copy(update={"limit": DEFAULT_STATS_MAX_LIMIT})
     if req.limit is not None:
         aggregated_columns["has_more"] = f"toUInt8(count() >= {req.limit})"
         settings["optimize_aggregation_in_order"] = 1
