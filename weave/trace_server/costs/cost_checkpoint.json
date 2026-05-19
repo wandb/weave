@@ -24252,12 +24252,6 @@
   "vertex_ai/gemini-embedding-2-preview": [
     {
       "provider": "vertex_ai",
-      "input": 1.5e-07,
-      "output": 0.0,
-      "created_at": "2026-03-18 14:49:41"
-    },
-    {
-      "provider": "vertex_ai",
       "input": 2e-07,
       "output": 0.0,
       "cache_read_input": 0.0,
@@ -24271,6 +24265,14 @@
       "cache_read_input": 0.0,
       "cache_creation_input": 0.0,
       "created_at": "2026-04-30 13:13:24"
+    },
+    {
+      "provider": "vertex_ai",
+      "input": 2e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
     }
   ],
   "gemini/gemini-embedding-2-preview": [
@@ -25657,6 +25659,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-05-06 10:05:19"
+    },
+    {
+      "provider": "coreweave",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-19 10:56:57"
     }
   ],
   "xai/grok-4.3": [
@@ -25677,6 +25687,216 @@
       "cache_read_input": 2e-07,
       "cache_creation_input": 0.0,
       "created_at": "2026-05-07 10:19:33"
+    }
+  ],
+  "jp.anthropic.claude-sonnet-4-6": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.3e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 3.3e-07,
+      "cache_creation_input": 4.125e-06,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "azure_ai/gpt-5.4": [
+    {
+      "provider": "azure_ai",
+      "input": 2.5e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 2.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "azure_ai/gpt-5.4-2026-03-05": [
+    {
+      "provider": "azure_ai",
+      "input": 2.5e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 2.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "azure_ai/gpt-5.4-pro": [
+    {
+      "provider": "azure_ai",
+      "input": 3e-05,
+      "output": 0.00018,
+      "cache_read_input": 3e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "azure_ai/gpt-5.4-pro-2026-03-05": [
+    {
+      "provider": "azure_ai",
+      "input": 3e-05,
+      "output": 0.00018,
+      "cache_read_input": 3e-06,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "azure_ai/gpt-5.4-mini": [
+    {
+      "provider": "azure_ai",
+      "input": 7.5e-07,
+      "output": 4.5e-06,
+      "cache_read_input": 7.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "azure_ai/gpt-5.4-mini-2026-03-17": [
+    {
+      "provider": "azure_ai",
+      "input": 7.5e-07,
+      "output": 4.5e-06,
+      "cache_read_input": 7.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "azure_ai/gpt-5.4-nano": [
+    {
+      "provider": "azure_ai",
+      "input": 2e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 2e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "azure_ai/gpt-5.4-nano-2026-03-17": [
+    {
+      "provider": "azure_ai",
+      "input": 2e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 2e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "gpt-realtime-2": [
+    {
+      "provider": "openai",
+      "input": 4e-06,
+      "output": 1.6e-05,
+      "cache_read_input": 4e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "openrouter/qwen/qwen3.6-plus": [
+    {
+      "provider": "openrouter",
+      "input": 3.25e-07,
+      "output": 1.95e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "sambanova/MiniMax-M2.7": [
+    {
+      "provider": "sambanova",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-V4-Pro": [
+    {
+      "provider": "coreweave",
+      "input": 1.74e-06,
+      "output": 3.48e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "gemini-3.1-flash-lite": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:13:20"
+    }
+  ],
+  "gemini/gemini-3.1-flash-lite": [
+    {
+      "provider": "gemini",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:13:20"
+    }
+  ],
+  "vertex_ai/gemini-3.1-flash-lite": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:13:20"
+    }
+  ],
+  "openrouter/google/gemini-3.1-flash-lite": [
+    {
+      "provider": "openrouter",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 2.5e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 10:13:20"
+    }
+  ],
+  "gemini-3.5-flash": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-06,
+      "output": 9e-06,
+      "cache_read_input": 1.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 12:00:00"
+    }
+  ],
+  "gemini/gemini-3.5-flash": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-06,
+      "output": 9e-06,
+      "cache_read_input": 1.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 12:00:00"
+    }
+  ],
+  "vertex_ai/gemini-3.5-flash": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-06,
+      "output": 9e-06,
+      "cache_read_input": 1.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 12:00:00"
+    }
+  ],
+  "openrouter/google/gemini-3.5-flash": [
+    {
+      "provider": "openrouter",
+      "input": 1.5e-06,
+      "output": 9e-06,
+      "cache_read_input": 1.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-05-19 12:00:00"
     }
   ]
 }

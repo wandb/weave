@@ -8,6 +8,7 @@ import pytest
 
 from weave.trace_server.costs.update_costs import (
     COST_FILE,
+    fetch_manual_costs,
     fetch_new_costs,
     get_current_costs,
     main,
@@ -125,6 +126,7 @@ class TestUpdateCosts(unittest.TestCase):
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
+    @patch("weave.trace_server.costs.update_costs.fetch_manual_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_models_begin_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
@@ -133,6 +135,7 @@ class TestUpdateCosts(unittest.TestCase):
         mock_get_current_costs,
         mock_fetch_new_costs,
         mock_fetch_models_begin_costs,
+        mock_fetch_manual_costs,
         mock_exists,
         mock_file,
     ):
@@ -164,6 +167,7 @@ class TestUpdateCosts(unittest.TestCase):
             },
         }
         mock_fetch_models_begin_costs.return_value = {}
+        mock_fetch_manual_costs.return_value = {}
         main()
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
@@ -195,6 +199,7 @@ class TestUpdateCosts(unittest.TestCase):
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
+    @patch("weave.trace_server.costs.update_costs.fetch_manual_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_models_begin_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
@@ -203,6 +208,7 @@ class TestUpdateCosts(unittest.TestCase):
         mock_get_current_costs,
         mock_fetch_new_costs,
         mock_fetch_models_begin_costs,
+        mock_fetch_manual_costs,
         mock_exists,
         mock_file,
     ):
@@ -228,6 +234,7 @@ class TestUpdateCosts(unittest.TestCase):
             }
         }
         mock_fetch_models_begin_costs.return_value = {}
+        mock_fetch_manual_costs.return_value = {}
         main()
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
@@ -257,6 +264,7 @@ class TestUpdateCosts(unittest.TestCase):
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
+    @patch("weave.trace_server.costs.update_costs.fetch_manual_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_models_begin_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
@@ -265,6 +273,7 @@ class TestUpdateCosts(unittest.TestCase):
         mock_get_current_costs,
         mock_fetch_new_costs,
         mock_fetch_models_begin_costs,
+        mock_fetch_manual_costs,
         mock_exists,
         mock_file,
     ):
@@ -302,6 +311,7 @@ class TestUpdateCosts(unittest.TestCase):
             }
         }
         mock_fetch_models_begin_costs.return_value = {}
+        mock_fetch_manual_costs.return_value = {}
         main()
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
@@ -334,6 +344,146 @@ class TestUpdateCosts(unittest.TestCase):
             ]
         }
         assert written_costs == expected_costs
+
+
+class TestFetchManualCosts(unittest.TestCase):
+    @patch("weave.trace_server.costs.update_costs.os.path.exists")
+    def test_missing_file_returns_empty(self, mock_exists):
+        """Missing manual_costs.json is fine — returns empty dict, no crash."""
+        mock_exists.return_value = False
+        assert fetch_manual_costs() == {}
+
+    @patch("weave.trace_server.costs.update_costs.os.path.exists")
+    @patch("builtins.open", new_callable=mock_open, read_data="not valid json")
+    def test_malformed_json_returns_empty(self, mock_file, mock_exists):
+        """Malformed JSON is tolerated — returns empty dict, prints warning."""
+        mock_exists.return_value = True
+        assert fetch_manual_costs() == {}
+
+    @patch("weave.trace_server.costs.update_costs.os.path.exists")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=json.dumps(
+            {
+                "good-model": [
+                    {
+                        "provider": "manual",
+                        "input": 1.5e-06,
+                        "output": 6e-06,
+                        "cache_read_input": 2.5e-08,
+                        "cache_creation_input": 0.0,
+                        "created_at": "2026-05-19 10:13:20",
+                    }
+                ],
+                "bad-non-list": {"input": 1, "output": 2},
+                "bad-empty-list": [],
+                "bad-missing-fields": [{"provider": "x"}],
+            }
+        ),
+    )
+    def test_loads_well_formed_skips_malformed(self, mock_file, mock_exists):
+        """Well-formed entries load; malformed entries are skipped, not fatal."""
+        mock_exists.return_value = True
+        costs = fetch_manual_costs()
+        assert set(costs.keys()) == {"good-model"}
+        assert costs["good-model"]["provider"] == "manual"
+        assert costs["good-model"]["input"] == 1.5e-06
+        assert costs["good-model"]["output"] == 6e-06
+        assert costs["good-model"]["cache_read_input"] == 2.5e-08
+        assert costs["good-model"]["cache_creation_input"] == 0.0
+        assert costs["good-model"]["created_at"] == "2026-05-19 10:13:20"
+
+    @patch("weave.trace_server.costs.update_costs.os.path.exists")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=json.dumps(
+            {
+                "model-with-history": [
+                    {
+                        "provider": "manual",
+                        "input": 1e-06,
+                        "output": 2e-06,
+                        "cache_read_input": 0,
+                        "cache_creation_input": 0,
+                        "created_at": "2026-01-01 00:00:00",
+                    },
+                    {
+                        "provider": "manual",
+                        "input": 3e-06,
+                        "output": 4e-06,
+                        "cache_read_input": 0,
+                        "cache_creation_input": 0,
+                        "created_at": "2026-05-19 00:00:00",
+                    },
+                ]
+            }
+        ),
+    )
+    def test_uses_most_recent_entry_from_history_list(self, mock_file, mock_exists):
+        """When an entry has multiple historical costs, the last one wins."""
+        mock_exists.return_value = True
+        costs = fetch_manual_costs()
+        assert costs["model-with-history"]["input"] == 3e-06
+        assert costs["model-with-history"]["output"] == 4e-06
+        assert costs["model-with-history"]["created_at"] == "2026-05-19 00:00:00"
+
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("os.path.exists")
+    @patch("weave.trace_server.costs.update_costs.fetch_manual_costs")
+    @patch("weave.trace_server.costs.update_costs.fetch_models_begin_costs")
+    @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
+    @patch("weave.trace_server.costs.update_costs.get_current_costs")
+    def test_main_manual_overrides_litellm(
+        self,
+        mock_get_current_costs,
+        mock_fetch_new_costs,
+        mock_fetch_models_begin_costs,
+        mock_fetch_manual_costs,
+        mock_exists,
+        mock_file,
+    ):
+        """Manual costs take precedence over litellm for the same llm_id."""
+        mock_exists.return_value = True
+        mock_get_current_costs.return_value = {}
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        mock_fetch_new_costs.return_value = {
+            "shared-model": {
+                "input": 0.01,
+                "output": 0.02,
+                "provider": "litellm_provider",
+                "created_at": current_time,
+            }
+        }
+        mock_fetch_models_begin_costs.return_value = {}
+        mock_fetch_manual_costs.return_value = {
+            "shared-model": {
+                "input": 0.99,
+                "output": 0.99,
+                "provider": "manual",
+                "cache_read_input": 0,
+                "cache_creation_input": 0,
+                "created_at": current_time,
+            },
+            "manual-only-model": {
+                "input": 1.5e-06,
+                "output": 6e-06,
+                "provider": "manual",
+                "cache_read_input": 0,
+                "cache_creation_input": 0,
+                "created_at": current_time,
+            },
+        }
+        main()
+        handle = mock_file()
+        written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
+        written_costs = json.loads(written_data)
+        # Manual override wins for shared-model
+        assert written_costs["shared-model"][-1]["input"] == 0.99
+        assert written_costs["shared-model"][-1]["provider"] == "manual"
+        # Manual-only model also lands in the checkpoint
+        assert written_costs["manual-only-model"][-1]["input"] == 1.5e-06
 
 
 if __name__ == "__main__":
