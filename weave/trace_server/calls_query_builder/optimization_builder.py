@@ -412,14 +412,8 @@ def process_query_to_optimization_sql(
     heavy_field_result = apply_processor(heavy_field_processor, and_operation)
     heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
 
-    # Also produce the strict (no OR-IS-NULL) variant for the index-friendly
-    # candidate-id CTE. For calls_complete this matches heavy_field_result_sql;
-    # ParamBuilder dedupes params by value so this doesn't bloat the parameters.
-    #
-    # Gated on the same env flag as the candidate-CTE builder: when off, the
-    # builder returns None before consuming the strict form, so computing it
-    # would be wasted work. Keeping the gate next to the builder's gate keeps
-    # the two in sync as the rollout flag is managed.
+    # Strict (no OR-IS-NULL) variant for the bloom-friendly candidate-CTE.
+    # Env-gated to match _build_filter_candidate_ids_cte_sql (builder returns None when off).
     if wf_env.wf_calls_merged_heavy_indexes_enabled():
         strict_processor = HeavyFieldOptimizationProcessor(
             param_builder, table_alias, use_null_check=False
