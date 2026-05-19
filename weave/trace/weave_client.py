@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
 from httpx import HTTPStatusError as HTTPError
@@ -321,6 +321,134 @@ def map_to_refs(obj: Any) -> Any:
         return map_to_refs(obj._val)
 
     return obj
+
+
+def _snapshot_mutable_containers(obj: Any, _memo: dict[int, Any] | None = None) -> Any:
+    """Return a copy of `obj` with plain `dict`/`list`/`set`/`tuple` containers
+    rebuilt at every level, so a caller mutating the original after
+    `finish_call` returns cannot reach into the deferred output walk.
+
+    Only EXACT `dict`/`list`/`set`/`tuple` are rebuilt. Subclasses
+    (`namedtuple`, `Counter`, `OrderedDict`, dict-subclass dataclasses like
+    `huggingface_hub.ChatCompletionOutput`) carry type information the
+    serializer needs and are returned by identity. Rebuilding as the bare
+    type would strip the subclass and silently change saved output shape
+    (namedtuple field names lost, typed dict becomes plain dict, etc.).
+
+    Frozensets, primitives, and SDK leaf types (Ref, pydantic BaseModel,
+    ObjectRecord, weave Object/Table) are also returned by identity: they
+    are either immutable or carry behavior we want preserved
+    (e.g. `_save_nested_objects` mutating an Object to attach a ref).
+
+    `_memo` maps `id(original) -> snapshot` so that aliased containers
+    (the same list/dict appearing under multiple keys) get a single shared
+    NEW copy across all aliases, and so that cycles terminate by returning
+    the already-built snapshot on the second visit. Each mutable container
+    is pre-registered in the memo BEFORE its children are walked, which is
+    what makes cycles safe.
+    """
+    if _memo is None:
+        _memo = {}
+    cached = _memo.get(id(obj))
+    if cached is not None:
+        return cached
+    t = type(obj)
+    if t is dict:
+        snap_d: dict = {}
+        _memo[id(obj)] = snap_d
+        for k, v in obj.items():
+            snap_d[k] = _snapshot_mutable_containers(v, _memo)
+        return snap_d
+    if t is list:
+        snap_l: list = []
+        _memo[id(obj)] = snap_l
+        for v in obj:
+            snap_l.append(_snapshot_mutable_containers(v, _memo))
+        return snap_l
+    if t is set:
+        snap_s: set = set()
+        _memo[id(obj)] = snap_s
+        for v in obj:
+            snap_s.add(_snapshot_mutable_containers(v, _memo))
+        return snap_s
+    if t is tuple:
+        # Tuples are immutable, so a tuple can't be part of a cycle without
+        # going through a mutable container first. We don't pre-register
+        # the tuple result, but the memo still gives aliased mutables inside
+        # the tuple a single shared snapshot.
+        return tuple(_snapshot_mutable_containers(v, _memo) for v in obj)
+    return obj
+
+
+def _collect_pending_digests(val: Any) -> list[Future]:
+    """Walk `val` and return any unresolved digest/row-digest futures held by
+    nested refs.
+
+    Used by `_save_object_basic` and `_save_table` to pre-gate `to_json` (and
+    the subsequent server call) on child digest resolution. Without this gate,
+    a worker calls `to_json(parent_with_refs)`, which calls `child_ref.uri ->
+    child_ref.digest -> digest_future.result()` and blocks the worker thread.
+    Under high concurrency several workers can land in this state simultaneously,
+    each waiting for an `obj_create` that is queued behind them — classic thread
+    pool starvation.
+
+    Chaining `future_executor.then(pending, send_obj_create)` instead of
+    `future_executor.defer(send_obj_create)` registers a done-callback on the
+    digest futures and returns the worker thread to the pool. The continuation
+    runs once digests are resolved, by which point `to_json` is non-blocking.
+    """
+    pending: list[Future] = []
+    seen: set[int] = set()
+
+    def walk(obj: Any) -> None:
+        oid = id(obj)
+        if oid in seen:
+            return
+        seen.add(oid)
+
+        if isinstance(obj, Ref):
+            digest = obj.__dict__.get("_digest")
+            if isinstance(digest, Future) and not digest.done():
+                pending.append(digest)
+            if isinstance(obj, TableRef):
+                row_digests = obj.__dict__.get("_row_digests")
+                if isinstance(row_digests, Future) and not row_digests.done():
+                    pending.append(row_digests)
+            return
+
+        if isinstance(obj, ObjectRecord):
+            for v in obj.__dict__.values():
+                walk(v)
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                walk(v)
+        elif isinstance(obj, (list, tuple)):
+            for v in obj:
+                walk(v)
+
+    walk(val)
+    return pending
+
+
+_R = TypeVar("_R")
+
+
+def _defer_after_pending_digests(
+    future_executor: FutureExecutor,
+    val: Any,
+    fn: Callable[[], _R],
+) -> Future[_R]:
+    """Schedule `fn` so it runs after any unresolved nested digest futures in
+    `val` resolve. If none are pending, defer normally.
+
+    Pre-gating via `then(...)` returns the worker thread to the pool while
+    waiting; chaining to `defer(...)` would leave the worker blocked inside
+    `to_json -> digest.result()` and risk thread pool starvation under load.
+    """
+    pending = _collect_pending_digests(val)
+    if pending:
+        return future_executor.then(pending, lambda _resolved: fn())
+    return future_executor.defer(fn)
 
 
 RESERVED_SUMMARY_USAGE_KEY = "usage"
@@ -993,8 +1121,6 @@ class WeaveClient:
         if self.postprocess_output:
             postprocessed_output = self.postprocess_output(postprocessed_output)
 
-        self._save_nested_objects(postprocessed_output)
-        output_as_refs = map_to_refs(postprocessed_output)
         call.output = postprocessed_output
 
         # Summary handling
@@ -1065,40 +1191,82 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> None:
-            maybe_redacted_output_as_refs = output_as_refs
-            if should_redact_pii():
-                from weave.utils.pii_redaction import redact_pii
+        # Phase 2: serialize `output_as_refs`, build the request, and send.
+        # Runs after any output-side digest futures resolve (see Phase 1).
+        # Errors are routed to `end_complete_future` so the on_end_complete
+        # callback fires once exactly when the whole pipeline finishes.
+        # Tracked in the executor's active set so `_flush()` waits for it.
+        end_complete_future: Future[None] = self.future_executor._track_future(
+            Future(), log_exception=True
+        )
 
-                maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+        def finalize_send(output_as_refs: Any) -> None:
+            try:
+                maybe_redacted_output_as_refs = output_as_refs
+                if should_redact_pii():
+                    from weave.utils.pii_redaction import redact_pii
 
-            output_json = to_json(
-                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
-            )
+                    maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
-            # Capture wb_run_step_end at call end time
-            wb_run_context_end = self._get_current_wb_run_context()
-            current_wb_run_step_end = (
-                wb_run_context_end.step if wb_run_context_end else None
-            )
-
-            call_end_req = CallEndReq(
-                end=EndedCallSchemaForInsertWithStartedAt(
-                    project_id=project_id,
-                    id=call.id,
-                    started_at=call.started_at,
-                    ended_at=ended_at,
-                    output=output_json,
-                    summary=merged_summary,
-                    exception=exception_str,
-                    wb_run_step_end=current_wb_run_step_end,
+                output_json = to_json(
+                    maybe_redacted_output_as_refs,
+                    project_id,
+                    self,
+                    use_dictify=False,
                 )
-            )
-            # WAL path: persist to disk; the sender replays to the server.
-            if self._wal is not None:
-                self._wal.write("call_end", call_end_req)
-            else:
-                self.server.call_end(call_end_req)
+                wb_run_context_end = self._get_current_wb_run_context()
+                current_wb_run_step_end = (
+                    wb_run_context_end.step if wb_run_context_end else None
+                )
+
+                call_end_req = CallEndReq(
+                    end=EndedCallSchemaForInsertWithStartedAt(
+                        project_id=project_id,
+                        id=call.id,
+                        started_at=call.started_at,
+                        ended_at=ended_at,
+                        output=output_json,
+                        summary=merged_summary,
+                        exception=exception_str,
+                        wb_run_step_end=current_wb_run_step_end,
+                    )
+                )
+                # WAL path: persist to disk; the sender replays to the server.
+                if self._wal is not None:
+                    self._wal.write("call_end", call_end_req)
+                else:
+                    self.server.call_end(call_end_req)
+                end_complete_future.set_result(None)
+            except Exception as e:
+                end_complete_future.set_exception(e)
+
+        # Snapshot containers so a post-finish_call mutation can't reach the
+        # deferred walk. Leaf types (Refs, weave Objects, pydantic models)
+        # stay by identity so async ref attachment surfaces to the caller's
+        # alias.
+        output_for_defer = _snapshot_mutable_containers(postprocessed_output)
+
+        # Phase 1: in a worker, save any new nested Objects/Tables/Ops in the
+        # output and rebuild `output_as_refs`. Then schedule Phase 2 either
+        # inline (if no pending digests) or via `then(pending, ...)` so the
+        # worker doesn't block on `digest.result()` from inside `to_json`.
+        # `_collect_pending_digests` finds refs whose digest_future was
+        # registered by an EARLIER `_save_object_basic` (e.g., from
+        # `create_call._save_nested_objects` for inputs) and may still be
+        # queued behind us in the executor.
+        def schedule_send() -> None:
+            try:
+                self._save_nested_objects(output_for_defer)
+                output_as_refs = map_to_refs(output_for_defer)
+                pending = _collect_pending_digests(output_as_refs)
+                if pending:
+                    self.future_executor.then(
+                        pending, lambda _resolved: finalize_send(output_as_refs)
+                    )
+                else:
+                    finalize_send(output_as_refs)
+            except Exception as e:
+                end_complete_future.set_exception(e)
 
         # For calls_complete path (non-eager CallBatchProcessor), print the call link
         # after finish_call, when the complete call is queued to the batch processor.
@@ -1120,8 +1288,8 @@ class WeaveClient:
             except Exception:
                 pass
 
-        fut = self.future_executor.defer(send_end_call)
-        fut.add_done_callback(on_end_complete)
+        self.future_executor.defer(schedule_send)
+        end_complete_future.add_done_callback(on_end_complete)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:
@@ -2153,7 +2321,9 @@ class WeaveClient:
                 req.obj.expected_digest = None
                 return self.server.obj_create(req)
 
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
+        res_future = _defer_after_pending_digests(
+            self.future_executor, val, send_obj_create
+        )
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
@@ -2245,9 +2415,11 @@ class WeaveClient:
 
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
-            # Simple case: defer the entire serialization and upload
-            res_future: Future[TableCreateRes] = self.future_executor.defer(
-                lambda: self._send_table_create(list(table.rows))
+            rows_list = list(table.rows)
+            res_future = _defer_after_pending_digests(
+                self.future_executor,
+                rows_list,
+                lambda: self._send_table_create(rows_list),
             )
         elif chunking_config.use_parallel_chunks:
             # Need to chunk up, use parallelism
@@ -2329,7 +2501,6 @@ class WeaveClient:
         chunk_manager = TableChunkManager()
         raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
 
-        # Create chunks in parallel using future_executor - defer serialization
         chunk_futures = []
         for raw_chunk in raw_chunks:
 
@@ -2339,7 +2510,9 @@ class WeaveClient:
 
                 return chunk_task
 
-            chunk_future = self.future_executor.defer(make_chunk_task(raw_chunk))
+            chunk_future = _defer_after_pending_digests(
+                self.future_executor, raw_chunk, make_chunk_task(raw_chunk)
+            )
             chunk_futures.append(chunk_future)
 
         # Chain the operations using future_executor.then
@@ -2386,14 +2559,15 @@ class WeaveClient:
         if not raw_chunks:
             return self.future_executor.defer(lambda: self._send_table_create([]))
 
-        # Create first chunk as the base table - defer serialization
         first_raw_chunk = raw_chunks[0]
 
         def create_first_chunk() -> TableCreateRes:
             serialized_rows = to_json(first_raw_chunk, self.project_id, self)
             return self._send_table_create(serialized_rows)
 
-        base_future = self.future_executor.defer(create_first_chunk)
+        base_future = _defer_after_pending_digests(
+            self.future_executor, first_raw_chunk, create_first_chunk
+        )
 
         # Chain the incremental updates sequentially
         def process_remaining_chunks(
