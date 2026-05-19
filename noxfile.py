@@ -7,7 +7,7 @@ GSM8K_ENVIRONMENT_PACKAGE = (
     "@b4d851db42cebbab2358b827fd0ed19773631937"
     "#subdirectory=environments/gsm8k ; python_version >= '3.11'"
 )
-SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
+SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14t"]
 NUM_TRACE_SERVER_SHARDS = 4
 VERIFIERS_MIN_PYTHON_VERSION = (3, 11)
 
@@ -116,8 +116,11 @@ SHARDS_WITHOUT_EXTRAS = {
     ],
 )
 def tests(session: nox.Session, shard: str):
-    # Normalize nox's configured Python string, like "3.10", for numeric comparison.
-    python_version = tuple(int(part) for part in str(session.python).split(".")[:2])
+    # Normalize nox's configured Python string, like "3.10" or "3.14t", for
+    # numeric comparison. Strip the free-threaded "t" suffix when present.
+    python_version = tuple(
+        int(part.rstrip("t")) for part in str(session.python).split(".")[:2]
+    )
     if shard == "verifiers_test" and python_version < VERIFIERS_MIN_PYTHON_VERSION:
         session.skip("verifiers_test requires Python >= 3.11")
 
