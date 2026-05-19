@@ -27,6 +27,7 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
 )
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
+from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -85,6 +86,66 @@ def test_clickhouse_storage_size_query_generation():
         )  # First argument should be the query
         # with mocks, we don't have any params generated
         assert call_args[1] == {}  # Second argument should be project_id
+
+
+@pytest.mark.parametrize(
+    ("sort_by", "limit", "expected_orders", "expect_streaming_setting"),
+    [
+        pytest.param(
+            None,
+            100,
+            [("started_at", "asc"), ("id", "asc")],
+            False,
+            id="none-uses-default-order",
+        ),
+        pytest.param([], 100, [], True, id="empty-list-disables-sort"),
+        pytest.param([], None, [], False, id="empty-list-no-limit-no-setting"),
+        pytest.param(
+            [tsi.SortBy(field="started_at", direction="desc")],
+            100,
+            [("started_at", "desc"), ("id", "desc")],
+            False,
+            id="user-sort-disables-setting",
+        ),
+    ],
+)
+def test_clickhouse_calls_query_stream_sort_modes(
+    sort_by, limit, expected_orders, expect_streaming_setting
+):
+    """sort_by=None keeps default order; [] is explicit no-sort and engages
+    optimize_aggregation_in_order; a user-supplied sort defeats the setting.
+    """
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.CallsQuery",
+            autospec=True,
+        ) as mock_cq,
+        patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=MagicMock()
+        ),
+    ):
+        mock_calls_query = Mock()
+        mock_calls_query.order_fields = []
+        mock_calls_query.select_fields = []
+        mock_calls_query.add_order.side_effect = lambda field, direction: (
+            mock_calls_query.order_fields.append((field, direction))
+        )
+        mock_cq.return_value = mock_calls_query
+        mock_query_stream.return_value = []
+
+        req = tsi.CallsQueryReq(project_id="p", sort_by=sort_by, limit=limit)
+        server = chts.ClickHouseTraceServer(host="h")
+        with patch.object(
+            server.table_routing_resolver,
+            "resolve_read_table",
+            return_value=ReadTable.CALLS_MERGED,
+        ):
+            list(server.calls_query_stream(req))
+
+        assert mock_calls_query.order_fields == expected_orders
+        settings = mock_query_stream.call_args.kwargs.get("settings") or {}
+        assert ("optimize_aggregation_in_order" in settings) == expect_streaming_setting
 
 
 def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
