@@ -1167,6 +1167,116 @@ def test_select_objs_query_partial_value_miss_returns_empty():
     assert result[0].val_dump == '{"x": 1}'
 
 
+def test_obj_read_retries_with_final_on_miss():
+    """When the first metadata read finds nothing, obj_read retries with
+    `settings={"final": 1}` to defeat the ReplacingMergeTree visibility race.
+    Both the metadata and value queries on the retry pass `final=1`.
+    """
+    server = chts.ClickHouseTraceServer(host="test_host")
+
+    metadata_row = (
+        "test_project",  # project_id
+        "obj-id-1",  # object_id
+        datetime(2024, 1, 1, tzinfo=timezone.utc),  # created_at
+        [],  # refs
+        "object",  # kind
+        None,  # base_object_class
+        None,  # leaf_object_class
+        "digest-abc",  # digest
+        0,  # version_index
+        1,  # is_latest
+        None,  # deleted_at
+        None,  # wb_user_id
+        1,  # version_count
+        0,  # is_op
+    )
+
+    captured_settings: list[dict | None] = []
+
+    def fake_query_stream(self, query, parameters, **kwargs):
+        captured_settings.append(kwargs.get("settings"))
+        idx = len(captured_settings) - 1
+        # Plain metadata: empty -> triggers fallback.
+        # Final metadata: returns the row.
+        # Final value: returns the val_dump.
+        if idx == 0:
+            return iter([])
+        if idx == 1:
+            return iter([metadata_row])
+        return iter([("obj-id-1", "digest-abc", '{"x": 1}')])
+
+    req = tsi.ObjReadReq(
+        project_id="test_project", object_id="obj-id-1", digest="digest-abc"
+    )
+
+    with patch.object(chts.ClickHouseTraceServer, "_query_stream", fake_query_stream):
+        with patch.object(
+            chts.ClickHouseTraceServer,
+            "_maybe_resolve_alias",
+            return_value=None,
+        ):
+            res = server.obj_read(req)
+
+    assert res.obj.digest == "digest-abc"
+    assert captured_settings == [None, {"final": 1}, {"final": 1}]
+
+
+def test_obj_read_raises_when_final_retry_also_misses():
+    """If even the FINAL retry returns no row, NotFoundError surfaces."""
+    server = chts.ClickHouseTraceServer(host="test_host")
+
+    req = tsi.ObjReadReq(
+        project_id="test_project", object_id="obj-id-1", digest="digest-abc"
+    )
+
+    captured_settings: list[dict | None] = []
+
+    def fake_query_stream(self, query, parameters, **kwargs):
+        captured_settings.append(kwargs.get("settings"))
+        return iter([])
+
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_query_stream", fake_query_stream),
+        patch.object(
+            chts.ClickHouseTraceServer, "_maybe_resolve_alias", return_value=None
+        ),
+    ):
+        with pytest.raises(NotFoundError, match="Obj obj-id-1:digest-abc not found"):
+            server.obj_read(req)
+
+    # Plain metadata, then FINAL metadata. No value query since both miss.
+    assert captured_settings == [None, {"final": 1}]
+
+
+def test_file_content_read_once_retries_with_final_on_miss():
+    """`_file_content_read_once` retries with `settings={"final": 1}` when the
+    first plain query returns no rows.
+    """
+    server = chts.ClickHouseTraceServer(host="test_host")
+    req = tsi.FileContentReadReq(project_id="test_project", digest="digest-1")
+
+    captured_settings: list[dict | None] = []
+
+    def fake_query(query, **kwargs):
+        captured_settings.append(kwargs.get("settings"))
+        result = MagicMock()
+        if len(captured_settings) == 1:
+            result.result_rows = []
+        else:
+            # n_chunks=1, val_bytes=b"hi", file_storage_uri=None
+            result.result_rows = [(1, b"hi", None)]
+        return result
+
+    mock_client = MagicMock()
+    mock_client.query.side_effect = fake_query
+    server._thread_local.ch_client = mock_client
+
+    res = server._file_content_read_once(req)
+
+    assert res.content == b"hi"
+    assert captured_settings == [None, {"final": 1}]
+
+
 def test_file_content_read_retries_eventual_consistency():
     """File reads should tolerate transient read-after-write misses."""
     server = chts.ClickHouseTraceServer(host="test_host")
@@ -1195,6 +1305,75 @@ def test_file_content_read_retries_eventual_consistency():
             server.file_content_read(req)
 
         assert mock_read_once.call_count == 2
+
+
+def test_obj_read_final_fallback_recovers_real_row(ch_server):
+    """Integration test: when the first metadata read returns no rows,
+    `obj_read`'s `final=True` retry must execute against real ClickHouse and
+    return the actual row written by `obj_create`. This proves the
+    `settings={"final": 1}` kwarg is accepted by the real driver and that the
+    FINAL-retry path returns the right schema/columns end-to-end.
+    """
+    project_id = _make_project_id("rmt_obj")
+    obj_id = "rmt_recover"
+    val = {"v": "real_value", "n": 42}
+    create_res = _obj_create(ch_server, project_id, obj_id, val)
+
+    original = ch_server._select_objs_query
+    captured: list[dict] = []
+
+    def empty_first_then_real(builder, metadata_only=False, **kwargs):
+        captured.append(kwargs)
+        if len(captured) == 1:
+            return []
+        return original(builder, metadata_only, **kwargs)
+
+    with patch.object(
+        ch_server, "_select_objs_query", side_effect=empty_first_then_real
+    ):
+        res = ch_server.obj_read(
+            tsi.ObjReadReq(
+                project_id=project_id, object_id=obj_id, digest=create_res.digest
+            )
+        )
+
+    assert res.obj.digest == create_res.digest
+    assert res.obj.val == val
+    assert len(captured) == 2
+    assert captured[0].get("final", False) is False
+    assert captured[1].get("final") is True
+
+
+def test_file_content_read_final_fallback_recovers_real_bytes(ch_server):
+    """Integration test: when the first chunks query returns no rows,
+    `_file_content_read_once`'s `settings={"final": 1}` retry must execute
+    against real ClickHouse and return the file bytes written by
+    `file_create`.
+    """
+    project_id = _make_project_id("rmt_file")
+    content = b"final-fallback integration bytes"
+    create_res = ch_server.file_create(
+        tsi.FileCreateReq(project_id=project_id, name="f.bin", content=content)
+    )
+
+    real_query = ch_server.ch_client.query
+    captured_settings: list[dict | None] = []
+
+    def empty_first_then_real(query, **kwargs):
+        captured_settings.append(kwargs.get("settings"))
+        if len(captured_settings) == 1:
+            empty = MagicMock()
+            empty.result_rows = []
+            return empty
+        return real_query(query, **kwargs)
+
+    with patch.object(ch_server.ch_client, "query", side_effect=empty_first_then_real):
+        res = ch_server._file_content_read_once(
+            tsi.FileContentReadReq(project_id=project_id, digest=create_res.digest)
+        )
+
+    assert res.content == content
+    assert captured_settings == [None, {"final": 1}]
 
 
 @pytest.mark.disable_logging_error_check

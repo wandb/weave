@@ -441,7 +441,9 @@ FROM object_versions_with_index AS {main_table_alias}
 
 
 def make_objects_val_query_and_parameters(
-    project_id: str, object_ids: list[str], digests: list[str]
+    project_id: str,
+    object_ids: list[str],
+    digests: list[str],
 ) -> tuple[str, dict[str, Any]]:
     query = """
         SELECT object_id, digest, argMax(val_dump, created_at)
