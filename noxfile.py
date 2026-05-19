@@ -104,7 +104,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "pandas_test",
         "huggingface",
         "smolagents",
-        "mcp",
+        "fastmcp",
         "verdict",
         "claude_agent_sdk",
         "verifiers_test",

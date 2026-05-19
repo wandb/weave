@@ -211,14 +211,17 @@ def patch_notdiamond(settings: IntegrationSettings | None = None) -> None:
     )
 
 
-def patch_mcp(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for MCP (Model Context Protocol)."""
-    from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
+def patch_fastmcp(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for FastMCP (Model Context Protocol)."""
+    from weave.integrations.fastmcp import (
+        get_fastmcp_client_patcher,
+        get_fastmcp_server_patcher,
+    )
 
     if settings is None:
         settings = IntegrationSettings()
-    server_patched = get_mcp_server_patcher(settings).attempt_patch()
-    client_patched = get_mcp_client_patcher(settings).attempt_patch()
+    server_patched = get_fastmcp_server_patcher(settings).attempt_patch()
+    client_patched = get_fastmcp_client_patcher(settings).attempt_patch()
     if server_patched or client_patched:
         _PATCHED_INTEGRATIONS.add("mcp")
 
@@ -341,7 +344,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "crewai": patch_crewai,
     "crewai_tools": patch_crewai,
     "notdiamond": patch_notdiamond,
-    "mcp": patch_mcp,
+    "mcp": patch_fastmcp,
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
     "agents": patch_openai_agents,
