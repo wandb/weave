@@ -42,20 +42,47 @@ BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 # behaviour and is handled correctly by the existing storage path.
 AUTO_CONVERSION_MIN_SIZE = 8192  # 8 KiB
 
+# Sniff the first N chars for a whitespace/punct character to reject natural
+# text before running the O(n) base64 regex.
+PREFIX_SNIFF_LEN = 128
+
+# Reject strings whose first N chars have fewer than MIN_UNIQUE distinct
+# characters. Real base64 of binary content has uniformly high entropy in any
+# short window. Pathological inputs like 'x' * 50000 collapse to one unique
+# char and would otherwise pass the regex and force a full Content.from_base64
+# decode + libmagic probe (DD trace 6a0c7d99...975ce4fb10f7c246: 454ms leaf).
+ENTROPY_SAMPLE_LEN = 32
+ENTROPY_MIN_UNIQUE = 3
+
 
 def is_base64(value: str) -> bool:
-    """Huerestic to quickly check if a string is likely base64.
-    We do not decode here because Content already does decode based 'true' validation
+    """Heuristic to quickly check if a string is likely base64.
+
+    We do not decode here because Content already does decode based 'true' validation.
+    Two cheap O(1) rejects run before the full regex: a whitespace check on the
+    first 128 chars (natural text trips this immediately, base64 cannot contain
+    whitespace) and an entropy floor on the first 32 chars (rejects all-same-char
+    fillers like "x" * N which otherwise pass the regex and trigger a wasted
+    base64 decode + libmagic probe).
+
     Args:
         value: String to check
     Returns:
         True if the string is possibly valid base64
     """
+    prefix = value[:PREFIX_SNIFF_LEN]
+    if " " in prefix or "\n" in prefix:
+        return False
+    if len(set(value[:ENTROPY_SAMPLE_LEN])) < ENTROPY_MIN_UNIQUE:
+        return False
     return BASE64_PATTERN.match(value) is not None
 
 
 def is_data_uri(data_uri: str) -> bool:
     """Extract content type and decoded bytes from a data URI.
+
+    Every data URI starts with `data:`; checking this prefix skips the
+    regex on the overwhelming majority of long strings in trace payloads.
 
     Args:
         data_uri: Data URI string in format data:[content-type];base64,[data]
@@ -63,6 +90,8 @@ def is_data_uri(data_uri: str) -> bool:
     Returns:
         bool: True is match, else false
     """
+    if not data_uri.startswith("data:"):
+        return False
     return DATA_URI_PATTERN.match(data_uri) is not None
 
 
