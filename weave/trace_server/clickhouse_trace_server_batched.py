@@ -1119,8 +1119,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb, read_table)
-        raw_res = self._query(query, pb.get_params())
+        query, columns, settings = build_calls_stats_query(req, pb, read_table)
+        raw_res = self._query(query, pb.get_params(), settings=settings or None)
 
         res_dict = (
             dict(zip(columns, raw_res.result_rows[0], strict=False))
@@ -1130,6 +1130,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsQueryStatsRes(
             count=res_dict.get("count", 0),
+            has_more=bool(res_dict.get("has_more", 0)),
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 

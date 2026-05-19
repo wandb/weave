@@ -660,6 +660,8 @@ class CallsQueryStatsReq(BaseModelStrict):
 
 class CallsQueryStatsRes(BaseModel):
     count: int
+    # True when count saturated the request's limit; clients render as "<count>+".
+    has_more: bool = False
     total_storage_size_bytes: int | None = None
 
 

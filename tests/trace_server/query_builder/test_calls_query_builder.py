@@ -16,6 +16,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
+    build_calls_stats_query,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -3824,7 +3825,7 @@ def test_stats_query_calls_complete_flat_count() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT count() AS count
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_1:String}
         WHERE 1
@@ -3847,7 +3848,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT count() AS count
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_2:String}
         WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
@@ -3873,6 +3874,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         req,
         """
         SELECT count() AS count,
+               toUInt8(0) AS has_more,
                sum(coalesce(CASE
                    WHEN calls_complete.parent_id = {pb_2:String}
                         THEN rolled_up_cms.total_storage_size_bytes
@@ -3924,7 +3926,7 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     assert_stats_sql(
         req,
         """
-        SELECT count(DISTINCT calls_complete.id) AS count
+        SELECT count(DISTINCT calls_complete.id) AS count, toUInt8(0) AS has_more
         FROM calls_complete
         LEFT JOIN (
             SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
@@ -3951,13 +3953,21 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     )
 
 
-def test_stats_query_calls_merged_uses_subquery() -> None:
-    """Stats query on calls_merged should use subquery wrapping (GROUP BY requires it)."""
+def test_stats_query_calls_merged_no_caller_limit_skips_cap() -> None:
+    """No caller-supplied limit -> no server cap, no setting, has_more=0.
+
+    When the cap deferred behind `DEFAULT_STATS_MAX_LIMIT` is re-enabled, this
+    test should assert the streaming-aggregate setting + inner `LIMIT 1000000`
+    + `has_more = toUInt8(count() >= 1000000)`.
+    """
     req = tsi.CallsQueryStatsReq(project_id="project")
+    pb = ParamBuilder("pb")
+    query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    assert settings == {}
     assert_stats_sql(
         req,
         """
-        SELECT count()
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM (
             SELECT calls_merged.id AS id
             FROM calls_merged
@@ -3973,6 +3983,50 @@ def test_stats_query_calls_merged_uses_subquery() -> None:
         {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
     )
+
+
+def test_stats_query_calls_merged_caller_limit_keeps_setting() -> None:
+    """Caller-supplied limit also triggers the streaming-aggregate setting and
+    `has_more` reflects saturation against the caller's limit.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project", limit=5)
+    pb = ParamBuilder("pb")
+    query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    assert settings == {"optimize_aggregation_in_order": 1}
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(count() >= 5) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_0:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND
+                ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+            LIMIT 5
+        )
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
+    """include_total_storage_size needs every row, so no cap and no setting."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        include_total_storage_size=True,
+    )
+    query, _columns, settings = build_calls_stats_query(
+        req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
+    )
+    assert settings == {}
+    assert "LIMIT" not in query
+    assert "toUInt8(0) AS has_more" in query
 
 
 # ---------------------------------------------------------------------------

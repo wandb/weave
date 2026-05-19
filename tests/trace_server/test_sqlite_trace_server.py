@@ -115,6 +115,60 @@ def _make_server_with_call(
     return server, call_id
 
 
+def test_sqlite_calls_query_stats_sets_has_more_when_limit_saturates():
+    """Backend-equivalence with the CH path: has_more must be True when
+    count==limit (caller's count is truncated) and False otherwise. Sqlite
+    previously returned the Pydantic default (False) regardless, which makes
+    a dev frontend hitting sqlite silently disagree with prod on the "X+" cap.
+    """
+    server = slts.SqliteTraceServer(":memory:")
+    server.drop_tables()
+    server.setup_tables()
+    try:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for i in range(3):
+            server.call_start(
+                tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id="test_project",
+                        id=f"call_{i}",
+                        trace_id=f"trace_{i}",
+                        op_name="op",
+                        started_at=now,
+                        attributes={},
+                        inputs={},
+                    )
+                )
+            )
+            server.call_end(
+                tsi.CallEndReq(
+                    end=tsi.EndedCallSchemaForInsert(
+                        project_id="test_project",
+                        id=f"call_{i}",
+                        ended_at=now,
+                        output=None,
+                        summary={},
+                    )
+                )
+            )
+
+        # 3 calls, limit=2 -> count==2, has_more=True (truncated).
+        truncated = server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id="test_project", limit=2)
+        )
+        assert truncated.count == 2
+        assert truncated.has_more is True
+
+        # 3 calls, limit=10 -> count==3, has_more=False (room to spare).
+        exact = server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id="test_project", limit=10)
+        )
+        assert exact.count == 3
+        assert exact.has_more is False
+    finally:
+        server.close()
+
+
 def test_sqlite_storage_size_bytes_populated_on_call_end():
     """storage_size_bytes column is populated when a call is started then ended."""
     server, call_id = _make_server_with_call(

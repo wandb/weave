@@ -83,6 +83,12 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 
+# Deferred: server-side defense-in-depth cap for unfiltered calls_merged stats.
+# Wired up in `build_calls_stats_query` but currently commented out; callers
+# without a `limit` still get an exact count. Flip this on when we see real
+# >>1M-count requests in the wild.
+DEFAULT_STATS_MAX_LIMIT = 1_000_000
+
 
 @dataclass(frozen=True, slots=True)
 class FilterConditionsResult:
@@ -2697,11 +2703,10 @@ def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
-) -> tuple[str, KeysView[str]]:
+) -> tuple[str, KeysView[str], dict[str, int | str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
     This function handles both optimized special-case queries and the general case.
-    Returns a tuple of (query_sql, column_names).
 
     Args:
         req: The stats query request
@@ -2709,13 +2714,17 @@ def build_calls_stats_query(
         read_table: Which calls table to read from
 
     Returns:
-        Tuple of (SQL query string, column names in the result)
+        Tuple of (SQL query string, column names in the result, ClickHouse
+        query settings to apply at execution time).
     """
-    aggregated_columns = {"count": "count()"}
+    aggregated_columns: dict[str, str] = {
+        "count": "count()",
+        "has_more": "toUInt8(0)",
+    }
+    settings: dict[str, int | str] = {}
 
-    # Try optimized special case queries first
     if opt_query := _try_optimized_stats_query(req, param_builder, read_table):
-        return (opt_query, aggregated_columns.keys())
+        return (opt_query, aggregated_columns.keys(), settings)
 
     if req.include_total_storage_size:
         aggregated_columns["total_storage_size_bytes"] = (
@@ -2729,14 +2738,21 @@ def build_calls_stats_query(
         query = _build_calls_complete_stats_query(
             req, param_builder, aggregated_columns
         )
-        return (query, aggregated_columns.keys())
+        return (query, aggregated_columns.keys(), settings)
 
-    # For calls_merged, use subquery wrapping (GROUP BY requires materialization)
+    # Deferred (see DEFAULT_STATS_MAX_LIMIT): uncomment to apply the server-side
+    # cap when the caller didn't pass a limit.
+    # if req.limit is None and not req.include_total_storage_size:
+    #     req = req.model_copy(update={"limit": DEFAULT_STATS_MAX_LIMIT})
+    if req.limit is not None:
+        aggregated_columns["has_more"] = f"toUInt8(count() >= {req.limit})"
+        settings["optimize_aggregation_in_order"] = 1
+
     cq = _build_stats_calls_query(req, read_table)
     inner_query = cq.as_sql(param_builder)
-    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
+    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] + ' AS ' + k for k in aggregated_columns)} FROM ({inner_query})"
 
-    return (calls_query_sql, aggregated_columns.keys())
+    return (calls_query_sql, aggregated_columns.keys(), settings)
 
 
 def _build_stats_calls_query(

@@ -1527,8 +1527,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 include_total_storage_size=req.include_total_storage_size,
             )
         ).calls
+        count = len(calls)
         return tsi.CallsQueryStatsRes(
-            count=len(calls),
+            count=count,
+            has_more=req.limit is not None and count >= req.limit,
             total_storage_size_bytes=sum(
                 call.total_storage_size_bytes
                 for call in calls

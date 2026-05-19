@@ -1290,7 +1290,15 @@
         "title": "CallsQueryStatsReq"
       },
       "CallsQueryStatsRes": {
-        "properties": {"count": {"type": "integer", "title": "Count"}},
+        "properties": {
+          "count": {"type": "integer", "title": "Count"},
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false,
+            "description": "True when count saturated the request's limit (caller-supplied or the server's defense-in-depth ceiling). Clients should render the count as e.g. '10,000+'."
+          }
+        },
         "type": "object",
         "required": ["count"],
         "title": "CallsQueryStatsRes"
