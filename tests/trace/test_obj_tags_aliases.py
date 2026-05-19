@@ -1,9 +1,8 @@
-import time
-
 import pytest
 from pydantic import ValidationError
 
 import weave
+from tests.trace.util import retry_not_found
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -1271,8 +1270,10 @@ def test_sdk_alias_lifecycle(client: WeaveClient):
 
     # Set with single-element list
     ref3 = weave.publish({"data": "test3"}, name="sdk_alias_single")
-    time.sleep(0.2)
-    client.set_aliases(ref3, ["only-one"])
+    # Allow ClickHouse eventual consistency to settle before setting aliases.
+    for attempt in retry_not_found():
+        with attempt:
+            client.set_aliases(ref3, ["only-one"])
     assert "only-one" in client.get_aliases(ref3)
 
     # Set with empty list — no-op

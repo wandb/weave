@@ -11,13 +11,13 @@
 4. We ensure that invalid schemas are properly rejected from the server.
 """
 
-import time
 from typing import Literal
 
 import pytest
 from pydantic import ValidationError
 
 import weave
+from tests.trace.util import retry_not_found
 from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
@@ -226,8 +226,9 @@ def test_interface_creation(client):
     )
 
     # Allow ClickHouse eventual consistency to settle before reading
-    time.sleep(0.2)
-    top_obj_gotten = weave.ref(top_obj_ref.uri).get()
+    for attempt in retry_not_found():
+        with attempt:
+            top_obj_gotten = weave.ref(top_obj_ref.uri).get()
 
     assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
 
