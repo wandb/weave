@@ -171,14 +171,59 @@ def _log_response(response: Response) -> None:
     pprint_response(response)
 
 
-client = httpx.Client(
-    # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
-    # works natively.
-    event_hooks={"request": [_log_request], "response": [_log_response]},
-    timeout=http_timeout(),
-    limits=CLIENT_LIMITS,
-    verify=ssl_verify(),
-)
+# Shared httpx.Client lifecycle.
+#
+# The client is built lazily on first use so env-driven config such as
+# ``WEAVE_INSECURE_DISABLE_SSL`` and ``WF_HTTP_TIMEOUT`` is read at first-use
+# time, not at import time. The trade-off this design makes:
+#
+#   Config (verify=, timeout=, event_hooks) is captured when the client is
+#   built, and frozen for the life of the process.
+#
+# This matches how httpx itself wants to be used — ``verify`` is a property of
+# the connection pool and cannot be changed per-request (see encode/httpx#554).
+# It also matches the openai/anthropic SDKs, which build their httpx.Client
+# eagerly per SDK instance and do not reconfigure it. Callers who need to
+# change SSL/timeout config must set the env var *before* the first HTTP
+# call (typically before ``weave.init``).
+_client: httpx.Client | None = None
+_client_lock = threading.Lock()
+
+
+def get_client() -> httpx.Client:
+    """Return the shared httpx.Client, building it on first use.
+
+    See module-level comment for the freeze-after-first-use contract.
+    """
+    global _client  # noqa: PLW0603
+    with _client_lock:
+        if _client is None:
+            # Use HTTPX's default transport so env proxy handling
+            # (including NO_PROXY) works natively.
+            _client = httpx.Client(
+                event_hooks={
+                    "request": [_log_request],
+                    "response": [_log_response],
+                },
+                timeout=http_timeout(),
+                limits=CLIENT_LIMITS,
+                verify=ssl_verify(),
+            )
+        return _client
+
+
+def _reset_client_for_tests() -> None:
+    """Close the cached client and clear it. Test seam only.
+
+    Production code must not call this — the freeze-after-first-use contract
+    is intentional. Tests use it to simulate a fresh process when asserting
+    behavior tied to env vars read at client-construction time.
+    """
+    global _client  # noqa: PLW0603
+    with _client_lock:
+        if _client is not None:
+            _client.close()
+        _client = None
 
 
 def get(
@@ -189,6 +234,7 @@ def get(
     **kwargs: Any,
 ) -> Response:
     """Send a GET request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -206,6 +252,7 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -223,6 +270,7 @@ def put(
     **kwargs: Any,
 ) -> Response:
     """Send a PUT request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -239,6 +287,7 @@ def delete(
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
