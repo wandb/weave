@@ -7,6 +7,7 @@ from weave.scorers.remote_scorer import (
     RemoteScorer,
     _validate_remote_scorer_endpoint_url,
 )
+from weave.trace.object_record import pydantic_object_record
 
 
 def test_remote_scorer_fields() -> None:
@@ -110,3 +111,36 @@ def test_remote_scorer_score_raises_not_implemented() -> None:
         "RemoteScorer is run by the Weave scoring worker against your HTTPS "
         "endpoint; score() is not part of that path."
     )
+
+
+def test_remote_scorer_summarize_raises_not_implemented() -> None:
+    rs = RemoteScorer(endpoint_url="https://scoring.example.com/v1/score")
+    with pytest.raises(NotImplementedError):
+        rs.summarize([])
+
+
+def test_remote_scorer_object_record_omits_op_methods() -> None:
+    """Regression test for WB-33909.
+
+    Programmatic publish of ``RemoteScorer`` previously embedded ``score`` and
+    ``summarize`` as ``@op`` method attributes on the published object. The
+    scoring worker's safety check (``_assert_safe_scorer_payload``) follows
+    those op refs and rejects the resulting ``CustomWeaveType(Op)`` payload,
+    causing online monitors to be skipped. ``RemoteScorer`` must therefore
+    expose no ``@op`` members, matching the slim UI-created payload shape.
+    """
+    rs = RemoteScorer(
+        name="policy_remote",
+        endpoint_url="https://scoring.example.com/v1/score",
+        config={"threshold": 0.9},
+    )
+    obj_rec = pydantic_object_record(rs)
+    assert obj_rec._class_name == "RemoteScorer"
+    # No @op methods should leak into the serialized object's attributes;
+    # they would otherwise be published as op refs.
+    assert "score" not in obj_rec.__dict__
+    assert "summarize" not in obj_rec.__dict__
+    # Data fields stay intact.
+    assert obj_rec.__dict__["endpoint_url"] == "https://scoring.example.com/v1/score"
+    assert obj_rec.__dict__["config"] == {"threshold": 0.9}
+    assert obj_rec.__dict__["name"] == "policy_remote"

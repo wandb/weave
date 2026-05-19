@@ -7,7 +7,6 @@ from pydantic import Field, field_validator
 
 from weave.flow.scorer import Scorer
 from weave.trace.objectify import register_object
-from weave.trace.op import op
 
 
 @register_object
@@ -63,15 +62,36 @@ class RemoteScorer(Scorer):
         description="Optional customer-defined JSON-serializable configuration.",
     )
 
-    @op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
-        """Override for the Scorer.score function containing a more specific error.
+        """Local invocation is not supported; raise to make the contract explicit.
 
         Not used for remote scoring; the Weave scoring worker performs the HTTP request.
+
+        Intentionally NOT decorated with ``@op``: during publish, the Weave SDK
+        walks each ``@op`` method on the object and serializes it as an op ref.
+        Following that ref later (e.g. in the scoring worker's
+        ``_assert_safe_scorer_payload`` check) yields a ``CustomWeaveType(Op)``
+        payload, which the worker rejects as unsafe and the monitor is skipped.
+        Since RemoteScorer's score/summarize are never executed locally, leaving
+        them as plain methods keeps them out of the published object's fields
+        (matching the UI-created payload shape). See WB-33909.
         """
         raise NotImplementedError(
             "RemoteScorer is run by the Weave scoring worker against your HTTPS "
             "endpoint; score() is not part of that path."
+        )
+
+    def summarize(self, score_rows: list) -> dict | None:
+        """Local invocation is not supported; raise to make the contract explicit.
+
+        Intentionally NOT decorated with ``@op`` for the same reason as
+        :meth:`score`. The base ``Scorer.summarize`` is an op; overriding it
+        with a plain method prevents it from being picked up by
+        ``getmembers(obj, is_op)`` during publish. See WB-33909.
+        """
+        raise NotImplementedError(
+            "RemoteScorer summaries are computed by the Weave scoring worker; "
+            "summarize() is not part of that path."
         )
 
 
