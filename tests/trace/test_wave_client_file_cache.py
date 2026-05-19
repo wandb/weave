@@ -1,10 +1,17 @@
 import threading
+from concurrent.futures import Future
+from unittest.mock import patch
 
+import httpx
+import pytest
+
+from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_client_send_file_cache import (
     ThreadSafeLRUCache,
     WeaveClientSendFileCache,
 )
 from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateRes
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 
 class TestThreadSafeLRUCache:
@@ -294,6 +301,21 @@ class TestWeaveClientSendFileCache:
         assert cache.get(req1) is None
         assert cache.get(req2) is None
 
+    def test_delete(self):
+        """Test deleting a cached entry by request."""
+        cache = WeaveClientSendFileCache()
+        req = FileCreateReq(project_id="test", name="file", content=b"content")
+        cache.put(req, FileCreateRes(digest="d"))
+        assert cache.get(req) is not None
+        cache.delete(req)
+        assert cache.get(req) is None
+
+    def test_delete_nonexistent(self):
+        """Deleting a missing entry should not raise."""
+        cache = WeaveClientSendFileCache()
+        req = FileCreateReq(project_id="test", name="missing", content=b"x")
+        cache.delete(req)  # no-op
+
     def test_size(self):
         """Test the size method."""
         cache = WeaveClientSendFileCache()
@@ -364,3 +386,138 @@ def test_wave_client_file_cache_backwards_compatible():
     res = FileCreateRes(digest="test")
     cache.put(req, res)
     assert cache.get(req) == res
+
+
+def _make_502() -> httpx.HTTPStatusError:
+    response = httpx.Response(
+        status_code=502,
+        request=httpx.Request("POST", "http://example.com/file/create"),
+        content=b"Bad Gateway",
+    )
+    return httpx.HTTPStatusError("502", request=response.request, response=response)
+
+
+@pytest.fixture
+def offline_client(monkeypatch):
+    monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "2")
+    monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.01")
+    monkeypatch.setenv("WEAVE_ENABLE_WAL", "false")
+    server = RemoteHTTPTraceServer("http://example.com")
+    client = WeaveClient(
+        entity="ent",
+        project="proj",
+        server=server,
+        ensure_project_exists=False,
+    )
+    return client, server
+
+
+@pytest.mark.disable_logging_error_check
+def test_failed_file_create_evicts_cache_and_retries_on_next_call(offline_client):
+    """A failed file_create future must be evicted so the next call retries."""
+    client, server = offline_client
+    req = FileCreateReq(project_id="ent/proj", name="f", content=b"hello")
+
+    with patch.object(server, "file_create", side_effect=_make_502()):
+        fut1 = client._send_file_create(req)
+        client.future_executor.flush()
+        if client.future_executor_fastlane is not None:
+            client.future_executor_fastlane.flush()
+
+    assert fut1.exception() is not None
+    assert client.send_file_cache.get(req) is None
+
+    success_res = FileCreateRes(digest="abc")
+    with patch.object(server, "file_create", return_value=success_res):
+        fut2 = client._send_file_create(req)
+        client.future_executor.flush()
+        if client.future_executor_fastlane is not None:
+            client.future_executor_fastlane.flush()
+
+    assert fut2 is not fut1
+    assert fut2.result() == success_res
+    assert client.send_file_cache.get(req) is fut2
+
+
+def test_successful_file_create_stays_cached(offline_client):
+    """A successful file_create must stay cached so duplicates are deduped."""
+    client, server = offline_client
+    req = FileCreateReq(project_id="ent/proj", name="f", content=b"hello")
+    success_res = FileCreateRes(digest="abc")
+
+    with patch.object(server, "file_create", return_value=success_res):
+        fut1 = client._send_file_create(req)
+        client.future_executor.flush()
+        if client.future_executor_fastlane is not None:
+            client.future_executor_fastlane.flush()
+
+    assert client.send_file_cache.get(req) is fut1
+    fut2 = client._send_file_create(req)
+    assert fut2 is fut1
+
+
+@pytest.mark.disable_logging_error_check
+def test_stale_failure_callback_does_not_evict_replacement_entry(offline_client):
+    """Late failure of an LRU-evicted in-flight future must not wipe a replacement entry.
+
+    Scenario: req_a's in-flight future is LRU-evicted while still pending. The same key
+    is later re-populated by a successful upload. When the original future finally fails,
+    its done-callback must not delete the unrelated, freshly-cached success.
+    """
+    client, server = offline_client
+    client.send_file_cache.max_size = 1  # force LRU eviction after each put
+
+    req_a = FileCreateReq(project_id="ent/proj", name="a", content=b"a")
+    req_b = FileCreateReq(project_id="ent/proj", name="b", content=b"b")
+
+    controllable_future: Future[FileCreateRes] = Future()
+    target_executor = client.future_executor_fastlane or client.future_executor
+    original_defer = target_executor.defer
+    call_count = [0]
+
+    def fake_defer(fn, *args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return controllable_future
+        return original_defer(fn, *args, **kwargs)
+
+    with patch.object(target_executor, "defer", side_effect=fake_defer):
+        # 1. Put req_a -> controllable_future (in-flight). Callback wired.
+        fut_a_initial = client._send_file_create(req_a)
+        assert fut_a_initial is controllable_future
+        assert client.send_file_cache.get(req_a) is controllable_future
+
+        # 2. Put req_b -> LRU evicts req_a from the cache.
+        with patch.object(
+            server, "file_create", return_value=FileCreateRes(digest="b")
+        ):
+            client._send_file_create(req_b)
+            client.future_executor.flush()
+            if client.future_executor_fastlane is not None:
+                client.future_executor_fastlane.flush()
+        assert client.send_file_cache.get(req_a) is None
+
+        # 3. Cache miss for req_a -> fresh successful upload takes the slot.
+        with patch.object(
+            server, "file_create", return_value=FileCreateRes(digest="a")
+        ):
+            fut_a_v2 = client._send_file_create(req_a)
+            client.future_executor.flush()
+            if client.future_executor_fastlane is not None:
+                client.future_executor_fastlane.flush()
+        assert client.send_file_cache.get(req_a) is fut_a_v2
+
+    # 4. Original future fails late. Its callback runs delete(req_a) and wrongly
+    #    evicts the replacement entry.
+    controllable_future.set_exception(
+        httpx.HTTPStatusError(
+            "502",
+            request=httpx.Request("POST", "http://example.com/file/create"),
+            response=httpx.Response(
+                status_code=502,
+                request=httpx.Request("POST", "http://example.com/file/create"),
+            ),
+        )
+    )
+
+    assert client.send_file_cache.get(req_a) is fut_a_v2
