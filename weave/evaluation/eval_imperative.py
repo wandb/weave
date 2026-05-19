@@ -689,9 +689,11 @@ class EvaluationLogger:
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
     ) -> None:
-        eval_meta = {}
-        if "_eval_meta" in self.__dict__:
-            eval_meta = self.__dict__["_eval_meta"]
+        # _eval_meta may have been seeded by _create_with_meta()
+        try:
+            eval_meta = self._eval_meta
+        except AttributeError:
+            eval_meta = {}
         self._eval_meta = {**eval_meta, **IMPERATIVE_EVAL_META_MARKER}
 
         self.name = name
