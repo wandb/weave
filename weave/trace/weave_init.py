@@ -125,6 +125,8 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
     except ImportError as e:
         logger.warning(
             "Session SDK tracing skipped: opentelemetry not available (%s)", e
@@ -168,6 +170,10 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
         exporter._certificate_file = False
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(BatchSpanProcessor(exporter))
+    # Auto-link GenAI OTel spans to eval predictions and inject eval
+    # metadata (call ID, project, evaluation name) onto spans for
+    # deep-linking in the agent traces UI.
+    provider.add_span_processor(EvalLinkSpanProcessor())
     trace.set_tracer_provider(provider)
 
 

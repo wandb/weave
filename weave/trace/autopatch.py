@@ -56,7 +56,7 @@ class AutopatchSettings(BaseModel):
     gepa: IntegrationSettings | None = None
     crewai: IntegrationSettings | None = None
     notdiamond: IntegrationSettings | None = None
-    mcp: IntegrationSettings | None = None
+    fastmcp: IntegrationSettings | None = None
     nvidia: IntegrationSettings | None = None
     smolagents: IntegrationSettings | None = None
     openai_agents: IntegrationSettings | None = None

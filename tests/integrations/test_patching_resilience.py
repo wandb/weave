@@ -12,7 +12,7 @@ def assert_no_current_call():
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_patcher_errors(client, log_collector):
+def test_resilience_to_patcher_errors(log_collector):
     class Module:
         def method(self):
             return 0

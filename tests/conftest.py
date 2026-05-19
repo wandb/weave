@@ -18,7 +18,7 @@ from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
-from weave.trace.settings import UserSettings, parse_and_apply_settings
+from weave.trace.settings import replace_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -105,7 +105,7 @@ def reset_project_residence_cache():
 def reset_digest_settings():
     """Reset client-side digest settings after each test."""
     yield
-    parse_and_apply_settings(UserSettings())
+    replace_settings()
 
 
 @pytest.fixture(autouse=True)
@@ -519,9 +519,7 @@ def _teardown_test_client(
     finally:
         weave_client_context.set_weave_client_global(None)
         if reset_settings:
-            weave.trace.settings.parse_and_apply_settings(
-                weave.trace.settings.UserSettings()
-            )
+            weave.trace.settings.replace_settings()
         try:
             if close_cache_only:
                 client.server._cache.close()
@@ -573,7 +571,7 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
         settings: weave.trace.settings.UserSettings | None = None,
     ):
         if settings is not None:
-            weave.trace.settings.parse_and_apply_settings(settings)
+            weave.trace.settings.replace_settings(settings)
         client = create_client(request, trace_server, attributes)
         try:
             yield client

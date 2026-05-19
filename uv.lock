@@ -10794,6 +10794,9 @@ crewai = [
 dspy = [
     { name = "dspy", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
+fastmcp = [
+    { name = "mcp", extra = ["cli"], marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+]
 gepa = [
     { name = "gepa", version = "0.1.1", source = { registry = "https://pypi.org/simple" }, marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
@@ -10842,9 +10845,6 @@ litellm = [
 llamaindex = [
     { name = "llama-index", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "openai", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-]
-mcp = [
-    { name = "mcp", extra = ["cli"], marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
 mistral = [
     { name = "mistralai", version = "1.5.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and platform_python_implementation == 'CPython' and extra == 'extra-5-weave-crewai') or (python_full_version >= '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (python_full_version >= '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (python_full_version >= '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (extra != 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra != 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
@@ -11038,7 +11038,7 @@ requires-dist = [
     { name = "litellm", marker = "extra == 'scorers'", specifier = ">=1.58,<1.82.7" },
     { name = "litellm", marker = "extra == 'trace-server'", specifier = ">=1.36.1,<1.82.7" },
     { name = "llama-index", marker = "extra == 'llamaindex'", specifier = ">=0.10.35" },
-    { name = "mcp", extras = ["cli"], marker = "python_full_version >= '3.10' and extra == 'mcp'", specifier = ">=1.6.0,<1.10.0" },
+    { name = "mcp", extras = ["cli"], marker = "python_full_version >= '3.10' and extra == 'fastmcp'", specifier = ">=1.6.0,<1.10.0" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = ">=1.0.0" },
     { name = "modal", marker = "extra == 'modal'" },
     { name = "moto", extras = ["bedrock"], marker = "extra == 'bedrock'", specifier = ">=5.0.24" },
@@ -11054,11 +11054,11 @@ requires-dist = [
     { name = "openai", marker = "extra == 'smolagents'", specifier = ">=1.99.9" },
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.0.4" },
     { name = "openinference-semantic-conventions", marker = "extra == 'trace-server'", specifier = ">=0.1.17" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp", marker = "python_full_version >= '3.10' and extra == 'langchain'" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-proto", marker = "extra == 'trace-server'", specifier = ">=1.12.0" },
-    { name = "opentelemetry-sdk" },
+    { name = "opentelemetry-api", specifier = ">=1.28.0" },
+    { name = "opentelemetry-exporter-otlp", marker = "python_full_version >= '3.10' and extra == 'langchain'", specifier = ">=1.28.0" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.28.0" },
+    { name = "opentelemetry-proto", marker = "extra == 'trace-server'", specifier = ">=1.28.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.28.0" },
     { name = "opentelemetry-semantic-conventions-ai", marker = "extra == 'trace-server'", specifier = ">=0.4.3" },
     { name = "packaging", specifier = ">=21.0" },
     { name = "pandas", marker = "extra == 'notdiamond'", specifier = ">=2.0.0" },
@@ -11090,7 +11090,7 @@ requires-dist = [
     { name = "vertexai", marker = "platform_python_implementation != 'PyPy' and extra == 'vertexai'", specifier = ">=1.70.0" },
     { name = "wandb", marker = "extra == 'wandb'", specifier = ">=0.17.1" },
 ]
-provides-extras = ["anthropic", "autogen", "bedrock", "cerebras", "claude-agent-sdk", "cohere", "crewai", "dspy", "gepa", "google-genai", "groq", "huggingface", "instructor", "langchain", "langchain-nvidia-ai-endpoints", "litellm", "llamaindex", "mcp", "mistral", "modal", "notdiamond", "openai", "openai-agents", "presidio", "rich", "scorers", "smolagents", "trace-server", "verdict", "verifiers", "vertexai", "video-support", "wandb"]
+provides-extras = ["anthropic", "autogen", "bedrock", "cerebras", "claude-agent-sdk", "cohere", "crewai", "dspy", "fastmcp", "gepa", "google-genai", "groq", "huggingface", "instructor", "langchain", "langchain-nvidia-ai-endpoints", "litellm", "llamaindex", "mistral", "modal", "notdiamond", "openai", "openai-agents", "presidio", "rich", "scorers", "smolagents", "trace-server", "verdict", "verifiers", "vertexai", "video-support", "wandb"]
 
 [package.metadata.requires-dev]
 autogen-tests = [
