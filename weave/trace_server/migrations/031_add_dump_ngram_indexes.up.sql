@@ -1,7 +1,7 @@
 -- Migration 031: Add ngram bloom filter indexes on
--- ifNull(inputs_dump, ''), ifNull(output_dump, ''), and
--- ifNull(summary_dump, '') to accelerate substring filters over the
--- pre-aggregation calls_merged rows.
+-- ifNull(inputs_dump, ''), ifNull(output_dump, ''),
+-- ifNull(summary_dump, ''), and ifNull(attributes_dump, '') to
+-- accelerate substring filters over the pre-aggregation calls_merged rows.
 --
 -- The optimization_builder emits `ifNull(calls_merged.<dump>, '') LIKE ...`
 -- for heavy-field eq/contains/in filters before GROUP BY. Matching the index
@@ -46,3 +46,7 @@ ALTER TABLE calls_merged
 ALTER TABLE calls_merged
     ADD INDEX IF NOT EXISTS idx_summary_dump_ngram
         ifNull(summary_dump, '') TYPE ngrambf_v1(5, 65536, 3, 0) GRANULARITY 8;
+
+ALTER TABLE calls_merged
+    ADD INDEX IF NOT EXISTS idx_attributes_dump_ngram
+        ifNull(attributes_dump, '') TYPE ngrambf_v1(5, 65536, 3, 0) GRANULARITY 8;

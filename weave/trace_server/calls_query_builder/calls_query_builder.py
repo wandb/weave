@@ -40,6 +40,7 @@ from weave.shared.trace_server_interface_util import (
     wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import ch_sentinel_values
+from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
@@ -1794,10 +1795,13 @@ class CallsQuery(BaseModel):
         `id IN filter_candidate_ids` and keeps the OR-IS-NULL form.
 
         Returns None when the optimization does not apply:
+        - the `WF_CALLS_MERGED_HEAVY_INDEXES` env flag is off (operator-gated rollout),
         - non-calls_merged read tables (no GROUP BY, so no benefit),
         - heavy fields in ORDER BY (cannot mirror without GROUP BY/any()),
         - no heavy filter optimization (nothing to gain).
         """
+        if not wf_env.wf_calls_merged_heavy_indexes_enabled():
+            return None
         if self.read_table != ReadTable.CALLS_MERGED:
             return None
         if any(of.field.is_heavy() for of in self.order_fields):
