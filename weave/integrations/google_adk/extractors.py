@@ -34,7 +34,6 @@ from opentelemetry.semconv._incubating.attributes.gen_ai_attributes import (
     GEN_AI_RESPONSE_MODEL,
     GEN_AI_SYSTEM_INSTRUCTIONS,
     GEN_AI_TOOL_DEFINITIONS,
-    GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
     GenAiOutputTypeValues,
     GenAiSystemValues,
@@ -220,9 +219,12 @@ def set_llm_response_attributes(span: Span, llm_response: LlmResponse) -> None:
     usage = llm_response.usage_metadata
     if usage is None:
         return
-    # ADK emits prompt / candidates tokens via the legacy keys; we add the
-    # reasoning + cache token columns that Weave exposes but ADK either
-    # omits or stashes under the experimental namespace.
+    # ADK emits prompt / candidates tokens via the canonical keys; we add
+    # the two Gemini-specific usage fields Weave exposes that ADK leaves
+    # in the experimental namespace or omits. We do NOT emit
+    # ``gen_ai.usage.cache_creation.input_tokens`` here — that's an
+    # Anthropic-style "tokens written to cache" metric with no equivalent
+    # field on ``google-genai``'s ``GenerateContentResponseUsageMetadata``.
     if usage.thoughts_token_count is not None:
         span.set_attribute(
             GEN_AI_USAGE_REASONING_OUTPUT_TOKENS, int(usage.thoughts_token_count)
@@ -231,9 +233,4 @@ def set_llm_response_attributes(span: Span, llm_response: LlmResponse) -> None:
         span.set_attribute(
             GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
             int(usage.cached_content_token_count),
-        )
-    if usage.cache_creation_token_count is not None:
-        span.set_attribute(
-            GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-            int(usage.cache_creation_token_count),
         )

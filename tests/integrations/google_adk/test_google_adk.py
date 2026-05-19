@@ -90,7 +90,6 @@ class _MockUsageMetadata:
     candidates_token_count: int | None = None
     thoughts_token_count: int | None = None
     cached_content_token_count: int | None = None
-    cache_creation_token_count: int | None = None
 
 
 @dataclass
@@ -170,7 +169,6 @@ def test_unit_set_llm_response_attributes_full_payload() -> None:
             candidates_token_count=42,
             thoughts_token_count=8,
             cached_content_token_count=15,
-            cache_creation_token_count=5,
         ),
         interaction_id="resp-9988",
         model_version="gemini-2.0-flash-2025-01",
@@ -185,7 +183,6 @@ def test_unit_set_llm_response_attributes_full_payload() -> None:
     # Canonical OTel name from semantic-conventions#3383 (merged 2026-04-27).
     assert a["gen_ai.usage.reasoning.output_tokens"] == 8
     assert a["gen_ai.usage.cache_read.input_tokens"] == 15
-    assert a["gen_ai.usage.cache_creation.input_tokens"] == 5
 
     output_messages = json.loads(a["gen_ai.output.messages"])
     assert output_messages[0]["role"] == "assistant"
