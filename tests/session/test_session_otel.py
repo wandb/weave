@@ -51,6 +51,8 @@ from weave.session.session_otel import (
     invoke_agent_attributes,
     llm_attributes,
 )
+from weave.trace.context import weave_client_context
+from weave.trace.context.call_context import tracing_disabled
 
 
 @pytest.fixture(autouse=True)
@@ -65,8 +67,29 @@ def _reset_contextvars():
         session.end()
 
 
+_STUB_WEAVE_CLIENT = object()
+
+
+def _get_stub_weave_client() -> object:
+    return _STUB_WEAVE_CLIENT
+
+
 @pytest.fixture
-def otel_spans(monkeypatch: pytest.MonkeyPatch):
+def _weave_client_stub(monkeypatch: pytest.MonkeyPatch):
+    """Stub ``get_weave_client`` so ``is_tracing_setting_disabled()`` returns False.
+
+    The Session SDK's OTel emission is gated on ``is_tracing_setting_disabled()``,
+    which returns True when no client is initialized. Tests that exercise span
+    emission need a non-None client; we monkeypatch the lookup rather than
+    install a real client to keep these tests isolated from server fixtures.
+    """
+    monkeypatch.setattr(
+        weave_client_context, "get_weave_client", _get_stub_weave_client
+    )
+
+
+@pytest.fixture
+def otel_spans(monkeypatch: pytest.MonkeyPatch, _weave_client_stub):
     """Provide an in-memory span exporter for capturing OTel spans.
 
     Overrides the global OTel tracer provider for the duration of the test.
@@ -2313,3 +2336,79 @@ class TestReasoningFromOpenAIResponses:
         )
         assert result is not None
         assert result.content == "kept\nalso kept"
+
+
+class TestRespectsTracingSettingDisabled:
+    """Session SDK OTel emission must honor ``is_tracing_setting_disabled()``.
+
+    Three independent conditions disable tracing repo-wide; the Session SDK
+    has to respect each, so a user toggling weave off doesn't get surprise
+    spans from ``start_session`` / ``start_turn`` / ``log_turn``.
+    """
+
+    def test_weave_disabled_env_suppresses_spans(
+        self,
+        otel_spans: InMemorySpanExporter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("WEAVE_DISABLED", "true")
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            with start_llm(model="gpt-4o") as llm:
+                llm.record(output_messages=[Message(role="assistant", content="hi")])
+        assert otel_spans.get_finished_spans() == ()
+
+    def test_no_weave_client_suppresses_spans(
+        self,
+        otel_spans: InMemorySpanExporter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(weave_client_context, "get_weave_client", lambda: None)
+        with start_session(agent_name="bot", session_id="sess") as s, s.start_turn():
+            with start_llm(model="gpt-4o") as llm:
+                llm.record(output_messages=[Message(role="assistant", content="hi")])
+        assert otel_spans.get_finished_spans() == ()
+
+    def test_tracing_disabled_contextmanager_suppresses_spans(
+        self,
+        otel_spans: InMemorySpanExporter,
+    ) -> None:
+        with tracing_disabled():
+            with (
+                start_session(agent_name="bot", session_id="sess") as s,
+                s.start_turn(),
+            ):
+                with start_llm(model="gpt-4o") as llm:
+                    llm.record(
+                        output_messages=[Message(role="assistant", content="hi")]
+                    )
+        assert otel_spans.get_finished_spans() == ()
+
+    def test_log_turn_suppressed_when_disabled(
+        self,
+        otel_spans: InMemorySpanExporter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """``log_turn`` is a separate emission path from the context-manager API."""
+        monkeypatch.setenv("WEAVE_DISABLED", "true")
+        result = log_turn(
+            session_id="sess",
+            agent_name="bot",
+            messages=[Message(role="user", content="hi")],
+            spans=[LLM(model="gpt-4o")],
+        )
+        assert result.span_count == 0
+        assert result.trace_ids == []
+        assert otel_spans.get_finished_spans() == ()
+
+    def test_re_enables_after_contextmanager_exits(
+        self,
+        otel_spans: InMemorySpanExporter,
+    ) -> None:
+        """The contextmanager guard must not leak — spans resume after exit."""
+        with tracing_disabled():
+            with start_session(agent_name="bot", session_id="off") as s, s.start_turn():
+                pass
+        with start_session(agent_name="bot", session_id="on") as s, s.start_turn():
+            pass
+        names = [sp.name for sp in otel_spans.get_finished_spans()]
+        assert "invoke_agent bot" in names
