@@ -80,4 +80,5 @@ jobs:
 
       - name: Publish to npm
         working-directory: sdks/node
+        # npm trusted publishing authenticates this step through GitHub OIDC.
         run: npm publish --access public --provenance --tag "${{ inputs.npm_tag }}"
