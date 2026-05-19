@@ -1102,10 +1102,16 @@ class WeaveClient:
 
         # For calls_complete path (non-eager CallBatchProcessor), print the call link
         # after finish_call, when the complete call is queued to the batch processor.
+        # ``op`` may be None when callers (e.g. the imperative EvaluationLogger)
+        # finish a call without re-supplying the op; in that case we cannot tell
+        # whether the start was eager, so be conservative and don't claim the
+        # calls_complete path — the eager start already printed at create_call.
         is_root_call = call.parent_id is None
-        uses_calls_complete_path = isinstance(
-            self._server_call_processor, CallBatchProcessor
-        ) and not (op is not None and op.eager_call_start)
+        uses_calls_complete_path = (
+            isinstance(self._server_call_processor, CallBatchProcessor)
+            and op is not None
+            and not op.eager_call_start
+        )
 
         def on_end_complete(f: Future) -> None:
             try:
