@@ -4576,7 +4576,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         prediction_id = generate_id()
         genai_span_ref = (
-            req.genai_span_ref.model_dump(exclude_none=True)
+            [ref.model_dump(exclude_none=True) for ref in req.genai_span_ref]
             if req.genai_span_ref is not None
             else None
         )
@@ -4614,7 +4614,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 version=predict_and_score_op_res.digest,
             )
 
-            predict_and_score_weave_attrs = {
+            predict_and_score_weave_attrs: dict[str, Any] = {
                 constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
             }
             if genai_span_ref is not None:

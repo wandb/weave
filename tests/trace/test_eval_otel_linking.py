@@ -79,14 +79,57 @@ async def test_genai_span_ref_attached_to_eval_call(client, otel_setup):
 
     trial = res.rows[0].evaluations[0].trials[0]
     assert trial.genai_span_ref is not None
+    assert len(trial.genai_span_ref) == 1
     # OTel stores trace/span IDs as integers; W3C Trace Context represents them
     # as zero-padded hex: 32 hex chars for 128-bit trace IDs, 16 for 64-bit span IDs.
-    assert trial.genai_span_ref.trace_id == format(
+    assert trial.genai_span_ref[0].trace_id == format(
         genai_spans[0].context.trace_id, "032x"
     )
-    assert trial.genai_span_ref.span_id == format(
+    assert trial.genai_span_ref[0].span_id == format(
         genai_spans[0].context.span_id, "016x"
     )
+
+
+@pytest.mark.asyncio
+async def test_multiple_genai_span_refs_attached_to_eval_call(client, otel_setup):
+    """All GenAI OTel spans emitted during a prediction should be linked."""
+    exporter = otel_setup
+
+    @weave.op
+    async def model_predict(input) -> str:
+        _emit_genai_span("gpt-4o")
+        _emit_genai_span("gpt-4o-mini")
+        return input
+
+    evaluation = Evaluation(
+        dataset=[{"input": "1 + 1"}],
+        scorers=[],
+    )
+    await evaluation.evaluate(model_predict)
+    client.flush()
+
+    genai_spans = [
+        s
+        for s in exporter.get_finished_spans()
+        if s.attributes.get("gen_ai.operation.name")
+    ]
+    assert len(genai_spans) == 2
+
+    evaluate_call = next(iter(evaluation.evaluate.calls()))
+    res = client.server.eval_results_query(
+        tsi.EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[evaluate_call.id],
+            include_predict_and_score_children=False,
+        )
+    )
+
+    trial = res.rows[0].evaluations[0].trials[0]
+    assert trial.genai_span_ref is not None
+    assert {(r.trace_id, r.span_id) for r in trial.genai_span_ref} == {
+        (format(s.context.trace_id, "032x"), format(s.context.span_id, "016x"))
+        for s in genai_spans
+    }
 
 
 @pytest.mark.asyncio
