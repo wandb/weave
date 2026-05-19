@@ -157,16 +157,15 @@ When developing a new integration, it will automatically work with both implicit
 
    ```python
    import importlib
-   from typing import Optional
 
    import weave
    from weave.integrations.patcher import SymbolPatcher, MultiPatcher, NoOpPatcher
    from weave.trace.autopatch import IntegrationSettings
 
-   _<vendor>_patcher: Optional[MultiPatcher] = None
+   _<vendor>_patcher: MultiPatcher | None = None
 
    def get_<vendor>_patcher(
-       settings: Optional[IntegrationSettings] = None,
+       settings: IntegrationSettings | None = None,
    ) -> MultiPatcher | NoOpPatcher:
        if settings is None:
            settings = IntegrationSettings()
@@ -202,7 +201,7 @@ When developing a new integration, it will automatically work with both implicit
 7. Register the patch function to enable both implicit and explicit patching. Navigate to `weave/integrations/patch.py` and add a new patch function:
 
    ```python
-   def patch_<vendor>(settings: Optional[IntegrationSettings] = None) -> None:
+   def patch_<vendor>(settings: IntegrationSettings | None = None) -> None:
        """Enable Weave tracing for <Vendor>.
 
        When implicit patching is enabled (default), this is called automatically

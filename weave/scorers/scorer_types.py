@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, PrivateAttr
 
@@ -103,7 +103,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
         frozen=True,
     )
 
-    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
+    _pipeline: "Pipeline | None" = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
         ensure_hf_imports()
@@ -130,8 +130,8 @@ class HuggingFaceScorer(weave.Scorer):
         frozen=True,
         description="The device to use model, default to cpu.",
     )
-    _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
-    _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
+    _model: "PreTrainedModel | None" = PrivateAttr(default=None)
+    _tokenizer: "PreTrainedTokenizer | None" = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any = None, /) -> None:
         """Template method for post-initialization."""

@@ -37,11 +37,11 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
         class_names (list[str]): The list of target class names.
 
     Methods:
-        score(target: dict, model_output: Optional[dict]) -> dict:
+        score(target: dict, model_output: dict | None) -> dict:
             Compares the target class labels with the model outputs to indicate correctness for each class.
             Uses the "model_output" key for backwards compatibility.
 
-        summarize(score_rows: list) -> Optional[dict]:
+        summarize(score_rows: list) -> dict | None:
             Aggregates multiple scoring results to compute the precision, recall, and F1 score for each class.
     """
 
@@ -56,7 +56,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
             contains entries for each class with keys "correct" and "negative".
 
         Returns:
-            Optional[dict]: A dictionary mapping each class name to its metrics,
+            dict | None: A dictionary mapping each class name to its metrics,
             including keys "precision", "recall", and "f1".
         """
         result = {}
@@ -81,7 +81,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
 
         Args:
             target (dict): A dictionary mapping each class name to the ground truth label.
-            model_output (Optional[dict]): A dictionary mapping each class name to the model's output.
+            model_output (dict | None): A dictionary mapping each class name to the model's output.
                 If None, outputs are treated as false.
 
         Returns:

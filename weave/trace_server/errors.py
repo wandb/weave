@@ -2,7 +2,7 @@ import datetime
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
@@ -218,7 +218,7 @@ class ErrorDefinition:
 
 
 # Global registry instance
-_error_registry: Optional["ErrorRegistry"] = None
+_error_registry: "ErrorRegistry | None" = None
 
 
 class ErrorRegistry:

@@ -26,7 +26,7 @@ from weave.trace_server.clickhouse_schema import (
     CallCompleteCHInsertable,
     CallStartCHInsertable,
 )
-from weave.trace_server.errors import NotFoundError
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -1540,3 +1540,343 @@ def test_concurrent_queries_on_one_client_vs_session_autogeneration(
             assert "concurrent queries within the same session" in str(e), e
     else:
         assert not errors, errors
+
+
+# ── Explicit "latest" alias on obj_create ────────────────────────────
+#
+# End-to-end alias behavior (write, move on new version, move on dedup) is
+# covered against both backends via tests/trace/test_obj_tags_aliases.py
+# (test_alias_resolution + test_republish_promotes_to_latest). The tests
+# below cover paths that are unique to the CH server: the obj_create_batch
+# API (CH-only) and the partial-failure contract on the alias write.
+
+
+def _resolve_latest(ch_server, project_id: str, object_id: str) -> str:
+    """Resolve 'latest' for an object via the public obj_read API.
+
+    Used to probe alias state in tests: with the hybrid is_latest model,
+    obj_read('latest') returns the alias-pointed digest when the explicit
+    'latest' alias row is live, and falls back to the computed
+    most-recent-surviving digest when the alias is absent or tombstoned.
+    """
+    return ch_server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=object_id, digest="latest")
+    ).obj.digest
+
+
+def test_obj_create_batch_writes_latest_alias(ch_server):
+    """obj_create_batch should write a 'latest' alias for every object in the batch."""
+    project_id = make_project_id("alias")
+    batch = [
+        tsi.ObjSchemaForInsert(
+            project_id=project_id, object_id=f"batch_obj_{i}", val={"v": i}
+        )
+        for i in range(3)
+    ]
+    results = ch_server.obj_create_batch(batch)
+
+    for obj_in, res in zip(batch, results, strict=True):
+        assert _resolve_latest(ch_server, project_id, obj_in.object_id) == res.digest
+
+
+def test_obj_create_alias_failure_preserves_prior_latest(ch_server):
+    """If the alias INSERT raises after the version row lands, the new version
+    is readable by digest but 'latest' continues to resolve to the prior version.
+
+    Documents the CH best-effort partial-failure contract for the
+    (object_versions insert, aliases insert) pair.
+    """
+    project_id = make_project_id("alias")
+    obj_id = "alias_failure"
+
+    # Establish a prior latest.
+    r1 = _obj_create(ch_server, project_id, obj_id, {"v": 1})
+    assert _resolve_latest(ch_server, project_id, obj_id) == r1.digest
+
+    # Simulate failure on the alias write for the next obj_create.
+    # `mock.patch.object` correctly delattrs on exit when the original was
+    # a class method (not an instance attribute) — leaves ch_server.__dict__
+    # clean for test_reset_server_state_covers_all_attrs.
+    def failing_insert_aliases(*args, **kwargs):
+        raise RuntimeError("simulated alias write failure")
+
+    with patch.object(ch_server, "_insert_aliases", failing_insert_aliases):
+        with pytest.raises(RuntimeError, match="simulated alias write failure"):
+            _obj_create(ch_server, project_id, obj_id, {"v": 2})
+
+    # The version row landed (object_versions insert is unconditional in CH),
+    # but 'latest' still resolves to v1 because the alias write never
+    # completed. The explicit alias row pointing at v1 wins the hybrid
+    # is_latest projection over the (otherwise-newer) v2 row.
+    assert _resolve_latest(ch_server, project_id, obj_id) == r1.digest
+
+    # A retry of the same content takes the dedup path, succeeds, and
+    # promotes 'latest' to the new digest — the documented recovery flow.
+    r2_retry = _obj_create(ch_server, project_id, obj_id, {"v": 2})
+    assert _resolve_latest(ch_server, project_id, obj_id) == r2_retry.digest
+
+
+def test_delete_current_latest_promotes_prior_surviving_version(ch_server):
+    """Deleting the version that currently holds 'latest' must promote the
+    next surviving version to 'latest'.
+
+    Pre-WB-32435, is_latest was a window function over object_versions
+    ranked by `(deleted_at IS NULL) DESC, _first_created_at DESC` so a
+    soft-deleted latest naturally yielded the slot to the next surviving
+    version. Post-WB-32435, is_latest is projected from the aliases-table
+    CTE; obj_delete cascades a soft-delete onto the 'latest' alias row
+    but never re-points it. Without a fix, obj_read('latest') and
+    objs_query(latest_only=True) both go silent for an object that still
+    has a surviving version — a regression the existing test suite does
+    not cover because the public Python client's delete_object_versions
+    flow only ever exercises 'delete by alias name' or 'delete all'.
+    """
+    project_id = make_project_id("alias_delete_latest")
+    obj_id = "delete_latest_advances"
+
+    r0 = _obj_create(ch_server, project_id, obj_id, {"v": 0})
+    r1 = _obj_create(ch_server, project_id, obj_id, {"v": 1})
+
+    ch_server.obj_delete(
+        tsi.ObjDeleteReq(project_id=project_id, object_id=obj_id, digests=[r1.digest])
+    )
+
+    # objs_query(latest_only=True) should surface the surviving v0 row.
+    latest = ch_server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=True),
+        )
+    ).objs
+    assert len(latest) == 1
+    assert latest[0].digest == r0.digest
+    assert latest[0].is_latest == 1
+
+    # obj_read(digest='latest') must resolve to the surviving v0.
+    read_res = ch_server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=obj_id, digest="latest")
+    )
+    assert read_res.obj.digest == r0.digest
+
+
+# Common column lists for direct-insert seeding in the tests below.
+_OBJ_VER_COLS = [
+    "project_id",
+    "object_id",
+    "kind",
+    "base_object_class",
+    "leaf_object_class",
+    "refs",
+    "val_dump",
+    "digest",
+    "wb_user_id",
+    "created_at",
+    "deleted_at",
+]
+_ALIAS_COLS = [
+    "project_id",
+    "object_id",
+    "alias",
+    "digest",
+    "wb_user_id",
+    "created_at",
+    "deleted_at",
+]
+_ALIAS_LIVE = dt.datetime.fromtimestamp(0, tz=dt.timezone.utc)
+
+
+def _seed_obj_version(
+    ch_server,
+    project_id: str,
+    obj_id: str,
+    digest: str,
+    created_at: dt.datetime,
+    deleted_at: dt.datetime | None = None,
+) -> None:
+    ch_server._insert(
+        "object_versions",
+        data=[
+            [
+                project_id,
+                obj_id,
+                "object",
+                None,
+                None,
+                [],
+                "{}",
+                digest,
+                None,
+                created_at,
+                deleted_at,
+            ]
+        ],
+        column_names=_OBJ_VER_COLS,
+    )
+
+
+def _seed_alias_row(
+    ch_server,
+    project_id: str,
+    obj_id: str,
+    digest: str,
+    created_at: dt.datetime,
+    wb_user_id: str = "real_user",
+    deleted_at: dt.datetime | None = None,
+) -> None:
+    ch_server._insert(
+        "aliases",
+        data=[
+            [
+                project_id,
+                obj_id,
+                "latest",
+                digest,
+                wb_user_id,
+                created_at,
+                deleted_at if deleted_at is not None else _ALIAS_LIVE,
+            ]
+        ],
+        column_names=_ALIAS_COLS,
+    )
+
+
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
+def test_obj_create_batch_duplicate_object_id_last_entry_wins_latest(ch_server):
+    """obj_create_batch with two entries sharing object_id and different vals.
+
+    Both alias-row INSERTs land in one CH batch with effectively the same
+    `now64(3)` created_at — `argMax(digest, created_at)` ties, and CH
+    breaks ties by storage order (per-part insertion order for rows with
+    the same ORDER BY key).  Result: which digest wins 'latest' is
+    undefined by CH spec, and `obj_create_batch` does not reject duplicates.
+
+    This test pins the *expected* behavior — last entry in the batch wins
+    'latest' — and surfaces the non-determinism if it does not hold.  A
+    real fix would either (a) reject duplicate object_ids in the batch
+    or (b) deterministically order alias INSERTs so the last batch entry
+    wins (e.g. by post-processing alias_rows to keep only the last entry
+    per object_id, OR by stamping alias rows with incrementing created_at
+    within the batch).
+
+    Decorated with `@pytest.mark.flaky(reruns=3)` because storage-order
+    tiebreaking is not stable across runs; the failure mode here is the
+    documented non-determinism, not a real regression.
+    """
+    project_id = make_project_id("alias_batch_dup")
+    obj_id = "batch_dup_obj"
+    batch = [
+        tsi.ObjSchemaForInsert(project_id=project_id, object_id=obj_id, val={"v": "A"}),
+        tsi.ObjSchemaForInsert(project_id=project_id, object_id=obj_id, val={"v": "B"}),
+    ]
+    results = ch_server.obj_create_batch(batch)
+    # Both digests should be returned (they're content-derived).
+    digest_a = results[0].digest
+    digest_b = results[1].digest
+    assert digest_a != digest_b, "fixture invariant: vals must yield distinct digests"
+
+    resolved = _resolve_latest(ch_server, project_id, obj_id)
+    assert resolved == digest_b, (
+        f"obj_create_batch with duplicate object_id resolved 'latest' to "
+        f"{resolved!r}; expected {digest_b!r} (the last entry in the batch).  "
+        f"Both alias rows land at the same now64(3) timestamp; argMax ties "
+        f"and CH breaks the tie by storage order, which is implementation-"
+        f"defined.  Either deduplicate alias_rows in obj_create_batch (keep "
+        f"only the last per object_id) or reject duplicate object_ids in "
+        f"the batch."
+    )
+
+
+def test_legacy_no_alias_row_resolves_latest_via_computed_fallback(ch_server):
+    """An object with a version row but NO 'latest' alias row (legacy data
+    that pre-dates obj_create's alias write) must still resolve
+    `obj_read('latest')` via the hybrid CTE's computed fallback.
+
+    Catches: re-introducing the `if digest == "latest": return None`
+    short-circuit in `_maybe_resolve_alias` while simultaneously
+    removing the computed-fallback branch of the is_latest CTE — would
+    leave legacy objects with no way to resolve 'latest'.
+
+    Also catches the inverse: removing the short-circuit but breaking
+    the fallback such that legacy objects only resolve via the alias row.
+    """
+    project_id = make_project_id("legacy_no_alias")
+    obj_id = "legacy_obj"
+    t_old = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t_new = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+
+    _seed_obj_version(ch_server, project_id, obj_id, "legacy_v0", t_old)
+    _seed_obj_version(ch_server, project_id, obj_id, "legacy_v1", t_new)
+    # Note: no alias row inserted.
+
+    # _maybe_resolve_alias returns None (no alias row).  obj_read falls
+    # through to make_metadata_query's CTE, where the computed fallback
+    # (window function ranked by _first_created_at DESC) picks legacy_v1.
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") is None
+    read_res = ch_server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=obj_id, digest="latest")
+    )
+    assert read_res.obj.digest == "legacy_v1", (
+        f"legacy object with no alias row resolved 'latest' to "
+        f"{read_res.obj.digest!r}; expected 'legacy_v1' (most recently "
+        f"published).  The computed fallback in the is_latest CTE is not "
+        f"firing — check that the CTE's IF expression includes the "
+        f"`(project_id, object_id) NOT IN latest_alias_per_object` branch."
+    )
+    # Same answer through the latest_only path.
+    latest_only = ch_server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=True),
+        )
+    ).objs
+    assert [o.digest for o in latest_only] == ["legacy_v1"]
+
+
+def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
+    """When the 'latest' alias points to a digest whose object_versions
+    row has been soft-deleted (a state obj_delete normally prevents by
+    cascading the alias soft-delete, but which can arise from partial
+    failures or external maintenance), `obj_read('latest')` must fail
+    cleanly rather than return a ghost record.
+
+    `_maybe_resolve_alias` returns the (live) alias digest; the
+    subsequent obj_read filters on `deleted_at IS NULL` and finds no
+    rows.  Expected behavior: raise NotFoundError / ObjectDeletedError.
+
+    Catches: anyone removing the `deleted_at IS NULL` filter from the
+    object-fetch path, which would surface deleted versions as 'latest'.
+    """
+    project_id = make_project_id("alias_to_tomb")
+    obj_id = "alias_to_tomb_obj"
+    digest_dead = "alias_target_tomb"
+    t_pub = dt.datetime(2026, 5, 14, 10, 0, 0, tzinfo=dt.timezone.utc)
+    t_tomb = dt.datetime(2026, 5, 14, 11, 0, 0, tzinfo=dt.timezone.utc)
+    t_alias = dt.datetime(2026, 5, 14, 12, 0, 0, tzinfo=dt.timezone.utc)
+
+    # Version exists then gets tombstoned, without going through obj_delete
+    # (so the alias cascade does not run).  Then the live alias row points
+    # at the now-tombstoned digest.
+    _seed_obj_version(
+        ch_server, project_id, obj_id, digest_dead, t_pub, deleted_at=t_tomb
+    )
+    _seed_alias_row(ch_server, project_id, obj_id, digest_dead, t_alias)
+
+    # _maybe_resolve_alias resolves to the digest (it only knows about the
+    # aliases table, not whether the target is alive in object_versions).
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == digest_dead
+
+    # obj_read must NOT return the tombstoned version.  Either raises, or
+    # falls through to the CTE's computed fallback — which itself filters
+    # tombstones via `(deleted_at IS NULL) DESC` and would find nothing.
+    with pytest.raises((NotFoundError, ObjectDeletedError)) as exc_info:
+        ch_server.obj_read(
+            tsi.ObjReadReq(project_id=project_id, object_id=obj_id, digest="latest")
+        )
+    # Sanity: the error mentions "not found" or "deleted" — i.e. it's a
+    # NotFoundError-family failure, not an unrelated crash.
+    msg = str(exc_info.value).lower()
+    assert "not found" in msg or "deleted" in msg, (
+        f"obj_read raised an unexpected exception when 'latest' alias "
+        f"pointed at a tombstoned version: {exc_info.value!r}.  Expected a "
+        f"NotFoundError-family error mentioning 'not found' or 'deleted'."
+    )

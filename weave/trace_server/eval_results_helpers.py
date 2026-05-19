@@ -289,23 +289,57 @@ def best_effort_scorer_call_ids(
     return result
 
 
-def extract_genai_span_ref(call: tsi.CallSchema | None) -> tsi.GenAISpanRef | None:
-    """Extract an optional GenAI span ref from call attributes."""
-    if call is None or not isinstance(call.attributes, dict):
+def extract_genai_span_refs_from_weave_namespace(
+    data: dict[str, Any] | tsi.SummaryMap | None,
+) -> list[tsi.GenAISpanRef] | None:
+    if not isinstance(data, dict):
         return None
 
-    weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
-    if not isinstance(weave_attrs, dict):
+    weave_data = data.get(constants.WEAVE_ATTRIBUTES_NAMESPACE)
+    if not isinstance(weave_data, dict):
         return None
 
-    raw_ref = weave_attrs.get(constants.GENAI_SPAN_REF_ATTR_KEY)
-    if not isinstance(raw_ref, dict):
+    raw_refs = weave_data.get(constants.GENAI_SPAN_REF_ATTR_KEY)
+    if not isinstance(raw_refs, list):
         return None
 
-    try:
-        return tsi.GenAISpanRef.model_validate(raw_ref)
-    except ValidationError:
+    refs: list[tsi.GenAISpanRef] = []
+    for item in raw_refs:
+        if not isinstance(item, dict):
+            continue
+        try:
+            refs.append(tsi.GenAISpanRef.model_validate(item))
+        except ValidationError:
+            continue
+    return refs or None
+
+
+def extract_genai_span_refs(
+    call: tsi.CallSchema | None,
+) -> list[tsi.GenAISpanRef] | None:
+    """Extract optional GenAI span refs from call attributes or summary."""
+    if call is None:
         return None
+
+    return extract_genai_span_refs_from_weave_namespace(
+        call.attributes
+    ) or extract_genai_span_refs_from_weave_namespace(call.summary)
+
+
+def _combine_genai_span_refs(
+    predict_call: tsi.CallSchema | None,
+    predict_and_score_call: tsi.CallSchema,
+) -> list[tsi.GenAISpanRef] | None:
+    refs: list[tsi.GenAISpanRef] = []
+    seen: set[tuple[str, str]] = set()
+    for call in (predict_call, predict_and_score_call):
+        extracted = extract_genai_span_refs(call)
+        for ref in extracted or []:
+            key = (ref.trace_id, ref.span_id)
+            if key not in seen:
+                refs.append(ref)
+                seen.add(key)
+    return refs or None
 
 
 def _build_trial(
@@ -346,8 +380,7 @@ def _build_trial(
             predict_call.summary if predict_call else predict_and_score_call.summary
         ),
         scorer_call_ids=best_effort_scorer_call_ids(scores, trial_children),
-        genai_span_ref=extract_genai_span_ref(predict_call)
-        or extract_genai_span_ref(predict_and_score_call),
+        genai_span_ref=_combine_genai_span_refs(predict_call, predict_and_score_call),
     )
 
 
