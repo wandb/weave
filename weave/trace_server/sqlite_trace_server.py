@@ -2718,6 +2718,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        # Validate the replacement payload before purging — if validation
+        # rejects we want the old row preserved, not destroyed.
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        validate_feedback_create_req(create_req, self)
         purge_request = tsi.FeedbackPurgeReq(
             project_id=req.project_id,
             query={
@@ -2730,7 +2734,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             },
         )
         self.feedback_purge(purge_request)
-        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
         create_result = self.feedback_create(create_req)
 
         return tsi.FeedbackReplaceRes(
