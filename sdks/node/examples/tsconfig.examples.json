@@ -1,16 +1,9 @@
 {
-  "extends": "../tsconfig.json",
-  "exclude": [],
   "compilerOptions": {
-    "rootDir": ".",
-    "outDir": "../dist/examples",
-    "paths": {
-      "weave": ["../dist/src"]
-    }
-  },
-  "references": [
-    {
-      "path": "../src/tsconfig.src.json"
-    }
-  ]
+    "target": "es2022",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "strict": true,
+    "paths": {"weave": ["../dist/index.d.ts"]}
+  }
 }
