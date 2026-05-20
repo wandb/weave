@@ -512,6 +512,8 @@ class AgentSpanGroupRow(BaseModel):
     invocation_count: int = 0  # countIf(operation_name = 'invoke_agent')
     conversation_count: int = 0
     total_input_tokens: int = 0
+    total_cache_creation_input_tokens: int = 0
+    total_cache_read_input_tokens: int = 0
     total_output_tokens: int = 0
     total_duration_ms: int = 0
     error_count: int = 0

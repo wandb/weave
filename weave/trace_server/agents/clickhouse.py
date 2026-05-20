@@ -637,6 +637,12 @@ def _hydrate_group_row(
         invocation_count=safe_int(row.get("invocation_count")),
         conversation_count=safe_int(row.get("conversation_count")),
         total_input_tokens=safe_int(row.get("total_input_tokens")),
+        total_cache_creation_input_tokens=safe_int(
+            row.get("total_cache_creation_input_tokens")
+        ),
+        total_cache_read_input_tokens=safe_int(
+            row.get("total_cache_read_input_tokens")
+        ),
         total_output_tokens=safe_int(row.get("total_output_tokens")),
         total_duration_ms=safe_int(row.get("total_duration_ms")),
         error_count=safe_int(row.get("error_count")),
