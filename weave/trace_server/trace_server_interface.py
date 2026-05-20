@@ -1191,23 +1191,33 @@ class FeedbackCreateReq(BaseModelStrict):
     # typed scorer outputs; populated by agent-monitor scorers
     scorer_tags: list[str] | None = Field(
         default=None,
-        description="Tags applied to the ref by a scorer, e.g. ['nsfw', 'pii'].",
+        description="Tags applied to the ref by a scorer",
         examples=[["nsfw", "high-quality"]],
+    )
+    scorer_tag_reasons: dict[str, str] | None = Field(
+        default=None,
+        description="reason text per tag, keyed by tag name",
+        examples=[{"nsfw": "Contains explicit language"}],
+    )
+    scorer_tag_confidences: dict[str, float] | None = Field(
+        default=None,
+        description="confidence (0-1) per tag, keyed by tag name",
+        examples=[{"nsfw": 0.92}],
     )
     scorer_ratings: dict[str, float] | None = Field(
         default=None,
-        description="Numeric ratings (0-1) keyed by name, e.g. {'_rating_': 0.87}.",
+        description="numeric ratings (0-1) keyed by rating name",
         examples=[{"_rating_": 0.87}],
     )
-    scorer_reasons: dict[str, str] | None = Field(
+    scorer_rating_reasons: dict[str, str] | None = Field(
         default=None,
-        description="Optional reason text keyed by 'tag.<name>' or 'rating.<name>'.",
-        examples=[{"tag.nsfw": "Contains explicit language"}],
+        description="reason text per rating, keyed by rating name",
+        examples=[{"_rating_": "very confident response"}],
     )
-    scorer_confidences: dict[str, float] | None = Field(
+    scorer_rating_confidences: dict[str, float] | None = Field(
         default=None,
-        description="Optional confidence (0-1) keyed by 'tag.<name>' or 'rating.<name>'.",
-        examples=[{"rating._rating_": 0.92}],
+        description="confidence (0-1) per rating, keyed by rating name",
+        examples=[{"_rating_": 0.92}],
     )
 
     # wb_user_id is automatically populated by the server
