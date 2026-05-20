@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import importlib
+import threading
 from unittest.mock import MagicMock, patch
 
 import gql
@@ -38,34 +38,40 @@ class TestSslVerifyEnv:
 
 
 class TestHttpxClientSslVerify:
-    """The global httpx.Client in http_requests respects ssl_verify().
+    """The per-thread httpx.Client in http_requests respects ssl_verify().
 
-    The http_requests module creates a module-level `client = httpx.Client(verify=...)`
-    at import time, so we must reload the module after changing the env var to
-    re-create the client with the new SSL setting. After the test we reload again
-    to restore the default client for other tests.
+    The client is built lazily on first use, so changing the env var and then
+    asking for a fresh client (e.g. from a new thread) picks up the new SSL
+    setting without reloading the module.
     """
+
+    def _client_in_fresh_thread(self) -> httpx.Client:
+        # Each thread has its own cache, so calling from a fresh thread
+        # forces a new client to be built with the current env.
+        captured: list[httpx.Client] = []
+
+        def grab() -> None:
+            captured.append(http_requests.get_client())
+
+        t = threading.Thread(target=grab)
+        t.start()
+        t.join()
+        return captured[0]
 
     def test_client_verify_disabled(self, monkeypatch):
         monkeypatch.setenv(WEAVE_INSECURE_DISABLE_SSL, "true")
-        # Reload to re-create the module-level httpx.Client with verify=False.
-        importlib.reload(http_requests)
-        try:
-            # httpx bakes the verify flag into an ssl_context on the transport pool;
-            # CERT_NONE means SSL certificate verification is disabled.
-            transport = http_requests.client._transport
-            assert isinstance(transport, httpx.HTTPTransport)
-            pool = transport._pool
-            assert pool._ssl_context.verify_mode.name == "CERT_NONE"
-        finally:
-            # Restore the module-level client to its default (verify=True) state
-            # so other tests aren't affected.
-            monkeypatch.delenv(WEAVE_INSECURE_DISABLE_SSL, raising=False)
-            importlib.reload(http_requests)
+        client = self._client_in_fresh_thread()
+        # httpx bakes the verify flag into an ssl_context on the transport pool;
+        # CERT_NONE means SSL certificate verification is disabled.
+        transport = client._transport
+        assert isinstance(transport, httpx.HTTPTransport)
+        pool = transport._pool
+        assert pool._ssl_context.verify_mode.name == "CERT_NONE"
 
-    def test_client_verify_enabled_by_default(self):
-        # Without WEAVE_INSECURE_DISABLE_SSL set, the client should verify certs.
-        transport = http_requests.client._transport
+    def test_client_verify_enabled_by_default(self, monkeypatch):
+        monkeypatch.delenv(WEAVE_INSECURE_DISABLE_SSL, raising=False)
+        client = self._client_in_fresh_thread()
+        transport = client._transport
         assert isinstance(transport, httpx.HTTPTransport)
         pool = transport._pool
         assert pool._ssl_context.verify_mode.name != "CERT_NONE"

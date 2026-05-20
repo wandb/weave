@@ -18,6 +18,30 @@ from weave.trace.settings import http_timeout
 
 console = Console()
 
+# Per-thread client cache. httpx.Client is thread-safe at the API level, but
+# its connection pool and SSL state are NOT safe across fork(): a child that
+# inherits an open Client will share TCP sockets with the parent and corrupt
+# both. We resolve both axes here by:
+#   * Storing the Client in threading.local so each thread reads/writes its
+#     own attribute and there is no shared mutable state across threads.
+#   * Tagging the cached Client with the PID at creation. On every access we
+#     compare the current PID to the cached one and rebuild after fork().
+#
+# The Client is created lazily on first use so importing this module never
+# opens sockets or builds an SSL context, which keeps fork-before-first-use
+# safe and avoids leaking fds in subprocesses that never make HTTP calls.
+
+
+class _ClientCache(threading.local):
+    # threading.local.__init__ runs once per thread on first access, so every
+    # thread sees its own fresh None pair without any getattr-style probing.
+    def __init__(self) -> None:
+        self.client: httpx.Client | None = None
+        self.pid: int | None = None
+
+
+_thread_local = _ClientCache()
+
 # See https://rich.readthedocs.io/en/stable/appendix/colors.html
 STYLE_LABEL = "bold slate_blue3"
 STYLE_METHOD = "bold cyan"
@@ -171,14 +195,26 @@ def _log_response(response: Response) -> None:
     pprint_response(response)
 
 
-client = httpx.Client(
-    # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
-    # works natively.
-    event_hooks={"request": [_log_request], "response": [_log_response]},
-    timeout=http_timeout(),
-    limits=CLIENT_LIMITS,
-    verify=ssl_verify(),
-)
+def get_client() -> httpx.Client:
+    """Return an httpx.Client safe to use from the current thread and process.
+
+    Caches one client per (process, thread) pair. After a fork() the child
+    inherits the parent's cached client but its PID no longer matches, so we
+    drop the stale reference (without closing it — that would also tear down
+    the parent's still-live sockets) and build a fresh one.
+    """
+    pid = os.getpid()
+    if _thread_local.client is None or _thread_local.pid != pid:
+        _thread_local.client = httpx.Client(
+            # Use HTTPX's default transport so env proxy handling (including
+            # NO_PROXY) works natively.
+            event_hooks={"request": [_log_request], "response": [_log_response]},
+            timeout=http_timeout(),
+            limits=CLIENT_LIMITS,
+            verify=ssl_verify(),
+        )
+        _thread_local.pid = pid
+    return _thread_local.client
 
 
 def get(
@@ -189,6 +225,7 @@ def get(
     **kwargs: Any,
 ) -> Response:
     """Send a GET request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -206,6 +243,7 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -223,6 +261,7 @@ def put(
     **kwargs: Any,
 ) -> Response:
     """Send a PUT request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -239,6 +278,7 @@ def delete(
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)

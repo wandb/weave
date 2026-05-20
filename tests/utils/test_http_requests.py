@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import threading
 from unittest.mock import patch
 
 import httpx
@@ -25,7 +27,39 @@ def clear_http_env(monkeypatch):
 
 
 def test_client_uses_default_httpx_transport():
-    assert isinstance(http_requests.client._transport, httpx.HTTPTransport)
+    assert isinstance(http_requests.get_client()._transport, httpx.HTTPTransport)
+
+
+def test_get_client_is_cached_per_thread():
+    assert http_requests.get_client() is http_requests.get_client()
+
+
+def test_get_client_is_distinct_across_threads():
+    clients: list[httpx.Client] = []
+
+    def collect() -> None:
+        clients.append(http_requests.get_client())
+
+    threads = [threading.Thread(target=collect) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(clients) == 3
+    assert len({id(c) for c in clients}) == 3
+    assert http_requests.get_client() not in clients
+
+
+def test_get_client_rebuilds_after_fork(monkeypatch):
+    main = http_requests.get_client()
+
+    real_pid = os.getpid()
+    fake_pid = real_pid + 1
+    monkeypatch.setattr(http_requests.os, "getpid", lambda: fake_pid)
+
+    after_fork = http_requests.get_client()
+    assert after_fork is not main
 
 
 def test_request_hook_logs_when_enabled(monkeypatch):
