@@ -82,6 +82,7 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
+    replace_genai_content_blobs_in_span_attrs,
 )
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
@@ -747,6 +748,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
+
+                    replace_genai_content_blobs_in_span_attrs(
+                        span.attributes, req.project_id, self
+                    )
 
                     calls.append(
                         span.to_call(
@@ -6750,7 +6755,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+        res, span_rows = AgentWriteHandler(self.ch_client, self).insert_otel_spans(req)
 
         # Return early without emitting kafka events if online eval or agent scoring are disabled
         if not wf_env.wf_enable_online_eval() or not wf_env.wf_enable_agent_scoring():

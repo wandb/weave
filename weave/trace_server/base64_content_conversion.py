@@ -11,6 +11,7 @@ from typing import Any, TypeVar
 
 import ddtrace
 
+from weave.trace_server.opentelemetry.helpers import get_attribute
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallEndV2Req,
@@ -253,3 +254,161 @@ def process_complete_call_to_content(
         complete_call.output, complete_call.project_id, trace_server
     )
     return complete_call
+
+
+# ---------------------------------------------------------------------------
+# GenAI content blob conversion
+# ---------------------------------------------------------------------------
+
+_GENAI_MESSAGE_ATTR_KEYS = {
+    "gen_ai.input.messages": "user",
+    "gen_ai.output.messages": "assistant",
+}
+
+_CONTENT_REFS_KEY = "weave.content_refs"
+
+
+def _is_flat_dict(data: dict[str, Any]) -> bool:
+    """Return True if the dict uses dotted keys (flat), False if nested."""
+    return any("." in k for k in data)
+
+
+def _set_attribute(data: dict[str, Any], key: str, value: Any) -> None:
+    """Set a value in a potentially nested or flat dict, mirroring get_attribute."""
+    if key in data:
+        data[key] = value
+        return
+    if _is_flat_dict(data):
+        data[key] = value
+        return
+    segments = key.split(".")
+    current: Any = data
+    for seg in segments[:-1]:
+        if isinstance(current, dict) and seg in current:
+            current = current[seg]
+        else:
+            if isinstance(current, dict):
+                current[seg] = {}
+                current = current[seg]
+            else:
+                return
+    if isinstance(current, dict):
+        current[segments[-1]] = value
+
+
+@ddtrace.tracer.wrap(name="replace_genai_content_blobs_in_span_attrs")
+def replace_genai_content_blobs_in_span_attrs(
+    attrs: dict[str, Any],
+    project_id: str,
+    trace_server: TraceServerInterface,
+) -> dict[str, Any]:
+    """Replace Google GenAI-style blob parts with stored Content objects.
+
+    Google GenAI OTel spans encode binary data (images, audio) as message
+    parts with ``{"type": "blob", "data": "<base64>", "mime_type": "..."}``.
+    This function walks ``gen_ai.input.messages`` and
+    ``gen_ai.output.messages``, converts each blob part into a
+    ``weave.Content`` object persisted in file storage, and replaces the
+    inline blob with a Content reference dict.
+
+    Also populates ``weave.content_refs`` with metadata so the chat view
+    can render the stored media.
+
+    Modifies *attrs* in place and returns it.
+    """
+    all_content_refs: list[str] = []
+
+    for key, default_role in _GENAI_MESSAGE_ATTR_KEYS.items():
+        raw = get_attribute(attrs, key)
+        if raw is None:
+            continue
+
+        messages = raw
+        was_string = isinstance(raw, str)
+        if was_string:
+            try:
+                messages = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+        if not isinstance(messages, list):
+            continue
+
+        modified, refs = _replace_blobs_in_messages(
+            messages, project_id, trace_server, default_role
+        )
+        all_content_refs.extend(refs)
+        if modified:
+            new_val = json.dumps(messages) if was_string else messages
+            _set_attribute(attrs, key, new_val)
+            logger.debug(
+                "Replaced %d blob part(s) in %s for project %s",
+                len(refs), key, project_id,
+            )
+
+    if all_content_refs:
+        existing = get_attribute(attrs, _CONTENT_REFS_KEY)
+        if isinstance(existing, list):
+            existing.extend(all_content_refs)
+        else:
+            _set_attribute(attrs, _CONTENT_REFS_KEY, all_content_refs)
+        logger.debug(
+            "Set %d content_refs on span attrs: %s",
+            len(all_content_refs),
+            [json.loads(r)["role"] for r in all_content_refs],
+        )
+
+    return attrs
+
+
+def _replace_blobs_in_messages(
+    messages: list[Any],
+    project_id: str,
+    trace_server: TraceServerInterface,
+    default_role: str,
+) -> tuple[bool, list[str]]:
+    """Walk message parts and replace blob entries with Content refs.
+
+    Returns (modified, content_ref_strings) where each content_ref_string
+    is a JSON-serialized ContentRef for the ``weave.content_refs`` attribute.
+    """
+    modified = False
+    content_refs: list[str] = []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role", default_role)
+        parts = msg.get("parts")
+        if not isinstance(parts, list):
+            continue
+        for i, part in enumerate(parts):
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") != "blob":
+                continue
+            data = part.get("data")
+            mime_type = part.get("mime_type")
+            if not data or not mime_type:
+                continue
+            try:
+                content_obj = Content.from_base64(data, mimetype=mime_type)
+                ref = store_content_object(content_obj, project_id, trace_server)
+                parts[i] = ref
+                modified = True
+                ref_entry = {
+                    "digest": ref["files"]["content"],
+                    "media_type": content_obj.mimetype,
+                    "role": role,
+                    "size_bytes": content_obj.size,
+                }
+                content_refs.append(json.dumps(ref_entry))
+                logger.debug(
+                    "Converted blob part %d: role=%s, mime=%s, size=%d, digest=%s",
+                    i, role, content_obj.mimetype, content_obj.size,
+                    ref["files"]["content"],
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to convert GenAI blob part to Content: %s", e
+                )
+    return modified, content_refs

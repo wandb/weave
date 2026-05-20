@@ -12,6 +12,7 @@ from weave.trace_server.base64_content_conversion import (
     is_data_uri,
     process_call_req_to_content,
     replace_base64_with_content_objects,
+    replace_genai_content_blobs_in_span_attrs,
     store_content_object,
 )
 from weave.trace_server.trace_server_interface import (
@@ -514,6 +515,202 @@ class TestThresholdAndStructuralIdentity:
         # unchanged regardless of the SDK copy.
         assert processed.start.inputs == inputs_before
         assert trace_server.file_create.call_count == 0
+
+
+class TestGenAIContentBlobConversion:
+    """Test conversion of Google GenAI-style blob parts in span attributes."""
+
+    @staticmethod
+    def _make_trace_server():
+        ts = MagicMock()
+        ts.file_create = MagicMock(
+            side_effect=lambda req: FileCreateRes(digest=f"digest_{req.name}")
+        )
+        return ts
+
+    @staticmethod
+    def _make_png_b64(size: int = 12000) -> str:
+        raw = b"\x89PNG\r\n\x1a\n" + b"\x00" * size
+        return base64.b64encode(raw).decode("ascii")
+
+    def test_blob_part_in_input_messages_flat(self):
+        """Flat attribute key: gen_ai.input.messages as a JSON string."""
+        ts = self._make_trace_server()
+        b64 = self._make_png_b64()
+        messages = json.dumps([
+            {
+                "role": "user",
+                "parts": [
+                    {"content": "Describe this image.", "type": "text"},
+                    {"data": b64, "mime_type": "image/png", "type": "blob"},
+                ],
+            }
+        ])
+        attrs = {"gen_ai.input.messages": messages}
+
+        replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
+
+        result_messages = json.loads(attrs["gen_ai.input.messages"])
+        text_part = result_messages[0]["parts"][0]
+        blob_part = result_messages[0]["parts"][1]
+
+        assert text_part["content"] == "Describe this image."
+        assert blob_part["_type"] == "CustomWeaveType"
+        assert "files" in blob_part
+        assert ts.file_create.call_count == 2
+
+        # Verify content_refs populated for chat view media rendering
+        content_refs = attrs["weave.content_refs"]
+        assert len(content_refs) == 1
+        ref = json.loads(content_refs[0])
+        assert ref["digest"] == "digest_content"
+        assert ref["media_type"].startswith("image/")
+        assert ref["role"] == "user"
+        assert ref["size_bytes"] > 0
+
+    def test_blob_part_in_output_messages_flat(self):
+        """Flat attribute key: gen_ai.output.messages with audio blob."""
+        ts = self._make_trace_server()
+        audio_data = b"\x00\x01" * 6000
+        b64 = base64.b64encode(audio_data).decode("ascii")
+        messages = json.dumps([
+            {
+                "role": "assistant",
+                "parts": [
+                    {"data": b64, "mime_type": "audio/L16;codec=pcm;rate=24000", "type": "blob"},
+                ],
+            }
+        ])
+        attrs = {"gen_ai.output.messages": messages}
+
+        replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
+
+        result_messages = json.loads(attrs["gen_ai.output.messages"])
+        blob_part = result_messages[0]["parts"][0]
+        assert blob_part["_type"] == "CustomWeaveType"
+        assert ts.file_create.call_count == 2
+
+        content_refs = attrs["weave.content_refs"]
+        assert len(content_refs) == 1
+        ref = json.loads(content_refs[0])
+        assert ref["role"] == "assistant"
+        assert ref["size_bytes"] > 0
+
+    def test_blob_part_in_nested_attrs(self):
+        """Nested attribute structure: gen_ai -> input -> messages."""
+        ts = self._make_trace_server()
+        b64 = self._make_png_b64()
+        messages = json.dumps([
+            {
+                "role": "user",
+                "parts": [
+                    {"data": b64, "mime_type": "image/png", "type": "blob"},
+                ],
+            }
+        ])
+        attrs = {"gen_ai": {"input": {"messages": messages}}}
+
+        replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
+
+        result_messages = json.loads(attrs["gen_ai"]["input"]["messages"])
+        assert result_messages[0]["parts"][0]["_type"] == "CustomWeaveType"
+        # content_refs are written to the weave namespace (nested)
+        assert len(attrs["weave"]["content_refs"]) == 1
+
+    def test_non_blob_parts_untouched(self):
+        """Text parts and other part types are not modified."""
+        ts = self._make_trace_server()
+        messages = json.dumps([
+            {
+                "role": "user",
+                "parts": [
+                    {"content": "Hello", "type": "text"},
+                    {"content": "Some reasoning", "type": "reasoning"},
+                ],
+            }
+        ])
+        attrs = {"gen_ai.input.messages": messages}
+
+        replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
+
+        result_messages = json.loads(attrs["gen_ai.input.messages"])
+        assert result_messages[0]["parts"][0] == {"content": "Hello", "type": "text"}
+        assert result_messages[0]["parts"][1] == {"content": "Some reasoning", "type": "reasoning"}
+        assert ts.file_create.call_count == 0
+
+    def test_no_message_attrs_is_noop(self):
+        """Attributes without gen_ai message keys are untouched."""
+        ts = self._make_trace_server()
+        attrs = {"code.function.name": "some_func", "gen_ai.request.model": "gemini"}
+
+        result = replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
+
+        assert result is attrs
+        assert ts.file_create.call_count == 0
+
+    def test_already_parsed_list_messages(self):
+        """Messages that are already a list (not JSON string) are handled."""
+        ts = self._make_trace_server()
+        b64 = self._make_png_b64()
+        messages = [
+            {
+                "role": "user",
+                "parts": [
+                    {"data": b64, "mime_type": "image/png", "type": "blob"},
+                ],
+            }
+        ]
+        attrs = {"gen_ai.input.messages": messages}
+
+        replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
+
+        blob_part = attrs["gen_ai.input.messages"][0]["parts"][0]
+        assert blob_part["_type"] == "CustomWeaveType"
+
+    def test_multiple_blobs_in_same_message(self):
+        """Multiple blob parts in a single message are all converted."""
+        ts = self._make_trace_server()
+        b64_1 = self._make_png_b64(10000)
+        b64_2 = self._make_png_b64(11000)
+        messages = json.dumps([
+            {
+                "role": "user",
+                "parts": [
+                    {"content": "Compare these.", "type": "text"},
+                    {"data": b64_1, "mime_type": "image/png", "type": "blob"},
+                    {"data": b64_2, "mime_type": "image/jpeg", "type": "blob"},
+                ],
+            }
+        ])
+        attrs = {"gen_ai.input.messages": messages}
+
+        replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
+
+        result_messages = json.loads(attrs["gen_ai.input.messages"])
+        assert result_messages[0]["parts"][0]["content"] == "Compare these."
+        assert result_messages[0]["parts"][1]["_type"] == "CustomWeaveType"
+        assert result_messages[0]["parts"][2]["_type"] == "CustomWeaveType"
+        # 2 blobs × 2 file_create calls each (content + metadata)
+        assert ts.file_create.call_count == 4
+
+    def test_blob_without_data_is_skipped(self):
+        """A blob part missing the data field is left unchanged."""
+        ts = self._make_trace_server()
+        messages = json.dumps([
+            {
+                "role": "user",
+                "parts": [
+                    {"mime_type": "image/png", "type": "blob"},
+                ],
+            }
+        ])
+        attrs = {"gen_ai.input.messages": messages}
+
+        replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
+
+        result_messages = json.loads(attrs["gen_ai.input.messages"])
+        assert result_messages[0]["parts"][0] == {"mime_type": "image/png", "type": "blob"}
+        assert ts.file_create.call_count == 0
 
 
 if __name__ == "__main__":

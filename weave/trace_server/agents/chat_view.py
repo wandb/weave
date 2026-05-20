@@ -455,9 +455,31 @@ def _compute_duration_ms(started_at: datetime | None, ended_at: datetime | None)
     return max(0, int(delta.total_seconds() * 1000))
 
 
-def _content_refs(span: AgentSpanSchema) -> list[str]:
-    """Return opaque content handles for UI-side attachment rendering."""
-    return [str(r) for r in (span.content_refs or []) if r]
+def _content_refs(span: AgentSpanSchema, *, role: str | None = None) -> list[str]:
+    """Return opaque content handles for UI-side attachment rendering.
+
+    When *role* is given, only refs whose ``role`` field matches are returned.
+    This prevents an image from the user's input appearing on the assistant
+    bubble (and vice-versa).
+    """
+    import json as _json
+
+    refs: list[str] = [str(r) for r in (span.content_refs or []) if r]
+    if role is None:
+        return refs
+    filtered = []
+    for r in refs:
+        try:
+            parsed = _json.loads(r)
+            if parsed.get("role") == role:
+                filtered.append(r)
+        except (ValueError, TypeError):
+            filtered.append(r)
+    logger.debug(
+        "content_refs for span %s role=%s: %d/%d refs",
+        span.span_id, role, len(filtered), len(refs),
+    )
+    return filtered
 
 
 def _sum_descendant_tokens(node: SpanNode) -> TokenTotals:
@@ -499,7 +521,7 @@ def _find_user_message(spans: list[AgentSpanSchema]) -> AgentChatMessage | None:
                 started_at=s.started_at,
                 user_message=AgentChatUserMessage(
                     text=text,
-                    content_refs=_content_refs(s),
+                    content_refs=_content_refs(s, role="user"),
                 ),
             )
     return None
@@ -549,6 +571,6 @@ def _emit_assistant_message(
             output_tokens=totals.output_tokens or span.output_tokens,
             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
             status=span.status_code,
-            content_refs=_content_refs(span),
+            content_refs=_content_refs(span, role="assistant"),
         ),
     )
