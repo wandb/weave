@@ -28,6 +28,8 @@ export const GEN_AI_ATTR = {
   // Tool
   GEN_AI_TOOL_NAME: 'gen_ai.tool.name',
   GEN_AI_TOOL_CALL_ID: 'gen_ai.tool.call.id',
+  GEN_AI_TOOL_CALL_ARGUMENTS: 'gen_ai.tool.call.arguments',
+  GEN_AI_TOOL_CALL_RESULT: 'gen_ai.tool.call.result',
   GEN_AI_OUTPUT_TYPE: 'gen_ai.output.type',
   GEN_AI_INPUT_MESSAGES: 'gen_ai.input.messages',
   GEN_AI_OUTPUT_MESSAGES: 'gen_ai.output.messages',
@@ -54,3 +56,11 @@ export const GEN_AI_EVENT = {
 export const OTEL_ATTR = {
   ERROR_TYPE: 'error.type',
 } as const;
+
+// ---------------------------------------------------------------------------
+// Emitter identity
+// ---------------------------------------------------------------------------
+
+/** Instrumentation-library name passed to `getWeaveTracer` by every emitter
+ *  in the GenAI session SDK. */
+export const WEAVE_GENAI_TRACER_NAME = 'weave-genai';
