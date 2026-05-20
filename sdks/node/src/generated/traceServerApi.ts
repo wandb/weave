@@ -435,6 +435,7 @@ export interface EndedCallSchemaForInsert {
   /** Exception */
   exception?: string | null;
   /** Output */
+  // TODO: This type is manually updated at the moment. https://github.com/wandb/weave/pull/6195/changes#r2850346035
   output?: any;
   summary: SummaryInsertMap;
 }
