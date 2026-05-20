@@ -602,10 +602,10 @@ class WeaveTable(Traceable):  # noqa: PLW1641
         self._mark_dirty()
         rows.append(val)
 
-    def pop(self, index: int) -> None:
+    def pop(self, index: int) -> dict:
         rows = self._inefficiently_materialize_rows_as_list()
         self._mark_dirty()
-        rows.pop(index)
+        return rows.pop(index)
 
     def unwrap(self) -> Any:
         return unwrap(list(self.rows))
