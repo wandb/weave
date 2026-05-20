@@ -413,6 +413,7 @@ class AgentSpanSchema(BaseModel):
     span_kind: SpanKindLiteral | None = None
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
+    created_at: datetime.datetime | None = None
     status_code: StatusCodeLiteral | None = None
     status_message: str | None = None
     operation_name: str | None = None
@@ -465,10 +466,15 @@ class AgentSpanSchema(BaseModel):
     custom_attrs_bool: dict[str, bool] = Field(default_factory=dict)
     server_address: str | None = None
     server_port: int | None = None
+    raw_span_dump: str | None = None
+    attributes_dump: str | None = None
+    events_dump: str | None = None
+    resource_dump: str | None = None
     wb_user_id: str | None = None
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
+    expire_at: datetime.datetime | None = None
 
 
 class AgentSortBy(BaseModel):
@@ -540,6 +546,7 @@ class AgentSpansQueryReq(BaseModel):
     group_by: list[AgentGroupByRef] | None = None
     measures: list[AgentSpanMeasureSpec] = Field(default_factory=list)
     group_filters: list[AgentSpanGroupFilter] = Field(default_factory=list)
+    columns: list[str] = Field(default_factory=list)
     custom_attr_columns: list[AgentSpanValueRef] = Field(default_factory=list)
     sort_by: list[AgentSortBy] | None = None
     limit: int = Field(
@@ -553,10 +560,19 @@ class AgentSpansQueryReq(BaseModel):
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
         if (self.measures or self.group_filters) and not self.group_by:
             raise ValueError("grouped measures and group filters require group_by")
+        if self.group_by and self.columns:
+            raise ValueError("columns are only supported for ungrouped spans")
         if self.group_by and self.custom_attr_columns:
             raise ValueError(
                 "custom_attr_columns are only supported for ungrouped spans"
             )
+        invalid_columns = [
+            column
+            for column in self.columns
+            if column not in AgentSpanSchema.model_fields
+        ]
+        if invalid_columns:
+            raise ValueError(f"unknown span columns: {invalid_columns}")
         invalid_custom_attr_columns = [
             col.source
             for col in self.custom_attr_columns

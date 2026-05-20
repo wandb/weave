@@ -12,6 +12,7 @@ import pytest
 import sqlparse
 from pydantic import ValidationError
 
+from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentCustomAttrsSchemaReq,
@@ -20,6 +21,7 @@ from weave.trace_server.agents.types import (
     AgentSortBy,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
+    AgentSpanSchema,
     AgentSpansQueryReq,
     AgentSpanValueRef,
     AgentsQueryFilters,
@@ -187,6 +189,52 @@ class TestMakeSpansListQuery:
         """
         expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
         assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_selects_cache_token_fields(self) -> None:
+        assert "cache_creation_input_tokens" in SPANS_LIST_COLS
+        assert "cache_read_input_tokens" in SPANS_LIST_COLS
+
+    def test_agent_span_schema_covers_persisted_columns(self) -> None:
+        missing = set(AgentSpanCHInsertable.model_fields) - set(
+            AgentSpanSchema.model_fields
+        )
+        assert missing == set()
+
+    def test_selects_requested_columns(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                columns=[
+                    "request_temperature",
+                    "custom_attrs_float",
+                    "raw_span_dump",
+                ],
+            ),
+        )
+
+        expected = """
+            SELECT project_id, trace_id, span_id, request_temperature, custom_attrs_float, raw_span_dump
+            FROM spans s
+            WHERE s.project_id = {genai_0:String}
+            ORDER BY started_at DESC
+            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_rejects_unknown_requested_columns(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(project_id="p1", columns=["does_not_exist"])
+
+    def test_requested_columns_rejected_with_group_by(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="agent_name")],
+                columns=["raw_span_dump"],
+            )
 
     def test_with_custom_sort(self) -> None:
         pb = ParamBuilder("genai")
@@ -739,6 +787,10 @@ class TestMakeTraceDetailSpansQuery:
             query,
             pb.get_params(),
         )
+
+    def test_selects_cache_token_fields(self) -> None:
+        assert "cache_creation_input_tokens" in CHAT_VIEW_COLS
+        assert "cache_read_input_tokens" in CHAT_VIEW_COLS
 
 
 # ============================================================================

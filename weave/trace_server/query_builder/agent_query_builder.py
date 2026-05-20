@@ -257,13 +257,17 @@ def _projection(cols: list[str], *, table_alias: str | None = None) -> str:
     return ", ".join(cols)
 
 
-# Spans list query: lightweight table projection. Custom attrs and raw dumps
-# remain queryable/filterable server-side, but the UI does not need to hydrate
-# arbitrary Map/blob payloads for every span row.
-_SPANS_LIST_FIELD_NAMES = [
+# Spans list query default: lightweight table projection. Callers can request
+# additional AgentSpanSchema columns with AgentSpansQueryReq.columns when they
+# need heavier typed columns such as messages, custom attribute maps, or raw
+# span dumps.
+_SPANS_LIST_REQUIRED_FIELD_NAMES = [
     "project_id",
     "trace_id",
     "span_id",
+]
+_SPANS_LIST_DEFAULT_FIELD_NAMES = [
+    *_SPANS_LIST_REQUIRED_FIELD_NAMES,
     "parent_span_id",
     "span_name",
     "span_kind",
@@ -283,6 +287,8 @@ _SPANS_LIST_FIELD_NAMES = [
     "input_tokens",
     "output_tokens",
     "reasoning_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
     "conversation_id",
     "conversation_name",
     "tool_name",
@@ -293,7 +299,17 @@ _SPANS_LIST_FIELD_NAMES = [
     "wb_user_id",
     "wb_run_id",
 ]
-SPANS_LIST_COLS: str = _projection(_SPANS_LIST_FIELD_NAMES)
+SPANS_LIST_COLS: str = _projection(_SPANS_LIST_DEFAULT_FIELD_NAMES)
+
+
+def _spans_list_field_names(req: AgentSpansQueryReq) -> list[str]:
+    if not req.columns:
+        return _SPANS_LIST_DEFAULT_FIELD_NAMES
+    out: list[str] = []
+    for col in [*_SPANS_LIST_REQUIRED_FIELD_NAMES, *req.columns]:
+        if col not in out:
+            out.append(col)
+    return out
 
 
 def _custom_attr_field_name(ref: AgentSpanValueRef) -> str:
@@ -305,13 +321,15 @@ def _custom_attr_map_projection(
     refs: list[AgentSpanValueRef],
     *,
     table_alias: str = "s",
+    skip_sources: set[str] | None = None,
 ) -> str:
     """Project only selected custom-attribute Map keys for spans table rows."""
     keys_by_source: dict[str, set[str]] = {
         source: set() for source in sorted(_CUSTOM_ATTR_SOURCES)
     }
+    skip_sources = skip_sources or set()
     for ref in refs:
-        if ref.source in keys_by_source:
+        if ref.source in keys_by_source and ref.source not in skip_sources:
             keys_by_source[ref.source].add(str(ref.key))
 
     projections: list[str] = []
@@ -372,6 +390,8 @@ _CHAT_VIEW_FIELD_NAMES = [
     "input_tokens",
     "output_tokens",
     "reasoning_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
     "reasoning_content",
     "conversation_id",
     "conversation_name",
@@ -900,11 +920,14 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
             "started_at DESC",
             column_exprs=custom_sort_exprs,
         )
+        span_list_field_names = _spans_list_field_names(req)
         custom_attr_projection = _custom_attr_map_projection(
-            pb, req.custom_attr_columns
+            pb,
+            req.custom_attr_columns,
+            skip_sources=set(span_list_field_names),
         )
         return f"""
-            SELECT {SPANS_LIST_COLS}{custom_attr_projection}
+            SELECT {_projection(span_list_field_names)}{custom_attr_projection}
             FROM spans s
             WHERE {span_filters.where}
             ORDER BY {order_by}
