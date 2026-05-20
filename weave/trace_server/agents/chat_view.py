@@ -477,7 +477,10 @@ def _content_refs(span: AgentSpanSchema, *, role: str | None = None) -> list[str
             filtered.append(r)
     logger.debug(
         "content_refs for span %s role=%s: %d/%d refs",
-        span.span_id, role, len(filtered), len(refs),
+        span.span_id,
+        role,
+        len(filtered),
+        len(refs),
     )
     return filtered
 

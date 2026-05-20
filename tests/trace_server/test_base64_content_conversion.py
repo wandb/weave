@@ -537,15 +537,17 @@ class TestGenAIContentBlobConversion:
         """Flat attribute key: gen_ai.input.messages as a JSON string."""
         ts = self._make_trace_server()
         b64 = self._make_png_b64()
-        messages = json.dumps([
-            {
-                "role": "user",
-                "parts": [
-                    {"content": "Describe this image.", "type": "text"},
-                    {"data": b64, "mime_type": "image/png", "type": "blob"},
-                ],
-            }
-        ])
+        messages = json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"content": "Describe this image.", "type": "text"},
+                        {"data": b64, "mime_type": "image/png", "type": "blob"},
+                    ],
+                }
+            ]
+        )
         attrs = {"gen_ai.input.messages": messages}
 
         replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
@@ -573,14 +575,20 @@ class TestGenAIContentBlobConversion:
         ts = self._make_trace_server()
         audio_data = b"\x00\x01" * 6000
         b64 = base64.b64encode(audio_data).decode("ascii")
-        messages = json.dumps([
-            {
-                "role": "assistant",
-                "parts": [
-                    {"data": b64, "mime_type": "audio/L16;codec=pcm;rate=24000", "type": "blob"},
-                ],
-            }
-        ])
+        messages = json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "data": b64,
+                            "mime_type": "audio/L16;codec=pcm;rate=24000",
+                            "type": "blob",
+                        },
+                    ],
+                }
+            ]
+        )
         attrs = {"gen_ai.output.messages": messages}
 
         replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
@@ -600,14 +608,16 @@ class TestGenAIContentBlobConversion:
         """Nested attribute structure: gen_ai -> input -> messages."""
         ts = self._make_trace_server()
         b64 = self._make_png_b64()
-        messages = json.dumps([
-            {
-                "role": "user",
-                "parts": [
-                    {"data": b64, "mime_type": "image/png", "type": "blob"},
-                ],
-            }
-        ])
+        messages = json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"data": b64, "mime_type": "image/png", "type": "blob"},
+                    ],
+                }
+            ]
+        )
         attrs = {"gen_ai": {"input": {"messages": messages}}}
 
         replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
@@ -620,22 +630,27 @@ class TestGenAIContentBlobConversion:
     def test_non_blob_parts_untouched(self):
         """Text parts and other part types are not modified."""
         ts = self._make_trace_server()
-        messages = json.dumps([
-            {
-                "role": "user",
-                "parts": [
-                    {"content": "Hello", "type": "text"},
-                    {"content": "Some reasoning", "type": "reasoning"},
-                ],
-            }
-        ])
+        messages = json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"content": "Hello", "type": "text"},
+                        {"content": "Some reasoning", "type": "reasoning"},
+                    ],
+                }
+            ]
+        )
         attrs = {"gen_ai.input.messages": messages}
 
         replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
 
         result_messages = json.loads(attrs["gen_ai.input.messages"])
         assert result_messages[0]["parts"][0] == {"content": "Hello", "type": "text"}
-        assert result_messages[0]["parts"][1] == {"content": "Some reasoning", "type": "reasoning"}
+        assert result_messages[0]["parts"][1] == {
+            "content": "Some reasoning",
+            "type": "reasoning",
+        }
         assert ts.file_create.call_count == 0
 
     def test_no_message_attrs_is_noop(self):
@@ -672,16 +687,18 @@ class TestGenAIContentBlobConversion:
         ts = self._make_trace_server()
         b64_1 = self._make_png_b64(10000)
         b64_2 = self._make_png_b64(11000)
-        messages = json.dumps([
-            {
-                "role": "user",
-                "parts": [
-                    {"content": "Compare these.", "type": "text"},
-                    {"data": b64_1, "mime_type": "image/png", "type": "blob"},
-                    {"data": b64_2, "mime_type": "image/jpeg", "type": "blob"},
-                ],
-            }
-        ])
+        messages = json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"content": "Compare these.", "type": "text"},
+                        {"data": b64_1, "mime_type": "image/png", "type": "blob"},
+                        {"data": b64_2, "mime_type": "image/jpeg", "type": "blob"},
+                    ],
+                }
+            ]
+        )
         attrs = {"gen_ai.input.messages": messages}
 
         replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
@@ -696,20 +713,25 @@ class TestGenAIContentBlobConversion:
     def test_blob_without_data_is_skipped(self):
         """A blob part missing the data field is left unchanged."""
         ts = self._make_trace_server()
-        messages = json.dumps([
-            {
-                "role": "user",
-                "parts": [
-                    {"mime_type": "image/png", "type": "blob"},
-                ],
-            }
-        ])
+        messages = json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"mime_type": "image/png", "type": "blob"},
+                    ],
+                }
+            ]
+        )
         attrs = {"gen_ai.input.messages": messages}
 
         replace_genai_content_blobs_in_span_attrs(attrs, "proj", ts)
 
         result_messages = json.loads(attrs["gen_ai.input.messages"])
-        assert result_messages[0]["parts"][0] == {"mime_type": "image/png", "type": "blob"}
+        assert result_messages[0]["parts"][0] == {
+            "mime_type": "image/png",
+            "type": "blob",
+        }
         assert ts.file_create.call_count == 0
 
 

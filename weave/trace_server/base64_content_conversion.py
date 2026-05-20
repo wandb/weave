@@ -286,12 +286,11 @@ def _set_attribute(data: dict[str, Any], key: str, value: Any) -> None:
     for seg in segments[:-1]:
         if isinstance(current, dict) and seg in current:
             current = current[seg]
+        elif isinstance(current, dict):
+            current[seg] = {}
+            current = current[seg]
         else:
-            if isinstance(current, dict):
-                current[seg] = {}
-                current = current[seg]
-            else:
-                return
+            return
     if isinstance(current, dict):
         current[segments[-1]] = value
 
@@ -343,7 +342,9 @@ def replace_genai_content_blobs_in_span_attrs(
             _set_attribute(attrs, key, new_val)
             logger.debug(
                 "Replaced %d blob part(s) in %s for project %s",
-                len(refs), key, project_id,
+                len(refs),
+                key,
+                project_id,
             )
 
     if all_content_refs:
@@ -404,11 +405,12 @@ def _replace_blobs_in_messages(
                 content_refs.append(json.dumps(ref_entry))
                 logger.debug(
                     "Converted blob part %d: role=%s, mime=%s, size=%d, digest=%s",
-                    i, role, content_obj.mimetype, content_obj.size,
+                    i,
+                    role,
+                    content_obj.mimetype,
+                    content_obj.size,
                     ref["files"]["content"],
                 )
             except Exception as e:
-                logger.warning(
-                    "Failed to convert GenAI blob part to Content: %s", e
-                )
+                logger.warning("Failed to convert GenAI blob part to Content: %s", e)
     return modified, content_refs
