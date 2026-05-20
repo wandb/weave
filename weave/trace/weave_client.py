@@ -2610,8 +2610,15 @@ class WeaveClient:
             self._wal = None
 
     def flush(self) -> None:
-        """Flushes background asynchronous tasks, safe to call multiple times."""
-        self._flush()
+        """Flushes background asynchronous tasks, safe to call multiple times.
+
+        Drains items already in the send queue. Items mid-pairing (a start
+        whose end has not yet been enqueued, e.g. an open `Evaluation.evaluate`
+        under `use_calls_complete=True`) stay in the processor's pending
+        buffers and are sent when their counterpart arrives — keeping the
+        bulk-endpoint optimization intact across repeated flushes.
+        """
+        self._flush(for_shutdown=False)
 
     def _flush_with_callback(
         self,
@@ -2704,20 +2711,34 @@ class WeaveClient:
         )
         callback(final_status)
 
-    def _flush(self) -> None:
-        """Used to wait until all currently enqueued jobs are processed."""
+    def _flush(self, *, for_shutdown: bool = True) -> None:
+        """Used to wait until all currently enqueued jobs are processed.
+
+        Args:
+            for_shutdown: If True (default — used by `finish()`), tear down
+                each processor, waiting up to its full pairing budget for
+                in-flight starts/ends to combine into bulk-endpoint writes,
+                then restart. If False (used by user-facing `flush()`), drain
+                the send queue without touching pending-pair state or
+                stopping the processor — preserves the bulk-endpoint
+                optimization across repeated user flushes.
+        """
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
         if self._server_call_processor:
-            self._server_call_processor.stop_accepting_new_work_and_flush_queue()
-            # Restart call processor processing thread after flushing
-            self._server_call_processor.accept_new_work()
+            if for_shutdown:
+                self._server_call_processor.stop_accepting_new_work_and_flush_queue()
+                self._server_call_processor.accept_new_work()
+            else:
+                self._server_call_processor.drain_queue()
         if self._server_feedback_processor:
-            self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
-            # Restart feedback processor processing thread after flushing
-            self._server_feedback_processor.accept_new_work()
+            if for_shutdown:
+                self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
+                self._server_feedback_processor.accept_new_work()
+            else:
+                self._server_feedback_processor.drain_queue()
         if self._wal is not None:
             self._wal.flush()
 

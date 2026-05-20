@@ -152,6 +152,37 @@ class AsyncBatchProcessor(Generic[T]):
         self.processing_thread.join()
         self.health_check_thread.join()
 
+    def drain_queue(self, timeout: float = 60.0) -> None:
+        """Wait for the send queue to drain without shutting down the processor.
+
+        Use this for user-initiated `client.flush()`. Unlike
+        `stop_accepting_new_work_and_flush_queue`, this:
+
+        - leaves the processing thread running, so subsequent enqueues
+          continue to be batched and sent without restart cost
+        - does not touch any subclass-owned pending-pair state (e.g.
+          `CallBatchProcessor._pending_starts`), so the bulk-endpoint
+          pairing optimization survives flushes that happen mid-call
+
+        Returns when the queue is empty for a full poll interval, or when
+        `timeout` elapses (whichever comes first). Items that arrive after
+        return are picked up on the next flush.
+
+        Args:
+            timeout: Hard ceiling, in seconds. Belt-and-suspenders against
+                an unresponsive processor thread; a healthy processor empties
+                the queue at batch cadence and this should rarely be hit.
+        """
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.queue.empty():
+                # One extra tick to let an in-flight batch finish its send
+                # before we declare the queue drained.
+                time.sleep(self.min_batch_interval)
+                if self.queue.empty():
+                    return
+            time.sleep(self.min_batch_interval)
+
     def accept_new_work(self) -> None:
         """Resumes accepting new work."""
         self.stop_accepting_work_event.clear()

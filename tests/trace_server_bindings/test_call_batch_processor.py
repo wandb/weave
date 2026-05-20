@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import pathlib
+import time
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -209,6 +210,83 @@ def test_missing_trace_id_raises_value_error() -> None:
     with pytest.raises(ValueError, match="missing trace_id"):
         processor.enqueue([end_item])
 
+    with patch(
+        "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS",
+        0.05,
+    ):
+        processor.stop_accepting_new_work_and_flush_queue()
+
+
+def test_drain_queue_skips_pending_pair_wait() -> None:
+    """User flush drains the send queue without waiting on pending pairs.
+
+    Pins WB-34557. Under `WEAVE_USE_CALLS_COMPLETE=true`, the old
+    `stop_accepting_new_work_and_flush_queue` path made `client.flush()`
+    hang up to FLUSH_TIMEOUT_SECONDS waiting for in-flight starts to pair.
+    The drain path used by `WeaveClient.flush()` must:
+      1. return quickly even when pending pairs exist,
+      2. leave _pending_starts / _pending_ends / _eager_call_ids untouched
+         so the bulk-endpoint pairing optimization survives the flush,
+      3. NOT orphan-send pending items (those still belong to in-flight calls).
+    """
+    complete_fn = MagicMock()
+    eager_fn = MagicMock()
+    processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
+
+    # Simulate an in-flight non-eager call: start enqueued, end not yet.
+    pending_start = _make_start_item("call-1", "trace-1")
+    processor.enqueue([pending_start])
+    # And an in-flight eager call: start sent immediately, end not yet.
+    eager_start = _make_start_item("call-2", "trace-2")
+    processor.enqueue_start(eager_start, eager_call_start=True)
+
+    t0 = time.monotonic()
+    processor.drain_queue(timeout=5.0)
+    elapsed = time.monotonic() - t0
+
+    # Drain must return quickly — well under any pairing budget.
+    assert elapsed < 2.0, f"drain_queue blocked for {elapsed:.2f}s"
+
+    # Pending state preserved so pairing can still happen later.
+    assert "call-1" in processor._pending_starts
+    assert "call-2" in processor._eager_call_ids
+    # Neither processor was called with the still-in-flight non-eager start.
+    complete_fn.assert_not_called()
+    # The eager start was queued and sent immediately by enqueue_start;
+    # the eager processor may have already drained it. Either way, we did
+    # not orphan-send "call-1".
+    sent_items = [item for call in eager_fn.call_args_list for item in call.args[0]]
+    assert pending_start not in sent_items
+
+    # Processor is still accepting work.
+    assert processor.is_accepting_new_work()
+
+    # Cleanup
+    with patch(
+        "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS",
+        0.05,
+    ):
+        processor.stop_accepting_new_work_and_flush_queue()
+
+
+def test_drain_queue_processes_already_paired_items() -> None:
+    """Drain still sends what's already paired and queued."""
+    complete_fn = MagicMock()
+    eager_fn = MagicMock()
+    processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
+
+    # Pair up a call so it lands in the send queue.
+    processor.enqueue([_make_start_item("call-1", "trace-1")])
+    processor.enqueue([_make_end_item("call-1")])
+
+    processor.drain_queue(timeout=5.0)
+
+    complete_fn.assert_called_once()
+    batch = complete_fn.call_args[0][0]
+    assert len(batch) == 1
+    assert batch[0].req.id == "call-1"
+
+    # Cleanup
     with patch(
         "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS",
         0.05,
