@@ -16,7 +16,6 @@ import {Tool, type ToolInit} from './tool';
 export interface TurnInit {
   agentName?: string;
   model?: string;
-  userMessage?: string;
 }
 
 export class Turn {

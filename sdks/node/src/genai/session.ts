@@ -33,7 +33,6 @@ export class Session {
     return Turn.create({
       agentName: opts.agentName ?? this.agentName,
       model: opts.model ?? this.model,
-      userMessage: opts.userMessage,
       conversationId: this.sessionId,
     });
   }

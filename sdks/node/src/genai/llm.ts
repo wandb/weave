@@ -16,7 +16,6 @@ import type {Message, Reasoning, Usage} from './types';
 export interface LLMInit {
   model: string;
   providerName?: string;
-  systemInstructions?: string[];
 }
 
 export class LLM {
@@ -33,8 +32,7 @@ export class LLM {
     private readonly context: Context,
     private readonly conversationId: string,
     public readonly model: string,
-    public readonly providerName: string,
-    public readonly systemInstructions: string[]
+    public readonly providerName: string
   ) {}
 
   static create(opts: LLMInit & ChildSpanContext): LLM {
@@ -59,8 +57,7 @@ export class LLM {
       trace.setSpan(opts.parentContext, span),
       opts.conversationId ?? '',
       opts.model,
-      opts.providerName ?? '',
-      opts.systemInstructions ?? []
+      opts.providerName ?? ''
     );
   }
 
