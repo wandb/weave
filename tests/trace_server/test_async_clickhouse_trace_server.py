@@ -54,8 +54,6 @@ async def server() -> AsyncIterator[AsyncClickHouseTraceServer]:
 async def test_no_tracking_returns_passthrough_response(
     server: AsyncClickHouseTraceServer,
 ) -> None:
-    # track_llm_call=False short-circuits inside _log_completion_call: response
-    # passes through, no weave_call_id, no CH write.
     with patch(
         LITELLM_ACOMPLETION_PATCH,
         new=AsyncMock(return_value=tsi.CompletionsCreateRes(response={"ok": True})),
@@ -102,8 +100,6 @@ async def test_litellm_error_propagates_as_response_error(
 async def test_prep_short_circuit_returns_without_calling_litellm(
     server: AsyncClickHouseTraceServer,
 ) -> None:
-    # If prep returns a CompletionsCreateRes (e.g. unknown model), we must return
-    # without invoking litellm or the executor.
     short_circuit = tsi.CompletionsCreateRes(response={"error": "no model"})
     acompletion = AsyncMock()
     with (
@@ -119,9 +115,6 @@ async def test_prep_short_circuit_returns_without_calling_litellm(
 async def test_prep_runs_off_the_event_loop_thread(
     server: AsyncClickHouseTraceServer,
 ) -> None:
-    # Prep can do CH obj_read (prompt resolution, custom:: provider lookup) or
-    # hit the secret fetcher. It must run off the event loop, even on the hot
-    # path where prep is pure CPU, so the invariant holds.
     loop_thread_id = threading.get_ident()
     captured = {"thread_id": None}
 
