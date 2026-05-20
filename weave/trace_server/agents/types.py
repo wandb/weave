@@ -515,6 +515,7 @@ class AgentSpanGroupRow(BaseModel):
     total_cache_creation_input_tokens: int = 0
     total_cache_read_input_tokens: int = 0
     total_output_tokens: int = 0
+    total_reasoning_tokens: int = 0
     total_duration_ms: int = 0
     error_count: int = 0
     agent_names: list[str] = Field(default_factory=list)

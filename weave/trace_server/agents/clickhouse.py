@@ -644,6 +644,7 @@ def _hydrate_group_row(
             row.get("total_cache_read_input_tokens")
         ),
         total_output_tokens=safe_int(row.get("total_output_tokens")),
+        total_reasoning_tokens=safe_int(row.get("total_reasoning_tokens")),
         total_duration_ms=safe_int(row.get("total_duration_ms")),
         error_count=safe_int(row.get("error_count")),
         agent_names=unpack_string_array(row.get("agent_names")),
