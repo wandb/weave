@@ -12,7 +12,7 @@ import {getWeaveTracerProvider} from './provider';
  * may have in-flight work, or in tests that need to observe exported spans
  * synchronously.
  */
-export async function flushWeaveOTel(): Promise<void> {
+export async function flushOTel(): Promise<void> {
   const provider = getWeaveTracerProvider();
   if (!provider) return;
   await provider.forceFlush();

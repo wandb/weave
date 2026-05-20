@@ -23,7 +23,7 @@ export {
   patchRealtimeSession,
   createOtelExtension,
 } from './integrations';
-export {flushWeaveOTel} from './genai/flush';
+export {flushOTel} from './genai/flush';
 export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
 export {op} from './op';
 export * from './types';

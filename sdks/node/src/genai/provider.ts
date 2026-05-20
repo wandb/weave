@@ -62,7 +62,7 @@ export function getWeaveTracer(name: string): Tracer {
 
 /**
  * Returns the live singleton TracerProvider, or `null` if no GenAI tracer
- * has been pulled yet. Used by the `flushWeaveOTel` / `beforeExit` paths.
+ * has been pulled yet. Used by the `flushOTel` / `beforeExit` paths.
  */
 export function getWeaveTracerProvider(): BasicTracerProvider | null {
   return _providerHolder.provider;

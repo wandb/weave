@@ -6,7 +6,7 @@ import {
 
 import {setGlobalClient} from '../../clientApi';
 import {Api as TraceServerApi} from '../../generated/traceServerApi';
-import {flushWeaveOTel} from '../../genai/flush';
+import {flushOTel} from '../../genai/flush';
 import {
   getWeaveTracer,
   getWeaveTracerProvider,
@@ -110,7 +110,7 @@ describe('otel/provider', () => {
 
     const tracer = getWeaveTracer('weave-genai');
     tracer.startSpan('user-supplied-processor-span').end();
-    await flushWeaveOTel();
+    await flushOTel();
 
     const finished = exporter.getFinishedSpans();
     expect(finished).toHaveLength(1);
@@ -121,16 +121,16 @@ describe('otel/provider', () => {
     ).toBe('test-entity');
   });
 
-  it('flushWeaveOTel is a no-op when no provider has been built', async () => {
-    await expect(flushWeaveOTel()).resolves.toBeUndefined();
+  it('flushOTel is a no-op when no provider has been built', async () => {
+    await expect(flushOTel()).resolves.toBeUndefined();
   });
 
-  it('flushWeaveOTel triggers forceFlush on the active provider', async () => {
+  it('flushOTel triggers forceFlush on the active provider', async () => {
     installFakeClient();
     getWeaveTracer('weave-genai');
     const provider = getWeaveTracerProvider()!;
     const flushSpy = jest.spyOn(provider, 'forceFlush').mockResolvedValue();
-    await flushWeaveOTel();
+    await flushOTel();
     expect(flushSpy).toHaveBeenCalledTimes(1);
     flushSpy.mockRestore();
   });
