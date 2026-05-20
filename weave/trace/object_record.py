@@ -36,6 +36,14 @@ class ObjectRecord:  # noqa: PLW1641
                 return False
         return True
 
+    def __getitem__(self, key: str) -> Any:
+        # Mirror attribute access so templates using `{x[field]}` subscript
+        # syntax work the same as `{x.field}`. Without this, `str.format` on
+        # an ObjectRecord raises `TypeError: 'ObjectRecord' object is not
+        # subscriptable` — for example, when a scoring prompt formats over a
+        # call's deserialized inputs/output.
+        return self.__dict__[key]
+
     def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
