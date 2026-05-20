@@ -6256,7 +6256,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
-        # To replace, first purge, then if successful, create.
+        # Validate the replacement payload before purging — if validation
+        # rejects we want the old row preserved, not destroyed. This duplicates
+        # the validation that feedback_create() runs internally (one extra
+        # ref-lookup network call on annotation/agent-monitor paths), which is
+        # acceptable to preserve the no-data-loss guarantee on replace.
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        validate_feedback_create_req(create_req, self)
         query = tsi.Query(
             **{
                 "$expr": {
@@ -6272,7 +6278,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             query=query,
         )
         self.feedback_purge(purge_request)
-        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
         create_result = self.feedback_create(create_req)
         return tsi.FeedbackReplaceRes(
             id=create_result.id,
