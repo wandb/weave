@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 WEAVE_PARALLELISM = "WEAVE_PARALLELISM"
 DEFAULT_WEAVE_PARALLELISM = 20
 WEAVE_INSECURE_DISABLE_SSL = "WEAVE_INSECURE_DISABLE_SSL"
-WEAVE_USE_OTEL_V2 = "WEAVE_USE_OTEL_V2"
 
 logger = logging.getLogger(__name__)
 
@@ -80,19 +79,6 @@ def ssl_verify() -> bool:
     allowing self-signed certificates in local dev environments.
     """
     return os.environ.get(WEAVE_INSECURE_DISABLE_SSL, "").lower() != "true"
-
-
-def use_otel_v2() -> bool:
-    """Route OTel-capable integrations through their OTel variant when set.
-
-    When ``WEAVE_USE_OTEL_V2=true``, integrations that ship a sibling OTel
-    patcher (e.g. ``openai_agents`` → ``openai_agents_otel``) dispatch to the
-    OTel variant on implicit import-hook patching. Explicit ``patch_*`` calls
-    are unaffected — they always do exactly what their name says.
-
-    Read at dispatch time (not cached) so tests can toggle between cases.
-    """
-    return os.environ.get(WEAVE_USE_OTEL_V2, "").lower() == "true"
 
 
 def _wandb_api_key_via_env() -> str | None:

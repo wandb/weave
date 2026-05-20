@@ -41,6 +41,8 @@ from agents.tracing import (
     TracingProcessor,
     TranscriptionSpanData,
 )
+from opentelemetry import trace as otel_trace
+from opentelemetry.trace import StatusCode
 
 from weave.integrations.openai_agents.openai_agents import (
     _call_name,
@@ -51,14 +53,6 @@ from weave.session.session_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
 )
-
-try:
-    from opentelemetry import trace as otel_trace
-    from opentelemetry.trace import StatusCode
-
-    _OTEL_AVAILABLE = True
-except ImportError:
-    _OTEL_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -273,8 +267,6 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         return otel_trace.set_span_in_context(parent_otel)
 
     def on_trace_start(self, trace: Trace) -> None:
-        if not _OTEL_AVAILABLE:
-            return
         conversation_id = _conversation_id_for_trace(trace)
         self._conversation_ids[trace.trace_id] = conversation_id
 
@@ -292,16 +284,12 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         self._trace_root_spans[trace.trace_id] = root
 
     def on_trace_end(self, trace: Trace) -> None:
-        if not _OTEL_AVAILABLE:
-            return
         root = self._trace_root_spans.pop(trace.trace_id, None)
         if root is not None and root.is_recording():
             root.end()
         self._conversation_ids.pop(trace.trace_id, None)
 
     def on_span_start(self, span: Span) -> None:
-        if not _OTEL_AVAILABLE:
-            return
         # Skip Response/Generation entirely — openai SDK's OTel patcher is
         # the source of truth for chat spans (see module docstring).
         if isinstance(span.span_data, (ResponseSpanData, GenerationSpanData)):
@@ -325,8 +313,6 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         self._span_otel[span.span_id] = otel_span
 
     def on_span_end(self, span: Span) -> None:
-        if not _OTEL_AVAILABLE:
-            return
         if isinstance(span.span_data, (ResponseSpanData, GenerationSpanData)):
             return
         otel_span = self._span_otel.pop(span.span_id, None)
@@ -361,8 +347,6 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         self._end_open_spans()
 
     def _end_open_spans(self) -> None:
-        if not _OTEL_AVAILABLE:
-            return
         for otel_span in self._span_otel.values():
             if otel_span.is_recording():
                 otel_span.end()

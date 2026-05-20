@@ -13,8 +13,8 @@ import sys
 from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
-from weave.trace import env
 from weave.trace.autopatch import IntegrationSettings
+from weave.trace.settings import should_use_otel_v2
 
 # Integrations that have actually been patched. Prevents double-patching
 # when libraries are imported multiple times.
@@ -322,10 +322,10 @@ def _dispatch_openai_agents() -> None:
     Explicit ``patch_openai_agents()`` / ``patch_openai_agents_otel()`` calls
     are unaffected — they always do exactly what their name says.
     """
-    if env.use_otel_v2():
+    if should_use_otel_v2():
         patch_openai_agents_otel()
-    else:
-        patch_openai_agents()
+        return
+    patch_openai_agents()
 
 
 def patch_verdict(settings: IntegrationSettings | None = None) -> None:
