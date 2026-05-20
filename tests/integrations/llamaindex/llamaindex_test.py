@@ -27,12 +27,20 @@ from weave.integrations.integration_utilities import (
     filter_body,
     flatten_calls,
     flattened_calls_to_names,
+    op_name_from_call,
     op_name_from_ref,
 )
 from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
 from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
+
+# Internal workflow notification events emitted by llama-index >=0.14 around
+# each step. They wrap useful spans but are not part of the semantic call
+# graph the integration tests verify.
+_NOISY_WORKFLOW_EVENT_OPS = frozenset(
+    {"llama_index.event.step.output", "llama_index.event.workflow.output"}
+)
 
 
 @pytest.fixture(autouse=True)
@@ -833,11 +841,16 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
     # Check the captured calls
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
-    print(flattened_calls_to_names(flattened_calls))
 
-    # LlamaIndex 0.14.1+ no longer emits TestWorkflow-done span and SpanDrop event
-    # Expected hierarchy: run -> step_one, step_two, step_three
-    assert len(flattened_calls) == 4
+    # LlamaIndex 0.14.x emits internal workflow notification events
+    # (step.output, workflow.output) that wrap each step. Filter them out and
+    # assert on the semantic structure: run -> step_one, step_two, step_three.
+    meaningful_calls = [
+        (call, depth)
+        for call, depth in flattened_calls
+        if op_name_from_call(call) not in _NOISY_WORKFLOW_EVENT_OPS
+    ]
+    assert len(meaningful_calls) == 4
 
 
 @pytest.mark.skip_clickhouse_client
@@ -894,11 +907,21 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
-    # LlamaIndex 0.14.1+ no longer emits FunctionAgent-done span and SpanDrop event
-    names = flattened_calls_to_names(flattened_calls)
-    # LlamaIndex can emit duplicate consecutive spans depending on timing/chunking
-    # (e.g. LLMChatInProgress, aggregate_tool_results). Collapse all consecutive
-    # duplicate (name, depth) pairs to avoid flakes across platforms.
+    # LlamaIndex 0.14.x:
+    #   * agent method spans use the defining base class (BaseWorkflowAgent),
+    #     not the concrete subclass (FunctionAgent). The top-level run span
+    #     still uses the concrete class.
+    #   * Workflows emit internal step.output / workflow.output notification
+    #     events around each step; filter those out to keep the assertion
+    #     focused on the semantic call graph.
+    # LlamaIndex can also emit duplicate consecutive spans depending on
+    # timing/chunking (e.g. LLMChatInProgress, aggregate_tool_results).
+    # Collapse all consecutive duplicate (name, depth) pairs to avoid flakes.
+    names = [
+        (name, depth)
+        for name, depth in flattened_calls_to_names(flattened_calls)
+        if name not in _NOISY_WORKFLOW_EVENT_OPS
+    ]
     normalized_names: list[tuple[str, int]] = []
     for name, depth in names:
         if normalized_names and normalized_names[-1] == (name, depth):
@@ -910,16 +933,16 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
         ("llama_index.span.SentenceSplitter-parse_nodes", 0),
         ("llama_index.span.SentenceSplitter.split_text_metadata_aware", 1),
         ("llama_index.span.FunctionAgent.run", 0),
-        ("llama_index.span.FunctionAgent.init_run", 1),
-        ("llama_index.span.FunctionAgent.setup_agent", 1),
-        ("llama_index.span.FunctionAgent.run_agent_step", 1),
+        ("llama_index.span.BaseWorkflowAgent.init_run", 1),
+        ("llama_index.span.BaseWorkflowAgent.setup_agent", 1),
+        ("llama_index.span.BaseWorkflowAgent.run_agent_step", 1),
         ("llama_index.span.OpenAI-prepare_chat_with_tools", 2),
         ("llama_index.span.OpenAI.astream_chat", 2),
         ("llama_index.event.LLMChat", 3),
         ("llama_index.event.LLMChatInProgress", 4),
         ("openai.chat.completions.create", 5),
-        ("llama_index.span.FunctionAgent.parse_agent_output", 1),
-        ("llama_index.span.FunctionAgent.call_tool", 1),
+        ("llama_index.span.BaseWorkflowAgent.parse_agent_output", 1),
+        ("llama_index.span.BaseWorkflowAgent.call_tool", 1),
         ("llama_index.span.FunctionTool.acall", 2),
         ("llama_index.span.RetrieverQueryEngine.aquery", 3),
         ("llama_index.event.Query", 4),
@@ -943,15 +966,15 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
         ("llama_index.span.OpenAI.achat", 9),
         ("llama_index.event.LLMChat", 10),
         ("openai.chat.completions.create", 11),
-        ("llama_index.span.FunctionAgent.call_tool", 1),
+        ("llama_index.span.BaseWorkflowAgent.call_tool", 1),
         ("llama_index.span.FunctionTool.acall", 2),
-        ("llama_index.span.FunctionAgent.aggregate_tool_results", 1),
-        ("llama_index.span.FunctionAgent.setup_agent", 1),
-        ("llama_index.span.FunctionAgent.run_agent_step", 1),
+        ("llama_index.span.BaseWorkflowAgent.aggregate_tool_results", 1),
+        ("llama_index.span.BaseWorkflowAgent.setup_agent", 1),
+        ("llama_index.span.BaseWorkflowAgent.run_agent_step", 1),
         ("llama_index.span.OpenAI-prepare_chat_with_tools", 2),
         ("llama_index.span.OpenAI.astream_chat", 2),
         ("llama_index.event.LLMChat", 3),
         ("llama_index.event.LLMChatInProgress", 4),
         ("openai.chat.completions.create", 5),
-        ("llama_index.span.FunctionAgent.parse_agent_output", 1),
+        ("llama_index.span.BaseWorkflowAgent.parse_agent_output", 1),
     ]
