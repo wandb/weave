@@ -48,6 +48,10 @@ TABLE_FEEDBACK = Table(
         Column("call_ref", "string", nullable=True),
         Column("trigger_ref", "string", nullable=True),
         Column("queue_id", "string", nullable=True),
+        Column("scorer_tags", "array_string"),
+        Column("scorer_ratings", "map_string_float"),
+        Column("scorer_reasons", "map_string_string"),
+        Column("scorer_confidences", "map_string_float"),
     ],
 )
 
@@ -257,6 +261,10 @@ def format_feedback_to_row(
         "call_ref": feedback_req.call_ref,
         "trigger_ref": feedback_req.trigger_ref,
         "queue_id": feedback_req.queue_id,
+        "scorer_tags": feedback_req.scorer_tags or [],
+        "scorer_ratings": feedback_req.scorer_ratings or {},
+        "scorer_reasons": feedback_req.scorer_reasons or {},
+        "scorer_confidences": feedback_req.scorer_confidences or {},
     }
 
 
