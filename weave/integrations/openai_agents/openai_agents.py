@@ -31,13 +31,9 @@ except ImportError:  # pragma: no cover - older openai-agents SDKs lack these
     TaskSpanData = None
     TurnSpanData = None
 
-from weave.integrations.patcher import NoOpPatcher, Patcher
-from weave.trace.autopatch import IntegrationSettings
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import get_weave_client
-
-_openai_agents_patcher: OpenAIAgentsPatcher | None = None
 
 
 def _call_type(span: Span) -> str:
@@ -620,64 +616,3 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         self._span_calls.clear()
         self._ended_traces.clear()
         self._span_parents.clear()
-
-
-class OpenAIAgentsPatcher(Patcher):
-    """A patcher for OpenAI Agents that manages the lifecycle of a WeaveTracingProcessor.
-
-    Unlike other patchers that modify function behavior, this patcher installs and
-    removes a processor from the OpenAI Agents tracing system.
-    """
-
-    def __init__(self, settings: IntegrationSettings) -> None:
-        self.settings = settings
-        self.patched = False
-        self.processor: WeaveTracingProcessor | None = None
-
-    def attempt_patch(self) -> bool:
-        """Install a WeaveTracingProcessor in the OpenAI Agents tracing system."""
-        if self.patched:
-            return True
-
-        try:
-            from agents.tracing import add_trace_processor
-
-            self.processor = WeaveTracingProcessor()
-            add_trace_processor(self.processor)
-            self.patched = True
-        except Exception as e:
-            self.processor = None
-            return False
-        else:
-            return True
-
-    def undo_patch(self) -> bool:
-        # OpenAI Agents doesn't have a way to de-register a processor yet...
-        return True
-
-
-def get_openai_agents_patcher(
-    settings: IntegrationSettings | None = None,
-) -> OpenAIAgentsPatcher | NoOpPatcher:
-    """Get a patcher for OpenAI Agents integration.
-
-    Args:
-        settings: Optional integration settings to configure the patcher.
-            If None, default settings will be used.
-
-    Returns:
-        A patcher that can be used to patch and unpatch the OpenAI Agents integration.
-    """
-    if settings is None:
-        settings = IntegrationSettings()
-
-    if not settings.enabled:
-        return NoOpPatcher()
-
-    global _openai_agents_patcher  # noqa: PLW0603
-    if _openai_agents_patcher is not None:
-        return _openai_agents_patcher
-
-    _openai_agents_patcher = OpenAIAgentsPatcher(settings)
-
-    return _openai_agents_patcher

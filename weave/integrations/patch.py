@@ -13,6 +13,7 @@ import sys
 from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
+from weave.trace import env
 from weave.trace.autopatch import IntegrationSettings
 
 # Integrations that have actually been patched. Prevents double-patching
@@ -296,13 +297,35 @@ def patch_smolagents(settings: IntegrationSettings | None = None) -> None:
 
 
 def patch_openai_agents(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for OpenAI Agents."""
+    """Enable Weave tracing for OpenAI Agents (calls-based processor)."""
     _patch_integration(
-        module_path="weave.integrations.openai_agents.openai_agents",
+        module_path="weave.integrations.openai_agents.patcher",
         patcher_func_getter_name="get_openai_agents_patcher",
         triggering_symbols=["openai_agents"],
         settings=settings,
     )
+
+
+def patch_openai_agents_otel(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave OTel tracing for OpenAI Agents (Agents-tab destination)."""
+    _patch_integration(
+        module_path="weave.integrations.openai_agents.patcher",
+        patcher_func_getter_name="get_openai_agents_otel_patcher",
+        triggering_symbols=["openai_agents_otel"],
+        settings=settings,
+    )
+
+
+def _dispatch_openai_agents() -> None:
+    """Implicit-patch entry: route to OTel processor when WEAVE_USE_OTEL_V2 is set.
+
+    Explicit ``patch_openai_agents()`` / ``patch_openai_agents_otel()`` calls
+    are unaffected — they always do exactly what their name says.
+    """
+    if env.use_otel_v2():
+        patch_openai_agents_otel()
+    else:
+        patch_openai_agents()
 
 
 def patch_verdict(settings: IntegrationSettings | None = None) -> None:
@@ -400,7 +423,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "mcp": patch_fastmcp,
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
-    "agents": patch_openai_agents,
+    "agents": _dispatch_openai_agents,
     "claude_agent_sdk": patch_claude_agent_sdk,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,
