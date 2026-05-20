@@ -1,9 +1,11 @@
 {
   "compilerOptions": {
     "target": "es2022",
-    "module": "commonjs",
+    "module": "esnext",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "strict": true,
+    "skipLibCheck": true,
     "paths": {"weave": ["../dist/index.d.ts"]}
   }
 }
