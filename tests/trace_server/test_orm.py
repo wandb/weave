@@ -81,27 +81,35 @@ def test_transform_external_field_to_internal_field():
 
     # Transforming a column that doesn't exist should raise
     with pytest.raises(ValueError, match="Unknown field"):
-        _transform_external_field_to_internal_field("foo", all_columns, json_columns)
+        _transform_external_field_to_internal_field(
+            "foo", all_columns=all_columns, json_columns=json_columns
+        )
 
     result = _transform_external_field_to_internal_field(
-        "id", all_columns, json_columns
+        "id", all_columns=all_columns, json_columns=json_columns
     )
     assert result[0] == "id"
     assert result[2] == {"id"}
     result = _transform_external_field_to_internal_field(
-        "payload", all_columns, json_columns
+        "payload", all_columns=all_columns, json_columns=json_columns
     )
     assert result[0] == "payload_dump"
     assert result[2] == {"payload_dump"}
     pb = ParamBuilder(prefix="pb", database_type="sqlite")
     result = _transform_external_field_to_internal_field(
-        "payload.address", all_columns, json_columns, param_builder=pb
+        "payload.address",
+        all_columns=all_columns,
+        json_columns=json_columns,
+        param_builder=pb,
     )
     assert result[0] == "json_extract(payload_dump, :pb_0)"
     assert result[2] == {"payload_dump"}
     pb = ParamBuilder(prefix="pb", database_type="clickhouse")
     result = _transform_external_field_to_internal_field(
-        "payload.address", all_columns, json_columns, param_builder=pb
+        "payload.address",
+        all_columns=all_columns,
+        json_columns=json_columns,
+        param_builder=pb,
     )
     assert result[0] == "toString(JSON_VALUE(payload_dump, {pb_0:String}))"
     assert result[2] == {"payload_dump"}

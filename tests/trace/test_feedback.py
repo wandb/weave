@@ -491,6 +491,221 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     assert query_res.result[0]["scorer_rating_confidences"] == {}
 
 
+def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
+    """Filter agent_monitor rows by typed scorer columns.
+
+    Covers each access pattern the proposal calls out:
+      - `$contains` on `scorer_tags` → array membership (`has` / `json_each`)
+      - dotted access on `scorer_ratings.<name>` → typed map value lookup
+      - dotted access on `scorer_tag_reasons.<name>` for reason equality
+    """
+    project_id = client.project_id
+    runnable_ref = f"weave:///{project_id}/object/my_scorer:obj_id_123"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+    trigger_ref = f"weave:///{project_id}/object/my_scorer:trigger_id_123"
+
+    def _create(weave_ref_suffix: str, **scorer_kwargs):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/{weave_ref_suffix}",
+                feedback_type="wandb.agent_monitor",
+                payload={"value": scorer_kwargs.get("scorer_tags", [])},
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger_ref,
+                **scorer_kwargs,
+            )
+        )
+
+    _create("a", scorer_tags=["nsfw"], scorer_ratings={"_rating_": 0.9})
+    _create(
+        "b",
+        scorer_tags=["high-quality"],
+        scorer_ratings={"_rating_": 0.4},
+        scorer_tag_reasons={"high-quality": "well formatted"},
+    )
+    _create("c")  # empty defaults
+
+    def _query(query_dict) -> list[dict]:
+        res = client.server.feedback_query(
+            tsi.FeedbackQueryReq(project_id=project_id, query=Query(**query_dict))
+        )
+        return res.result
+
+    # $contains on scorer_tags — must use array membership, not substring.
+    matches = _query(
+        {
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "scorer_tags"},
+                    "substr": {"$literal": "nsfw"},
+                }
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a"}
+
+    # Substring-style false positive should NOT match. "ns" appears inside
+    # "nsfw" but `has()` requires exact tag equality.
+    matches = _query(
+        {
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "scorer_tags"},
+                    "substr": {"$literal": "ns"},
+                }
+            }
+        }
+    )
+    assert matches == []
+
+    # case_insensitive $contains must still match. Without the case-insensitive
+    # branch the array path falls back to exact equality and misses tags that
+    # differ only in case.
+    _create("upper", scorer_tags=["NSFW"])
+    matches = _query(
+        {
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "scorer_tags"},
+                    "substr": {"$literal": "nsfw"},
+                    "case_insensitive": True,
+                }
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a", "upper"}
+
+    # Map value lookup with numeric comparison.
+    matches = _query(
+        {
+            "$expr": {
+                "$gt": [
+                    {"$getField": "scorer_ratings._rating_"},
+                    {"$literal": 0.5},
+                ]
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a"}
+
+    # Map value lookup on scorer_tag_reasons keyed by tag name.
+    matches = _query(
+        {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "scorer_tag_reasons.high-quality"},
+                    {"$literal": "well formatted"},
+                ]
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"b"}
+
+    # Regression: ClickHouse Map(*, Float64) returns 0 for missing keys,
+    # which would otherwise match `== 0` filters and surface every row
+    # without a rating as a "zero rating" row. Row 'c' has no rating and
+    # must not match an equality-against-zero filter.
+    matches = _query(
+        {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "scorer_ratings._rating_"},
+                    {"$literal": 0},
+                ]
+            }
+        }
+    )
+    assert matches == []
+
+    # Same regression for Map(*, String) — missing keys would otherwise
+    # read as "" and match an `== ""` filter.
+    matches = _query(
+        {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "scorer_tag_reasons.missing"},
+                    {"$literal": ""},
+                ]
+            }
+        }
+    )
+    assert matches == []
+
+
+def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
+    """Sorting by a map-column key (e.g. `scorer_ratings._rating_`) must work.
+
+    Regression: the ORDER BY path used to pass the field name into the
+    function's `cast` slot, which silently no-op'd for pre-existing column
+    types but raised on the new map_string_string branch. Locks in the
+    fix so future refactors don't reintroduce that mismatch.
+    """
+    project_id = client.project_id
+    runnable_ref = f"weave:///{project_id}/object/my_scorer:obj_id_123"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+    trigger_ref = f"weave:///{project_id}/object/my_scorer:trigger_id_123"
+
+    # Reasons in alphabetical order match the rating order so a single
+    # set of rows exercises both Map(*, Float64) and Map(*, String) sorts.
+    rows = [
+        ("low", 0.1, "alpha"),
+        ("mid", 0.5, "beta"),
+        ("high", 0.9, "gamma"),
+    ]
+    for suffix, rating, reason in rows:
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/{suffix}",
+                feedback_type="wandb.agent_monitor",
+                payload={"value": rating},
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger_ref,
+                scorer_ratings={"_rating_": rating},
+                scorer_rating_reasons={"_rating_": reason},
+            )
+        )
+
+    asc = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            sort_by=[SortBy(field="scorer_ratings._rating_", direction="asc")],
+        )
+    )
+    assert [r["weave_ref"].rsplit("/", 1)[-1] for r in asc.result] == [
+        "low",
+        "mid",
+        "high",
+    ]
+
+    desc = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            sort_by=[SortBy(field="scorer_ratings._rating_", direction="desc")],
+        )
+    )
+    assert [r["weave_ref"].rsplit("/", 1)[-1] for r in desc.result] == [
+        "high",
+        "mid",
+        "low",
+    ]
+
+    by_reason = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            sort_by=[SortBy(field="scorer_rating_reasons._rating_", direction="asc")],
+        )
+    )
+    assert [r["weave_ref"].rsplit("/", 1)[-1] for r in by_reason.result] == [
+        "low",
+        "mid",
+        "high",
+    ]
+
+
 async def populate_feedback(client: WeaveClient) -> None:
     @weave.op
     def my_scorer(x: int, output: int) -> int:
