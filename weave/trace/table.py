@@ -53,6 +53,6 @@ class Table:  # noqa: PLW1641
             raise TypeError("Can only append dicts to tables")
         self.rows.append(row)
 
-    def pop(self, index: int) -> None:
-        """Remove a row at the given index from the table."""
-        self.rows.pop(index)
+    def pop(self, index: int) -> dict:
+        """Remove and return a row at the given index from the table."""
+        return self.rows.pop(index)
