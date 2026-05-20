@@ -7,7 +7,6 @@ import {Evaluation} from '../evaluation';
 import {
   EvalLinkSpanProcessor,
   registerEvalLinkSpanProcessor,
-  setEvalLinkClientGetter,
 } from '../evaluationOtelLinker';
 import {InMemoryTraceServer} from '../inMemoryTraceServer';
 import {op} from '../op';
@@ -36,12 +35,11 @@ describe('EvalLinkSpanProcessor', () => {
   beforeEach(() => {
     traceServer = new InMemoryTraceServer();
     initWithCustomTraceServer(projectId, traceServer);
-    setEvalLinkClientGetter(() => requireGlobalClient());
   });
 
   test('injects eval metadata on span start and stores GenAI span refs on end', () => {
     const client = requireGlobalClient();
-    const processor = new EvalLinkSpanProcessor();
+    const processor = new EvalLinkSpanProcessor(() => requireGlobalClient());
     const evaluateEntry: CallStackEntry = {
       callId: 'eval-call',
       traceId: 'weave-trace',
@@ -95,7 +93,7 @@ describe('EvalLinkSpanProcessor', () => {
   });
 
   test('upgrades existing single GenAI span ref summary and deduplicates refs', () => {
-    const processor = new EvalLinkSpanProcessor();
+    const processor = new EvalLinkSpanProcessor(() => requireGlobalClient());
     const predictAndScoreEntry: CallStackEntry = {
       callId: 'predict-and-score-call',
       traceId: 'weave-trace',
@@ -136,8 +134,12 @@ describe('EvalLinkSpanProcessor', () => {
       getTracer: jest.fn(),
     };
 
-    expect(registerEvalLinkSpanProcessor(provider as any)).toBe(true);
-    expect(registerEvalLinkSpanProcessor(provider as any)).toBe(true);
+    expect(
+      registerEvalLinkSpanProcessor(() => requireGlobalClient(), provider as any)
+    ).toBe(true);
+    expect(
+      registerEvalLinkSpanProcessor(() => requireGlobalClient(), provider as any)
+    ).toBe(true);
 
     expect(provider.addSpanProcessor).toHaveBeenCalledTimes(1);
     expect(provider.addSpanProcessor.mock.calls[0][0]).toBeInstanceOf(
@@ -150,11 +152,13 @@ describe('EvalLinkSpanProcessor', () => {
       getTracer: jest.fn(),
     };
 
-    expect(registerEvalLinkSpanProcessor(provider as any)).toBe(false);
+    expect(
+      registerEvalLinkSpanProcessor(() => requireGlobalClient(), provider as any)
+    ).toBe(false);
   });
 
   test('links GenAI spans to declarative Evaluation.predictAndScore calls', async () => {
-    const processor = new EvalLinkSpanProcessor();
+    const processor = new EvalLinkSpanProcessor(() => requireGlobalClient());
     const dataset = new Dataset({rows: [{question: 'hello'}]});
     const model = op(async function model({
       datasetRow,

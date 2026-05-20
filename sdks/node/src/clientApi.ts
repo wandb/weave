@@ -1,8 +1,5 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
-import {
-  registerEvalLinkSpanProcessor,
-  setEvalLinkClientGetter,
-} from './evaluationOtelLinker';
+import {registerEvalLinkSpanProcessor} from './evaluationOtelLinker';
 import {makeSettings, SettingsInit} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
@@ -146,8 +143,7 @@ export async function init(
     );
     setGlobalClient(client);
     setGlobalDomain(domain);
-    setEvalLinkClientGetter(getGlobalClient);
-    registerEvalLinkSpanProcessor();
+    registerEvalLinkSpanProcessor(getGlobalClient);
     console.log(`Initializing project: ${projectId}`);
     return client;
   } catch (error) {

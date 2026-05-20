@@ -21,7 +21,12 @@ import {
 } from './constants';
 import type {CallStackEntry, WeaveClient} from './weaveClient';
 
+// `gen_ai.operation.name` is an OTel GenAI semantic convention, but GenAI
+// conventions are still incubating. The JS semconv package will have a stable
+// version of this constant at some point.
 const GENAI_OPERATION_NAME_ATTR = 'gen_ai.operation.name';
+// We store this attribute on the tracer provider to ensure repeated init paths
+// do not register the span processor multiple times.
 const EVAL_LINK_PROCESSOR_REGISTERED = Symbol.for(
   '_weave_eval_link_span_processor_registered'
 );
@@ -31,13 +36,7 @@ type SpanProcessorProvider = TracerProvider & {
   [EVAL_LINK_PROCESSOR_REGISTERED]?: boolean;
 };
 
-let getClient: () => WeaveClient | null = () => null;
-
-export function setEvalLinkClientGetter(
-  clientGetter: () => WeaveClient | null
-): void {
-  getClient = clientGetter;
-}
+type ClientGetter = () => WeaveClient | null;
 
 export interface GenAISpanRef {
   trace_id: string;
@@ -78,7 +77,11 @@ export function attachGenAISpanRefToCallSummary(
   };
 }
 
-function findPredictAndScoreCall(): CallStackEntry | null {
+function findPredictAndScoreCall(
+  getClient: ClientGetter
+): CallStackEntry | null {
+  // The predict-and-score call is the per-row eval call that owns the model
+  // prediction. This is where we store GenAI span refs for eval result rows.
   return (
     getClient()
       ?.getCallStack()
@@ -86,7 +89,9 @@ function findPredictAndScoreCall(): CallStackEntry | null {
   );
 }
 
-function findEvaluateCall(): CallStackEntry | null {
+function findEvaluateCall(getClient: ClientGetter): CallStackEntry | null {
+  // The evaluate call is the parent eval run. We only use it to attach the
+  // human-readable evaluation name onto GenAI spans for filtering/deep links.
   return (
     getClient()
       ?.getCallStack()
@@ -99,9 +104,11 @@ function findEvaluateCall(): CallStackEntry | null {
  * Evaluation.predictAndScore call back to that evaluation row.
  */
 export class EvalLinkSpanProcessor implements SpanProcessor {
+  constructor(private readonly getClient: ClientGetter) {}
+
   onStart(span: Span, _parentContext: Context): void {
-    const client = getClient();
-    const call = findPredictAndScoreCall();
+    const client = this.getClient();
+    const call = findPredictAndScoreCall(this.getClient);
     if (!client || !call) {
       return;
     }
@@ -109,7 +116,7 @@ export class EvalLinkSpanProcessor implements SpanProcessor {
     span.setAttribute(EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR, call.callId);
     span.setAttribute(EVAL_PROJECT_ID_SPAN_ATTR, client.projectId);
 
-    const evalName = findEvaluateCall()?.displayName;
+    const evalName = findEvaluateCall(this.getClient)?.displayName;
     if (evalName) {
       span.setAttribute(EVAL_EVALUATION_NAME_SPAN_ATTR, evalName);
     }
@@ -121,7 +128,7 @@ export class EvalLinkSpanProcessor implements SpanProcessor {
       return;
     }
 
-    const call = findPredictAndScoreCall();
+    const call = findPredictAndScoreCall(this.getClient);
     if (!call) {
       return;
     }
@@ -155,6 +162,7 @@ export class EvalLinkSpanProcessor implements SpanProcessor {
  * not expose addSpanProcessor.
  */
 export function registerEvalLinkSpanProcessor(
+  getClient: ClientGetter,
   provider: TracerProvider = trace.getTracerProvider()
 ): boolean {
   const spanProcessorProvider = provider as SpanProcessorProvider;
@@ -165,7 +173,7 @@ export function registerEvalLinkSpanProcessor(
     return false;
   }
 
-  spanProcessorProvider.addSpanProcessor(new EvalLinkSpanProcessor());
+  spanProcessorProvider.addSpanProcessor(new EvalLinkSpanProcessor(getClient));
   spanProcessorProvider[EVAL_LINK_PROCESSOR_REGISTERED] = true;
   return true;
 }

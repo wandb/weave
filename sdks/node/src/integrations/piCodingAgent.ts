@@ -176,7 +176,7 @@ export class PiCodingAgentOtelAdapter {
               'wandb.project': project,
             }),
             spanProcessors: [
-              new EvalLinkSpanProcessor(),
+              new EvalLinkSpanProcessor(getGlobalClient),
               new SimpleSpanProcessor(
                 new OTLPTraceExporter({
                   url: endpoint,
