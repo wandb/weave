@@ -11,8 +11,6 @@ import pytest_asyncio
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_clickhouse_trace_server import (
-    ASYNC_PATH_UNSUPPORTED_CUSTOM_PROVIDER,
-    ASYNC_PATH_UNSUPPORTED_PROMPT,
     AsyncClickHouseTraceServer,
 )
 from weave.trace_server.datadog import _db_insert_path
@@ -118,31 +116,65 @@ async def test_prep_short_circuit_returns_without_calling_litellm(
 
 
 @pytest.mark.asyncio
-async def test_prompt_request_returns_error_pointing_at_sync_path(
+async def test_prep_runs_off_the_event_loop_thread(
     server: AsyncClickHouseTraceServer,
 ) -> None:
-    # Prompt-based requests would force obj_read on the loop thread; gate them
-    # before any work.
-    acompletion = AsyncMock()
-    with patch(LITELLM_ACOMPLETION_PATCH, new=acompletion):
-        res = await server.acompletions_create(
-            _make_req(track_llm_call=False, prompt="weave:///p/o/prompt:v1")
-        )
-    assert res.response == {"error": ASYNC_PATH_UNSUPPORTED_PROMPT}
-    assert acompletion.await_count == 0
+    # Prep can do CH obj_read (prompt resolution, custom:: provider lookup) or
+    # hit the secret fetcher. It must run off the event loop, even on the hot
+    # path where prep is pure CPU, so the invariant holds.
+    loop_thread_id = threading.get_ident()
+    captured = {"thread_id": None}
+
+    def _capture_prep(req: object) -> tuple[list, object]:
+        captured["thread_id"] = threading.get_ident()
+        return ([{"role": "user", "content": "hi"}], MagicMock(api_key="k"))
+
+    with (
+        patch.object(server, "_prepare_completion_request", side_effect=_capture_prep),
+        patch(
+            LITELLM_ACOMPLETION_PATCH,
+            new=AsyncMock(return_value=tsi.CompletionsCreateRes(response={"ok": True})),
+        ),
+    ):
+        await server.acompletions_create(_make_req(track_llm_call=False))
+
+    assert captured["thread_id"] != loop_thread_id
 
 
 @pytest.mark.asyncio
-async def test_custom_provider_returns_error_pointing_at_sync_path(
+@pytest.mark.parametrize(
+    ("model", "prompt"),
+    [
+        ("custom::myprovider::mymodel", None),
+        ("gpt-4o-mini", "weave:///p/o/prompt:v1"),
+    ],
+    ids=["custom_provider", "prompt_request"],
+)
+async def test_blocking_prep_shapes_complete_via_to_thread(
     server: AsyncClickHouseTraceServer,
+    model: str,
+    prompt: str | None,
 ) -> None:
-    acompletion = AsyncMock()
-    with patch(LITELLM_ACOMPLETION_PATCH, new=acompletion):
+    # Requests that force obj_read inside prep (custom:: provider, prompt
+    # resolution) must complete end-to-end on the async path, not error out.
+    # Verified by stubbing prep to a known result and asserting we reach
+    # litellm and return the final response.
+    prep_result = ([{"role": "user", "content": "hi"}], MagicMock(api_key="k"))
+    with (
+        patch.object(server, "_prepare_completion_request", return_value=prep_result),
+        patch(
+            LITELLM_ACOMPLETION_PATCH,
+            new=AsyncMock(
+                return_value=tsi.CompletionsCreateRes(response={"choices": []})
+            ),
+        ) as acompletion,
+    ):
         res = await server.acompletions_create(
-            _make_req(track_llm_call=False, model="custom::myprovider::mymodel")
+            _make_req(track_llm_call=False, model=model, prompt=prompt)
         )
-    assert res.response == {"error": ASYNC_PATH_UNSUPPORTED_CUSTOM_PROVIDER}
-    assert acompletion.await_count == 0
+
+    assert res.response == {"choices": []}
+    assert acompletion.await_count == 1
 
 
 @pytest.mark.asyncio

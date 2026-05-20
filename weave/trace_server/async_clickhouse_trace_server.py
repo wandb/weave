@@ -5,16 +5,18 @@ is inherited from `ClickHouseTraceServer`. `acompletions_create` awaits
 `litellm.acompletion` (no thread held during the network wait) and
 dispatches the CH insert via `run_in_executor`.
 
-The async path supports the worker-shaped request only: resolved messages,
-built-in provider (not `custom::`). Requests carrying `prompt` or a
-`custom::` provider would force a CH `obj_read` during prep and block the
-loop, so those return an error pointing the caller at the sync path.
+Invariant: the only thing that runs on the loop thread is the
+`await litellm.acompletion`. Prep (prompt resolve + provider lookup) and the
+post-LLM CH insert both hop off-loop. Prep goes through `asyncio.to_thread`
+unconditionally; built-in-provider/no-prompt requests are pure CPU but the
+~50us thread hop is dwarfed by the ~3s LLM call, and the uniformity removes
+a footgun if prep ever grows another I/O call.
 
 `secret_fetcher_context` is a `ContextVar` and propagates across `await`
-boundaries automatically. The `_db_insert_path` contextvar set by
-`@tag_db_insert_path` does NOT cross `run_in_executor`; we explicitly
-copy the context for the executor branch so CH-insert dogstatsd counters
-get tagged `path:completions_create`.
+boundaries and `asyncio.to_thread`/`copy_context().run` automatically. The
+`_db_insert_path` contextvar set by `@tag_db_insert_path` does NOT cross
+`run_in_executor` automatically; we explicitly copy the context for the
+CH-insert hop so dogstatsd counters get tagged `path:completions_create`.
 """
 
 import asyncio
@@ -31,17 +33,6 @@ from weave.trace_server.datadog import tag_db_insert_path
 from weave.trace_server.llm_completion import lite_llm_acompletion
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelDispatcher,
-)
-
-ASYNC_PATH_UNSUPPORTED_PROMPT = (
-    "acompletions_create does not support prompt-based requests; "
-    "prompt resolution requires a synchronous CH obj_read that would "
-    "block the event loop. Use the sync completions_create path."
-)
-ASYNC_PATH_UNSUPPORTED_CUSTOM_PROVIDER = (
-    "acompletions_create does not support custom::-prefixed providers; "
-    "custom provider lookup requires a synchronous CH obj_read that would "
-    "block the event loop. Use the sync completions_create path."
 )
 
 
@@ -85,16 +76,10 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         insert continues on the executor thread (executor futures are not
         cancellable). Cancellation during `litellm.acompletion` is propagated.
         """
-        if getattr(req.inputs, "prompt", None) is not None:
-            return tsi.CompletionsCreateRes(
-                response={"error": ASYNC_PATH_UNSUPPORTED_PROMPT}
-            )
-        if req.inputs.model.startswith("custom::"):
-            return tsi.CompletionsCreateRes(
-                response={"error": ASYNC_PATH_UNSUPPORTED_CUSTOM_PROVIDER}
-            )
-
-        prep = self._prepare_completion_request(req)
+        # Prep may obj_read CH (prompt resolution, custom:: provider lookup) or
+        # hit the secret fetcher; always off-loop it. asyncio.to_thread
+        # propagates the current context, so secret_fetcher_context flows.
+        prep = await asyncio.to_thread(self._prepare_completion_request, req)
         if isinstance(prep, tsi.CompletionsCreateRes):
             return prep
         initial_messages, completion_model_info = prep
