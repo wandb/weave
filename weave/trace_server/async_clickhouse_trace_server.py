@@ -5,17 +5,20 @@ is inherited from `ClickHouseTraceServer`. `acompletions_create` awaits
 `litellm.acompletion` (no thread held during the network wait) and
 dispatches the CH insert via `run_in_executor`.
 
-Prep (prompt resolve + provider lookup) runs synchronously on the event loop.
-When `inputs.messages` is already resolved and the model is a built-in
-provider, prep is pure-CPU; if the request supplies `prompt` or a `custom::`
-provider, prep makes a CH `obj_read` and will block the loop. Callers in
-that shape should stay on the sync path.
+The async path supports the worker-shaped request only: resolved messages,
+built-in provider (not `custom::`). Requests carrying `prompt` or a
+`custom::` provider would force a CH `obj_read` during prep and block the
+loop, so those return an error pointing the caller at the sync path.
 
 `secret_fetcher_context` is a `ContextVar` and propagates across `await`
-boundaries, so no plumbing change is needed.
+boundaries automatically. The `_db_insert_path` contextvar set by
+`@tag_db_insert_path` does NOT cross `run_in_executor`; we explicitly
+copy the context for the executor branch so CH-insert dogstatsd counters
+get tagged `path:completions_create`.
 """
 
 import asyncio
+import contextvars
 import datetime
 from concurrent.futures import Executor
 
@@ -24,9 +27,21 @@ from weave.trace_server.clickhouse_trace_server_batched import (
     CLICKHOUSE_DEFAULT_PORT,
     ClickHouseTraceServer,
 )
+from weave.trace_server.datadog import tag_db_insert_path
 from weave.trace_server.llm_completion import lite_llm_acompletion
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelDispatcher,
+)
+
+ASYNC_PATH_UNSUPPORTED_PROMPT = (
+    "acompletions_create does not support prompt-based requests; "
+    "prompt resolution requires a synchronous CH obj_read that would "
+    "block the event loop. Use the sync completions_create path."
+)
+ASYNC_PATH_UNSUPPORTED_CUSTOM_PROVIDER = (
+    "acompletions_create does not support custom::-prefixed providers; "
+    "custom provider lookup requires a synchronous CH obj_read that would "
+    "block the event loop. Use the sync completions_create path."
 )
 
 
@@ -60,10 +75,25 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         )
         self._ch_executor: Executor | None = ch_executor
 
+    @tag_db_insert_path("completions_create")
     async def acompletions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        """Async twin of `completions_create`. No thread held during the LLM wait."""
+        """Async twin of `completions_create`. No thread held during the LLM wait.
+
+        Cancellation note: if the caller cancels mid-`run_in_executor`, the CH
+        insert continues on the executor thread (executor futures are not
+        cancellable). Cancellation during `litellm.acompletion` is propagated.
+        """
+        if getattr(req.inputs, "prompt", None) is not None:
+            return tsi.CompletionsCreateRes(
+                response={"error": ASYNC_PATH_UNSUPPORTED_PROMPT}
+            )
+        if req.inputs.model.startswith("custom::"):
+            return tsi.CompletionsCreateRes(
+                response={"error": ASYNC_PATH_UNSUPPORTED_CUSTOM_PROVIDER}
+            )
+
         prep = self._prepare_completion_request(req)
         if isinstance(prep, tsi.CompletionsCreateRes):
             return prep
@@ -80,9 +110,13 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         )
         end_time = datetime.datetime.now()
 
+        # contextvars don't cross run_in_executor; copy + .run lets the executor
+        # thread see _db_insert_path so record_db_insert tags correctly.
+        ctx = contextvars.copy_context()
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             self._ch_executor,
+            ctx.run,
             self._log_completion_call,
             req,
             completion_model_info,
