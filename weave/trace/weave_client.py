@@ -659,6 +659,8 @@ class WeaveClient:
 
         Returns:
             `CallsIter`: An iterator over `Call` objects. Supports slicing, iteration, and `.to_pandas()`.
+            Call `len(calls)` to get the total number of matching calls (issues a single
+            stats request the first time and caches the result).
 
         Example:
             ```python
@@ -667,6 +669,7 @@ class WeaveClient:
                 columns=["inputs", "output", "summary"],
                 limit=100,
             )
+            print(f"Found {len(calls)} calls")
             for call in calls:
                 print(call.inputs, call.output)
             ```

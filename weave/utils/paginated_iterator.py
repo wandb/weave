@@ -46,6 +46,7 @@ class PaginatedIterator(Generic[T, R_co]):
         self.limit = limit
         self.offset = offset
         self._next_index = 0
+        self._cached_size: int | None = None
 
         if page_size <= 0:
             raise ValueError("page_size must be greater than 0")
@@ -145,12 +146,26 @@ class PaginatedIterator(Generic[T, R_co]):
         return item
 
     def __len__(self) -> int:
-        """This method is included for convenience.  It includes a network call, which
-        is typically slower than most other len() operations!
+        """This method is included for convenience.  The first call issues a
+        network request to fetch the count, which is typically slower than most
+        other len() operations.  Subsequent calls are served from a cache.
         """
         if not self.size_func:
             raise TypeError("This iterator does not support len()")
-        return self.size_func()
+        if self._cached_size is None:
+            self._cached_size = self.size_func()
+        return self._cached_size
+
+    def __repr__(self) -> str:
+        # Deliberately does NOT call size_func: repr must be cheap and free of
+        # side effects (Jupyter, debuggers, tracebacks, and %r in log lines all
+        # invoke repr).  We only surface the count if len() has already
+        # populated the cache.
+        name = type(self).__name__
+        if self.size_func is None:
+            return f"<{name}>"
+        size = self._cached_size if self._cached_size is not None else "?"
+        return f"<{name} len={size}>"
 
     def to_pandas(self) -> pd.DataFrame:
         """Convert the iterator's contents to a pandas DataFrame.
