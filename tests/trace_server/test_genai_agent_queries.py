@@ -200,6 +200,7 @@ def test_group_by_conversation_id(ch_server):
             agent_name="agent-x",
             cache_creation_input_tokens=3,
             cache_read_input_tokens=7,
+            reasoning_tokens=13,
             started_at=now,
         ),
         _make_span(
@@ -210,6 +211,7 @@ def test_group_by_conversation_id(ch_server):
             agent_name="agent-x",
             cache_creation_input_tokens=5,
             cache_read_input_tokens=11,
+            reasoning_tokens=17,
             started_at=now + datetime.timedelta(seconds=1),
         ),
         _make_span(
@@ -240,6 +242,7 @@ def test_group_by_conversation_id(ch_server):
     assert by_conv[conv_a].invocation_count == 1  # one invoke_agent span
     assert by_conv[conv_a].total_cache_creation_input_tokens == 8
     assert by_conv[conv_a].total_cache_read_input_tokens == 18
+    assert by_conv[conv_a].total_reasoning_tokens == 30
     assert "agent-x" in by_conv[conv_a].agent_names
     assert "Alpha Chat" in by_conv[conv_a].conversation_names
 
