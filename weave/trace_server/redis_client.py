@@ -51,15 +51,12 @@ def get_redis_client() -> redis.Redis | None:
             if tls:
                 parsed = parsed._replace(scheme="rediss")
             clean_url = parsed._replace(query="").geturl()
-            ssl_kwargs: dict[str, str] = {}
-            if tls and ca_cert_path:
-                ssl_kwargs["ssl_ca_certs"] = ca_cert_path
             return redis.from_url(
                 clean_url,
                 decode_responses=True,
                 socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
                 socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
-                **ssl_kwargs,
+                ssl_ca_certs=ca_cert_path if tls else None,
             )
 
         if not parsed.hostname:

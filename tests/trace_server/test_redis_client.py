@@ -33,7 +33,10 @@ def test_client_resolution_from_url(monkeypatch):
         monkeypatch.setenv("WEAVE_REDIS_URL", "redis://redis.example:6379")
         client = redis_client.get_redis_client()
         mock_from_url.assert_called_once_with(
-            "redis://redis.example:6379", decode_responses=True, **timeouts
+            "redis://redis.example:6379",
+            decode_responses=True,
+            ssl_ca_certs=None,
+            **timeouts,
         )
         assert client is mock_from_url.return_value
 
@@ -87,13 +90,16 @@ def test_direct_url_strips_wandb_query_params(monkeypatch):
             **timeouts,
         )
 
-    # tls=true without caCertPath -> rediss:// scheme, no ssl_ca_certs kwarg.
+    # tls=true without caCertPath -> rediss:// scheme, ssl_ca_certs stays None.
     with patch.object(redis_client.redis, "from_url") as mock_from_url:
         redis_client.get_redis_client.cache_clear()
         monkeypatch.setenv("WEAVE_REDIS_URL", "redis://host:6379?tls=true")
         redis_client.get_redis_client()
         mock_from_url.assert_called_once_with(
-            "rediss://host:6379", decode_responses=True, **timeouts
+            "rediss://host:6379",
+            decode_responses=True,
+            ssl_ca_certs=None,
+            **timeouts,
         )
 
     # Non-tls wandb params are still stripped, scheme left as-is.
@@ -102,7 +108,10 @@ def test_direct_url_strips_wandb_query_params(monkeypatch):
         monkeypatch.setenv("WEAVE_REDIS_URL", "redis://host:6379?ttlInSeconds=604800")
         redis_client.get_redis_client()
         mock_from_url.assert_called_once_with(
-            "redis://host:6379", decode_responses=True, **timeouts
+            "redis://host:6379",
+            decode_responses=True,
+            ssl_ca_certs=None,
+            **timeouts,
         )
 
 
