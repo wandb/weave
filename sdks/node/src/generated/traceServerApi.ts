@@ -318,7 +318,7 @@ export interface ConvertSpec {
     | InOperation
     | ContainsOperation;
   /** To */
-  to: "double" | "string" | "int" | "bool" | "exists";
+  to: 'double' | 'string' | 'int' | 'bool' | 'exists';
 }
 
 /** CostCreateInput */
@@ -847,7 +847,7 @@ export interface SortBy {
   /** Field */
   field: string;
   /** Direction */
-  direction: "asc" | "desc";
+  direction: 'asc' | 'desc';
 }
 
 /** StartedCallSchemaForInsert */
@@ -1054,9 +1054,9 @@ export interface ValidationError {
 }
 
 export type QueryParamsType = Record<string | number, any>;
-export type ResponseFormat = keyof Omit<Body, "body" | "bodyUsed">;
+export type ResponseFormat = keyof Omit<Body, 'body' | 'bodyUsed'>;
 
-export interface FullRequestParams extends Omit<RequestInit, "body"> {
+export interface FullRequestParams extends Omit<RequestInit, 'body'> {
   /** set parameter to `true` for call `securityWorker` for this request */
   secure?: boolean;
   /** request path */
@@ -1077,14 +1077,14 @@ export interface FullRequestParams extends Omit<RequestInit, "body"> {
 
 export type RequestParams = Omit<
   FullRequestParams,
-  "body" | "method" | "query" | "path"
+  'body' | 'method' | 'query' | 'path'
 >;
 
 export interface ApiConfig<SecurityDataType = unknown> {
   baseUrl?: string;
-  baseApiParams?: Omit<RequestParams, "baseUrl" | "cancelToken" | "signal">;
+  baseApiParams?: Omit<RequestParams, 'baseUrl' | 'cancelToken' | 'signal'>;
   securityWorker?: (
-    securityData: SecurityDataType | null,
+    securityData: SecurityDataType | null
   ) => Promise<RequestParams | void> | RequestParams | void;
   customFetch?: typeof fetch;
 }
@@ -1098,26 +1098,26 @@ export interface HttpResponse<D extends unknown, E extends unknown = unknown>
 type CancelToken = Symbol | string | number;
 
 export enum ContentType {
-  Json = "application/json",
-  JsonApi = "application/vnd.api+json",
-  FormData = "multipart/form-data",
-  UrlEncoded = "application/x-www-form-urlencoded",
-  Text = "text/plain",
+  Json = 'application/json',
+  JsonApi = 'application/vnd.api+json',
+  FormData = 'multipart/form-data',
+  UrlEncoded = 'application/x-www-form-urlencoded',
+  Text = 'text/plain',
 }
 
 export class HttpClient<SecurityDataType = unknown> {
-  public baseUrl: string = "https://api.wandb.ai";
+  public baseUrl: string = 'https://api.wandb.ai';
   private securityData: SecurityDataType | null = null;
-  private securityWorker?: ApiConfig<SecurityDataType>["securityWorker"];
+  private securityWorker?: ApiConfig<SecurityDataType>['securityWorker'];
   private abortControllers = new Map<CancelToken, AbortController>();
   private customFetch = (...fetchParams: Parameters<typeof fetch>) =>
     fetch(...fetchParams);
 
   private baseApiParams: RequestParams = {
-    credentials: "same-origin",
+    credentials: 'same-origin',
     headers: {},
-    redirect: "follow",
-    referrerPolicy: "no-referrer",
+    redirect: 'follow',
+    referrerPolicy: 'no-referrer',
   };
 
   constructor(apiConfig: ApiConfig<SecurityDataType> = {}) {
@@ -1130,7 +1130,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected encodeQueryParam(key: string, value: any) {
     const encodedKey = encodeURIComponent(key);
-    return `${encodedKey}=${encodeURIComponent(typeof value === "number" ? value : `${value}`)}`;
+    return `${encodedKey}=${encodeURIComponent(typeof value === 'number' ? value : `${value}`)}`;
   }
 
   protected addQueryParam(query: QueryParamsType, key: string) {
@@ -1139,39 +1139,39 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected addArrayQueryParam(query: QueryParamsType, key: string) {
     const value = query[key];
-    return value.map((v: any) => this.encodeQueryParam(key, v)).join("&");
+    return value.map((v: any) => this.encodeQueryParam(key, v)).join('&');
   }
 
   protected toQueryString(rawQuery?: QueryParamsType): string {
     const query = rawQuery || {};
     const keys = Object.keys(query).filter(
-      (key) => "undefined" !== typeof query[key],
+      key => 'undefined' !== typeof query[key]
     );
     return keys
-      .map((key) =>
+      .map(key =>
         Array.isArray(query[key])
           ? this.addArrayQueryParam(query, key)
-          : this.addQueryParam(query, key),
+          : this.addQueryParam(query, key)
       )
-      .join("&");
+      .join('&');
   }
 
   protected addQueryParams(rawQuery?: QueryParamsType): string {
     const queryString = this.toQueryString(rawQuery);
-    return queryString ? `?${queryString}` : "";
+    return queryString ? `?${queryString}` : '';
   }
 
   private contentFormatters: Record<ContentType, (input: any) => any> = {
     [ContentType.Json]: (input: any) =>
-      input !== null && (typeof input === "object" || typeof input === "string")
+      input !== null && (typeof input === 'object' || typeof input === 'string')
         ? JSON.stringify(input)
         : input,
     [ContentType.JsonApi]: (input: any) =>
-      input !== null && (typeof input === "object" || typeof input === "string")
+      input !== null && (typeof input === 'object' || typeof input === 'string')
         ? JSON.stringify(input)
         : input,
     [ContentType.Text]: (input: any) =>
-      input !== null && typeof input !== "string"
+      input !== null && typeof input !== 'string'
         ? JSON.stringify(input)
         : input,
     [ContentType.FormData]: (input: any) => {
@@ -1185,9 +1185,9 @@ export class HttpClient<SecurityDataType = unknown> {
           key,
           property instanceof Blob
             ? property
-            : typeof property === "object" && property !== null
+            : typeof property === 'object' && property !== null
               ? JSON.stringify(property)
-              : `${property}`,
+              : `${property}`
         );
         return formData;
       }, new FormData());
@@ -1197,7 +1197,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected mergeRequestParams(
     params1: RequestParams,
-    params2?: RequestParams,
+    params2?: RequestParams
   ): RequestParams {
     return {
       ...this.baseApiParams,
@@ -1212,7 +1212,7 @@ export class HttpClient<SecurityDataType = unknown> {
   }
 
   protected createAbortSignal = (
-    cancelToken: CancelToken,
+    cancelToken: CancelToken
   ): AbortSignal | undefined => {
     if (this.abortControllers.has(cancelToken)) {
       const abortController = this.abortControllers.get(cancelToken);
@@ -1248,7 +1248,7 @@ export class HttpClient<SecurityDataType = unknown> {
     ...params
   }: FullRequestParams): Promise<HttpResponse<T, E>> => {
     const secureParams =
-      ((typeof secure === "boolean" ? secure : this.baseApiParams.secure) &&
+      ((typeof secure === 'boolean' ? secure : this.baseApiParams.secure) &&
         this.securityWorker &&
         (await this.securityWorker(this.securityData))) ||
       {};
@@ -1258,13 +1258,13 @@ export class HttpClient<SecurityDataType = unknown> {
     const responseFormat = format || requestParams.format;
 
     return this.customFetch(
-      `${baseUrl || this.baseUrl || ""}${path}${queryString ? `?${queryString}` : ""}`,
+      `${baseUrl || this.baseUrl || ''}${path}${queryString ? `?${queryString}` : ''}`,
       {
         ...requestParams,
         headers: {
           ...(requestParams.headers || {}),
           ...(type && type !== ContentType.FormData
-            ? { "Content-Type": type }
+            ? {'Content-Type': type}
             : {}),
         },
         signal:
@@ -1272,11 +1272,11 @@ export class HttpClient<SecurityDataType = unknown> {
             ? this.createAbortSignal(cancelToken)
             : requestParams.signal) || null,
         body:
-          typeof body === "undefined" || body === null
+          typeof body === 'undefined' || body === null
             ? null
             : payloadFormatter(body),
-      },
-    ).then(async (response) => {
+      }
+    ).then(async response => {
       const r = response as HttpResponse<T, E>;
       r.data = null as unknown as T;
       r.error = null as unknown as E;
@@ -1285,7 +1285,7 @@ export class HttpClient<SecurityDataType = unknown> {
       const data = !responseFormat
         ? r
         : await responseToParse[responseFormat]()
-            .then((data) => {
+            .then(data => {
               if (r.ok) {
                 r.data = data;
               } else {
@@ -1293,7 +1293,7 @@ export class HttpClient<SecurityDataType = unknown> {
               }
               return r;
             })
-            .catch((e) => {
+            .catch(e => {
               r.error = e;
               return r;
             });
@@ -1328,8 +1328,8 @@ export class Api<
     readRootHealthGet: (params: RequestParams = {}) =>
       this.request<any, any>({
         path: `/health`,
-        method: "GET",
-        format: "json",
+        method: 'GET',
+        format: 'json',
         ...params,
       }),
   };
@@ -1345,8 +1345,8 @@ export class Api<
     serverInfoServerInfoGet: (params: RequestParams = {}) =>
       this.request<ServerInfoRes, any>({
         path: `/server_info`,
-        method: "GET",
-        format: "json",
+        method: 'GET',
+        format: 'json',
         ...params,
       }),
   };
@@ -1363,11 +1363,11 @@ export class Api<
     callStartCallStartPost: (data: CallStartReq, params: RequestParams = {}) =>
       this.request<CallStartRes, HTTPValidationError>({
         path: `/call/start`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1383,11 +1383,11 @@ export class Api<
     callEndCallEndPost: (data: CallEndReq, params: RequestParams = {}) =>
       this.request<CallEndRes, HTTPValidationError>({
         path: `/call/end`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1402,15 +1402,15 @@ export class Api<
      */
     callStartBatchCallUpsertBatchPost: (
       data: CallCreateBatchReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CallCreateBatchRes, HTTPValidationError>({
         path: `/call/upsert_batch`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1425,15 +1425,15 @@ export class Api<
      */
     callUpdateCallUpdatePost: (
       data: CallUpdateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CallUpdateRes, HTTPValidationError>({
         path: `/call/update`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1449,11 +1449,11 @@ export class Api<
     callReadCallReadPost: (data: CallReadReq, params: RequestParams = {}) =>
       this.request<CallReadRes, HTTPValidationError>({
         path: `/call/read`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
@@ -1469,15 +1469,15 @@ export class Api<
      */
     callsDeleteCallsDeletePost: (
       data: CallsDeleteReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CallsDeleteRes, HTTPValidationError>({
         path: `/calls/delete`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1492,15 +1492,15 @@ export class Api<
      */
     callsQueryStatsCallsQueryStatsPost: (
       data: CallsQueryStatsReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CallsQueryStatsRes, HTTPValidationError>({
         path: `/calls/query_stats`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1515,15 +1515,15 @@ export class Api<
      */
     callsQueryStreamCallsStreamQueryPost: (
       data: CallsQueryReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<any, HTTPValidationError>({
         path: `/calls/stream_query`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
@@ -1540,11 +1540,11 @@ export class Api<
     objCreateObjCreatePost: (data: ObjCreateReq, params: RequestParams = {}) =>
       this.request<ObjCreateRes, HTTPValidationError>({
         path: `/obj/create`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1560,11 +1560,11 @@ export class Api<
     objReadObjReadPost: (data: ObjReadReq, params: RequestParams = {}) =>
       this.request<ObjReadRes, HTTPValidationError>({
         path: `/obj/read`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
@@ -1581,11 +1581,11 @@ export class Api<
     objsQueryObjsQueryPost: (data: ObjQueryReq, params: RequestParams = {}) =>
       this.request<ObjQueryRes, HTTPValidationError>({
         path: `/objs/query`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
@@ -1601,15 +1601,15 @@ export class Api<
      */
     tableCreateTableCreatePost: (
       data: TableCreateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<TableCreateRes, HTTPValidationError>({
         path: `/table/create`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1624,15 +1624,15 @@ export class Api<
      */
     tableUpdateTableUpdatePost: (
       data: TableUpdateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<TableUpdateRes, HTTPValidationError>({
         path: `/table/update`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1647,15 +1647,15 @@ export class Api<
      */
     tableQueryTableQueryPost: (
       data: TableQueryReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<TableQueryRes, HTTPValidationError>({
         path: `/table/query`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1670,15 +1670,15 @@ export class Api<
      */
     tableQueryStatsTableQueryStatsPost: (
       data: TableQueryStatsReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<TableQueryStatsRes, HTTPValidationError>({
         path: `/table/query_stats`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
@@ -1694,15 +1694,15 @@ export class Api<
      */
     refsReadBatchRefsReadBatchPost: (
       data: RefsReadBatchReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<RefsReadBatchRes, HTTPValidationError>({
         path: `/refs/read_batch`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
@@ -1718,15 +1718,15 @@ export class Api<
      */
     fileCreateFileCreatePost: (
       data: BodyFileCreateFileCreatePost,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FileCreateRes, HTTPValidationError>({
         path: `/file/create`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.FormData,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1741,15 +1741,15 @@ export class Api<
      */
     fileContentFileContentPost: (
       data: FileContentReadReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<any, HTTPValidationError>({
         path: `/file/content`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
@@ -1765,15 +1765,15 @@ export class Api<
      */
     costCreateCostCreatePost: (
       data: CostCreateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<CostCreateRes, HTTPValidationError>({
         path: `/cost/create`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1789,11 +1789,11 @@ export class Api<
     costQueryCostQueryPost: (data: CostQueryReq, params: RequestParams = {}) =>
       this.request<CostQueryRes, HTTPValidationError>({
         path: `/cost/query`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1809,11 +1809,11 @@ export class Api<
     costPurgeCostPurgePost: (data: CostPurgeReq, params: RequestParams = {}) =>
       this.request<CostPurgeRes, HTTPValidationError>({
         path: `/cost/purge`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
@@ -1829,15 +1829,15 @@ export class Api<
      */
     feedbackCreateFeedbackCreatePost: (
       data: FeedbackCreateReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FeedbackCreateRes, HTTPValidationError>({
         path: `/feedback/create`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1852,15 +1852,15 @@ export class Api<
      */
     feedbackQueryFeedbackQueryPost: (
       data: FeedbackQueryReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FeedbackQueryRes, HTTPValidationError>({
         path: `/feedback/query`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1875,15 +1875,15 @@ export class Api<
      */
     feedbackPurgeFeedbackPurgePost: (
       data: FeedbackPurgeReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FeedbackPurgeRes, HTTPValidationError>({
         path: `/feedback/purge`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
 
@@ -1898,15 +1898,15 @@ export class Api<
      */
     feedbackReplaceFeedbackReplacePost: (
       data: FeedbackReplaceReq,
-      params: RequestParams = {},
+      params: RequestParams = {}
     ) =>
       this.request<FeedbackReplaceRes, HTTPValidationError>({
         path: `/feedback/replace`,
-        method: "POST",
+        method: 'POST',
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
+        format: 'json',
         ...params,
       }),
   };
