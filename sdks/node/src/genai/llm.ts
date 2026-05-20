@@ -89,6 +89,9 @@ export class LLM {
 
   /** Append an assistant message to the response. */
   output(content: string): this {
+    if (this._warnIfEnded('output')) {
+      return this;
+    }
     this.outputMessages.push({role: 'assistant', content});
     return this;
   }
@@ -98,6 +101,9 @@ export class LLM {
    *  a `ReasoningPart` at serialization time, matching the Python SDK's
    *  on-the-wire shape. */
   think(content: string): this {
+    if (this._warnIfEnded('think')) {
+      return this;
+    }
     if (this.reasoning === undefined) {
       this.reasoning = {content};
     } else {
@@ -110,6 +116,9 @@ export class LLM {
    *  `content` (inline base64 bytes), `uri` (URI reference), or `fileId`
    *  (pre-uploaded file id). */
   attachMedia(opts: AttachMediaOpts): this {
+    if (this._warnIfEnded('attachMedia')) {
+      return this;
+    }
     const parts = this._ensureLastInputParts();
     let part: MessagePart;
     if ('content' in opts) {
@@ -125,11 +134,17 @@ export class LLM {
 
   /** Convenience for `attachMedia({uri, modality})`. */
   attachMediaUrl(url: string, opts: {modality: Modality}): this {
+    if (this._warnIfEnded('attachMediaUrl')) {
+      return this;
+    }
     return this.attachMedia({uri: url, modality: opts.modality});
   }
 
   /** Bulk-set any subset of the mutable fields. Replaces (does not merge). */
   record(opts: LLMRecordOpts): this {
+    if (this._warnIfEnded('record')) {
+      return this;
+    }
     if (opts.inputMessages !== undefined) {
       this.inputMessages = opts.inputMessages;
     }
@@ -268,6 +283,19 @@ export class LLM {
       this.inputMessages.push(last);
     }
     return ensureParts(last);
+  }
+
+  /** Warn if called after `end()`. Returns `true` if the caller should
+   *  short-circuit; the span is already closed, so any further mutation can
+   *  no longer reach the trace. */
+  private _warnIfEnded(method: string): boolean {
+    if (this._ended) {
+      console.warn(
+        `weave.LLM.${method}() called after end() — data will not be recorded on the span.`
+      );
+      return true;
+    }
+    return false;
   }
 }
 

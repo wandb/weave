@@ -277,5 +277,46 @@ describe('LLM (via Turn.llm)', () => {
       llm.end();
       turn.end();
     });
+
+    it('accumulators called after end() warn and do not mutate state', () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const turn = Turn.create({});
+      const llm = turn.llm({model: 'gpt-4o'});
+      llm.end();
+
+      llm.output('after end');
+      llm.think('after end');
+      llm.attachMedia({
+        content: 'x',
+        mimeType: 'audio/mp3',
+        modality: 'audio',
+      });
+      llm.attachMediaUrl('https://example.com/x', {modality: 'image'});
+      llm.record({inputMessages: [{role: 'user', content: 'after end'}]});
+
+      // One warning per method (warnOnce dedupes per key process-wide; each
+      // method uses a distinct key).
+      expect(warnSpy).toHaveBeenCalledTimes(5);
+      for (const method of [
+        'output',
+        'think',
+        'attachMedia',
+        'attachMediaUrl',
+        'record',
+      ]) {
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining(`LLM.${method}() called after end()`)
+        );
+      }
+
+      // State on the instance is untouched.
+      expect(llm.outputMessages).toEqual([]);
+      expect(llm.inputMessages).toEqual([]);
+      expect(llm.reasoning).toBeUndefined();
+
+      turn.end();
+      warnSpy.mockRestore();
+    });
   });
 });
