@@ -197,6 +197,10 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "call_ref": None,
         "trigger_ref": None,
         "queue_id": None,
+        "scorer_tags": [],
+        "scorer_ratings": {},
+        "scorer_reasons": {},
+        "scorer_confidences": {},
     }
 
 
@@ -348,6 +352,10 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "call_ref": call_ref,
         "trigger_ref": trigger_ref,
         "queue_id": None,
+        "scorer_tags": [],
+        "scorer_ratings": {},
+        "scorer_reasons": {},
+        "scorer_confidences": {},
     }
 
 

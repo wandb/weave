@@ -97,7 +97,22 @@ ColumnType = Literal[
     "datetime",
     "json",  # Represented as string in ClickHouse
     "float",
+    # Array(String) in ClickHouse; JSON text in SQLite.
+    "array_string",
+    # Map(*, String) in ClickHouse; JSON text in SQLite.
+    "map_string_string",
+    # Map(*, Float64) in ClickHouse; JSON text in SQLite.
+    "map_string_float",
 ]
+
+# Column types that ClickHouse stores natively as Array/Map but SQLite stores
+# as JSON-encoded text. The ClickHouse driver round-trips these as native
+# Python list/dict, so coercion is only needed on the SQLite path.
+_JSON_TEXT_BACKED_COL_TYPES: set[ColumnType] = {
+    "array_string",
+    "map_string_string",
+    "map_string_float",
+}
 
 
 class Column:
@@ -183,10 +198,12 @@ class Table:
         for i, field in enumerate(fields):
             normalized_field = field[:-5] if field.endswith("_dump") else field
             value = tup[i]
-            if (
-                normalized_field in self.col_types
-                and self.col_types[normalized_field] == "json"
-            ):
+            col_type = self.col_types.get(normalized_field)
+            if col_type == "json":
+                d[normalized_field] = json.loads(value)
+            elif col_type in _JSON_TEXT_BACKED_COL_TYPES and isinstance(value, str):
+                # SQLite stores Array/Map columns as JSON text; ClickHouse returns
+                # them as native list/dict already, so only decode on string values.
                 d[normalized_field] = json.loads(value)
             else:
                 d[normalized_field] = value
@@ -461,10 +478,15 @@ class Insert:
         for row in self.rows:
             r: list[Any] = []
             for field in given_column_names:
-                if (
-                    field in self.table.col_types
-                    and self.table.col_types[field] == "json"
+                col_type = self.table.col_types.get(field)
+                if col_type == "json":
+                    r.append(json.dumps(row[field]))
+                elif (
+                    col_type in _JSON_TEXT_BACKED_COL_TYPES
+                    and database_type == "sqlite"
                 ):
+                    # SQLite has no Array/Map types; store as JSON text. The
+                    # ClickHouse driver accepts native list/dict directly.
                     r.append(json.dumps(row[field]))
                 else:
                     r.append(row[field])

@@ -134,6 +134,56 @@ def test_table_drop_sql():
     assert table.drop_sql() == "DROP TABLE IF EXISTS users"
 
 
+def test_array_string_column_round_trip_clickhouse():
+    table = Table("t", [Column("id", "string"), Column("tags", "array_string")])
+    insert = table.insert({"id": "a", "tags": ["x", "y"]})
+    prepared = insert.prepare(database_type="clickhouse")
+    # ClickHouse driver accepts native list; ORM must not JSON-encode it.
+    assert prepared.data == [["a", ["x", "y"]]]
+    # Reading back a CH row returns a native list and ORM passes it through.
+    assert table.tuple_to_row(("a", ["x", "y"]), ["id", "tags"]) == {
+        "id": "a",
+        "tags": ["x", "y"],
+    }
+
+
+def test_array_string_column_round_trip_sqlite():
+    table = Table("t", [Column("id", "string"), Column("tags", "array_string")])
+    insert = table.insert({"id": "a", "tags": ["x", "y"]})
+    prepared = insert.prepare(database_type="sqlite")
+    # SQLite has no Array type — ORM must JSON-encode the list to TEXT.
+    assert prepared.data == [["a", '["x", "y"]']]
+    # And decode on the way out.
+    assert table.tuple_to_row(("a", '["x", "y"]'), ["id", "tags"]) == {
+        "id": "a",
+        "tags": ["x", "y"],
+    }
+
+
+def test_map_string_float_column_round_trip():
+    table = Table(
+        "t",
+        [Column("id", "string"), Column("ratings", "map_string_float")],
+    )
+    payload = {"_rating_": 0.87}
+    ch_prepared = table.insert({"id": "a", "ratings": payload}).prepare(
+        database_type="clickhouse"
+    )
+    assert ch_prepared.data == [["a", payload]]
+    sqlite_prepared = table.insert({"id": "a", "ratings": payload}).prepare(
+        database_type="sqlite"
+    )
+    assert sqlite_prepared.data == [["a", '{"_rating_": 0.87}']]
+    assert table.tuple_to_row(("a", payload), ["id", "ratings"]) == {
+        "id": "a",
+        "ratings": payload,
+    }
+    assert table.tuple_to_row(("a", '{"_rating_": 0.87}'), ["id", "ratings"]) == {
+        "id": "a",
+        "ratings": payload,
+    }
+
+
 def test_select_basic():
     table = Table(
         "users",
