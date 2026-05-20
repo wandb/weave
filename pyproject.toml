@@ -141,7 +141,6 @@ langchain_nvidia_ai_endpoints = [
   "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1,<1.82.7", "openai>=1.99.9"]
-# temporary max pin b/c 0.12.50 changes call structure and therefor tests
 llamaindex = ["llama-index>=0.10.35", "openai>=1.99.9"]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
