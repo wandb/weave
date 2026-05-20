@@ -9,10 +9,10 @@ import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
-_mcp_server_patcher: MultiPatcher | None = None
+_fastmcp_server_patcher: MultiPatcher | None = None
 
 
-def mcp_server_wrapper(settings: OpSettings) -> Callable:
+def fastmcp_server_wrapper(settings: OpSettings) -> Callable:
     """Wrapper for MCP server methods."""
 
     def wrapper(fn: Callable) -> Callable:
@@ -60,7 +60,7 @@ def decorator_wrapper(settings: OpSettings) -> Callable:
     return outer_wrapper
 
 
-def get_mcp_server_patcher(
+def get_fastmcp_server_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
     if settings is None:
@@ -69,9 +69,9 @@ def get_mcp_server_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _mcp_server_patcher  # noqa: PLW0603
-    if _mcp_server_patcher is not None:
-        return _mcp_server_patcher
+    global _fastmcp_server_patcher  # noqa: PLW0603
+    if _fastmcp_server_patcher is not None:
+        return _fastmcp_server_patcher
 
     base = settings.op_settings
 
@@ -134,12 +134,12 @@ def get_mcp_server_patcher(
         SymbolPatcher(
             lambda: importlib.import_module("mcp.server.fastmcp"),
             "FastMCP.call_tool",
-            mcp_server_wrapper(call_tool_settings),
+            fastmcp_server_wrapper(call_tool_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("mcp.server.fastmcp"),
             "FastMCP.read_resource",
-            mcp_server_wrapper(read_resource_settings),
+            fastmcp_server_wrapper(read_resource_settings),
         ),
         # Decorator methods
         SymbolPatcher(
@@ -171,16 +171,16 @@ def get_mcp_server_patcher(
                 SymbolPatcher(
                     lambda: importlib.import_module("mcp.server.fastmcp"),
                     "FastMCP.list_tools",
-                    mcp_server_wrapper(list_tools_settings),
+                    fastmcp_server_wrapper(list_tools_settings),
                 ),
                 SymbolPatcher(
                     lambda: importlib.import_module("mcp.server.fastmcp"),
                     "FastMCP.list_resources",
-                    mcp_server_wrapper(list_resources_settings),
+                    fastmcp_server_wrapper(list_resources_settings),
                 ),
             ]
         )
 
-    _mcp_server_patcher = MultiPatcher(patchers)
+    _fastmcp_server_patcher = MultiPatcher(patchers)
 
-    return _mcp_server_patcher
+    return _fastmcp_server_patcher

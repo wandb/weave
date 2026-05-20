@@ -1604,8 +1604,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 include_total_storage_size=req.include_total_storage_size,
             )
         ).calls
+        count = len(calls)
         return tsi.CallsQueryStatsRes(
-            count=len(calls),
+            count=count,
+            has_more=req.limit is not None and count >= req.limit,
             total_storage_size_bytes=sum(
                 call.total_storage_size_bytes
                 for call in calls
@@ -4209,7 +4211,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """
         prediction_id = generate_id()
         genai_span_ref = (
-            req.genai_span_ref.model_dump(exclude_none=True)
+            [ref.model_dump(exclude_none=True) for ref in req.genai_span_ref]
             if req.genai_span_ref is not None
             else None
         )
@@ -4247,7 +4249,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 version=predict_and_score_op_res.digest,
             )
 
-            predict_and_score_weave_attrs = {
+            predict_and_score_weave_attrs: dict[str, Any] = {
                 constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
             }
             if genai_span_ref is not None:

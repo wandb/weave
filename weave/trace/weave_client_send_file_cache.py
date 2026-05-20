@@ -72,6 +72,14 @@ class ThreadSafeLRUCache(Generic[K, V]):
             if key in self._cache:
                 del self._cache[key]
 
+    def delete_if(self, key: K, expected: V) -> bool:
+        """Delete only if the current value is `expected` (identity check)."""
+        with self._lock:
+            if key in self._cache and self._cache[key] is expected:
+                del self._cache[key]
+                return True
+            return False
+
     def contains(self, key: K) -> bool:
         """Check if key exists in a thread-safe way."""
         with self._lock:
@@ -148,6 +156,16 @@ class WeaveClientSendFileCache:
         """Cache a response for a file create request."""
         key = self._key(req)
         self.cache.put(key, res)
+
+    def delete(self, req: FileCreateReq) -> None:
+        """Remove a cached entry for a file create request."""
+        key = self._key(req)
+        self.cache.delete(key)
+
+    def delete_if(self, req: FileCreateReq, expected: Future[FileCreateRes]) -> bool:
+        """Remove a cached entry only if it still maps to `expected`."""
+        key = self._key(req)
+        return self.cache.delete_if(key, expected)
 
     def clear(self) -> None:
         """Clear all items from the cache."""

@@ -2,7 +2,7 @@ import weave
 import weave.trace.call
 
 
-def test_op_call_method(client):
+def test_op_call_method(weave_active):
     @weave.op
     def add(a, b):
         return a + b

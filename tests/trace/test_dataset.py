@@ -5,7 +5,7 @@ from tests.trace.test_evaluate import Dataset
 from weave.trace.context.tests_context import raise_on_captured_errors
 
 
-def test_basic_dataset_lifecycle(client):
+def test_basic_dataset_lifecycle(weave_active):
     for _i in range(2):
         dataset = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
         ref = weave.publish(dataset)
@@ -17,7 +17,7 @@ def test_basic_dataset_lifecycle(client):
         )
 
 
-def test_dataset_iteration(client):
+def test_dataset_iteration(weave_active):
     dataset = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     rows = list(dataset)
     assert rows == [{"a": 5, "b": 6}, {"a": 7, "b": 10}]
@@ -27,7 +27,7 @@ def test_dataset_iteration(client):
     assert rows2 == rows
 
 
-def test_pythonic_access(client):
+def test_pythonic_access(weave_active):
     rows = [{"a": 1}, {"a": 2}, {"a": 3}, {"a": 4}, {"a": 5}]
     ds = weave.Dataset(rows=rows)
     assert len(ds) == 5
@@ -141,7 +141,7 @@ def test_dataset_from_calls(client):
     assert rows[1]["output"] == "Hello Bob, you are 25!"
 
 
-def test_dataset_caching(client):
+def test_dataset_caching(weave_active):
     ds = weave.Dataset(rows=[{"a": i} for i in range(200)])
     ref = weave.publish(ds)
 
@@ -151,7 +151,7 @@ def test_dataset_caching(client):
         assert len(ds2) == 200
 
 
-def test_dataset_select(client):
+def test_dataset_select(weave_active):
     original_rows = [{"id": i, "val": i * 2} for i in range(10)]
     ds = weave.Dataset(
         name="dataset-select-test",
@@ -210,7 +210,7 @@ def test_dataset_select(client):
         ds.select([-1])
 
 
-def test_add_rows(client):
+def test_add_rows(weave_active):
     ds = weave.Dataset(name="test", rows=[{"a": i} for i in range(10)])
     ref = weave.publish(ds)
 
@@ -232,13 +232,13 @@ def test_add_rows(client):
     assert ds3.rows == ds4.rows
 
 
-def test_add_rows_to_unsaved_dataset(client):
+def test_add_rows_to_unsaved_dataset(weave_active):
     ds = weave.Dataset(rows=[{"a": i} for i in range(10)])
     with pytest.raises(TypeError):
         ds.add_rows([{"a": 10}])
 
 
-def test_hf_conversion(client):
+def test_hf_conversion(weave_active):
     try:
         from datasets import Dataset as HFDataset
         from datasets import DatasetDict as HFDatasetDict

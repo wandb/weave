@@ -22,7 +22,7 @@ from weave.trace.refs import ObjectRef, Ref
 from weave.trace.registry_links import LinkablePrompt
 from weave.trace.settings import (
     UserSettings,
-    parse_and_apply_settings,
+    replace_settings,
     should_disable_weave,
 )
 from weave.trace.table import Table
@@ -140,7 +140,7 @@ def init(
             project_name,
         )
 
-    parse_and_apply_settings(settings)
+    replace_settings(settings)
 
     if global_postprocess_inputs is not None:
         warnings.warn(

@@ -5,7 +5,7 @@ import pytest
 import weave
 
 
-def test_ref_hashable(client):
+def test_ref_hashable(weave_active):
     class Thing(weave.Object):
         val: int
 
@@ -24,7 +24,7 @@ def test_ref_hashable(client):
     }
 
 
-def test_ref_immutable(client):
+def test_ref_immutable(weave_active):
     class Thing(weave.Object):
         val: int
 

@@ -11,7 +11,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 )
 
 
-def test_publish_and_load_scorer_with_prompt_ref(client):
+def test_publish_and_load_scorer_with_prompt_ref(weave_active):
     """Test that LLMAsAJudgeScorer with a MessagesPrompt ref can be published and loaded.
 
     When the scorer is loaded via weave.get(), the scoring_prompt ref string
@@ -50,7 +50,7 @@ def test_publish_and_load_scorer_with_prompt_ref(client):
     assert len(loaded_scorer.scoring_prompt.messages) == 1
 
 
-def test_score_with_string_prompt(client):
+def test_score_with_string_prompt():
     """Test score() with a simple string prompt."""
     scorer = LLMAsAJudgeScorer(
         model=LLMStructuredCompletionModel(
@@ -74,7 +74,7 @@ def test_score_with_string_prompt(client):
         assert messages == [{"role": "user", "content": "Output: hello"}]
 
 
-def test_score_with_messages_prompt(client):
+def test_score_with_messages_prompt():
     """Test score() with a MessagesPrompt and template variables."""
     prompt = MessagesPrompt(
         messages=[

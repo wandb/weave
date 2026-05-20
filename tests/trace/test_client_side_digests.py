@@ -21,7 +21,7 @@ from weave.shared.digest import (
 from weave.trace.settings import (
     UserSettings,
     override_settings,
-    parse_and_apply_settings,
+    replace_settings,
 )
 from weave.trace.weave_client import (
     CrossProjectRefError,
@@ -37,7 +37,7 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
 
 def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
     """Toggle client-side digest computation on or off."""
-    parse_and_apply_settings(UserSettings(enable_client_side_digests=enable))
+    replace_settings(UserSettings(enable_client_side_digests=enable))
     client._warm_project_id_resolver()
 
 
@@ -282,7 +282,7 @@ class TestDataCorrectness:
         assert got.size == (32, 32)
         assert got.getpixel((0, 0)) == (255, 0, 0)
 
-    def test_get_without_explicit_flush(self, client: WeaveClient, fast_path: None):
+    def test_get_without_explicit_flush(self, weave_active, fast_path: None):
         """ref.get() must work without an explicit _flush() call.
 
         In production, the FutureExecutor resolves deferred work when the
