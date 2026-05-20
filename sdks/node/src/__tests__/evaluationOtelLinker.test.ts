@@ -135,10 +135,16 @@ describe('EvalLinkSpanProcessor', () => {
     };
 
     expect(
-      registerEvalLinkSpanProcessor(() => requireGlobalClient(), provider as any)
+      registerEvalLinkSpanProcessor(
+        () => requireGlobalClient(),
+        provider as any
+      )
     ).toBe(true);
     expect(
-      registerEvalLinkSpanProcessor(() => requireGlobalClient(), provider as any)
+      registerEvalLinkSpanProcessor(
+        () => requireGlobalClient(),
+        provider as any
+      )
     ).toBe(true);
 
     expect(provider.addSpanProcessor).toHaveBeenCalledTimes(1);
@@ -153,7 +159,10 @@ describe('EvalLinkSpanProcessor', () => {
     };
 
     expect(
-      registerEvalLinkSpanProcessor(() => requireGlobalClient(), provider as any)
+      registerEvalLinkSpanProcessor(
+        () => requireGlobalClient(),
+        provider as any
+      )
     ).toBe(false);
   });
 

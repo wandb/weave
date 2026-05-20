@@ -27,9 +27,8 @@ import type {CallStackEntry, WeaveClient} from './weaveClient';
 const GENAI_OPERATION_NAME_ATTR = 'gen_ai.operation.name';
 // We store this attribute on the tracer provider to ensure repeated init paths
 // do not register the span processor multiple times.
-const EVAL_LINK_PROCESSOR_REGISTERED = Symbol.for(
-  '_weave_eval_link_span_processor_registered'
-);
+const EVAL_LINK_PROCESSOR_REGISTERED =
+  '_weave_eval_link_span_processor_registered';
 
 type SpanProcessorProvider = TracerProvider & {
   addSpanProcessor?: (processor: SpanProcessor) => void;
@@ -93,9 +92,8 @@ function findEvaluateCall(getClient: ClientGetter): CallStackEntry | null {
   // The evaluate call is the parent eval run. We only use it to attach the
   // human-readable evaluation name onto GenAI spans for filtering/deep links.
   return (
-    getClient()
-      ?.getCallStack()
-      .findLastByOpName([EVALUATION_RUN_OP_NAME]) ?? null
+    getClient()?.getCallStack().findLastByOpName([EVALUATION_RUN_OP_NAME]) ??
+    null
   );
 }
 
