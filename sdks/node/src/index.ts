@@ -7,11 +7,6 @@ export {
 } from './clientApi';
 export {Dataset} from './dataset';
 export {Evaluation} from './evaluation';
-export {
-  attachGenAISpanRefToCallSummary,
-  EvalLinkSpanProcessor,
-  registerEvalLinkSpanProcessor,
-} from './evaluationOtelLinker';
 export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
 export {
   CallSchema,
