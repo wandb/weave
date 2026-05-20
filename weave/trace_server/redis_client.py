@@ -42,13 +42,31 @@ def get_redis_client() -> redis.Redis | None:
 
     try:
         parsed = urlparse(url)
-        master = parse_qs(parsed.query).get("master", [None])[0]
+        query = parse_qs(parsed.query)
+        master = query.get("master", [None])[0]
         if not master:
+            # WEAVE_REDIS_URL may carry wandb-specific query params (tls,
+            # caCertPath, ttlInSeconds, poolSize, ...) consumed by the Go
+            # connector at `services/connectors/redis.go`. redis-py forwards
+            # unknown URL params straight into Connection.__init__ kwargs and
+            # blows up at first command with `AbstractConnection.__init__() got
+            # an unexpected keyword argument 'tls'`. Strip the whole querystring
+            # and translate the bits redis-py understands.
+            tls = query.get("tls", [None])[0] == "true"
+            ca_cert_path = query.get("caCertPath", [None])[0]
+            if tls:
+                # redis-py picks SSLConnection from the URL scheme, not kwargs.
+                parsed = parsed._replace(scheme="rediss")
+            clean_url = parsed._replace(query="").geturl()
+            ssl_kwargs: dict[str, str] = {}
+            if tls and ca_cert_path:
+                ssl_kwargs["ssl_ca_certs"] = ca_cert_path
             return redis.from_url(
-                url,
+                clean_url,
                 decode_responses=True,
                 socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
                 socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
+                **ssl_kwargs,
             )
 
         if not parsed.hostname:
