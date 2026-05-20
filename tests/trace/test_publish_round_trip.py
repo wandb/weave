@@ -26,7 +26,7 @@ def test_publish_round_trip_query_object(client) -> None:
     assert query_2 == query
 
 
-def test_publish_round_trip_register_object_nested(client) -> None:
+def test_publish_round_trip_register_object_nested(weave_active) -> None:
     class Inner(BaseModel):
         name: str
 
@@ -47,7 +47,7 @@ def test_publish_round_trip_register_object_nested(client) -> None:
     assert outer == outer_gotten
 
 
-def test_round_trip_unwrap(client) -> None:
+def test_round_trip_unwrap(weave_active) -> None:
     data = {
         "a": 1,
         "b": [

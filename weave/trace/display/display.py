@@ -27,7 +27,7 @@ from weave.trace.display.viewers.print_viewer import PrintViewer
 
 DEFAULT_PROGRESS_REFRESH_PER_SECOND = 10
 
-# Since ViewerProtocol is a Protocol, we can't use Type[ViewerProtocol]
+# Since ViewerProtocol is a Protocol, we can't use type[ViewerProtocol]
 # Instead, we use a callable that returns a ViewerProtocol
 ViewerFactory = Callable[..., ViewerProtocol]
 

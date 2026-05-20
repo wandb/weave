@@ -169,7 +169,7 @@ def assert_stats_sql(
         read_table: Which table to query (calls_merged or calls_complete)
     """
     pb = ParamBuilder("pb")
-    query, _columns = build_calls_stats_query(req, pb, read_table)
+    query, _columns, _settings = build_calls_stats_query(req, pb, read_table)
     params = pb.get_params()
 
     exp_formatted = sqlparse.format(exp_query, reindent=True).strip()

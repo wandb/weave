@@ -158,3 +158,17 @@ def update_settings_for_async_insert(
     if settings is not None:
         merged_settings.update(settings)
     return merged_settings
+
+
+# Streams the GROUP BY in (project_id, id) order so a LIMIT short-circuits.
+# Only safe when there is no ORDER BY — ClickHouse otherwise inserts a
+# SortingTransform after the in-order aggregate that nullifies the win.
+CLICKHOUSE_AGGREGATION_IN_ORDER_SETTINGS: dict[str, int | str] = {
+    "optimize_aggregation_in_order": 1,
+}
+
+
+def update_settings_for_aggregation_in_order(
+    settings: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
+    return {**(settings or {}), **CLICKHOUSE_AGGREGATION_IN_ORDER_SETTINGS}

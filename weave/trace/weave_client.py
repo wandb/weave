@@ -2540,6 +2540,12 @@ class WeaveClient:
             res = self.future_executor.defer(file_create_with_fallback)
 
         self.send_file_cache.put(req, res)
+
+        def _evict_on_failure(fut: Future[FileCreateRes]) -> None:
+            if fut.exception() is not None:
+                self.send_file_cache.delete_if(req, fut)
+
+        res.add_done_callback(_evict_on_failure)
         return res
 
     @cached_property

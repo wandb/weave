@@ -3,7 +3,13 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    model_validator,
+)
 from typing_extensions import TypedDict
 
 if TYPE_CHECKING:
@@ -660,6 +666,8 @@ class CallsQueryStatsReq(BaseModelStrict):
 
 class CallsQueryStatsRes(BaseModel):
     count: int
+    # True when count saturated the request's limit; clients render as "<count>+".
+    has_more: bool = False
     total_storage_size_bytes: int | None = None
 
 
@@ -2547,9 +2555,9 @@ class PredictionCreateBody(BaseModel):
         None,
         description="Optional evaluation run ID to link this prediction as a child call",
     )
-    genai_span_ref: GenAISpanRef | None = Field(
+    genai_span_ref: list[GenAISpanRef] | None = Field(
         default=None,
-        description="Optional GenAI span reference produced by this prediction.",
+        description="Optional GenAI span reference(s) produced by this prediction.",
     )
 
 
@@ -2845,7 +2853,7 @@ class EvalResultsTrial(BaseModel):
     model_latency_seconds: float | None = None
     total_tokens: int | None = None
     scorer_call_ids: dict[str, str] = Field(default_factory=dict)
-    genai_span_ref: GenAISpanRef | None = None
+    genai_span_ref: list[GenAISpanRef] | None = None
 
 
 class EvalResultsRowEvaluation(BaseModel):
@@ -2923,6 +2931,9 @@ class TraceServerInterface(Protocol):
     def agent_spans_stats(
         self, req: agent_types.AgentSpanStatsReq
     ) -> agent_types.AgentSpanStatsRes: ...
+    def agent_custom_attrs_schema(
+        self, req: agent_types.AgentCustomAttrsSchemaReq
+    ) -> agent_types.AgentCustomAttrsSchemaRes: ...
     def agent_agents_query(
         self, req: agent_types.AgentsQueryReq
     ) -> agent_types.AgentsQueryRes: ...

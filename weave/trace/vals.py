@@ -4,7 +4,7 @@ import logging
 import operator
 from collections.abc import Callable, Generator, Iterator, Sequence
 from copy import deepcopy
-from typing import Any, Literal, Optional, SupportsIndex, cast
+from typing import Any, Literal, SupportsIndex, cast
 
 from pydantic import BaseModel
 
@@ -114,7 +114,7 @@ class Traceable:
     ref: RefWithExtra | None
     mutations: list[Mutation] | None = None
     root: "Traceable"
-    parent: Optional["Traceable"] = None
+    parent: "Traceable | None" = None
     server: TraceServerInterface
     _is_dirty: bool = False
 

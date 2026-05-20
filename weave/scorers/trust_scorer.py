@@ -367,7 +367,7 @@ class WeaveTrustScorerV1(weave.Scorer):
 
         Args:
             query: str, The query to score the context against
-            context: Union[str, list[str]], The context to score the query against
+            context: str | list[str], The context to score the query against
             output: str, The output to score, e.g. the output of a LLM
         """
         return self._score_with_logic(query=query, context=context, output=output)

@@ -24,7 +24,6 @@ from weave.trace_server.environment import (
     kafka_broker_port,
     kafka_client_password,
     kafka_client_user,
-    kafka_partition_by_project_id,
     kafka_producer_max_buffer_size,
 )
 
@@ -139,13 +138,12 @@ class KafkaProducer(ConfluentKafkaProducer):
         ):
             return
 
-        publish_key = req.project_id if kafka_partition_by_project_id() else None
         for i in range(0, len(req.call_ids), self.SCORE_CALLS_CHUNK_SIZE):
             chunk = req.call_ids[i : i + self.SCORE_CALLS_CHUNK_SIZE]
             self.produce(
                 topic=SCORE_CALLS_TOPIC,
                 value=req.model_copy(update={"call_ids": chunk}).model_dump_json(),
-                key=publish_key,
+                key=req.project_id,
             )
 
         if flush_immediately:
@@ -236,7 +234,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
 
     Args:
         group_id (str): The group ID for the consumer.
-        additional_kafka_config (Optional[dict[str, Any]]): Additional Kafka configuration to pass to the consumer.
+        additional_kafka_config (dict[str, Any] | None): Additional Kafka configuration to pass to the consumer.
     """
 
     @classmethod

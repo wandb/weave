@@ -11,10 +11,10 @@ import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
-_mcp_client_patcher: MultiPatcher | None = None
+_fastmcp_client_patcher: MultiPatcher | None = None
 
 
-def mcp_client_wrapper(settings: OpSettings) -> Callable:
+def fastmcp_client_wrapper(settings: OpSettings) -> Callable:
     """Wrapper for MCP client methods."""
 
     def wrapper(fn: Callable) -> Callable:
@@ -118,7 +118,7 @@ def mcp_client_wrapper(settings: OpSettings) -> Callable:
     return wrapper
 
 
-def get_mcp_client_patcher(
+def get_fastmcp_client_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
     if settings is None:
@@ -127,9 +127,9 @@ def get_mcp_client_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _mcp_client_patcher  # noqa: PLW0603
-    if _mcp_client_patcher is not None:
-        return _mcp_client_patcher
+    global _fastmcp_client_patcher  # noqa: PLW0603
+    if _fastmcp_client_patcher is not None:
+        return _fastmcp_client_patcher
 
     base = settings.op_settings
 
@@ -184,17 +184,17 @@ def get_mcp_client_patcher(
         SymbolPatcher(
             lambda: importlib.import_module("mcp.client.session"),
             "ClientSession.call_tool",
-            mcp_client_wrapper(call_tool_settings),
+            fastmcp_client_wrapper(call_tool_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("mcp.client.session"),
             "ClientSession.read_resource",
-            mcp_client_wrapper(read_resource_settings),
+            fastmcp_client_wrapper(read_resource_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("mcp.client.session"),
             "ClientSession.get_prompt",
-            mcp_client_wrapper(get_prompt_settings),
+            fastmcp_client_wrapper(get_prompt_settings),
         ),
     ]
 
@@ -209,21 +209,21 @@ def get_mcp_client_patcher(
                 SymbolPatcher(
                     lambda: importlib.import_module("mcp.client.session"),
                     "ClientSession.list_tools",
-                    mcp_client_wrapper(list_tools_settings),
+                    fastmcp_client_wrapper(list_tools_settings),
                 ),
                 SymbolPatcher(
                     lambda: importlib.import_module("mcp.client.session"),
                     "ClientSession.list_resources",
-                    mcp_client_wrapper(list_resources_settings),
+                    fastmcp_client_wrapper(list_resources_settings),
                 ),
                 SymbolPatcher(
                     lambda: importlib.import_module("mcp.client.session"),
                     "ClientSession.list_prompts",
-                    mcp_client_wrapper(list_prompts_settings),
+                    fastmcp_client_wrapper(list_prompts_settings),
                 ),
             ]
         )
 
-    _mcp_client_patcher = MultiPatcher(patchers)
+    _fastmcp_client_patcher = MultiPatcher(patchers)
 
-    return _mcp_client_patcher
+    return _fastmcp_client_patcher

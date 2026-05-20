@@ -71,6 +71,7 @@ from weave.trace_server.token_costs import (
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
+    apply_tags_and_synth_latest_in_place,
     assert_parameter_length_less_than_max,
     determine_call_status,
     digest_is_content_hash,
@@ -319,6 +320,27 @@ def _build_sqlite_ref_filter_condition(column_name: str, refs: list[str]) -> str
     return "(" + " OR ".join(or_conditions) + ")"
 
 
+# is_latest is hybrid: the explicit "latest" alias row wins when present
+# (this is what makes dedup-republish promote the re-published digest to
+# latest, WB-32435). When the alias is absent for an object — most commonly
+# because obj_delete removed the version that held it — fall back to the
+# column-based `objects.is_latest`. obj_create maintains the column on
+# insert; obj_delete re-points it to the most-recent surviving version
+# after a cascade. The two writers together make the column-based
+# fallback equivalent to CH's window-function fallback for delete and
+# dedup-then-delete scenarios.
+_IS_LATEST_FROM_ALIASES_SQL = (
+    "(("
+    "(objects.project_id, objects.object_id, objects.digest) IN "
+    "(SELECT project_id, object_id, digest FROM aliases WHERE alias = 'latest')"
+    ") OR ("
+    "(objects.project_id, objects.object_id) NOT IN "
+    "(SELECT project_id, object_id FROM aliases WHERE alias = 'latest') "
+    "AND objects.is_latest = 1"
+    "))"
+)
+
+
 class SqliteTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
@@ -401,6 +423,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 val_dump TEXT,
                 digest TEXT,
                 version_index INTEGER,
+                -- `is_latest` is the column-based fallback for the hybrid
+                -- is_latest projection: when no live "latest" alias row
+                -- exists for a (project_id, object_id) — for legacy data
+                -- written before WB-32435 — the projection falls back to
+                -- this column. obj_create maintains it on insert.
                 is_latest INTEGER,
                 deleted_at TEXT,
                 primary key (project_id, kind, object_id, digest)
@@ -1577,8 +1604,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 include_total_storage_size=req.include_total_storage_size,
             )
         ).calls
+        count = len(calls)
         return tsi.CallsQueryStatsRes(
-            count=len(calls),
+            count=count,
+            has_more=req.limit is not None and count >= req.limit,
             total_storage_size_bytes=sum(
                 call.total_storage_size_bytes
                 for call in calls
@@ -1884,10 +1913,19 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         with self.lock:
             if self._obj_exists(cursor, project_id, object_id, digest):
+                # Even on dedup: move "latest" alias to this digest.
+                cursor.execute(
+                    "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                    (project_id, object_id, "latest", digest),
+                )
+                conn.commit()
                 return tsi.ObjCreateRes(digest=digest, object_id=object_id)
 
             # Use IMMEDIATE transaction to acquire write lock immediately, preventing
-            # race conditions where concurrent transactions read stale version_index values
+            # race conditions where concurrent transactions read stale version_index values.
+            # The transaction also makes the version-row INSERT and the "latest" alias
+            # INSERT atomic — on failure neither lands, so derived is_latest stays
+            # consistent with the prior state.
             cursor.execute("BEGIN IMMEDIATE TRANSACTION")
             self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
             version_index = self._get_obj_version_index(cursor, project_id, object_id)
@@ -1934,6 +1972,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     wb_user_id,
                 ),
             )
+            # Set "latest" alias on every new version.
+            cursor.execute(
+                "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                (project_id, object_id, "latest", digest),
+            )
             conn.commit()
         return tsi.ObjCreateRes(digest=digest, object_id=object_id)
 
@@ -1976,7 +2019,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     @staticmethod
     def _make_digest_condition(digest: str) -> str:
         if digest == "latest":
-            return "is_latest = 1"
+            # is_latest is derived from the aliases table — match on the
+            # explicit "latest" alias row directly.
+            return _IS_LATEST_FROM_ALIASES_SQL
         else:
             (is_version, version_index) = digest_is_version_like(digest)
             if is_version:
@@ -2026,7 +2071,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 conds.append(f"object_id IN ({placeholders})")
                 parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
-                conds.append("is_latest = 1")
+                conds.append(_IS_LATEST_FROM_ALIASES_SQL)
             if req.filter.base_object_classes:
                 placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
                 conds.append(f"base_object_class IN ({placeholders})")
@@ -2052,23 +2097,32 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 )
                 parameters["filter_tags"] = [req.project_id] + list(req.filter.tags)
             if req.filter.aliases:
+                # Routing note (mirrors CH `add_aliases_condition`): "latest"
+                # is NOT treated as a literal alias name lookup. It routes
+                # through the hybrid `_IS_LATEST_FROM_ALIASES_SQL` which
+                # unions the explicit alias row with the column-based
+                # fallback. A raw alias-table subquery alone would miss
+                # objects whose alias row was hard-deleted by obj_delete
+                # and which now rely on the column. Non-"latest" aliases
+                # use the raw subquery as before.
                 non_latest = [a for a in req.filter.aliases if a != "latest"]
                 has_latest = "latest" in req.filter.aliases
-                alias_subquery = (
-                    "(project_id, object_id, digest) IN "
-                    "(SELECT project_id, object_id, digest FROM aliases "
-                    "WHERE project_id = ? AND alias IN ("
-                    + ",".join(["?" for _ in non_latest])
-                    + "))"
-                )
-                if non_latest and has_latest:
-                    conds.append(f"(is_latest = 1 OR {alias_subquery})")
-                    parameters["filter_aliases"] = [req.project_id] + non_latest
+                if non_latest:
+                    placeholders = ",".join(["?" for _ in non_latest])
+                    alias_subquery = (
+                        "(objects.project_id, objects.object_id, objects.digest) IN "
+                        f"(SELECT project_id, object_id, digest FROM aliases "
+                        f"WHERE project_id = ? AND alias IN ({placeholders}))"
+                    )
+                    parameters["filter_aliases"] = [req.project_id] + list(non_latest)
+                    if has_latest:
+                        conds.append(
+                            f"({_IS_LATEST_FROM_ALIASES_SQL} OR {alias_subquery})"
+                        )
+                    else:
+                        conds.append(alias_subquery)
                 elif has_latest:
-                    conds.append("is_latest = 1")
-                else:
-                    conds.append(alias_subquery)
-                    parameters["filter_aliases"] = [req.project_id] + non_latest
+                    conds.append(_IS_LATEST_FROM_ALIASES_SQL)
 
         objs = self._select_objs_query(
             req.project_id,
@@ -2144,6 +2198,29 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             cursor.execute(
                 f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
                 [req.project_id, req.object_id] + list(found_digests),
+            )
+            # Re-point objects.is_latest to the most-recent surviving
+            # version of this object_id. The hybrid is_latest projection
+            # falls back to this column when no explicit "latest" alias
+            # row exists, so leaving a deleted digest as is_latest=1
+            # would make the fallback path either go silent (filtered by
+            # deleted_at IS NULL) or return a stale-but-not-current
+            # version. Symmetric to the CH window-function fallback.
+            cursor.execute(
+                """
+                UPDATE objects
+                SET is_latest = CASE
+                    WHEN digest = (
+                        SELECT digest FROM objects
+                        WHERE project_id = ? AND object_id = ? AND deleted_at IS NULL
+                        ORDER BY created_at DESC, digest DESC
+                        LIMIT 1
+                    ) THEN 1
+                    ELSE 0
+                END
+                WHERE project_id = ? AND object_id = ?
+                """,
+                [req.project_id, req.object_id, req.project_id, req.object_id],
             )
             conn.commit()
 
@@ -4134,7 +4211,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """
         prediction_id = generate_id()
         genai_span_ref = (
-            req.genai_span_ref.model_dump(exclude_none=True)
+            [ref.model_dump(exclude_none=True) for ref in req.genai_span_ref]
             if req.genai_span_ref is not None
             else None
         )
@@ -4172,7 +4249,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 version=predict_and_score_op_res.digest,
             )
 
-            predict_and_score_weave_attrs = {
+            predict_and_score_weave_attrs: dict[str, Any] = {
                 constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
             }
             if genai_span_ref is not None:
@@ -4962,17 +5039,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if not objs:
             return
         object_ids = list({obj.object_id for obj in objs})
-
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
-
-        for obj in objs:
-            key = (obj.object_id, obj.digest)
-            obj.tags = sorted(tags_map.get(key, []))
-            aliases = aliases_map.get(key, [])
-            if obj.is_latest == 1 and "latest" not in aliases:
-                aliases = ["latest"] + aliases
-            obj.aliases = aliases
+        apply_tags_and_synth_latest_in_place(objs, tags_map, aliases_map)
 
     def _maybe_resolve_alias(
         self,
@@ -4981,14 +5050,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         digest: str,
     ) -> str | None:
         """If digest looks like an alias name, resolve it to the actual digest.
-        Returns None if not an alias.
+        Returns None if not an alias or if no live alias row exists (callers
+        fall through to `_make_digest_condition` / the hybrid is_latest
+        expression for "latest").
         """
-        # Return None for digests that are not alias names, so the caller
-        # falls through to normal digest-based lookup.  "latest" and version
-        # patterns (v0, v1, …) are handled by the existing obj_read logic;
-        # content hashes are real digests that don't need resolution.
-        if digest == "latest":
-            return None
+        # Version patterns (v0, v1, …) are handled by the existing obj_read
+        # logic; content hashes are real digests that don't need resolution.
         (is_version, _) = digest_is_version_like(digest)
         if is_version:
             return None
@@ -5023,22 +5090,26 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conditions.append("1 = 1")
         pred = " AND ".join(conditions)
         val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
+        # is_latest projection mirrors _IS_LATEST_FROM_ALIASES_SQL: explicit
+        # "latest" alias row wins when present, column-based objects.is_latest
+        # is the fallback when no alias row exists for the (project, object).
         query = f"""
             SELECT
-                project_id,
-                object_id,
-                created_at,
-                kind,
-                base_object_class,
-                {val_dump_part},
-                digest,
-                version_index,
-                is_latest,
-                deleted_at,
-                wb_user_id,
-                leaf_object_class
+                objects.project_id,
+                objects.object_id,
+                objects.created_at,
+                objects.kind,
+                objects.base_object_class,
+                {val_dump_part.replace("val_dump", "objects.val_dump") if not metadata_only else val_dump_part},
+                objects.digest,
+                objects.version_index,
+                CASE WHEN {_IS_LATEST_FROM_ALIASES_SQL}
+                    THEN 1 ELSE 0 END AS is_latest,
+                objects.deleted_at,
+                objects.wb_user_id,
+                objects.leaf_object_class
             FROM objects
-            WHERE project_id = ? AND {pred}
+            WHERE objects.project_id = ? AND {pred}
         """
 
         if sort_by:

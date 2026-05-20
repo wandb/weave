@@ -19,7 +19,11 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
-from weave.evaluation.eval import Evaluation, default_evaluation_display_name
+from weave.evaluation.eval import (
+    Evaluation,
+    _active_eval_prediction_context,
+    default_evaluation_display_name,
+)
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
@@ -372,6 +376,9 @@ class ScoreLogger:
         self._call_stack_context: (
             contextlib.AbstractContextManager[list[Call]] | None
         ) = None
+        self._eval_prediction_context: (
+            contextlib.AbstractContextManager[None] | None
+        ) = None
 
     def _apply_eval_meta(self, eval_meta: dict[str, Any]) -> None:
         """Internal-only: Merge potential caller-provided fields into the eval meta."""
@@ -606,6 +613,10 @@ class ScoreLogger:
 
     def __enter__(self) -> Self:
         """Enter context manager and set call stack to predict_call."""
+        self._eval_prediction_context = _active_eval_prediction_context(
+            self.predict_and_score_call
+        )
+        self._eval_prediction_context.__enter__()
         self._call_stack_context = call_context.set_call_stack([self.predict_call])
         self._call_stack_context.__enter__()
         return self
@@ -623,6 +634,9 @@ class ScoreLogger:
         finally:
             if self._call_stack_context is not None:
                 self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
+            if self._eval_prediction_context is not None:
+                self._eval_prediction_context.__exit__(exc_type, exc_val, exc_tb)
+            self._eval_prediction_context = None
 
 
 class EvaluationLogger:
@@ -675,10 +689,10 @@ class EvaluationLogger:
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
     ) -> None:
-        eval_meta = {}
-        if "_eval_meta" in self.__dict__:
-            eval_meta = self.__dict__["_eval_meta"]
-        self._eval_meta = {**eval_meta, **IMPERATIVE_EVAL_META_MARKER}
+        self._eval_meta = {
+            **(self._client_eval_meta or {}),
+            **IMPERATIVE_EVAL_META_MARKER,
+        }
 
         self.name = name
         self.scorers = scorers
@@ -787,6 +801,10 @@ class EvaluationLogger:
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
 
+    # Pre-seeded by _create_with_meta() to inject caller-provided fields into
+    # _eval_meta during __init__.
+    _client_eval_meta: dict[str, Any] | None = None
+
     @classmethod
     def _create_with_meta(
         cls,
@@ -804,7 +822,7 @@ class EvaluationLogger:
         Note: Semi-internal; used by wandb/wandb SDK.
         """
         instance = cls.__new__(cls)
-        instance._eval_meta = eval_meta
+        instance._client_eval_meta = eval_meta
         EvaluationLogger.__init__(
             instance,
             name=name,

@@ -172,7 +172,7 @@ updates:
           - "modal*"
           - "python-dotenv*"
 
-      mcp:
+      fastmcp:
         patterns:
           - "mcp*"
 

@@ -51,9 +51,9 @@ dependencies = [
   "polyfile-weave>=0.5.9",
 
   # Session SDK — uses OTel GenAI semantic conventions for span emission
-  "opentelemetry-api",
-  "opentelemetry-sdk",
-  "opentelemetry-exporter-otlp-proto-http",
+  "opentelemetry-api>=1.28.0",
+  "opentelemetry-sdk>=1.28.0",
+  "opentelemetry-exporter-otlp-proto-http>=1.28.0",
 ]
 
 [project.optional-dependencies]
@@ -83,7 +83,7 @@ trace_server = [
   # LLM Support
   "litellm>=1.36.1,<1.82.7",
   # OTEL trace support
-  "opentelemetry-proto>=1.12.0",
+  "opentelemetry-proto>=1.28.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17",
   # For emoji shortcode support in Feedback
@@ -132,7 +132,7 @@ langchain = [
   "langchain-litellm>=0.2.2; python_version >= '3.10'",
   "chromadb>=0.5.0; python_version >= '3.10'",
   "pysqlite3; platform_system == 'Linux' and python_version >= '3.10'",
-  "opentelemetry-exporter-otlp; python_version >= '3.10'",
+  "opentelemetry-exporter-otlp>=1.28.0; python_version >= '3.10'",
   "openai>=1.99.9",
   "google-cloud-iam; python_version >= '3.13'",
 ]
@@ -169,7 +169,7 @@ presidio = [
   "presidio-anonymizer==2.2.357; python_version < '3.13'",
 ]
 modal = ["modal", "python-dotenv"]
-mcp = ["mcp[cli]>=1.6.0,<1.10.0; python_version >= '3.10'"]
+fastmcp = ["mcp[cli]>=1.6.0,<1.10.0; python_version >= '3.10'"]
 vertexai = [
   "vertexai>=1.70.0; platform_python_implementation != 'PyPy'",
   "shapely<=2.0.6; platform_python_implementation != 'PyPy'",
@@ -362,7 +362,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.41-dev0"
+current_version = "0.52.42-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

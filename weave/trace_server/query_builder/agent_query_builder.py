@@ -23,7 +23,9 @@ from weave.trace_server.agents.constants import (
     SEARCH_CONTENT_PREVIEW_CHARS,
 )
 from weave.trace_server.agents.types import (
+    AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
     AgentConversationChatReq,
+    AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
@@ -40,6 +42,9 @@ from weave.trace_server.agents.types import (
     AgentVersionsQueryReq,
 )
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder.agent_custom_attrs import (
+    custom_attr_value_or_null,
+)
 
 # ---------------------------------------------------------------------------
 # Column whitelists — only these can appear in WHERE/ORDER BY/GROUP BY
@@ -83,7 +88,10 @@ SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
         "invocation_count",
         "conversation_count",
         "total_input_tokens",
+        "total_cache_creation_input_tokens",
+        "total_cache_read_input_tokens",
         "total_output_tokens",
+        "total_reasoning_tokens",
         "total_duration_ms",
         "error_count",
         "first_seen",
@@ -94,11 +102,20 @@ SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
 SPAN_SORTABLE_COLS: frozenset[str] = SPAN_FILTERABLE_COLS.union(
     frozenset(
         {
+            "span_name",
             "started_at",
             "ended_at",
             "input_tokens",
             "output_tokens",
             "reasoning_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+            "output_type",
+            "request_temperature",
+            "request_max_tokens",
+            "request_top_p",
+            "wb_run_step",
+            "server_address",
         }
     )
 )
@@ -118,14 +135,7 @@ AGENT_SORTABLE_COLS: frozenset[str] = frozenset(
 _IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 # Sources that read from a Map(...) column on spans, keyed by user-supplied key.
-_CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
-    {
-        "custom_attrs_string",
-        "custom_attrs_int",
-        "custom_attrs_float",
-        "custom_attrs_bool",
-    }
-)
+_CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES)
 _FIELD_GROUP_BY_SOURCES: frozenset[str] = frozenset({"field", "column"})
 
 _VALUE_TYPE_STRING: AgentSpanStatsValueType = "string"
@@ -177,6 +187,10 @@ _CUSTOM_ATTR_VALUE_TYPES: dict[str, AgentSpanStatsValueType] = {
     _SOURCE_CUSTOM_ATTRS_FLOAT: _VALUE_TYPE_NUMBER,
     _SOURCE_CUSTOM_ATTRS_BOOL: _VALUE_TYPE_BOOLEAN,
 }
+
+_CUSTOM_ATTR_SCHEMA_SOURCES: tuple[tuple[str, str], ...] = tuple(
+    AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES.items()
+)
 
 _CORE_SPAN_VALUE_TYPES: dict[str, AgentSpanStatsColumnValueType] = {
     "trace_id": _VALUE_TYPE_STRING,
@@ -283,6 +297,58 @@ _SPANS_LIST_FIELD_NAMES = [
     "wb_run_id",
 ]
 SPANS_LIST_COLS: str = _projection(_SPANS_LIST_FIELD_NAMES)
+
+
+def _custom_attr_field_name(ref: AgentSpanValueRef) -> str:
+    return f"{ref.source}.{ref.key}"
+
+
+def _custom_attr_map_projection(
+    pb: ParamBuilder,
+    refs: list[AgentSpanValueRef],
+    *,
+    table_alias: str = "s",
+) -> str:
+    """Project only selected custom-attribute Map keys for spans table rows."""
+    keys_by_source: dict[str, set[str]] = {
+        source: set() for source in sorted(_CUSTOM_ATTR_SOURCES)
+    }
+    for ref in refs:
+        if ref.source in keys_by_source:
+            keys_by_source[ref.source].add(str(ref.key))
+
+    projections: list[str] = []
+    for source, keys in keys_by_source.items():
+        if not keys:
+            continue
+        keys_slot = pb.add(sorted(keys), param_type="Array(String)")
+        projections.append(
+            f"mapFilter((k, v) -> has({keys_slot}, k), "
+            f"{table_alias}.{source}) AS {source}"
+        )
+    return ", " + ", ".join(projections) if projections else ""
+
+
+def _custom_attr_sort_exprs(
+    pb: ParamBuilder,
+    refs: list[AgentSpanValueRef],
+    *,
+    table_alias: str = "s",
+) -> dict[str, str]:
+    exprs: dict[str, str] = {}
+    for ref in refs:
+        if ref.source not in _CUSTOM_ATTR_VALUE_TYPES:
+            continue
+        value_sql = span_value_sql(
+            ref,
+            pb,
+            table_alias=table_alias,
+        )
+        exprs[_custom_attr_field_name(ref)] = (
+            f"if({value_sql.valid_sql}, {value_sql.value_sql}, NULL)"
+        )
+    return exprs
+
 
 # Chat view projection: includes messages and tool data but skips raw dumps,
 # custom attrs, W&B integration IDs, and request params not needed for rendering.
@@ -429,7 +495,7 @@ def resolve_group_by(
             sql_expr = f"{table_alias}.{column}"
         elif ref.source in _CUSTOM_ATTR_SOURCES:
             key_slot = pb.add(str(ref.key), param_type="String")
-            sql_expr = f"{table_alias}.{ref.source}[{key_slot}]"
+            sql_expr = custom_attr_value_or_null(table_alias, ref.source, key_slot)
         else:
             raise ValueError(f"unknown group_by source: {ref.source!r}")
         out.append((sql_expr, alias))
@@ -698,7 +764,9 @@ def _and_conditions(*conditions: str) -> str:
     return " AND ".join(condition for condition in conditions if condition)
 
 
-def _spans_filter_sql(pb: ParamBuilder, req: AgentSpansQueryReq) -> _FilterSQL:
+def _spans_filter_sql(
+    pb: ParamBuilder, req: AgentSpansQueryReq | AgentCustomAttrsSchemaReq
+) -> _FilterSQL:
     pid_slot = pb.add(req.project_id, param_type="String")
     where_conditions = [_project_filter_sql("s.project_id", pid_slot)]
     add_time_filters(
@@ -787,7 +855,10 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
                countIf(s.operation_name = 'invoke_agent') AS invocation_count,
                uniqExact(s.conversation_id) AS conversation_count,
                sum(s.input_tokens) AS total_input_tokens,
+               sum(s.cache_creation_input_tokens) AS total_cache_creation_input_tokens,
+               sum(s.cache_read_input_tokens) AS total_cache_read_input_tokens,
                sum(s.output_tokens) AS total_output_tokens,
+               sum(s.reasoning_tokens) AS total_reasoning_tokens,
                sum(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)) AS total_duration_ms,
                countIf(s.status_code = 'ERROR') AS error_count,
                groupUniqArray(s.agent_name) AS agent_names,
@@ -828,9 +899,18 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
 
     if not req.group_by:
-        order_by = build_order_by(req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC")
+        custom_sort_exprs = _custom_attr_sort_exprs(pb, req.custom_attr_columns)
+        order_by = build_order_by(
+            req.sort_by,
+            SPAN_SORTABLE_COLS.union(frozenset(custom_sort_exprs.keys())),
+            "started_at DESC",
+            column_exprs=custom_sort_exprs,
+        )
+        custom_attr_projection = _custom_attr_map_projection(
+            pb, req.custom_attr_columns
+        )
         return f"""
-            SELECT {SPANS_LIST_COLS}
+            SELECT {SPANS_LIST_COLS}{custom_attr_projection}
             FROM spans s
             WHERE {span_filters.where}
             ORDER BY {order_by}
@@ -875,6 +955,44 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         GROUP BY {group_by_clause}
         {having_sql}
         ORDER BY {order_by}
+        LIMIT {limit_slot} OFFSET {offset_slot}
+    """
+
+
+def make_custom_attrs_schema_query(
+    pb: ParamBuilder, req: AgentCustomAttrsSchemaReq
+) -> str:
+    """Discover typed custom attribute keys for spans matching the request.
+
+    The query intentionally unnests only Map keys. Values can be arbitrarily
+    large, and callers only need the typed source to build follow-up
+    filter/group/stats requests.
+    """
+    span_filters = _spans_filter_sql(pb, req)
+    limit_slot = pb.add(req.limit + 1, param_type="UInt64")
+    offset_slot = pb.add(req.offset, param_type="UInt64")
+    key_columns = ",\n               ".join(
+        f"s.{source}.keys AS {source}_keys" for source, _ in _CUSTOM_ATTR_SCHEMA_SOURCES
+    )
+    attr_arrays = ",\n            ".join(
+        f"arrayMap(k -> tuple('{source}', k, '{value_type}'), filtered.{source}_keys)"
+        for source, value_type in _CUSTOM_ATTR_SCHEMA_SOURCES
+    )
+    return f"""
+        SELECT tupleElement(attr, 1) AS source,
+               tupleElement(attr, 2) AS key,
+               tupleElement(attr, 3) AS value_type,
+               count() AS span_count
+        FROM (
+            SELECT {key_columns}
+            FROM spans s
+            WHERE {span_filters.where}
+        ) filtered
+        ARRAY JOIN arrayConcat(
+            {attr_arrays}
+        ) AS attr
+        GROUP BY source, key, value_type
+        ORDER BY span_count DESC, key ASC, source ASC
         LIMIT {limit_slot} OFFSET {offset_slot}
     """
 

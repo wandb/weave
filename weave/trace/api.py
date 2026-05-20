@@ -22,7 +22,7 @@ from weave.trace.refs import ObjectRef, Ref
 from weave.trace.registry_links import LinkablePrompt
 from weave.trace.settings import (
     UserSettings,
-    parse_and_apply_settings,
+    replace_settings,
     should_disable_weave,
 )
 from weave.trace.table import Table
@@ -107,7 +107,7 @@ def init(
                 - `use_calls_complete` (bool): Uses an optimized write path that batches complete
                     call data (start and end) into a single request instead of separate start/end requests.
                     This reduces server load and improves performance, especially for short-lived ops.
-                    Default: `False`
+                    Default: `True`
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         postprocess_inputs: A function applied to the inputs of every op traced by this client.
         postprocess_output: A function applied to the output of every op traced by this client.
@@ -140,7 +140,7 @@ def init(
             project_name,
         )
 
-    parse_and_apply_settings(settings)
+    replace_settings(settings)
 
     if global_postprocess_inputs is not None:
         warnings.warn(
