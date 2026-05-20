@@ -38,7 +38,7 @@ def example_to_model_input(example):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_callable_as_model(client):
+async def test_evaluate_callable_as_model(weave_active):
     @weave.op
     async def model_predict(input) -> str:
         return eval(input)
@@ -52,7 +52,7 @@ async def test_evaluate_callable_as_model(client):
 
 
 @pytest.mark.asyncio
-async def test_predict_can_receive_other_params(client):
+async def test_predict_can_receive_other_params(weave_active):
     @weave.op
     async def model_predict(input, target) -> str:
         return eval(input) + target
@@ -72,7 +72,7 @@ async def test_predict_can_receive_other_params(client):
 
 
 @pytest.mark.asyncio
-async def test_can_preprocess_model_input(client):
+async def test_can_preprocess_model_input(weave_active):
     @weave.op
     async def model_predict(x) -> str:
         return eval(x)
@@ -91,7 +91,7 @@ async def test_can_preprocess_model_input(client):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_rows_only(client):
+async def test_evaluate_rows_only(weave_active):
     evaluation = Evaluation(
         dataset=dataset_rows,
         scorers=[score],
@@ -118,7 +118,7 @@ async def test_evaluate_other_model_method_names():
 
 
 @pytest.mark.asyncio
-async def test_score_as_class(client):
+async def test_score_as_class(weave_active):
     class MyScorer(weave.Scorer):
         @weave.op
         def score(self, target, output):
@@ -140,7 +140,7 @@ async def test_score_as_class(client):
 
 
 @pytest.mark.asyncio
-async def test_score_with_custom_summarize(client):
+async def test_score_with_custom_summarize(weave_active):
     class MyScorer(weave.Scorer):
         @weave.op
         def summarize(self, score_rows):
@@ -193,7 +193,7 @@ async def test_score_with_custom_summarize(client):
     ],
 )
 async def test_basic_evaluation_with_scorer_styles(
-    client, scorers, expected_output_key
+    weave_active, scorers, expected_output_key
 ):
     # Define all possible scorers
     @weave.op
@@ -304,7 +304,7 @@ async def test_scorer_name_sanitization(scorer_name):
 
 
 @pytest.mark.asyncio
-async def test_sync_eval_parallelism(client):
+async def test_sync_eval_parallelism(weave_active):
     @weave.op
     def sync_op(a):
         time.sleep(1)
@@ -342,7 +342,7 @@ async def test_sync_eval_parallelism(client):
 
 
 @pytest.mark.asyncio
-async def test_evaluation_from_weaveobject_missing_evaluation_name(client):
+async def test_evaluation_from_weaveobject_missing_evaluation_name(weave_active):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
     dataset = Dataset(rows=dataset_rows)
 
@@ -447,7 +447,7 @@ async def test_evaluate_table_lazy_iter(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_table_order(client):
+async def test_evaluate_table_order(weave_active):
     """Test that evaluation results maintain the original order of the dataset
     when using a published dataset with images.
     """
@@ -507,7 +507,7 @@ async def test_evaluate_table_order(client):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_with_pydantic_summary(client):
+async def test_evaluate_with_pydantic_summary(weave_active):
     class MyScorerSummary(BaseModel):
         awesome: int
 

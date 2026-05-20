@@ -1106,7 +1106,7 @@ def test_dataset_rows_ref(client):
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 @pytest.mark.asyncio
-async def test_evaluate(client):
+async def test_evaluate(weave_active):
     @weave.op
     async def model_predict(input) -> str:
         return eval(input)
@@ -1386,7 +1386,7 @@ def test_isinstance_checks(client):
     assert y3 is None
 
 
-def test_summary_tokens(client):
+def test_summary_tokens(weave_active):
     @weave.op
     def model_a(text):
         result = "a: " + text
@@ -1433,7 +1433,7 @@ def test_summary_tokens(client):
 
 
 @pytest.mark.skip("descendent error tracking disabled until we fix UI")
-def test_summary_descendents(client):
+def test_summary_descendents(weave_active):
     @weave.op
     def model_a(text):
         return "a: " + text
@@ -2019,7 +2019,7 @@ def test_object_version_read(client):
 
 
 @pytest.mark.asyncio
-async def test_op_calltime_display_name(client):
+async def test_op_calltime_display_name(weave_active):
     @weave.op
     def my_op(a: int) -> int:
         return a
@@ -2040,7 +2040,7 @@ async def test_op_calltime_display_name(client):
     assert call.display_name == "custom_display_name"
 
 
-def test_long_display_names_are_elided(client):
+def test_long_display_names_are_elided(weave_active):
     @weave.op(call_display_name="a" * 2048)
     def func():
         pass
@@ -2118,7 +2118,7 @@ def test_object_deletion(client):
     assert len(versions.objs) == 0
 
 
-def test_recursive_object_deletion(client):
+def test_recursive_object_deletion(weave_active):
     # Create a bunch of objects that refer to each other
     obj1 = {"a": 5}
     obj1_ref = weave.publish(obj1, "obj1")
@@ -2148,7 +2148,7 @@ def test_recursive_object_deletion(client):
     assert obj3_ref.get() == {"c": obj2}
 
 
-def test_delete_op_version(client):
+def test_delete_op_version(weave_active):
     @weave.op
     def my_op(a: int) -> int:
         return a

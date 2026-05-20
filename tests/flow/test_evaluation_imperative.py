@@ -507,7 +507,7 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, sco
     assert len(calls) == expected_num_calls * 2
 
 
-def test_passing_dict_requires_name_with_scorer(client):
+def test_passing_dict_requires_name_with_scorer(weave_active):
     ev = weave.EvaluationLogger()
     pred = ev.log_prediction(inputs={}, output=None)
     with pytest.raises(ValueError, match="Your dict must contain a `name` key."):
@@ -518,7 +518,7 @@ def test_passing_dict_requires_name_with_scorer(client):
 
 
 @pytest.mark.disable_logging_error_check
-def test_passing_dict_requires_name_with_model(client):
+def test_passing_dict_requires_name_with_model(weave_active):
     with pytest.raises(ValueError, match="Your dict must contain a `name` key."):
         ev = weave.EvaluationLogger(model={"something": "else"})
 
@@ -573,7 +573,7 @@ def test_evaluation_no_auto_summarize_with_custom_dict(client):
     }
 
 
-def test_evaluation_logger_model_inference_method_handling(client):
+def test_evaluation_logger_model_inference_method_handling(weave_active):
     """Test that EvaluationLogger correctly handles models with and without inference methods.
 
     This test validates the fix where EvaluationLogger only adds a predict method
@@ -622,7 +622,7 @@ def test_evaluation_logger_model_inference_method_handling(client):
     ev2.finish()
 
 
-def test_evaluation_logger_model_with_different_inference_method_names(client):
+def test_evaluation_logger_model_with_different_inference_method_names(weave_active):
     """Test that EvaluationLogger handles models with different inference method names."""
 
     class ModelWithInfer(Model):
@@ -1153,7 +1153,7 @@ def test_log_example_with_empty_scores(client):
     assert predict_and_score_call.output["scores"] == {}
 
 
-def test_log_example_after_finalization_raises_error(client):
+def test_log_example_after_finalization_raises_error(weave_active):
     """Test that log_example raises ValueError when called after finalization."""
     ev = EvaluationLogger()
 
@@ -1179,7 +1179,7 @@ def test_log_example_after_finalization_raises_error(client):
         )
 
 
-def test_log_example_after_log_summary_raises_error(client):
+def test_log_example_after_log_summary_raises_error(weave_active):
     """Test that log_example raises ValueError when called after log_summary."""
     ev = EvaluationLogger()
 
@@ -1205,7 +1205,7 @@ def test_log_example_after_log_summary_raises_error(client):
         )
 
 
-def test_evaluation_logger_with_weave_disabled(client, monkeypatch):
+def test_evaluation_logger_with_weave_disabled(weave_active, monkeypatch):
     """Test that EvaluationLogger works when WEAVE_DISABLED=true (WB-32259)."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 

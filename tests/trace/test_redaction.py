@@ -5,7 +5,7 @@ from weave.trace.weave_client import redact_sensitive_keys
 from weave.utils import sanitize
 
 
-def test_code_capture_redacts_sensitive_values(client):
+def test_code_capture_redacts_sensitive_values(weave_active):
     api_key = "123"
 
     @weave.op

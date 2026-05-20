@@ -38,7 +38,7 @@ def example_to_model_input(example):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_callable_as_model(client):
+async def test_evaluate_callable_as_model(weave_active):
     @weave.op
     async def model_predict(input) -> str:
         return eval(input)
@@ -52,7 +52,7 @@ async def test_evaluate_callable_as_model(client):
 
 
 @pytest.mark.asyncio
-async def test_predict_can_receive_other_params(client):
+async def test_predict_can_receive_other_params(weave_active):
     @weave.op
     async def model_predict(input, target) -> str:
         return eval(input) + target
@@ -72,7 +72,7 @@ async def test_predict_can_receive_other_params(client):
 
 
 @pytest.mark.asyncio
-async def test_can_preprocess_model_input(client):
+async def test_can_preprocess_model_input(weave_active):
     @weave.op
     async def model_predict(x) -> str:
         return eval(x)
@@ -91,7 +91,7 @@ async def test_can_preprocess_model_input(client):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_rows_only(client):
+async def test_evaluate_rows_only(weave_active):
     evaluation = Evaluation(
         dataset=dataset_rows,
         scorers=[score_oldstyle],
@@ -102,7 +102,7 @@ async def test_evaluate_rows_only(client):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_both_styles(client):
+async def test_evaluate_both_styles(weave_active):
     evaluation = Evaluation(
         dataset=dataset_rows,
         scorers=[score_oldstyle, score_newstyle],
@@ -134,7 +134,7 @@ async def test_evaluate_other_model_method_names():
 
 
 @pytest.mark.asyncio
-async def test_score_as_class(client):
+async def test_score_as_class(weave_active):
     class MyScorerOldstyle(weave.Scorer):
         @weave.op
         def score(self, model_output, target):
@@ -156,7 +156,7 @@ async def test_score_as_class(client):
 
 
 @pytest.mark.asyncio
-async def test_score_with_custom_summarize(client):
+async def test_score_with_custom_summarize(weave_active):
     class MyScorerOldstyle(weave.Scorer):
         @weave.op
         def summarize(self, score_rows):
@@ -183,7 +183,7 @@ async def test_score_with_custom_summarize(client):
 
 
 @pytest.mark.asyncio
-async def test_multiclass_f1_score(client):
+async def test_multiclass_f1_score(weave_active):
     evaluation = Evaluation(
         dataset=[{"target": {"a": False, "b": True}, "pred": {"a": True, "b": False}}],
         scorers=[MultiTaskBinaryClassificationF1(class_names=["a", "b"])],
