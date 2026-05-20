@@ -216,6 +216,43 @@ def test_missing_trace_id_raises_value_error() -> None:
         processor.stop_accepting_new_work_and_flush_queue()
 
 
+def test_flush_with_unpaired_items_completes_within_default_budget() -> None:
+    """Default FLUSH_TIMEOUT_SECONDS keeps flush from stalling on unpaired items.
+
+    Pins WB-34557: under WEAVE_USE_CALLS_COMPLETE=true, calling client.flush()
+    while an eager root call (e.g. Evaluation.evaluate) is still open used to
+    block for 300s waiting for the end to arrive. The pairing window is a
+    perf optimization (favor the bulk endpoint over per-call eager v2), not a
+    correctness requirement — flush must orphan-send and move on quickly.
+    """
+    import time
+
+    from weave.trace_server_bindings.call_batch_processor import (
+        FLUSH_TIMEOUT_SECONDS,
+    )
+
+    # If this assertion ever fires, someone has bumped the constant back up
+    # to its old multi-minute value. Don't.
+    assert FLUSH_TIMEOUT_SECONDS <= 10.0, (
+        f"FLUSH_TIMEOUT_SECONDS={FLUSH_TIMEOUT_SECONDS}s is too long for an "
+        "interactive flush; see WB-34557."
+    )
+
+    processor = CallBatchProcessor(MagicMock(), MagicMock(), min_batch_interval=0.01)
+    # Eager-style orphan: start with no matching end (what
+    # EvaluationLogger.__init__ produces before log_summary).
+    processor.enqueue([_make_start_item("call-1", "trace-1")])
+
+    t0 = time.monotonic()
+    processor.stop_accepting_new_work_and_flush_queue()
+    elapsed = time.monotonic() - t0
+
+    # Pad the budget slightly for test-machine slop.
+    assert elapsed <= FLUSH_TIMEOUT_SECONDS + 1.0, (
+        f"flush took {elapsed:.2f}s with budget {FLUSH_TIMEOUT_SECONDS}s"
+    )
+
+
 def test_flush_eager_sends_unpaired_items_and_clears_state() -> None:
     """Flush sends unpaired items via the eager v2 endpoints and clears caches."""
     complete_fn = MagicMock()

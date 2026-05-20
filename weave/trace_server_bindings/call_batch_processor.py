@@ -41,9 +41,14 @@ DEFAULT_MAX_PENDING_CALLS = 10_000
 MAX_BATCH_SIZE = 1000
 # TTL for eager call IDs (24 hours in seconds)
 EAGER_CALL_ID_TTL_SECONDS = 24 * 60 * 60
-# Timeout for flush: wait this long for in-flight calls to pair before falling
-# back to the eager v2 start/end endpoints.
-FLUSH_TIMEOUT_SECONDS = 5 * 60
+# Budget for flush to wait for genuinely in-flight calls to pair (start meets
+# end) before orphan-sending unpaired items via the eager v2 start/end
+# endpoints. Should cover the natural gap between enqueue_start and
+# enqueue_end on a fast op, not the full lifetime of a long-running call.
+# Anything still unpaired after this window is either an eager-mode call whose
+# end will arrive arbitrarily later (Evaluation.evaluate, agent loops, etc.)
+# or a race where one half was lost.
+FLUSH_TIMEOUT_SECONDS = 2.0
 # Default max queue size for ready-to-send items
 DEFAULT_MAX_QUEUE_SIZE = 10_000
 # How often to poll during flush while waiting for pending items to pair
