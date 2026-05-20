@@ -1,8 +1,10 @@
 import abc
-from collections.abc import Callable, Iterator
+import asyncio
+from collections.abc import Awaitable, Callable, Iterator
 from typing import Any, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
@@ -97,6 +99,23 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             verify_internal_project_id=self._make_project_verifier(internal_project_id),
         )
         res = method(req_conv)
+        res_conv = universal_int_to_ext_ref_converter(
+            res, self._idc.int_to_ext_project_id
+        )
+        return res_conv
+
+    async def _aref_apply(
+        self,
+        method: Callable[[A], Awaitable[B]],
+        req: A,
+        internal_project_id: str,
+    ) -> B:
+        req_conv = universal_ext_to_int_ref_converter(
+            req,
+            self._idc.ext_to_int_project_id,
+            verify_internal_project_id=self._make_project_verifier(internal_project_id),
+        )
+        res = await method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
             res, self._idc.int_to_ext_project_id
         )
@@ -616,6 +635,22 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.completions_create, req, req.project_id
         )
         return res
+
+    async def acompletions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        inner = self._internal_trace_server
+        if isinstance(inner, AsyncClickHouseTraceServer):
+            return await self._aref_apply(
+                inner.acompletions_create, req, req.project_id
+            )
+        # Fallback for non-async backends: run the sync path in a thread so the
+        # event loop is still freed while we wait.
+        return await asyncio.to_thread(
+            self._ref_apply, inner.completions_create, req, req.project_id
+        )
 
     # Streaming completions - simply proxy through after converting project ID.
     def completions_create_stream(

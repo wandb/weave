@@ -14,6 +14,10 @@ from weave.trace_server.async_clickhouse_trace_server import (
     AsyncClickHouseTraceServer,
 )
 from weave.trace_server.datadog import _db_insert_path
+from weave.trace_server.external_to_internal_trace_server_adapter import (
+    ExternalTraceServer,
+    IdConverter,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 LITELLM_ACOMPLETION_PATCH = (
@@ -254,3 +258,62 @@ async def test_many_in_flight_with_one_thread_ch_executor() -> None:
     finally:
         _secret_fetcher_context.reset(token)
         ch_executor.shutdown(wait=True)
+
+
+class _IdentityConverter(IdConverter):
+    def ext_to_int_project_id(self, project_id: str) -> str:
+        return project_id
+
+    def int_to_ext_project_id(self, project_id: str) -> str | None:
+        return project_id
+
+    def ext_to_int_run_id(self, run_id: str) -> str:
+        return run_id
+
+    def int_to_ext_run_id(self, run_id: str) -> str:
+        return run_id
+
+    def ext_to_int_user_id(self, user_id: str) -> str:
+        return user_id
+
+    def int_to_ext_user_id(self, user_id: str) -> str:
+        return user_id
+
+
+@pytest.mark.asyncio
+async def test_external_adapter_routes_to_async_backend() -> None:
+    inner = AsyncClickHouseTraceServer(host="test_host")
+    adapter = ExternalTraceServer(inner, _IdentityConverter(), username_resolver=None)
+
+    expected = tsi.CompletionsCreateRes(response={"ok": True}, weave_call_id="abc")
+    with patch.object(
+        inner, "acompletions_create", new=AsyncMock(return_value=expected)
+    ) as a_mock:
+        res = await adapter.acompletions_create(_make_req(track_llm_call=False))
+
+    assert res.response == {"ok": True}
+    assert a_mock.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_external_adapter_falls_back_for_sync_backend() -> None:
+    # Non-async backend: adapter must hop to a thread so the loop stays free.
+    sync_inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    sync_inner.completions_create.return_value = tsi.CompletionsCreateRes(
+        response={"ok": True}
+    )
+    adapter = ExternalTraceServer(
+        sync_inner, _IdentityConverter(), username_resolver=None
+    )
+
+    loop_tid = threading.get_ident()
+    captured = {"tid": None}
+
+    def _capture(_req: object) -> tsi.CompletionsCreateRes:
+        captured["tid"] = threading.get_ident()
+        return tsi.CompletionsCreateRes(response={"ok": True})
+
+    sync_inner.completions_create.side_effect = _capture
+    res = await adapter.acompletions_create(_make_req(track_llm_call=False))
+    assert res.response == {"ok": True}
+    assert captured["tid"] != loop_tid
