@@ -14,6 +14,8 @@ import {getWeaveTracerProvider} from './provider';
  */
 export async function flushOTel(): Promise<void> {
   const provider = getWeaveTracerProvider();
-  if (!provider) return;
+  if (!provider) {
+    return;
+  }
   await provider.forceFlush();
 }

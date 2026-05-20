@@ -69,7 +69,9 @@ export function getWeaveTracerProvider(): BasicTracerProvider | null {
 }
 
 function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
-  if (_providerHolder.provider) return _providerHolder.provider;
+  if (_providerHolder.provider) {
+    return _providerHolder.provider;
+  }
 
   const [entity, project] = client.projectId.includes('/')
     ? client.projectId.split('/')
@@ -94,10 +96,14 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
 // provider is built, so processes that never use the GenAI surface don't pay
 // the hook cost.
 function registerBeforeExitHookOnce(): void {
-  if (_providerHolder.beforeExitRegistered) return;
+  if (_providerHolder.beforeExitRegistered) {
+    return;
+  }
   _providerHolder.beforeExitRegistered = true;
   process.once('beforeExit', async () => {
-    if (!_providerHolder.provider) return;
+    if (!_providerHolder.provider) {
+      return;
+    }
     try {
       await _providerHolder.provider.shutdown();
     } catch {
