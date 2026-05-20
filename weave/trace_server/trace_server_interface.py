@@ -1188,7 +1188,7 @@ class FeedbackCreateReq(BaseModelStrict):
         examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
     )
 
-    # typed scorer outputs and populated by agent-monitor scorers
+    # typed scorer outputs; populated by agent-monitor scorers
     scorer_tags: list[str] | None = Field(
         default=None,
         description="Tags applied to the ref by a scorer, e.g. ['nsfw', 'pii'].",
