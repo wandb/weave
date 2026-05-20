@@ -33,6 +33,7 @@ export const GEN_AI_ATTR = {
   GEN_AI_OUTPUT_TYPE: 'gen_ai.output.type',
   GEN_AI_INPUT_MESSAGES: 'gen_ai.input.messages',
   GEN_AI_OUTPUT_MESSAGES: 'gen_ai.output.messages',
+  GEN_AI_SYSTEM_INSTRUCTIONS: 'gen_ai.system_instructions',
 } as const;
 
 // ---------------------------------------------------------------------------
