@@ -1,6 +1,5 @@
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseError
-from clickhouse_connect.driver.exceptions import OperationalError as CHOperationalError
 from gql.transport.exceptions import TransportServerError
 
 from weave.trace_server.errors import (
@@ -46,12 +45,18 @@ def test_clickhouse_type_mismatch_returns_400() -> None:
     assert result.status_code == 400
 
 
-def test_too_large_query_returns_413() -> None:
-    """CH `TOO_LARGE_QUERY` (parser blew max_query_size) maps to 413, not 502."""
+def test_max_query_size_exceeded_returns_413() -> None:
+    """CH parser overflow (`max_query_size`) maps to 413, not 502.
+
+    Verbatim shape observed against CH 26.3 when a lightweight UPDATE inlines
+    an output payload larger than `max_query_size`.
+    """
     error_msg = (
-        "Code: 62. DB::Exception: Max query size exceeded: ... (TOO_LARGE_QUERY)"
+        "Code: 62. DB::Exception: Max query size exceeded "
+        "(can be increased with the `max_query_size` setting): "
+        "Syntax error: failed at position 190 ... (SYNTAX_ERROR)"
     )
-    exc = CHOperationalError(error_msg)
+    exc = CHDatabaseError(error_msg)
 
     with pytest.raises(RequestTooLarge):
         handle_clickhouse_query_error(exc)

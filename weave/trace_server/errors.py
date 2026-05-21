@@ -429,7 +429,10 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Lightweight update queries are not supported by this ClickHouse version or configuration. "
             "This is a ClickHouse version issue that needs to be resolved."
         ) from e
-    if "TOO_LARGE_QUERY" in error_str:
+    if "Max query size exceeded" in error_str:
+        # CH 26.x throws this as `Code: 62 SYNTAX_ERROR` with the
+        # `Max query size exceeded` prefix when the parser buffer
+        # (`max_query_size`, default 256 KiB) overflows.
         raise RequestTooLarge(
             "Call payload exceeded the storage backend's max query size. "
             "Reduce the size of `output` or `summary` and retry."
