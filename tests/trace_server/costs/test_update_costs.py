@@ -444,7 +444,7 @@ class TestFetchManualCosts(unittest.TestCase):
         mock_exists,
         mock_file,
     ):
-        """litellm takes precedence over manual for the same llm_id.
+        """Litellm takes precedence over manual for the same llm_id.
 
         Manual entries are stopgaps for models litellm hasn't published yet;
         once litellm has authoritative numbers for the same id, those win.
