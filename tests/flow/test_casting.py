@@ -8,7 +8,7 @@ from weave.trace.op import is_op
 
 
 @pytest.fixture
-def valid_dataset(client, request):
+def valid_dataset(weave_active, request):
     data = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
 
     if request.param == "dataset":
@@ -26,7 +26,7 @@ def valid_dataset(client, request):
 
 
 @pytest.fixture
-def valid_scorer(client, request):
+def valid_scorer(weave_active, request):
     if request.param == "scorer":
 
         class MyScorer(weave.Scorer):

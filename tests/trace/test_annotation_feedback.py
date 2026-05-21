@@ -458,7 +458,7 @@ def test_annotation_spec_validate_return_value():
     assert not enum_spec.value_is_valid(123)
 
 
-def test_annotation_feedback_sdk(client):
+def test_annotation_feedback_sdk(weave_active):
     number_spec = AnnotationSpec(
         name="Number Rating",
         field_schema={

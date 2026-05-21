@@ -107,7 +107,7 @@ def test_op_versioning_lotsofstuff():
         return np.array(k).mean()
 
 
-def test_op_versioning_inline_import(client):
+def test_op_versioning_inline_import():
     pass
 
 
@@ -460,7 +460,7 @@ def test_op_nested_function(
     assert weave.ref(ref.uri).get()(2) == 5
 
 
-def test_op_basic_execution(client):
+def test_op_basic_execution(weave_active):
     @weave.op
     def adder(v: int) -> int:
         return v + 1
