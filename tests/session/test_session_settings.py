@@ -96,6 +96,23 @@ def _exercise_log_turn() -> None:
     )
 
 
+def _exercise_log_turn_minimal() -> Any:
+    """Minimal log_turn call used to assert disabled-mode short-circuit."""
+    return log_turn(
+        session_id="sess",
+        agent_name="a",
+        messages=[Message(role="user", content="hi")],
+    )
+
+
+def _exercise_log_session_minimal() -> Any:
+    """Minimal log_session call used to assert disabled-mode short-circuit."""
+    return log_session(
+        turns=[Turn(agent_name="a", messages=[Message(role="user", content="hi")])],
+        session_id="sess",
+    )
+
+
 # ---------------------------------------------------------------------------
 # disabled
 # ---------------------------------------------------------------------------
@@ -113,32 +130,17 @@ def test_disabled_streaming_emits_no_spans(otel_spans: InMemorySpanExporter):
 
 
 @pytest.mark.parametrize(
-    "batch_call",
+    "exercise",
     [
-        pytest.param(
-            lambda: log_turn(
-                session_id="sess",
-                agent_name="a",
-                messages=[Message(role="user", content="hi")],
-            ),
-            id="log_turn",
-        ),
-        pytest.param(
-            lambda: log_session(
-                turns=[
-                    Turn(agent_name="a", messages=[Message(role="user", content="hi")])
-                ],
-                session_id="sess",
-            ),
-            id="log_session",
-        ),
+        pytest.param(_exercise_log_turn_minimal, id="log_turn"),
+        pytest.param(_exercise_log_session_minimal, id="log_session"),
     ],
 )
 def test_disabled_batch_emits_no_spans(
-    batch_call: Callable[[], Any], otel_spans: InMemorySpanExporter
+    exercise: Callable[[], Any], otel_spans: InMemorySpanExporter
 ):
     with override_settings(disabled=True):
-        result = batch_call()
+        result = exercise()
     assert result.span_count == 0
     assert otel_spans.get_finished_spans() == ()
 
