@@ -1,6 +1,11 @@
 import {SpanKind, SpanStatusCode} from '@opentelemetry/api';
 
-import {GEN_AI_ATTR} from '../../genai/semconv';
+import {
+  ATTR_GEN_AI_AGENT_NAME,
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+} from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
 import {
@@ -23,12 +28,10 @@ describe('Turn', () => {
 
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
     expect(span.kind).toBe(SpanKind.CLIENT);
-    expect(span.attributes[GEN_AI_ATTR.GEN_AI_OPERATION_NAME]).toBe(
-      'invoke_agent'
-    );
-    expect(span.attributes[GEN_AI_ATTR.GEN_AI_AGENT_NAME]).toBe('weather-bot');
-    expect(span.attributes[GEN_AI_ATTR.GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
-    expect(span.attributes[GEN_AI_ATTR.GEN_AI_CONVERSATION_ID]).toBe('conv-1');
+    expect(span.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('invoke_agent');
+    expect(span.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('weather-bot');
+    expect(span.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
+    expect(span.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
     expect(span.parentSpanId).toBeUndefined();
   });
 

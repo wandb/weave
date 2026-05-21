@@ -1,6 +1,13 @@
 import {SpanKind} from '@opentelemetry/api';
 
-import {GEN_AI_ATTR} from '../../genai/semconv';
+import {
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_ID,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
+  ATTR_GEN_AI_TOOL_NAME,
+} from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
 import {
@@ -29,22 +36,16 @@ describe('Tool', () => {
     const turnSpan = findSpan(spans, 'invoke_agent');
 
     expect(toolSpan.kind).toBe(SpanKind.INTERNAL);
-    expect(toolSpan.attributes[GEN_AI_ATTR.GEN_AI_OPERATION_NAME]).toBe(
+    expect(toolSpan.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe(
       'execute_tool'
     );
-    expect(toolSpan.attributes[GEN_AI_ATTR.GEN_AI_TOOL_NAME]).toBe(
-      'get_weather'
-    );
-    expect(toolSpan.attributes[GEN_AI_ATTR.GEN_AI_TOOL_CALL_ID]).toBe('tc-1');
-    expect(toolSpan.attributes[GEN_AI_ATTR.GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_NAME]).toBe('get_weather');
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_ID]).toBe('tc-1');
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
       '{"city":"Tokyo"}'
     );
-    expect(toolSpan.attributes[GEN_AI_ATTR.GEN_AI_TOOL_CALL_RESULT]).toBe(
-      '75F'
-    );
-    expect(toolSpan.attributes[GEN_AI_ATTR.GEN_AI_CONVERSATION_ID]).toBe(
-      'conv-1'
-    );
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe('75F');
+    expect(toolSpan.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
     expect(toolSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
   });
 

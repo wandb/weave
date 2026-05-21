@@ -2,7 +2,15 @@ import {type Span, SpanKind, SpanStatusCode} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
-import {GEN_AI_ATTR, WEAVE_GENAI_TRACER_NAME} from './semconv';
+import {
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_ID,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
+  ATTR_GEN_AI_TOOL_NAME,
+  WEAVE_GENAI_TRACER_NAME,
+} from './semconv';
 
 export interface ToolInit {
   name: string;
@@ -26,17 +34,17 @@ export class Tool {
   static create(opts: ToolInit & ChildSpanContext): Tool {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
-      [GEN_AI_ATTR.GEN_AI_OPERATION_NAME]: 'execute_tool',
-      [GEN_AI_ATTR.GEN_AI_TOOL_NAME]: opts.name,
+      [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
+      [ATTR_GEN_AI_TOOL_NAME]: opts.name,
     };
     if (opts.toolCallId) {
-      attributes[GEN_AI_ATTR.GEN_AI_TOOL_CALL_ID] = opts.toolCallId;
+      attributes[ATTR_GEN_AI_TOOL_CALL_ID] = opts.toolCallId;
     }
     if (opts.args) {
-      attributes[GEN_AI_ATTR.GEN_AI_TOOL_CALL_ARGUMENTS] = opts.args;
+      attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = opts.args;
     }
     if (opts.conversationId) {
-      attributes[GEN_AI_ATTR.GEN_AI_CONVERSATION_ID] = opts.conversationId;
+      attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
     const span = tracer.startSpan(
       'execute_tool',
@@ -52,7 +60,7 @@ export class Tool {
     }
     this._ended = true;
     if (this.result !== undefined) {
-      this.span.setAttribute(GEN_AI_ATTR.GEN_AI_TOOL_CALL_RESULT, this.result);
+      this.span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, this.result);
     }
     if (opts?.error) {
       this.span.recordException(opts.error);

@@ -36,7 +36,28 @@ import {
 } from '@opentelemetry/api';
 
 import {getWeaveTracer} from '../genai/provider';
-import {GEN_AI_ATTR, OTEL_ATTR} from '../genai/semconv';
+import {
+  ATTR_ERROR_TYPE,
+  ATTR_GEN_AI_AGENT_NAME,
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
+  ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
+  ATTR_GEN_AI_RESPONSE_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_ID,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
+  ATTR_GEN_AI_TOOL_NAME,
+  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
+} from '../genai/semconv';
 
 import type {
   PiAgentMessage,
@@ -62,21 +83,16 @@ export interface OtelExtensionOptions {
 // Attribute keys — GenAI semconv keys from common, pi-specific keys below
 // ---------------------------------------------------------------------------
 
-const ATTR = {
-  ...GEN_AI_ATTR,
-  ...OTEL_ATTR,
-  // Pi-specific (not in GenAI spec)
-  PI_SESSION_CWD: 'pi.session.cwd',
-  PI_USAGE_COST_USD: 'pi.usage.cost_usd',
-  PI_COMPACTION_REASON: 'pi.compaction.reason',
-  PI_COMPACTION_ABORTED: 'pi.compaction.aborted',
-  PI_COMPACTION_WILL_RETRY: 'pi.compaction.will_retry',
-  PI_AUTO_RETRY_ATTEMPT: 'auto_retry.attempt',
-  PI_AUTO_RETRY_MAX_ATTEMPTS: 'auto_retry.max_attempts',
-  PI_AUTO_RETRY_ERROR_MESSAGE: 'auto_retry.error_message',
-  PI_AUTO_RETRY_SUCCESS: 'auto_retry.success',
-  PI_AUTO_RETRY_FINAL_ERROR: 'auto_retry.final_error',
-} as const;
+const ATTR_PI_SESSION_CWD = 'pi.session.cwd';
+const ATTR_PI_USAGE_COST_USD = 'pi.usage.cost_usd';
+const ATTR_PI_COMPACTION_REASON = 'pi.compaction.reason';
+const ATTR_PI_COMPACTION_ABORTED = 'pi.compaction.aborted';
+const ATTR_PI_COMPACTION_WILL_RETRY = 'pi.compaction.will_retry';
+const ATTR_PI_AUTO_RETRY_ATTEMPT = 'auto_retry.attempt';
+const ATTR_PI_AUTO_RETRY_MAX_ATTEMPTS = 'auto_retry.max_attempts';
+const ATTR_PI_AUTO_RETRY_ERROR_MESSAGE = 'auto_retry.error_message';
+const ATTR_PI_AUTO_RETRY_SUCCESS = 'auto_retry.success';
+const ATTR_PI_AUTO_RETRY_FINAL_ERROR = 'auto_retry.final_error';
 
 const TRACER_NAME = 'pi-coding-agent';
 
@@ -277,9 +293,9 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          [ATTR.GEN_AI_AGENT_NAME]: 'pi-coding-agent',
-          [ATTR.PI_SESSION_CWD]: ctx.cwd,
-          [ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId,
+          [ATTR_GEN_AI_AGENT_NAME]: 'pi-coding-agent',
+          [ATTR_PI_SESSION_CWD]: ctx.cwd,
+          [ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId,
         },
       },
       ROOT_CONTEXT
@@ -307,17 +323,17 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          [ATTR.GEN_AI_OPERATION_NAME]: 'invoke_agent',
-          [ATTR.GEN_AI_AGENT_NAME]: 'pi-coding-agent',
+          [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
+          [ATTR_GEN_AI_AGENT_NAME]: 'pi-coding-agent',
           ...(model
             ? {
-                [ATTR.GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
+                [ATTR_GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
                   model.provider
                 ),
               }
             : {}),
           ...(this.conversationId
-            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
             : {}),
         },
       },
@@ -332,12 +348,12 @@ export class PiCodingAgentOtelAdapter {
     if (this.captureContent) {
       if (event.systemPrompt) {
         this.invokeAgentSpan.setAttribute(
-          ATTR.GEN_AI_SYSTEM_INSTRUCTIONS,
+          ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
           JSON.stringify([event.systemPrompt])
         );
       }
       this.invokeAgentSpan.setAttribute(
-        ATTR.GEN_AI_INPUT_MESSAGES,
+        ATTR_GEN_AI_INPUT_MESSAGES,
         JSON.stringify([{role: 'user', content: event.prompt}])
       );
     }
@@ -356,7 +372,7 @@ export class PiCodingAgentOtelAdapter {
         .map(mapPiMessage);
       if (assistantMessages.length > 0) {
         this.invokeAgentSpan.setAttribute(
-          ATTR.GEN_AI_OUTPUT_MESSAGES,
+          ATTR_GEN_AI_OUTPUT_MESSAGES,
           JSON.stringify(assistantMessages)
         );
       }
@@ -375,17 +391,17 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.CLIENT,
         attributes: {
-          [ATTR.GEN_AI_OPERATION_NAME]: 'chat',
+          [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
           ...(model
             ? {
-                [ATTR.GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
+                [ATTR_GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
                   model.provider
                 ),
-                [ATTR.GEN_AI_REQUEST_MODEL]: model.id,
+                [ATTR_GEN_AI_REQUEST_MODEL]: model.id,
               }
             : {}),
           ...(this.conversationId
-            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
             : {}),
         },
       },
@@ -415,13 +431,13 @@ export class PiCodingAgentOtelAdapter {
     }
     if (systemInstructions.length > 0) {
       this.chatSpan.setAttribute(
-        ATTR.GEN_AI_SYSTEM_INSTRUCTIONS,
+        ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
         JSON.stringify(systemInstructions)
       );
     }
     if (inputMessages.length > 0) {
       this.chatSpan.setAttribute(
-        ATTR.GEN_AI_INPUT_MESSAGES,
+        ATTR_GEN_AI_INPUT_MESSAGES,
         JSON.stringify(inputMessages)
       );
     }
@@ -439,19 +455,19 @@ export class PiCodingAgentOtelAdapter {
 
       if (this.chatSpan) {
         this.chatSpan.setAttributes({
-          [ATTR.GEN_AI_RESPONSE_MODEL]: event.message.model,
-          [ATTR.GEN_AI_RESPONSE_FINISH_REASONS]: [event.message.stopReason],
-          [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: usage.input,
-          [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output,
-          [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: usage.totalTokens,
-          [ATTR.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cacheRead,
-          [ATTR.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: usage.cacheWrite,
-          [ATTR.PI_USAGE_COST_USD]: usage.cost.total,
+          [ATTR_GEN_AI_RESPONSE_MODEL]: event.message.model,
+          [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: [event.message.stopReason],
+          [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: usage.input,
+          [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output,
+          [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: usage.totalTokens,
+          [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cacheRead,
+          [ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: usage.cacheWrite,
+          [ATTR_PI_USAGE_COST_USD]: usage.cost.total,
         });
 
         if (this.captureContent) {
           this.chatSpan.setAttribute(
-            ATTR.GEN_AI_OUTPUT_MESSAGES,
+            ATTR_GEN_AI_OUTPUT_MESSAGES,
             JSON.stringify([mapPiMessage(event.message)])
           );
         }
@@ -460,7 +476,7 @@ export class PiCodingAgentOtelAdapter {
           event.message.stopReason === 'error' &&
           event.message.errorMessage
         ) {
-          this.chatSpan.setAttribute(ATTR.ERROR_TYPE, 'llm_error');
+          this.chatSpan.setAttribute(ATTR_ERROR_TYPE, 'llm_error');
           this.chatSpan.setStatus({
             code: SpanStatusCode.ERROR,
             message: event.message.errorMessage,
@@ -475,15 +491,15 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'tool_call'}>
   ): void => {
     const attributes: Record<string, string> = {
-      [ATTR.GEN_AI_OPERATION_NAME]: 'execute_tool',
-      [ATTR.GEN_AI_TOOL_NAME]: event.toolName,
-      [ATTR.GEN_AI_TOOL_CALL_ID]: event.toolCallId,
+      [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
+      [ATTR_GEN_AI_TOOL_NAME]: event.toolName,
+      [ATTR_GEN_AI_TOOL_CALL_ID]: event.toolCallId,
     };
     if (this.conversationId) {
-      attributes[ATTR.GEN_AI_CONVERSATION_ID] = this.conversationId;
+      attributes[ATTR_GEN_AI_CONVERSATION_ID] = this.conversationId;
     }
     if (this.captureContent) {
-      attributes[ATTR.GEN_AI_TOOL_CALL_ARGUMENTS] = safeStringify(event.input);
+      attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = safeStringify(event.input);
     }
     const span = this.tracer.startSpan(
       `execute_tool ${event.toolName}`,
@@ -502,7 +518,7 @@ export class PiCodingAgentOtelAdapter {
     }
     this.toolSpans.delete(event.toolCallId);
     if (event.isError) {
-      span.setAttribute(ATTR.ERROR_TYPE, 'tool_error');
+      span.setAttribute(ATTR_ERROR_TYPE, 'tool_error');
       span.setStatus({
         code: SpanStatusCode.ERROR,
         message:
@@ -513,7 +529,7 @@ export class PiCodingAgentOtelAdapter {
     }
     if (this.captureContent) {
       span.setAttribute(
-        ATTR.GEN_AI_TOOL_CALL_RESULT,
+        ATTR_GEN_AI_TOOL_CALL_RESULT,
         safeStringify(event.content)
       );
     }
@@ -528,11 +544,11 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          [ATTR.PI_COMPACTION_REASON]: event.reason,
-          [ATTR.PI_COMPACTION_ABORTED]: event.aborted,
-          [ATTR.PI_COMPACTION_WILL_RETRY]: event.willRetry,
+          [ATTR_PI_COMPACTION_REASON]: event.reason,
+          [ATTR_PI_COMPACTION_ABORTED]: event.aborted,
+          [ATTR_PI_COMPACTION_WILL_RETRY]: event.willRetry,
           ...(this.conversationId
-            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
             : {}),
         },
       },
@@ -545,9 +561,9 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'auto_retry_start'}>
   ): void => {
     this.invokeAgentSpan?.addEvent('auto_retry_start', {
-      [ATTR.PI_AUTO_RETRY_ATTEMPT]: event.attempt,
-      [ATTR.PI_AUTO_RETRY_MAX_ATTEMPTS]: event.maxAttempts,
-      [ATTR.PI_AUTO_RETRY_ERROR_MESSAGE]: event.errorMessage,
+      [ATTR_PI_AUTO_RETRY_ATTEMPT]: event.attempt,
+      [ATTR_PI_AUTO_RETRY_MAX_ATTEMPTS]: event.maxAttempts,
+      [ATTR_PI_AUTO_RETRY_ERROR_MESSAGE]: event.errorMessage,
     });
   };
 
@@ -555,10 +571,10 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'auto_retry_end'}>
   ): void => {
     this.invokeAgentSpan?.addEvent('auto_retry_end', {
-      [ATTR.PI_AUTO_RETRY_SUCCESS]: event.success,
-      [ATTR.PI_AUTO_RETRY_ATTEMPT]: event.attempt,
+      [ATTR_PI_AUTO_RETRY_SUCCESS]: event.success,
+      [ATTR_PI_AUTO_RETRY_ATTEMPT]: event.attempt,
       ...(event.finalError
-        ? {[ATTR.PI_AUTO_RETRY_FINAL_ERROR]: event.finalError}
+        ? {[ATTR_PI_AUTO_RETRY_FINAL_ERROR]: event.finalError}
         : {}),
     });
   };
@@ -577,7 +593,7 @@ export class PiCodingAgentOtelAdapter {
   private endInvokeAgentSpan(): void {
     this.endChatSpan();
     for (const [, span] of this.toolSpans) {
-      span.setAttribute(ATTR.ERROR_TYPE, 'aborted');
+      span.setAttribute(ATTR_ERROR_TYPE, 'aborted');
       span.setStatus({
         code: SpanStatusCode.ERROR,
         message: 'Agent ended with open tool span',
@@ -587,10 +603,10 @@ export class PiCodingAgentOtelAdapter {
     this.toolSpans.clear();
     if (this.invokeAgentSpan) {
       this.invokeAgentSpan.setAttributes({
-        [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: this.agentInputTokens,
-        [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: this.agentOutputTokens,
-        [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: this.agentTotalTokens,
-        [ATTR.PI_USAGE_COST_USD]: this.agentCostUsd,
+        [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: this.agentInputTokens,
+        [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: this.agentOutputTokens,
+        [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: this.agentTotalTokens,
+        [ATTR_PI_USAGE_COST_USD]: this.agentCostUsd,
       });
       this.invokeAgentSpan.end();
       this.invokeAgentSpan = null;
