@@ -9,38 +9,39 @@ Two layers:
   redact → restore Literal discriminators → revalidate).
 
 ``presidio`` is an optional dependency gated by ``WEAVE_REDACT_PII``.
-The top-level guard lets the module import without presidio so tests can
-``mock.patch`` ``redact_pii`` to exercise routing without installing the
-heavy NLP stack.
+Presidio is imported lazily inside the redaction functions so the module
+loads without it — same pattern as ``weave/scorers/presidio_guardrail.py``.
 """
 
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from weave.session.types import Message
 from weave.telemetry import trace_sentry
 from weave.trace.settings import redact_pii_exclude_fields, redact_pii_fields
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
-# Defer the failure from import time to call time. Two reasons:
-#   1) Tests can ``mock.patch("weave.utils.pii_redaction.redact_pii")``
-#      without installing presidio + spacy + transformers.
-#   2) Users who never opt into ``WEAVE_REDACT_PII=true`` don't need the
-#      heavy NLP stack — they only pay for it if they actually call in.
-try:
+if TYPE_CHECKING:
     from presidio_analyzer import AnalyzerEngine
     from presidio_anonymizer import AnonymizerEngine
-
-    _HAS_PRESIDIO = True
-except ImportError:  # pragma: no cover — exercised when presidio isn't installed
-    _HAS_PRESIDIO = False
 
 _PRESIDIO_INSTALL_HINT = (
     "presidio is required for PII redaction. "
     "Install with `pip install 'weave[presidio]'`."
 )
+
+
+def _get_engines() -> tuple[AnalyzerEngine, AnonymizerEngine]:
+    """Lazy-load presidio engines, re-raising with a friendly install hint."""
+    try:
+        from presidio_analyzer import AnalyzerEngine
+        from presidio_anonymizer import AnonymizerEngine
+    except ImportError as e:
+        raise ImportError(_PRESIDIO_INSTALL_HINT) from e
+    return AnalyzerEngine(), AnonymizerEngine()
+
 
 DEFAULT_REDACTED_FIELDS = [
     "CREDIT_CARD",
@@ -73,11 +74,7 @@ def _get_redaction_entities() -> list[str]:
 def redact_pii(
     data: dict[str, Any] | str,
 ) -> dict[str, Any] | str:
-    if not _HAS_PRESIDIO:
-        raise ImportError(_PRESIDIO_INSTALL_HINT)
-
-    analyzer = AnalyzerEngine()
-    anonymizer = AnonymizerEngine()
+    analyzer, anonymizer = _get_engines()
     entities = _get_redaction_entities()
 
     def redact_recursive(value: Any) -> Any:
@@ -108,11 +105,7 @@ def redact_pii(
 
 
 def redact_pii_string(data: str) -> str:
-    if not _HAS_PRESIDIO:
-        raise ImportError(_PRESIDIO_INSTALL_HINT)
-
-    analyzer = AnalyzerEngine()
-    anonymizer = AnonymizerEngine()
+    analyzer, anonymizer = _get_engines()
     entities = _get_redaction_entities()
     results = analyzer.analyze(text=data, language="en", entities=entities)
     redacted = anonymizer.anonymize(text=data, analyzer_results=results)
