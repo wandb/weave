@@ -13,9 +13,9 @@ describe('Tool', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('attaches to the turn span when started via turn.tool() (flat)', () => {
+  it('attaches to the turn span when started via turn.startTool() (flat)', () => {
     const turn = Turn.create({conversationId: 'conv-1'});
-    const tool = turn.tool({
+    const tool = turn.startTool({
       name: 'get_weather',
       args: '{"city":"Tokyo"}',
       toolCallId: 'tc-1',
