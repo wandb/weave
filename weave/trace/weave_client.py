@@ -442,19 +442,18 @@ class WeaveClient:
         """Callback fired by the WAL sender after a record reaches the server."""
         if record_type != "call_start" or not should_print_call_link():
             return
-        start = record.get("req", {}).get("start", {})
-        call_id = start.get("id", "")
-        if call_id not in self._wal_pending_call_ids:
-            return  # not our call or already printed
-        self._wal_pending_call_ids.discard(call_id)
-        project_id = start.get("project_id", "")
         try:
+            start = record.get("req", {}).get("start", {})
+            call_id = start.get("id", "")
+            if call_id not in self._wal_pending_call_ids:
+                return  # not our call or already printed
+            self._wal_pending_call_ids.discard(call_id)
+            project_id = start.get("project_id", "")
             entity, project = from_project_id(project_id)
             url = redirect_call(entity, project, call_id)
+            logger.info("%s %s", TRACE_CALL_EMOJI, url)
         except Exception:
             pass
-        else:
-            logger.info("%s %s", TRACE_CALL_EMOJI, url)
 
     ################ High Level Convenience Methods ################
 
