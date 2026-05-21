@@ -9,9 +9,6 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from opentelemetry import trace as otel_trace
-from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from weave import version
@@ -23,9 +20,6 @@ from weave.session.session import (
     Tool,
     ToolCallPart,
     Turn,
-    get_current_llm,
-    get_current_session,
-    get_current_turn,
     log_session,
     log_turn,
     start_session,
@@ -33,28 +27,6 @@ from weave.session.session import (
 from weave.trace.settings import override_settings
 from weave.trace.weave_init import init_weave_disabled
 from weave.utils import pii_redaction
-
-
-@pytest.fixture(autouse=True)
-def _reset_contextvars():
-    yield
-    if (llm := get_current_llm()) is not None:
-        llm.end()
-    if (turn := get_current_turn()) is not None:
-        turn.end()
-    if (session := get_current_session()) is not None:
-        session.end()
-
-
-@pytest.fixture
-def otel_spans(monkeypatch: pytest.MonkeyPatch):
-    """In-memory span exporter. Mirrors test_session_otel.py pattern."""
-    exporter = InMemorySpanExporter()
-    provider = SDKTracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
-    yield exporter
-    provider.shutdown()
 
 
 def _make_redact_substitutor(substitutions: dict[str, str]) -> Callable[[Any], Any]:
