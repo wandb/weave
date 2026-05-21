@@ -14,7 +14,7 @@ import {
   getCurrentTurn,
   runIsolated,
 } from '../../genai/context';
-import {GEN_AI_ATTR} from '../../genai/semconv';
+import {ATTR_GEN_AI_CONVERSATION_ID} from '../../genai/semconv';
 
 import {
   findSpan,
@@ -51,7 +51,7 @@ describe('genai api (top-level functions)', () => {
     expect(llmSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
     expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
     for (const s of spans) {
-      expect(s.attributes[GEN_AI_ATTR.GEN_AI_CONVERSATION_ID]).toBe('conv-1');
+      expect(s.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
     }
   });
 

@@ -10,7 +10,13 @@ import {
 import {_getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
-import {GEN_AI_ATTR, WEAVE_GENAI_TRACER_NAME} from './semconv';
+import {
+  ATTR_GEN_AI_AGENT_NAME,
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  WEAVE_GENAI_TRACER_NAME,
+} from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
 
@@ -39,16 +45,16 @@ export class Turn {
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
-      [GEN_AI_ATTR.GEN_AI_OPERATION_NAME]: 'invoke_agent',
+      [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
     };
     if (opts.agentName) {
-      attributes[GEN_AI_ATTR.GEN_AI_AGENT_NAME] = opts.agentName;
+      attributes[ATTR_GEN_AI_AGENT_NAME] = opts.agentName;
     }
     if (opts.model) {
-      attributes[GEN_AI_ATTR.GEN_AI_REQUEST_MODEL] = opts.model;
+      attributes[ATTR_GEN_AI_REQUEST_MODEL] = opts.model;
     }
     if (opts.conversationId) {
-      attributes[GEN_AI_ATTR.GEN_AI_CONVERSATION_ID] = opts.conversationId;
+      attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
     // Pass ROOT_CONTEXT explicitly so Turn is always a root span — never
     // accidentally inherits a parent from some other OTel-instrumented

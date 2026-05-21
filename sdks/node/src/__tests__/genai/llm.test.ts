@@ -1,6 +1,18 @@
 import {SpanKind} from '@opentelemetry/api';
 
-import {GEN_AI_ATTR} from '../../genai/semconv';
+import {
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
+  ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+} from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
 import {
@@ -24,12 +36,10 @@ describe('LLM (via Turn.startLLM)', () => {
     const turnSpan = findSpan(spans, 'invoke_agent');
 
     expect(llmSpan.kind).toBe(SpanKind.CLIENT);
-    expect(llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OPERATION_NAME]).toBe('chat');
-    expect(llmSpan.attributes[GEN_AI_ATTR.GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
-    expect(llmSpan.attributes[GEN_AI_ATTR.GEN_AI_PROVIDER_NAME]).toBe('openai');
-    expect(llmSpan.attributes[GEN_AI_ATTR.GEN_AI_CONVERSATION_ID]).toBe(
-      'conv-1'
-    );
+    expect(llmSpan.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
+    expect(llmSpan.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
+    expect(llmSpan.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('openai');
+    expect(llmSpan.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
     expect(llmSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
     expect(llmSpan.spanContext().traceId).toBe(turnSpan.spanContext().traceId);
   });
@@ -51,25 +61,21 @@ describe('LLM (via Turn.startLLM)', () => {
 
     const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
     expect(
-      JSON.parse(
-        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
-      )
+      JSON.parse(llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
     ).toEqual([{role: 'user', content: 'hi'}]);
     expect(
-      JSON.parse(
-        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES] as string
-      )
+      JSON.parse(llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
     ).toEqual([{role: 'assistant', content: 'hello'}]);
-    expect(llmSpan.attributes[GEN_AI_ATTR.GEN_AI_USAGE_INPUT_TOKENS]).toBe(10);
-    expect(llmSpan.attributes[GEN_AI_ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(5);
+    expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(10);
+    expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(5);
+    expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]).toBe(
+      2
+    );
+    expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+      1
+    );
     expect(
-      llmSpan.attributes[GEN_AI_ATTR.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
-    ).toBe(2);
-    expect(
-      llmSpan.attributes[GEN_AI_ATTR.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
-    ).toBe(1);
-    expect(
-      llmSpan.attributes[GEN_AI_ATTR.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+      llmSpan.attributes[ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
     ).toBe(3);
   });
 
@@ -80,15 +86,9 @@ describe('LLM (via Turn.startLLM)', () => {
     turn.end();
 
     const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
-    expect(
-      llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES]
-    ).toBeUndefined();
-    expect(
-      llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES]
-    ).toBeUndefined();
-    expect(
-      llmSpan.attributes[GEN_AI_ATTR.GEN_AI_USAGE_INPUT_TOKENS]
-    ).toBeUndefined();
+    expect(llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES]).toBeUndefined();
+    expect(llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES]).toBeUndefined();
+    expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
   });
 
   // ---------------------------------------------------------------------------
@@ -105,9 +105,7 @@ describe('LLM (via Turn.startLLM)', () => {
 
       const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
       expect(
-        JSON.parse(
-          llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES] as string
-        )
+        JSON.parse(llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
       ).toEqual([{role: 'assistant', content: 'Hello!'}]);
     });
 
@@ -120,7 +118,7 @@ describe('LLM (via Turn.startLLM)', () => {
 
       const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
       const messages = JSON.parse(
-        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES] as string
+        llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
       );
       expect(messages).toEqual([
         {role: 'assistant', content: 'first'},
@@ -148,7 +146,7 @@ describe('LLM (via Turn.startLLM)', () => {
 
       const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
       const messages = JSON.parse(
-        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES] as string
+        llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
       );
       expect(messages).toHaveLength(1);
       // output() produced {role:'assistant', content:'hello'}; end() promoted
@@ -173,7 +171,7 @@ describe('LLM (via Turn.startLLM)', () => {
 
       const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
       const messages = JSON.parse(
-        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
+        llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
       );
       expect(messages).toHaveLength(1);
       expect(messages[0].role).toBe('user');
@@ -197,7 +195,7 @@ describe('LLM (via Turn.startLLM)', () => {
 
       const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
       const messages = JSON.parse(
-        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
+        llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
       );
       expect(messages[0].parts).toEqual([
         {type: 'uri', uri: 'https://example.com/a.png', modality: 'image'},
@@ -217,7 +215,7 @@ describe('LLM (via Turn.startLLM)', () => {
 
       const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
       const messages = JSON.parse(
-        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
+        llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
       );
       expect(messages[0].parts).toEqual([
         {
@@ -238,7 +236,7 @@ describe('LLM (via Turn.startLLM)', () => {
 
       const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
       const messages = JSON.parse(
-        llmSpan.attributes[GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES] as string
+        llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
       );
       expect(messages[0].parts).toEqual([
         {type: 'uri', uri: 'https://example.com/v.mp4', modality: 'video'},

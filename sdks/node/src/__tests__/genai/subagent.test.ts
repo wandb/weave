@@ -1,4 +1,7 @@
-import {GEN_AI_ATTR} from '../../genai/semconv';
+import {
+  ATTR_GEN_AI_AGENT_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+} from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
 import {setupExporterPerTest, setupGenAITestEnvironment} from './common';
@@ -18,18 +21,16 @@ describe('SubAgent', () => {
     const subSpan = spans.find(
       s =>
         s.name === 'invoke_agent' &&
-        s.attributes[GEN_AI_ATTR.GEN_AI_AGENT_NAME] === 'child-bot'
+        s.attributes[ATTR_GEN_AI_AGENT_NAME] === 'child-bot'
     );
     const parentTurnSpan = spans.find(
       s =>
         s.name === 'invoke_agent' &&
-        s.attributes[GEN_AI_ATTR.GEN_AI_AGENT_NAME] === 'parent'
+        s.attributes[ATTR_GEN_AI_AGENT_NAME] === 'parent'
     );
     expect(subSpan).toBeDefined();
     expect(parentTurnSpan).toBeDefined();
     expect(subSpan!.parentSpanId).toBe(parentTurnSpan!.spanContext().spanId);
-    expect(subSpan!.attributes[GEN_AI_ATTR.GEN_AI_REQUEST_MODEL]).toBe(
-      'gpt-4o'
-    );
+    expect(subSpan!.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
   });
 });

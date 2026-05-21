@@ -9,7 +9,20 @@ import {
 import type {ChildSpanContext} from './common';
 import {_getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
-import {GEN_AI_ATTR, WEAVE_GENAI_TRACER_NAME} from './semconv';
+import {
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
+  ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+  WEAVE_GENAI_TRACER_NAME,
+} from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
 import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
@@ -58,14 +71,14 @@ export class LLM {
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
-      [GEN_AI_ATTR.GEN_AI_OPERATION_NAME]: 'chat',
-      [GEN_AI_ATTR.GEN_AI_REQUEST_MODEL]: opts.model,
+      [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+      [ATTR_GEN_AI_REQUEST_MODEL]: opts.model,
     };
     if (opts.providerName) {
-      attributes[GEN_AI_ATTR.GEN_AI_PROVIDER_NAME] = opts.providerName;
+      attributes[ATTR_GEN_AI_PROVIDER_NAME] = opts.providerName;
     }
     if (opts.conversationId) {
-      attributes[GEN_AI_ATTR.GEN_AI_CONVERSATION_ID] = opts.conversationId;
+      attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
     const span = tracer.startSpan(
       'chat',
@@ -200,45 +213,39 @@ export class LLM {
 
     if (this.inputMessages.length > 0) {
       this.span.setAttribute(
-        GEN_AI_ATTR.GEN_AI_INPUT_MESSAGES,
+        ATTR_GEN_AI_INPUT_MESSAGES,
         JSON.stringify(this.inputMessages)
       );
     }
     if (this.outputMessages.length > 0) {
       this.span.setAttribute(
-        GEN_AI_ATTR.GEN_AI_OUTPUT_MESSAGES,
+        ATTR_GEN_AI_OUTPUT_MESSAGES,
         JSON.stringify(this.outputMessages)
       );
     }
 
     const u = this.usage;
     if (u.inputTokens !== undefined) {
-      this.span.setAttribute(
-        GEN_AI_ATTR.GEN_AI_USAGE_INPUT_TOKENS,
-        u.inputTokens
-      );
+      this.span.setAttribute(ATTR_GEN_AI_USAGE_INPUT_TOKENS, u.inputTokens);
     }
     if (u.outputTokens !== undefined) {
-      this.span.setAttribute(
-        GEN_AI_ATTR.GEN_AI_USAGE_OUTPUT_TOKENS,
-        u.outputTokens
-      );
+      this.span.setAttribute(ATTR_GEN_AI_USAGE_OUTPUT_TOKENS, u.outputTokens);
     }
     if (u.reasoningTokens !== undefined) {
       this.span.setAttribute(
-        GEN_AI_ATTR.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+        ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
         u.reasoningTokens
       );
     }
     if (u.cacheCreationInputTokens !== undefined) {
       this.span.setAttribute(
-        GEN_AI_ATTR.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+        ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
         u.cacheCreationInputTokens
       );
     }
     if (u.cacheReadInputTokens !== undefined) {
       this.span.setAttribute(
-        GEN_AI_ATTR.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
         u.cacheReadInputTokens
       );
     }
