@@ -291,9 +291,7 @@ ERROR_TYPE = Attribute("weave.error.type", "string", "Error type", ["error.type"
 SERVER_ADDRESS = Attribute(
     "weave.server.address", "string", "Server hostname", ["server.address"]
 )
-SERVER_PORT = Attribute(
-    "weave.server.port", "int", "Server port", ["server.port"]
-)
+SERVER_PORT = Attribute("weave.server.port", "int", "Server port", ["server.port"])
 
 # Weave-only extensions (no gen_ai.* alias)
 REASONING_CONTENT = Attribute(

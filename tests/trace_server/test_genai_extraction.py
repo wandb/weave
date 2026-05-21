@@ -366,9 +366,7 @@ def test_multi_alias_extraction_recognises_every_form() -> None:
     example; the same contract applies to any multi-alias semconv attribute.
     """
     for key in semconv.USAGE_REASONING_TOKENS.lookup_keys:
-        result = extract_genai_span(
-            _make_span(attrs={key: 42}), project_id="p1"
-        )
+        result = extract_genai_span(_make_span(attrs={key: 42}), project_id="p1")
         assert result.reasoning_tokens == 42, f"key {key!r} did not populate column"
 
 
