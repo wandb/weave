@@ -667,6 +667,10 @@ class AgentSpansQueryReq(BaseModel):
             raise ValueError(
                 "custom_attr_columns are only supported for ungrouped spans"
             )
+        if self.group_by and self.include_details:
+            raise ValueError(
+                "include_details is only supported for ungrouped spans"
+            )
         invalid_custom_attr_columns = [
             col.source
             for col in self.custom_attr_columns

@@ -275,6 +275,39 @@ class TestMakeSpansListQuery:
                 ],
             )
 
+    def test_include_details_projects_detail_columns(self) -> None:
+        from weave.trace_server.query_builder.agent_query_builder import (
+            SPANS_DETAILS_COLS,
+        )
+
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb, AgentSpansQueryReq(project_id="p1", include_details=True)
+        )
+
+        expected = f"""
+            SELECT {SPANS_LIST_COLS}, {SPANS_DETAILS_COLS}
+            FROM spans s
+            WHERE s.project_id = {{genai_0:String}}
+            ORDER BY started_at DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_include_details_rejected_with_group_by(self) -> None:
+        """SPANS_DETAILS_COLS is only projected on the ungrouped path. The
+        grouped branch ignores `include_details`, so the validator rejects
+        the combination instead of accepting it and quietly dropping the
+        heavy-fields projection.
+        """
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="agent_name")],
+                include_details=True,
+            )
+
 
 # ============================================================================
 # make_spans_count_query (grouped)
