@@ -24,6 +24,9 @@ import type {CallStackEntry, WeaveClient} from './weaveClient';
 
 const registeredProviders = new WeakSet<TracerProvider>();
 
+// The API TracerProvider type only exposes getTracer. addSpanProcessor is an
+// SDK-specific, deprecated late-registration hook, so we feature-detect it and
+// no-op for API-only or newer providers that do not support it.
 type SpanProcessorProvider = TracerProvider & {
   addSpanProcessor?: (processor: SpanProcessor) => void;
 };
