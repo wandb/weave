@@ -6539,10 +6539,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None
         if write_target == WriteTarget.CALLS_COMPLETE:
             end_call_handler = lambda end: self._update_call_end_in_calls_complete(
-                tsi.EndedCallSchemaForInsertWithStartedAt(
-                    **end.model_dump(),
-                    started_at=start_call.started_at,
-                )
+                end.model_copy(update={"started_at": start_call.started_at})
             )
 
         assert retention_days is not None  # narrowed by track_llm_call guard above

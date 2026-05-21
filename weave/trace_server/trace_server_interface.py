@@ -226,6 +226,12 @@ class EndedCallSchemaForInsert(BaseModel):
     # End time is required
     ended_at: datetime.datetime
 
+    # Optional start time. Propagated to `call_parts` so `sortable_datetime`
+    # materializes to `started_at` on the call-end row too, keeping the
+    # post-merge `anySimpleState(coalesce(...))` aggregate deterministic
+    # across both parts of a call.
+    started_at: datetime.datetime | None = None
+
     # Exception is present if the call failed
     exception: str | None = None
 
@@ -244,14 +250,9 @@ class EndedCallSchemaForInsert(BaseModel):
 
 
 class EndedCallSchemaForInsertWithStartedAt(EndedCallSchemaForInsert):
-    """Ended call schema with optional started_at for v2 end updates.
-
-    When started_at is provided, it enables more efficient ClickHouse queries
-    by utilizing the primary key (project_id, started_at, id). Without it,
-    the query falls back to using only (project_id, id).
+    """Alias kept for backwards-compatibility with callers that import the
+    `WithStartedAt` name. `started_at` now lives on the parent.
     """
-
-    started_at: datetime.datetime | None = None
 
 
 class CompletedCallSchemaForInsert(BaseModel):

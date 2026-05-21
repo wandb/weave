@@ -211,6 +211,7 @@ def end_call_for_insert_to_ch_insertable(
         project_id=end_call.project_id,
         id=end_call.id,
         exception=end_call.exception,
+        started_at=end_call.started_at,
         ended_at=end_call.ended_at,
         summary_dump=dict_value_to_dump(dict(end_call.summary)),
         output_dump=any_value_to_dump(output),
