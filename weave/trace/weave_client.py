@@ -67,6 +67,11 @@ from weave.trace.op import (
 )
 from weave.trace.op import op as op_deco
 from weave.trace.op_protocol import Op
+from weave.trace.oversize_repackage import (
+    emit_user_warning,
+    is_payload_too_large_error,
+    repackage_oversize_payload,
+)
 from weave.trace.project_id_resolver import ProjectIdResolver
 from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
@@ -1266,8 +1271,32 @@ class WeaveClient:
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_end", call_end_req)
-            else:
+                return
+
+            try:
                 self.server.call_end(call_end_req)
+            except Exception as e:
+                if not is_payload_too_large_error(e):
+                    raise
+                new_summary, new_output, repackaged = repackage_oversize_payload(
+                    self, summary=merged_summary, output=output_json
+                )
+                if not repackaged:
+                    raise
+                retry_req = CallEndReq(
+                    end=EndedCallSchemaForInsertWithStartedAt(
+                        project_id=project_id,
+                        id=call.id,
+                        started_at=call.started_at,
+                        ended_at=ended_at,
+                        output=new_output,
+                        summary=new_summary,
+                        exception=exception_str,
+                        wb_run_step_end=current_wb_run_step_end,
+                    )
+                )
+                self.server.call_end(retry_req)
+                emit_user_warning(repackaged)
 
         # For calls_complete path (non-eager CallBatchProcessor), print the call link
         # after finish_call, when the complete call is queued to the batch processor.

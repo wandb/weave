@@ -1,0 +1,153 @@
+"""Repackage oversize call payloads into refs and retry on HTTP 413.
+
+When the server rejects a call_end with 413, the SDK extracts the
+largest subtrees from `summary` and `output`, publishes each as a
+first-class weave object, and substitutes a `weave:///...` ref URI
+inline. The repackaged payload is then retried once.
+
+The user sees one warning describing which fields were repackaged
+and how to avoid the overhead next time (publish large artifacts
+upfront via `weave.publish(...)` before they enter the call).
+
+Companion to WB-34652. Defense-in-depth pair to the server-side spill
+in `weave/trace_server/summary_overflow.py`.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import TYPE_CHECKING, Any
+
+import httpx
+
+if TYPE_CHECKING:
+    from weave.trace.weave_client import WeaveClient
+
+logger = logging.getLogger(__name__)
+
+# Subtree byte threshold for extraction. Anything bigger gets published
+# as its own object and replaced inline with the resulting ref URI.
+# Picked well under the server's 3.5 MiB row limit so several oversize
+# subtrees can be repackaged independently.
+OVERSIZE_SUBTREE_BYTES = 256 * 1024
+
+
+def is_payload_too_large_error(exc: BaseException) -> bool:
+    """True iff `exc` is an HTTP 413 (payload too large) error."""
+    return (
+        isinstance(exc, httpx.HTTPStatusError)
+        and exc.response is not None
+        and exc.response.status_code == 413
+    )
+
+
+def _approx_size(value: Any) -> int:
+    """Cheap JSON-encoded byte estimate. Returns 0 for un-serializable."""
+    try:
+        return len(json.dumps(value, default=str).encode("utf-8"))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _safe_name_from_path(path: tuple[str, ...]) -> str:
+    parts = [p.replace("/", "_").replace(".", "_") for p in path if p]
+    return "_".join(parts) or "call_overflow"
+
+
+def _publish_subtree(
+    value: Any,
+    *,
+    client: WeaveClient,
+    path: tuple[str, ...],
+    repackaged: list[str],
+) -> str:
+    """Publish `value` as a weave object and return its ref URI."""
+    name = _safe_name_from_path(path)
+    ref = client._save_object(value, name=name)
+    repackaged.append(".".join(path))
+    return ref.uri()
+
+
+def _walk_and_repackage(
+    obj: Any,
+    *,
+    client: WeaveClient,
+    path: tuple[str, ...],
+    repackaged: list[str],
+) -> Any:
+    """Walk `obj`. When a subtree exceeds the threshold, descend into
+    dicts to find smaller offenders first; otherwise publish the whole
+    subtree as a weave object and replace it with its ref URI.
+    """
+    if _approx_size(obj) <= OVERSIZE_SUBTREE_BYTES:
+        return obj
+
+    if isinstance(obj, dict):
+        new_obj: dict[str, Any] = {}
+        for k, v in obj.items():
+            new_obj[k] = _walk_and_repackage(
+                v,
+                client=client,
+                path=path + (str(k),),
+                repackaged=repackaged,
+            )
+        if _approx_size(new_obj) <= OVERSIZE_SUBTREE_BYTES:
+            return new_obj
+        return _publish_subtree(new_obj, client=client, path=path, repackaged=repackaged)
+
+    return _publish_subtree(obj, client=client, path=path, repackaged=repackaged)
+
+
+def repackage_oversize_payload(
+    client: WeaveClient,
+    *,
+    summary: Any,
+    output: Any,
+) -> tuple[Any, Any, list[str]]:
+    """Walk `summary` and `output`, extracting and publishing oversize
+    subtrees. Returns `(slimmer_summary, slimmer_output, repackaged_paths)`.
+
+    `inputs` is intentionally not repackaged here: inputs are sent at
+    call_start, before the failure happens, so retroactive substitution
+    needs a separate update path.
+    """
+    repackaged: list[str] = []
+
+    new_summary: Any = summary
+    if summary is not None:
+        new_summary = _walk_and_repackage(
+            summary,
+            client=client,
+            path=("summary",),
+            repackaged=repackaged,
+        )
+        if not isinstance(new_summary, dict):
+            new_summary = {"_weave": {"summary_ref": new_summary}}
+
+    new_output: Any = output
+    if output is not None:
+        new_output = _walk_and_repackage(
+            output,
+            client=client,
+            path=("output",),
+            repackaged=repackaged,
+        )
+
+    return new_summary, new_output, repackaged
+
+
+def emit_user_warning(repackaged_paths: list[str]) -> None:
+    """One concise warning so the user knows the repackage happened
+    and can prevent it next time.
+    """
+    if not repackaged_paths:
+        return
+    logger.warning(
+        "weave: call payload exceeded the server size limit; "
+        "automatically repackaged %d field(s) into refs: %s. "
+        "To avoid this overhead, publish large artifacts upfront with "
+        "weave.publish(...) before they enter call inputs/outputs/summary.",
+        len(repackaged_paths),
+        ", ".join(repackaged_paths),
+    )
