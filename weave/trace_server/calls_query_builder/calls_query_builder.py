@@ -1145,9 +1145,12 @@ class CallsQuery(BaseModel):
             )
         )
 
-        # For calls_merged: filter out orphaned call ends (started_at IS NULL).
-        # This can occur with out-of-order call part insertion or early client
-        # termination.  Also REQUIRED for proper pre-GROUP BY (WHERE) optimizations.
+        # For calls_merged: filter out orphaned call ends (op_name IS NULL).
+        # op_name is start-only (CallEndCHInsertable has no op_name), so its
+        # NULL-ness is the reliable signal that a row group is "missing its
+        # start." `started_at` used to serve here but is now populated on
+        # call_end rows too (so the SDK-provided value can pin
+        # `sortable_datetime`), making it ambiguous as an orphan signal.
         # For calls_complete: every row has a non-nullable started_at, so this
         # condition is always true -- skip it to avoid dead SQL.
         if self.read_table == ReadTable.CALLS_MERGED:
@@ -1157,7 +1160,7 @@ class CallsQuery(BaseModel):
                         "$not": [
                             {
                                 "$eq": [
-                                    {"$getField": "started_at"},
+                                    {"$getField": "op_name"},
                                     {"$literal": None},
                                 ]
                             }

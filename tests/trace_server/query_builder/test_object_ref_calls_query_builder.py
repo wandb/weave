@@ -60,7 +60,7 @@ def test_object_ref_filter_simple() -> None:
                       (SELECT ref
                        FROM obj_filter_0)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC)
         SELECT calls_merged.id AS id
         FROM calls_merged
@@ -131,7 +131,7 @@ def test_object_ref_filter_lt() -> None:
                       (SELECT ref
                        FROM obj_filter_0)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC)
         SELECT calls_merged.id AS id
         FROM calls_merged
@@ -228,7 +228,7 @@ def test_object_ref_filter_nested() -> None:
                       (SELECT ref
                        FROM obj_filter_2)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC
            LIMIT 50
            OFFSET 0)
@@ -351,7 +351,7 @@ def test_multiple_object_ref_filters() -> None:
                                (SELECT ref
                                 FROM obj_filter_1)))))
                    AND ((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC)
         SELECT calls_merged.id AS id
         FROM calls_merged
@@ -550,7 +550,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                 FROM obj_filter_3)))
            AND (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), {pb_9:String}) > 0)
            AND ((any(calls_merged.deleted_at) IS NULL))
-           AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
+           AND ((NOT ((any(calls_merged.op_name) IS NULL))))))
         SELECT calls_merged.id AS id
         FROM calls_merged
         PREWHERE calls_merged.project_id = {pb_0:String}
@@ -717,7 +717,7 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                              (SELECT ref
                               FROM obj_filter_2)))))))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
                 ORDER BY any(calls_merged.started_at) DESC
                 LIMIT 10)
         SELECT calls_merged.id AS id,
@@ -781,7 +781,7 @@ def test_object_ref_order_by_simple() -> None:
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
            ORDER BY (NOT (JSONType(any(obj_filter_0.object_val_dump)) = 'Null'
                           OR JSONType(any(obj_filter_0.object_val_dump)) IS NULL)) desc, toFloat64OrNull(any(obj_filter_0.object_val_dump)) DESC, toString(any(obj_filter_0.object_val_dump)) DESC)
         SELECT calls_merged.id AS id
@@ -865,7 +865,7 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
                       (SELECT ref
                        FROM obj_filter_1)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         )
         SELECT calls_merged.id AS id
         FROM calls_merged
@@ -950,7 +950,7 @@ def test_object_ref_filter_complex_nested_path() -> None:
                       (SELECT ref
                        FROM obj_filter_1)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC)
         SELECT calls_merged.id AS id
         FROM calls_merged
