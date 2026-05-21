@@ -28,8 +28,17 @@ const registeredProviders = new WeakSet<TracerProvider>();
 // SDK-specific, deprecated late-registration hook, so we feature-detect it and
 // no-op for API-only or newer providers that do not support it.
 type SpanProcessorProvider = TracerProvider & {
-  addSpanProcessor?: (processor: SpanProcessor) => void;
+  addSpanProcessor: (processor: SpanProcessor) => void;
 };
+
+function isSpanProcessorProvider(
+  provider: TracerProvider
+): provider is SpanProcessorProvider {
+  return (
+    'addSpanProcessor' in provider &&
+    typeof provider.addSpanProcessor === 'function'
+  );
+}
 
 type ClientGetter = () => WeaveClient | null;
 
@@ -163,12 +172,11 @@ export function registerEvalLinkSpanProcessor(
     return true;
   }
 
-  const spanProcessorProvider = provider as SpanProcessorProvider;
-  if (typeof spanProcessorProvider.addSpanProcessor !== 'function') {
+  if (!isSpanProcessorProvider(provider)) {
     return false;
   }
 
-  spanProcessorProvider.addSpanProcessor(new EvalLinkSpanProcessor(getClient));
+  provider.addSpanProcessor(new EvalLinkSpanProcessor(getClient));
   registeredProviders.add(provider);
   return true;
 }
