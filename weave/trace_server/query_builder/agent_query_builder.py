@@ -13,14 +13,16 @@ from __future__ import annotations
 
 import datetime
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple, TypeAlias
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
     OP_INVOKE_AGENT,
     SEARCH_CONTENT_PREVIEW_CHARS,
+    SPAN_GROUP_AGGREGATE_COLS,
+    SPAN_GROUP_RESULT_COLS,
 )
 from weave.trace_server.agents.types import (
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
@@ -29,6 +31,7 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
+    AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
     AgentSpanSchema,
@@ -40,6 +43,7 @@ from weave.trace_server.agents.types import (
     AgentSpanValueRef,
     AgentsQueryReq,
     AgentVersionsQueryReq,
+    group_by_ref_alias,
 )
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_custom_attrs import (
@@ -79,24 +83,6 @@ SPAN_GROUP_BY_COLS: frozenset[str] = SPAN_FILTERABLE_COLS.union(
             "wb_user_id",
         }
     )
-)
-
-# Aggregate aliases produced by a grouped spans list query.
-SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
-    {
-        "span_count",
-        "invocation_count",
-        "conversation_count",
-        "total_input_tokens",
-        "total_cache_creation_input_tokens",
-        "total_cache_read_input_tokens",
-        "total_output_tokens",
-        "total_reasoning_tokens",
-        "total_duration_ms",
-        "error_count",
-        "first_seen",
-        "last_seen",
-    }
 )
 
 SPAN_SORTABLE_COLS: frozenset[str] = SPAN_FILTERABLE_COLS.union(
@@ -149,6 +135,14 @@ _SOURCE_CUSTOM_ATTRS_STRING = "custom_attrs_string"
 _SOURCE_CUSTOM_ATTRS_INT = "custom_attrs_int"
 _SOURCE_CUSTOM_ATTRS_FLOAT = "custom_attrs_float"
 _SOURCE_CUSTOM_ATTRS_BOOL = "custom_attrs_bool"
+_NUMERIC_DISTRIBUTION_SOURCES = {
+    _SOURCE_CUSTOM_ATTRS_INT,
+    _SOURCE_CUSTOM_ATTRS_FLOAT,
+}
+_CATEGORICAL_DISTRIBUTION_SOURCES = {
+    _SOURCE_CUSTOM_ATTRS_STRING,
+    _SOURCE_CUSTOM_ATTRS_BOOL,
+}
 
 _AGG_SUM: AgentSpanStatsAggregation = "sum"
 _AGG_AVG: AgentSpanStatsAggregation = "avg"
@@ -191,6 +185,14 @@ _CUSTOM_ATTR_VALUE_TYPES: dict[str, AgentSpanStatsValueType] = {
 _CUSTOM_ATTR_SCHEMA_SOURCES: tuple[tuple[str, str], ...] = tuple(
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES.items()
 )
+
+SpanGroupKeyValue: TypeAlias = str | int | float | bool | None
+
+
+class SpanGroupDistributionContext(NamedTuple):
+    group_key_sql: str
+    group_values_slot: str
+
 
 _CORE_SPAN_VALUE_TYPES: dict[str, AgentSpanStatsColumnValueType] = {
     "trace_id": _VALUE_TYPE_STRING,
@@ -507,15 +509,6 @@ def resolve_agent_span_field_column(field: str) -> str:
     return semconv.FILTERABLE_KEY_TO_COLUMN.get(field, field)
 
 
-def group_by_ref_alias(ref: AgentGroupByRef) -> str:
-    """Return the SQL-safe output alias for a group-by ref."""
-    if ref.alias is not None:
-        return ref.alias
-    if ref.source in _FIELD_GROUP_BY_SOURCES:
-        return resolve_agent_span_field_column(ref.key)
-    return ref.key
-
-
 # ---------------------------------------------------------------------------
 # Span value and grouped measure resolution
 # ---------------------------------------------------------------------------
@@ -713,6 +706,24 @@ def ensure_group_filters_match(
             )
 
 
+def _ensure_group_measure_aliases_do_not_collide(
+    group_aliases: list[str], measures: list[AgentSpanMeasureSpec]
+) -> None:
+    """Reject dynamic measure aliases that would overwrite grouped row fields."""
+    # TODO: surface this as a 4xx instead of a 500. The same check runs in
+    # AgentSpansQueryReq's pydantic validator (which becomes a 422), so this
+    # branch is defense-in-depth — but if it ever does fire we should map it
+    # to a structured client error rather than letting ValueError bubble out.
+    reserved = SPAN_GROUP_RESULT_COLS.union(frozenset(group_aliases))
+    collisions = sorted(
+        {measure.alias for measure in measures if measure.alias in reserved}
+    )
+    if collisions:
+        raise ValueError(
+            f"measure aliases collide with grouped row fields: {collisions!r}"
+        )
+
+
 def group_filters_having_sql(
     pb: ParamBuilder,
     filters: list[AgentSpanGroupFilter],
@@ -765,7 +776,8 @@ def _and_conditions(*conditions: str) -> str:
 
 
 def _spans_filter_sql(
-    pb: ParamBuilder, req: AgentSpansQueryReq | AgentCustomAttrsSchemaReq
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq | AgentCustomAttrsSchemaReq,
 ) -> _FilterSQL:
     pid_slot = pb.add(req.project_id, param_type="String")
     where_conditions = [_project_filter_sql("s.project_id", pid_slot)]
@@ -876,6 +888,8 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     if not req.group_by:
         return f"SELECT count() FROM spans s WHERE {span_filters.where}"
     resolved = resolve_group_by(pb, req.group_by)
+    aliases = [alias for _, alias in resolved]
+    _ensure_group_measure_aliases_do_not_collide(aliases, req.measures)
     group_exprs = ", ".join(expr for expr, _ in resolved)
     group_filters = span_group_filters(
         req.group_filters,
@@ -919,21 +933,21 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
 
     resolved = resolve_group_by(pb, req.group_by)
     aliases = [a for _, a in resolved]
+    _ensure_group_measure_aliases_do_not_collide(aliases, req.measures)
     select_group_cols = ", ".join(f"{expr} AS {alias}" for expr, alias in resolved)
     group_by_clause = ", ".join(aliases)
 
     measure_sqls = [span_measure_sql(measure, pb) for measure in req.measures]
-    aggregate_selects = (
-        ",\n               ".join(
-            f"{measure.aggregate_sql} AS {measure.alias}" for measure in measure_sqls
-        )
-        if measure_sqls
-        else _GROUPED_SPAN_AGGREGATES
+    dynamic_aggregate_selects = ",\n               ".join(
+        f"{measure.aggregate_sql} AS {measure.alias}" for measure in measure_sqls
     )
-    sortable = (
-        frozenset(aliases).union(measure.alias for measure in measure_sqls)
-        if measure_sqls
-        else SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases))
+    aggregate_selects = _GROUPED_SPAN_AGGREGATES
+    if dynamic_aggregate_selects:
+        aggregate_selects = (
+            f"{aggregate_selects},\n               {dynamic_aggregate_selects}"
+        )
+    sortable = SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases)).union(
+        measure.alias for measure in measure_sqls
     )
     default_order_by = (
         f"{measure_sqls[0].alias} DESC" if measure_sqls else "last_seen DESC"
@@ -994,6 +1008,293 @@ def make_custom_attrs_schema_query(
         GROUP BY source, key, value_type
         ORDER BY span_count DESC, key ASC, source ASC
         LIMIT {limit_slot} OFFSET {offset_slot}
+    """
+
+
+def span_group_distribution_key(value: SpanGroupKeyValue) -> str:
+    """Call `str(value)` or return an empty string for None."""
+    return "" if value is None else str(value)
+
+
+def _span_group_distribution_context(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    group_values: Sequence[SpanGroupKeyValue],
+) -> SpanGroupDistributionContext:
+    if not req.group_by or len(req.group_by) != 1:
+        raise ValueError("span group distributions require exactly one group_by ref")
+    group_expr, _ = resolve_group_by(pb, req.group_by)[0]
+    group_key_sql = f"toString({group_expr})"
+    group_values_slot = pb.add(
+        [span_group_distribution_key(value) for value in group_values],
+        param_type="Array(String)",
+    )
+    return SpanGroupDistributionContext(
+        group_key_sql=group_key_sql,
+        group_values_slot=group_values_slot,
+    )
+
+
+def _span_group_distribution_spec_tuple_sql(
+    pb: ParamBuilder,
+    spec: AgentSpanGroupDistributionSpec,
+    *,
+    limit_value: int,
+) -> str:
+    alias_slot = pb.add(spec.alias, param_type="String")
+    source_slot = pb.add(spec.value.source, param_type="String")
+    key_slot = pb.add(spec.value.key, param_type="String")
+    limit_slot = pb.add(limit_value, param_type="UInt64")
+    return f"tuple({alias_slot}, {source_slot}, {key_slot}, {limit_slot})"
+
+
+def _span_group_distribution_specs_array_sql(
+    pb: ParamBuilder,
+    specs: Sequence[AgentSpanGroupDistributionSpec],
+    *,
+    get_limit: Callable[[AgentSpanGroupDistributionSpec], int],
+) -> str:
+    spec_tuples = [
+        _span_group_distribution_spec_tuple_sql(pb, spec, limit_value=get_limit(spec))
+        for spec in specs
+    ]
+    return f"array({', '.join(spec_tuples)})"
+
+
+def make_span_group_distribution_counts_query(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    group_values: Sequence[SpanGroupKeyValue],
+) -> str:
+    """Count filtered spans per returned group row."""
+    span_filters = _spans_filter_sql(pb, req)
+    context = _span_group_distribution_context(pb, req, group_values)
+    return f"""
+        SELECT {context.group_key_sql} AS group_key,
+               count() AS total_count
+        FROM spans s
+        WHERE {span_filters.where}
+          AND {context.group_key_sql} IN {context.group_values_slot}
+        GROUP BY group_key
+    """
+
+
+def make_span_group_numeric_distributions_query(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    group_values: Sequence[SpanGroupKeyValue],
+    specs: Sequence[AgentSpanGroupDistributionSpec],
+) -> str:
+    """Build per-group histograms for numeric custom attributes."""
+    numeric_specs = [
+        spec for spec in specs if spec.value.source in _NUMERIC_DISTRIBUTION_SOURCES
+    ]
+    if not numeric_specs:
+        raise ValueError("numeric span group distributions require numeric specs")
+    span_filters = _spans_filter_sql(pb, req)
+    context = _span_group_distribution_context(pb, req, group_values)
+    specs_sql = _span_group_distribution_specs_array_sql(
+        pb,
+        numeric_specs,
+        get_limit=lambda spec: spec.bins,
+    )
+    spec_alias_sql = "tupleElement(spec, 1)"
+    spec_source_sql = "tupleElement(spec, 2)"
+    spec_key_sql = "tupleElement(spec, 3)"
+    spec_bins_sql = "tupleElement(spec, 4)"
+    map_contains_sql = (
+        f"multiIf({spec_source_sql} = '{_SOURCE_CUSTOM_ATTRS_INT}', "
+        f"mapContains(s.{_SOURCE_CUSTOM_ATTRS_INT}, {spec_key_sql}), "
+        f"{spec_source_sql} = '{_SOURCE_CUSTOM_ATTRS_FLOAT}', "
+        f"mapContains(s.{_SOURCE_CUSTOM_ATTRS_FLOAT}, {spec_key_sql}), "
+        "false)"
+    )
+    value_sql = (
+        f"multiIf({spec_source_sql} = '{_SOURCE_CUSTOM_ATTRS_INT}', "
+        f"toFloat64(s.{_SOURCE_CUSTOM_ATTRS_INT}[{spec_key_sql}]), "
+        f"{spec_source_sql} = '{_SOURCE_CUSTOM_ATTRS_FLOAT}', "
+        f"toFloat64(s.{_SOURCE_CUSTOM_ATTRS_FLOAT}[{spec_key_sql}]), "
+        "NULL)"
+    )
+    bucket_width_sql = (
+        "if(bounds.max_value > bounds.min_value, "
+        "(bounds.max_value - bounds.min_value) / toFloat64(bounds.bins), 1.0)"
+    )
+    bucket_index_sql = (
+        "if(bounds.max_value = bounds.min_value, toUInt64(0), "
+        "toUInt64(least(toFloat64(bounds.bins) - 1.0, floor("
+        f"(value_rows.value - bounds.min_value) / {bucket_width_sql}))))"
+    )
+    bucket_min_sql = (
+        "if(bounds.max_value = bounds.min_value, bounds.min_value, "
+        f"bounds.min_value + toFloat64(all_buckets.bucket_index) * "
+        f"{bucket_width_sql})"
+    )
+    bucket_max_sql = (
+        "if(bounds.max_value = bounds.min_value, bounds.max_value, "
+        "if(all_buckets.bucket_index = bounds.bins - toUInt64(1), "
+        "bounds.max_value, "
+        "bounds.min_value + toFloat64(all_buckets.bucket_index + 1) * "
+        f"{bucket_width_sql}))"
+    )
+    return f"""
+        WITH
+          value_rows AS (
+            SELECT group_key,
+                   alias,
+                   bins,
+                   value
+            FROM (
+              SELECT {context.group_key_sql} AS group_key,
+                     {spec_alias_sql} AS alias,
+                     {spec_bins_sql} AS bins,
+                     {value_sql} AS value
+              FROM spans s
+              ARRAY JOIN {specs_sql} AS spec
+              WHERE {span_filters.where}
+                AND {context.group_key_sql} IN {context.group_values_slot}
+                AND {map_contains_sql}
+            )
+            WHERE isNotNull(value)
+              AND isFinite(value)
+          ),
+          bounds AS (
+            SELECT group_key,
+                   alias,
+                   bins,
+                   min(value) AS min_value,
+                   max(value) AS max_value,
+                   count() AS present_count
+            FROM value_rows
+            GROUP BY group_key, alias, bins
+          ),
+          all_buckets AS (
+            SELECT group_key,
+                   alias,
+                   bins,
+                   toUInt64(bucket_index) AS bucket_index
+            FROM bounds
+            ARRAY JOIN range(bins) AS bucket_index
+          ),
+          aggregated AS (
+            SELECT value_rows.group_key AS group_key,
+                   value_rows.alias AS alias,
+                   {bucket_index_sql} AS bucket_index,
+                   count() AS bin_count
+            FROM value_rows
+            INNER JOIN bounds
+              ON value_rows.group_key = bounds.group_key
+             AND value_rows.alias = bounds.alias
+            GROUP BY group_key, alias, bucket_index
+          )
+        SELECT bounds.group_key AS group_key,
+               bounds.alias AS alias,
+               all_buckets.bucket_index AS bucket_index,
+               {bucket_min_sql} AS bucket_min,
+               {bucket_max_sql} AS bucket_max,
+               ifNull(aggregated.bin_count, 0) AS count,
+               bounds.present_count AS present_count
+        FROM bounds
+        INNER JOIN all_buckets
+          ON all_buckets.group_key = bounds.group_key
+         AND all_buckets.alias = bounds.alias
+        LEFT JOIN aggregated
+          ON aggregated.group_key = bounds.group_key
+         AND aggregated.alias = bounds.alias
+         AND aggregated.bucket_index = all_buckets.bucket_index
+        WHERE bounds.present_count > 0
+          AND (
+            bounds.max_value > bounds.min_value
+            OR all_buckets.bucket_index = 0
+          )
+        ORDER BY group_key ASC, alias ASC, bucket_index ASC
+    """
+
+
+def make_span_group_categorical_distributions_query(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    group_values: Sequence[SpanGroupKeyValue],
+    specs: Sequence[AgentSpanGroupDistributionSpec],
+) -> str:
+    """Build per-group top value counts for categorical custom attrs."""
+    categorical_specs = [
+        spec for spec in specs if spec.value.source in _CATEGORICAL_DISTRIBUTION_SOURCES
+    ]
+    if not categorical_specs:
+        raise ValueError(
+            "categorical span group distributions require categorical specs"
+        )
+    span_filters = _spans_filter_sql(pb, req)
+    context = _span_group_distribution_context(pb, req, group_values)
+    specs_sql = _span_group_distribution_specs_array_sql(
+        pb,
+        categorical_specs,
+        get_limit=lambda spec: spec.top_n,
+    )
+    spec_alias_sql = "tupleElement(spec, 1)"
+    spec_source_sql = "tupleElement(spec, 2)"
+    spec_key_sql = "tupleElement(spec, 3)"
+    spec_top_n_sql = "tupleElement(spec, 4)"
+    map_contains_sql = (
+        f"multiIf({spec_source_sql} = '{_SOURCE_CUSTOM_ATTRS_STRING}', "
+        f"mapContains(s.{_SOURCE_CUSTOM_ATTRS_STRING}, {spec_key_sql}), "
+        f"{spec_source_sql} = '{_SOURCE_CUSTOM_ATTRS_BOOL}', "
+        f"mapContains(s.{_SOURCE_CUSTOM_ATTRS_BOOL}, {spec_key_sql}), "
+        "false)"
+    )
+    value_sql = (
+        f"multiIf({spec_source_sql} = '{_SOURCE_CUSTOM_ATTRS_BOOL}', "
+        f"if(s.{_SOURCE_CUSTOM_ATTRS_BOOL}[{spec_key_sql}] = 1, 'true', 'false'), "
+        f"{spec_source_sql} = '{_SOURCE_CUSTOM_ATTRS_STRING}', "
+        f"toString(s.{_SOURCE_CUSTOM_ATTRS_STRING}[{spec_key_sql}]), "
+        "''"
+        ")"
+    )
+    return f"""
+        WITH
+          value_counts AS (
+            SELECT group_key,
+                   alias,
+                   raw_value,
+                   top_n,
+                   count() AS value_count
+            FROM (
+              SELECT {context.group_key_sql} AS group_key,
+                     {spec_alias_sql} AS alias,
+                     {spec_top_n_sql} AS top_n,
+                     {value_sql} AS raw_value
+              FROM spans s
+              ARRAY JOIN {specs_sql} AS spec
+              WHERE {span_filters.where}
+                AND {context.group_key_sql} IN {context.group_values_slot}
+                AND {map_contains_sql}
+            )
+            GROUP BY group_key, alias, raw_value, top_n
+          ),
+          ranked AS (
+            SELECT group_key,
+                   alias,
+                   raw_value,
+                   top_n,
+                   value_count,
+                   sum(value_count) OVER (
+                     PARTITION BY group_key, alias
+                   ) AS present_count,
+                   row_number() OVER (
+                     PARTITION BY group_key, alias
+                     ORDER BY value_count DESC, raw_value ASC
+                   ) AS value_rank
+            FROM value_counts
+          )
+        SELECT group_key,
+               alias,
+               substring(raw_value, 1, 256) AS value,
+               value_count AS count,
+               present_count
+        FROM ranked
+        WHERE value_rank <= top_n
+        ORDER BY group_key ASC, alias ASC, count DESC, raw_value ASC
     """
 
 

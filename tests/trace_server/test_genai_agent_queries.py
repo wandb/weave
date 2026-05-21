@@ -22,6 +22,7 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
+    AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
     AgentSpansQueryReq,
@@ -294,6 +295,205 @@ def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):
     assert conv_a in by_conv
     assert conv_b not in by_conv
     assert res.total_count == 1
+
+
+def test_group_by_conversation_id_custom_attr_measures(ch_server):
+    """Conversation groups return built-in aggregates plus custom attr metrics."""
+    project_id = _make_project_id("convs_cattr_metrics")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+    avg_score = AgentSpanMeasureSpec(
+        alias="custom_float_score_avg",
+        aggregation="avg",
+        value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+        value_type="number",
+    )
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            conversation_name="Alpha Chat",
+            custom_attrs_float={"score": 0.9},
+            custom_attrs_bool={"cached": True},
+            custom_attrs_string={"env": "prod"},
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            conversation_name="Alpha Chat",
+            custom_attrs_float={"score": 0.7},
+            custom_attrs_bool={"cached": False},
+            custom_attrs_string={"env": "prod"},
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            conversation_name="Beta Chat",
+            custom_attrs_float={"score": 0.2},
+            custom_attrs_bool={"cached": False},
+            custom_attrs_string={"env": "dev"},
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            measures=[
+                avg_score,
+                AgentSpanMeasureSpec(
+                    alias="custom_bool_cached_true",
+                    aggregation="count_true",
+                    value=AgentSpanValueRef(source="custom_attrs_bool", key="cached"),
+                ),
+                AgentSpanMeasureSpec(
+                    alias="custom_string_env_distinct",
+                    aggregation="count_distinct",
+                    value=AgentSpanValueRef(source="custom_attrs_string", key="env"),
+                ),
+            ],
+            group_filters=[AgentSpanGroupFilter(measure=avg_score, min=0.7)],
+            sort_by=[
+                AgentSortBy(field="custom_float_score_avg", direction="desc"),
+            ],
+        )
+    )
+
+    assert res.total_count == 1
+    assert len(res.groups) == 1
+    row = res.groups[0]
+    assert row.group_keys["conversation_id"] == conv_a
+    assert row.span_count == 2
+    assert row.conversation_names == ["Alpha Chat"]
+    assert abs(float(row.metrics["custom_float_score_avg"]) - 0.8) < 0.0001
+    assert row.metrics["custom_bool_cached_true"] == 1
+    assert row.metrics["custom_string_env_distinct"] == 1
+
+
+def test_conversation_custom_attr_distributions(ch_server):
+    """Grouped spans query returns custom attr distributions by conversation."""
+    project_id = _make_project_id("convs_cattr_dists")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            custom_attrs_float={"score": 0.1},
+            custom_attrs_int={"latency": 10},
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_bool={"cached": True},
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            custom_attrs_float={"score": 0.9},
+            custom_attrs_int={"latency": 30},
+            custom_attrs_string={"env": "prod"},
+            custom_attrs_bool={"cached": False},
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            custom_attrs_string={"env": "dev"},
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            custom_attrs_float={"score": 0.4},
+            custom_attrs_int={"latency": 20},
+            custom_attrs_string={"env": "staging"},
+            custom_attrs_bool={"cached": True},
+            started_at=now + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            group_distributions=[
+                AgentSpanGroupDistributionSpec(
+                    alias="custom_float_score_distribution",
+                    value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+                    bins=2,
+                ),
+                AgentSpanGroupDistributionSpec(
+                    alias="custom_int_latency_distribution",
+                    value=AgentSpanValueRef(source="custom_attrs_int", key="latency"),
+                    bins=2,
+                ),
+                AgentSpanGroupDistributionSpec(
+                    alias="custom_string_env_distribution",
+                    value=AgentSpanValueRef(source="custom_attrs_string", key="env"),
+                    top_n=2,
+                ),
+                AgentSpanGroupDistributionSpec(
+                    alias="custom_bool_cached_distribution",
+                    value=AgentSpanValueRef(source="custom_attrs_bool", key="cached"),
+                    top_n=2,
+                ),
+            ],
+        )
+    )
+
+    by_conversation = {row.group_keys["conversation_id"]: row for row in res.groups}
+
+    score_a = by_conversation[conv_a].distributions["custom_float_score_distribution"]
+    assert score_a.total_count == 3
+    assert score_a.present_count == 2
+    assert score_a.missing_count == 1
+    assert [bin.count for bin in score_a.bins] == [1, 1]
+    assert score_a.bins[0].min == 0.1
+    assert score_a.bins[-1].max == 0.9
+
+    latency_a = by_conversation[conv_a].distributions["custom_int_latency_distribution"]
+    assert latency_a.total_count == 3
+    assert latency_a.present_count == 2
+    assert latency_a.missing_count == 1
+    assert [bin.count for bin in latency_a.bins] == [1, 1]
+    assert latency_a.bins[0].min == 10
+    assert latency_a.bins[-1].max == 30
+
+    env_a = by_conversation[conv_a].distributions["custom_string_env_distribution"]
+    assert env_a.present_count == 3
+    assert env_a.other_count == 0
+    assert [(value.value, value.count) for value in env_a.values] == [
+        ("prod", 2),
+        ("dev", 1),
+    ]
+
+    cached_a = by_conversation[conv_a].distributions["custom_bool_cached_distribution"]
+    assert cached_a.present_count == 2
+    assert cached_a.missing_count == 1
+    assert [(value.value, value.count) for value in cached_a.values] == [
+        ("false", 1),
+        ("true", 1),
+    ]
+
+    score_b = by_conversation[conv_b].distributions["custom_float_score_distribution"]
+    assert score_b.total_count == 1
+    assert score_b.present_count == 1
+    assert len(score_b.bins) == 1
+    assert score_b.bins[0].count == 1
+
+    latency_b = by_conversation[conv_b].distributions["custom_int_latency_distribution"]
+    assert latency_b.total_count == 1
+    assert latency_b.present_count == 1
+    assert len(latency_b.bins) == 1
+    assert latency_b.bins[0].count == 1
 
 
 # ---------------------------------------------------------------------------
