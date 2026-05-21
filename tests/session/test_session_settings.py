@@ -1,7 +1,4 @@
-"""Tests that the Session SDK respects weave global settings.
-
-See spec: rgao/superpowers/specs/2026-05-13-session-sdk-respects-global-settings-design.md
-"""
+"""Tests that the Session SDK respects weave global settings."""
 
 from __future__ import annotations
 

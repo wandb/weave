@@ -10,8 +10,6 @@ attributes when used as context managers.
 
 from __future__ import annotations
 
-import platform
-import sys
 import types
 import uuid
 from contextvars import ContextVar, Token
@@ -44,13 +42,11 @@ from weave.session.types import (
     _parse_data_url,
 )
 from weave.trace.settings import (
-    should_capture_client_info,
-    should_capture_system_info,
     should_disable_weave,
     should_redact_pii,
 )
 from weave.utils import pii_redaction
-from weave.version import VERSION
+from weave.utils.capture_info import get_capture_info_items
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -121,18 +117,9 @@ def _capture_info_attrs() -> dict[str, Any]:
     """Build weave.* client / system info attrs, gated by settings.
 
     Per-span (not Resource) so env-var toggles take effect on every span,
-    matching @op semantics in weave_client.py:805-812.
+    matching @op semantics in weave_client.py.
     """
-    attrs: dict[str, Any] = {}
-    if should_capture_client_info():
-        attrs["weave.client_version"] = VERSION
-        attrs["weave.source"] = "python-sdk"
-        attrs["weave.sys_version"] = sys.version
-    if should_capture_system_info():
-        attrs["weave.os_name"] = platform.system()
-        attrs["weave.os_version"] = platform.version()
-        attrs["weave.os_release"] = platform.release()
-    return attrs
+    return {f"weave.{k}": v for k, v in get_capture_info_items()}
 
 
 class _SpanBase(BaseModel):

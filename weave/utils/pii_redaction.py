@@ -24,6 +24,11 @@ from weave.telemetry import trace_sentry
 from weave.trace.settings import redact_pii_exclude_fields, redact_pii_fields
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
+# Defer the failure from import time to call time. Two reasons:
+#   1) Tests can ``mock.patch("weave.utils.pii_redaction.redact_pii")``
+#      without installing presidio + spacy + transformers.
+#   2) Users who never opt into ``WEAVE_REDACT_PII=true`` don't need the
+#      heavy NLP stack — they only pay for it if they actually call in.
 try:
     from presidio_analyzer import AnalyzerEngine
     from presidio_anonymizer import AnonymizerEngine
