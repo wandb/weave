@@ -443,20 +443,17 @@ class WeaveClient:
         if record_type != "call_start" or not should_print_call_link():
             return
         try:
-            self._print_wal_call_link(record)
+            start = record.get("req", {}).get("start", {})
+            call_id = start.get("id", "")
+            if call_id not in self._wal_pending_call_ids:
+                return  # not our call or already printed
+            self._wal_pending_call_ids.discard(call_id)
+            project_id = start.get("project_id", "")
+            entity, project = from_project_id(project_id)
+            url = redirect_call(entity, project, call_id)
+            logger.info("%s %s", TRACE_CALL_EMOJI, url)
         except Exception:
             pass
-
-    def _print_wal_call_link(self, record: dict) -> None:
-        start = record.get("req", {}).get("start", {})
-        call_id = start.get("id", "")
-        if call_id not in self._wal_pending_call_ids:
-            return  # not our call or already printed
-        self._wal_pending_call_ids.discard(call_id)
-        project_id = start.get("project_id", "")
-        entity, project = from_project_id(project_id)
-        url = redirect_call(entity, project, call_id)
-        logger.info("%s %s", TRACE_CALL_EMOJI, url)
 
     ################ High Level Convenience Methods ################
 
