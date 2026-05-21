@@ -85,7 +85,7 @@ export class Turn {
     });
   }
 
-  subagent(opts: SubAgentInit): SubAgent {
+  startSubagent(opts: SubAgentInit): SubAgent {
     return SubAgent.create({
       ...opts,
       parentContext: this.context,

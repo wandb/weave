@@ -73,7 +73,7 @@ export function startSubagent(opts: SubAgentInit): SubAgent {
       'weave.startSubagent() called without an active Turn or LLM. Call weave.startTurn() or weave.startLLM() first.'
     );
   }
-  return state.turn.subagent(opts);
+  return state.turn.startSubagent(opts);
 }
 
 /**
