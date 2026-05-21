@@ -30,30 +30,17 @@ AttributeType = Literal["string", "int", "float", "string[]", "json"]
 class Attribute:
     """A single semantic convention attribute.
 
-    ``gen_ai_alias`` is the *primary* OTel ``gen_ai.*`` wire key for this
-    attribute — usually whatever the upstream OpenTelemetry semconv has
-    standardised on. ``additional_aliases`` lets the server recognise
-    historical / parallel forms for the same column so old data and
-    clients-in-the-field keep parsing.
-
-    Concrete example: ``USAGE_REASONING_TOKENS`` below. The upstream OTel
-    spec landed on ``gen_ai.usage.reasoning.output_tokens``, but Weave
-    has years of data on the wire with ``gen_ai.usage.reasoning_tokens``
-    and ADK emits ``gen_ai.usage.experimental.reasoning_tokens``. All
-    three need to feed the same ``reasoning_tokens`` column without
-    forcing a discontinuity in stored data. Primary alias = canonical
-    upstream name (what new clients emit). Additional aliases = the two
-    historical forms (read-only at this layer).
-
-    The catalog is a recognizer registry; the OTel spec is the source of
-    truth, not this file.
+    ``gen_ai_aliases`` lists the OTel ``gen_ai.*`` wire key(s) for this
+    column — pass a string for a single alias, or a tuple when multiple
+    OTel forms must feed the same column. The first tuple entry is the
+    canonical upstream name; later entries are parallel forms recognised
+    on ingest. See ``USAGE_REASONING_TOKENS`` for an example.
     """
 
     key: str  # canonical weave.* key
     type: AttributeType
     description: str
-    gen_ai_alias: str = ""  # primary OTel gen_ai.* wire key, if any
-    additional_aliases: tuple[str, ...] = ()  # historical / parallel wire keys
+    gen_ai_aliases: str | tuple[str, ...] = ""  # OTel gen_ai.* equivalent(s), if any
 
     def __post_init__(self) -> None:
         """Validate that canonical attributes stay in the Weave namespace."""
@@ -63,18 +50,21 @@ class Attribute:
             )
 
     @property
+    def aliases(self) -> tuple[str, ...]:
+        """``gen_ai_aliases`` normalised to a tuple (strings → 1-tuple)."""
+        if isinstance(self.gen_ai_aliases, str):
+            return (self.gen_ai_aliases,) if self.gen_ai_aliases else ()
+        return self.gen_ai_aliases
+
+    @property
     def lookup_keys(self) -> tuple[str, ...]:
         """Return all recognized keys, ordered weave-canonical first.
 
         Extraction probes them in order and uses the first non-None hit,
-        so callers can rely on the weave.* key winning over older aliases
+        so callers can rely on the weave.* key winning over OTel aliases
         when both are present on a span.
         """
-        keys: list[str] = [self.key]
-        if self.gen_ai_alias:
-            keys.append(self.gen_ai_alias)
-        keys.extend(self.additional_aliases)
-        return tuple(keys)
+        return (self.key, *self.aliases)
 
 
 # ---------------------------------------------------------------------------
@@ -137,14 +127,16 @@ USAGE_REASONING_TOKENS = Attribute(
     "weave.usage.reasoning_tokens",
     "int",
     "Reasoning/thinking tokens",
-    # Canonical name from upstream OTel GenAI semconv
-    # (https://github.com/open-telemetry/semantic-conventions/pull/3383, merged
-    # 2026-04-27). The Python ``opentelemetry-semantic-conventions`` package
-    # had not picked it up at our floor of 0.62b1; switch to importing the
-    # constant once it ships.
-    "gen_ai.usage.reasoning.output_tokens",
-    additional_aliases=(
-        # Earlier Weave-internal name; old span data still uses this on the wire.
+    (
+        # Canonical name from upstream OTel GenAI semconv
+        # (https://github.com/open-telemetry/semantic-conventions/pull/3383,
+        # merged 2026-04-27). The Python
+        # ``opentelemetry-semantic-conventions`` package had not picked it up
+        # at our floor of 0.62b1; switch to importing the constant once it
+        # ships.
+        "gen_ai.usage.reasoning.output_tokens",
+        # Earlier Weave-internal name emitted by the Session SDK before the
+        # upstream spec landed; spans on the wire still use this form.
         "gen_ai.usage.reasoning_tokens",
         # What ADK emits natively before our integration enriches the span.
         "gen_ai.usage.experimental.reasoning_tokens",
@@ -379,16 +371,14 @@ ATTRIBUTES: dict[str, Attribute] = {a.key: a for a in _DEFS}
 # attribute is known statically.
 SEMCONV_LOOKUP_KEYS: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
 
-# Map from any recognized key (weave.*, gen_ai.*, or legacy aliases) to
-# canonical weave.* key. ``additional_aliases`` participate too so old data
-# and pre-standardisation client emissions keep resolving.
+# Map from any recognized key (weave.* or any registered gen_ai.* alias) to
+# canonical weave.* key. Every entry in ``gen_ai_aliases`` participates so
+# parallel client emissions all resolve to the same column.
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
 for _a in _DEFS:
     _ALIAS_TO_CANONICAL[_a.key] = _a.key
-    if _a.gen_ai_alias:
-        _ALIAS_TO_CANONICAL[_a.gen_ai_alias] = _a.key
-    for _extra in _a.additional_aliases:
-        _ALIAS_TO_CANONICAL[_extra] = _a.key
+    for _alias in _a.aliases:
+        _ALIAS_TO_CANONICAL[_alias] = _a.key
 
 
 def resolve_alias_to_canonical(key: str) -> str | None:
@@ -462,20 +452,18 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
 def _build_filterable_lookup() -> dict[str, str]:
     """Flatten CANONICAL_KEY_TO_COLUMN to also accept gen_ai.* aliases and
     prefix-stripped short-forms (`agent.name` alongside `weave.agent.name`).
-    Additional legacy aliases participate too so query callers can filter on
-    historical attribute names.
+    Every registered alias participates so query callers can filter on any
+    recognised attribute name.
     """
     out: dict[str, str] = {}
     for canonical, col in CANONICAL_KEY_TO_COLUMN.items():
         out[canonical] = col
         attr = ATTRIBUTES[canonical]
-        if attr.gen_ai_alias:
-            out[attr.gen_ai_alias] = col
-        for extra in attr.additional_aliases:
-            out[extra] = col
-        for k in (canonical, attr.gen_ai_alias, *attr.additional_aliases):
+        for alias in attr.aliases:
+            out[alias] = col
+        for k in (canonical, *attr.aliases):
             for prefix in ("weave.", "gen_ai."):
-                if k and k.startswith(prefix):
+                if k.startswith(prefix):
                     out[k[len(prefix) :]] = col
     return out
 
