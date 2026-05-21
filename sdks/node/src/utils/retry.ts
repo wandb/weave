@@ -20,7 +20,7 @@ function parseRetryAfterMs(headers: Headers): number | null {
 
   // Retry-After can be a number of seconds or an HTTP date
   const seconds = Number(retryAfter);
-  if (!isNaN(seconds)) return seconds * 1000;
+  if (!isNaN(seconds) && seconds >= 0) return seconds * 1000;
 
   const date = new Date(retryAfter);
   if (!isNaN(date.getTime())) {
@@ -49,11 +49,12 @@ export function createFetchWithRetry(options: RetryOptions = {}) {
       try {
         const response = await fetch(...fetchParams);
 
-        // For 429 responses, inspect Retry-After to classify the rate limit:
+        // For 429 responses, inspect Retry-After to classify the rate limit,
+        // but only if the caller has not disabled retries for this status code.
         // - Long Retry-After (> threshold) → quota/billing exhaustion, do not retry
         // - Short Retry-After → transient pressure, wait the specified duration
         // - No Retry-After → transient pressure, use exponential backoff
-        if (response.status === 429) {
+        if (response.status === 429 && retryOnStatus(response.status)) {
           const retryAfterMs = parseRetryAfterMs(response.headers);
           const retryAfterSeconds =
             retryAfterMs !== null ? retryAfterMs / 1000 : null;
