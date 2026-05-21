@@ -477,6 +477,10 @@ class AgentSpanSchema(BaseModel):
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
+    # Only populated when AgentSpansQueryReq.include_details is set; the raw
+    # OTel JSON dump for the span is large, so it's omitted from list queries
+    # by default.
+    raw_span_dump: str | None = None
 
 
 class AgentSortBy(BaseModel):
@@ -637,6 +641,10 @@ class AgentSpansQueryReq(BaseModel):
         max_length=MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_SPECS,
     )
     custom_attr_columns: list[AgentSpanValueRef] = Field(default_factory=list)
+    # When true, include heavy fields (messages, tool payloads, raw_span_dump,
+    # etc.) in each row. Intended for single-trace detail fetches; do not set
+    # for broad list queries.
+    include_details: bool = False
     sort_by: list[AgentSortBy] | None = None
     limit: int = Field(
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT

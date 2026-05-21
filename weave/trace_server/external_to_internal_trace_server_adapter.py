@@ -1,12 +1,78 @@
 import abc
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any, TypeVar
 
+from opentelemetry.proto.common.v1.common_pb2 import KeyValue
+
+from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
 )
+
+# OTel attribute keys whose values are typed `Array(String)` ref columns
+# in the agents `spans` table. Refs in these columns are surfaced as bare
+# strings by the read-path response, so they must be in internal form on
+# disk for the int→ext converter to round-trip them.
+_OTEL_REF_ATTR_KEYS = frozenset(
+    {
+        "weave.content_refs",
+        "weave.artifact_refs",
+        "weave.object_refs",
+    }
+)
+_WEAVE_EXT_PREFIX = ri.WEAVE_SCHEME + ":///"
+
+
+def _convert_external_weave_ref(
+    ref: str, ext_to_int_project_id: Callable[[str], str]
+) -> str:
+    """Rewrite a single `weave:///entity/project/tail` ref to internal form.
+
+    Anything else (other schemes, malformed refs, already-internal refs)
+    is returned unchanged.
+    """
+    if not ref.startswith(_WEAVE_EXT_PREFIX):
+        return ref
+    rest = ref[len(_WEAVE_EXT_PREFIX) :]
+    parts = rest.split("/", 2)
+    if len(parts) != 3:
+        return ref
+    entity, project, tail = parts
+    internal_project_id = ext_to_int_project_id(f"{entity}/{project}")
+    return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
+
+
+def _rewrite_otel_ref_attrs_inplace(
+    attrs: Iterable[KeyValue],
+    ext_to_int_project_id: Callable[[str], str],
+    prefix: str = "",
+) -> None:
+    """Recursively rewrite typed ref attributes from external to internal form.
+
+    OTel encodes attributes either flat (`weave.object_refs`) or nested as
+    a `kvlist_value` (top-level key `weave` with a child `object_refs`),
+    so we descend through `kvlist_value`s and accumulate dotted prefixes.
+    Only `Array(String)` values under the known ref keys are touched;
+    everything else (including refs embedded in event payloads, message
+    content, `raw_span_dump`, etc.) is left exactly as the client sent it.
+    """
+    for kv in attrs:
+        full_key = f"{prefix}{kv.key}" if prefix else kv.key
+        value = kv.value
+        if full_key in _OTEL_REF_ATTR_KEYS and value.HasField("array_value"):
+            for item in value.array_value.values:
+                if item.HasField("string_value"):
+                    item.string_value = _convert_external_weave_ref(
+                        item.string_value, ext_to_int_project_id
+                    )
+        elif value.HasField("kvlist_value"):
+            _rewrite_otel_ref_attrs_inplace(
+                value.kvlist_value.values,
+                ext_to_int_project_id,
+                prefix=f"{full_key}.",
+            )
 
 
 class IdConverter:
@@ -1164,6 +1230,18 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        # `_ref_apply`'s universal walker can't descend into the raw
+        # protobuf `ResourceSpans` payload, so the typed-ref OTel
+        # attribute values (`weave.content_refs`, `weave.artifact_refs`,
+        # `weave.object_refs`) escape the standard ext→int conversion.
+        # Rewrite them in-place here so the inner trace server sees a
+        # request that's already in internal-ref form, matching the
+        # invariant every other resolver relies on.
+        ext_to_int = self._idc.ext_to_int_project_id
+        for processed_span in req.processed_spans:
+            for scope_spans in processed_span.resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    _rewrite_otel_ref_attrs_inplace(span.attributes, ext_to_int)
         return self._internal_trace_server.genai_otel_export(req)
 
     def agent_spans_query(
