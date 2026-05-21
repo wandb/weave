@@ -36,7 +36,7 @@ export function startLLM(opts: LLMInit): LLM {
       'weave.startLLM() called without an active Turn. Call weave.startTurn() first.'
     );
   }
-  return turn.llm(opts);
+  return turn.startLLM(opts);
 }
 
 /**
