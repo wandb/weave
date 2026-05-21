@@ -98,6 +98,8 @@ AGENT_CUSTOM_ATTR_SOURCES: frozenset[AgentCustomAttrSource] = frozenset(
 )
 
 _IDENT_RE = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
+# AgentGroupByRef sources that resolve to a plain span column rather than a
+# typed custom-attribute map; used to pick alias/value resolution paths.
 _FIELD_GROUP_BY_SOURCES = {"field", "column"}
 AGENT_SPAN_STATS_DERIVED_VALUE_TYPES: dict[
     AgentSpanStatsDerivedMetric, AgentSpanStatsValueType
@@ -506,7 +508,12 @@ class AgentGroupByRef(BaseModel):
     alias: str | None = None  # output key in AgentSpanGroupRow.group_keys
 
 
-def _group_by_ref_alias(ref: AgentGroupByRef) -> str:
+def group_by_ref_alias(ref: AgentGroupByRef) -> str:
+    """Return the SQL-safe output alias for a group-by ref.
+
+    Used for both request validation here and SQL projection in the query
+    builder, so both call sites agree on what shows up in `group_keys`.
+    """
     if ref.alias is not None:
         return ref.alias
     if ref.source in _FIELD_GROUP_BY_SOURCES:
@@ -528,10 +535,29 @@ class AgentSpanGroupDistributionSpec(BaseModel):
             raise ValueError("distribution specs must reference custom attr sources")
         return self
 
+    def custom_attr_source(self) -> AgentCustomAttrSource:
+        """Return ``value.source`` narrowed to ``AgentCustomAttrSource``.
+
+        The model validator guarantees this at construction time; this helper
+        re-checks each literal so callers avoid `cast()` at use sites.
+        """
+        source = self.value.source
+        if source == "custom_attrs_string":
+            return source
+        if source == "custom_attrs_int":
+            return source
+        if source == "custom_attrs_float":
+            return source
+        if source == "custom_attrs_bool":
+            return source
+        raise ValueError(f"distribution spec source is not custom attr: {source!r}")
+
 
 class AgentSpanGroupDistributionBin(BaseModel):
     """One numeric histogram bin for a custom attribute in a span group."""
 
+    # 0-based bucket position within the histogram; clients render bins in
+    # `index` order so this can double as a stable sort key.
     index: int
     min: float
     max: float
@@ -647,7 +673,7 @@ class AgentSpansQueryReq(BaseModel):
         if duplicate_aliases:
             raise ValueError(f"duplicate measure aliases: {duplicate_aliases!r}")
         if self.group_by:
-            group_aliases = [_group_by_ref_alias(ref) for ref in self.group_by]
+            group_aliases = [group_by_ref_alias(ref) for ref in self.group_by]
             reserved = SPAN_GROUP_RESULT_COLS.union(frozenset(group_aliases))
             measure_alias_collisions = sorted(
                 {

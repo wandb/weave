@@ -15,7 +15,7 @@ import datetime
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, NamedTuple, cast
+from typing import Any, Callable, NamedTuple, TypeAlias
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -43,6 +43,7 @@ from weave.trace_server.agents.types import (
     AgentSpanValueRef,
     AgentsQueryReq,
     AgentVersionsQueryReq,
+    group_by_ref_alias,
 )
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_custom_attrs import (
@@ -185,7 +186,7 @@ _CUSTOM_ATTR_SCHEMA_SOURCES: tuple[tuple[str, str], ...] = tuple(
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES.items()
 )
 
-SpanGroupKeyValue = str | int | float | bool | None
+SpanGroupKeyValue: TypeAlias = str | int | float | bool | None
 
 
 class SpanGroupDistributionContext(NamedTuple):
@@ -508,15 +509,6 @@ def resolve_agent_span_field_column(field: str) -> str:
     return semconv.FILTERABLE_KEY_TO_COLUMN.get(field, field)
 
 
-def group_by_ref_alias(ref: AgentGroupByRef) -> str:
-    """Return the SQL-safe output alias for a group-by ref."""
-    if ref.alias is not None:
-        return ref.alias
-    if ref.source in _FIELD_GROUP_BY_SOURCES:
-        return resolve_agent_span_field_column(ref.key)
-    return ref.key
-
-
 # ---------------------------------------------------------------------------
 # Span value and grouped measure resolution
 # ---------------------------------------------------------------------------
@@ -718,6 +710,10 @@ def _ensure_group_measure_aliases_do_not_collide(
     group_aliases: list[str], measures: list[AgentSpanMeasureSpec]
 ) -> None:
     """Reject dynamic measure aliases that would overwrite grouped row fields."""
+    # TODO: surface this as a 4xx instead of a 500. The same check runs in
+    # AgentSpansQueryReq's pydantic validator (which becomes a 422), so this
+    # branch is defense-in-depth — but if it ever does fire we should map it
+    # to a structured client error rather than letting ValueError bubble out.
     reserved = SPAN_GROUP_RESULT_COLS.union(frozenset(group_aliases))
     collisions = sorted(
         {measure.alias for measure in measures if measure.alias in reserved}
@@ -1056,14 +1052,10 @@ def _span_group_distribution_specs_array_sql(
     pb: ParamBuilder,
     specs: Sequence[AgentSpanGroupDistributionSpec],
     *,
-    limit_attr: str,
+    get_limit: Callable[[AgentSpanGroupDistributionSpec], int],
 ) -> str:
     spec_tuples = [
-        _span_group_distribution_spec_tuple_sql(
-            pb,
-            spec,
-            limit_value=cast(int, getattr(spec, limit_attr)),
-        )
+        _span_group_distribution_spec_tuple_sql(pb, spec, limit_value=get_limit(spec))
         for spec in specs
     ]
     return f"array({', '.join(spec_tuples)})"
@@ -1087,16 +1079,6 @@ def make_span_group_distribution_counts_query(
     """
 
 
-def make_span_group_numeric_distribution_query(
-    pb: ParamBuilder,
-    req: AgentSpansQueryReq,
-    group_values: Sequence[SpanGroupKeyValue],
-    spec: AgentSpanGroupDistributionSpec,
-) -> str:
-    """Build per-group histograms for one numeric custom attribute."""
-    return make_span_group_numeric_distributions_query(pb, req, group_values, [spec])
-
-
 def make_span_group_numeric_distributions_query(
     pb: ParamBuilder,
     req: AgentSpansQueryReq,
@@ -1114,7 +1096,7 @@ def make_span_group_numeric_distributions_query(
     specs_sql = _span_group_distribution_specs_array_sql(
         pb,
         numeric_specs,
-        limit_attr="bins",
+        get_limit=lambda spec: spec.bins,
     )
     spec_alias_sql = "tupleElement(spec, 1)"
     spec_source_sql = "tupleElement(spec, 2)"
@@ -1229,18 +1211,6 @@ def make_span_group_numeric_distributions_query(
     """
 
 
-def make_span_group_categorical_distribution_query(
-    pb: ParamBuilder,
-    req: AgentSpansQueryReq,
-    group_values: Sequence[SpanGroupKeyValue],
-    spec: AgentSpanGroupDistributionSpec,
-) -> str:
-    """Build per-group top value counts for one categorical custom attr."""
-    return make_span_group_categorical_distributions_query(
-        pb, req, group_values, [spec]
-    )
-
-
 def make_span_group_categorical_distributions_query(
     pb: ParamBuilder,
     req: AgentSpansQueryReq,
@@ -1260,7 +1230,7 @@ def make_span_group_categorical_distributions_query(
     specs_sql = _span_group_distribution_specs_array_sql(
         pb,
         categorical_specs,
-        limit_attr="top_n",
+        get_limit=lambda spec: spec.top_n,
     )
     spec_alias_sql = "tupleElement(spec, 1)"
     spec_source_sql = "tupleElement(spec, 2)"

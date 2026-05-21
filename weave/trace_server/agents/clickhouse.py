@@ -11,7 +11,7 @@ import datetime
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents.chat_view import build_trace_chat
@@ -33,7 +33,6 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
     AgentCustomAttrSchemaItem,
-    AgentCustomAttrSource,
     AgentCustomAttrsSchemaReq,
     AgentCustomAttrsSchemaRes,
     AgentSchema,
@@ -60,6 +59,7 @@ from weave.trace_server.agents.types import (
     AgentVersionsQueryRes,
     GenAIOTelExportReq,
     GenAIOTelExportRes,
+    group_by_ref_alias,
 )
 from weave.trace_server.datadog import record_db_insert
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
@@ -67,7 +67,6 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
-    group_by_ref_alias,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -122,6 +121,13 @@ PaginatedReqT = TypeVar(
     AgentConversationChatReq,
 )
 PARAM_NAMESPACE = "genai"
+
+
+class _SpanGroupDistKey(NamedTuple):
+    """Lookup key for distribution items: one per (group row, dist alias)."""
+
+    group_key: str
+    alias: str
 
 
 @dataclass(frozen=True)
@@ -226,11 +232,11 @@ class AgentQueryHandler:
             for row in _rows_as_dicts(self._query(counts_sql, pb.get_params()))
         }
 
-        items: dict[tuple[str, str], AgentSpanGroupDistributionItem] = {}
+        items: dict[_SpanGroupDistKey, AgentSpanGroupDistributionItem] = {}
         for group_key, group in groups_by_key.items():
             for spec in req.group_distributions:
                 total_count = total_counts.get(group_key, 0)
-                source = cast("AgentCustomAttrSource", spec.value.source)
+                source = spec.custom_attr_source()
                 item = AgentSpanGroupDistributionItem(
                     alias=spec.alias,
                     source=source,
@@ -241,9 +247,11 @@ class AgentQueryHandler:
                     # present values for groups where the custom attr exists.
                     missing_count=total_count,
                 )
-                items[group_key, spec.alias] = item
+                items[_SpanGroupDistKey(group_key, spec.alias)] = item
                 group.distributions[spec.alias] = item
 
+        # TODO: Run the numeric and categorical distribution queries in parallel
+        # — they're independent and each is the slowest piece of this hydrate.
         numeric_specs = [
             spec
             for spec in req.group_distributions
@@ -255,7 +263,9 @@ class AgentQueryHandler:
                 pb, req, group_values, numeric_specs
             )
             for row in _rows_as_dicts(self._query(sql, pb.get_params())):
-                key = (safe_str(row.get("group_key")), safe_str(row.get("alias")))
+                key = _SpanGroupDistKey(
+                    safe_str(row.get("group_key")), safe_str(row.get("alias"))
+                )
                 distribution_item = items.get(key)
                 if distribution_item is None:
                     continue
@@ -284,7 +294,9 @@ class AgentQueryHandler:
                 pb, req, group_values, categorical_specs
             )
             for row in _rows_as_dicts(self._query(sql, pb.get_params())):
-                key = (safe_str(row.get("group_key")), safe_str(row.get("alias")))
+                key = _SpanGroupDistKey(
+                    safe_str(row.get("group_key")), safe_str(row.get("alias"))
+                )
                 distribution_item = items.get(key)
                 if distribution_item is None:
                     continue
@@ -300,6 +312,8 @@ class AgentQueryHandler:
                     )
                 )
 
+        # Categorical queries return only the top-N values per group; anything
+        # beyond that lands in `other_count` so the UI can show a remainder slice.
         for item in items.values():
             if item.values:
                 top_count = sum(value.count for value in item.values)
