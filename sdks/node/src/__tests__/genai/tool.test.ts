@@ -50,7 +50,7 @@ describe('Tool', () => {
 
   it('attaches to the LLM span when started via llm.startTool() (nested)', () => {
     const turn = Turn.create({});
-    const llm = turn.llm({model: 'gpt-4o'});
+    const llm = turn.startLLM({model: 'gpt-4o'});
     const tool = llm.startTool({name: 'get_weather'});
     tool.end();
     llm.end();

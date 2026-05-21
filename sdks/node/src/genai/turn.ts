@@ -69,7 +69,7 @@ export class Turn {
     return turn;
   }
 
-  llm(opts: LLMInit): LLM {
+  startLLM(opts: LLMInit): LLM {
     return LLM.create({
       ...opts,
       parentContext: this.context,
