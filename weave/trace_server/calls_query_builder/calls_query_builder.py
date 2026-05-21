@@ -3067,13 +3067,9 @@ def build_calls_complete_update_end_query(
         because clickhouse-connect truncates datetime objects to whole seconds.
         We use fromUnixTimestamp64Micro() to convert back to DateTime64(6).
 
-        Placeholders use Python `%(name)s` (client-side substitution via
-        `clickhouse_connect.driver.binding.finalize_query`) instead of CH's
-        `{name:Type}` server-side binding. The server-side path puts every param
-        in the request URL as `?param_<name>=...`, which makes the URL grow with
-        `output_dump`/`summary_dump`; multi-MB outputs blow past LB URI limits
-        and surface as `BrokenPipeError`. Client-side substitution inlines values
-        into the SQL body via `escape_str`, keeping the URL small.
+        Uses `%(name)s` (client-side), not `{name:Type}` -- the latter puts
+        params in the URL and broken-pipes on multi-MB outputs. Injection safety
+        comes from clickhouse_connect's `escape_str`.
     """
     # Build WHERE clause - include started_at if provided for better primary key usage
     where_clauses = [f"project_id = %({project_id_param})s"]
