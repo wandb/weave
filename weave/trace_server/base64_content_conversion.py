@@ -391,25 +391,37 @@ def _replace_blobs_in_messages(
             if not isinstance(part, dict) or not Content.is_content_like(part):
                 continue
             try:
-                content_obj = Content._from_guess(part)
-                ref = store_content_object(content_obj, project_id, trace_server)
-                parts[i] = ref
+                ref_json = _convert_part(part, i, role, project_id, trace_server)
+                parts[i] = ref_json[0]
+                content_refs.append(ref_json[1])
                 modified = True
-                ref_entry = {
-                    "digest": ref["files"]["content"],
-                    "media_type": content_obj.mimetype,
-                    "role": role,
-                    "size_bytes": content_obj.size,
-                }
-                content_refs.append(json.dumps(ref_entry))
-                logger.debug(
-                    "Converted content part %d: role=%s, mime=%s, size=%d, digest=%s",
-                    i,
-                    role,
-                    content_obj.mimetype,
-                    content_obj.size,
-                    ref["files"]["content"],
-                )
             except Exception as e:
                 logger.warning("Failed to convert part to Content: %s", e)
     return modified, content_refs
+
+
+def _convert_part(
+    part: dict[str, Any],
+    index: int,
+    role: str,
+    project_id: str,
+    trace_server: TraceServerInterface,
+) -> tuple[dict[str, Any], str]:
+    """Convert a single content-like part to a stored Content ref."""
+    content_obj = Content._from_guess(part)
+    ref = store_content_object(content_obj, project_id, trace_server)
+    ref_entry = {
+        "digest": ref["files"]["content"],
+        "media_type": content_obj.mimetype,
+        "role": role,
+        "size_bytes": content_obj.size,
+    }
+    logger.debug(
+        "Converted content part %d: role=%s, mime=%s, size=%d, digest=%s",
+        index,
+        role,
+        content_obj.mimetype,
+        content_obj.size,
+        ref["files"]["content"],
+    )
+    return ref, json.dumps(ref_entry)
