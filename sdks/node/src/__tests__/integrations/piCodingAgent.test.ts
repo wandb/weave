@@ -146,7 +146,7 @@ describe('PiCodingAgentOtelAdapter', () => {
       );
     });
 
-    it('adds gen_ai.user.message event when captureContent is true', () => {
+    it('sets gen_ai.input.messages and gen_ai.system_instructions when captureContent is true', () => {
       const {exporter, emit} = makeExporterAndAdapter();
       startInvoke(emit, 'what time is it?');
       emit('agent_end', {messages: []});
@@ -155,26 +155,51 @@ describe('PiCodingAgentOtelAdapter', () => {
       const invoke = exporter
         .getFinishedSpans()
         .find(s => s.name === 'invoke_agent pi-coding-agent')!;
-      expect(invoke.events).toHaveLength(2);
-      expect(invoke.events[0].name).toBe('gen_ai.system.message');
-
-      expect(invoke.events[1].name).toBe('gen_ai.user.message');
-      const userContent = JSON.parse(
-        invoke.events[1].attributes!['gen_ai.event.content'] as string
+      const inputMessages = JSON.parse(
+        invoke.attributes['gen_ai.input.messages'] as string
       );
-      expect(userContent.content).toBe('what time is it?');
+      expect(inputMessages).toEqual([
+        {role: 'user', content: 'what time is it?'},
+      ]);
+      const systemInstructions = JSON.parse(
+        invoke.attributes['gen_ai.system_instructions'] as string
+      );
+      expect(systemInstructions).toEqual(['be helpful']);
     });
 
-    it('omits event content when captureContent is false', () => {
-      const {exporter, emit} = makeExporterAndAdapter({captureContent: false});
+    it('sets gen_ai.output.messages from assistant messages in agent_end', () => {
+      const {exporter, emit} = makeExporterAndAdapter();
       startInvoke(emit, 'what time is it?');
-      emit('agent_end', {messages: []});
+      emit('agent_end', {messages: [MOCK_ASSISTANT_MSG]});
       emit('session_shutdown');
 
       const invoke = exporter
         .getFinishedSpans()
         .find(s => s.name === 'invoke_agent pi-coding-agent')!;
-      expect(invoke.events).toHaveLength(0);
+      const outputMessages = JSON.parse(
+        invoke.attributes['gen_ai.output.messages'] as string
+      );
+      expect(outputMessages).toHaveLength(1);
+      expect(outputMessages[0].role).toBe('assistant');
+      expect(outputMessages[0].parts[0]).toEqual({
+        type: 'text',
+        content: 'Hello!',
+      });
+      expect(outputMessages[0].finish_reason).toBe('stop');
+    });
+
+    it('omits message attributes when captureContent is false', () => {
+      const {exporter, emit} = makeExporterAndAdapter({captureContent: false});
+      startInvoke(emit, 'what time is it?');
+      emit('agent_end', {messages: [MOCK_ASSISTANT_MSG]});
+      emit('session_shutdown');
+
+      const invoke = exporter
+        .getFinishedSpans()
+        .find(s => s.name === 'invoke_agent pi-coding-agent')!;
+      expect(invoke.attributes['gen_ai.input.messages']).toBeUndefined();
+      expect(invoke.attributes['gen_ai.output.messages']).toBeUndefined();
+      expect(invoke.attributes['gen_ai.system_instructions']).toBeUndefined();
     });
 
     it('aggregates usage across multiple turns', () => {
@@ -266,7 +291,7 @@ describe('PiCodingAgentOtelAdapter', () => {
       );
     });
 
-    it('adds gen_ai.system.message event from context', () => {
+    it('sets gen_ai.system_instructions and gen_ai.input.messages from context', () => {
       const {exporter, emit} = makeExporterAndAdapter();
       startTurn(emit);
       emit('context', {
@@ -282,17 +307,17 @@ describe('PiCodingAgentOtelAdapter', () => {
       const chat = exporter
         .getFinishedSpans()
         .find(s => s.name.startsWith('chat '))!;
-      const sysEvent = chat.events.find(
-        e => e.name === 'gen_ai.system.message'
+      const systemInstructions = JSON.parse(
+        chat.attributes['gen_ai.system_instructions'] as string
       );
-      expect(sysEvent).toBeDefined();
-      const content = JSON.parse(
-        sysEvent!.attributes!['gen_ai.event.content'] as string
+      expect(systemInstructions).toEqual(['You are a helpful assistant.']);
+      const inputMessages = JSON.parse(
+        chat.attributes['gen_ai.input.messages'] as string
       );
-      expect(content[0].role).toBe('system');
+      expect(inputMessages).toEqual([{role: 'user', content: 'hello'}]);
     });
 
-    it('skips gen_ai.system.message when no system messages in context', () => {
+    it('skips gen_ai.system_instructions when no system messages in context', () => {
       const {exporter, emit} = makeExporterAndAdapter();
       startTurn(emit);
       emit('context', {messages: [{role: 'user', content: 'hello'}]});
@@ -303,15 +328,12 @@ describe('PiCodingAgentOtelAdapter', () => {
       const chat = exporter
         .getFinishedSpans()
         .find(s => s.name.startsWith('chat '))!;
-      expect(
-        chat.events.find(e => e.name === 'gen_ai.system.message')
-      ).toBeUndefined();
+      expect(chat.attributes['gen_ai.system_instructions']).toBeUndefined();
     });
 
-    it('adds gen_ai.assistant.message event on message_end', () => {
+    it('sets gen_ai.output.messages on turn_end with assistant content', () => {
       const {exporter, emit} = makeExporterAndAdapter();
       startTurn(emit);
-      emit('message_end', {message: MOCK_ASSISTANT_MSG});
       emit('turn_end', {turnIndex: 0, message: MOCK_ASSISTANT_MSG});
       emit('agent_end', {messages: []});
       emit('session_shutdown');
@@ -319,21 +341,22 @@ describe('PiCodingAgentOtelAdapter', () => {
       const chat = exporter
         .getFinishedSpans()
         .find(s => s.name.startsWith('chat '))!;
-      const assistantEvent = chat.events.find(
-        e => e.name === 'gen_ai.assistant.message'
+      const outputMessages = JSON.parse(
+        chat.attributes['gen_ai.output.messages'] as string
       );
-      expect(assistantEvent).toBeDefined();
-      const content = JSON.parse(
-        assistantEvent!.attributes!['gen_ai.event.content'] as string
-      );
-      expect(content.role).toBe('assistant');
+      expect(outputMessages).toHaveLength(1);
+      expect(outputMessages[0].role).toBe('assistant');
+      expect(outputMessages[0].parts[0]).toEqual({
+        type: 'text',
+        content: 'Hello!',
+      });
+      expect(outputMessages[0].finish_reason).toBe('stop');
     });
 
-    it('omits event content when captureContent is false', () => {
+    it('omits message attributes when captureContent is false', () => {
       const {exporter, emit} = makeExporterAndAdapter({captureContent: false});
       startTurn(emit);
       emit('context', {messages: [{role: 'system', content: 'sys'}]});
-      emit('message_end', {message: MOCK_ASSISTANT_MSG});
       emit('turn_end', {turnIndex: 0, message: MOCK_ASSISTANT_MSG});
       emit('agent_end', {messages: []});
       emit('session_shutdown');
@@ -341,16 +364,16 @@ describe('PiCodingAgentOtelAdapter', () => {
       const chat = exporter
         .getFinishedSpans()
         .find(s => s.name.startsWith('chat '))!;
-      for (const event of chat.events) {
-        expect(event.attributes?.['gen_ai.event.content']).toBeUndefined();
-      }
+      expect(chat.attributes['gen_ai.input.messages']).toBeUndefined();
+      expect(chat.attributes['gen_ai.output.messages']).toBeUndefined();
+      expect(chat.attributes['gen_ai.system_instructions']).toBeUndefined();
     });
   });
 
   // ── tool spans ────────────────────────────────────────────────────────────
 
   describe('tool spans', () => {
-    it('has correct attributes, is a sibling of chat, and adds tool message event', () => {
+    it('has correct attributes, is a sibling of chat, and sets tool call arguments and result', () => {
       const {exporter, emit} = makeExporterAndAdapter();
       startTurn(emit);
       emit('tool_call', {
@@ -378,12 +401,35 @@ describe('PiCodingAgentOtelAdapter', () => {
       expect(tool.attributes['gen_ai.tool.name']).toBe('bash');
       expect(tool.attributes['gen_ai.tool.call.id']).toBe('call-1');
       expect(tool.attributes['gen_ai.conversation.id']).toBe('test-session-id');
-      const toolEvent = tool.events.find(e => e.name === 'gen_ai.tool.message');
-      expect(toolEvent).toBeDefined();
-      const content = JSON.parse(
-        toolEvent!.attributes!['gen_ai.event.content'] as string
+      expect(tool.attributes['gen_ai.tool.call.arguments']).toBe(
+        JSON.stringify({cmd: 'ls'})
       );
-      expect(content.content).toBe('file.ts');
+      expect(tool.attributes['gen_ai.tool.call.result']).toBe('file.ts');
+    });
+
+    it('omits tool arguments and result when captureContent is false', () => {
+      const {exporter, emit} = makeExporterAndAdapter({captureContent: false});
+      startTurn(emit);
+      emit('tool_call', {
+        toolCallId: 'call-1',
+        toolName: 'bash',
+        input: {cmd: 'ls'},
+      });
+      emit('tool_result', {
+        toolCallId: 'call-1',
+        toolName: 'bash',
+        content: 'file.ts',
+        isError: false,
+      });
+      emit('turn_end', {turnIndex: 0, message: MOCK_ASSISTANT_MSG});
+      emit('agent_end', {messages: []});
+      emit('session_shutdown');
+
+      const tool = exporter
+        .getFinishedSpans()
+        .find(s => s.name === 'execute_tool bash')!;
+      expect(tool.attributes['gen_ai.tool.call.arguments']).toBeUndefined();
+      expect(tool.attributes['gen_ai.tool.call.result']).toBeUndefined();
     });
 
     it('sets error attributes on tool_result with isError', () => {
