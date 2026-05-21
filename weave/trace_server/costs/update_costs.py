@@ -177,12 +177,16 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
 
 
 def fetch_manual_costs() -> dict[str, CostDetails]:
-    """Load manually-curated cost overrides for models litellm is missing or wrong about.
+    """Load manually-curated cost stopgaps for models litellm hasn't published yet.
 
     File format mirrors ``cost_checkpoint.json`` (``dict[str, list[CostDetails]]``)
     so entries can be copy-pasted between the two. The most recent entry in each
     list is used as the current cost; the existing historical-merge logic in
     ``main`` handles rotation.
+
+    Precedence is intentionally *lowest*: litellm and modelsBegin win on any
+    collision, so a manual entry quietly defers as soon as an authoritative
+    source picks up the same ``llm_id``. Stale manual entries are harmless.
 
     Missing or malformed files are tolerated (return ``{}`` and warn) — the rest
     of the pipeline still runs from litellm + modelsBegin.
@@ -263,8 +267,10 @@ def main(file_name: str = COST_FILE) -> None:
         print("Failed to fetch manual costs:", e)
         manual_costs = {}
 
-    # Manual overrides win over both litellm and modelsBegin.
-    all_new_costs = {**new_costs, **models_begin_costs, **manual_costs}
+    # Precedence: litellm > modelsBegin > manual. Manual entries are a
+    # stopgap for models litellm hasn't published yet — once litellm catches up
+    # with authoritative numbers, those take over automatically.
+    all_new_costs = {**manual_costs, **models_begin_costs, **new_costs}
     print(
         f"Total costs: {len(all_new_costs)} "
         f"({len(new_costs)} from litellm, {len(models_begin_costs)} from modelsBegin.json, "

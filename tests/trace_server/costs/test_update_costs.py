@@ -435,7 +435,7 @@ class TestFetchManualCosts(unittest.TestCase):
     @patch("weave.trace_server.costs.update_costs.fetch_models_begin_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
-    def test_main_manual_overrides_litellm(
+    def test_main_litellm_overrides_manual(
         self,
         mock_get_current_costs,
         mock_fetch_new_costs,
@@ -444,7 +444,12 @@ class TestFetchManualCosts(unittest.TestCase):
         mock_exists,
         mock_file,
     ):
-        """Manual costs take precedence over litellm for the same llm_id."""
+        """litellm takes precedence over manual for the same llm_id.
+
+        Manual entries are stopgaps for models litellm hasn't published yet;
+        once litellm has authoritative numbers for the same id, those win.
+        Manual-only models still flow through when litellm doesn't cover them.
+        """
         mock_exists.return_value = True
         mock_get_current_costs.return_value = {}
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -479,11 +484,12 @@ class TestFetchManualCosts(unittest.TestCase):
         handle = mock_file()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
         written_costs = json.loads(written_data)
-        # Manual override wins for shared-model
-        assert written_costs["shared-model"][-1]["input"] == 0.99
-        assert written_costs["shared-model"][-1]["provider"] == "manual"
-        # Manual-only model also lands in the checkpoint
+        # litellm wins for shared-model — manual is silently superseded
+        assert written_costs["shared-model"][-1]["input"] == 0.01
+        assert written_costs["shared-model"][-1]["provider"] == "litellm_provider"
+        # Manual-only model still lands in the checkpoint (no collision)
         assert written_costs["manual-only-model"][-1]["input"] == 1.5e-06
+        assert written_costs["manual-only-model"][-1]["provider"] == "manual"
 
 
 if __name__ == "__main__":
