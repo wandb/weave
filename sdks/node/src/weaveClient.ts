@@ -986,7 +986,7 @@ export class WeaveClient {
   ) {
     // EvalLinkSpanProcessor runs from OTel callbacks and only has access to
     // the in-memory call stack. Store the short op name for stack lookup
-    // because the persisted `op_name` below is a full ref URI; store the
+    // because the persisted `opName` below is a full ref URI; store the
     // display name so eval metadata can use the user-facing evaluation name.
     currentCall.opName =
       opRef instanceof OpRef ? opRef.objectId : getOpName(opRef);

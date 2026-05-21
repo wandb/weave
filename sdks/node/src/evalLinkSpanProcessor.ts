@@ -22,14 +22,10 @@ import {
 import {GEN_AI_ATTR} from './genai/semconv';
 import type {CallStackEntry, WeaveClient} from './weaveClient';
 
-// We store this attribute on the tracer provider to ensure repeated init paths
-// do not register the span processor multiple times.
-const EVAL_LINK_PROCESSOR_REGISTERED =
-  '_weave_eval_link_span_processor_registered';
+const registeredProviders = new WeakSet<TracerProvider>();
 
 type SpanProcessorProvider = TracerProvider & {
   addSpanProcessor?: (processor: SpanProcessor) => void;
-  [EVAL_LINK_PROCESSOR_REGISTERED]?: boolean;
 };
 
 type ClientGetter = () => WeaveClient | null;
@@ -160,15 +156,16 @@ export function registerEvalLinkSpanProcessor(
   getClient: ClientGetter,
   provider: TracerProvider = trace.getTracerProvider()
 ): boolean {
-  const spanProcessorProvider = provider as SpanProcessorProvider;
-  if (spanProcessorProvider[EVAL_LINK_PROCESSOR_REGISTERED]) {
+  if (registeredProviders.has(provider)) {
     return true;
   }
+
+  const spanProcessorProvider = provider as SpanProcessorProvider;
   if (typeof spanProcessorProvider.addSpanProcessor !== 'function') {
     return false;
   }
 
   spanProcessorProvider.addSpanProcessor(new EvalLinkSpanProcessor(getClient));
-  spanProcessorProvider[EVAL_LINK_PROCESSOR_REGISTERED] = true;
+  registeredProviders.add(provider);
   return true;
 }
