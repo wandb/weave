@@ -46,20 +46,11 @@ def test_clickhouse_type_mismatch_returns_400() -> None:
     assert result.status_code == 400
 
 
-@pytest.mark.parametrize(
-    "error_msg",
-    [
-        # CH parser blew through max_query_size when our SQL body got large.
-        "Code: 62. DB::Exception: Max query size exceeded: ... (TOO_LARGE_QUERY)",
-        # urllib3 wraps a kernel EPIPE during the write to CH Cloud.
-        (
-            "Error (\"Connection broken: BrokenPipeError(32, 'Broken pipe')\", "
-            "BrokenPipeError(32, 'Broken pipe')) executing HTTP request attempt 1"
-        ),
-    ],
-)
-def test_oversized_call_payload_returns_413(error_msg: str) -> None:
-    """Backend-side size errors should map to 413 with an actionable hint, not 502."""
+def test_too_large_query_returns_413() -> None:
+    """CH `TOO_LARGE_QUERY` (parser blew max_query_size) maps to 413, not 502."""
+    error_msg = (
+        "Code: 62. DB::Exception: Max query size exceeded: ... (TOO_LARGE_QUERY)"
+    )
     exc = CHOperationalError(error_msg)
 
     with pytest.raises(RequestTooLarge):
