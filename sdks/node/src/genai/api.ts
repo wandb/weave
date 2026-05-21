@@ -57,7 +57,7 @@ export function startTool(opts: ToolInit): Tool {
       'weave.startTool() called without an active Turn or LLM. Call weave.startTurn() or weave.startLLM() first.'
     );
   }
-  return state.turn.tool(opts);
+  return state.turn.startTool(opts);
 }
 
 /**

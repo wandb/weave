@@ -77,7 +77,7 @@ export class Turn {
     });
   }
 
-  tool(opts: ToolInit): Tool {
+  startTool(opts: ToolInit): Tool {
     return Tool.create({
       ...opts,
       parentContext: this.context,
