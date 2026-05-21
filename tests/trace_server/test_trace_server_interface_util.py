@@ -162,9 +162,7 @@ def _make_otel_export_req_with_ref_attrs(
 
     def build_array_value(refs: list[str]) -> AnyValue:
         v = AnyValue()
-        v.array_value.values.extend(
-            [AnyValue(string_value=ref) for ref in refs]
-        )
+        v.array_value.values.extend([AnyValue(string_value=ref) for ref in refs])
         return v
 
     span = Span()
@@ -193,7 +191,7 @@ def _make_otel_export_req_with_ref_attrs(
     resource_spans.scope_spans.append(scope_spans)
 
     processed = tsi.ProcessedResourceSpans(
-        entity=project_id.split("/")[0],
+        entity=project_id.split("/", maxsplit=1)[0],
         project=project_id.split("/")[1],
         run_id=None,
         resource_spans=resource_spans,

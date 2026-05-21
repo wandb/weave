@@ -5,8 +5,8 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 
 from weave.trace.refs import ObjectRef
-from weave.trace_server.interface.query import Query
 from weave.trace_server.errors import InvalidExternalRef
+from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_converter import (
     replace_external_weave_ref,
     universal_ext_to_int_ref_converter,
@@ -199,15 +199,9 @@ def test_replace_external_weave_ref_uses_cache():
 
     cache: dict[str, str] = {}
 
-    a = replace_external_weave_ref(
-        "weave:///ent/proj/object/a:v1", converter, cache
-    )
-    b = replace_external_weave_ref(
-        "weave:///ent/proj/object/b:v1", converter, cache
-    )
-    c = replace_external_weave_ref(
-        "weave:///other/proj/object/c:v1", converter, cache
-    )
+    a = replace_external_weave_ref("weave:///ent/proj/object/a:v1", converter, cache)
+    b = replace_external_weave_ref("weave:///ent/proj/object/b:v1", converter, cache)
+    c = replace_external_weave_ref("weave:///other/proj/object/c:v1", converter, cache)
 
     assert a == "weave-trace-internal:///internal:ent/proj/object/a:v1"
     assert b == "weave-trace-internal:///internal:ent/proj/object/b:v1"
@@ -220,7 +214,7 @@ def test_replace_external_weave_ref_rejects_non_external_scheme():
     """Inputs not on the external scheme are a contract violation; the
     caller must precheck `startswith(weave_prefix)` before invoking.
     """
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid URI"):
         replace_external_weave_ref(
             "weave-trace-internal:///proj/object/a:v1", lambda p: p
         )
