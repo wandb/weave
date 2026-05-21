@@ -15,6 +15,7 @@ class FeedbackPayloadNoteReq(BaseModel):
 
 REACTION_FEEDBACK_TYPE = "wandb.reaction.1"
 NOTE_FEEDBACK_TYPE = "wandb.note.1"
+AGENT_MONITOR_FEEDBACK_TYPE = "wandb.agent_monitor"
 
 # Feedback types where multiple entries can exist per call per type.
 # When filtering on these, we use groupArrayIf (collect all values) + has()
