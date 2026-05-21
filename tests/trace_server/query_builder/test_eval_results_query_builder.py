@@ -30,6 +30,13 @@ def test_cte_chain_calls_merged() -> None:
     assert_raw_sql(
         cte,
         """
+            filter_candidate_ids AS (
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_0:String}
+                WHERE ifNull(calls_merged.parent_id, '') IN {pb_1:Array(String)}
+            ),
+
             predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
@@ -42,8 +49,9 @@ def test_cte_chain_calls_merged() -> None:
                     END AS row_digest
                 FROM calls_merged
                 PREWHERE calls_merged.project_id = {pb_0:String}
-                WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
-                    OR calls_merged.parent_id IS NULL)
+                WHERE calls_merged.id IN filter_candidate_ids
+                    AND (calls_merged.parent_id IN {pb_1:Array(String)}
+                        OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
                     AND (position(calls_merged.op_name, {pb_2:String}) > 0
                         OR position(calls_merged.op_name, {pb_3:String}) > 0
@@ -199,6 +207,28 @@ def test_cte_chain_calls_complete() -> None:
             "pb_4": SENTINEL_EPOCH,
         },
     )
+
+
+def test_cte_chain_calls_complete_no_candidate_cte() -> None:
+    """calls_complete has a non-nullable parent_id with its own bloom index,
+    so it must NOT emit a filter_candidate_ids CTE. The candidate-CTE shape
+    exists only to let the idx_parent_id_bloom skip-index on calls_merged
+    fire around the OR-IS-NULL escape hatch.
+    """
+    pb = ParamBuilder("pb")
+    cte = build_eval_results_cte_chain(
+        project_id="proj-1",
+        eval_root_ids=["eval-1"],
+        sort_by=None,
+        filters=None,
+        require_intersection=False,
+        limit=10,
+        offset=0,
+        pb=pb,
+        read_table="calls_complete",
+    )
+    assert "filter_candidate_ids" not in cte
+    assert "ifNull(calls_complete.parent_id" not in cte
 
 
 def test_cte_chain_sort_and_multi_eval_filters() -> None:
@@ -393,6 +423,13 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
     assert_raw_sql(
         cte,
         """
+            filter_candidate_ids AS (
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_0:String}
+                WHERE ifNull(calls_merged.parent_id, '') IN {pb_1:Array(String)}
+            ),
+
             predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
@@ -405,8 +442,9 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                     END AS row_digest
                 FROM calls_merged
                 PREWHERE calls_merged.project_id = {pb_0:String}
-                WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
-                    OR calls_merged.parent_id IS NULL)
+                WHERE calls_merged.id IN filter_candidate_ids
+                    AND (calls_merged.parent_id IN {pb_1:Array(String)}
+                        OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
                     AND (position(calls_merged.op_name, {pb_2:String}) > 0
                         OR position(calls_merged.op_name, {pb_3:String}) > 0
@@ -493,7 +531,14 @@ def test_full_query_calls_merged() -> None:
     assert_raw_sql(
         sql,
         """
-        WITH predict_and_score_calls AS (
+        WITH filter_candidate_ids AS (
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_0:String}
+                WHERE ifNull(calls_merged.parent_id, '') IN {pb_1:Array(String)}
+            ),
+
+            predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
                     any(calls_merged.inputs_dump) AS inputs_dump,
@@ -505,8 +550,9 @@ def test_full_query_calls_merged() -> None:
                     END AS row_digest
                 FROM calls_merged
                 PREWHERE calls_merged.project_id = {pb_0:String}
-                WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
-                    OR calls_merged.parent_id IS NULL)
+                WHERE calls_merged.id IN filter_candidate_ids
+                    AND (calls_merged.parent_id IN {pb_1:Array(String)}
+                        OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
                     AND (position(calls_merged.op_name, {pb_2:String}) > 0
                         OR position(calls_merged.op_name, {pb_3:String}) > 0

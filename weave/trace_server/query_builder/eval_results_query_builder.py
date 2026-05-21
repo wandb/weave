@@ -1,6 +1,7 @@
 """Query builder for the /eval_results endpoint.
 
 Generates ClickHouse CTEs for the eval_results CTE chain:
+  filter_candidate_ids             → (calls_merged only) tight bloom-prunable parent_id scan
   predict_and_score_calls          → filter to predict-and-score calls, extract row_digest
   predict_and_score_calls_resolved → (conditionally) LEFT JOIN table_rows so sort/filter on inputs.* can read the dataset row
   ranked_digests                   → GROUP BY row_digest, HAVING filters, ROW_NUMBER for sort
@@ -96,7 +97,21 @@ def build_predict_and_score_calls_cte(
     )
 
     if read_table == "calls_merged":
-        return f"""predict_and_score_calls AS (
+        # The candidate-ids CTE issues a tight `ifNull(parent_id, '') IN (...)`
+        # lookup against calls_merged so the idx_parent_id_bloom skip-index can
+        # prune granules. The outer predict_and_score_calls CTE then keeps the
+        # original `parent_id IN (...) OR parent_id IS NULL` predicate so we
+        # still pick up pre-merge end-rows whose parent_id has not yet merged.
+        # See migration 032; this CTE is the only shape that lets the bloom
+        # actually fire (the OR-IS-NULL arm alone disables index analysis).
+        return f"""filter_candidate_ids AS (
+    SELECT calls_merged.id AS id
+    FROM calls_merged
+    PREWHERE calls_merged.project_id = {project_id_param}
+    WHERE ifNull(calls_merged.parent_id, '') IN {eval_root_ids_param}
+),
+
+predict_and_score_calls AS (
     SELECT
         calls_merged.id AS call_id,
         any(calls_merged.parent_id) AS eval_call_id,
@@ -105,7 +120,8 @@ def build_predict_and_score_calls_cte(
         {row_digest_expr} AS row_digest
     FROM calls_merged
     PREWHERE calls_merged.project_id = {project_id_param}
-    WHERE (
+    WHERE calls_merged.id IN filter_candidate_ids
+    AND (
         calls_merged.parent_id IN {eval_root_ids_param}
         OR calls_merged.parent_id IS NULL
     )
