@@ -12,11 +12,24 @@ import {getWeaveTracer} from './provider';
 import {GEN_AI_ATTR, WEAVE_GENAI_TRACER_NAME} from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
-import type {Message, Reasoning, Usage} from './types';
+import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
 
 export interface LLMInit {
   model: string;
   providerName?: string;
+}
+
+/** Discriminated union for `LLM.attachMedia`: pick one of content / uri / fileId. */
+export type AttachMediaOpts =
+  | {content: string; mimeType: string; modality: Modality}
+  | {uri: string; modality: Modality}
+  | {fileId: string; modality: Modality; mimeType?: string};
+
+export interface LLMRecordOpts {
+  inputMessages?: Message[];
+  outputMessages?: Message[];
+  usage?: Usage;
+  reasoning?: Reasoning;
 }
 
 export class LLM {
@@ -70,6 +83,87 @@ export class LLM {
     return llm;
   }
 
+  // ---------------------------------------------------------------------------
+  // Enrichment surface
+  // ---------------------------------------------------------------------------
+
+  /** Append an assistant message to the response. */
+  output(content: string): this {
+    if (this._warnIfEnded('output')) {
+      return this;
+    }
+    this.outputMessages.push({role: 'assistant', content});
+    return this;
+  }
+
+  /** Set or extend the model's reasoning/chain-of-thought content. Accumulates
+   *  into `this.reasoning.content`. Folded into the last assistant message as
+   *  a `ReasoningPart` at serialization time, matching the Python SDK's
+   *  on-the-wire shape. */
+  think(content: string): this {
+    if (this._warnIfEnded('think')) {
+      return this;
+    }
+    if (this.reasoning === undefined) {
+      this.reasoning = {content};
+    } else {
+      this.reasoning.content += content;
+    }
+    return this;
+  }
+
+  /** Attach a media part to the last input message. Pick exactly one of
+   *  `content` (inline base64 bytes), `uri` (URI reference), or `fileId`
+   *  (pre-uploaded file id). */
+  attachMedia(opts: AttachMediaOpts): this {
+    if (this._warnIfEnded('attachMedia')) {
+      return this;
+    }
+    const parts = this._ensureLastInputParts();
+    let part: MessagePart;
+    if ('content' in opts) {
+      part = {type: 'blob', ...opts};
+    } else if ('uri' in opts) {
+      part = {type: 'uri', ...opts};
+    } else {
+      part = {type: 'file', ...opts};
+    }
+    parts.push(part);
+    return this;
+  }
+
+  /** Convenience for `attachMedia({uri, modality})`. */
+  attachMediaUrl(url: string, opts: {modality: Modality}): this {
+    if (this._warnIfEnded('attachMediaUrl')) {
+      return this;
+    }
+    return this.attachMedia({uri: url, modality: opts.modality});
+  }
+
+  /** Bulk-set any subset of the mutable fields. Replaces (does not merge). */
+  record(opts: LLMRecordOpts): this {
+    if (this._warnIfEnded('record')) {
+      return this;
+    }
+    if (opts.inputMessages !== undefined) {
+      this.inputMessages = opts.inputMessages;
+    }
+    if (opts.outputMessages !== undefined) {
+      this.outputMessages = opts.outputMessages;
+    }
+    if (opts.usage !== undefined) {
+      this.usage = opts.usage;
+    }
+    if (opts.reasoning !== undefined) {
+      this.reasoning = opts.reasoning;
+    }
+    return this;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Child factories
+  // ---------------------------------------------------------------------------
+
   startTool(opts: ToolInit): Tool {
     return Tool.create({
       ...opts,
@@ -86,11 +180,23 @@ export class LLM {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
   end(opts?: {error?: Error}): void {
     if (this._ended) {
       return;
     }
     this._ended = true;
+
+    // Fold reasoning into the last assistant message as a ReasoningPart so
+    // the wire format matches the Python SDK (which serializes reasoning
+    // inside gen_ai.output.messages, not as a separate attribute).
+    if (this.reasoning?.content) {
+      const parts = this._ensureLastAssistantParts();
+      parts.push({type: 'reasoning', content: this.reasoning.content});
+    }
 
     if (this.inputMessages.length > 0) {
       this.span.setAttribute(
@@ -150,4 +256,56 @@ export class LLM {
       state.llm = null;
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /** Return the parts array of the last assistant message, creating both the
+   *  message and the parts array if needed. If the existing assistant message
+   *  has a `content` string but no parts, promote that content to a TextPart
+   *  so subsequent appends compose cleanly. */
+  private _ensureLastAssistantParts(): MessagePart[] {
+    let last = this.outputMessages[this.outputMessages.length - 1];
+    if (last === undefined || last.role !== 'assistant') {
+      last = {role: 'assistant'};
+      this.outputMessages.push(last);
+    }
+    return ensureParts(last);
+  }
+
+  /** Same as above, but for the last input message (creating a user message
+   *  if `inputMessages` is empty). Media parts attach here. */
+  private _ensureLastInputParts(): MessagePart[] {
+    let last = this.inputMessages[this.inputMessages.length - 1];
+    if (last === undefined) {
+      last = {role: 'user'};
+      this.inputMessages.push(last);
+    }
+    return ensureParts(last);
+  }
+
+  /** Warn if called after `end()`. Returns `true` if the caller should
+   *  short-circuit; the span is already closed, so any further mutation can
+   *  no longer reach the trace. */
+  private _warnIfEnded(method: string): boolean {
+    if (this._ended) {
+      console.warn(
+        `weave.LLM.${method}() called after end() — data will not be recorded on the span.`
+      );
+      return true;
+    }
+    return false;
+  }
+}
+
+function ensureParts(msg: Message): MessagePart[] {
+  if (msg.parts === undefined) {
+    msg.parts = [];
+    if (msg.content !== undefined) {
+      msg.parts.push({type: 'text', content: msg.content});
+      msg.content = undefined;
+    }
+  }
+  return msg.parts;
 }
