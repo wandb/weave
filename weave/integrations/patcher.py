@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -74,6 +75,9 @@ class SymbolPatcher(Patcher):
         self._get_base_symbol = get_base_symbol
         self._attribute_name = attribute_name
         self._make_new_value = make_new_value
+        # RLock (not Lock): _make_new_value or _get_base_symbol could re-enter
+        # attempt_patch on the same instance via a transitive import.
+        self._lock = threading.RLock()
 
     def _get_symbol_target(self) -> _SymbolTarget | None:
         try:
@@ -92,36 +96,38 @@ class SymbolPatcher(Patcher):
         return _SymbolTarget(base_symbol, attr)
 
     def attempt_patch(self) -> bool:
-        if self._original_value:
-            # Already patched
+        with self._lock:
+            if self._original_value:
+                # Already patched
+                return True
+            target = self._get_symbol_target()
+            if target is None:
+                return False
+            try:
+                original_value = getattr(target.base_symbol, target.attr)
+            except AttributeError:
+                return False
+            try:
+                new_val = self._make_new_value(original_value)
+            except Exception:
+                logger.exception("Failed to patch %s", self._attribute_name)
+                return False
+            setattr(
+                target.base_symbol,
+                target.attr,
+                new_val,
+            )
+            self._original_value = original_value
             return True
-        target = self._get_symbol_target()
-        if target is None:
-            return False
-        try:
-            original_value = getattr(target.base_symbol, target.attr)
-        except AttributeError:
-            return False
-        try:
-            new_val = self._make_new_value(original_value)
-        except Exception:
-            logger.exception("Failed to patch %s", self._attribute_name)
-            return False
-        setattr(
-            target.base_symbol,
-            target.attr,
-            new_val,
-        )
-        self._original_value = original_value
-        return True
 
     def undo_patch(self) -> bool:
-        if not self._original_value:
-            return False
-        target = self._get_symbol_target()
-        if target is None:
-            return False
+        with self._lock:
+            if not self._original_value:
+                return False
+            target = self._get_symbol_target()
+            if target is None:
+                return False
 
-        setattr(target.base_symbol, target.attr, self._original_value)
-        self._original_value = None
-        return True
+            setattr(target.base_symbol, target.attr, self._original_value)
+            self._original_value = None
+            return True

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+import threading
 from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
@@ -35,6 +36,16 @@ _SUPPRESSED_INTEGRATIONS: set[str] = set()
 # Global reference to the import hook, so we can unregister it if needed
 _IMPORT_HOOK: WeaveImportHook | None = None
 
+# RLock guarding _PATCHED_INTEGRATIONS, _IMPORT_HOOK, and the attempt_patch
+# critical section. RLock (not Lock) because the import hook path is
+# re-entrant: PatchingLoader.exec_module -> _patch_if_needed -> patch_X() ->
+# _patch_integration -> importlib.import_module(...) may transitively trigger
+# WeaveImportHook.find_spec for another mapped integration, which re-enters.
+# IMPORTANT: never hold this lock across importlib.import_module(...) — Python
+# has its own per-module import locks, and bracketing one around the other
+# risks A-then-B vs B-then-A deadlocks across threads.
+_PATCH_LOCK = threading.RLock()
+
 
 def _patch_integration(
     *,
@@ -51,23 +62,35 @@ def _patch_integration(
         triggering_symbols: Symbols to add to _PATCHED_INTEGRATIONS on success (e.g. ["openai"])
         settings: Optional integration settings
     """
-    # Skip if already patched, or if another integration has claimed this
-    # symbol (and ours should defer).
-    if any(
-        name in _PATCHED_INTEGRATIONS or name in _SUPPRESSED_INTEGRATIONS
-        for name in triggering_symbols
-    ):
-        return
+    # Cheap pre-check; importing the patcher module is not free. Skip if
+    # already patched, or if another integration has claimed this symbol
+    # (and ours should defer).
+    with _PATCH_LOCK:
+        if any(
+            name in _PATCHED_INTEGRATIONS or name in _SUPPRESSED_INTEGRATIONS
+            for name in triggering_symbols
+        ):
+            return
 
     if settings is None:
         settings = IntegrationSettings()
 
+    # Build the patcher outside the lock — see _PATCH_LOCK docstring.
     module = importlib.import_module(module_path)
     patcher_func = getattr(module, patcher_func_getter_name)
+    patcher = patcher_func(settings)
 
-    if patcher_func(settings).attempt_patch():
-        for name in triggering_symbols:
-            _PATCHED_INTEGRATIONS.add(name)
+    with _PATCH_LOCK:
+        # Re-check: another thread may have finished patching (or suppressed
+        # us) while we were importing. If so, drop our patcher on the floor.
+        if any(
+            name in _PATCHED_INTEGRATIONS or name in _SUPPRESSED_INTEGRATIONS
+            for name in triggering_symbols
+        ):
+            return
+        if patcher.attempt_patch():
+            for name in triggering_symbols:
+                _PATCHED_INTEGRATIONS.add(name)
 
 
 def patch_openai(settings: IntegrationSettings | None = None) -> None:
@@ -262,6 +285,10 @@ def patch_notdiamond(settings: IntegrationSettings | None = None) -> None:
 
 def patch_fastmcp(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for FastMCP (Model Context Protocol)."""
+    with _PATCH_LOCK:
+        if "mcp" in _PATCHED_INTEGRATIONS:
+            return
+
     from weave.integrations.fastmcp import (
         get_fastmcp_client_patcher,
         get_fastmcp_server_patcher,
@@ -269,10 +296,16 @@ def patch_fastmcp(settings: IntegrationSettings | None = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    server_patched = get_fastmcp_server_patcher(settings).attempt_patch()
-    client_patched = get_fastmcp_client_patcher(settings).attempt_patch()
-    if server_patched or client_patched:
-        _PATCHED_INTEGRATIONS.add("mcp")
+    server_patcher = get_fastmcp_server_patcher(settings)
+    client_patcher = get_fastmcp_client_patcher(settings)
+
+    with _PATCH_LOCK:
+        if "mcp" in _PATCHED_INTEGRATIONS:
+            return
+        server_patched = server_patcher.attempt_patch()
+        client_patched = client_patcher.attempt_patch()
+        if server_patched or client_patched:
+            _PATCHED_INTEGRATIONS.add("mcp")
 
 
 def patch_nvidia(settings: IntegrationSettings | None = None) -> None:
@@ -347,19 +380,33 @@ def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
 
 def patch_langchain() -> None:
     """Enable Weave tracing for LangChain."""
+    with _PATCH_LOCK:
+        if "langchain" in _PATCHED_INTEGRATIONS:
+            return
+
     from weave.integrations.langchain.langchain import langchain_patcher
 
-    if langchain_patcher.attempt_patch():
-        _PATCHED_INTEGRATIONS.add("langchain")
-        _PATCHED_INTEGRATIONS.add("langchain_core")
+    with _PATCH_LOCK:
+        if "langchain" in _PATCHED_INTEGRATIONS:
+            return
+        if langchain_patcher.attempt_patch():
+            _PATCHED_INTEGRATIONS.add("langchain")
+            _PATCHED_INTEGRATIONS.add("langchain_core")
 
 
 def patch_llamaindex() -> None:
     """Enable Weave tracing for LlamaIndex."""
+    with _PATCH_LOCK:
+        if "llama_index" in _PATCHED_INTEGRATIONS:
+            return
+
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
 
-    if llamaindex_patcher.attempt_patch():
-        _PATCHED_INTEGRATIONS.add("llama_index")
+    with _PATCH_LOCK:
+        if "llama_index" in _PATCHED_INTEGRATIONS:
+            return
+        if llamaindex_patcher.attempt_patch():
+            _PATCHED_INTEGRATIONS.add("llama_index")
 
 
 def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
@@ -562,27 +609,30 @@ def register_import_hook() -> None:
 
     global _IMPORT_HOOK  # noqa: PLW0603
 
-    # Only register if not already registered
-    if _IMPORT_HOOK is None:
-        _IMPORT_HOOK = WeaveImportHook()
-        # Insert at the beginning of meta_path to ensure we intercept imports early
-        sys.meta_path.insert(0, _IMPORT_HOOK)
+    with _PATCH_LOCK:
+        # Only register if not already registered
+        if _IMPORT_HOOK is None:
+            _IMPORT_HOOK = WeaveImportHook()
+            # Insert at the beginning of meta_path to ensure we intercept imports early
+            sys.meta_path.insert(0, _IMPORT_HOOK)
 
 
 def unregister_import_hook() -> None:
     """Unregister the import hook (useful for testing or cleanup)."""
     global _IMPORT_HOOK  # noqa: PLW0603
 
-    if _IMPORT_HOOK is not None:
-        try:
-            sys.meta_path.remove(_IMPORT_HOOK)
-        except ValueError:
-            pass  # Already removed
-        _IMPORT_HOOK = None
+    with _PATCH_LOCK:
+        if _IMPORT_HOOK is not None:
+            try:
+                sys.meta_path.remove(_IMPORT_HOOK)
+            except ValueError:
+                pass  # Already removed
+            _IMPORT_HOOK = None
 
 
 def reset_patched_integrations() -> None:
     """Reset the patched + suppressed integration sets (useful for testing)."""
     global _PATCHED_INTEGRATIONS, _SUPPRESSED_INTEGRATIONS  # noqa: PLW0603
-    _PATCHED_INTEGRATIONS = set()
-    _SUPPRESSED_INTEGRATIONS = set()
+    with _PATCH_LOCK:
+        _PATCHED_INTEGRATIONS = set()
+        _SUPPRESSED_INTEGRATIONS = set()
