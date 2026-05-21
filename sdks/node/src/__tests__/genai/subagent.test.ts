@@ -9,7 +9,7 @@ describe('SubAgent', () => {
 
   it('emits a nested invoke_agent span as a child of the turn', () => {
     const turn = Turn.create({agentName: 'parent'});
-    const sub = turn.subagent({name: 'child-bot', model: 'gpt-4o'});
+    const sub = turn.startSubagent({name: 'child-bot', model: 'gpt-4o'});
     sub.end();
     turn.end();
 

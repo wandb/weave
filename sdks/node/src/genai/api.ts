@@ -36,7 +36,7 @@ export function startLLM(opts: LLMInit): LLM {
       'weave.startLLM() called without an active Turn. Call weave.startTurn() first.'
     );
   }
-  return turn.llm(opts);
+  return turn.startLLM(opts);
 }
 
 /**
@@ -57,7 +57,7 @@ export function startTool(opts: ToolInit): Tool {
       'weave.startTool() called without an active Turn or LLM. Call weave.startTurn() or weave.startLLM() first.'
     );
   }
-  return state.turn.tool(opts);
+  return state.turn.startTool(opts);
 }
 
 /**
@@ -73,7 +73,7 @@ export function startSubagent(opts: SubAgentInit): SubAgent {
       'weave.startSubagent() called without an active Turn or LLM. Call weave.startTurn() or weave.startLLM() first.'
     );
   }
-  return state.turn.subagent(opts);
+  return state.turn.startSubagent(opts);
 }
 
 /**

@@ -17,7 +17,7 @@ describe('end-to-end chain', () => {
       sessionId: 'conv-e2e',
     });
     const turn = session.startTurn();
-    const llm = turn.llm({model: 'gpt-4o'});
+    const llm = turn.startLLM({model: 'gpt-4o'});
     const tool = llm.startTool({name: 'get_weather'});
     tool.end();
     llm.end();

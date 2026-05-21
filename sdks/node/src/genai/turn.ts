@@ -69,7 +69,7 @@ export class Turn {
     return turn;
   }
 
-  llm(opts: LLMInit): LLM {
+  startLLM(opts: LLMInit): LLM {
     return LLM.create({
       ...opts,
       parentContext: this.context,
@@ -77,7 +77,7 @@ export class Turn {
     });
   }
 
-  tool(opts: ToolInit): Tool {
+  startTool(opts: ToolInit): Tool {
     return Tool.create({
       ...opts,
       parentContext: this.context,
@@ -85,7 +85,7 @@ export class Turn {
     });
   }
 
-  subagent(opts: SubAgentInit): SubAgent {
+  startSubagent(opts: SubAgentInit): SubAgent {
     return SubAgent.create({
       ...opts,
       parentContext: this.context,

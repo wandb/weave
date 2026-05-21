@@ -9,13 +9,13 @@ import {
   setupGenAITestEnvironment,
 } from './common';
 
-describe('LLM (via Turn.llm)', () => {
+describe('LLM (via Turn.startLLM)', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
   it("emits a 'chat' span as a child of the turn's invoke_agent span", () => {
     const turn = Turn.create({agentName: 'a', conversationId: 'conv-1'});
-    const llm = turn.llm({model: 'gpt-4o', providerName: 'openai'});
+    const llm = turn.startLLM({model: 'gpt-4o', providerName: 'openai'});
     llm.end();
     turn.end();
 
@@ -36,7 +36,7 @@ describe('LLM (via Turn.llm)', () => {
 
   it('serializes input/output messages and usage at end()', () => {
     const turn = Turn.create({});
-    const llm = turn.llm({model: 'gpt-4o'});
+    const llm = turn.startLLM({model: 'gpt-4o'});
     llm.inputMessages = [{role: 'user', content: 'hi'}];
     llm.outputMessages = [{role: 'assistant', content: 'hello'}];
     llm.usage = {
@@ -75,7 +75,7 @@ describe('LLM (via Turn.llm)', () => {
 
   it("omits message + usage attributes when fields aren't populated", () => {
     const turn = Turn.create({});
-    const llm = turn.llm({model: 'gpt-4o'});
+    const llm = turn.startLLM({model: 'gpt-4o'});
     llm.end();
     turn.end();
 
@@ -98,7 +98,7 @@ describe('LLM (via Turn.llm)', () => {
   describe('enrichment', () => {
     it('output(content) appends a new assistant message', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.output('Hello!');
       llm.end();
       turn.end();
@@ -113,7 +113,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('each output() call adds its own assistant message', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.output('first').output('second');
       llm.end();
       turn.end();
@@ -130,7 +130,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('think(content) accumulates into the reasoning field', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.think('First, ').think('I need to check the weather.');
       expect(llm.reasoning).toEqual({
         content: 'First, I need to check the weather.',
@@ -141,7 +141,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('end() folds reasoning into the last assistant message as a ReasoningPart', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.output('hello').think('thinking out loud');
       llm.end();
       turn.end();
@@ -161,7 +161,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('attachMedia({content, mimeType, modality}) appends a blob part to the last input message', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.inputMessages = [{role: 'user', content: 'Listen to this:'}];
       llm.attachMedia({
         content: 'base64data',
@@ -190,7 +190,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('attachMedia({uri, modality}) appends a uri part', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.attachMedia({uri: 'https://example.com/a.png', modality: 'image'});
       llm.end();
       turn.end();
@@ -206,7 +206,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('attachMedia({fileId, modality, mimeType}) appends a file part', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.attachMedia({
         fileId: 'f-123',
         modality: 'document',
@@ -231,7 +231,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('attachMediaUrl(url, opts) delegates to the uri form', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.attachMediaUrl('https://example.com/v.mp4', {modality: 'video'});
       llm.end();
       turn.end();
@@ -247,7 +247,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('record(opts) replaces the data fields', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.inputMessages = [{role: 'user', content: 'will be replaced'}];
       llm.record({
         inputMessages: [{role: 'user', content: 'hi'}],
@@ -267,7 +267,7 @@ describe('LLM (via Turn.llm)', () => {
 
     it('chains: output / think / attachMedia / record all return `this`', () => {
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       const result = llm
         .output('hi')
         .think('thoughts')
@@ -282,7 +282,7 @@ describe('LLM (via Turn.llm)', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       const turn = Turn.create({});
-      const llm = turn.llm({model: 'gpt-4o'});
+      const llm = turn.startLLM({model: 'gpt-4o'});
       llm.end();
 
       llm.output('after end');

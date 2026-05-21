@@ -13,9 +13,9 @@ describe('Tool', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('attaches to the turn span when started via turn.tool() (flat)', () => {
+  it('attaches to the turn span when started via turn.startTool() (flat)', () => {
     const turn = Turn.create({conversationId: 'conv-1'});
-    const tool = turn.tool({
+    const tool = turn.startTool({
       name: 'get_weather',
       args: '{"city":"Tokyo"}',
       toolCallId: 'tc-1',
@@ -50,7 +50,7 @@ describe('Tool', () => {
 
   it('attaches to the LLM span when started via llm.startTool() (nested)', () => {
     const turn = Turn.create({});
-    const llm = turn.llm({model: 'gpt-4o'});
+    const llm = turn.startLLM({model: 'gpt-4o'});
     const tool = llm.startTool({name: 'get_weather'});
     tool.end();
     llm.end();
