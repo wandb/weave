@@ -98,13 +98,15 @@ CLICKHOUSE_DEFAULT_COMMAND_SETTINGS = CLICKHOUSE_BASE_QUERY_SETTINGS
 # Gated by WF_CLICKHOUSE_DISABLE_LIGHTWEIGHT_UPDATE env var for old CH versions.
 # `max_query_size` (default 256 KiB) gates the parser buffer; `_update_call_end_*`
 # uses client-side substitution that inlines `output_dump`/`summary_dump` into the
-# SQL body, so this needs headroom for realistic call outputs.
+# SQL body, so this needs headroom for realistic call outputs. 32 MiB matches the
+# `/call/*` request-body cap so the storage path doesn't reject what the request
+# layer already accepted.
 CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
     {}
     if wf_env.wf_clickhouse_disable_lightweight_update()
     else {
         "allow_experimental_lightweight_update": 1,
-        "max_query_size": 8 * 1024 * 1024,
+        "max_query_size": 32 * 1024 * 1024,
     }
 )
 

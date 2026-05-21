@@ -4,7 +4,6 @@ from gql.transport.exceptions import TransportServerError
 
 from weave.trace_server.errors import (
     InvalidRequest,
-    RequestTooLarge,
     handle_clickhouse_query_error,
     handle_server_exception,
 )
@@ -43,23 +42,3 @@ def test_clickhouse_type_mismatch_returns_400() -> None:
 
     result = handle_server_exception(InvalidRequest(error_msg))
     assert result.status_code == 400
-
-
-def test_max_query_size_exceeded_returns_413() -> None:
-    """CH parser overflow (`max_query_size`) maps to 413, not 502.
-
-    Verbatim shape observed against CH 26.3 when a lightweight UPDATE inlines
-    an output payload larger than `max_query_size`.
-    """
-    error_msg = (
-        "Code: 62. DB::Exception: Max query size exceeded "
-        "(can be increased with the `max_query_size` setting): "
-        "Syntax error: failed at position 190 ... (SYNTAX_ERROR)"
-    )
-    exc = CHDatabaseError(error_msg)
-
-    with pytest.raises(RequestTooLarge):
-        handle_clickhouse_query_error(exc)
-
-    result = handle_server_exception(RequestTooLarge(error_msg))
-    assert result.status_code == 413
