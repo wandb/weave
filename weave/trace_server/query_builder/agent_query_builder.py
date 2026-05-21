@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import datetime
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, NamedTuple, TypeAlias
+from typing import Any, NamedTuple, TypeAlias
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
