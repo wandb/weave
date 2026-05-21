@@ -2591,8 +2591,11 @@ def process_object_refs_filter_to_opt_sql(
     # are filtering on.
     #
     # calls_merged has split start/end rows, so we must also include
-    # "naked call end" rows (started_at IS NULL) for input ref filters and
+    # "naked call end" rows (op_name IS NULL) for input ref filters and
     # "naked call start" rows (ended_at IS NULL) for output ref filters.
+    # op_name (not started_at) is the reliable end-row signal: started_at
+    # is now propagated onto call_end rows so it can pin sortable_datetime,
+    # but op_name remains start-only.
     #
     # calls_complete has one complete row per call -- started_at is always
     # set (non-nullable, no sentinel) and ended_at uses a sentinel for
@@ -2603,12 +2606,12 @@ def process_object_refs_filter_to_opt_sql(
         if read_table == ReadTable.CALLS_COMPLETE:
             refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0)"
         else:
-            started_at_field = get_field_by_name("started_at")
-            started_at_null = started_at_field.null_check_sql(
+            op_name_field = get_field_by_name("op_name")
+            op_name_null = op_name_field.null_check_sql(
                 param_builder, table_alias, read_table, use_agg_fn=False
             )
             refs_filter_opt_sql += (
-                f"AND (length({table_alias}.input_refs) > 0 OR {started_at_null})"
+                f"AND (length({table_alias}.input_refs) > 0 OR {op_name_null})"
             )
     if "output_dump" in object_ref_fields_consumed:
         ended_at_field = get_field_by_name("ended_at")

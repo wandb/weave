@@ -218,7 +218,7 @@ def test_object_ref_filter_nested() -> None:
            PREWHERE calls_merged.project_id = {pb_0:String}
            WHERE (calls_merged.parent_id IS NULL)
              AND (length(calls_merged.input_refs) > 0
-                  OR calls_merged.started_at IS NULL)
+                  OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), '') IN
@@ -335,7 +335,7 @@ def test_multiple_object_ref_filters() -> None:
            PREWHERE calls_merged.project_id = {pb_0:String}
            WHERE (calls_merged.parent_id IS NULL)
              AND (length(calls_merged.input_refs) > 0
-                  OR calls_merged.started_at IS NULL)
+                  OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
@@ -515,7 +515,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              AND ((lower(calls_merged.inputs_dump) LIKE {pb_10:String}
                   OR calls_merged.inputs_dump IS NULL))
              AND (length(calls_merged.input_refs) > 0
-                  OR calls_merged.started_at IS NULL)
+                  OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
@@ -694,7 +694,7 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
         WHERE ((calls_merged.op_name IN {pb_10:Array(String)})
                OR (calls_merged.op_name IS NULL))
           AND (length(calls_merged.input_refs) > 0
-               OR calls_merged.started_at IS NULL)
+               OR calls_merged.op_name IS NULL)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         HAVING (((((((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
@@ -855,7 +855,7 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
            FROM calls_merged
            PREWHERE calls_merged.project_id = {pb_0:String}
            WHERE (length(calls_merged.input_refs) > 0
-                  OR calls_merged.started_at IS NULL)
+                  OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
@@ -940,7 +940,7 @@ def test_object_ref_filter_complex_nested_path() -> None:
            PREWHERE calls_merged.project_id = {pb_0:String}
            WHERE (calls_merged.parent_id IS NULL)
              AND (length(calls_merged.input_refs) > 0
-                  OR calls_merged.started_at IS NULL)
+                  OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
