@@ -915,7 +915,10 @@ class TestAttributes:
         """JSON string arriving after dotted subkeys should merge in extra fields."""
         flat_attrs = [
             ("gen_ai.completion.0.role", "assistant"),
-            ("gen_ai.completion", '[{"role": "assistant", "content": "hello", "extra": true}]'),
+            (
+                "gen_ai.completion",
+                '[{"role": "assistant", "content": "hello", "extra": true}]',
+            ),
         ]
         result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
         assert result["gen_ai"]["completion"] == [
@@ -2075,9 +2078,7 @@ def test_otel_export_json_string_and_dotted_completion_keys(
     response = client.server.otel_export(export_req)
     assert isinstance(response, tsi.OTelExportRes)
 
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=project_id)
-    )
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=project_id))
     # BUG: span is silently rejected — this assert fails (0 calls instead of 1)
     assert len(res.calls) == 1, (
         f"Expected 1 call but got {len(res.calls)}. "

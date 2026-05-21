@@ -541,7 +541,9 @@ class Content(BaseModel, Generic[T]):
                     return validated.to_content()  # type: ignore[return-value]
                 except Exception:
                     continue
-            raise ValueError(f"No registered adapter matched dict with keys: {sorted(input.keys())}")
+            raise ValueError(
+                f"No registered adapter matched dict with keys: {sorted(input.keys())}"
+            )
 
         # First check if it is a path, we only check validity for str scenario
         # because we have dedicated error message for invalid path

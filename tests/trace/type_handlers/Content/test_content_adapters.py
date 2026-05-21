@@ -140,9 +140,7 @@ class TestGenAIBlobAdapter:
     def test_blob_dict_missing_fields_not_content_like(self):
         assert not Content.is_content_like({"type": "blob"})
         assert not Content.is_content_like({"type": "blob", "data": "AAAA"})
-        assert not Content.is_content_like(
-            {"type": "blob", "mime_type": "image/png"}
-        )
+        assert not Content.is_content_like({"type": "blob", "mime_type": "image/png"})
 
     def test_non_blob_dict_not_content_like(self):
         assert not Content.is_content_like({"type": "text", "content": "hi"})
@@ -328,9 +326,7 @@ class TestGooglePartAdapters:
     def test_tool_response_adapter(self):
         from weave.type_wrappers.Content.adapters import GooglePartToolResponse
 
-        adapter = GooglePartToolResponse(
-            tool_response={"id": "tc_1", "output": "done"}
-        )
+        adapter = GooglePartToolResponse(tool_response={"id": "tc_1", "output": "done"})
         content = adapter.to_content()
         assert json.loads(content.as_string())["output"] == "done"
 
@@ -352,9 +348,7 @@ class TestGooglePartAdapters:
             GooglePartMediaResolution,
         )
 
-        adapter = GooglePartMediaResolution(
-            media_resolution={"level": "MEDIUM"}
-        )
+        adapter = GooglePartMediaResolution(media_resolution={"level": "MEDIUM"})
         content = adapter.to_content()
         assert json.loads(content.as_string())["level"] == "MEDIUM"
 
