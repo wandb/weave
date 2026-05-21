@@ -20,9 +20,13 @@ import {
   WEAVE_ATTRIBUTES_NAMESPACE,
 } from './constants';
 import {GEN_AI_ATTR} from './genai/semconv';
+import {globalSingleton} from './utils/globalSingleton';
 import type {CallStackEntry, WeaveClient} from './weaveClient';
 
-const registeredProviders = new WeakSet<TracerProvider>();
+const registeredProviders = globalSingleton<WeakSet<TracerProvider>>(
+  '_weave_eval_link_registered_providers',
+  () => new WeakSet()
+);
 
 // The API TracerProvider type only exposes getTracer. addSpanProcessor is an
 // SDK-specific, deprecated late-registration hook, so we feature-detect it and
