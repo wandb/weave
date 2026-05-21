@@ -20,7 +20,7 @@ Usage:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 AttributeType = Literal["string", "int", "float", "string[]", "json"]
@@ -31,16 +31,16 @@ class Attribute:
     """A single semantic convention attribute.
 
     ``gen_ai_aliases`` lists the OTel ``gen_ai.*`` wire key(s) for this
-    column — pass a string for a single alias, or a tuple when multiple
-    OTel forms must feed the same column. The first tuple entry is the
-    canonical upstream name; later entries are parallel forms recognised
-    on ingest. See ``USAGE_REASONING_TOKENS`` for an example.
+    column. The first entry is the canonical upstream name; later entries
+    are parallel forms recognised on ingest. See ``USAGE_REASONING_TOKENS``
+    for an example with multiple aliases.
     """
 
     key: str  # canonical weave.* key
     type: AttributeType
     description: str
-    gen_ai_aliases: str | tuple[str, ...] = ""  # OTel gen_ai.* equivalent(s), if any
+    # OTel gen_ai.* equivalent(s), if any
+    gen_ai_aliases: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate that canonical attributes stay in the Weave namespace."""
@@ -50,13 +50,6 @@ class Attribute:
             )
 
     @property
-    def aliases(self) -> tuple[str, ...]:
-        """``gen_ai_aliases`` normalised to a tuple (strings → 1-tuple)."""
-        if isinstance(self.gen_ai_aliases, str):
-            return (self.gen_ai_aliases,) if self.gen_ai_aliases else ()
-        return self.gen_ai_aliases
-
-    @property
     def lookup_keys(self) -> tuple[str, ...]:
         """Return all recognized keys, ordered weave-canonical first.
 
@@ -64,7 +57,7 @@ class Attribute:
         so callers can rely on the weave.* key winning over OTel aliases
         when both are present on a span.
         """
-        return (self.key, *self.aliases)
+        return (self.key, *self.gen_ai_aliases)
 
 
 # ---------------------------------------------------------------------------
@@ -75,59 +68,70 @@ OPERATION_NAME = Attribute(
     "weave.operation.name",
     "string",
     "Operation type (chat, invoke_agent, execute_tool, ...)",
-    "gen_ai.operation.name",
+    ["gen_ai.operation.name"],
 )
 PROVIDER_NAME = Attribute(
     "weave.provider.name",
     "string",
     "Provider: openai, anthropic, gcp.gemini, ...",
-    "gen_ai.provider.name",
+    ["gen_ai.provider.name"],
 )
 SYSTEM = Attribute(
-    "weave.system", "string", "Deprecated alias for provider.name", "gen_ai.system"
+    "weave.system",
+    "string",
+    "Deprecated alias for provider.name",
+    ["gen_ai.system"],
 )
 AGENT_NAME = Attribute(
-    "weave.agent.name", "string", "Agent display name", "gen_ai.agent.name"
+    "weave.agent.name", "string", "Agent display name", ["gen_ai.agent.name"]
 )
-AGENT_ID = Attribute("weave.agent.id", "string", "Agent identifier", "gen_ai.agent.id")
+AGENT_ID = Attribute(
+    "weave.agent.id", "string", "Agent identifier", ["gen_ai.agent.id"]
+)
 AGENT_DESCRIPTION = Attribute(
     "weave.agent.description",
     "string",
     "Agent description",
-    "gen_ai.agent.description",
+    ["gen_ai.agent.description"],
 )
 AGENT_VERSION = Attribute(
-    "weave.agent.version", "string", "Agent version", "gen_ai.agent.version"
+    "weave.agent.version", "string", "Agent version", ["gen_ai.agent.version"]
 )
 REQUEST_MODEL = Attribute(
-    "weave.request.model", "string", "Requested model name", "gen_ai.request.model"
+    "weave.request.model",
+    "string",
+    "Requested model name",
+    ["gen_ai.request.model"],
 )
 RESPONSE_MODEL = Attribute(
-    "weave.response.model", "string", "Actual model used", "gen_ai.response.model"
+    "weave.response.model",
+    "string",
+    "Actual model used",
+    ["gen_ai.response.model"],
 )
 RESPONSE_ID = Attribute(
     "weave.response.id",
     "string",
     "Provider response identifier",
-    "gen_ai.response.id",
+    ["gen_ai.response.id"],
 )
 USAGE_INPUT_TOKENS = Attribute(
     "weave.usage.input_tokens",
     "int",
     "Input tokens (includes cached)",
-    "gen_ai.usage.input_tokens",
+    ["gen_ai.usage.input_tokens"],
 )
 USAGE_OUTPUT_TOKENS = Attribute(
     "weave.usage.output_tokens",
     "int",
     "Output tokens",
-    "gen_ai.usage.output_tokens",
+    ["gen_ai.usage.output_tokens"],
 )
 USAGE_REASONING_TOKENS = Attribute(
     "weave.usage.reasoning_tokens",
     "int",
     "Reasoning/thinking tokens",
-    (
+    [
         # Canonical name from upstream OTel GenAI semconv
         # (https://github.com/open-telemetry/semantic-conventions/pull/3383,
         # merged 2026-04-27). The Python
@@ -140,148 +144,156 @@ USAGE_REASONING_TOKENS = Attribute(
         "gen_ai.usage.reasoning_tokens",
         # What ADK emits natively before our integration enriches the span.
         "gen_ai.usage.experimental.reasoning_tokens",
-    ),
+    ],
 )
 USAGE_CACHE_CREATION_INPUT_TOKENS = Attribute(
     "weave.usage.cache_creation.input_tokens",
     "int",
     "Tokens written to cache",
-    "gen_ai.usage.cache_creation.input_tokens",
+    ["gen_ai.usage.cache_creation.input_tokens"],
 )
 USAGE_CACHE_READ_INPUT_TOKENS = Attribute(
     "weave.usage.cache_read.input_tokens",
     "int",
     "Tokens served from cache",
-    "gen_ai.usage.cache_read.input_tokens",
+    ["gen_ai.usage.cache_read.input_tokens"],
 )
 CONVERSATION_ID = Attribute(
     "weave.conversation.id",
     "string",
     "Conversation or session ID",
-    "gen_ai.conversation.id",
+    ["gen_ai.conversation.id"],
 )
 CONVERSATION_NAME = Attribute(
     "weave.conversation.name",
     "string",
     "Human-readable conversation name",
-    "gen_ai.conversation.name",
+    ["gen_ai.conversation.name"],
 )
 TOOL_NAME = Attribute(
-    "weave.tool.name", "string", "Tool/function name", "gen_ai.tool.name"
+    "weave.tool.name", "string", "Tool/function name", ["gen_ai.tool.name"]
 )
 TOOL_TYPE = Attribute(
     "weave.tool.type",
     "string",
     "Tool type: function, extension, datastore",
-    "gen_ai.tool.type",
+    ["gen_ai.tool.type"],
 )
 TOOL_CALL_ID = Attribute(
-    "weave.tool.call.id", "string", "Tool call identifier", "gen_ai.tool.call.id"
+    "weave.tool.call.id",
+    "string",
+    "Tool call identifier",
+    ["gen_ai.tool.call.id"],
 )
 TOOL_DESCRIPTION = Attribute(
     "weave.tool.description",
     "string",
     "Tool description",
-    "gen_ai.tool.description",
+    ["gen_ai.tool.description"],
 )
 TOOL_DEFINITIONS = Attribute(
     "weave.tool.definitions",
     "json",
     "Available tool definitions",
-    "gen_ai.tool.definitions",
+    ["gen_ai.tool.definitions"],
 )
 TOOL_CALL_ARGUMENTS = Attribute(
     "weave.tool.call.arguments",
     "json",
     "Arguments passed to the tool",
-    "gen_ai.tool.call.arguments",
+    ["gen_ai.tool.call.arguments"],
 )
 TOOL_CALL_RESULT = Attribute(
     "weave.tool.call.result",
     "json",
     "Result returned by the tool",
-    "gen_ai.tool.call.result",
+    ["gen_ai.tool.call.result"],
 )
 REQUEST_TEMPERATURE = Attribute(
     "weave.request.temperature",
     "float",
     "Sampling temperature",
-    "gen_ai.request.temperature",
+    ["gen_ai.request.temperature"],
 )
 REQUEST_MAX_TOKENS = Attribute(
     "weave.request.max_tokens",
     "int",
     "Maximum output tokens",
-    "gen_ai.request.max_tokens",
+    ["gen_ai.request.max_tokens"],
 )
 REQUEST_TOP_P = Attribute(
     "weave.request.top_p",
     "float",
     "Nucleus sampling threshold",
-    "gen_ai.request.top_p",
+    ["gen_ai.request.top_p"],
 )
 REQUEST_FREQUENCY_PENALTY = Attribute(
     "weave.request.frequency_penalty",
     "float",
     "Frequency penalty",
-    "gen_ai.request.frequency_penalty",
+    ["gen_ai.request.frequency_penalty"],
 )
 REQUEST_PRESENCE_PENALTY = Attribute(
     "weave.request.presence_penalty",
     "float",
     "Presence penalty",
-    "gen_ai.request.presence_penalty",
+    ["gen_ai.request.presence_penalty"],
 )
 REQUEST_SEED = Attribute(
-    "weave.request.seed", "int", "Random seed", "gen_ai.request.seed"
+    "weave.request.seed", "int", "Random seed", ["gen_ai.request.seed"]
 )
 REQUEST_STOP_SEQUENCES = Attribute(
     "weave.request.stop_sequences",
     "string[]",
     "Stop sequences",
-    "gen_ai.request.stop_sequences",
+    ["gen_ai.request.stop_sequences"],
 )
 REQUEST_CHOICE_COUNT = Attribute(
     "weave.request.choice.count",
     "int",
     "Number of choices requested",
-    "gen_ai.request.choice.count",
+    ["gen_ai.request.choice.count"],
 )
 RESPONSE_FINISH_REASONS = Attribute(
     "weave.response.finish_reasons",
     "string[]",
     "Finish reasons",
-    "gen_ai.response.finish_reasons",
+    ["gen_ai.response.finish_reasons"],
 )
 OUTPUT_TYPE = Attribute(
     "weave.output.type",
     "string",
     "Output modality: text, json, image, speech",
-    "gen_ai.output.type",
+    ["gen_ai.output.type"],
 )
 INPUT_MESSAGES = Attribute(
-    "weave.input.messages", "json", "Input messages", "gen_ai.input.messages"
+    "weave.input.messages", "json", "Input messages", ["gen_ai.input.messages"]
 )
 OUTPUT_MESSAGES = Attribute(
-    "weave.output.messages", "json", "Output messages", "gen_ai.output.messages"
+    "weave.output.messages",
+    "json",
+    "Output messages",
+    ["gen_ai.output.messages"],
 )
 SYSTEM_INSTRUCTIONS = Attribute(
     "weave.system_instructions",
     "json",
     "System instructions",
-    "gen_ai.system_instructions",
+    ["gen_ai.system_instructions"],
 )
 COMPLETION = Attribute(
     "weave.completion",
     "json",
     "Output messages (pre-v1.36 format)",
-    "gen_ai.completion",
+    ["gen_ai.completion"],
 )
-ERROR_TYPE = Attribute("weave.error.type", "string", "Error type", "error.type")
+ERROR_TYPE = Attribute("weave.error.type", "string", "Error type", ["error.type"])
 SERVER_ADDRESS = Attribute(
-    "weave.server.address", "string", "Server hostname", "server.address"
+    "weave.server.address", "string", "Server hostname", ["server.address"]
 )
-SERVER_PORT = Attribute("weave.server.port", "int", "Server port", "server.port")
+SERVER_PORT = Attribute(
+    "weave.server.port", "int", "Server port", ["server.port"]
+)
 
 # Weave-only extensions (no gen_ai.* alias)
 REASONING_CONTENT = Attribute(
@@ -377,7 +389,7 @@ SEMCONV_LOOKUP_KEYS: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
 for _a in _DEFS:
     _ALIAS_TO_CANONICAL[_a.key] = _a.key
-    for _alias in _a.aliases:
+    for _alias in _a.gen_ai_aliases:
         _ALIAS_TO_CANONICAL[_alias] = _a.key
 
 
@@ -459,9 +471,9 @@ def _build_filterable_lookup() -> dict[str, str]:
     for canonical, col in CANONICAL_KEY_TO_COLUMN.items():
         out[canonical] = col
         attr = ATTRIBUTES[canonical]
-        for alias in attr.aliases:
+        for alias in attr.gen_ai_aliases:
             out[alias] = col
-        for k in (canonical, *attr.aliases):
+        for k in (canonical, *attr.gen_ai_aliases):
             for prefix in ("weave.", "gen_ai."):
                 if k.startswith(prefix):
                     out[k[len(prefix) :]] = col
