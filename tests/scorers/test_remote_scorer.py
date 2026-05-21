@@ -4,7 +4,9 @@ import pytest
 from pydantic import ValidationError
 
 from weave.scorers.remote_scorer import (
+    OAuthClientCredentialsConfig,
     RemoteScorer,
+    StaticBearerAuthConfig,
     _validate_remote_scorer_endpoint_url,
 )
 
@@ -17,6 +19,201 @@ def test_remote_scorer_fields() -> None:
     )
     assert rs.endpoint_url == "https://scoring.example.com/v1/score"
     assert rs.config == {"threshold": 0.9}
+    assert rs.auth_config is None
+
+
+def test_remote_scorer_oauth_auth_config_serializes_and_deserializes() -> None:
+    rs = RemoteScorer(
+        name="policy_remote",
+        endpoint_url="https://scoring.example.com/v1/score",
+        auth_config={
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "https://idp.example.com/oauth2/token",
+            "client_id": "weave-remote-scorer",
+            "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+            "scope": "remote-score",
+        },
+    )
+
+    assert isinstance(rs.auth_config, OAuthClientCredentialsConfig)
+    dumped = rs.model_dump()
+    assert dumped["auth_config"] == {
+        "mode": "oauth_client_credentials",
+        "token_endpoint_url": "https://idp.example.com/oauth2/token",
+        "client_id": "weave-remote-scorer",
+        "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+        "scope": "remote-score",
+    }
+
+    round_tripped = RemoteScorer.model_validate(dumped)
+    assert isinstance(round_tripped.auth_config, OAuthClientCredentialsConfig)
+    assert round_tripped.auth_config == rs.auth_config
+
+
+def test_remote_scorer_static_bearer_auth_config_serializes_and_deserializes() -> None:
+    rs = RemoteScorer(
+        endpoint_url="https://scoring.example.com/v1/score",
+        auth_config={
+            "mode": "static_bearer",
+            "bearer_secret_name": "REMOTE_SCORER_BEARER_TOKEN",
+        },
+    )
+
+    assert isinstance(rs.auth_config, StaticBearerAuthConfig)
+    dumped = rs.model_dump()
+    assert dumped["auth_config"] == {
+        "mode": "static_bearer",
+        "bearer_secret_name": "REMOTE_SCORER_BEARER_TOKEN",
+    }
+
+    round_tripped = RemoteScorer.model_validate(dumped)
+    assert isinstance(round_tripped.auth_config, StaticBearerAuthConfig)
+    assert round_tripped.auth_config == rs.auth_config
+
+
+@pytest.mark.parametrize(
+    "token_endpoint_url",
+    [
+        "https://idp.example.com/oauth2/token",
+        "http://127.0.0.1:8000/token",
+        "http://localhost:3000/token",
+    ],
+)
+def test_oauth_token_endpoint_url_accepts_http_s_with_host(
+    token_endpoint_url: str,
+) -> None:
+    rs = RemoteScorer(
+        endpoint_url="https://scoring.example.com/v1/score",
+        auth_config={
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": token_endpoint_url,
+            "client_id": "weave-remote-scorer",
+            "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+        },
+    )
+    assert isinstance(rs.auth_config, OAuthClientCredentialsConfig)
+    assert rs.auth_config.token_endpoint_url == token_endpoint_url
+
+
+@pytest.mark.parametrize(
+    ("token_endpoint_url", "match_substr"),
+    [
+        ("", "http or https"),
+        ("https://", "include a host"),
+        ("http://", "include a host"),
+        ("ftp://idp.example.com/token", "http or https"),
+        ("not-a-url", "http or https"),
+    ],
+)
+def test_oauth_token_endpoint_url_rejects_malformed(
+    token_endpoint_url: str, match_substr: str
+) -> None:
+    with pytest.raises(ValidationError, match=match_substr):
+        RemoteScorer(
+            endpoint_url="https://scoring.example.com/v1/score",
+            auth_config={
+                "mode": "oauth_client_credentials",
+                "token_endpoint_url": token_endpoint_url,
+                "client_id": "weave-remote-scorer",
+                "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "auth_config",
+    [
+        {"mode": "static_bearer"},
+        {
+            "mode": "oauth_client_credentials",
+            "client_id": "weave-remote-scorer",
+            "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+        },
+        {
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "https://idp.example.com/oauth2/token",
+            "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+        },
+        {
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "https://idp.example.com/oauth2/token",
+            "client_id": "weave-remote-scorer",
+        },
+    ],
+)
+def test_remote_scorer_auth_config_missing_required_fields_fail_validation(
+    auth_config: dict[str, str],
+) -> None:
+    with pytest.raises(ValidationError, match="Field required"):
+        RemoteScorer(
+            endpoint_url="https://scoring.example.com/v1/score",
+            auth_config=auth_config,
+        )
+
+
+@pytest.mark.parametrize(
+    "auth_config",
+    [
+        {
+            "mode": "static_bearer",
+            "bearer_secret_name": "",
+        },
+        {
+            "mode": "static_bearer",
+            "bearer_secret_name": "   ",
+        },
+        {
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "https://idp.example.com/oauth2/token",
+            "client_id": "weave-remote-scorer",
+            "client_secret_name": "",
+        },
+        {
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "https://idp.example.com/oauth2/token",
+            "client_id": "weave-remote-scorer",
+            "client_secret_name": "   ",
+        },
+    ],
+)
+def test_remote_scorer_auth_config_secret_names_must_not_be_empty(
+    auth_config: dict[str, str],
+) -> None:
+    with pytest.raises(ValidationError, match="must not be empty"):
+        RemoteScorer(
+            endpoint_url="https://scoring.example.com/v1/score",
+            auth_config=auth_config,
+        )
+
+
+@pytest.mark.parametrize(
+    "auth_config",
+    [
+        {
+            "mode": "static_bearer",
+            "bearer_secret_name": "REMOTE_SCORER_BEARER_TOKEN",
+            "bearer_token": "raw-token-value",
+        },
+        {
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "https://idp.example.com/oauth2/token",
+            "client_id": "weave-remote-scorer",
+            "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+            "client_secret": "raw-client-secret",
+        },
+    ],
+)
+def test_remote_scorer_auth_config_rejects_raw_secret_fields(
+    auth_config: dict[str, str],
+) -> None:
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        RemoteScorer(
+            endpoint_url="https://scoring.example.com/v1/score",
+            auth_config=auth_config,
+        )
+
+    assert "bearer_token" not in StaticBearerAuthConfig.model_fields
+    assert "client_secret" not in OAuthClientCredentialsConfig.model_fields
 
 
 def test_remote_scorer_endpoint_url_allows_http_for_local_dev() -> None:
