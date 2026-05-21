@@ -430,7 +430,6 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "This is a ClickHouse version issue that needs to be resolved."
         ) from e
     if "Max query size exceeded" in error_str:
-        # CH reports `max_query_size` overflows as SYNTAX_ERROR with this prefix.
         raise RequestTooLarge(
             "Call payload exceeded the storage backend's max query size. "
             "Reduce the size of `output` or `summary` and retry."
