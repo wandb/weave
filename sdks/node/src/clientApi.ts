@@ -1,5 +1,5 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
-import {registerEvalLinkSpanProcessor} from './evaluationOtelLinker';
+import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
 import {makeSettings, SettingsInit} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';

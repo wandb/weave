@@ -39,7 +39,7 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {getGlobalClient} from '../clientApi';
-import {EvalLinkSpanProcessor} from '../evaluationOtelLinker';
+import {EvalLinkSpanProcessor} from '../evalLinkSpanProcessor';
 import {getWandbConfigs} from '../wandb/settings';
 
 import {GEN_AI_ATTR, GEN_AI_EVENT, OTEL_ATTR} from '../genai/semconv';

@@ -7,7 +7,7 @@ import {Evaluation} from '../evaluation';
 import {
   EvalLinkSpanProcessor,
   registerEvalLinkSpanProcessor,
-} from '../evaluationOtelLinker';
+} from '../evalLinkSpanProcessor';
 import {InMemoryTraceServer} from '../inMemoryTraceServer';
 import {op} from '../op';
 import {CallStack, type CallStackEntry} from '../weaveClient';

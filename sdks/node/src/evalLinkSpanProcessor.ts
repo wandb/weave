@@ -19,12 +19,9 @@ import {
   GENAI_SPAN_REF_ATTR_KEY,
   WEAVE_ATTRIBUTES_NAMESPACE,
 } from './constants';
+import {GEN_AI_ATTR} from './genai/semconv';
 import type {CallStackEntry, WeaveClient} from './weaveClient';
 
-// `gen_ai.operation.name` is an OTel GenAI semantic convention, but GenAI
-// conventions are still incubating. The JS semconv package will have a stable
-// version of this constant at some point.
-const GENAI_OPERATION_NAME_ATTR = 'gen_ai.operation.name';
 // We store this attribute on the tracer provider to ensure repeated init paths
 // do not register the span processor multiple times.
 const EVAL_LINK_PROCESSOR_REGISTERED =
@@ -37,12 +34,12 @@ type SpanProcessorProvider = TracerProvider & {
 
 type ClientGetter = () => WeaveClient | null;
 
-export interface GenAISpanRef {
+interface GenAISpanRef {
   trace_id: string;
   span_id: string;
 }
 
-export function attachGenAISpanRefToCallSummary(
+function attachGenAISpanRefToCallSummary(
   call: CallStackEntry,
   genaiSpanRef: GenAISpanRef
 ): void {
@@ -122,7 +119,7 @@ export class EvalLinkSpanProcessor implements SpanProcessor {
 
   onEnd(span: ReadableSpan): void {
     const attrs = span.attributes || {};
-    if (!(GENAI_OPERATION_NAME_ATTR in attrs)) {
+    if (!(GEN_AI_ATTR.GEN_AI_OPERATION_NAME in attrs)) {
       return;
     }
 
