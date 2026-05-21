@@ -23,7 +23,6 @@ from tests.trace_server_bindings.conftest import (
     generate_start,
 )
 from weave.trace.display.term import configure_logger
-from weave.trace.settings import should_use_calls_complete
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
@@ -136,14 +135,6 @@ def test_calls_complete_batch_endpoint_and_payload(mock_post, monkeypatch):
     payload = json.loads(sent_data.decode("utf-8"))
     expected = tsi.CallsUpsertCompleteReq(batch=[complete]).model_dump(mode="json")
     assert payload == expected
-
-
-def test_calls_complete_entity_allowlist(monkeypatch):
-    """Allowlisted entities opt into calls_complete even with env var unset."""
-    monkeypatch.delenv("WEAVE_USE_CALLS_COMPLETE", raising=False)
-    assert should_use_calls_complete("wandb") is True
-    assert should_use_calls_complete("acme") is False
-    assert should_use_calls_complete(None) is False
 
 
 @patch("weave.utils.http_requests.post")
@@ -313,8 +304,9 @@ def test_other_error_retry(mock_post, unbatched_server, monkeypatch):
 
 
 @patch("weave.utils.http_requests.post")
-def test_timeout_retry_mechanism(mock_post, success_response):
+def test_timeout_retry_mechanism(mock_post, success_response, monkeypatch):
     """Test that timeouts trigger the retry mechanism."""
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     # Mock server to raise errors twice, then succeed
@@ -335,8 +327,9 @@ def test_timeout_retry_mechanism(mock_post, success_response):
 
 
 @pytest.fixture
-def fast_retrying_server():
+def fast_retrying_server(monkeypatch):
     """Create a RemoteHTTPTraceServer with fast retry settings for testing."""
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
     fast_retry = tenacity.retry(
         wait=tenacity.wait_fixed(0.1),

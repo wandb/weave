@@ -181,7 +181,7 @@ export function requireGlobalClient(): WeaveClient {
   return client;
 }
 
-export function setGlobalClient(client: WeaveClient) {
+export function setGlobalClient(client: WeaveClient | null) {
   _globalClientHolder.client = client;
 }
 
