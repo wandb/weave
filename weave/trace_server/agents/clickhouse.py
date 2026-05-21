@@ -88,6 +88,7 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     FeedbackQueryRes,
+    TraceServerInterface,
 )
 
 if TYPE_CHECKING:
@@ -430,9 +431,11 @@ class AgentWriteHandler:
     """Write-side operations for agent data.
 
     Takes a `ch_client` for `insert` calls, which have no query wrapper.
+    Optionally takes a `trace_server` for file storage (Content conversion).
     """
 
     _ch_client: CHClient
+    _trace_server: TraceServerInterface | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -469,6 +472,20 @@ class AgentWriteHandler:
                         rejected += 1
                         errors.append(str(e))
                         continue
+
+                    if self._trace_server is not None:
+                        from weave.trace_server.base64_content_conversion import (
+                            replace_genai_content_blobs_in_span_attrs,
+                        )
+
+                        try:
+                            replace_genai_content_blobs_in_span_attrs(
+                                span.attributes,
+                                req.project_id,
+                                self._trace_server,
+                            )
+                        except Exception:
+                            logger.exception("Failed to convert GenAI blobs for span")
 
                     try:
                         genai_row = extract_genai_span(
