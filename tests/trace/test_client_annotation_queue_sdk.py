@@ -119,7 +119,7 @@ def test_annotation_queue_sdk_methods_build_requests():
     assert server.requests["read"].queue_id == "queue-id"
 
     sort_by = [SortBy(field="updated_at", direction="desc")]
-    queues = client.get_annotation_queues(
+    queues = client.list_annotation_queues(
         name="Test",
         sort_by=sort_by,
         limit=10,
@@ -166,7 +166,7 @@ def test_annotation_queue_sdk_methods_build_requests():
     assert add_req.display_fields == ["inputs.prompt", "output.text"]
 
     item_filter = AnnotationQueueItemsFilter(call_id="call-id")
-    items = client.get_annotation_queue_items(
+    items = client.list_annotation_queue_items(
         "queue-id",
         filter=item_filter,
         sort_by=sort_by,
@@ -222,7 +222,7 @@ def test_annotation_queue_sdk_lifecycle(client):
     assert queue.description == "Created through WeaveClient"
     assert queue.scorer_refs == scorer_refs
 
-    queues = client.get_annotation_queues(name="sdk test")
+    queues = client.list_annotation_queues(name="sdk test")
     assert any(q.id == queue_id for q in queues)
 
     updated_queue = client.update_annotation_queue(
@@ -244,7 +244,7 @@ def test_annotation_queue_sdk_lifecycle(client):
     assert add_res.added_count == 2
     assert add_res.duplicates == 0
 
-    items = client.get_annotation_queue_items(
+    items = client.list_annotation_queue_items(
         queue_id,
         sort_by=[SortBy(field="created_at", direction="asc")],
         include_position=True,
@@ -256,7 +256,7 @@ def test_annotation_queue_sdk_lifecycle(client):
     ]
     assert [item.position_in_queue for item in items] == [1, 2]
 
-    filtered_items = client.get_annotation_queue_items(
+    filtered_items = client.list_annotation_queue_items(
         queue_id,
         filter=AnnotationQueueItemsFilter(call_id=calls[0].id),
     )
