@@ -2132,16 +2132,16 @@ def test_build_calls_complete_update_end_query() -> None:
     expected = """
         UPDATE calls_complete
         SET
-            ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC'),
-            exception = {exception:String},
-            output_dump = {output_dump:String},
-            summary_dump = {summary_dump:String},
-            output_refs = {output_refs:Array(String)},
-            wb_run_step_end = {wb_run_step_end:UInt64},
+            ended_at = fromUnixTimestamp64Micro(%(ended_at)s, 'UTC'),
+            exception = %(exception)s,
+            output_dump = %(output_dump)s,
+            summary_dump = %(summary_dump)s,
+            output_refs = %(output_refs)s,
+            wb_run_step_end = %(wb_run_step_end)s,
             updated_at = now64(3)
-        WHERE project_id = {project_id:String}
-            AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')
-            AND id = {id:String}
+        WHERE project_id = %(project_id)s
+            AND started_at = fromUnixTimestamp64Micro(%(started_at)s, 'UTC')
+            AND id = %(id)s
     """
 
     exp_formatted = sqlparse.format(expected, reindent=True)
@@ -2150,6 +2150,57 @@ def test_build_calls_complete_update_end_query() -> None:
     assert exp_formatted == found_formatted, (
         f"\nExpected:\n{exp_formatted}\n\nGot:\n{found_formatted}"
     )
+
+
+def test_build_calls_complete_update_end_query_client_side_binding() -> None:
+    """The update-end query MUST use Python `%(name)s` (client-side) placeholders.
+
+    `clickhouse_connect`'s `{name:Type}` server-side substitution puts params in
+    the URL, which makes multi-MB outputs blow past LB URI limits and surface as
+    `BrokenPipeError`. We deliberately use client-side substitution so that the
+    `output_dump`/`summary_dump` values land in the SQL body instead.
+
+    Also verifies that running the query through `clickhouse_connect.driver.binding.bind_query`
+    with a malicious string literal does not let the value escape its quotes.
+    """
+    from clickhouse_connect.driver.binding import bind_query
+
+    query = build_calls_complete_update_end_query(
+        table_name="calls_complete",
+        project_id_param="pb_0",
+        id_param="pb_1",
+        ended_at_param="pb_2",
+        exception_param="pb_3",
+        output_dump_param="pb_4",
+        summary_dump_param="pb_5",
+        output_refs_param="pb_6",
+        wb_run_step_end_param="pb_7",
+    )
+
+    assert "{pb_4:String}" not in query
+    assert "%(pb_4)s" in query
+
+    injection = "'); DROP TABLE calls_complete; --"
+    bound_query, bound_params = bind_query(
+        query,
+        {
+            "pb_0": "user/project",
+            "pb_1": "call-id",
+            "pb_2": 1_700_000_000_000_000,
+            "pb_3": "",
+            "pb_4": injection,
+            "pb_5": "{}",
+            "pb_6": [],
+            "pb_7": 0,
+        },
+    )
+
+    # bind_query renders into the SQL body and emits no URL params.
+    assert bound_params == {}
+    # The injection payload survives only as a single, fully-escaped string
+    # literal: opening quote, backslash-escaped quote, payload, closing quote.
+    expected_literal = r"'\'); DROP TABLE calls_complete; --'"
+    assert expected_literal in bound_query
 
 
 def test_storage_size_fields():

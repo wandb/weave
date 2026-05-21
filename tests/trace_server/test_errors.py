@@ -1,9 +1,11 @@
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseError
+from clickhouse_connect.driver.exceptions import OperationalError as CHOperationalError
 from gql.transport.exceptions import TransportServerError
 
 from weave.trace_server.errors import (
     InvalidRequest,
+    RequestTooLarge,
     handle_clickhouse_query_error,
     handle_server_exception,
 )
@@ -42,3 +44,26 @@ def test_clickhouse_type_mismatch_returns_400() -> None:
 
     result = handle_server_exception(InvalidRequest(error_msg))
     assert result.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "error_msg",
+    [
+        # CH parser blew through max_query_size when our SQL body got large.
+        "Code: 62. DB::Exception: Max query size exceeded: ... (TOO_LARGE_QUERY)",
+        # urllib3 wraps a kernel EPIPE during the write to CH Cloud.
+        (
+            "Error (\"Connection broken: BrokenPipeError(32, 'Broken pipe')\", "
+            "BrokenPipeError(32, 'Broken pipe')) executing HTTP request attempt 1"
+        ),
+    ],
+)
+def test_oversized_call_payload_returns_413(error_msg: str) -> None:
+    """Backend-side size errors should map to 413 with an actionable hint, not 502."""
+    exc = CHOperationalError(error_msg)
+
+    with pytest.raises(RequestTooLarge):
+        handle_clickhouse_query_error(exc)
+
+    result = handle_server_exception(RequestTooLarge(error_msg))
+    assert result.status_code == 413

@@ -429,6 +429,20 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Lightweight update queries are not supported by this ClickHouse version or configuration. "
             "This is a ClickHouse version issue that needs to be resolved."
         ) from e
+    if "TOO_LARGE_QUERY" in error_str:
+        raise RequestTooLarge(
+            "Call payload exceeded the storage backend's max query size. "
+            "Reduce the size of `output` or `summary` and retry."
+        ) from e
+    if "Broken pipe" in error_str or "Connection broken" in error_str:
+        # Mid-flight connection close from CH/LB. Most commonly seen when a
+        # multi-MB call output bloats the request beyond an upstream URI/body
+        # limit. Surface as 413 with an actionable hint instead of leaking a 502.
+        raise RequestTooLarge(
+            "Storage backend dropped the connection while writing the call. "
+            "This is usually caused by an oversized `output` or `summary`; "
+            "reduce its size and retry."
+        ) from e
 
     # Re-raise the original exception if no known pattern matches
     raise e
