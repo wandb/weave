@@ -106,6 +106,7 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
+from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
 from weave.trace_server.ids import generate_id
@@ -117,6 +118,18 @@ from weave.trace_server.interface.feedback_types import (
 from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace_server.trace_server_interface import (
     AliasesListReq,
+    AnnotationQueueAddCallsReq,
+    AnnotationQueueAddCallsRes,
+    AnnotationQueueCreateReq,
+    AnnotationQueueDeleteReq,
+    AnnotationQueueItemSchema,
+    AnnotationQueueItemsQueryReq,
+    AnnotationQueueReadReq,
+    AnnotationQueueSchema,
+    AnnotationQueuesQueryReq,
+    AnnotationQueuesStatsReq,
+    AnnotationQueueStatsSchema,
+    AnnotationQueueUpdateReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
@@ -731,6 +744,155 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def create_annotation_queue(
+        self,
+        *,
+        name: str,
+        scorer_refs: list[str],
+        description: str = "",
+    ) -> str:
+        """Create an annotation queue for this project.
+
+        Args:
+            name: Display name for the queue.
+            scorer_refs: Weave refs for the scorers/annotation fields reviewers complete.
+            description: Optional reviewer guidelines or queue description.
+
+        Returns:
+            The ID of the created annotation queue.
+        """
+        res = self.server.annotation_queue_create(
+            AnnotationQueueCreateReq(
+                project_id=self.project_id,
+                name=name,
+                description=description,
+                scorer_refs=scorer_refs,
+            )
+        )
+        return res.id
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_annotation_queue(self, queue_id: str) -> AnnotationQueueSchema:
+        """Read a single annotation queue by ID."""
+        res = self.server.annotation_queue_read(
+            AnnotationQueueReadReq(project_id=self.project_id, queue_id=queue_id)
+        )
+        return res.queue
+
+    @trace_sentry.global_trace_sentry.watch()
+    def list_annotation_queues(
+        self,
+        *,
+        name: str | None = None,
+        sort_by: list[SortBy] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[AnnotationQueueSchema]:
+        """List annotation queues for this project."""
+        return list(
+            self.server.annotation_queues_query_stream(
+                AnnotationQueuesQueryReq(
+                    project_id=self.project_id,
+                    name=name,
+                    sort_by=sort_by,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def update_annotation_queue(
+        self,
+        queue_id: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        scorer_refs: list[str] | None = None,
+    ) -> AnnotationQueueSchema:
+        """Update annotation queue metadata."""
+        res = self.server.annotation_queue_update(
+            AnnotationQueueUpdateReq(
+                project_id=self.project_id,
+                queue_id=queue_id,
+                name=name,
+                description=description,
+                scorer_refs=scorer_refs,
+            )
+        )
+        return res.queue
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_annotation_queue(self, queue_id: str) -> AnnotationQueueSchema:
+        """Soft-delete an annotation queue."""
+        res = self.server.annotation_queue_delete(
+            AnnotationQueueDeleteReq(project_id=self.project_id, queue_id=queue_id)
+        )
+        return res.queue
+
+    @trace_sentry.global_trace_sentry.watch()
+    def add_calls_to_annotation_queue(
+        self,
+        queue_id: str,
+        *,
+        call_ids: list[str],
+        display_fields: list[str],
+    ) -> AnnotationQueueAddCallsRes:
+        """Add calls to an annotation queue.
+
+        Args:
+            queue_id: Annotation queue ID.
+            call_ids: Call IDs to add to the queue.
+            display_fields: JSON paths to show reviewers, such as
+                ``inputs.prompt`` or ``output.text``.
+        """
+        # Ensure newly created calls are persisted before queue membership is created.
+        self._flush()
+        return self.server.annotation_queue_add_calls(
+            AnnotationQueueAddCallsReq(
+                project_id=self.project_id,
+                queue_id=queue_id,
+                call_ids=call_ids,
+                display_fields=display_fields,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def list_annotation_queue_items(
+        self,
+        queue_id: str,
+        *,
+        filter: AnnotationQueueItemsFilter | None = None,
+        sort_by: list[SortBy] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        include_position: bool = False,
+    ) -> list[AnnotationQueueItemSchema]:
+        """List calls assigned to an annotation queue."""
+        res = self.server.annotation_queue_items_query(
+            AnnotationQueueItemsQueryReq(
+                project_id=self.project_id,
+                queue_id=queue_id,
+                filter=filter,
+                sort_by=sort_by,
+                limit=limit,
+                offset=offset,
+                include_position=include_position,
+            )
+        )
+        return res.items
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_annotation_queue_stats(
+        self, queue_ids: list[str]
+    ) -> list[AnnotationQueueStatsSchema]:
+        """Get item completion stats for annotation queues."""
+        res = self.server.annotation_queues_stats(
+            AnnotationQueuesStatsReq(project_id=self.project_id, queue_ids=queue_ids)
+        )
+        return res.stats
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
