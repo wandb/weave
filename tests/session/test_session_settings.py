@@ -171,19 +171,37 @@ def test_disabled_init_does_not_install_session_tracer_provider():
 
 
 @pytest.mark.parametrize(
-    ("input_str", "expected_output", "expects_call"),
+    ("input_str", "expects_engines_loaded"),
     [
-        pytest.param("", "", False, id="empty_skips_presidio"),
-        pytest.param(
-            "alice@example.com", "REDACTED", True, id="routes_through_redact_pii"
-        ),
+        pytest.param("", False, id="empty_skips_presidio"),
+        pytest.param("alice@example.com", True, id="routes_through_presidio"),
     ],
 )
-def test_redact_string(input_str: str, expected_output: str, expects_call: bool):
-    with patch("weave.utils.pii_redaction.redact_pii", return_value="REDACTED") as mock:
-        result = pii_redaction.redact_string(input_str)
-    assert result == expected_output
-    assert mock.called is expects_call
+def test_redact_pii_string_empty_skip(input_str: str, expects_engines_loaded: bool):
+    """``redact_pii_string`` short-circuits on empty before loading Presidio."""
+
+    class _FakeResult:
+        text = "REDACTED"
+
+    class _FakeAnalyzer:
+        def analyze(self, **_kwargs: Any) -> list[Any]:
+            return []
+
+    class _FakeAnonymizer:
+        def anonymize(self, **_kwargs: Any) -> _FakeResult:
+            return _FakeResult()
+
+    with patch(
+        "weave.utils.pii_redaction._get_engines",
+        return_value=(_FakeAnalyzer(), _FakeAnonymizer()),
+    ) as mock_get_engines:
+        result = pii_redaction.redact_pii_string(input_str)
+    if expects_engines_loaded:
+        assert result == "REDACTED"
+        assert mock_get_engines.called
+    else:
+        assert result == ""
+        assert not mock_get_engines.called
 
 
 @pytest.mark.parametrize(
@@ -238,7 +256,7 @@ def test_redact_messages_dump_redact_revalidate():
 
 def test_redact_system_instructions():
     with patch(
-        "weave.utils.pii_redaction.redact_pii",
+        "weave.utils.pii_redaction.redact_pii_string",
         side_effect=lambda s: "<REDACTED>" if s else s,
     ):
         out = pii_redaction.redact_system_instructions(["secret instruction"])
@@ -369,9 +387,13 @@ def test_redact_pii_applied(
     otel_spans: InMemorySpanExporter,
 ):
     """redact_pii=True applies redaction across streaming + batch paths."""
+    substitutor = _email_substitutor()
     with override_settings(redact_pii=True):
-        with patch(
-            "weave.utils.pii_redaction.redact_pii", side_effect=_email_substitutor()
+        with (
+            patch("weave.utils.pii_redaction.redact_pii", side_effect=substitutor),
+            patch(
+                "weave.utils.pii_redaction.redact_pii_string", side_effect=substitutor
+            ),
         ):
             exercise()
 
@@ -403,9 +425,13 @@ def test_skip_presidio_when_include_content_false(
 ):
     """include_content=False drops content at source; Presidio is never called."""
     with override_settings(redact_pii=True):
-        with patch("weave.utils.pii_redaction.redact_pii") as mock_redact:
+        with (
+            patch("weave.utils.pii_redaction.redact_pii") as mock_redact,
+            patch("weave.utils.pii_redaction.redact_pii_string") as mock_redact_str,
+        ):
             exercise_path()
     mock_redact.assert_not_called()
+    mock_redact_str.assert_not_called()
 
 
 def _exercise_streaming_reasoning() -> None:
@@ -533,12 +559,15 @@ def test_settings_independence(otel_spans: InMemorySpanExporter):
     """redact_pii=True, capture_client_info=False produces redacted content
     without weave.client_version. Confirms settings don't bleed into each other.
     """
+    substitutor = _email_substitutor()
     with override_settings(
         redact_pii=True, capture_client_info=False, capture_system_info=False
     ):
-        with patch(
-            "weave.utils.pii_redaction.redact_pii",
-            side_effect=_email_substitutor(),
+        with (
+            patch("weave.utils.pii_redaction.redact_pii", side_effect=substitutor),
+            patch(
+                "weave.utils.pii_redaction.redact_pii_string", side_effect=substitutor
+            ),
         ):
             with start_session(session_id="s") as sess, sess.start_turn() as t:
                 with t.tool(name="lookup") as tool:
@@ -552,8 +581,12 @@ def test_settings_independence(otel_spans: InMemorySpanExporter):
 
 def test_all_settings_default_off_redaction(otel_spans: InMemorySpanExporter):
     """With defaults, redaction does not run. Sanity check."""
-    with patch("weave.utils.pii_redaction.redact_pii") as mock_redact:
+    with (
+        patch("weave.utils.pii_redaction.redact_pii") as mock_redact,
+        patch("weave.utils.pii_redaction.redact_pii_string") as mock_redact_str,
+    ):
         with start_session(session_id="s") as sess, sess.start_turn() as t:
             with t.tool(name="x") as tool:
                 tool.arguments = "alice@example.com"
     mock_redact.assert_not_called()
+    mock_redact_str.assert_not_called()

@@ -2,11 +2,11 @@
 
 Two layers:
 
-- ``redact_pii`` / ``redact_pii_string`` are the recursive primitives that
-  walk dicts, lists, and dataclasses applying Presidio.
-- ``redact_string`` / ``redact_messages`` / ``redact_system_instructions``
-  are the Session SDK helpers shaped for typed Message payloads (dump →
-  redact → restore Literal discriminators → revalidate).
+- ``redact_pii`` / ``redact_pii_string`` are the primitives that walk
+  dicts, lists, and dataclasses applying Presidio.
+- ``redact_messages`` / ``redact_system_instructions`` are the Session
+  SDK helpers shaped for typed Message payloads (dump → redact → restore
+  Literal discriminators → revalidate).
 
 ``presidio`` is an optional dependency gated by ``WEAVE_REDACT_PII``.
 Presidio is imported lazily inside the redaction functions so the module
@@ -105,18 +105,14 @@ def redact_pii(
 
 
 def redact_pii_string(data: str) -> str:
+    """Redact PII in a single string. Empty in → empty out (skips Presidio)."""
+    if not data:
+        return data
     analyzer, anonymizer = _get_engines()
     entities = _get_redaction_entities()
     results = analyzer.analyze(text=data, language="en", entities=entities)
     redacted = anonymizer.anonymize(text=data, analyzer_results=results)
     return redacted.text
-
-
-def redact_string(s: str) -> str:
-    """Redact PII in a single string. Empty in → empty out (skips Presidio)."""
-    if not s:
-        return s
-    return cast(str, redact_pii(s))
 
 
 def _restore_literals(redacted: dict[str, Any], original: dict[str, Any]) -> None:
@@ -163,7 +159,7 @@ def redact_system_instructions(insts: list[str] | None) -> list[str] | None:
     """Redact each system instruction. None/empty in → same out."""
     if not insts:
         return insts
-    return [redact_string(s) for s in insts]
+    return [redact_pii_string(s) for s in insts]
 
 
 def track_pii_redaction_enabled(

@@ -225,8 +225,8 @@ class Tool(_SpanBase):
         arguments = self.arguments
         result = self.result
         if redact:
-            arguments = pii_redaction.redact_string(arguments)
-            result = pii_redaction.redact_string(result)
+            arguments = pii_redaction.redact_pii_string(arguments)
+            result = pii_redaction.redact_pii_string(result)
         return {"tool_call_arguments": arguments, "tool_call_result": result}
 
     def end(self) -> None:
@@ -335,7 +335,7 @@ class LLM(_SpanBase):
             )
             if reasoning is not None and reasoning.content:
                 reasoning = Reasoning(
-                    content=pii_redaction.redact_string(reasoning.content)
+                    content=pii_redaction.redact_pii_string(reasoning.content)
                 )
         return {
             "input_messages": input_messages,
