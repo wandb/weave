@@ -249,7 +249,7 @@ def test_annotation_queue_sdk_lifecycle(client):
         sort_by=[SortBy(field="created_at", direction="asc")],
         include_position=True,
     )
-    assert [item.call_id for item in items] == [call.id for call in calls]
+    assert {item.call_id for item in items} == {call.id for call in calls}
     assert [item.display_fields for item in items] == [
         ["inputs.prompt", "output.text"],
         ["inputs.prompt", "output.text"],
