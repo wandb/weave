@@ -145,12 +145,16 @@ def test_disabled_batch_emits_no_spans(
     assert otel_spans.get_finished_spans() == ()
 
 
-def test_disabled_init_skips_session_tracing():
-    """``init_weave_disabled`` is the path ``weave.init()`` takes under
-    ``WEAVE_DISABLED=true`` (short-circuited in ``api.py`` before
-    ``init_weave``). It must not invoke ``_setup_session_tracing`` —
-    otherwise a global OTel TracerProvider would be installed against
-    the disabled stub server.
+def test_disabled_init_does_not_install_session_tracer_provider():
+    """Init-time half of the disabled-tracing invariant.
+
+    The streaming/batch tests above verify runtime spans are suppressed
+    under ``disabled=True``. This one verifies that the init path itself
+    (``init_weave_disabled``, taken by ``weave.init()`` under
+    ``WEAVE_DISABLED=true``) doesn't install a session TracerProvider —
+    a regression that re-introduced the inner guard removed in
+    ``116289e1cd`` would pass the runtime tests but still install a
+    provider against the disabled stub server.
     """
     with (
         patch("weave.trace.weave_init.init_weave_get_server"),
