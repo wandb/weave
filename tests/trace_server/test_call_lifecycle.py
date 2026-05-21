@@ -131,6 +131,10 @@ def test_call_end_started_at_anchors_sortable_datetime(
         client.server.call_start(start_req)
         client.server.call_end(end_req)
 
+    # Force background merge: pre-merge, the start-batch row still has
+    # sortable_datetime = started_at and rescues the WHERE on its own, hiding
+    # the bug. The bug only surfaces once the merge collapses the two parts
+    # into a single row whose `any(sortable_datetime)` could be ended_at.
     ch_client.command("OPTIMIZE TABLE calls_merged FINAL")
 
     threshold = started_at + datetime.timedelta(seconds=60)
