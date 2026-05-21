@@ -11,6 +11,7 @@ from typing import Any, TypeVar
 
 import ddtrace
 
+import weave.type_wrappers.Content.adapters  # noqa: F401 — registers adapters
 from weave.trace_server.opentelemetry.helpers import get_attribute
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
@@ -368,7 +369,11 @@ def _replace_blobs_in_messages(
     trace_server: TraceServerInterface,
     default_role: str,
 ) -> tuple[bool, list[str]]:
-    """Walk message parts and replace blob entries with Content refs.
+    """Walk message parts and replace content-like entries with Content refs.
+
+    Uses ``Content.is_content_like`` so that any registered
+    :class:`ContentAdapter` (e.g. Google GenAI blobs) is handled
+    automatically.
 
     Returns (modified, content_ref_strings) where each content_ref_string
     is a JSON-serialized ContentRef for the ``weave.content_refs`` attribute.
@@ -383,16 +388,10 @@ def _replace_blobs_in_messages(
         if not isinstance(parts, list):
             continue
         for i, part in enumerate(parts):
-            if not isinstance(part, dict):
-                continue
-            if part.get("type") != "blob":
-                continue
-            data = part.get("data")
-            mime_type = part.get("mime_type")
-            if not data or not mime_type:
+            if not isinstance(part, dict) or not Content.is_content_like(part):
                 continue
             try:
-                content_obj = Content.from_base64(data, mimetype=mime_type)
+                content_obj = Content._from_guess(part)
                 ref = store_content_object(content_obj, project_id, trace_server)
                 parts[i] = ref
                 modified = True
@@ -404,7 +403,7 @@ def _replace_blobs_in_messages(
                 }
                 content_refs.append(json.dumps(ref_entry))
                 logger.debug(
-                    "Converted blob part %d: role=%s, mime=%s, size=%d, digest=%s",
+                    "Converted content part %d: role=%s, mime=%s, size=%d, digest=%s",
                     i,
                     role,
                     content_obj.mimetype,
@@ -412,5 +411,5 @@ def _replace_blobs_in_messages(
                     ref["files"]["content"],
                 )
             except Exception as e:
-                logger.warning("Failed to convert GenAI blob part to Content: %s", e)
+                logger.warning("Failed to convert part to Content: %s", e)
     return modified, content_refs

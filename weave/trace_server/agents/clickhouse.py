@@ -478,11 +478,14 @@ class AgentWriteHandler:
                             replace_genai_content_blobs_in_span_attrs,
                         )
 
-                        replace_genai_content_blobs_in_span_attrs(
-                            span.attributes,
-                            req.project_id,
-                            self._trace_server,
-                        )
+                        try:
+                            replace_genai_content_blobs_in_span_attrs(
+                                span.attributes,
+                                req.project_id,
+                                self._trace_server,
+                            )
+                        except Exception:
+                            logger.exception("Failed to convert GenAI blobs for span")
 
                     try:
                         genai_row = extract_genai_span(

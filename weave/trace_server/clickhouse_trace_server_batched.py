@@ -749,9 +749,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    replace_genai_content_blobs_in_span_attrs(
-                        span.attributes, req.project_id, self
-                    )
+                    try:
+                        replace_genai_content_blobs_in_span_attrs(
+                            span.attributes, req.project_id, self
+                        )
+                    except Exception:
+                        logger.exception("Failed to convert GenAI blobs for span")
 
                     calls.append(
                         span.to_call(

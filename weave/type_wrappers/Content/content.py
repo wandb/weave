@@ -12,7 +12,13 @@ from pathlib import Path
 from typing import Annotated, Any, Generic
 from urllib.parse import quote_from_bytes, urlparse
 
-from pydantic import BaseModel, Field, PrivateAttr, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_serializer,
+)
 from typing_extensions import Self, TypeVar
 
 from weave.trace.refs import Ref
@@ -37,6 +43,29 @@ logger = logging.getLogger(__name__)
 # Dummy typevar to allow for passing mimetype/extension through annotated content
 # e.x. Content["pdf"] or Content["application/pdf"]
 T = TypeVar("T", bound=str)
+
+
+class ContentAdaptable(BaseModel):
+    """Base for Pydantic models that can be converted to Content.
+
+    Subclass this, declare fields for your input shape, and implement
+    ``to_content``.  Then call ``register_content_adapter(YourModel)``
+    so that ``Content._from_guess`` and ``Content.is_content_like``
+    pick it up automatically via Pydantic validation.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    def to_content(self) -> Content:
+        raise NotImplementedError
+
+
+_content_adapters: list[type[ContentAdaptable]] = []
+
+
+def register_content_adapter(adapter: type[ContentAdaptable]) -> None:
+    """Register a :class:`ContentAdaptable` model so ``Content._from_guess`` can convert its objects."""
+    _content_adapters.append(adapter)
 
 
 class Content(BaseModel, Generic[T]):
@@ -472,13 +501,48 @@ class Content(BaseModel, Generic[T]):
         return cls.model_construct(**resolved_args)
 
     @classmethod
+    def is_content_like(cls, obj: Any) -> bool:
+        """Return True if *obj* can be converted to Content.
+
+        Tries Pydantic validation against registered
+        :class:`ContentAdaptable` models first, then falls back to the
+        built-in type checks (path, base64, str, bytes).
+        """
+        if isinstance(obj, (Content, ContentAdaptable)):
+            return True
+        if isinstance(obj, dict):
+            for adapter in _content_adapters:
+                try:
+                    adapter.model_validate(obj)
+                except Exception:
+                    continue
+                else:
+                    return True
+            return False
+        return isinstance(obj, (bytes, str, Path))
+
+    @classmethod
     def _from_guess(
         cls: type[Self],
-        input: ValidContentInputs,
+        input: ValidContentInputs | ContentAdaptable,
         /,
         extension: str | None = None,
         mimetype: str | None = None,
     ) -> Self:
+        # Already-validated adapter model
+        if isinstance(input, ContentAdaptable):
+            return input.to_content()  # type: ignore[return-value]
+
+        # Raw dict — try each registered adapter via Pydantic validation
+        if isinstance(input, dict):
+            for adapter in _content_adapters:
+                try:
+                    validated = adapter.model_validate(input)
+                    return validated.to_content()  # type: ignore[return-value]
+                except Exception:
+                    continue
+            raise ValueError(f"No registered adapter matched dict with keys: {sorted(input.keys())}")
+
         # First check if it is a path, we only check validity for str scenario
         # because we have dedicated error message for invalid path
         if isinstance(input, Path) or (isinstance(input, str) and is_valid_path(input)):
