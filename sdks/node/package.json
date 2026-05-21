@@ -29,7 +29,10 @@
     "run": "tsx",
     "prettier-check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\"",
     "generate-api": "swagger-typescript-api generate -o ./src/generated -n traceServerApi.ts --p ./weave.openapi.json ",
-    "dev": "nodemon"
+    "dev": "nodemon",
+    "typecheck:cjs": "tsc --noEmit -p tsconfig.cjs.json",
+    "typecheck:esm": "tsc --noEmit -p tsconfig.esm.json",
+    "typecheck:examples": "tsc --noEmit -p examples/tsconfig.examples.json"
   },
   "files": [
     "dist"
