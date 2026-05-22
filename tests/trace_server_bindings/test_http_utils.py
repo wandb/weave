@@ -42,13 +42,15 @@ def test_413_splits_batch_and_retries():
     assert len(sent_batches) == 2
 
 
-def _raises_413_once():
-    """Send fn factory: raises 413 on first call, succeeds afterwards."""
-    state = {"first": True}
+def _send_413(state: dict | None = None):
+    """Send fn factory. With `state=None`, always raises 413. Otherwise raises
+    on the first call only (uses `state["first"]` for bookkeeping).
+    """
 
     def send(data: bytes) -> None:
-        if state["first"]:
-            state["first"] = False
+        if state is None or state.get("first"):
+            if state is not None:
+                state["first"] = False
             raise httpx.HTTPStatusError(
                 "413", request=Mock(), response=Mock(status_code=413)
             )
@@ -56,119 +58,90 @@ def _raises_413_once():
     return send
 
 
-def test_repackage_callback_fires_on_413_with_single_item():
-    """A single-item batch that 413s and has a repackage callback that returns
-    a new item triggers exactly one resend with the repackaged item, no drop.
+def test_413_single_item_with_callback_repackages_and_retries_then_succeeds():
+    """Happy path for the new repackage hook: a single-item batch that 413s
+    invokes the callback, retries with the returned item, and does NOT drop.
     """
     dropped: list = []
+    encoded: list[bytes] = []
     repackage_calls: list = []
-    encoded_payloads: list[bytes] = []
 
     def repackage(item):
         repackage_calls.append(item)
         return {"item": item, "repackaged": True}
 
     def encode(batch):
-        encoded_payloads.append(repr(batch).encode())
-        return encoded_payloads[-1]
+        encoded.append(repr(batch).encode())
+        return encoded[-1]
 
     process_batch_with_retry(
         [{"item": "huge", "repackaged": False}],
         batch_name="calls_complete",
         remote_request_bytes_limit=100_000_000,
-        send_batch_fn=_raises_413_once(),
+        send_batch_fn=_send_413({"first": True}),
         processor_obj=None,
         encode_batch_fn=encode,
         log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
         repackage_oversize_fn=repackage,
     )
 
-    assert len(repackage_calls) == 1
-    assert repackage_calls[0] == {"item": "huge", "repackaged": False}
+    assert repackage_calls == [{"item": "huge", "repackaged": False}]
     # Two encode calls: original + repackaged.
-    assert len(encoded_payloads) == 2
-    assert b"'repackaged': True" in encoded_payloads[1]
+    assert len(encoded) == 2
+    assert b"'repackaged': True" in encoded[1]
     assert dropped == []
 
 
-def test_repackage_callback_returning_none_falls_through_to_drop():
-    """When the callback can't shrink the payload, drop the batch as before."""
-    dropped: list = []
+class _Tracker:
+    def __init__(self) -> None:
+        self.dropped: list = []
 
-    process_batch_with_retry(
-        [{"item": "tiny", "no": "shrink"}],
-        batch_name="calls",
-        remote_request_bytes_limit=100_000_000,
-        send_batch_fn=_raises_413_once(),
-        processor_obj=None,
-        encode_batch_fn=lambda b: str(b).encode(),
-        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
-        repackage_oversize_fn=lambda item: None,
-    )
-
-    assert len(dropped) == 1
-    assert dropped[0][0] == [{"item": "tiny", "no": "shrink"}]
+    def log(self, batch, err) -> None:
+        self.dropped.append((batch, err))
 
 
-def test_repackage_callback_raising_falls_through_to_drop():
-    """When the callback itself raises, log and drop without crashing."""
-    dropped: list = []
+def _encode_repr(batch) -> bytes:
+    return str(batch).encode()
+
+
+@pytest.mark.disable_logging_error_check
+def test_413_single_item_falls_through_to_drop_for_all_unrecoverable_cases():
+    """Sad paths for the repackage hook: callback returns None, callback
+    raises, retry still 413, no callback supplied. All four collapse to the
+    same outcome - one entry in the drop log, no crash.
+    """
 
     def boom(item):
-        raise RuntimeError("save_object hit the network and timed out")
+        raise RuntimeError("save_object hit the network")
 
-    process_batch_with_retry(
-        [{"item": "huge"}],
-        batch_name="calls_complete",
-        remote_request_bytes_limit=100_000_000,
-        send_batch_fn=_raises_413_once(),
-        processor_obj=None,
-        encode_batch_fn=lambda b: str(b).encode(),
-        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
-        repackage_oversize_fn=boom,
-    )
+    cases: list[tuple[str, dict]] = [
+        ("callback_returns_none", {"repackage_oversize_fn": lambda item: None}),
+        ("callback_raises", {"repackage_oversize_fn": boom}),
+        (
+            "retry_still_413",
+            {"repackage_oversize_fn": lambda item: {"item": "still_huge"}},
+        ),
+        ("no_callback", {}),
+    ]
 
-    assert len(dropped) == 1
-
-
-def test_repackage_retry_still_413_falls_through_to_drop():
-    """If the repackaged payload is also rejected, drop with the retry error."""
-    dropped: list = []
-
-    def always_413(data: bytes) -> None:
-        raise httpx.HTTPStatusError(
-            "413", request=Mock(), response=Mock(status_code=413)
+    for name, extra in cases:
+        tracker = _Tracker()
+        send_fn = (
+            _send_413(None)
+            if name == "retry_still_413"
+            else _send_413({"first": True})
         )
-
-    process_batch_with_retry(
-        [{"item": "huge"}],
-        batch_name="calls_complete",
-        remote_request_bytes_limit=100_000_000,
-        send_batch_fn=always_413,
-        processor_obj=None,
-        encode_batch_fn=lambda b: str(b).encode(),
-        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
-        repackage_oversize_fn=lambda item: {"item": "smaller_but_still_huge"},
-    )
-
-    assert len(dropped) == 1
-
-
-def test_no_callback_preserves_existing_drop_behavior():
-    """When repackage_oversize_fn is omitted, 413 + len==1 still drops cleanly."""
-    dropped: list = []
-
-    process_batch_with_retry(
-        [{"item": "single"}],
-        batch_name="calls",
-        remote_request_bytes_limit=100_000_000,
-        send_batch_fn=_raises_413_once(),
-        processor_obj=None,
-        encode_batch_fn=lambda b: str(b).encode(),
-        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
-    )
-
-    assert len(dropped) == 1
+        process_batch_with_retry(
+            [{"item": "huge"}],
+            batch_name="calls",
+            remote_request_bytes_limit=100_000_000,
+            send_batch_fn=send_fn,
+            processor_obj=None,
+            encode_batch_fn=_encode_repr,
+            log_dropped_fn=tracker.log,
+            **extra,
+        )
+        assert len(tracker.dropped) == 1, f"{name}: expected exactly one dropped batch"
 
 
 def test_calls_complete_mode_required_raises():

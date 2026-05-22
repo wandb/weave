@@ -10,7 +10,13 @@ from pydantic import BaseModel, Field, validate_call
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
 
+from weave.trace.context import weave_client_context
 from weave.trace.env import weave_trace_server_url
+from weave.trace.oversize_repackage import (
+    emit_user_warning,
+    is_payload_too_large_error,
+    repackage_call_fields,
+)
 from weave.trace.settings import (
     max_calls_queue_size,
     should_enable_disk_fallback,
@@ -51,90 +57,59 @@ logger = logging.getLogger(__name__)
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
-def _repackage_complete_batch_item(
-    item: CompleteBatchItem,
-) -> CompleteBatchItem | None:
-    """Repackage oversize fields on a CompleteBatchItem before retry.
+# Schema fields the repackager walks for each batch item shape. Inputs and
+# attributes only appear on starts (and the combined complete row); summary
+# and output only appear on ends (and the combined complete row).
+_REPACKAGEABLE_FIELDS: dict[type, tuple[str, ...]] = {
+    CompleteBatchItem: ("inputs", "attributes", "output", "summary"),
+    StartBatchItem: ("inputs", "attributes"),
+    EndBatchItem: ("summary", "output"),
+}
 
-    Walks `inputs`, `attributes`, `output`, and `summary`. Subtrees larger
-    than the oversize threshold are published as standalone weave objects
-    and replaced inline with their ref URIs. Returns a new item, or None
-    when no field needed repackaging or there's no current client.
+
+def _try_repackage_call_item(
+    item: StartBatchItem | EndBatchItem | CompleteBatchItem,
+) -> StartBatchItem | EndBatchItem | CompleteBatchItem | None:
+    """Repackage any oversize subtrees on a single batch item.
+
+    Walks the schema fields that exist on `item`'s shape, publishes oversize
+    subtrees as standalone weave objects, and substitutes their ref URIs
+    inline. Returns a new item of the same type, or None when there's no
+    current client or nothing crossed the threshold.
+
+    Used as the `repackage_oversize_fn` callback for both the `calls_merged`
+    flush (`/call/upsert_batch`) and `calls_complete` flush
+    (`/v2/<entity>/<project>/calls/complete`), and from `_flush_calls_eager`
+    for the per-item v2 single-call endpoints.
     """
-    # Lazy imports avoid the circular trace -> trace_server_bindings -> trace path.
-    from weave.trace.context import weave_client_context
-    from weave.trace.oversize_repackage import (
-        emit_user_warning,
-        repackage_call_fields,
-    )
-
     client = weave_client_context.get_weave_client()
     if client is None:
         return None
-    complete = item.req
-    new_fields, repackaged = repackage_call_fields(
-        client,
-        fields={
-            "inputs": dict(complete.inputs or {}),
-            "attributes": dict(complete.attributes or {}),
-            "output": complete.output,
-            "summary": dict(complete.summary or {}),
-        },
+    field_names = _REPACKAGEABLE_FIELDS.get(type(item))
+    if field_names is None:
+        return None
+
+    # CompleteBatchItem stores the schema directly on .req; Start/End wrap it
+    # one level deeper as .req.start / .req.end.
+    schema = item.req if isinstance(item, CompleteBatchItem) else (
+        item.req.start if isinstance(item, StartBatchItem) else item.req.end
     )
+    fields: dict[str, Any] = {}
+    for name in field_names:
+        value = getattr(schema, name)
+        fields[name] = dict(value) if isinstance(value, dict) else value
+
+    new_fields, repackaged = repackage_call_fields(client, fields=fields)
     if not repackaged:
         return None
-    new_complete = complete.model_copy(update=new_fields)
     emit_user_warning(repackaged)
-    return CompleteBatchItem(req=new_complete)
 
-
-def _repackage_legacy_batch_item(
-    item: StartBatchItem | EndBatchItem,
-) -> StartBatchItem | EndBatchItem | None:
-    """Repackage oversize fields on a legacy batch item.
-
-    For an EndBatchItem, walks `summary` and `output`. For a StartBatchItem,
-    walks `inputs` and `attributes`. Returns a new item, or None when no
-    field needed repackaging or there's no current client.
-    """
-    from weave.trace.context import weave_client_context
-    from weave.trace.oversize_repackage import (
-        emit_user_warning,
-        repackage_call_fields,
-    )
-
-    client = weave_client_context.get_weave_client()
-    if client is None:
-        return None
-    if isinstance(item, EndBatchItem):
-        end = item.req.end
-        new_fields, repackaged = repackage_call_fields(
-            client,
-            fields={
-                "summary": dict(end.summary or {}),
-                "output": end.output,
-            },
-        )
-        if not repackaged:
-            return None
-        new_end = end.model_copy(update=new_fields)
-        emit_user_warning(repackaged)
-        return EndBatchItem(req=tsi.CallEndReq(end=new_end))
+    new_schema = schema.model_copy(update=new_fields)
+    if isinstance(item, CompleteBatchItem):
+        return CompleteBatchItem(req=new_schema)
     if isinstance(item, StartBatchItem):
-        start = item.req.start
-        new_fields, repackaged = repackage_call_fields(
-            client,
-            fields={
-                "inputs": dict(start.inputs or {}),
-                "attributes": dict(start.attributes or {}),
-            },
-        )
-        if not repackaged:
-            return None
-        new_start = start.model_copy(update=new_fields)
-        emit_user_warning(repackaged)
-        return StartBatchItem(req=tsi.CallStartReq(start=new_start))
-    return None
+        return StartBatchItem(req=tsi.CallStartReq(start=new_schema))
+    return EndBatchItem(req=tsi.CallEndReq(end=new_schema))
 
 
 class RemoteHTTPTraceServer(TraceServerClientInterface):
@@ -296,7 +271,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 get_item_id_fn=get_item_id,
                 log_dropped_fn=log_dropped_call_batch,
                 encode_batch_fn=encode_batch,
-                repackage_oversize_fn=_repackage_legacy_batch_item,
+                repackage_oversize_fn=_try_repackage_call_item,
             )
         except CallsCompleteModeRequired as e:
             # Project requires calls_complete mode - upgrade and re-enqueue the batch
@@ -368,16 +343,30 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         are exhausted, the item is logged and dropped, then processing continues
         with remaining items in the batch.
         """
+        def send(it: StartBatchItem | EndBatchItem) -> None:
+            if isinstance(it, StartBatchItem):
+                self._send_call_start_v2(it.req.start)
+            elif isinstance(it, EndBatchItem):
+                self._send_call_end_v2(it.req.end)
+
         for item in batch:
             try:
-                if isinstance(item, StartBatchItem):
-                    self._send_call_start_v2(item.req.start)
-                elif isinstance(item, EndBatchItem):
-                    self._send_call_end_v2(item.req.end)
+                send(item)
             except CallsCompleteModeRequired:
                 # Re-raise so caller can handle the upgrade to calls_complete mode
                 raise
             except Exception as e:
+                # On 413, try repackaging oversize fields and resend once before
+                # giving up. Mirrors the same recovery that
+                # `process_batch_with_retry` performs for the batched flush paths.
+                if is_payload_too_large_error(e):
+                    repackaged = _try_repackage_call_item(item)
+                    if repackaged is not None:
+                        try:
+                            send(repackaged)
+                            continue
+                        except Exception as retry_err:
+                            e = retry_err
                 log_dropped_call_batch([item], e)
 
     @with_retry
@@ -467,7 +456,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             get_item_id_fn=get_item_id,
             log_dropped_fn=log_dropped_call_batch,
             encode_batch_fn=encode_batch,
-            repackage_oversize_fn=_repackage_complete_batch_item,
+            repackage_oversize_fn=_try_repackage_call_item,
         )
 
     def get_call_processor(self) -> AsyncBatchProcessor | CallBatchProcessor | None:
