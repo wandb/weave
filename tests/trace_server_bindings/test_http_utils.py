@@ -42,6 +42,135 @@ def test_413_splits_batch_and_retries():
     assert len(sent_batches) == 2
 
 
+def _raises_413_once():
+    """Send fn factory: raises 413 on first call, succeeds afterwards."""
+    state = {"first": True}
+
+    def send(data: bytes) -> None:
+        if state["first"]:
+            state["first"] = False
+            raise httpx.HTTPStatusError(
+                "413", request=Mock(), response=Mock(status_code=413)
+            )
+
+    return send
+
+
+def test_repackage_callback_fires_on_413_with_single_item():
+    """A single-item batch that 413s and has a repackage callback that returns
+    a new item triggers exactly one resend with the repackaged item, no drop.
+    """
+    dropped: list = []
+    repackage_calls: list = []
+    encoded_payloads: list[bytes] = []
+
+    def repackage(item):
+        repackage_calls.append(item)
+        return {"item": item, "repackaged": True}
+
+    def encode(batch):
+        encoded_payloads.append(repr(batch).encode())
+        return encoded_payloads[-1]
+
+    process_batch_with_retry(
+        [{"item": "huge", "repackaged": False}],
+        batch_name="calls_complete",
+        remote_request_bytes_limit=100_000_000,
+        send_batch_fn=_raises_413_once(),
+        processor_obj=None,
+        encode_batch_fn=encode,
+        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
+        repackage_oversize_fn=repackage,
+    )
+
+    assert len(repackage_calls) == 1
+    assert repackage_calls[0] == {"item": "huge", "repackaged": False}
+    # Two encode calls: original + repackaged.
+    assert len(encoded_payloads) == 2
+    assert b"'repackaged': True" in encoded_payloads[1]
+    assert dropped == []
+
+
+def test_repackage_callback_returning_none_falls_through_to_drop():
+    """When the callback can't shrink the payload, drop the batch as before."""
+    dropped: list = []
+
+    process_batch_with_retry(
+        [{"item": "tiny", "no": "shrink"}],
+        batch_name="calls",
+        remote_request_bytes_limit=100_000_000,
+        send_batch_fn=_raises_413_once(),
+        processor_obj=None,
+        encode_batch_fn=lambda b: str(b).encode(),
+        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
+        repackage_oversize_fn=lambda item: None,
+    )
+
+    assert len(dropped) == 1
+    assert dropped[0][0] == [{"item": "tiny", "no": "shrink"}]
+
+
+def test_repackage_callback_raising_falls_through_to_drop():
+    """When the callback itself raises, log and drop without crashing."""
+    dropped: list = []
+
+    def boom(item):
+        raise RuntimeError("save_object hit the network and timed out")
+
+    process_batch_with_retry(
+        [{"item": "huge"}],
+        batch_name="calls_complete",
+        remote_request_bytes_limit=100_000_000,
+        send_batch_fn=_raises_413_once(),
+        processor_obj=None,
+        encode_batch_fn=lambda b: str(b).encode(),
+        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
+        repackage_oversize_fn=boom,
+    )
+
+    assert len(dropped) == 1
+
+
+def test_repackage_retry_still_413_falls_through_to_drop():
+    """If the repackaged payload is also rejected, drop with the retry error."""
+    dropped: list = []
+
+    def always_413(data: bytes) -> None:
+        raise httpx.HTTPStatusError(
+            "413", request=Mock(), response=Mock(status_code=413)
+        )
+
+    process_batch_with_retry(
+        [{"item": "huge"}],
+        batch_name="calls_complete",
+        remote_request_bytes_limit=100_000_000,
+        send_batch_fn=always_413,
+        processor_obj=None,
+        encode_batch_fn=lambda b: str(b).encode(),
+        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
+        repackage_oversize_fn=lambda item: {"item": "smaller_but_still_huge"},
+    )
+
+    assert len(dropped) == 1
+
+
+def test_no_callback_preserves_existing_drop_behavior():
+    """When repackage_oversize_fn is omitted, 413 + len==1 still drops cleanly."""
+    dropped: list = []
+
+    process_batch_with_retry(
+        [{"item": "single"}],
+        batch_name="calls",
+        remote_request_bytes_limit=100_000_000,
+        send_batch_fn=_raises_413_once(),
+        processor_obj=None,
+        encode_batch_fn=lambda b: str(b).encode(),
+        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
+    )
+
+    assert len(dropped) == 1
+
+
 def test_calls_complete_mode_required_raises():
     """Map calls_complete mode errors to CallsCompleteModeRequired."""
     response = httpx.Response(

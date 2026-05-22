@@ -358,3 +358,197 @@ def test_emit_user_warning_names_repackaged_paths(caplog) -> None:
     assert "summary.weave.predictions" in msg
     assert "output" in msg
     assert "weave.publish" in msg  # guidance line
+
+
+# ---------------------------------------------------------------------------
+# repackage_call_fields
+# ---------------------------------------------------------------------------
+
+
+def test_repackage_call_fields_passes_through_none_values() -> None:
+    """None field values must round-trip as None, not '{}'."""
+    client = FakeClient()
+    new_fields, repackaged = oversize_repackage.repackage_call_fields(
+        client,  # type: ignore[arg-type]
+        fields={"summary": None, "output": None},
+    )
+    assert new_fields == {"summary": None, "output": None}
+    assert repackaged == []
+    assert client.saved == []
+
+
+def test_repackage_call_fields_returns_small_values_unchanged() -> None:
+    """Anything under the oversize threshold passes through identically."""
+    client = FakeClient()
+    new_fields, repackaged = oversize_repackage.repackage_call_fields(
+        client,  # type: ignore[arg-type]
+        fields={
+            "summary": {"weave": {"status": "success"}},
+            "output": {"label": "ok"},
+        },
+    )
+    assert new_fields == {
+        "summary": {"weave": {"status": "success"}},
+        "output": {"label": "ok"},
+    }
+    assert repackaged == []
+
+
+def test_repackage_call_fields_hoists_oversize_subtrees() -> None:
+    """A subtree above the threshold is published and replaced with a ref URI."""
+    client = FakeClient()
+    big = "x" * (OVERSIZE_SUBTREE_BYTES * 2)
+    new_fields, repackaged = oversize_repackage.repackage_call_fields(
+        client,  # type: ignore[arg-type]
+        fields={
+            "inputs": {"prompt": "small", "context": big},
+            "output": {"label": "ok"},
+        },
+    )
+    assert new_fields["inputs"]["prompt"] == "small"
+    assert new_fields["inputs"]["context"].startswith("weave:///")
+    assert new_fields["output"] == {"label": "ok"}
+    assert "inputs.context" in repackaged
+
+
+# ---------------------------------------------------------------------------
+# Batched-flush repackage closures (RemoteHTTPTraceServer)
+# ---------------------------------------------------------------------------
+
+
+def _complete_item(*, inputs=None, output=None, summary=None, attributes=None):
+    """Build a CompleteBatchItem for closure tests."""
+    import datetime as _dt
+    from weave.trace_server.trace_server_interface import (
+        CompletedCallSchemaForInsert,
+    )
+    from weave.trace_server_bindings.models import CompleteBatchItem
+
+    req = CompletedCallSchemaForInsert(
+        project_id="ent/proj",
+        id="0199_complete_id",
+        trace_id="0199_trace_id",
+        op_name="op_name",
+        started_at=_dt.datetime(2026, 5, 1),
+        ended_at=_dt.datetime(2026, 5, 1, 0, 0, 1),
+        attributes=attributes or {},
+        inputs=inputs or {},
+        output=output,
+        summary=summary or {},
+    )
+    return CompleteBatchItem(req=req)
+
+
+def _end_item(*, output=None, summary=None):
+    import datetime as _dt
+    from weave.trace_server.trace_server_interface import (
+        CallEndReq,
+        EndedCallSchemaForInsert,
+    )
+    from weave.trace_server_bindings.models import EndBatchItem
+
+    end = EndedCallSchemaForInsert(
+        project_id="ent/proj",
+        id="0199_end_id",
+        ended_at=_dt.datetime(2026, 5, 1),
+        output=output,
+        summary=summary or {},
+    )
+    return EndBatchItem(req=CallEndReq(end=end))
+
+
+def test_repackage_complete_batch_item_repackages_output(monkeypatch) -> None:
+    """The CompleteBatchItem closure hoists oversize output subtrees and
+    returns a new item with refs inline.
+    """
+    from weave.trace.context import weave_client_context
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        _repackage_complete_batch_item,
+    )
+
+    client = FakeClient()
+    monkeypatch.setattr(weave_client_context, "get_weave_client", lambda: client)
+
+    big = "x" * (OVERSIZE_SUBTREE_BYTES * 2)
+    item = _complete_item(
+        inputs={"prompt": "small"},
+        output={"label": "ok", "blob": big},
+        summary={"weave": {"status": "success"}},
+    )
+
+    new_item = _repackage_complete_batch_item(item)
+
+    assert new_item is not None
+    assert new_item.req.output["blob"].startswith("weave:///")
+    assert new_item.req.output["label"] == "ok"
+    assert new_item.req.inputs == {"prompt": "small"}
+    # Original item not mutated.
+    assert item.req.output["blob"] == big
+
+
+def test_repackage_complete_batch_item_returns_none_when_nothing_to_shrink(
+    monkeypatch,
+) -> None:
+    from weave.trace.context import weave_client_context
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        _repackage_complete_batch_item,
+    )
+
+    client = FakeClient()
+    monkeypatch.setattr(weave_client_context, "get_weave_client", lambda: client)
+    item = _complete_item(
+        inputs={"prompt": "small"},
+        output={"label": "ok"},
+        summary={"weave": {"status": "success"}},
+    )
+    assert _repackage_complete_batch_item(item) is None
+    assert client.saved == []
+
+
+def test_repackage_complete_batch_item_returns_none_when_no_client(
+    monkeypatch,
+) -> None:
+    from weave.trace.context import weave_client_context
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        _repackage_complete_batch_item,
+    )
+
+    monkeypatch.setattr(weave_client_context, "get_weave_client", lambda: None)
+    item = _complete_item(output={"blob": "x" * (OVERSIZE_SUBTREE_BYTES * 2)})
+    assert _repackage_complete_batch_item(item) is None
+
+
+def test_repackage_legacy_end_item_hoists_summary_and_output(monkeypatch) -> None:
+    from weave.trace.context import weave_client_context
+    from weave.trace_server_bindings.models import EndBatchItem
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        _repackage_legacy_batch_item,
+    )
+
+    client = FakeClient()
+    monkeypatch.setattr(weave_client_context, "get_weave_client", lambda: client)
+
+    big = "x" * (OVERSIZE_SUBTREE_BYTES * 2)
+    item = _end_item(
+        output={"blob": big, "label": "ok"},
+        summary={"keep": "small"},
+    )
+
+    new_item = _repackage_legacy_batch_item(item)
+
+    assert isinstance(new_item, EndBatchItem)
+    assert new_item.req.end.output["blob"].startswith("weave:///")
+    assert new_item.req.end.output["label"] == "ok"
+    assert new_item.req.end.summary == {"keep": "small"}
+
+
+def test_repackage_legacy_returns_none_when_nothing_to_shrink(monkeypatch) -> None:
+    from weave.trace.context import weave_client_context
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        _repackage_legacy_batch_item,
+    )
+
+    client = FakeClient()
+    monkeypatch.setattr(weave_client_context, "get_weave_client", lambda: client)
+    item = _end_item(output={"label": "ok"}, summary={"weave": {"status": "ok"}})
+    assert _repackage_legacy_batch_item(item) is None
