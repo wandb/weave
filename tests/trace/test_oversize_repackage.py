@@ -125,13 +125,14 @@ def test_walk_and_repackage_handles_all_shapes(client) -> None:
     """Covers under-threshold, oversize child, greedy bundle, oversize list/scalar, nested oversize."""
     obj = {"a": 1, "b": "small"}
     assert (
-        _walk_and_repackage(obj, client=client, path=("summary",), repackaged=[])
-        == obj
+        _walk_and_repackage(obj, client=client, path=("summary",), repackaged=[]) == obj
     )
 
     obj = {"small_a": 1, "small_b": "tiny", "huge": BIG_BLOB}
     paths: list[str] = []
-    result = _walk_and_repackage(obj, client=client, path=("summary",), repackaged=paths)
+    result = _walk_and_repackage(
+        obj, client=client, path=("summary",), repackaged=paths
+    )
     assert result["small_a"] == 1
     assert result["small_b"] == "tiny"
     assert result["huge"].startswith("weave:///")
@@ -220,7 +221,9 @@ def test_try_repackage_call_item_dispatches_all_three_item_shapes(
     assert new.req.start.inputs["prompt"].startswith("weave:///")
     assert new.req.start.inputs["tag"] == "t"
 
-    item = _end_item(output={"blob": BIG_BLOB, "label": "ok"}, summary={"keep": "small"})
+    item = _end_item(
+        output={"blob": BIG_BLOB, "label": "ok"}, summary={"keep": "small"}
+    )
     new = _try_repackage_call_item(item)
     assert isinstance(new, EndBatchItem)
     assert new.req.end.output["blob"].startswith("weave:///")

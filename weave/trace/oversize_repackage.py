@@ -83,7 +83,9 @@ def _greedy_batch(
 
     if not overflow_bundle:
         # JSON overhead pushed the parent over the threshold but every child fits.
-        return _publish_subtree(obj_dict, client=client, path=path, repackaged=repackaged)
+        return _publish_subtree(
+            obj_dict, client=client, path=path, repackaged=repackaged
+        )
 
     bundle_ref = _publish_subtree(
         overflow_bundle,

@@ -75,8 +75,10 @@ def _try_repackage_call_item(
     if field_names is None:
         return None
 
-    schema = item.req if isinstance(item, CompleteBatchItem) else (
-        item.req.start if isinstance(item, StartBatchItem) else item.req.end
+    schema = (
+        item.req
+        if isinstance(item, CompleteBatchItem)
+        else (item.req.start if isinstance(item, StartBatchItem) else item.req.end)
     )
     fields: dict[str, Any] = {}
     for name in field_names:
@@ -327,6 +329,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         are exhausted, the item is logged and dropped, then processing continues
         with remaining items in the batch.
         """
+
         def send(it: StartBatchItem | EndBatchItem) -> None:
             if isinstance(it, StartBatchItem):
                 self._send_call_start_v2(it.req.start)

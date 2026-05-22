@@ -224,11 +224,6 @@ def process_batch_with_retry(
                 if repackaged_item is not None:
                     try:
                         send_batch_fn(encode_batch_fn([repackaged_item]))
-                        logger.info(
-                            "Repackaged oversize %s payload and retry succeeded",
-                            batch_name,
-                        )
-                        return
                     except Exception as retry_err:
                         logger.warning(
                             "Repackaged %s payload still rejected: %s",
@@ -236,6 +231,12 @@ def process_batch_with_retry(
                             retry_err,
                         )
                         e = retry_err
+                    else:
+                        logger.info(
+                            "Repackaged oversize %s payload and retry succeeded",
+                            batch_name,
+                        )
+                        return
 
         if not _is_retryable_exception(e):
             if log_dropped_fn:

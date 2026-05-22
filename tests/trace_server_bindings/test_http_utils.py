@@ -127,9 +127,7 @@ def test_413_single_item_falls_through_to_drop_for_all_unrecoverable_cases():
     for name, extra in cases:
         tracker = _Tracker()
         send_fn = (
-            _send_413(None)
-            if name == "retry_still_413"
-            else _send_413({"first": True})
+            _send_413(None) if name == "retry_still_413" else _send_413({"first": True})
         )
         process_batch_with_retry(
             [{"item": "huge"}],
