@@ -99,9 +99,9 @@ ColumnType = Literal[
     "float",
     # Array(String) in ClickHouse; JSON text in SQLite.
     "array_string",
-    # Map(*, String) in ClickHouse; JSON text in SQLite.
+    # Map(String, String) in ClickHouse; JSON text in SQLite.
     "map_string_string",
-    # Map(*, Float64) in ClickHouse; JSON text in SQLite.
+    # Map(String, Float64) in ClickHouse; JSON text in SQLite.
     "map_string_float",
 ]
 
@@ -193,7 +193,12 @@ class Table:
         if database_type == "sqlite":
             return f"DELETE FROM {self.name}"
 
-    def tuple_to_row(self, tup: tuple, fields: list[str]) -> Row:
+    def tuple_to_row(
+        self,
+        tup: tuple,
+        fields: list[str],
+        database_type: DatabaseType,
+    ) -> Row:
         d = {}
         for i, field in enumerate(fields):
             normalized_field = field[:-5] if field.endswith("_dump") else field
@@ -201,18 +206,28 @@ class Table:
             col_type = self.col_types.get(normalized_field)
             if col_type == "json":
                 d[normalized_field] = json.loads(value)
-            elif col_type in _JSON_TEXT_BACKED_COL_TYPES and isinstance(value, str):
-                # SQLite stores Array/Map columns as JSON text; ClickHouse returns
-                # them as native list/dict already, so only decode on string values.
+            elif col_type in _JSON_TEXT_BACKED_COL_TYPES and database_type == "sqlite":
+                # SQLite stores Array/Map columns as JSON text; ClickHouse
+                # returns them as native list/dict already.
+                if not isinstance(value, str):
+                    raise ValueError(
+                        f"Unexpected value for {normalized_field}: "
+                        f"expected str, got {type(value).__name__}"
+                    )
                 d[normalized_field] = json.loads(value)
             else:
                 d[normalized_field] = value
         return d
 
-    def tuples_to_rows(self, tuples: list[tuple], fields: list[str]) -> Rows:
+    def tuples_to_rows(
+        self,
+        tuples: list[tuple],
+        fields: list[str],
+        database_type: DatabaseType,
+    ) -> Rows:
         rows = []
         for t in tuples:
-            rows.append(self.tuple_to_row(t, fields))
+            rows.append(self.tuple_to_row(t, fields, database_type))
         return rows
 
 

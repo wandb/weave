@@ -141,10 +141,9 @@ def test_array_string_column_round_trip_clickhouse():
     # ClickHouse driver accepts native list; ORM must not JSON-encode it.
     assert prepared.data == [["a", ["x", "y"]]]
     # Reading back a CH row returns a native list and ORM passes it through.
-    assert table.tuple_to_row(("a", ["x", "y"]), ["id", "tags"]) == {
-        "id": "a",
-        "tags": ["x", "y"],
-    }
+    assert table.tuple_to_row(
+        ("a", ["x", "y"]), ["id", "tags"], database_type="clickhouse"
+    ) == {"id": "a", "tags": ["x", "y"]}
 
 
 def test_array_string_column_round_trip_sqlite():
@@ -154,10 +153,9 @@ def test_array_string_column_round_trip_sqlite():
     # SQLite has no Array type — ORM must JSON-encode the list to TEXT.
     assert prepared.data == [["a", '["x", "y"]']]
     # And decode on the way out.
-    assert table.tuple_to_row(("a", '["x", "y"]'), ["id", "tags"]) == {
-        "id": "a",
-        "tags": ["x", "y"],
-    }
+    assert table.tuple_to_row(
+        ("a", '["x", "y"]'), ["id", "tags"], database_type="sqlite"
+    ) == {"id": "a", "tags": ["x", "y"]}
 
 
 def test_map_string_float_column_round_trip():
@@ -174,14 +172,12 @@ def test_map_string_float_column_round_trip():
         database_type="sqlite"
     )
     assert sqlite_prepared.data == [["a", '{"_rating_": 0.87}']]
-    assert table.tuple_to_row(("a", payload), ["id", "ratings"]) == {
-        "id": "a",
-        "ratings": payload,
-    }
-    assert table.tuple_to_row(("a", '{"_rating_": 0.87}'), ["id", "ratings"]) == {
-        "id": "a",
-        "ratings": payload,
-    }
+    assert table.tuple_to_row(
+        ("a", payload), ["id", "ratings"], database_type="clickhouse"
+    ) == {"id": "a", "ratings": payload}
+    assert table.tuple_to_row(
+        ("a", '{"_rating_": 0.87}'), ["id", "ratings"], database_type="sqlite"
+    ) == {"id": "a", "ratings": payload}
 
 
 def test_select_basic():

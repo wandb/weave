@@ -6120,7 +6120,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
-            query_result.result_rows, prepared.fields
+            query_result.result_rows, prepared.fields, database_type="clickhouse"
         )
         return tsi.CostQueryRes(results=results)
 
@@ -6210,7 +6210,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
-            query_result.result_rows, prepared.fields
+            query_result.result_rows, prepared.fields, database_type="clickhouse"
         )
         return tsi.FeedbackQueryRes(result=result)
 
