@@ -19,7 +19,7 @@ import {
   GENAI_SPAN_REF_ATTR_KEY,
   WEAVE_ATTRIBUTES_NAMESPACE,
 } from './constants';
-import {GEN_AI_ATTR} from './genai/semconv';
+import {ATTR_GEN_AI_OPERATION_NAME} from './genai/semconv';
 import {globalSingleton} from './utils/globalSingleton';
 import type {CallStackEntry, WeaveClient} from './weaveClient';
 
@@ -131,7 +131,7 @@ export class EvalLinkSpanProcessor implements SpanProcessor {
 
   onEnd(span: ReadableSpan): void {
     const attrs = span.attributes || {};
-    if (!(GEN_AI_ATTR.GEN_AI_OPERATION_NAME in attrs)) {
+    if (!(ATTR_GEN_AI_OPERATION_NAME in attrs)) {
       return;
     }
 
