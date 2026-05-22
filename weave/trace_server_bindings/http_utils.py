@@ -96,6 +96,7 @@ def _split_and_process_halves(
     get_item_id_fn: Callable[[T], str] | None,
     log_dropped_fn: Callable[[list[T], Exception], None] | None,
     encode_batch_fn: Callable[[list[T]], bytes],
+    repackage_oversize_fn: Callable[[T], T | None] | None = None,
 ) -> None:
     """Split a batch in half and recursively process each half."""
     split_idx = len(batch) // 2
@@ -110,6 +111,7 @@ def _split_and_process_halves(
             get_item_id_fn=get_item_id_fn,
             log_dropped_fn=log_dropped_fn,
             encode_batch_fn=encode_batch_fn,
+            repackage_oversize_fn=repackage_oversize_fn,
         )
 
 
@@ -124,6 +126,7 @@ def process_batch_with_retry(
     get_item_id_fn: Callable[[T], str] | None = None,
     log_dropped_fn: Callable[[list[T], Exception], None] | None = None,
     encode_batch_fn: Callable[[list[T]], bytes],
+    repackage_oversize_fn: Callable[[T], T | None] | None = None,
 ) -> None:
     """Process a batch with common retry and error handling logic.
 
@@ -168,6 +171,7 @@ def process_batch_with_retry(
             get_item_id_fn=get_item_id_fn,
             log_dropped_fn=log_dropped_fn,
             encode_batch_fn=encode_batch_fn,
+            repackage_oversize_fn=repackage_oversize_fn,
         )
         return
 
@@ -186,24 +190,52 @@ def process_batch_with_retry(
         # Re-raise so caller can handle the upgrade to calls_complete mode
         raise
     except Exception as e:
-        # Handle 413 specially: server rejected as too large, split and retry
-        if _is_413_error(e) and len(batch) > 1:
-            logger.warning(
-                "Server returned 413 for %s batch of %s items, splitting and retrying",
-                batch_name,
-                len(batch),
-            )
-            _split_and_process_halves(
-                batch,
-                batch_name=batch_name,
-                remote_request_bytes_limit=remote_request_bytes_limit,
-                send_batch_fn=send_batch_fn,
-                processor_obj=processor_obj,
-                get_item_id_fn=get_item_id_fn,
-                log_dropped_fn=log_dropped_fn,
-                encode_batch_fn=encode_batch_fn,
-            )
-            return
+        # Handle 413 specially: server rejected as too large.
+        if _is_413_error(e):
+            if len(batch) > 1:
+                logger.warning(
+                    "Server returned 413 for %s batch of %s items, splitting and retrying",
+                    batch_name,
+                    len(batch),
+                )
+                _split_and_process_halves(
+                    batch,
+                    batch_name=batch_name,
+                    remote_request_bytes_limit=remote_request_bytes_limit,
+                    send_batch_fn=send_batch_fn,
+                    processor_obj=processor_obj,
+                    get_item_id_fn=get_item_id_fn,
+                    log_dropped_fn=log_dropped_fn,
+                    encode_batch_fn=encode_batch_fn,
+                    repackage_oversize_fn=repackage_oversize_fn,
+                )
+                return
+
+            # len(batch) == 1: can't split further. Try repackaging oversize
+            # subtrees into refs and resending once before dropping.
+            if repackage_oversize_fn is not None:
+                repackaged_item: T | None = None
+                try:
+                    repackaged_item = repackage_oversize_fn(batch[0])
+                except Exception:
+                    logger.exception(
+                        "Failed to repackage oversize %s payload", batch_name
+                    )
+                if repackaged_item is not None:
+                    try:
+                        send_batch_fn(encode_batch_fn([repackaged_item]))
+                        logger.info(
+                            "Repackaged oversize %s payload and retry succeeded",
+                            batch_name,
+                        )
+                        return
+                    except Exception as retry_err:
+                        logger.warning(
+                            "Repackaged %s payload still rejected: %s",
+                            batch_name,
+                            retry_err,
+                        )
+                        e = retry_err
 
         if not _is_retryable_exception(e):
             if log_dropped_fn:

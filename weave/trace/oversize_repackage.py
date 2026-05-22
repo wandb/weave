@@ -192,6 +192,32 @@ def repackage_oversize_payload(
     return new_summary, new_output, repackaged
 
 
+def repackage_call_fields(
+    client: WeaveClient,
+    *,
+    fields: dict[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
+    """Walk each named value in `fields`, hoisting oversize subtrees out to
+    bucket-stored refs. Returns the new fields mapping (same keys as input)
+    and the dotted-path strings of every subtree that was repackaged.
+
+    Used from the batched flush path when the server rejects a call payload
+    with 413. Keys in `fields` correspond to schema fields on the call insert
+    schemas: `summary`, `output`, `inputs`, `attributes`. None values pass
+    through unchanged.
+    """
+    repackaged: list[str] = []
+    new_fields: dict[str, Any] = {}
+    for name, value in fields.items():
+        if value is None:
+            new_fields[name] = None
+            continue
+        new_fields[name] = _walk_and_repackage(
+            value, client=client, path=(name,), repackaged=repackaged
+        )
+    return new_fields, repackaged
+
+
 def emit_user_warning(repackaged_paths: list[str]) -> None:
     """One concise warning so the user knows the repackage happened
     and can prevent it next time.

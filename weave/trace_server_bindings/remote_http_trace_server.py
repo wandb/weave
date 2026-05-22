@@ -51,6 +51,92 @@ logger = logging.getLogger(__name__)
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
+def _repackage_complete_batch_item(
+    item: CompleteBatchItem,
+) -> CompleteBatchItem | None:
+    """Repackage oversize fields on a CompleteBatchItem before retry.
+
+    Walks `inputs`, `attributes`, `output`, and `summary`. Subtrees larger
+    than the oversize threshold are published as standalone weave objects
+    and replaced inline with their ref URIs. Returns a new item, or None
+    when no field needed repackaging or there's no current client.
+    """
+    # Lazy imports avoid the circular trace -> trace_server_bindings -> trace path.
+    from weave.trace.context import weave_client_context
+    from weave.trace.oversize_repackage import (
+        emit_user_warning,
+        repackage_call_fields,
+    )
+
+    client = weave_client_context.get_weave_client()
+    if client is None:
+        return None
+    complete = item.req
+    new_fields, repackaged = repackage_call_fields(
+        client,
+        fields={
+            "inputs": dict(complete.inputs or {}),
+            "attributes": dict(complete.attributes or {}),
+            "output": complete.output,
+            "summary": dict(complete.summary or {}),
+        },
+    )
+    if not repackaged:
+        return None
+    new_complete = complete.model_copy(update=new_fields)
+    emit_user_warning(repackaged)
+    return CompleteBatchItem(req=new_complete)
+
+
+def _repackage_legacy_batch_item(
+    item: StartBatchItem | EndBatchItem,
+) -> StartBatchItem | EndBatchItem | None:
+    """Repackage oversize fields on a legacy batch item.
+
+    For an EndBatchItem, walks `summary` and `output`. For a StartBatchItem,
+    walks `inputs` and `attributes`. Returns a new item, or None when no
+    field needed repackaging or there's no current client.
+    """
+    from weave.trace.context import weave_client_context
+    from weave.trace.oversize_repackage import (
+        emit_user_warning,
+        repackage_call_fields,
+    )
+
+    client = weave_client_context.get_weave_client()
+    if client is None:
+        return None
+    if isinstance(item, EndBatchItem):
+        end = item.req.end
+        new_fields, repackaged = repackage_call_fields(
+            client,
+            fields={
+                "summary": dict(end.summary or {}),
+                "output": end.output,
+            },
+        )
+        if not repackaged:
+            return None
+        new_end = end.model_copy(update=new_fields)
+        emit_user_warning(repackaged)
+        return EndBatchItem(req=tsi.CallEndReq(end=new_end))
+    if isinstance(item, StartBatchItem):
+        start = item.req.start
+        new_fields, repackaged = repackage_call_fields(
+            client,
+            fields={
+                "inputs": dict(start.inputs or {}),
+                "attributes": dict(start.attributes or {}),
+            },
+        )
+        if not repackaged:
+            return None
+        new_start = start.model_copy(update=new_fields)
+        emit_user_warning(repackaged)
+        return StartBatchItem(req=tsi.CallStartReq(start=new_start))
+    return None
+
+
 class RemoteHTTPTraceServer(TraceServerClientInterface):
     trace_server_url: str
 
@@ -210,6 +296,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 get_item_id_fn=get_item_id,
                 log_dropped_fn=log_dropped_call_batch,
                 encode_batch_fn=encode_batch,
+                repackage_oversize_fn=_repackage_legacy_batch_item,
             )
         except CallsCompleteModeRequired as e:
             # Project requires calls_complete mode - upgrade and re-enqueue the batch
@@ -380,6 +467,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             get_item_id_fn=get_item_id,
             log_dropped_fn=log_dropped_call_batch,
             encode_batch_fn=encode_batch,
+            repackage_oversize_fn=_repackage_complete_batch_item,
         )
 
     def get_call_processor(self) -> AsyncBatchProcessor | CallBatchProcessor | None:
