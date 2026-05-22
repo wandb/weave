@@ -4222,7 +4222,9 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
     """
     req = tsi.CallsQueryStatsReq(project_id="project")
     pb = ParamBuilder("pb")
-    _query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    _query, _columns, settings = build_calls_stats_query(
+        req, pb, ReadTable.CALLS_MERGED
+    )
     assert settings == {}
     assert_stats_sql(
         req,
@@ -4245,7 +4247,9 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
     """
     req = tsi.CallsQueryStatsReq(project_id="project", limit=5)
     pb = ParamBuilder("pb")
-    _query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    _query, _columns, settings = build_calls_stats_query(
+        req, pb, ReadTable.CALLS_MERGED
+    )
     assert settings == {}
     assert_stats_sql(
         req,
