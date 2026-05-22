@@ -69,6 +69,61 @@ def _publish_subtree(
     return ref.uri()
 
 
+# Reserved key used to attach the overflow bundle alongside the inline
+# survivors. Chosen with a `_weave_` prefix so it sorts last in dict views
+# and is unlikely to collide with user-supplied keys.
+OVERFLOW_BUNDLE_KEY = "_weave_overflow"
+
+
+def _greedy_batch(
+    obj_dict: dict[str, Any],
+    *,
+    client: WeaveClient,
+    path: tuple[str, ...],
+    repackaged: list[str],
+) -> Any:
+    """Smallest-first packing of `obj_dict`.
+
+    Walks children in ascending size order, keeping each inline until
+    inline_bytes would exceed `OVERSIZE_SUBTREE_BYTES`. Once the budget is
+    hit, every remaining (larger) child gets bundled into a single weave
+    object that's attached under `OVERFLOW_BUNDLE_KEY` as a ref URI.
+
+    This preserves the inline shape of small siblings (the common case for
+    a summary dict where one or two subtrees are huge), while batching
+    medium-sized siblings together to avoid N round-trips of `_save_object`.
+    """
+    sized = sorted(
+        ((k, v, _approx_size(v)) for k, v in obj_dict.items()),
+        key=lambda triple: triple[2],
+    )
+
+    inline: dict[str, Any] = {}
+    overflow_bundle: dict[str, Any] = {}
+    inline_bytes = 0
+
+    for k, v, size in sized:
+        if inline_bytes + size <= OVERSIZE_SUBTREE_BYTES:
+            inline[k] = v
+            inline_bytes += size
+        else:
+            overflow_bundle[k] = v
+
+    if not overflow_bundle:
+        # JSON overhead pushed the dict over the threshold but every child
+        # individually fits. Fall back to publishing the whole thing.
+        return _publish_subtree(obj_dict, client=client, path=path, repackaged=repackaged)
+
+    bundle_ref = _publish_subtree(
+        overflow_bundle,
+        client=client,
+        path=path + (OVERFLOW_BUNDLE_KEY,),
+        repackaged=repackaged,
+    )
+    inline[OVERFLOW_BUNDLE_KEY] = bundle_ref
+    return inline
+
+
 def _walk_and_repackage(
     obj: Any,
     *,
@@ -76,9 +131,9 @@ def _walk_and_repackage(
     path: tuple[str, ...],
     repackaged: list[str],
 ) -> Any:
-    """Walk `obj`. When a subtree exceeds the threshold, descend into
-    dicts to find smaller offenders first; otherwise publish the whole
-    subtree as a weave object and replace it with its ref URI.
+    """Walk `obj`. When a subtree exceeds the threshold, first recurse to
+    hoist out any individually-oversize nested children, then greedy-batch
+    the remaining medium-sized siblings under a single overflow ref.
     """
     if _approx_size(obj) <= OVERSIZE_SUBTREE_BYTES:
         return obj
@@ -94,7 +149,7 @@ def _walk_and_repackage(
             )
         if _approx_size(new_obj) <= OVERSIZE_SUBTREE_BYTES:
             return new_obj
-        return _publish_subtree(new_obj, client=client, path=path, repackaged=repackaged)
+        return _greedy_batch(new_obj, client=client, path=path, repackaged=repackaged)
 
     return _publish_subtree(obj, client=client, path=path, repackaged=repackaged)
 
