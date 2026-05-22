@@ -117,7 +117,7 @@ def redact_pii_string(data: str) -> str:
     return redacted.text
 
 
-def redact_messages(msgs: list[Message] | None) -> list[Message] | None:
+def redact_messages(messages: list[Message] | None) -> list[Message] | None:
     """Redact PII in each Message via dump → redact → revalidate.
 
     Routes through the same recursive ``redact_pii`` used by ``@op`` so
@@ -125,21 +125,23 @@ def redact_messages(msgs: list[Message] | None) -> list[Message] | None:
     (``role``, part ``type``) aren't matched by Presidio's default
     recognizers, so the round-trip preserves the typed shape.
     """
-    if not msgs:
-        return msgs
-    out: list[Message] = []
-    for m in msgs:
-        dumped = m.model_dump()
-        redacted = cast(dict[str, Any], redact_pii(dumped))
-        out.append(Message.model_validate(redacted))
-    return out
+    if not messages:
+        return messages
+    redacted: list[Message] = []
+    for message in messages:
+        dumped = message.model_dump()
+        redacted_dump = cast(dict[str, Any], redact_pii(dumped))
+        redacted.append(Message.model_validate(redacted_dump))
+    return redacted
 
 
-def redact_system_instructions(insts: list[str] | None) -> list[str] | None:
+def redact_system_instructions(
+    instructions: list[str] | None,
+) -> list[str] | None:
     """Redact each system instruction. None/empty in → same out."""
-    if not insts:
-        return insts
-    return [redact_pii_string(s) for s in insts]
+    if not instructions:
+        return instructions
+    return [redact_pii_string(instruction) for instruction in instructions]
 
 
 def track_pii_redaction_enabled(

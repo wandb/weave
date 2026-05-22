@@ -9,6 +9,12 @@ Covers four settings + one bug fix:
   ``weave.*`` metadata attrs on every span (matches ``@op`` defaults).
 - Reasoning leak fix — ``LLM.reasoning`` is now gated by ``include_content``
   in both streaming (``LLM.end``) and batch (``_attrs_for_span``) paths.
+
+Mocking strategy: tests that need redaction patch ``_get_engines`` with
+stub Presidio engines (see ``fake_presidio`` fixture). The real
+``redact_pii`` / ``redact_pii_string`` code paths run — only the external
+NLP dependency is stubbed. Tests that need to assert "no redaction
+happens" patch ``_get_engines`` and assert it isn't called.
 """
 
 from __future__ import annotations
@@ -16,6 +22,7 @@ from __future__ import annotations
 import platform
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 from unittest.mock import patch
 
@@ -35,25 +42,45 @@ from weave.session.session import (
 )
 from weave.trace.settings import override_settings
 
+_PII_EMAIL = "alice@example.com"
+_REDACTED_EMAIL = "<EMAIL>"
 
-def _email_substitutor() -> Callable[[Any], Any]:
-    """Recursive ``alice@example.com → <EMAIL>`` substitutor.
 
-    Stand-in for the real ``redact_pii``: walks dicts and lists like
-    Presidio does, but does plain string substitution so tests don't
-    need the NLP stack installed.
+@dataclass
+class _FakeEntity:
+    start: int
+    end: int
+
+
+@dataclass
+class _FakeResult:
+    text: str
+
+
+class _FakeAnalyzer:
+    def analyze(self, *, text: str, **_: Any) -> list[_FakeEntity]:
+        i = text.find(_PII_EMAIL)
+        return [_FakeEntity(i, i + len(_PII_EMAIL))] if i >= 0 else []
+
+
+class _FakeAnonymizer:
+    def anonymize(self, *, text: str, analyzer_results: Any) -> _FakeResult:
+        return _FakeResult(text.replace(_PII_EMAIL, _REDACTED_EMAIL))
+
+
+@pytest.fixture
+def fake_presidio(monkeypatch: pytest.MonkeyPatch):
+    """Replace Presidio engines with stubs that substitute ``_PII_EMAIL`` → ``_REDACTED_EMAIL``.
+
+    Patches ``_get_engines`` (the single dependency on Presidio) so the
+    real ``redact_pii`` / ``redact_pii_string`` code paths run end-to-end
+    against deterministic engines. Lets tests assert on resulting span
+    attrs without installing the NLP stack.
     """
-
-    def _walk(value: Any) -> Any:
-        if isinstance(value, str):
-            return value.replace("alice@example.com", "<EMAIL>")
-        if isinstance(value, dict):
-            return {k: _walk(v) for k, v in value.items()}
-        if isinstance(value, list):
-            return [_walk(x) for x in value]
-        return value
-
-    return _walk
+    monkeypatch.setattr(
+        "weave.utils.pii_redaction._get_engines",
+        lambda: (_FakeAnalyzer(), _FakeAnonymizer()),
+    )
 
 
 def _spans_with_prefix(otel_spans: InMemorySpanExporter, prefix: str) -> list[Any]:
@@ -61,7 +88,7 @@ def _spans_with_prefix(otel_spans: InMemorySpanExporter, prefix: str) -> list[An
 
 
 # ---------------------------------------------------------------------------
-# disabled — runtime span emission
+# WEAVE_DISABLED — runtime span emission suppressed in streaming + batch
 # ---------------------------------------------------------------------------
 
 
@@ -76,7 +103,7 @@ def test_disabled_streaming_emits_no_spans(otel_spans: InMemorySpanExporter):
     assert otel_spans.get_finished_spans() == ()
 
 
-def _exercise_log_turn() -> Any:
+def _user_func_log_turn() -> Any:
     return log_turn(
         session_id="s",
         agent_name="a",
@@ -84,7 +111,7 @@ def _exercise_log_turn() -> Any:
     )
 
 
-def _exercise_log_session() -> Any:
+def _user_func_log_session() -> Any:
     return log_session(
         turns=[Turn(agent_name="a", messages=[Message(role="user", content="hi")])],
         session_id="s",
@@ -92,98 +119,103 @@ def _exercise_log_session() -> Any:
 
 
 @pytest.mark.parametrize(
-    "exercise",
+    "user_func",
     [
-        pytest.param(_exercise_log_turn, id="log_turn"),
-        pytest.param(_exercise_log_session, id="log_session"),
+        pytest.param(_user_func_log_turn, id="log_turn"),
+        pytest.param(_user_func_log_session, id="log_session"),
     ],
 )
 def test_disabled_batch_emits_no_spans(
-    exercise: Callable[[], Any], otel_spans: InMemorySpanExporter
+    user_func: Callable[[], Any], otel_spans: InMemorySpanExporter
 ):
     with override_settings(disabled=True):
-        result = exercise()
+        result = user_func()
     assert result.span_count == 0
     assert otel_spans.get_finished_spans() == ()
 
 
 # ---------------------------------------------------------------------------
-# redact_pii — applied across streaming + batch paths
+# WEAVE_REDACT_PII — applied across streaming + batch paths
+#
+# Each helper below sets up a session that emits PII through one code path.
+# The test runs the helper under ``redact_pii=True`` and asserts that the
+# resulting span's content attrs are redacted (no raw email, ``<EMAIL>``
+# present).
 # ---------------------------------------------------------------------------
 
 
-def _redact_streaming_tool() -> None:
+def _streaming_tool_with_pii() -> None:
     with start_session(session_id="s") as sess, sess.start_turn() as t:
         with t.tool(name="lookup") as tool:
-            tool.arguments = '{"email":"alice@example.com"}'
-            tool.result = "found alice@example.com"
+            tool.arguments = f'{{"email":"{_PII_EMAIL}"}}'
+            tool.result = f"found {_PII_EMAIL}"
 
 
-def _redact_streaming_llm_messages() -> None:
+def _streaming_llm_messages_with_pii() -> None:
     with start_session(session_id="s") as sess, sess.start_turn() as t:
         with t.llm(
-            model="gpt-4o", system_instructions=["contact alice@example.com"]
+            model="gpt-4o", system_instructions=[f"contact {_PII_EMAIL}"]
         ) as llm:
-            llm.input_messages = [Message(role="user", content="alice@example.com")]
+            llm.input_messages = [Message(role="user", content=_PII_EMAIL)]
             llm.output_messages = [
-                Message(role="assistant", content="hi alice@example.com")
+                Message(role="assistant", content=f"hi {_PII_EMAIL}")
             ]
 
 
-def _redact_streaming_llm_reasoning() -> None:
+def _streaming_llm_reasoning_with_pii() -> None:
     """Regression case for the pre-existing leak: reasoning bypassing redaction."""
     with start_session(session_id="s") as sess, sess.start_turn() as t:
         with t.llm(model="gpt-4o") as llm:
-            llm.reasoning = Reasoning(content="think about alice@example.com")
+            llm.reasoning = Reasoning(content=f"think about {_PII_EMAIL}")
             llm.output_messages = [Message(role="assistant", content="ok")]
 
 
-def _redact_streaming_turn() -> None:
+def _streaming_turn_with_pii() -> None:
     with start_session(session_id="s") as sess:
-        with sess.start_turn(user_message="alice@example.com"):
+        with sess.start_turn(user_message=_PII_EMAIL):
             pass
 
 
-def _redact_batch_turn_messages() -> None:
+def _batch_turn_messages_with_pii() -> None:
     log_turn(
         session_id="s",
         agent_name="a",
-        messages=[Message(role="user", content="alice@example.com")],
+        messages=[Message(role="user", content=_PII_EMAIL)],
     )
 
 
-def _redact_batch_child_llm() -> None:
+def _batch_child_llm_with_pii() -> None:
     log_turn(
         session_id="s",
         agent_name="a",
         spans=[
             LLM(
                 model="gpt-4o",
-                input_messages=[Message(role="user", content="alice@example.com")],
+                input_messages=[Message(role="user", content=_PII_EMAIL)],
             ),
         ],
     )
 
 
-def _redact_batch_child_tool() -> None:
+def _batch_child_tool_with_pii() -> None:
     log_turn(
         session_id="s",
         agent_name="a",
-        spans=[Tool(name="lookup", arguments='{"email":"alice@example.com"}')],
+        spans=[Tool(name="lookup", arguments=f'{{"email":"{_PII_EMAIL}"}}')],
     )
 
 
 @pytest.mark.parametrize(
-    ("exercise", "span_prefix", "checked_keys"),
+    ("user_func", "span_prefix", "checked_keys"),
     [
         pytest.param(
-            _redact_streaming_tool,
+            _streaming_tool_with_pii,
             "execute_tool",
             ("gen_ai.tool.call.arguments", "gen_ai.tool.call.result"),
             id="streaming_tool",
         ),
         pytest.param(
-            _redact_streaming_llm_messages,
+            _streaming_llm_messages_with_pii,
             "chat",
             (
                 "gen_ai.input.messages",
@@ -193,31 +225,31 @@ def _redact_batch_child_tool() -> None:
             id="streaming_llm_messages",
         ),
         pytest.param(
-            _redact_streaming_llm_reasoning,
+            _streaming_llm_reasoning_with_pii,
             "chat",
             ("gen_ai.output.messages",),
             id="streaming_llm_reasoning",
         ),
         pytest.param(
-            _redact_streaming_turn,
+            _streaming_turn_with_pii,
             "invoke_agent",
             ("gen_ai.input.messages",),
             id="streaming_turn",
         ),
         pytest.param(
-            _redact_batch_turn_messages,
+            _batch_turn_messages_with_pii,
             "invoke_agent",
             ("gen_ai.input.messages",),
             id="batch_turn_messages",
         ),
         pytest.param(
-            _redact_batch_child_llm,
+            _batch_child_llm_with_pii,
             "chat",
             ("gen_ai.input.messages",),
             id="batch_child_llm",
         ),
         pytest.param(
-            _redact_batch_child_tool,
+            _batch_child_tool_with_pii,
             "execute_tool",
             ("gen_ai.tool.call.arguments",),
             id="batch_child_tool",
@@ -225,98 +257,92 @@ def _redact_batch_child_tool() -> None:
     ],
 )
 def test_redact_pii_applied(
-    exercise: Callable[[], None],
+    user_func: Callable[[], None],
     span_prefix: str,
     checked_keys: tuple[str, ...],
     otel_spans: InMemorySpanExporter,
+    fake_presidio: None,
 ):
-    """redact_pii=True applies redaction across streaming + batch paths."""
-    substitutor = _email_substitutor()
+    """redact_pii=True routes content through real redact_pii / redact_pii_string."""
     with override_settings(redact_pii=True):
-        with (
-            patch("weave.utils.pii_redaction.redact_pii", side_effect=substitutor),
-            patch(
-                "weave.utils.pii_redaction.redact_pii_string", side_effect=substitutor
-            ),
-        ):
-            exercise()
+        user_func()
 
     spans = _spans_with_prefix(otel_spans, span_prefix)
     assert len(spans) == 1, f"expected 1 {span_prefix} span, got {len(spans)}"
     attrs = dict(spans[0].attributes)
     for key in checked_keys:
-        assert "alice@example.com" not in attrs[key], key
-        assert "<EMAIL>" in attrs[key], key
+        assert _PII_EMAIL not in attrs[key], key
+        assert _REDACTED_EMAIL in attrs[key], key
 
 
 # ---------------------------------------------------------------------------
-# include_content=False — Presidio skipped, content dropped
+# include_content=False — content dropped at source, Presidio never loaded
 # ---------------------------------------------------------------------------
 
 
-def _ic_off_tool() -> None:
+def _content_off_tool() -> None:
     with start_session(session_id="s", include_content=False) as sess:
         with sess.start_turn() as t:
             with t.tool(name="lookup") as tool:
-                tool.arguments = '{"email":"alice@example.com"}'
+                tool.arguments = f'{{"email":"{_PII_EMAIL}"}}'
 
 
-def _ic_off_llm() -> None:
+def _content_off_llm() -> None:
     with start_session(session_id="s", include_content=False) as sess:
         with sess.start_turn() as t:
             with t.llm(model="gpt-4o") as llm:
-                llm.input_messages = [Message(role="user", content="alice@example.com")]
+                llm.input_messages = [Message(role="user", content=_PII_EMAIL)]
                 llm.reasoning = Reasoning(content="think")
 
 
-def _ic_off_turn() -> None:
+def _content_off_turn() -> None:
     with start_session(session_id="s", include_content=False) as sess:
-        with sess.start_turn(user_message="alice@example.com"):
+        with sess.start_turn(user_message=_PII_EMAIL):
             pass
 
 
-def _ic_off_log_turn() -> None:
+def _content_off_log_turn() -> None:
     log_turn(
         session_id="s",
         agent_name="a",
         include_content=False,
-        messages=[Message(role="user", content="alice@example.com")],
-        spans=[Tool(name="lookup", arguments='{"email":"alice@example.com"}')],
+        messages=[Message(role="user", content=_PII_EMAIL)],
+        spans=[Tool(name="lookup", arguments=f'{{"email":"{_PII_EMAIL}"}}')],
     )
 
 
 @pytest.mark.parametrize(
-    "exercise",
+    "user_func",
     [
-        pytest.param(_ic_off_tool, id="tool"),
-        pytest.param(_ic_off_llm, id="llm"),
-        pytest.param(_ic_off_turn, id="turn"),
-        pytest.param(_ic_off_log_turn, id="log_turn"),
+        pytest.param(_content_off_tool, id="tool"),
+        pytest.param(_content_off_llm, id="llm"),
+        pytest.param(_content_off_turn, id="turn"),
+        pytest.param(_content_off_log_turn, id="log_turn"),
     ],
 )
 def test_include_content_false_skips_presidio(
-    exercise: Callable[[], None],
+    user_func: Callable[[], None],
     otel_spans: InMemorySpanExporter,
 ):
-    """include_content=False drops content at source; Presidio is never called."""
+    """Content dropped upstream → Presidio engines must never load.
+
+    Patching ``_get_engines`` and asserting it isn't called is the meaningful
+    invariant: no NLP cost paid on content that's already gone.
+    """
     with override_settings(redact_pii=True):
-        with (
-            patch("weave.utils.pii_redaction.redact_pii") as mock_redact,
-            patch("weave.utils.pii_redaction.redact_pii_string") as mock_redact_str,
-        ):
-            exercise()
-    mock_redact.assert_not_called()
-    mock_redact_str.assert_not_called()
+        with patch("weave.utils.pii_redaction._get_engines") as mock_get_engines:
+            user_func()
+    mock_get_engines.assert_not_called()
 
 
-def _reasoning_streaming() -> None:
+def _reasoning_content_off_streaming() -> None:
     with start_session(session_id="s", include_content=False) as sess:
         with sess.start_turn() as t:
             with t.llm(model="gpt-4o") as llm:
                 llm.reasoning = Reasoning(content="sensitive reasoning")
 
 
-def _reasoning_batch() -> None:
+def _reasoning_content_off_batch() -> None:
     log_turn(
         session_id="s",
         agent_name="a",
@@ -326,24 +352,24 @@ def _reasoning_batch() -> None:
 
 
 @pytest.mark.parametrize(
-    "exercise",
+    "user_func",
     [
-        pytest.param(_reasoning_streaming, id="streaming"),
-        pytest.param(_reasoning_batch, id="batch"),
+        pytest.param(_reasoning_content_off_streaming, id="streaming"),
+        pytest.param(_reasoning_content_off_batch, id="batch"),
     ],
 )
 def test_include_content_false_drops_reasoning(
-    exercise: Callable[[], None], otel_spans: InMemorySpanExporter
+    user_func: Callable[[], None], otel_spans: InMemorySpanExporter
 ):
     """Regression: LLM.reasoning used to bypass include_content and leak into output.messages."""
-    exercise()
+    user_func()
     chat_spans = _spans_with_prefix(otel_spans, "chat")
     attrs = dict(chat_spans[0].attributes)
     assert "gen_ai.output.messages" not in attrs
 
 
 # ---------------------------------------------------------------------------
-# capture_client_info / capture_system_info
+# WEAVE_CAPTURE_CLIENT_INFO / WEAVE_CAPTURE_SYSTEM_INFO
 # ---------------------------------------------------------------------------
 
 # Sentinel for presence-only checks (value exists, content not asserted).
@@ -428,36 +454,25 @@ def test_capture_info_on_batch_path(otel_spans: InMemorySpanExporter):
 # ---------------------------------------------------------------------------
 
 
-def test_settings_independent(otel_spans: InMemorySpanExporter):
+def test_settings_independent(otel_spans: InMemorySpanExporter, fake_presidio: None):
     """redact_pii=True + capture_*=False produces redacted content without weave.* attrs."""
-    substitutor = _email_substitutor()
     with override_settings(
         redact_pii=True, capture_client_info=False, capture_system_info=False
     ):
-        with (
-            patch("weave.utils.pii_redaction.redact_pii", side_effect=substitutor),
-            patch(
-                "weave.utils.pii_redaction.redact_pii_string", side_effect=substitutor
-            ),
-        ):
-            with start_session(session_id="s") as sess, sess.start_turn() as t:
-                with t.tool(name="lookup") as tool:
-                    tool.arguments = "alice@example.com"
+        with start_session(session_id="s") as sess, sess.start_turn() as t:
+            with t.tool(name="lookup") as tool:
+                tool.arguments = _PII_EMAIL
 
     tool_spans = _spans_with_prefix(otel_spans, "execute_tool")
     attrs = dict(tool_spans[0].attributes)
-    assert "<EMAIL>" in attrs["gen_ai.tool.call.arguments"]
+    assert _REDACTED_EMAIL in attrs["gen_ai.tool.call.arguments"]
     assert "weave.client_version" not in attrs
 
 
 def test_defaults_skip_redaction(otel_spans: InMemorySpanExporter):
-    """With defaults (redact_pii=False), redaction primitives are never called."""
-    with (
-        patch("weave.utils.pii_redaction.redact_pii") as mock_redact,
-        patch("weave.utils.pii_redaction.redact_pii_string") as mock_redact_str,
-    ):
+    """With defaults (redact_pii=False), Presidio engines are never loaded."""
+    with patch("weave.utils.pii_redaction._get_engines") as mock_get_engines:
         with start_session(session_id="s") as sess, sess.start_turn() as t:
             with t.tool(name="x") as tool:
-                tool.arguments = "alice@example.com"
-    mock_redact.assert_not_called()
-    mock_redact_str.assert_not_called()
+                tool.arguments = _PII_EMAIL
+    mock_get_engines.assert_not_called()

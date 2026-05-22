@@ -18,27 +18,20 @@ from weave.trace.settings import (
 from weave.version import VERSION
 
 
-def get_capture_info_items() -> list[tuple[str, str]]:
-    """Return weave.* (subkey, value) pairs gated by capture-info settings.
+def get_capture_info() -> dict[str, str]:
+    """Return weave.* metadata keys (unprefixed), gated by capture-info settings.
 
-    Subkeys are unprefixed (``client_version``, not ``weave.client_version``)
+    Keys are unprefixed (``client_version``, not ``weave.client_version``)
     so call sites can prefix or nest as their attribute shape requires.
+    Both settings can independently include or exclude their key group.
     """
-    items: list[tuple[str, str]] = []
+    info: dict[str, str] = {}
     if should_capture_client_info():
-        items.extend(
-            [
-                ("client_version", VERSION),
-                ("source", "python-sdk"),
-                ("sys_version", sys.version),
-            ]
-        )
+        info["client_version"] = VERSION
+        info["source"] = "python-sdk"
+        info["sys_version"] = sys.version
     if should_capture_system_info():
-        items.extend(
-            [
-                ("os_name", platform.system()),
-                ("os_version", platform.version()),
-                ("os_release", platform.release()),
-            ]
-        )
-    return items
+        info["os_name"] = platform.system()
+        info["os_version"] = platform.version()
+        info["os_release"] = platform.release()
+    return info

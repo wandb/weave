@@ -183,7 +183,7 @@ from weave.trace_server_bindings.link_asset_to_registry import (
 )
 from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
-from weave.utils.capture_info import get_capture_info_items
+from weave.utils.capture_info import get_capture_info
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
 from weave.utils.project_id import from_project_id, to_project_id
@@ -967,7 +967,7 @@ class WeaveClient:
         # per-call attributes. Per-call attributes take precedence over the client defaults.
         attributes_dict = AttributesDict(**zip_dicts(self.attributes, attributes))
 
-        for k, v in get_capture_info_items():
+        for k, v in get_capture_info().items():
             attributes_dict._set_weave_item(k, v)
 
         # Skip the future allocation once the op's digest is resolved (any

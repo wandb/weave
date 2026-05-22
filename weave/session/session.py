@@ -43,7 +43,7 @@ from weave.session.types import (
 )
 from weave.trace.settings import should_disable_weave, should_redact_pii
 from weave.utils import pii_redaction
-from weave.utils.capture_info import get_capture_info_items
+from weave.utils.capture_info import get_capture_info
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -110,13 +110,13 @@ __all__ = [
 _TRACER_NAME = "weave.session"
 
 
-def _capture_info_attrs() -> dict[str, Any]:
+def _capture_info_attrs() -> dict[str, str]:
     """Build weave.* client / system info attrs, gated by settings.
 
     Per-span (not OTel ``Resource``) so env-var toggles take effect on
     every emit, matching ``@op`` semantics in ``weave_client.py``.
     """
-    return {f"weave.{k}": v for k, v in get_capture_info_items()}
+    return {f"weave.{k}": v for k, v in get_capture_info().items()}
 
 
 class _SpanBase(BaseModel):
