@@ -2937,6 +2937,20 @@ def _try_optimized_stats_query(
             req.project_id, param_builder, read_table
         )
 
+    # Pattern 3: Unfiltered distinct-call count on calls_merged.
+    #
+    # The slow path GROUP BYs id only to dedupe the start/end rows; with no
+    # filter, query, ref expansion, or storage rollup we can dedupe flat against
+    # the (project_id, id) sort key via uniqExact / uniqUpTo and skip the rollup
+    # entirely. Soft-deleted calls are included -- deleted_at is a per-id rollup
+    # we can't apply without the GROUP BY -- a small one-directional overcount we
+    # accept for the project-overview surface. Calls_complete has its own flat
+    # path; limit=1 keeps going to Pattern 1.
+    if read_table == ReadTable.CALLS_MERGED and _is_unfiltered_stats_req(req):
+        return _optimized_unfiltered_calls_merged_count_query(
+            req.project_id, req.limit, param_builder
+        )
+
     return None
 
 
@@ -2991,6 +3005,51 @@ def _optimized_wb_run_id_not_null_query(
             LIMIT 1
         )
     """
+
+
+def _optimized_unfiltered_calls_merged_count_query(
+    project_id: str,
+    limit: int | None,
+    param_builder: ParamBuilder,
+) -> str:
+    """Flat distinct-id count for unfiltered calls_merged stats.
+
+    Uses the (project_id, id) sort key for streaming dedup. Soft-deleted calls
+    are included (see caller comment).
+    """
+    table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
+    project_id_slot = param_slot(param_builder.add_param(project_id), "String")
+    where = f"WHERE {table_name}.project_id = {project_id_slot}"
+    if limit is None:
+        return f"""
+            SELECT uniqExact({table_name}.id) AS count,
+                   toUInt8(0) AS has_more
+            FROM {table_name}
+            {where}
+        """
+    # uniqUpTo(N)(x) returns the exact distinct count when <= N, else N+1.
+    # Early-terminates dedup once we've saturated the cap.
+    raw = f"uniqUpTo({limit})({table_name}.id)"
+    return f"""
+        SELECT least({raw}, {limit}) AS count,
+               toUInt8({raw} > {limit}) AS has_more
+        FROM {table_name}
+        {where}
+    """
+
+
+def _is_unfiltered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
+    """True iff the request is a pure project-scope count with no narrowing.
+
+    Gates Pattern 3 (flat distinct-id count). limit=1 stays with Pattern 1.
+    """
+    return (
+        (req.limit is None or req.limit > 1)
+        and req.query is None
+        and not req.include_total_storage_size
+        and not req.expand_columns
+        and _is_minimal_filter(req.filter)
+    )
 
 
 def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:

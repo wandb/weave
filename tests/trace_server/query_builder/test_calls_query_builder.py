@@ -4192,17 +4192,118 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     )
 
 
-def test_stats_query_calls_merged_no_caller_limit_skips_cap() -> None:
-    """No caller-supplied limit -> no server cap, no setting, has_more=0.
+def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> None:
+    """Unfiltered calls_merged stats with no limit takes the flat distinct-id path.
 
-    When the cap deferred behind `DEFAULT_STATS_MAX_LIMIT` is re-enabled, this
-    test should assert the streaming-aggregate setting + inner `LIMIT 1000000`
-    + `has_more = toUInt8(count() >= 1000000)`.
+    The (project_id, id) sort key lets uniqExact dedupe streaming, bypassing the
+    GROUP BY rollup. Soft-deleted calls are intentionally included -- deleted_at
+    is a per-id argMax we can't apply without the rollup.
     """
     req = tsi.CallsQueryStatsReq(project_id="project")
     pb = ParamBuilder("pb")
-    query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    _query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
     assert settings == {}
+    assert_stats_sql(
+        req,
+        """
+        SELECT uniqExact(calls_merged.id) AS count,
+               toUInt8(0) AS has_more
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_unfiltered_with_limit_uses_uniq_up_to() -> None:
+    """Caller-supplied limit on the flat path uses uniqUpTo(N) for early-termination.
+
+    least() caps `count` at the limit; has_more flips when uniqUpTo returns N+1.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project", limit=5)
+    pb = ParamBuilder("pb")
+    _query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    assert settings == {}
+    assert_stats_sql(
+        req,
+        """
+        SELECT least(uniqUpTo(5)(calls_merged.id), 5) AS count,
+               toUInt8(uniqUpTo(5)(calls_merged.id) > 5) AS has_more
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_filter_falls_back_to_group_by() -> None:
+    """Hardcoded filter forces the GROUP BY rollup -- filters need per-id state."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        filter=tsi.CallsFilter(op_names=["my_op"]),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                   OR (calls_merged.op_name IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND
+                ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        """,
+        {"pb_0": ["my_op"], "pb_1": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_query_falls_back_to_group_by() -> None:
+    """A `query` argument forces the GROUP BY rollup -- predicates live in HAVING."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=tsi.Query.model_validate(
+            {"$expr": {"$eq": [{"$getField": "id"}, {"$literal": "x"}]}}
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((calls_merged.id = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        """,
+        {"pb_0": "x", "pb_1": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_expand_columns_falls_back_to_group_by() -> None:
+    """expand_columns disables the flat path even when no filter/query references
+    the expansion -- treat any caller-supplied expansion as opting into rollup.
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        expand_columns=["inputs.model"],
+    )
     assert_stats_sql(
         req,
         """
@@ -4217,36 +4318,6 @@ def test_stats_query_calls_merged_no_caller_limit_skips_cap() -> None:
                 AND
                 ((NOT ((any(calls_merged.started_at) IS NULL))))
             )
-        )
-        """,
-        {"pb_0": "project"},
-        read_table=ReadTable.CALLS_MERGED,
-    )
-
-
-def test_stats_query_calls_merged_caller_limit_keeps_setting() -> None:
-    """Caller-supplied limit also triggers the streaming-aggregate setting and
-    `has_more` reflects saturation against the caller's limit.
-    """
-    req = tsi.CallsQueryStatsReq(project_id="project", limit=5)
-    pb = ParamBuilder("pb")
-    query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
-    assert settings == {"optimize_aggregation_in_order": 1}
-    assert_stats_sql(
-        req,
-        """
-        SELECT count() AS count, toUInt8(count() >= 5) AS has_more
-        FROM (
-            SELECT calls_merged.id AS id
-            FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_0:String}
-            GROUP BY (calls_merged.project_id, calls_merged.id)
-            HAVING (
-                ((any(calls_merged.deleted_at) IS NULL))
-                AND
-                ((NOT ((any(calls_merged.started_at) IS NULL))))
-            )
-            LIMIT 5
         )
         """,
         {"pb_0": "project"},
