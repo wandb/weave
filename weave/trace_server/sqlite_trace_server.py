@@ -2696,7 +2696,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="sqlite")
         r = cursor.execute(prepared.sql, prepared.parameters)
-        result = TABLE_FEEDBACK.tuples_to_rows(r.fetchall(), prepared.fields)
+        result = TABLE_FEEDBACK.tuples_to_rows(
+            r.fetchall(), prepared.fields, database_type="sqlite"
+        )
         return tsi.FeedbackQueryRes(result=result)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
@@ -2855,7 +2857,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="sqlite")
         result = cursor.execute(prepared.sql, prepared.parameters)
-        rows = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(result.fetchall(), prepared.fields)
+        rows = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
+            result.fetchall(), prepared.fields, database_type="sqlite"
+        )
         return tsi.CostQueryRes(results=rows)
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:

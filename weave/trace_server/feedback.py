@@ -263,12 +263,12 @@ def format_feedback_to_row(
         "call_ref": feedback_req.call_ref,
         "trigger_ref": feedback_req.trigger_ref,
         "queue_id": feedback_req.queue_id,
-        "scorer_tags": feedback_req.scorer_tags or [],
-        "scorer_tag_reasons": feedback_req.scorer_tag_reasons or {},
-        "scorer_tag_confidences": feedback_req.scorer_tag_confidences or {},
-        "scorer_ratings": feedback_req.scorer_ratings or {},
-        "scorer_rating_reasons": feedback_req.scorer_rating_reasons or {},
-        "scorer_rating_confidences": feedback_req.scorer_rating_confidences or {},
+        "scorer_tags": feedback_req.scorer_tags,
+        "scorer_tag_reasons": feedback_req.scorer_tag_reasons,
+        "scorer_tag_confidences": feedback_req.scorer_tag_confidences,
+        "scorer_ratings": feedback_req.scorer_ratings,
+        "scorer_rating_reasons": feedback_req.scorer_rating_reasons,
+        "scorer_rating_confidences": feedback_req.scorer_rating_confidences,
     }
 
 
