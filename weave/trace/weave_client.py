@@ -64,6 +64,7 @@ from weave.trace.op import (
 )
 from weave.trace.op import op as op_deco
 from weave.trace.op_protocol import Op
+from weave.trace.output_snapshot import snapshot_mutable_containers
 from weave.trace.project_id_resolver import ProjectIdResolver
 from weave.trace.ref_util import (
     clear_refs_on_failure,
@@ -334,63 +335,6 @@ def map_to_refs(obj: Any) -> Any:
     elif isinstance(obj, WeaveObject):
         return map_to_refs(obj._val)
 
-    return obj
-
-
-def _snapshot_mutable_containers(obj: Any, _memo: dict[int, Any] | None = None) -> Any:
-    """Return a copy of `obj` with plain `dict`/`list`/`set`/`tuple` containers
-    rebuilt at every level, so a caller mutating the original after
-    `finish_call` returns cannot reach into the deferred output walk.
-
-    Only EXACT `dict`/`list`/`set`/`tuple` are rebuilt. Subclasses
-    (`namedtuple`, `Counter`, `OrderedDict`, dict-subclass dataclasses like
-    `huggingface_hub.ChatCompletionOutput`) carry type information the
-    serializer needs and are returned by identity. Rebuilding as the bare
-    type would strip the subclass and silently change saved output shape
-    (namedtuple field names lost, typed dict becomes plain dict, etc.).
-
-    Frozensets, primitives, and SDK leaf types (Ref, pydantic BaseModel,
-    ObjectRecord, weave Object/Table) are also returned by identity: they
-    are either immutable or carry behavior we want preserved
-    (e.g. `_save_nested_objects` mutating an Object to attach a ref).
-
-    `_memo` maps `id(original) -> snapshot` so that aliased containers
-    (the same list/dict appearing under multiple keys) get a single shared
-    NEW copy across all aliases, and so that cycles terminate by returning
-    the already-built snapshot on the second visit. Each mutable container
-    is pre-registered in the memo BEFORE its children are walked, which is
-    what makes cycles safe.
-    """
-    if _memo is None:
-        _memo = {}
-    cached = _memo.get(id(obj))
-    if cached is not None:
-        return cached
-    t = type(obj)
-    if t is dict:
-        snap_d: dict = {}
-        _memo[id(obj)] = snap_d
-        for k, v in obj.items():
-            snap_d[k] = _snapshot_mutable_containers(v, _memo)
-        return snap_d
-    if t is list:
-        snap_l: list = []
-        _memo[id(obj)] = snap_l
-        for v in obj:
-            snap_l.append(_snapshot_mutable_containers(v, _memo))
-        return snap_l
-    if t is set:
-        snap_s: set = set()
-        _memo[id(obj)] = snap_s
-        for v in obj:
-            snap_s.add(_snapshot_mutable_containers(v, _memo))
-        return snap_s
-    if t is tuple:
-        # Tuples are immutable, so a tuple can't be part of a cycle without
-        # going through a mutable container first. We don't pre-register
-        # the tuple result, but the memo still gives aliased mutables inside
-        # the tuple a single shared snapshot.
-        return tuple(_snapshot_mutable_containers(v, _memo) for v in obj)
     return obj
 
 
@@ -1417,7 +1361,7 @@ class WeaveClient:
         # deferred walk. Leaf types (Refs, weave Objects, pydantic models)
         # stay by identity so async ref attachment surfaces to the caller's
         # alias.
-        output_for_defer = _snapshot_mutable_containers(postprocessed_output)
+        output_for_defer = snapshot_mutable_containers(postprocessed_output)
 
         # Phase 1: in a worker, save any new nested Objects/Tables/Ops in the
         # output and rebuild `output_as_refs`. Then schedule Phase 2 either

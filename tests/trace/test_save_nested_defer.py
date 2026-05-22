@@ -21,11 +21,11 @@ import pytest
 import weave
 from tests.trace.conftest import BlockingTraceServer, paused
 from weave.trace.object_record import ObjectRecord
+from weave.trace.output_snapshot import snapshot_mutable_containers
 from weave.trace.refs import ObjectRef, OpRef, TableRef
 from weave.trace.weave_client import (
     WeaveClient,
     _collect_pending_digests,
-    _snapshot_mutable_containers,
 )
 from weave.trace_server import trace_server_interface as tsi
 
@@ -436,7 +436,7 @@ def test_output_mutation_after_finish_is_not_recorded(client: WeaveClient) -> No
 
 
 # ---------------------------------------------------------------------------
-# _snapshot_mutable_containers: type preservation. Subclasses of dict/list/
+# snapshot_mutable_containers: type preservation. Subclasses of dict/list/
 # set/tuple must be returned by identity — rebuilding them as the bare type
 # would strip subclass information the serializer needs (namedtuple field
 # names, dict-subclass dataclass types like HuggingFace ChatCompletionOutput).
@@ -448,7 +448,7 @@ class TestSnapshotPreservesSubclassTypes:
         # Plain dict/list/set/tuple at the top level get fresh copies so
         # post-finish mutations can't reach the deferred walk.
         d = {"k": [1, 2]}
-        snap = _snapshot_mutable_containers(d)
+        snap = snapshot_mutable_containers(d)
         assert snap == d
         assert snap is not d
         assert snap["k"] is not d["k"]
@@ -460,7 +460,7 @@ class TestSnapshotPreservesSubclassTypes:
             x: int
             y: int
 
-        snap = _snapshot_mutable_containers(Point(1, 2))
+        snap = snapshot_mutable_containers(Point(1, 2))
         assert type(snap) is Point
         assert snap._asdict() == {"x": 1, "y": 2}
 
@@ -468,12 +468,12 @@ class TestSnapshotPreservesSubclassTypes:
         from collections import Counter, OrderedDict
 
         c = Counter({"a": 1, "b": 2})
-        snap_c = _snapshot_mutable_containers(c)
+        snap_c = snapshot_mutable_containers(c)
         assert type(snap_c) is Counter
         assert snap_c is c
 
         od = OrderedDict([("a", 1), ("b", 2)])
-        snap_od = _snapshot_mutable_containers(od)
+        snap_od = snapshot_mutable_containers(od)
         assert type(snap_od) is OrderedDict
         assert snap_od is od
 
@@ -482,7 +482,7 @@ class TestSnapshotPreservesSubclassTypes:
             pass
 
         ml = MyList([1, 2, 3])
-        snap = _snapshot_mutable_containers(ml)
+        snap = snapshot_mutable_containers(ml)
         assert type(snap) is MyList
         assert snap is ml
 
@@ -495,7 +495,7 @@ class TestSnapshotPreservesSubclassTypes:
             x: int
             y: int
 
-        snap = _snapshot_mutable_containers([Point(1, 2), 3])
+        snap = snapshot_mutable_containers([Point(1, 2), 3])
         assert isinstance(snap, list)
         assert type(snap[0]) is Point
         assert snap[0]._asdict() == {"x": 1, "y": 2}
@@ -504,7 +504,7 @@ class TestSnapshotPreservesSubclassTypes:
 class TestSnapshotSharedReferences:
     """Aliased mutable containers must be snapshotted, not deduped to the original.
 
-    `_snapshot_mutable_containers` uses an `id(obj) in _seen` check for cycle
+    `snapshot_mutable_containers` uses an `id(obj) in _seen` check for cycle
     protection. The same check also collapses non-cyclic shared references:
     the first occurrence of an aliased list/dict gets a fresh copy, but the
     second occurrence returns the ORIGINAL by identity. A caller mutating the
@@ -516,7 +516,7 @@ class TestSnapshotSharedReferences:
     def test_shared_list_aliased_in_dict_is_fully_snapshotted(self) -> None:
         shared = [1, 2]
         out = {"a": shared, "b": shared}
-        snap = _snapshot_mutable_containers(out)
+        snap = snapshot_mutable_containers(out)
 
         # Caller mutates the value they got back from `finish_call`.
         shared.append(99)
@@ -534,7 +534,7 @@ class TestSnapshotSharedReferences:
 
     def test_shared_list_aliased_in_tuple_is_fully_snapshotted(self) -> None:
         shared = [1, 2]
-        snap = _snapshot_mutable_containers((shared, shared))
+        snap = snapshot_mutable_containers((shared, shared))
 
         shared.append(99)
 
@@ -545,7 +545,7 @@ class TestSnapshotSharedReferences:
 
     def test_shared_dict_aliased_in_list_is_fully_snapshotted(self) -> None:
         shared = {"x": 1}
-        snap = _snapshot_mutable_containers([shared, shared])
+        snap = snapshot_mutable_containers([shared, shared])
 
         shared["x"] = 99
 
@@ -561,7 +561,7 @@ class TestSnapshotSharedReferences:
         a: list = [1]
         a.append(a)
 
-        snap = _snapshot_mutable_containers(a)
+        snap = snapshot_mutable_containers(a)
 
         a.append("post-snapshot")
         assert snap[0] == 1
