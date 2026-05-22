@@ -2939,13 +2939,11 @@ def _try_optimized_stats_query(
 
     # Pattern 3: Unfiltered distinct-call count on calls_merged.
     #
-    # The slow path GROUP BYs id only to dedupe the start/end rows; with no
-    # filter, query, ref expansion, or storage rollup we can dedupe flat against
-    # the (project_id, id) sort key via uniqExact / uniqUpTo and skip the rollup
-    # entirely. Soft-deleted calls are included -- deleted_at is a per-id rollup
-    # we can't apply without the GROUP BY -- a small one-directional overcount we
-    # accept for the project-overview surface. Calls_complete has its own flat
-    # path; limit=1 keeps going to Pattern 1.
+    # Replace the GROUP BY + argMax rollup with two parallel aggregators on one
+    # scan: uniqExact(id) - uniqExactIf(id, deleted_at != EPOCH). Exact match
+    # to the GROUP BY path's deleted-call exclusion, 1.5-2x faster end-to-end
+    # in the bench. calls_complete has its own flat path; limit=1 stays with
+    # Pattern 1.
     if read_table == ReadTable.CALLS_MERGED and _is_unfiltered_stats_req(req):
         return _optimized_unfiltered_calls_merged_count_query(
             req.project_id, req.limit, param_builder
@@ -3014,28 +3012,36 @@ def _optimized_unfiltered_calls_merged_count_query(
 ) -> str:
     """Flat distinct-id count for unfiltered calls_merged stats.
 
-    Uses the (project_id, id) sort key for streaming dedup. Soft-deleted calls
-    are included (see caller comment).
+    Two parallel aggregators in one scan: total distinct ids minus distinct ids
+    that were soft-deleted (any row with deleted_at set). Matches the GROUP BY
+    path's `argMax(deleted_at) IS NULL` semantics exactly. The
+    `ifNull(deleted_at, EPOCH) != EPOCH` shape is also what Phase 2's bloom
+    skip index will prune.
     """
     table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
     project_id_slot = param_slot(param_builder.add_param(project_id), "String")
-    where = f"WHERE {table_name}.project_id = {project_id_slot}"
+    epoch_slot = param_slot(
+        param_builder.add_param(ch_sentinel_values.SENTINEL_EPOCH), "DateTime64(3)"
+    )
+    deleted_predicate = (
+        f"ifNull({table_name}.deleted_at, {epoch_slot}) != {epoch_slot}"
+    )
+    raw_count_expr = (
+        f"uniqExact({table_name}.id) "
+        f"- uniqExactIf({table_name}.id, {deleted_predicate})"
+    )
+    inner = (
+        f"SELECT {raw_count_expr} AS raw_count "
+        f"FROM {table_name} "
+        f"WHERE {table_name}.project_id = {project_id_slot}"
+    )
     if limit is None:
-        return f"""
-            SELECT uniqExact({table_name}.id) AS count,
-                   toUInt8(0) AS has_more
-            FROM {table_name}
-            {where}
-        """
-    # uniqUpTo(N)(x) returns the exact distinct count when <= N, else N+1.
-    # Early-terminates dedup once we've saturated the cap.
-    raw = f"uniqUpTo({limit})({table_name}.id)"
-    return f"""
-        SELECT least({raw}, {limit}) AS count,
-               toUInt8({raw} > {limit}) AS has_more
-        FROM {table_name}
-        {where}
-    """
+        return f"SELECT raw_count AS count, toUInt8(0) AS has_more FROM ({inner})"
+    return (
+        f"SELECT least(raw_count, {limit}) AS count, "
+        f"toUInt8(raw_count > {limit}) AS has_more "
+        f"FROM ({inner})"
+    )
 
 
 def _is_unfiltered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:

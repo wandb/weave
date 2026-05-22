@@ -4217,9 +4217,8 @@ def test_stats_query_calls_merged_unfiltered_limit_1_stays_with_pattern_1() -> N
 def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> None:
     """Unfiltered calls_merged stats with no limit takes the flat distinct-id path.
 
-    The (project_id, id) sort key lets uniqExact dedupe streaming, bypassing the
-    GROUP BY rollup. Soft-deleted calls are intentionally included -- deleted_at
-    is a per-id argMax we can't apply without the rollup.
+    Two parallel aggregators on one scan dedupe ids and subtract those with any
+    soft-delete row. Matches the GROUP BY path's exclusion semantics exactly.
     """
     req = tsi.CallsQueryStatsReq(project_id="project")
     pb = ParamBuilder("pb")
@@ -4228,20 +4227,21 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
     assert_stats_sql(
         req,
         """
-        SELECT uniqExact(calls_merged.id) AS count,
+        SELECT raw_count AS count,
                toUInt8(0) AS has_more
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
+        FROM (
+            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, ifNull(calls_merged.deleted_at, {pb_1:DateTime64(3)}) != {pb_1:DateTime64(3)}) AS raw_count
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_0:String})
         """,
-        {"pb_0": "project"},
+        {"pb_0": "project", "pb_1": SENTINEL_EPOCH},
         read_table=ReadTable.CALLS_MERGED,
     )
 
 
-def test_stats_query_calls_merged_unfiltered_with_limit_uses_uniq_up_to() -> None:
-    """Caller-supplied limit on the flat path uses uniqUpTo(N) for early-termination.
-
-    least() caps `count` at the limit; has_more flips when uniqUpTo returns N+1.
+def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -> None:
+    """Caller-supplied limit caps `count` via least() and flips `has_more`
+    when the raw distinct count exceeds the cap. Inner aggregator is unchanged.
     """
     req = tsi.CallsQueryStatsReq(project_id="project", limit=5)
     pb = ParamBuilder("pb")
@@ -4250,12 +4250,14 @@ def test_stats_query_calls_merged_unfiltered_with_limit_uses_uniq_up_to() -> Non
     assert_stats_sql(
         req,
         """
-        SELECT least(uniqUpTo(5)(calls_merged.id), 5) AS count,
-               toUInt8(uniqUpTo(5)(calls_merged.id) > 5) AS has_more
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
+        SELECT least(raw_count, 5) AS count,
+               toUInt8(raw_count > 5) AS has_more
+        FROM (
+            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, ifNull(calls_merged.deleted_at, {pb_1:DateTime64(3)}) != {pb_1:DateTime64(3)}) AS raw_count
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_0:String})
         """,
-        {"pb_0": "project"},
+        {"pb_0": "project", "pb_1": SENTINEL_EPOCH},
         read_table=ReadTable.CALLS_MERGED,
     )
 
