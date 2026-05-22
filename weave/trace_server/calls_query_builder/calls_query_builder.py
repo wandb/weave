@@ -2940,10 +2940,9 @@ def _try_optimized_stats_query(
     # Pattern 3: Unfiltered distinct-call count on calls_merged.
     #
     # Replace the GROUP BY + argMax rollup with two parallel aggregators on one
-    # scan: uniqExact(id) - uniqExactIf(id, deleted_at != EPOCH). Exact match
-    # to the GROUP BY path's deleted-call exclusion, 1.5-2x faster end-to-end
-    # in the bench. calls_complete has its own flat path; limit=1 stays with
-    # Pattern 1.
+    # scan: uniqExact(id) - uniqExactIf(id, isNotNull(deleted_at)). Exact match
+    # to the GROUP BY path's deleted-call exclusion. calls_complete has its own
+    # flat path; limit=1 stays with Pattern 1.
     if read_table == ReadTable.CALLS_MERGED and _is_unfiltered_stats_req(req):
         return _optimized_unfiltered_calls_merged_count_query(
             req.project_id, req.limit, param_builder
@@ -3013,22 +3012,14 @@ def _optimized_unfiltered_calls_merged_count_query(
     """Flat distinct-id count for unfiltered calls_merged stats.
 
     Two parallel aggregators in one scan: total distinct ids minus distinct ids
-    that were soft-deleted (any row with deleted_at set). Matches the GROUP BY
-    path's `argMax(deleted_at) IS NULL` semantics exactly. The
-    `ifNull(deleted_at, EPOCH) != EPOCH` shape is also what Phase 2's bloom
-    skip index will prune.
+    that have any row with deleted_at set. Matches the GROUP BY path's
+    `argMax(deleted_at) IS NULL` exclusion exactly.
     """
     table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
     project_id_slot = param_slot(param_builder.add_param(project_id), "String")
-    epoch_slot = param_slot(
-        param_builder.add_param(ch_sentinel_values.SENTINEL_EPOCH), "DateTime64(3)"
-    )
-    deleted_predicate = (
-        f"ifNull({table_name}.deleted_at, {epoch_slot}) != {epoch_slot}"
-    )
     raw_count_expr = (
         f"uniqExact({table_name}.id) "
-        f"- uniqExactIf({table_name}.id, {deleted_predicate})"
+        f"- uniqExactIf({table_name}.id, isNotNull({table_name}.deleted_at))"
     )
     inner = (
         f"SELECT {raw_count_expr} AS raw_count "

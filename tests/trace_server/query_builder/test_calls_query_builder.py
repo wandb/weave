@@ -4230,11 +4230,11 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
         SELECT raw_count AS count,
                toUInt8(0) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, ifNull(calls_merged.deleted_at, {pb_1:DateTime64(3)}) != {pb_1:DateTime64(3)}) AS raw_count
+            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
-        {"pb_0": "project", "pb_1": SENTINEL_EPOCH},
+        {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
     )
 
@@ -4253,11 +4253,11 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, ifNull(calls_merged.deleted_at, {pb_1:DateTime64(3)}) != {pb_1:DateTime64(3)}) AS raw_count
+            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
-        {"pb_0": "project", "pb_1": SENTINEL_EPOCH},
+        {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
     )
 
