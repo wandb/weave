@@ -453,7 +453,7 @@ class LLM(_SpanBase):
                 system_instructions = pii_redaction.redact_system_instructions(
                     system_instructions
                 )
-                if reasoning is not None and reasoning.content:
+                if reasoning.content:
                     reasoning = Reasoning(
                         content=pii_redaction.redact_pii_string(reasoning.content)
                     )
