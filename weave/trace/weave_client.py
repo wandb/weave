@@ -65,7 +65,12 @@ from weave.trace.op import (
 from weave.trace.op import op as op_deco
 from weave.trace.op_protocol import Op
 from weave.trace.project_id_resolver import ProjectIdResolver
-from weave.trace.ref_util import get_ref, remove_ref, set_ref
+from weave.trace.ref_util import (
+    clear_refs_on_failure,
+    get_ref,
+    remove_ref,
+    set_ref,
+)
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -2080,6 +2085,9 @@ class WeaveClient:
             # but that might have unintended consequences. As a result, we break the
             # typical pattern and explicitly set the ref here.
             set_ref(obj, ref)
+            # _save_object_basic cleaned up obj_rec; same ref now lives on obj.
+            if isinstance(ref._digest, Future):
+                clear_refs_on_failure(ref._digest, lambda: remove_ref(obj))
 
         # Case 2: Op:
         # Here we save the op itself.
@@ -2323,13 +2331,13 @@ class WeaveClient:
         else:
             ref = ObjectRef(self.entity, self.project, name, digest_future)
 
-        # Attach the ref to the object
         try:
             set_ref(orig_val, ref)
-        except Exception:
-            # Don't worry if we can't set the ref.
-            # This can happen for primitive types that don't have __dict__
+        except ValueError:
+            # Primitives without __dict__ can't hold a ref; that's fine.
             pass
+
+        clear_refs_on_failure(digest_future, lambda: remove_ref(orig_val))
 
         return ref
 
@@ -2430,6 +2438,13 @@ class WeaveClient:
 
         if isinstance(table, WeaveTable):
             table.table_ref = table_ref
+
+        def _clear_table_refs() -> None:
+            table.ref = None
+            if isinstance(table, WeaveTable):
+                table.table_ref = None
+
+        clear_refs_on_failure(digest_future, _clear_table_refs)
 
         return table_ref
 
