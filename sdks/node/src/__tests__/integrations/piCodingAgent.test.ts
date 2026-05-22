@@ -98,7 +98,10 @@ describe('PiCodingAgentOtelAdapter', () => {
       startSession(emit);
 
       // Prompt
-      emit('before_agent_start', {prompt: 'tell me a joke', systemPrompt: 'sys'});
+      emit('before_agent_start', {
+        prompt: 'tell me a joke',
+        systemPrompt: 'sys',
+      });
       emit('agent_end', {messages: []});
 
       emit('session_shutdown');
