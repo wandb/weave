@@ -1,11 +1,16 @@
 import datetime
 import json
 
+import pytest
 from pydantic import BaseModel, ConfigDict
 
 from weave.trace.refs import ObjectRef
+from weave.trace_server.errors import InvalidExternalRef
 from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
+from weave.trace_server.trace_server_converter import (
+    replace_external_weave_ref,
+    universal_ext_to_int_ref_converter,
+)
 from weave.trace_server.trace_server_interface import (
     CallStartReq,
     ObjCreateReq,
@@ -177,3 +182,48 @@ def test_universal_ext_to_int_ref_converter_rewrites_refs_in_model_extras():
     assert converted.declared == "plain"
     extras = converted.model_extra or {}
     assert extras.get("extra_ref") == internal_ref
+
+
+def test_replace_external_weave_ref_uses_cache():
+    """Shared cache amortizes ext→int_project_id lookups across calls.
+
+    Callers that walk many refs (e.g. an OTel batch with the same
+    entity/project on every span) pass a per-request dict so the
+    underlying converter runs once per distinct project_key.
+    """
+    calls: list[str] = []
+
+    def converter(project_key: str) -> str:
+        calls.append(project_key)
+        return f"internal:{project_key}"
+
+    cache: dict[str, str] = {}
+
+    a = replace_external_weave_ref("weave:///ent/proj/object/a:v1", converter, cache)
+    b = replace_external_weave_ref("weave:///ent/proj/object/b:v1", converter, cache)
+    c = replace_external_weave_ref("weave:///other/proj/object/c:v1", converter, cache)
+
+    assert a == "weave-trace-internal:///internal:ent/proj/object/a:v1"
+    assert b == "weave-trace-internal:///internal:ent/proj/object/b:v1"
+    assert c == "weave-trace-internal:///internal:other/proj/object/c:v1"
+    # Same entity/project resolves once, distinct one resolves again.
+    assert calls == ["ent/proj", "other/proj"]
+
+
+def test_replace_external_weave_ref_rejects_non_external_scheme():
+    """Inputs not on the external scheme are a contract violation; the
+    caller must precheck `startswith(weave_prefix)` before invoking.
+    """
+    with pytest.raises(ValueError, match="Invalid URI"):
+        replace_external_weave_ref(
+            "weave-trace-internal:///proj/object/a:v1", lambda p: p
+        )
+
+
+def test_replace_external_weave_ref_rejects_malformed_tail():
+    """Refs missing the `entity/project/tail` triplet trip InvalidExternalRef
+    so the caller surfaces the bad payload rather than silently passing it
+    through.
+    """
+    with pytest.raises(InvalidExternalRef):
+        replace_external_weave_ref("weave:///just-entity", lambda p: p)
