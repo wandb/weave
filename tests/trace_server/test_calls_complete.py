@@ -762,6 +762,63 @@ def test_call_end_v2_oversized_output_returns_request_too_large(
         )
 
 
+def test_call_end_v2_payload_above_default_max_query_size_round_trips(
+    trace_server, clickhouse_trace_server
+):
+    """Realistic-sized `output` round-trips through call_end_v2 unmodified.
+
+    The lightweight UPDATE inlines `output_dump`/`summary_dump` into the SQL
+    body via client-side `%(name)s` substitution. ClickHouse's default
+    `max_query_size` is 256 KiB; without the 32 MiB bump in
+    `CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS`, any output larger than ~256 KiB
+    parse-fails and the SDK gets a 413. The existing oversize test
+    monkeypatches `max_query_size` down, so it can't detect removal of the
+    production bump -- this test exercises the real settings path.
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_v2_large_output"
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    trace_server.call_start_v2(
+        tsi.CallStartV2Req(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=trace_id,
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    # 512 KiB -- comfortably above the 256 KiB CH default, well under the
+    # 32 MiB lightweight-update bump.
+    large_blob = "x" * (512 * 1024)
+    output = {"blob": large_blob}
+
+    ended_at = started_at + datetime.timedelta(seconds=1)
+    trace_server.call_end_v2(
+        tsi.CallEndV2Req(
+            end=tsi.EndedCallSchemaForInsertWithStartedAt(
+                project_id=project_id,
+                id=call_id,
+                started_at=started_at,
+                ended_at=ended_at,
+                output=output,
+                summary={"usage": {}, "status_counts": {}},
+            )
+        )
+    )
+
+    calls = _fetch_calls_stream(trace_server, project_id)
+    updated_call = _find_call_by_id(calls, call_id)
+    assert updated_call is not None
+    assert updated_call.output == output
+    assert updated_call.ended_at == ended_at
+
+
 def test_call_start_end_v2_writes_calls_complete_for_empty_project(
     trace_server, clickhouse_trace_server
 ):
