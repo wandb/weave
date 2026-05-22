@@ -30,6 +30,9 @@ class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
+    def __str__(self) -> str:
+        return self.uri
+
     def as_param_dict(self) -> dict:
         return asdict(self)
 
