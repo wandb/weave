@@ -2666,13 +2666,16 @@ class WeaveClient:
         # Removing call display name, use "" for db representation
         if display_name is None:
             display_name = ""
-        self.server.call_update(
-            CallUpdateReq(
-                project_id=self.project_id,
-                call_id=call.id,
-                display_name=elide_display_name(display_name),
-            )
+        req = CallUpdateReq(
+            project_id=self.project_id,
+            call_id=call.id,
+            display_name=elide_display_name(display_name),
         )
+
+        def send_call_update() -> None:
+            self.server.call_update(req)
+
+        self.future_executor.defer(send_call_update)
 
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
