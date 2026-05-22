@@ -38,6 +38,12 @@ export {
   startTool,
   startTurn,
 } from './genai';
+// Low-level: get the Weave-configured OTel tracer so plugins /
+// integrations can emit spans directly into the Weave pipeline
+// (resource attrs, OTLP exporter, auth). The tracer is a no-op
+// until `init()` has been called. `init()` itself requires
+// WANDB_API_KEY or a ~/.netrc entry to be present.
+export {getWeaveTracer} from './genai/provider';
 // Type-only: consumers can name these in their own signatures, but the
 // runtime values aren't reachable — construction is private to the SDK's
 // top-level entry-point functions.
