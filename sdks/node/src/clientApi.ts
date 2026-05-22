@@ -1,4 +1,5 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
+import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
 import {makeSettings, SettingsInit} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
@@ -142,6 +143,7 @@ export async function init(
     );
     setGlobalClient(client);
     setGlobalDomain(domain);
+    registerEvalLinkSpanProcessor(getGlobalClient);
     console.log(`Initializing project: ${projectId}`);
     return client;
   } catch (error) {
