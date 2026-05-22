@@ -7,28 +7,33 @@ const openai = new OpenAI();
 // --- Wikipedia tool ---
 
 async function wikipediaSearch({query}: {query: string}): Promise<string> {
-  const searchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&limit=1&format=json&search=${encodeURIComponent(query)}`;
-  const searchResp = await fetch(searchUrl);
-  const searchData = await searchResp.json();
-  const title = searchData?.[1]?.[0];
-  if (!title) return `No Wikipedia results for "${query}".`;
-
-  const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
-  const summaryResp = await fetch(summaryUrl);
-  const summaryData = await summaryResp.json();
-  return summaryData.extract ?? `No summary available for "${title}".`;
+  const params = new URLSearchParams({
+    action: 'query',
+    generator: 'search',
+    gsrsearch: query,
+    gsrlimit: '1',
+    prop: 'extracts',
+    exintro: '1',
+    explaintext: '1',
+    format: 'json',
+  });
+  const resp = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, {
+    headers: {'User-Agent': 'weave-demo'},
+  });
+  const data = await resp.json();
+  const pages = data.query.pages as Record<string, {extract: string}>;
+  return Object.values(pages)[0].extract;
 }
 
 const wikipediaTool: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'wikipedia_search',
-    description:
-      'Search Wikipedia and return a short summary for the top result.',
+    description: 'Search Wikipedia for a topic and return its intro paragraph.',
     parameters: {
       type: 'object',
       properties: {
-        query: {type: 'string', description: 'Search query'},
+        query: {type: 'string'},
       },
       required: ['query'],
     },
@@ -40,11 +45,23 @@ const wikipediaTool: OpenAI.Chat.Completions.ChatCompletionTool = {
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 type ToolCall = OpenAI.Chat.Completions.ChatCompletionMessageToolCall;
 
-async function callLLM(
-  messages: Message[],
-  tools?: OpenAI.Chat.Completions.ChatCompletionTool[]
-): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
+async function callLLM({
+  messages,
+  tools,
+  userMessage,
+}: {
+  messages: Message[];
+  tools: OpenAI.Chat.Completions.ChatCompletionTool[];
+  userMessage?: Message;
+}): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
   const llm = weave.startLLM({model: MODEL, providerName: 'openai'});
+
+  if (userMessage) {
+    llm.inputMessages = [
+      {role: 'user', content: userMessage.content as string},
+    ];
+  }
+
   try {
     const resp = await openai.chat.completions.create({
       model: MODEL,
@@ -86,18 +103,23 @@ async function executeToolCalls(
 
 async function runTurn(
   history: Message[],
-  userMessage: string
+  prompt: string
 ): Promise<string | null> {
-  history.push({role: 'user', content: userMessage});
+  const userMessage = {role: 'user' as const, content: prompt};
+  history.push(userMessage);
 
   const turn = weave.startTurn({model: MODEL});
   try {
-    let msg = await callLLM(history, [wikipediaTool]);
+    let msg = await callLLM({
+      userMessage: userMessage,
+      messages: history,
+      tools: [wikipediaTool],
+    });
     history.push(msg);
 
     while (msg.tool_calls?.length) {
       await executeToolCalls(msg.tool_calls, history);
-      msg = await callLLM(history, [wikipediaTool]);
+      msg = await callLLM({messages: history, tools: [wikipediaTool]});
       history.push(msg);
     }
 
@@ -113,7 +135,13 @@ async function main() {
   const session = weave.startSession({agentName: 'research-bot'});
   try {
     console.log(`session_id = ${session.sessionId}\n`);
-    const history: Message[] = [];
+    const history: Message[] = [
+      {
+        role: 'system',
+        content:
+          'Always use the wikipedia_search tool to look up facts before answering. Do not rely on your own knowledge.',
+      },
+    ];
     const questions = [
       'List the names of a couple dinosaurs that were carnivores.',
       'List a couple more that were herbivores.',

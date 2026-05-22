@@ -64,6 +64,11 @@ export class Turn {
       {kind: SpanKind.CLIENT, attributes},
       ROOT_CONTEXT
     );
+
+    span.addEvent('gen_ai.user.message', {
+      'gen_ai.event.content': JSON.stringify({content: 'testing, 1, 2, 3'}),
+    });
+
     const turn = new Turn(
       span,
       trace.setSpan(ROOT_CONTEXT, span),
