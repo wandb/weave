@@ -10,6 +10,8 @@ from weave.scorers.remote_scorer import (
     _validate_remote_scorer_endpoint_url,
 )
 
+pytestmark = pytest.mark.trace_server
+
 
 def test_remote_scorer_fields() -> None:
     rs = RemoteScorer(
@@ -118,6 +120,54 @@ def test_oauth_token_endpoint_url_rejects_malformed(
                 "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
             },
         )
+
+
+def test_oauth_token_endpoint_url_strips_whitespace() -> None:
+    rs = RemoteScorer(
+        endpoint_url="https://scoring.example.com/v1/score",
+        auth_config={
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "  https://idp.example.com/oauth2/token\n",
+            "client_id": "weave-remote-scorer",
+            "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+        },
+    )
+    assert isinstance(rs.auth_config, OAuthClientCredentialsConfig)
+    assert rs.auth_config.token_endpoint_url == "https://idp.example.com/oauth2/token"
+
+
+def test_oauth_token_endpoint_url_non_string_input_rejected() -> None:
+    # Non-string inputs bypass the whitespace-stripping branch and then fail
+    # the URL-shape validator with a string-coercion error from pydantic.
+    with pytest.raises(ValidationError):
+        RemoteScorer(
+            endpoint_url="https://scoring.example.com/v1/score",
+            auth_config={
+                "mode": "oauth_client_credentials",
+                "token_endpoint_url": 12345,
+                "client_id": "weave-remote-scorer",
+                "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+            },
+        )
+
+
+def test_oauth_token_endpoint_url_urlparse_exception_path() -> None:
+    from weave.scorers import remote_scorer as remote_scorer_module
+
+    def boom(_: str) -> None:
+        raise RuntimeError("urlparse blew up")
+
+    with patch.object(remote_scorer_module, "urlparse", boom):
+        with pytest.raises(ValidationError, match="must be a valid URL string"):
+            RemoteScorer(
+                endpoint_url="https://scoring.example.com/v1/score",
+                auth_config={
+                    "mode": "oauth_client_credentials",
+                    "token_endpoint_url": "https://idp.example.com/oauth2/token",
+                    "client_id": "weave-remote-scorer",
+                    "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+                },
+            )
 
 
 @pytest.mark.parametrize(
