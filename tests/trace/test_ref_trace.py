@@ -18,9 +18,7 @@ from weave.trace.refs import (
     ("ref", "expected_uri"),
     [
         (
-            ObjectRef(
-                entity="e", project="p", name="obj", _digest="dig", _extra=()
-            ),
+            ObjectRef(entity="e", project="p", name="obj", _digest="dig", _extra=()),
             "weave:///e/p/object/obj:dig",
         ),
         (
@@ -58,17 +56,13 @@ def test_str_returns_uri(ref, expected_uri):
 def test_repr_is_unchanged_dataclass_form():
     # repr() must keep the verbose dataclass form for debugging; only str()
     # was changed to the URI.
-    ref = ObjectRef(
-        entity="e", project="p", name="obj", _digest="dig", _extra=()
-    )
+    ref = ObjectRef(entity="e", project="p", name="obj", _digest="dig", _extra=())
     assert repr(ref).startswith("ObjectRef(")
     assert "_digest='dig'" in repr(ref)
 
 
 def test_str_round_trips_through_parse_uri():
-    original = ObjectRef(
-        entity="e", project="p", name="obj", _digest="dig", _extra=()
-    )
+    original = ObjectRef(entity="e", project="p", name="obj", _digest="dig", _extra=())
     from weave.trace.refs import Ref
 
     parsed = Ref.parse_uri(str(original))
@@ -83,9 +77,7 @@ def test_leaderboard_column_accepts_str_of_ref():
         LeaderboardColumn,
     )
 
-    ref = ObjectRef(
-        entity="e", project="p", name="Eval", _digest="dig", _extra=()
-    )
+    ref = ObjectRef(entity="e", project="p", name="Eval", _digest="dig", _extra=())
     col = LeaderboardColumn(
         evaluation_object_ref=str(ref),
         scorer_name="score",
