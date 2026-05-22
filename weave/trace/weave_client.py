@@ -70,7 +70,7 @@ from weave.trace.op_protocol import Op
 from weave.trace.oversize_repackage import (
     emit_user_warning,
     is_payload_too_large_error,
-    repackage_oversize_payload,
+    repackage_call_fields,
 )
 from weave.trace.project_id_resolver import ProjectIdResolver
 from weave.trace.ref_util import get_ref, remove_ref, set_ref
@@ -1278,25 +1278,10 @@ class WeaveClient:
             except Exception as e:
                 if not is_payload_too_large_error(e):
                     raise
-                new_summary, new_output, repackaged = repackage_oversize_payload(
-                    self, summary=merged_summary, output=output_json
-                )
-                if not repackaged:
+                retry_req = self._try_repackage_call_end_req(call_end_req)
+                if retry_req is None:
                     raise
-                retry_req = CallEndReq(
-                    end=EndedCallSchemaForInsertWithStartedAt(
-                        project_id=project_id,
-                        id=call.id,
-                        started_at=call.started_at,
-                        ended_at=ended_at,
-                        output=new_output,
-                        summary=new_summary,
-                        exception=exception_str,
-                        wb_run_step_end=current_wb_run_step_end,
-                    )
-                )
                 self.server.call_end(retry_req)
-                emit_user_warning(repackaged)
 
         # For calls_complete path (non-eager CallBatchProcessor), print the call link
         # after finish_call, when the complete call is queued to the batch processor.
@@ -2037,6 +2022,19 @@ class WeaveClient:
     #  - creates an ObjectRef and attaches it to the object
     # `_save_op` and `_save_table` are the sister functions to `_save_object_basic`
     #  but for Ops and Tables respectively.
+
+    def _try_repackage_call_end_req(
+        self, call_end_req: CallEndReq
+    ) -> CallEndReq | None:
+        """Hoist oversize summary/output into refs and return a new req."""
+        end = call_end_req.end
+        new_fields, repackaged = repackage_call_fields(
+            self, fields={"summary": end.summary, "output": end.output}
+        )
+        if not repackaged:
+            return None
+        emit_user_warning(repackaged)
+        return CallEndReq(end=end.model_copy(update=new_fields))
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:

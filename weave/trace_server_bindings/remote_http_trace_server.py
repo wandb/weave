@@ -57,9 +57,6 @@ logger = logging.getLogger(__name__)
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
-# Schema fields the repackager walks for each batch item shape. Inputs and
-# attributes only appear on starts (and the combined complete row); summary
-# and output only appear on ends (and the combined complete row).
 _REPACKAGEABLE_FIELDS: dict[type, tuple[str, ...]] = {
     CompleteBatchItem: ("inputs", "attributes", "output", "summary"),
     StartBatchItem: ("inputs", "attributes"),
@@ -70,18 +67,7 @@ _REPACKAGEABLE_FIELDS: dict[type, tuple[str, ...]] = {
 def _try_repackage_call_item(
     item: StartBatchItem | EndBatchItem | CompleteBatchItem,
 ) -> StartBatchItem | EndBatchItem | CompleteBatchItem | None:
-    """Repackage any oversize subtrees on a single batch item.
-
-    Walks the schema fields that exist on `item`'s shape, publishes oversize
-    subtrees as standalone weave objects, and substitutes their ref URIs
-    inline. Returns a new item of the same type, or None when there's no
-    current client or nothing crossed the threshold.
-
-    Used as the `repackage_oversize_fn` callback for both the `calls_merged`
-    flush (`/call/upsert_batch`) and `calls_complete` flush
-    (`/v2/<entity>/<project>/calls/complete`), and from `_flush_calls_eager`
-    for the per-item v2 single-call endpoints.
-    """
+    """Hoist oversize subtrees on a batched call item. Returns None when no active client or nothing oversize."""
     client = weave_client_context.get_weave_client()
     if client is None:
         return None
@@ -89,8 +75,6 @@ def _try_repackage_call_item(
     if field_names is None:
         return None
 
-    # CompleteBatchItem stores the schema directly on .req; Start/End wrap it
-    # one level deeper as .req.start / .req.end.
     schema = item.req if isinstance(item, CompleteBatchItem) else (
         item.req.start if isinstance(item, StartBatchItem) else item.req.end
     )
@@ -356,14 +340,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 # Re-raise so caller can handle the upgrade to calls_complete mode
                 raise
             except Exception as e:
-                # On 413, try repackaging oversize fields and resend once before
-                # giving up. Mirrors the same recovery that
-                # `process_batch_with_retry` performs for the batched flush paths.
                 if is_payload_too_large_error(e):
-                    repackaged = _try_repackage_call_item(item)
-                    if repackaged is not None:
+                    new_item = _try_repackage_call_item(item)
+                    if new_item is not None:
                         try:
-                            send(repackaged)
+                            send(new_item)
                             continue
                         except Exception as retry_err:
                             e = retry_err

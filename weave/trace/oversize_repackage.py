@@ -1,16 +1,6 @@
-"""Repackage oversize call payloads into refs and retry on HTTP 413.
+"""SDK-side recovery for HTTP 413 by hoisting oversize call subtrees into refs.
 
-When the server rejects a call_end with 413, the SDK extracts the
-largest subtrees from `summary` and `output`, publishes each as a
-first-class weave object, and substitutes a `weave:///...` ref URI
-inline. The repackaged payload is then retried once.
-
-The user sees one warning describing which fields were repackaged
-and how to avoid the overhead next time (publish large artifacts
-upfront via `weave.publish(...)` before they enter the call).
-
-Companion to WB-34652. Defense-in-depth pair to the server-side spill
-in `weave/trace_server/summary_overflow.py`.
+Companion to WB-34652.
 """
 
 from __future__ import annotations
@@ -26,11 +16,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Subtree byte threshold for extraction. Anything bigger gets published
-# as its own object and replaced inline with the resulting ref URI.
-# Picked well under the server's 3.5 MiB row limit so several oversize
-# subtrees can be repackaged independently.
+# Subtrees above this threshold get hoisted into their own weave object.
 OVERSIZE_SUBTREE_BYTES = 256 * 1024
+
+# Reserved key for the bundled-overflow ref alongside inline survivors.
+OVERFLOW_BUNDLE_KEY = "_weave_overflow"
 
 
 def is_payload_too_large_error(exc: BaseException) -> bool:
@@ -43,7 +33,6 @@ def is_payload_too_large_error(exc: BaseException) -> bool:
 
 
 def _approx_size(value: Any) -> int:
-    """Cheap JSON-encoded byte estimate. Returns 0 for un-serializable."""
     try:
         return len(json.dumps(value, default=str).encode("utf-8"))
     except (TypeError, ValueError):
@@ -62,17 +51,10 @@ def _publish_subtree(
     path: tuple[str, ...],
     repackaged: list[str],
 ) -> str:
-    """Publish `value` as a weave object and return its ref URI."""
     name = _safe_name_from_path(path)
     ref = client._save_object(value, name=name)
     repackaged.append(".".join(path))
     return ref.uri()
-
-
-# Reserved key used to attach the overflow bundle alongside the inline
-# survivors. Chosen with a `_weave_` prefix so it sorts last in dict views
-# and is unlikely to collide with user-supplied keys.
-OVERFLOW_BUNDLE_KEY = "_weave_overflow"
 
 
 def _greedy_batch(
@@ -82,17 +64,7 @@ def _greedy_batch(
     path: tuple[str, ...],
     repackaged: list[str],
 ) -> Any:
-    """Smallest-first packing of `obj_dict`.
-
-    Walks children in ascending size order, keeping each inline until
-    inline_bytes would exceed `OVERSIZE_SUBTREE_BYTES`. Once the budget is
-    hit, every remaining (larger) child gets bundled into a single weave
-    object that's attached under `OVERFLOW_BUNDLE_KEY` as a ref URI.
-
-    This preserves the inline shape of small siblings (the common case for
-    a summary dict where one or two subtrees are huge), while batching
-    medium-sized siblings together to avoid N round-trips of `_save_object`.
-    """
+    """Smallest-first packing: keep small children inline, bundle the rest into one ref."""
     sized = sorted(
         ((k, v, _approx_size(v)) for k, v in obj_dict.items()),
         key=lambda triple: triple[2],
@@ -110,8 +82,7 @@ def _greedy_batch(
             overflow_bundle[k] = v
 
     if not overflow_bundle:
-        # JSON overhead pushed the dict over the threshold but every child
-        # individually fits. Fall back to publishing the whole thing.
+        # JSON overhead pushed the parent over the threshold but every child fits.
         return _publish_subtree(obj_dict, client=client, path=path, repackaged=repackaged)
 
     bundle_ref = _publish_subtree(
@@ -131,10 +102,7 @@ def _walk_and_repackage(
     path: tuple[str, ...],
     repackaged: list[str],
 ) -> Any:
-    """Walk `obj`. When a subtree exceeds the threshold, first recurse to
-    hoist out any individually-oversize nested children, then greedy-batch
-    the remaining medium-sized siblings under a single overflow ref.
-    """
+    """Recurse into dicts hoisting oversize children, then greedy-batch the rest."""
     if _approx_size(obj) <= OVERSIZE_SUBTREE_BYTES:
         return obj
 
@@ -154,58 +122,12 @@ def _walk_and_repackage(
     return _publish_subtree(obj, client=client, path=path, repackaged=repackaged)
 
 
-def repackage_oversize_payload(
-    client: WeaveClient,
-    *,
-    summary: Any,
-    output: Any,
-) -> tuple[Any, Any, list[str]]:
-    """Walk `summary` and `output`, extracting and publishing oversize
-    subtrees. Returns `(slimmer_summary, slimmer_output, repackaged_paths)`.
-
-    `inputs` is intentionally not repackaged here: inputs are sent at
-    call_start, before the failure happens, so retroactive substitution
-    needs a separate update path.
-    """
-    repackaged: list[str] = []
-
-    new_summary: Any = summary
-    if summary is not None:
-        new_summary = _walk_and_repackage(
-            summary,
-            client=client,
-            path=("summary",),
-            repackaged=repackaged,
-        )
-        if not isinstance(new_summary, dict):
-            new_summary = {"_weave": {"summary_ref": new_summary}}
-
-    new_output: Any = output
-    if output is not None:
-        new_output = _walk_and_repackage(
-            output,
-            client=client,
-            path=("output",),
-            repackaged=repackaged,
-        )
-
-    return new_summary, new_output, repackaged
-
-
 def repackage_call_fields(
     client: WeaveClient,
     *,
     fields: dict[str, Any],
 ) -> tuple[dict[str, Any], list[str]]:
-    """Walk each named value in `fields`, hoisting oversize subtrees out to
-    bucket-stored refs. Returns the new fields mapping (same keys as input)
-    and the dotted-path strings of every subtree that was repackaged.
-
-    Used from the batched flush path when the server rejects a call payload
-    with 413. Keys in `fields` correspond to schema fields on the call insert
-    schemas: `summary`, `output`, `inputs`, `attributes`. None values pass
-    through unchanged.
-    """
+    """Walk each named value in `fields`, hoisting oversize subtrees into refs."""
     repackaged: list[str] = []
     new_fields: dict[str, Any] = {}
     for name, value in fields.items():
@@ -219,9 +141,7 @@ def repackage_call_fields(
 
 
 def emit_user_warning(repackaged_paths: list[str]) -> None:
-    """One concise warning so the user knows the repackage happened
-    and can prevent it next time.
-    """
+    """One concise warning naming the fields that were repackaged."""
     if not repackaged_paths:
         return
     logger.warning(
