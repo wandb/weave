@@ -1312,10 +1312,11 @@ class CallsQuery(BaseModel):
             WhereFilters object containing all filter SQL strings
         """
         # The op_name, trace_id, trace_roots, wb_run_id conditions REQUIRE conditioning
-        # on the started_at field after grouping in the HAVING clause. These filters
+        # on the op_name field after grouping in the HAVING clause. These filters
         # remove call starts before grouping, creating orphan call ends. By conditioning
-        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
-        # all rows returned at least have a call start.
+        # on `NOT any(op_name) is NULL`, we filter out orphaned call ends, ensuring
+        # all rows returned at least have a call start. op_name is the orphan-end
+        # signal (start-only) because started_at now rides on call_end rows too.
 
         op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_id = process_trace_id_filter_to_sql(

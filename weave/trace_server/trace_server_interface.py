@@ -250,8 +250,10 @@ class EndedCallSchemaForInsert(BaseModel):
 
 
 class EndedCallSchemaForInsertWithStartedAt(EndedCallSchemaForInsert):
-    """Alias kept for backwards-compatibility with callers that import the
-    `WithStartedAt` name. `started_at` now lives on the parent.
+    """Deprecated alias. `started_at` now lives on the parent
+    `EndedCallSchemaForInsert`; prefer that. Kept so external SDK pins on the
+    `WithStartedAt` name keep importing. Remove once all in-tree callers
+    migrate.
     """
 
 
