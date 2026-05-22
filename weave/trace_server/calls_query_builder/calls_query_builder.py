@@ -2881,6 +2881,17 @@ def _try_optimized_stats_query(
             req.project_id, param_builder, read_table
         )
 
+    # Pattern 3: Unfiltered distinct-call count on calls_merged.
+    #
+    # Replace the GROUP BY + argMax rollup with two parallel aggregators on one
+    # scan: uniqExact(id) - uniqExactIf(id, isNotNull(deleted_at)). Exact match
+    # to the GROUP BY path's deleted-call exclusion. calls_complete has its own
+    # flat path; limit=1 stays with Pattern 1.
+    if read_table == ReadTable.CALLS_MERGED and _is_unfiltered_stats_req(req):
+        return _optimized_unfiltered_calls_merged_count_query(
+            req.project_id, req.limit, param_builder
+        )
+
     return None
 
 
@@ -2935,6 +2946,51 @@ def _optimized_wb_run_id_not_null_query(
             LIMIT 1
         )
     """
+
+
+def _optimized_unfiltered_calls_merged_count_query(
+    project_id: str,
+    limit: int | None,
+    param_builder: ParamBuilder,
+) -> str:
+    """Flat distinct-id count for unfiltered calls_merged stats.
+
+    Two parallel aggregators in one scan: total distinct ids minus distinct ids
+    that have any row with deleted_at set. Matches the GROUP BY path's
+    `argMax(deleted_at) IS NULL` exclusion exactly.
+    """
+    table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
+    project_id_slot = param_slot(param_builder.add_param(project_id), "String")
+    raw_count_expr = (
+        f"uniqExact({table_name}.id) "
+        f"- uniqExactIf({table_name}.id, isNotNull({table_name}.deleted_at))"
+    )
+    inner = (
+        f"SELECT {raw_count_expr} AS raw_count "
+        f"FROM {table_name} "
+        f"WHERE {table_name}.project_id = {project_id_slot}"
+    )
+    if limit is None:
+        return f"SELECT raw_count AS count, toUInt8(0) AS has_more FROM ({inner})"
+    return (
+        f"SELECT least(raw_count, {limit}) AS count, "
+        f"toUInt8(raw_count > {limit}) AS has_more "
+        f"FROM ({inner})"
+    )
+
+
+def _is_unfiltered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
+    """True iff the request is a pure project-scope count with no narrowing.
+
+    Gates Pattern 3 (flat distinct-id count). limit=1 stays with Pattern 1.
+    """
+    return (
+        (req.limit is None or req.limit > 1)
+        and req.query is None
+        and not req.include_total_storage_size
+        and not req.expand_columns
+        and _is_minimal_filter(req.filter)
+    )
 
 
 def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
