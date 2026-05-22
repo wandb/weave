@@ -262,9 +262,10 @@ def _projection(cols: list[str], *, table_alias: str | None = None) -> str:
     return ", ".join(cols)
 
 
-# Spans list query: lightweight table projection. Custom attrs and raw dumps
-# remain queryable/filterable server-side, but the UI does not need to hydrate
-# arbitrary Map/blob payloads for every span row.
+# Spans list query: scalar/short projection used for the spans table.
+# Custom-attr Maps and large blobs (messages, payloads, raw_span_dump) are
+# pulled in by `_SPANS_DETAILS_FIELD_NAMES` only when the caller opts in via
+# `include_details`.
 _SPANS_LIST_FIELD_NAMES = [
     "project_id",
     "trace_id",
@@ -288,6 +289,8 @@ _SPANS_LIST_FIELD_NAMES = [
     "input_tokens",
     "output_tokens",
     "reasoning_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
     "conversation_id",
     "conversation_name",
     "tool_name",
@@ -295,10 +298,50 @@ _SPANS_LIST_FIELD_NAMES = [
     "tool_call_id",
     "finish_reasons",
     "error_type",
+    "request_temperature",
+    "request_max_tokens",
+    "request_top_p",
+    "request_frequency_penalty",
+    "request_presence_penalty",
+    "request_seed",
+    "request_stop_sequences",
+    "request_choice_count",
+    "output_type",
+    "compaction_items_before",
+    "compaction_items_after",
+    "server_address",
+    "server_port",
     "wb_user_id",
     "wb_run_id",
+    "wb_run_step",
+    "wb_run_step_end",
 ]
 SPANS_LIST_COLS: str = _projection(_SPANS_LIST_FIELD_NAMES)
+
+# Detail-only fields: heavy text/array payloads. Included only when the
+# caller sets `include_details` (the span detail panel does this; the main
+# spans table does not).
+#
+# The `*_refs` columns are stored in internal-ref form by `extract_genai_span`
+# so the response-side int→ext converter can round-trip them. Pre-fix rows
+# may still hold external `weave:///` refs; those will trip the strict
+# converter at read time and need a backfill.
+_SPANS_DETAILS_FIELD_NAMES = [
+    "reasoning_content",
+    "tool_description",
+    "tool_definitions",
+    "input_messages",
+    "output_messages",
+    "system_instructions",
+    "tool_call_arguments",
+    "tool_call_result",
+    "compaction_summary",
+    "content_refs",
+    "artifact_refs",
+    "object_refs",
+    "raw_span_dump",
+]
+SPANS_DETAILS_COLS: str = _projection(_SPANS_DETAILS_FIELD_NAMES)
 
 
 def _custom_attr_field_name(ref: AgentSpanValueRef) -> str:
@@ -923,8 +966,9 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         custom_attr_projection = _custom_attr_map_projection(
             pb, req.custom_attr_columns
         )
+        details_projection = f", {SPANS_DETAILS_COLS}" if req.include_details else ""
         return f"""
-            SELECT {SPANS_LIST_COLS}{custom_attr_projection}
+            SELECT {SPANS_LIST_COLS}{details_projection}{custom_attr_projection}
             FROM spans s
             WHERE {span_filters.where}
             ORDER BY {order_by}
