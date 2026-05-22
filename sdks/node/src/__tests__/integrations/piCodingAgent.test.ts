@@ -92,56 +92,50 @@ function startTurn(emit: EmitFn, ctx = DEFAULT_CTX) {
 // ---------------------------------------------------------------------------
 
 describe('PiCodingAgentOtelAdapter', () => {
-  // ── Session span ──────────────────────────────────────────────────────────
-
-  describe('session span', () => {
-    it('starts with correct attributes', () => {
+  describe('invoke_agent span', () => {
+    it('emits with correct attributes', () => {
       const {exporter, emit} = makeExporterAndAdapter();
       startSession(emit);
+
+      // Prompt
+      emit('before_agent_start', {prompt: 'tell me a joke', systemPrompt: 'sys'});
+      emit('agent_end', {messages: []});
+
       emit('session_shutdown');
 
       const span = exporter
         .getFinishedSpans()
-        .find(s => s.name === 'pi.coding_agent.session');
-      expect(span).toBeDefined();
-      expect(span!.kind).toBe(SpanKind.INTERNAL);
+        .find(s => s.name === 'invoke_agent pi-coding-agent');
       expect(span!.attributes['gen_ai.agent.name']).toBe('pi-coding-agent');
+      expect(span!.attributes['gen_ai.provider.name']).toBe('anthropic');
       expect(span!.attributes['gen_ai.conversation.id']).toBe(
         'test-session-id'
       );
       expect(span!.attributes['pi.session.cwd']).toBe('/home/user/project');
     });
 
-    it('is ended by session_shutdown', () => {
+    it('emits one trace per prompt, linked by conversation id', () => {
       const {exporter, emit} = makeExporterAndAdapter();
       startSession(emit);
-      expect(exporter.getFinishedSpans()).toHaveLength(0);
-      emit('session_shutdown');
-      expect(
-        exporter
-          .getFinishedSpans()
-          .find(s => s.name === 'pi.coding_agent.session')
-      ).toBeDefined();
-    });
-  });
-
-  // ── invoke_agent span ─────────────────────────────────────────────────────
-
-  describe('invoke_agent span', () => {
-    it('has correct attributes and is a child of the session span', () => {
-      const {exporter, emit} = makeExporterAndAdapter();
-      startInvoke(emit);
+      // Prompt 1
+      emit('before_agent_start', {prompt: 'first', systemPrompt: 'sys'});
+      emit('agent_end', {messages: []});
+      // Prompt 2
+      emit('before_agent_start', {prompt: 'second', systemPrompt: 'sys'});
       emit('agent_end', {messages: []});
       emit('session_shutdown');
 
-      const spans = exporter.getFinishedSpans();
-      const session = spans.find(s => s.name === 'pi.coding_agent.session')!;
-      const invoke = spans.find(
-        s => s.name === 'invoke_agent pi-coding-agent'
-      )!;
-      expect(invoke.parentSpanId).toBe(session.spanContext().spanId);
-      expect(invoke.attributes['gen_ai.provider.name']).toBe('anthropic');
-      expect(invoke.attributes['gen_ai.conversation.id']).toBe(
+      const invokes = exporter
+        .getFinishedSpans()
+        .filter(s => s.name === 'invoke_agent pi-coding-agent');
+      expect(invokes).toHaveLength(2);
+      expect(invokes[0].spanContext().traceId).not.toBe(
+        invokes[1].spanContext().traceId
+      );
+      expect(invokes[0].attributes['gen_ai.conversation.id']).toBe(
+        'test-session-id'
+      );
+      expect(invokes[1].attributes['gen_ai.conversation.id']).toBe(
         'test-session-id'
       );
     });
@@ -473,7 +467,7 @@ describe('PiCodingAgentOtelAdapter', () => {
   // ── compaction span ───────────────────────────────────────────────────────
 
   describe('compaction span', () => {
-    it('emits pi.coding_agent.compaction as child of session', () => {
+    it('emits pi.coding_agent.compaction as a root span', () => {
       const {exporter, emit} = makeExporterAndAdapter();
       startSession(emit);
       emit('session_compact', {
@@ -483,11 +477,11 @@ describe('PiCodingAgentOtelAdapter', () => {
       });
       emit('session_shutdown');
 
-      const spans = exporter.getFinishedSpans();
-      const session = spans.find(s => s.name === 'pi.coding_agent.session')!;
-      const compact = spans.find(s => s.name === 'pi.coding_agent.compaction')!;
+      const compact = exporter
+        .getFinishedSpans()
+        .find(s => s.name === 'pi.coding_agent.compaction')!;
       expect(compact).toBeDefined();
-      expect(compact.parentSpanId).toBe(session.spanContext().spanId);
+      expect(compact.parentSpanId).toBeUndefined();
       expect(compact.attributes['pi.compaction.reason']).toBe('context_limit');
       expect(compact.attributes['pi.compaction.aborted']).toBe(false);
       expect(compact.attributes['pi.compaction.will_retry']).toBe(false);
