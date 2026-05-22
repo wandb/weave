@@ -140,6 +140,24 @@ class UserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().actions_execute_batch(req)
 
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        req.wb_user_id = req.wb_user_id or self._user_id
+        return super().annotation_queue_create(req)
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        req.wb_user_id = req.wb_user_id or self._user_id
+        return super().annotation_queue_update(req)
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        req.wb_user_id = req.wb_user_id or self._user_id
+        return super().annotation_queue_add_calls(req)
+
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         req.obj.wb_user_id = self._user_id
         return super().obj_create(req)

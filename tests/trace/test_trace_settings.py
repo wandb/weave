@@ -44,12 +44,12 @@ def func():
 
 
 def test_disabled_setting(client):
-    parse_and_apply_settings(UserSettings(disabled=True))
+    replace_settings(UserSettings(disabled=True))
     disabled_time = timeit.timeit(func, number=10)
     calls = list(client.get_calls())
     assert len(calls) == 0
 
-    parse_and_apply_settings(UserSettings(disabled=False))
+    replace_settings(UserSettings(disabled=False))
     enabled_time = timeit.timeit(func, number=10)
     calls = list(client.get_calls())
     assert len(calls) == 10
@@ -75,7 +75,7 @@ def test_disabled_env(client):
     )
 
 
-def test_publish_when_disabled(client, monkeypatch):
+def test_publish_when_disabled(weave_active, monkeypatch):
     """Test that weave.publish() returns a dummy ref when WEAVE_DISABLED=true."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
@@ -91,7 +91,7 @@ def test_publish_when_disabled(client, monkeypatch):
     assert ref.digest == "DISABLED"
 
 
-def test_publish_when_disabled_uses_obj_name(client, monkeypatch):
+def test_publish_when_disabled_uses_obj_name(weave_active, monkeypatch):
     """Test that publish uses object's name attribute when no explicit name given."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
@@ -108,7 +108,7 @@ def test_publish_when_disabled_uses_obj_name(client, monkeypatch):
     assert ref.name == "my_obj"
 
 
-def test_publish_when_disabled_uses_class_name(client, monkeypatch):
+def test_publish_when_disabled_uses_class_name(weave_active, monkeypatch):
     """Test that publish uses class name when object has no name attribute."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
@@ -125,7 +125,7 @@ def test_publish_when_disabled_uses_class_name(client, monkeypatch):
     assert ref.name == "MyClass"
 
 
-def test_publish_when_disabled_ignores_tags_aliases(client, monkeypatch):
+def test_publish_when_disabled_ignores_tags_aliases(weave_active, monkeypatch):
     """Tags and aliases should be silently ignored when weave is disabled."""
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
@@ -177,8 +177,8 @@ def test_print_call_link_env(client):
     del os.environ["WEAVE_PRINT_CALL_LINK"]
 
 
-def test_should_capture_code_setting(client):
-    parse_and_apply_settings(UserSettings(capture_code=False))
+def test_should_capture_code_setting(weave_active):
+    replace_settings(UserSettings(capture_code=False))
 
     @weave.op
     def test_func():
@@ -189,7 +189,7 @@ def test_should_capture_code_setting(client):
     code2 = test_func2.get_captured_code()
     assert "Code-capture was disabled" in code2
 
-    parse_and_apply_settings(UserSettings(capture_code=True))
+    replace_settings(UserSettings(capture_code=True))
 
     # TODO: Not safe to change capture_code setting mid-script because the op's ref
     # does not know about the setting change.
@@ -203,7 +203,7 @@ def test_should_capture_code_setting(client):
     assert "Code-capture was disabled" not in code3
 
 
-def test_should_capture_code_env(client):
+def test_should_capture_code_env(weave_active):
     os.environ["WEAVE_CAPTURE_CODE"] = "false"
 
     @weave.op
@@ -250,14 +250,14 @@ def test_client_parallelism_setting(client_creator):
             assert client.future_executor._max_workers == 4
             assert client.future_executor._executor._max_workers == 4
 
-    parse_and_apply_settings(UserSettings(client_parallelism=1))
+    replace_settings(UserSettings(client_parallelism=1))
     with mock.patch("os.cpu_count", return_value=4):
         with client_creator() as client:
             assert client.future_executor._max_workers == 1
             assert client.future_executor._executor._max_workers == 1
             wait_time_1, queue_time_1 = speed_test(client)
 
-    parse_and_apply_settings(UserSettings(client_parallelism=10))
+    replace_settings(UserSettings(client_parallelism=10))
     with client_creator() as client:
         assert client.future_executor._max_workers == 5
         assert client.future_executor._executor._max_workers == 5
@@ -270,7 +270,7 @@ def test_client_parallelism_setting(client_creator):
     assert wait_time_1 > wait_time_10
 
     # Test explicit None
-    parse_and_apply_settings(UserSettings(client_parallelism=None))
+    replace_settings(UserSettings(client_parallelism=None))
     with mock.patch("os.cpu_count", return_value=4):
         with client_creator() as client:
             assert client.future_executor._max_workers == 4

@@ -10,6 +10,7 @@ test since that's a separate code path (Status object vs attributes).
 import datetime
 from typing import Any
 
+from weave.trace_server.agents import semconv
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.python_spans import (
     Resource,
@@ -355,6 +356,36 @@ def test_extract_custom_attrs_routes_bool_to_bool_map() -> None:
     assert "lorem.is_active" not in result.custom_attrs_string
     assert "lorem.is_active" not in result.custom_attrs_int
     assert "lorem.is_active" not in result.custom_attrs_float
+
+
+def test_multi_alias_extraction_recognises_every_form() -> None:
+    """For any attribute with multiple OTel aliases, the extractor must
+    populate its column from a span carrying the value under any recognised
+    key — canonical weave.* form, primary OTel alias, or any parallel /
+    historical alias. ``USAGE_REASONING_TOKENS`` is used here as a concrete
+    example; the same contract applies to any multi-alias semconv attribute.
+    """
+    for key in semconv.USAGE_REASONING_TOKENS.lookup_keys:
+        result = extract_genai_span(_make_span(attrs={key: 42}), project_id="p1")
+        assert result.reasoning_tokens == 42, f"key {key!r} did not populate column"
+
+
+def test_multi_alias_extraction_canonical_weave_key_wins() -> None:
+    """When a span carries both the canonical weave.* key and parallel OTel
+    aliases, the weave.* value wins (extractor probes lookup_keys in order).
+    ``USAGE_REASONING_TOKENS`` is used here as a concrete example; the same
+    contract applies to any multi-alias semconv attribute.
+    """
+    result = extract_genai_span(
+        _make_span(
+            attrs={
+                semconv.USAGE_REASONING_TOKENS.key: 99,
+                **dict.fromkeys(semconv.USAGE_REASONING_TOKENS.gen_ai_aliases, 10),
+            }
+        ),
+        project_id="p1",
+    )
+    assert result.reasoning_tokens == 99
 
 
 def test_extract_custom_attrs_skips_non_finite_floats() -> None:

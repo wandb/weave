@@ -45,12 +45,6 @@ from typing_extensions import Unpack
 DEFAULT_RETRY_MAX_INTERVAL_SECONDS = 60 * 5  # 5 minutes
 SETTINGS_PREFIX = "WEAVE_"
 
-# Entities that auto-opt-in to the calls_complete write path, independent of
-# the WEAVE_USE_CALLS_COMPLETE env var. This lets us dogfood calls_complete on
-# wandb-internal projects first so any regressions land on us, not customers.
-# Expand the allowlist (or flip the env default) once we have confidence.
-CALLS_COMPLETE_ENTITY_ALLOWLIST: frozenset[str] = frozenset({"wandb"})
-
 
 # Attention Devs:
 # To add a new setting:
@@ -258,21 +252,18 @@ class UserSettings:
     Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
     """
 
-    use_calls_complete: bool = False
+    use_calls_complete: bool = True
     """
     Toggles use of the calls_complete write path for new calls.
 
-    If True, uses the new calls_complete endpoint which batches complete calls
-    (with both start and end information) together before sending to the server.
-    This reduces the number of write operations and improves performance.
+    If True (default), uses the calls_complete endpoint which batches complete
+    calls (with both start and end information) together before sending to the
+    server. This reduces the number of write operations and improves performance.
 
-    If False (default), uses the legacy call_start/call_end endpoints which
-    send start and end events separately.
+    If False, uses the legacy call_start/call_end endpoints which send start
+    and end events separately.
 
     Can be overridden with the environment variable `WEAVE_USE_CALLS_COMPLETE`.
-
-    Note: entities in `CALLS_COMPLETE_ENTITY_ALLOWLIST` auto-opt-in regardless
-    of this setting (see `should_use_calls_complete`).
     """
 
     enable_client_side_digests: bool = False
@@ -600,17 +591,11 @@ def should_use_stainless_server() -> bool:
     )
 
 
-def should_use_calls_complete(entity: str | None = None) -> bool:
-    """Returns whether the calls_complete write path should be used.
-
-    True if the `use_calls_complete` setting/env var is enabled, OR if
-    `entity` is in `CALLS_COMPLETE_ENTITY_ALLOWLIST` (dogfood gate).
-    """
-    if _env_or_default(
+def should_use_calls_complete() -> bool:
+    """Returns whether the calls_complete write path should be used."""
+    return _env_or_default(
         "use_calls_complete", _current_settings.get().use_calls_complete
-    ):
-        return True
-    return entity is not None and entity in CALLS_COMPLETE_ENTITY_ALLOWLIST
+    )
 
 
 def should_enable_client_side_digests() -> bool:
