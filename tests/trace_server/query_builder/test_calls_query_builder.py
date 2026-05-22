@@ -4192,6 +4192,28 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     )
 
 
+def test_stats_query_calls_merged_unfiltered_limit_1_stays_with_pattern_1() -> None:
+    """limit=1 with no filter is the project-existence check (Pattern 1),
+    which uses `LIMIT 1` and is strictly cheaper than starting a uniqUpTo
+    aggregator. Pinning this boundary so Pattern 3 never intercepts.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project", limit=1)
+    assert_stats_sql(
+        req,
+        """
+        SELECT toUInt8(count()) AS has_any
+        FROM (
+            SELECT 1
+            FROM calls_merged
+            WHERE project_id = {pb_0:String}
+            LIMIT 1
+        )
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
 def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> None:
     """Unfiltered calls_merged stats with no limit takes the flat distinct-id path.
 
