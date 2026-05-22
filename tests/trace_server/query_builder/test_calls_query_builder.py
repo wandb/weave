@@ -2132,16 +2132,16 @@ def test_build_calls_complete_update_end_query() -> None:
     expected = """
         UPDATE calls_complete
         SET
-            ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC'),
-            exception = {exception:String},
-            output_dump = {output_dump:String},
-            summary_dump = {summary_dump:String},
-            output_refs = {output_refs:Array(String)},
-            wb_run_step_end = {wb_run_step_end:UInt64},
+            ended_at = fromUnixTimestamp64Micro(%(ended_at)s, 'UTC'),
+            exception = %(exception)s,
+            output_dump = %(output_dump)s,
+            summary_dump = %(summary_dump)s,
+            output_refs = %(output_refs)s,
+            wb_run_step_end = %(wb_run_step_end)s,
             updated_at = now64(3)
-        WHERE project_id = {project_id:String}
-            AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')
-            AND id = {id:String}
+        WHERE project_id = %(project_id)s
+            AND started_at = fromUnixTimestamp64Micro(%(started_at)s, 'UTC')
+            AND id = %(id)s
     """
 
     exp_formatted = sqlparse.format(expected, reindent=True)

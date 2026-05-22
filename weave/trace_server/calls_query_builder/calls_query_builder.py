@@ -3066,19 +3066,23 @@ def build_calls_complete_update_end_query(
         started_at and ended_at params are passed as Int64 microseconds since epoch
         because clickhouse-connect truncates datetime objects to whole seconds.
         We use fromUnixTimestamp64Micro() to convert back to DateTime64(6).
+
+        Uses `%(name)s` (client-side), not `{name:Type}` -- the latter puts
+        params in the URL and broken-pipes on multi-MB outputs. Injection safety
+        comes from clickhouse_connect's `escape_str`.
     """
     # Build WHERE clause - include started_at if provided for better primary key usage
-    where_clauses = [f"project_id = {{{project_id_param}:String}}"]
+    where_clauses = [f"project_id = %({project_id_param})s"]
     if started_at_param is not None:
         where_clauses.append(
-            f"started_at = fromUnixTimestamp64Micro({{{started_at_param}:Int64}}, 'UTC')"
+            f"started_at = fromUnixTimestamp64Micro(%({started_at_param})s, 'UTC')"
         )
     else:
         # TODO: try to optimistically parse uuidv7, grabbing timestamps from the ID
         # then use that to narrow the granules we need to search.
         pass
 
-    where_clauses.append(f"id = {{{id_param}:String}}")
+    where_clauses.append(f"id = %({id_param})s")
     where_clause = " AND ".join(where_clauses)
 
     # Format table name with ON CLUSTER if cluster_name is provided
@@ -3089,12 +3093,12 @@ def build_calls_complete_update_end_query(
     return f"""
         UPDATE {formatted_table}
         SET
-            ended_at = fromUnixTimestamp64Micro({{{ended_at_param}:Int64}}, 'UTC'),
-            exception = {{{exception_param}:String}},
-            output_dump = {{{output_dump_param}:String}},
-            summary_dump = {{{summary_dump_param}:String}},
-            output_refs = {{{output_refs_param}:Array(String)}},
-            wb_run_step_end = {{{wb_run_step_end_param}:UInt64}},
+            ended_at = fromUnixTimestamp64Micro(%({ended_at_param})s, 'UTC'),
+            exception = %({exception_param})s,
+            output_dump = %({output_dump_param})s,
+            summary_dump = %({summary_dump_param})s,
+            output_refs = %({output_refs_param})s,
+            wb_run_step_end = %({wb_run_step_end_param})s,
             updated_at = now64(3)
         WHERE {where_clause}
         """

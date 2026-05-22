@@ -15,9 +15,22 @@ from importlib.abc import MetaPathFinder
 
 from weave.trace.autopatch import IntegrationSettings
 
-# Global set to track which integrations have been patched
-# This prevents double-patching when libraries are imported multiple times
+# Integrations that have actually been patched. Prevents double-patching
+# when libraries are imported multiple times.
 _PATCHED_INTEGRATIONS: set[str] = set()
+
+# Integrations that another (higher-priority) integration has claimed and
+# that should therefore be skipped. Example: ``patch_google_adk`` adds
+# ``"google.genai"`` here because ADK's own OTel spans already cover
+# google-genai calls, and double-logging would mean two spans per
+# Gemini request.
+#
+# Membership semantics:
+# - in ``_PATCHED_INTEGRATIONS`` → the patcher ran
+# - in ``_SUPPRESSED_INTEGRATIONS`` → the patcher must not run
+# - in both → impossible by construction (suppression guards run before
+#   patcher attempts)
+_SUPPRESSED_INTEGRATIONS: set[str] = set()
 
 # Global reference to the import hook, so we can unregister it if needed
 _IMPORT_HOOK: WeaveImportHook | None = None
@@ -38,8 +51,12 @@ def _patch_integration(
         triggering_symbols: Symbols to add to _PATCHED_INTEGRATIONS on success (e.g. ["openai"])
         settings: Optional integration settings
     """
-    # If symbols are already patched, don't patch again
-    if any(name in _PATCHED_INTEGRATIONS for name in triggering_symbols):
+    # Skip if already patched, or if another integration has claimed this
+    # symbol (and ours should defer).
+    if any(
+        name in _PATCHED_INTEGRATIONS or name in _SUPPRESSED_INTEGRATIONS
+        for name in triggering_symbols
+    ):
         return
 
     if settings is None:
@@ -149,6 +166,38 @@ def patch_vertexai(settings: IntegrationSettings | None = None) -> None:
         triggering_symbols=["vertexai"],
         settings=settings,
     )
+
+
+def patch_google_adk(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for Google Agent Development Kit (ADK).
+
+    ADK uses ``google.genai`` internally, and ADK's own OTel spans
+    already cover the model calls Weave's ``google_genai`` integration
+    targets. When ADK is patched we therefore suppress
+    ``patch_google_genai`` to avoid double-logging the same Gemini
+    request/response on the new agents pipeline and the legacy
+    call-level integration.
+
+    Note: the import hook currently matches only root modules, so
+    ``import google.adk`` after ``weave.init()`` will *not* auto-trigger
+    this patch (the root module ``google`` is not in the mapping).
+    Either import ADK before calling ``weave.init()`` so
+    ``implicit_patch()`` catches it, or call ``patch_google_adk()``
+    explicitly after init. Follow-up work will extend the hook to match
+    dotted paths.
+    """
+    _patch_integration(
+        module_path="weave.integrations.google_adk.google_adk_sdk",
+        patcher_func_getter_name="get_google_adk_patcher",
+        triggering_symbols=["google.adk"],
+        settings=settings,
+    )
+    # Only suppress google-genai if ADK actually patched (i.e.
+    # ``settings.enabled`` wasn't False). Both wire names go in so
+    # explicit calls and ``implicit_patch`` both defer.
+    if "google.adk" in _PATCHED_INTEGRATIONS:
+        _SUPPRESSED_INTEGRATIONS.add("google.genai")
+        _SUPPRESSED_INTEGRATIONS.add("google.generativeai")
 
 
 def patch_huggingface(settings: IntegrationSettings | None = None) -> None:
@@ -334,6 +383,10 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "litellm": patch_litellm,
     "cerebras": patch_cerebras,
     "cohere": patch_cohere,
+    # ADK must come before ``google.genai`` / ``google.generativeai``:
+    # patching ADK suppresses google-genai (see ``patch_google_adk``), but
+    # the suppression only takes effect if ADK is patched first.
+    "google.adk": patch_google_adk,
     "google.generativeai": patch_google_genai,
     "google.genai": patch_google_genai,
     "vertexai": patch_vertexai,
@@ -447,8 +500,9 @@ class PatchingLoader:
 def _patch_if_needed(module_name: str) -> None:
     """Apply patching for a module if it hasn't been patched yet."""
     if (
-        module_name not in _PATCHED_INTEGRATIONS
-        and module_name in INTEGRATION_MODULE_MAPPING
+        module_name in INTEGRATION_MODULE_MAPPING
+        and module_name not in _PATCHED_INTEGRATIONS
+        and module_name not in _SUPPRESSED_INTEGRATIONS
     ):
         patch_func = INTEGRATION_MODULE_MAPPING[module_name]
         try:
@@ -477,8 +531,14 @@ def implicit_patch() -> None:
         return
 
     for module_name, patch_func in INTEGRATION_MODULE_MAPPING.items():
-        # Check if the module is already imported and not yet patched
-        if module_name in sys.modules and module_name not in _PATCHED_INTEGRATIONS:
+        # Check if the module is already imported, not yet patched, and
+        # not suppressed by a sibling integration (e.g. ADK suppresses
+        # google.genai).
+        if (
+            module_name in sys.modules
+            and module_name not in _PATCHED_INTEGRATIONS
+            and module_name not in _SUPPRESSED_INTEGRATIONS
+        ):
             try:
                 patch_func()
                 _PATCHED_INTEGRATIONS.add(module_name)
@@ -522,6 +582,7 @@ def unregister_import_hook() -> None:
 
 
 def reset_patched_integrations() -> None:
-    """Reset the set of patched integrations (useful for testing)."""
-    global _PATCHED_INTEGRATIONS  # noqa: PLW0603
+    """Reset the patched + suppressed integration sets (useful for testing)."""
+    global _PATCHED_INTEGRATIONS, _SUPPRESSED_INTEGRATIONS  # noqa: PLW0603
     _PATCHED_INTEGRATIONS = set()
+    _SUPPRESSED_INTEGRATIONS = set()

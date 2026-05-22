@@ -1,4 +1,4 @@
-import {GEN_AI_ATTR} from '../../genai/semconv';
+import {ATTR_GEN_AI_CONVERSATION_ID} from '../../genai/semconv';
 import {Session} from '../../genai/session';
 
 import {
@@ -17,7 +17,7 @@ describe('end-to-end chain', () => {
       sessionId: 'conv-e2e',
     });
     const turn = session.startTurn();
-    const llm = turn.llm({model: 'gpt-4o'});
+    const llm = turn.startLLM({model: 'gpt-4o'});
     const tool = llm.startTool({name: 'get_weather'});
     tool.end();
     llm.end();
@@ -42,7 +42,7 @@ describe('end-to-end chain', () => {
 
     // Conversation id propagates everywhere.
     for (const s of spans) {
-      expect(s.attributes[GEN_AI_ATTR.GEN_AI_CONVERSATION_ID]).toBe('conv-e2e');
+      expect(s.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-e2e');
     }
   });
 });
