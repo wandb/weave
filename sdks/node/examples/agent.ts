@@ -67,6 +67,7 @@ async function callLLM({
       model: MODEL,
       messages,
       tools,
+      parallel_tool_calls: false,
     });
     const msg = resp.choices[0].message;
     llm.output(msg.content ?? '');
