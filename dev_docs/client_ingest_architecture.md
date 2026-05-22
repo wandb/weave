@@ -21,7 +21,7 @@ How a `@weave.op` call gets from user code to the trace server. Written as groun
 | Feedback batching | `weave/trace_server_bindings/async_batch_processor.py` | AsyncBatchProcessor (used for feedback only) |
 | HTTP transport | `weave/trace_server_bindings/remote_http_trace_server.py` | dispatches single vs batch endpoints |
 | Oversize handling | `weave/trace_server_bindings/http_utils.py` | binary-tree split, 413 retry, repackage |
-| HTTP client | `weave/utils/http_requests.py` | httpx.Client singleton, unbounded conn pool |
+| HTTP client | `weave/utils/http_requests.py` | httpx.Client singleton; conn pool intentionally uncapped, concurrency controlled at processor layer |
 
 ## Diagram
 
@@ -203,7 +203,7 @@ Three sub-claims to test, in order:
 
 1. **The CallBatchProcessor queue is bounded (10K) but does not block; it drops.** Switching to unbounded changes the failure mode from drop-on-saturation to OOM-on-saturation, which is worse unless paired with disk/WAL backpressure. So "unbounded async ingest queue" is only safe if we add explicit backpressure (or a dedicated spill-to-disk).
 
-2. **call_end IS batched for the normal path.** It is NOT batched for the eager path. So "a sender that batches call_end" is really "make the eager path batch ends." The eager path exists because evaluations need immediate UI visibility on the start side; the end side does not have that constraint and could safely batch.
+2. **call_end IS batched for the normal path.** It is NOT batched for the eager path. So "a sender that batches call_end" is really "make the eager path go through the DB-friendly path whenever possible." The eager path exists because evaluations need immediate UI visibility on the start side; in practice most eager calls' ends arrive within a second of the start, so a brief hold window lets them pair into a `calls/complete` insert instead of two separate eager records.
 
 3. **The actual prod bottleneck is worker-pool saturation under network latency.** Neither of the above directly fixes that. The real lever is widening / splitting the FutureExecutor pool, or making `server.obj_create`/`server.call_X` truly fire-and-forget (no synchronous HTTP wait inside the worker).
 
@@ -222,3 +222,7 @@ Pre-commit measurements I'd want before picking a shape:
 - Ratio of eager-end POSTs to complete-call POSTs in a representative evaluation workload.
 
 The PR-6740 prod result (no win, possibly a regression) is the signal that we should not be moving more CPU into the FutureExecutor without addressing what the pool is competing on first.
+
+---
+
+_LAST_VERIFIED against commit `20c16d57946d4435bb4d2f9dc15b53df41da930b` (master HEAD at doc-add time). Line numbers above will rot; re-verify against current code when citing._

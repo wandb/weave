@@ -50,15 +50,23 @@ DEFAULT_MAX_QUEUE_SIZE = 10_000
 FLUSH_POLL_INTERVAL_SECONDS = 0.1
 # Log every Nth dropped item to avoid log spam
 DROP_LOG_FREQUENCY = 1000
+# How long an eager-flagged start is held waiting for its end so the pair can
+# be sent as a single complete (DB-friendly insert) instead of two eager v2
+# records. If the end does not arrive within this window the start is sent
+# standalone via the eager path for UI visibility.
+DEFAULT_EAGER_HOLD_WINDOW_SECONDS = 1.0
 
 
 class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
     """Batch processor that pairs starts with ends to maximize complete calls.
 
     For normal ops: starts and ends are paired before sending as complete calls.
-    For eager ops (marked with @op(eager_call_start=True)): starts are sent immediately
-    via the legacy path, and ends are sent separately. This is useful for long-running
-    operations like evaluations that should be visible in the UI immediately.
+    For eager ops (marked with @op(eager_call_start=True)): the start is held
+    briefly (`eager_hold_window_seconds`) waiting for its end. If the end
+    arrives in the window, the pair flows through the complete path (one
+    DB-friendly insert via `calls/complete`). If the window expires, the
+    start is sent standalone via the eager v2 endpoint for UI visibility,
+    and its end (whenever it arrives) is sent via the eager v2 endpoint too.
     """
 
     def __init__(
@@ -71,6 +79,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         max_pending_calls: int = DEFAULT_MAX_PENDING_CALLS,
         enable_disk_fallback: bool = False,
         disk_fallback_path: str = ".weave_client_dropped_items_log.jsonl",
+        eager_hold_window_seconds: float = DEFAULT_EAGER_HOLD_WINDOW_SECONDS,
     ) -> None:
         """Initialize the CallBatchProcessor.
 
@@ -83,8 +92,28 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
             max_pending_calls: Maximum pending unpaired calls before error.
             enable_disk_fallback: Write dropped items to disk if True.
             disk_fallback_path: Path for dropped items log file.
+            eager_hold_window_seconds: How long to hold an eager-flagged start
+                waiting for its end before falling back to the eager v2 send.
+                Set to 0 to send eager starts immediately (legacy behavior).
         """
-        # The parent class will use this for complete items
+        self.complete_processor_fn = complete_processor_fn
+        self.eager_processor_fn = eager_processor_fn
+        self.max_pending_calls = max_pending_calls
+        self.eager_hold_window_seconds = eager_hold_window_seconds
+
+        # Track pending starts/ends waiting for their counterpart.
+        # Each start entry carries an optional eager deadline (monotonic seconds);
+        # when set, the start falls back to eager standalone send if its end
+        # has not arrived by the deadline.
+        # Initialized BEFORE super().__init__ because the parent constructor
+        # starts the processing thread, which calls _get_next_batch ->
+        # _promote_expired_eager_starts and would otherwise see no attribute.
+        self._pending_starts: dict[str, tuple[StartBatchItem, float | None]] = {}
+        self._pending_ends: dict[str, EndBatchItem] = {}
+        self._eager_call_ids: TTLCache[str, bool] = TTLCache(
+            maxsize=max_pending_calls, ttl=EAGER_CALL_ID_TTL_SECONDS
+        )
+
         super().__init__(
             processor_fn=self._process_mixed_batch,
             max_batch_size=max_batch_size,
@@ -92,20 +121,6 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
             max_queue_size=max_queue_size,
             enable_disk_fallback=enable_disk_fallback,
             disk_fallback_path=disk_fallback_path,
-        )
-
-        self.complete_processor_fn = complete_processor_fn
-        self.eager_processor_fn = eager_processor_fn
-        self.max_pending_calls = max_pending_calls
-
-        # Track pending starts/ends waiting for their counterpart
-        self._pending_starts: dict[str, StartBatchItem] = {}
-        self._pending_ends: dict[str, EndBatchItem] = {}
-
-        # Track which calls were sent as eager (start sent immediately)
-        # Uses TTL cache to auto-expire entries to prevent unbounded growth
-        self._eager_call_ids: TTLCache[str, bool] = TTLCache(
-            maxsize=max_pending_calls, ttl=EAGER_CALL_ID_TTL_SECONDS
         )
 
     @property
@@ -200,7 +215,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                     FLUSH_TIMEOUT_SECONDS,
                 )
                 while self._pending_starts:
-                    _, start_item = self._pending_starts.popitem()
+                    _, (start_item, _) = self._pending_starts.popitem()
                     self._queue_item(start_item)
 
             if self._pending_ends:
@@ -229,12 +244,14 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
     def _handle_start(
         self, item: StartBatchItem, *, eager_call_start: bool = False
     ) -> None:
-        """Handle a start item - pair with end if available, else hold or send eager.
+        """Handle a start item; pair with its end if already pending, else hold.
 
-        Args:
-            item: The start batch item.
-            eager_call_start: If True, send start immediately rather than batching.
-                Defined at op definition time via @op(eager_call_start=True).
+        Eager-flagged starts are also held briefly so a quickly-arriving end
+        can promote them into a complete (one DB-friendly insert) instead of
+        firing as a standalone v2 record. The fallback to standalone eager
+        send happens in `_promote_expired_eager_starts` when the hold window
+        expires. If `eager_hold_window_seconds` is 0, eager starts fire
+        immediately (legacy behavior).
         """
         call_id = item.req.start.id
 
@@ -242,45 +259,66 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
             logger.warning("Received start without call_id, dropping")
             return
 
-        if eager_call_start:
-            self._eager_call_ids[call_id] = True
-            self._queue_item(item)
-            # If end already arrived (race condition), queue it separately too
-            if call_id in self._pending_ends:
-                end_item = self._pending_ends.pop(call_id)
-                self._queue_item(end_item)  # Queue as EndBatchItem, not complete
-            return
-
-        # Check if we already have the end waiting
+        # End already waiting from a race condition; pair regardless of eager flag.
         if call_id in self._pending_ends:
             end_item = self._pending_ends.pop(call_id)
             complete_item = self._create_complete(item, end_item)
             self._queue_item(complete_item)
-        else:
-            # Hold the start until its end arrives
-            self._pending_starts[call_id] = item
+            return
+
+        if eager_call_start and self.eager_hold_window_seconds <= 0:
+            # Legacy behavior: fire eager start immediately, no hold window.
+            self._eager_call_ids[call_id] = True
+            self._queue_item(item)
+            return
+
+        deadline = (
+            time.monotonic() + self.eager_hold_window_seconds
+            if eager_call_start
+            else None
+        )
+        self._pending_starts[call_id] = (item, deadline)
 
     def _handle_end(self, item: EndBatchItem) -> None:
-        """Handle an end item - pair with start if available, else hold."""
+        """Handle an end item; pair with start if pending, else hold."""
         call_id = item.req.end.id
         if call_id is None:
             logger.warning("Received end without call_id, dropping")
             return
 
-        # Check if start was already sent
+        # Start was already promoted to eager standalone send; send end the same way.
         if call_id in self._eager_call_ids:
             self._eager_call_ids.pop(call_id, None)
-            self._queue_item(item)  # Send end via eager path
+            self._queue_item(item)
             return
 
-        # Check if we already have the start waiting
         if call_id in self._pending_starts:
-            start_item = self._pending_starts.pop(call_id)
+            start_item, _ = self._pending_starts.pop(call_id)
             complete_item = self._create_complete(start_item, item)
             self._queue_item(complete_item)
         else:
-            # Hold the end until its start arrives (handles race conditions)
             self._pending_ends[call_id] = item
+
+    def _promote_expired_eager_starts(self) -> None:
+        """Send any eager-flagged starts whose hold window has expired.
+
+        Called from the processing thread on every tick. Starts whose `(item,
+        deadline)` deadline is in the past are removed from `_pending_starts`,
+        recorded in `_eager_call_ids`, and queued as `StartBatchItem`s so they
+        flow through the eager v2 endpoint for UI visibility. Their eventual
+        end will then route through the eager path via `_handle_end`.
+        """
+        now = time.monotonic()
+        with self.lock:
+            expired_ids = [
+                call_id
+                for call_id, (_, deadline) in self._pending_starts.items()
+                if deadline is not None and deadline <= now
+            ]
+            for call_id in expired_ids:
+                start_item, _ = self._pending_starts.pop(call_id)
+                self._eager_call_ids[call_id] = True
+                self._queue_item(start_item)
 
     def _create_complete(
         self, start: StartBatchItem, end: EndBatchItem
@@ -342,6 +380,11 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
             if self._dropped_item_count % DROP_LOG_FREQUENCY == 1:
                 log_warning_with_sentry(error_message)
             self._write_item_to_disk(item, error_message)
+
+    def _get_next_batch(self) -> list[BatchItem]:
+        """Sweep expired eager starts, then collect the next batch from the queue."""
+        self._promote_expired_eager_starts()
+        return super()._get_next_batch()
 
     def _process_mixed_batch(self, batch: list[BatchItem]) -> None:
         """Process a mixed batch by splitting into complete and eager items.

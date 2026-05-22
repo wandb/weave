@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import pathlib
+import time
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -132,11 +133,35 @@ def test_start_end_pairing_orders(start_first: bool) -> None:
     eager_fn.assert_not_called()
 
 
-def test_eager_start_and_end_use_eager_processor() -> None:
-    """Eager starts and their ends should use the eager processor."""
+def test_eager_start_with_quick_end_pairs_into_complete() -> None:
+    """Eager start + end arriving within the hold window pair into a complete."""
     complete_fn = MagicMock()
     eager_fn = MagicMock()
-    processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
+    processor = CallBatchProcessor(
+        complete_fn, eager_fn, min_batch_interval=0.01, eager_hold_window_seconds=1.0
+    )
+
+    start = _make_start_item("call-1", "trace-1")
+    end = _make_end_item("call-1")
+    processor.enqueue_start(start, eager_call_start=True)
+    processor.enqueue([end])
+    processor.stop_accepting_new_work_and_flush_queue()
+
+    complete_fn.assert_called_once()
+    batch = complete_fn.call_args[0][0]
+    assert len(batch) == 1
+    assert isinstance(batch[0], CompleteBatchItem)
+    assert batch[0].req.id == "call-1"
+    eager_fn.assert_not_called()
+
+
+def test_eager_start_with_zero_hold_window_uses_eager_immediately() -> None:
+    """eager_hold_window_seconds=0 preserves legacy immediate-eager behavior."""
+    complete_fn = MagicMock()
+    eager_fn = MagicMock()
+    processor = CallBatchProcessor(
+        complete_fn, eager_fn, min_batch_interval=0.01, eager_hold_window_seconds=0
+    )
 
     start = _make_start_item("call-1", "trace-1")
     end = _make_end_item("call-1")
@@ -148,6 +173,38 @@ def test_eager_start_and_end_use_eager_processor() -> None:
     eager_fn.assert_called_once()
     eager_items = eager_fn.call_args[0][0]
     assert {type(item) for item in eager_items} == {StartBatchItem, EndBatchItem}
+
+
+def test_eager_start_promoted_after_hold_window_expires() -> None:
+    """Eager start with no matching end is promoted via the eager v2 endpoint."""
+    complete_fn = MagicMock()
+    eager_fn = MagicMock()
+    processor = CallBatchProcessor(
+        complete_fn, eager_fn, min_batch_interval=0.01, eager_hold_window_seconds=0.05
+    )
+
+    start = _make_start_item("call-1", "trace-1")
+    processor.enqueue_start(start, eager_call_start=True)
+
+    # Start is held until the window expires.
+    assert "call-1" in processor._pending_starts
+    eager_fn.assert_not_called()
+
+    time.sleep(0.1)
+    processor._promote_expired_eager_starts()
+
+    assert "call-1" not in processor._pending_starts
+    assert "call-1" in processor._eager_call_ids
+
+    # The end, when it eventually arrives, should also route through eager.
+    end = _make_end_item("call-1")
+    processor.enqueue([end])
+    processor.stop_accepting_new_work_and_flush_queue()
+
+    complete_fn.assert_not_called()
+    eager_fn.assert_called()
+    sent_items = [item for call in eager_fn.call_args_list for item in call[0][0]]
+    assert {type(item) for item in sent_items} == {StartBatchItem, EndBatchItem}
 
 
 def test_complete_item_routes_to_complete_processor() -> None:
