@@ -107,9 +107,9 @@ def redact_pii(
 
 
 def redact_pii_string(data: str) -> str:
-    """Redact PII in a single string. Empty in → empty out (skips Presidio)."""
+    """Redact PII in a single string."""
     if not data:
-        return data
+        return data  # _get_engines() is uncached; skip the engine-load cost on empty defaults
     analyzer, anonymizer = _get_engines()
     entities = _get_redaction_entities()
     results = analyzer.analyze(text=data, language="en", entities=entities)
