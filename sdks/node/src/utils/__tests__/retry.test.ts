@@ -86,15 +86,19 @@ describe('createFetchWithRetry — 429 behaviour', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1); // no retries
   });
 
-  test('short Retry-After (≤60 s) retries after the specified delay', async () => {
+  test('short Retry-After (≤60 s) uses the server-specified delay, not exponential backoff', async () => {
     const mockFetch = jest
       .fn()
       .mockResolvedValueOnce(make429('30'))
       .mockResolvedValue(makeOk());
     jest.spyOn(global, 'fetch').mockImplementation(mockFetch);
 
+    // Capture setTimeout calls to inspect the actual delay used
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
     const fetchWithRetry = createFetchWithRetry({
       retryOnStatus: () => true,
+      maxDelay: 60_000, // above 30 s so the cap does not mask the assertion
     });
 
     const responsePromise = fetchWithRetry('https://example.com');
@@ -103,6 +107,11 @@ describe('createFetchWithRetry — 429 behaviour', () => {
 
     expect(response.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    // The retry delay must be the server-specified 30 s (30000 ms).
+    // Exponential backoff at attempt 0 would be baseDelay * 2^0 = 100 ms — a clearly different value.
+    const observedDelays = setTimeoutSpy.mock.calls.map(([, delay]) => delay);
+    expect(observedDelays).toContain(30_000);
   });
 
   test('no Retry-After header retries with exponential backoff', async () => {
