@@ -14,13 +14,18 @@ type RetryOptions = {
  * Parse the Retry-After header and return the delay in milliseconds.
  * Returns null if the header is absent or unparseable.
  */
-function parseRetryAfterMs(headers: Headers): number | null {
+export function parseRetryAfterMs(headers: Headers): number | null {
   const retryAfter = headers.get('retry-after');
   if (!retryAfter) return null;
 
-  // Retry-After can be a number of seconds or an HTTP date
+  // Retry-After can be a number of seconds or an HTTP date.
+  // Handle the numeric case first — if the value is a valid number but
+  // negative, reject it explicitly rather than letting it fall through to
+  // the date parser (e.g. new Date('-1') parses as 1 BCE and returns 0).
   const seconds = Number(retryAfter);
-  if (!isNaN(seconds) && seconds >= 0) return seconds * 1000;
+  if (!isNaN(seconds)) {
+    return seconds >= 0 ? seconds * 1000 : null;
+  }
 
   const date = new Date(retryAfter);
   if (!isNaN(date.getTime())) {
