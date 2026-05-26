@@ -85,6 +85,7 @@ from weave.trace_server.base64_content_conversion import (
 )
 from weave.trace_server.byob import (
     GorillaHttpClient,
+    ResolvedStorageTarget,
     StorageResolutionError,
     StorageResolvePurpose,
     StorageResolver,
@@ -200,6 +201,7 @@ from weave.trace_server.file_storage import (
     FileStorageClient,
     FileStorageReadError,
     FileStorageWriteError,
+    is_not_found_error,
     key_for_project_digest,
     maybe_get_storage_client_from_env,
     read_from_bucket,
@@ -5865,13 +5867,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.FileCreateRes(digest=digest)
 
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
-        client = self._resolve_client_for_project(
+        client, key_prefix = self._resolve_client_for_project(
             req.project_id, StorageResolvePurpose.WRITE
         )
 
         if client is not None and use_file_storage:
             try:
-                self._file_create_bucket(req, digest, client)
+                self._file_create_bucket(req, digest, client, key_prefix)
             except FileStorageWriteError:
                 self._file_create_clickhouse(req, digest)
         else:
@@ -5904,12 +5906,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
-        self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
+        self,
+        req: tsi.FileCreateReq,
+        digest: str,
+        client: FileStorageClient,
+        key_prefix: str = "",
     ) -> None:
         set_root_span_dd_tags({"storage_provider": "bucket"})
-        target_file_storage_uri = store_in_bucket(
-            client, key_for_project_digest(req.project_id, digest), req.content
-        )
+        base_key = key_for_project_digest(req.project_id, digest)
+        final_key = f"{key_prefix.rstrip('/')}/{base_key}" if key_prefix else base_key
+        target_file_storage_uri = store_in_bucket(client, final_key, req.content)
         self._insert_file_chunks(
             [
                 FileChunkCreateCHInsertable(
@@ -6061,36 +6067,89 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _file_read_bucket(
         self, file_storage_uri: FileStorageURI, project_id: str | None = None
     ) -> bytes:
+        """Read a file chunk, with dual-read fallback for BYOB projects.
+
+        For a BYOB project, try the team bucket first (using the same object
+        path as the stored URI). If the object is not present in the team
+        bucket, fall back to the stored URI with the platform default client.
+        This covers files written before the team flipped to BYOB.
+
+        Bounded by the stored `file_storage_uri`: at most one extra GET.
+        """
         set_root_span_dd_tags({"storage_provider": "bucket"})
-        client: FileStorageClient | None
-        if project_id is not None:
-            client = self._resolve_client_for_project(
-                project_id, StorageResolvePurpose.READ
-            )
-        else:
-            client = self.file_storage_client
+
+        if project_id is None:
+            return self._read_default(file_storage_uri)
+
+        resolver = self.byob_storage_resolver
+        if resolver is None:
+            return self._read_default(file_storage_uri)
+
+        target = resolver.resolve(project_id, StorageResolvePurpose.READ)
+        if target.status == StorageResolveStatus.DEFAULT:
+            return self._read_default(file_storage_uri)
+        if target.status == StorageResolveStatus.BYOB:
+            return self._read_byob_with_fallback(target, file_storage_uri)
+        raise StorageResolutionError(
+            f"resolver returned unknown status {target.status!r}"
+        )
+
+    def _read_default(self, file_storage_uri: FileStorageURI) -> bytes:
+        client = self.file_storage_client
         if client is None:
             raise FileStorageReadError("File storage client is not configured")
         return read_from_bucket(client, file_storage_uri)
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._read_byob_with_fallback"
+    )
+    def _read_byob_with_fallback(
+        self,
+        target: ResolvedStorageTarget,
+        stored_uri: FileStorageURI,
+    ) -> bytes:
+        """Try BYOB target bucket; on a not-found miss, fall back to stored URI."""
+        byob_client = build_storage_client(target)
+        team_uri = byob_client.base_uri.with_path(stored_uri.path)
+        try:
+            return byob_client.read(team_uri)
+        except Exception as e:
+            if not is_not_found_error(e):
+                raise FileStorageReadError(
+                    f"Failed to read file from {team_uri}: {e!s}"
+                ) from e
+        # Team-bucket miss - retry against the original stored URI's bucket.
+        logger.info(
+            "BYOB dual-read fallback: %s not in team bucket, retrying from %s",
+            team_uri,
+            stored_uri,
+        )
+        default_client = self.file_storage_client
+        if default_client is None:
+            raise FileStorageReadError(
+                f"BYOB miss for {team_uri} and no default client configured "
+                f"(set WF_FILE_STORAGE_URI to enable dual-read fallback)"
+            )
+        return read_from_bucket(default_client, stored_uri)
+
     def _resolve_client_for_project(
         self, project_id: str, purpose: StorageResolvePurpose
-    ) -> FileStorageClient | None:
-        """Return the storage client to use for `project_id`.
+    ) -> tuple[FileStorageClient | None, str]:
+        """Return the storage client and key prefix to use for `project_id`.
 
         When the BYOB resolver is disabled (or returns DEFAULT), falls through
-        to the default `file_storage_client`. When the resolver fails
-        closed it raises `StorageResolutionError` - callers do not catch this,
-        which is intentional per spec §4.3.
+        to the default `file_storage_client` with an empty prefix. When the
+        resolver fails closed it raises `StorageResolutionError` - callers do
+        not catch this, which is intentional per spec §4.3.
         """
         resolver = self.byob_storage_resolver
         if resolver is None:
-            return self.file_storage_client
+            return (self.file_storage_client, "")
         target = resolver.resolve(project_id, purpose)
         if target.status == StorageResolveStatus.BYOB:
-            return build_storage_client(target)
+            return (build_storage_client(target), target.key_prefix)
         if target.status == StorageResolveStatus.DEFAULT:
-            return self.file_storage_client
+            return (self.file_storage_client, "")
         raise StorageResolutionError(
             f"resolver returned unknown status {target.status!r}"
         )
@@ -7672,21 +7731,38 @@ def _sanitize_name_for_object_id(name: str) -> str:
 
 
 def _maybe_build_byob_resolver_from_env() -> StorageResolver | None:
-    """Build the BYOB storage resolver from env, or None when disabled.
+    """Build the per-project BYOB resolver from env, or None when disabled.
 
-    Returns None if `WF_BYOB_RESOLVER_ENABLED` is unset/false. Raises
-    `StorageResolutionError` if the flag is on but the gorilla URL or token
-    is missing - the caller would otherwise silently fall back to the
-    default bucket, which the fail-closed truth table forbids.
+    When disabled, weave-trace uses only `WF_FILE_STORAGE_URI` (the single-bucket
+    path) - suitable for single-tenant self-hosted clusters. When enabled, the
+    resolver routes each project to its team's bucket via gorilla, with
+    dual-read fallback to `WF_FILE_STORAGE_URI` for pre-flip files. See
+    `byob/__init__.py` for the full story.
     """
     if not wf_env.wf_byob_resolver_enabled():
+        logger.info(
+            "BYOB per-project resolver disabled (WF_BYOB_RESOLVER_ENABLED unset). "
+            "Using single-bucket WF_FILE_STORAGE_URI path."
+        )
         return None
     base_url = wf_env.wf_byob_gorilla_base_url()
     token = wf_env.wf_byob_gorilla_service_token()
     if not base_url or not token:
         raise StorageResolutionError(
-            "WF_BYOB_RESOLVER_ENABLED is set but "
-            "WF_BYOB_GORILLA_BASE_URL or WF_BYOB_GORILLA_SERVICE_TOKEN is missing"
+            "WF_BYOB_RESOLVER_ENABLED=true but "
+            "WF_BYOB_GORILLA_BASE_URL or WF_BYOB_GORILLA_SERVICE_TOKEN is missing. "
+            "Either configure both, or unset WF_BYOB_RESOLVER_ENABLED to use the "
+            "single-bucket WF_FILE_STORAGE_URI path."
         )
+    if not wf_env.wf_file_storage_uri():
+        logger.warning(
+            "BYOB per-project resolver enabled but WF_FILE_STORAGE_URI is unset. "
+            "Dual-read fallback for pre-BYOB files will fail; default-status "
+            "projects will fall through to ClickHouse-chunked storage."
+        )
+    logger.info(
+        "BYOB per-project resolver enabled. Gorilla resolve endpoint: %s",
+        base_url,
+    )
     transport = GorillaHttpClient(base_url=base_url, service_identity_token=token)
     return StorageResolver(transport=transport)

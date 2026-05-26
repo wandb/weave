@@ -11,7 +11,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, field_validator
 
 
 class StorageResolveStatus(str, Enum):
@@ -68,6 +68,17 @@ class ResolvedStorageTarget(BaseModel):
     credentials_expires_at: datetime | None
     key_prefix: str
     source_project_id: str
+
+    @field_validator("key_prefix")
+    @classmethod
+    def _validate_key_prefix(cls, v: str) -> str:
+        # Reject path traversal and absolute paths; required before honoring
+        # key_prefix in the write path (spec §8).
+        if v.startswith("/"):
+            raise ValueError("key_prefix must not start with '/'")
+        if any(part == ".." for part in v.split("/")):
+            raise ValueError("key_prefix must not contain '..'")
+        return v
 
 
 class StorageResolutionError(Exception):

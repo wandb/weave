@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+import ddtrace
 import requests
 
 from weave.trace_server.byob.models import ResolvedStorageTarget
@@ -43,6 +44,7 @@ class GorillaHttpClient:
         self._retries = retries
         self._session = session or requests.Session()
 
+    @ddtrace.tracer.wrap(name="weave.byob.gorilla.resolve")
     def resolve(self, project_id: str) -> ResolvedStorageTarget:
         attempt = 0
         last_error: Exception | None = None
@@ -56,7 +58,8 @@ class GorillaHttpClient:
                     break
         assert last_error is not None
         raise GorillaTransportError(
-            f"gorilla resolve failed for project {project_id} after {attempt} attempts: {last_error!s}"
+            f"gorilla resolve failed for project {project_id} "
+            f"({self._url}) after {attempt} attempts: {last_error!s}"
         ) from last_error
 
     def _resolve_once(self, project_id: str) -> ResolvedStorageTarget:

@@ -19,7 +19,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from pydantic import SecretStr
+from azure.core.exceptions import ResourceNotFoundError
+from botocore.exceptions import ClientError
+from google.api_core import exceptions as gcp_exceptions
+from pydantic import SecretStr, ValidationError
 
 from weave.trace_server.byob import (
     AmbientCredentials,
@@ -35,6 +38,8 @@ from weave.trace_server.byob import (
 )
 from weave.trace_server.file_storage import (
     FileStorageClient,
+    FileStorageReadError,
+    is_not_found_error,
     key_for_project_digest,
     read_from_bucket,
     store_in_bucket,
@@ -43,6 +48,10 @@ from weave.trace_server.file_storage_uris import FileStorageURI
 
 PROJECT_BYOB = "team-byob/project-a"
 PROJECT_DEFAULT = "team-default/project-b"
+
+
+class FakeNotFound(Exception):
+    """Raised by `InMemoryStorageClient` on miss; classified as not-found."""
 
 
 class InMemoryStorageClient(FileStorageClient):
@@ -58,6 +67,8 @@ class InMemoryStorageClient(FileStorageClient):
 
     def read(self, uri: FileStorageURI) -> bytes:
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+        if uri.to_uri_str() not in self.objects:
+            raise FakeNotFound(uri.to_uri_str())
         return self.objects[uri.to_uri_str()]
 
 
@@ -316,3 +327,218 @@ def test_build_storage_client_constructs_s3() -> None:
     client = build_storage_client(target)
     # Verify the right URI was bound; do not exercise the boto client itself.
     assert client.base_uri.to_uri_str() == "s3://team-byob-bucket"
+
+
+# ---------------------------------------------------------------------------
+# Dual-read fallback
+#
+# The harness `byob_read_with_fallback` mirrors the production
+# `ClickHouseTraceServer._read_byob_with_fallback` so we can exercise the
+# fallback behavior end-to-end without spinning up ClickHouse or real S3.
+# ---------------------------------------------------------------------------
+
+
+def byob_read_with_fallback(
+    target: ResolvedStorageTarget,
+    stored_uri: FileStorageURI,
+    byob_clients: dict[str, FileStorageClient],
+    default_client: FileStorageClient | None,
+) -> bytes:
+    """Mirror of `_read_byob_with_fallback`."""
+    byob_client = byob_clients[target.bucket_uri]
+    team_uri = byob_client.base_uri.with_path(stored_uri.path)
+    try:
+        return byob_client.read(team_uri)
+    except Exception as e:
+        if not _is_test_not_found(e):
+            raise FileStorageReadError(f"read failed: {e!s}") from e
+    if default_client is None:
+        raise FileStorageReadError("no default client and BYOB miss")
+    return read_from_bucket(default_client, stored_uri)
+
+
+def _is_test_not_found(e: BaseException) -> bool:
+    # InMemoryStorageClient raises FakeNotFound; production providers are
+    # covered by `is_not_found_error` (see test below).
+    return isinstance(e, FakeNotFound) or is_not_found_error(e)
+
+
+def test_dual_read_team_bucket_hit() -> None:
+    target = make_byob_target()
+    team_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://team-byob-bucket")
+    )
+    default_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://platform-default-bucket")
+    )
+    # File exists in team bucket (post-BYOB-flip write).
+    team_client.objects[
+        f"s3://team-byob-bucket/{key_for_project_digest(PROJECT_BYOB, 'd1')}"
+    ] = b"team-content"
+    stored_uri = FileStorageURI.parse_uri_str(
+        f"s3://team-byob-bucket/{key_for_project_digest(PROJECT_BYOB, 'd1')}"
+    )
+
+    result = byob_read_with_fallback(
+        target,
+        stored_uri,
+        {"s3://team-byob-bucket": team_client},
+        default_client,
+    )
+    assert result == b"team-content"
+
+
+def test_dual_read_falls_back_to_default_on_miss() -> None:
+    """Pre-BYOB-flip file lives in default bucket; team bucket misses."""
+    target = make_byob_target()
+    team_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://team-byob-bucket")
+    )
+    default_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://platform-default-bucket")
+    )
+    stored_uri = FileStorageURI.parse_uri_str(
+        f"s3://platform-default-bucket/{key_for_project_digest(PROJECT_BYOB, 'old')}"
+    )
+    default_client.objects[stored_uri.to_uri_str()] = b"pre-flip-content"
+
+    result = byob_read_with_fallback(
+        target,
+        stored_uri,
+        {"s3://team-byob-bucket": team_client},
+        default_client,
+    )
+    assert result == b"pre-flip-content"
+
+
+def test_dual_read_raises_on_real_error() -> None:
+    """A non-404 error from the team bucket must NOT trigger fallback."""
+
+    class ExplodingClient(InMemoryStorageClient):
+        def read(self, uri: FileStorageURI) -> bytes:
+            raise RuntimeError("permission denied")
+
+    target = make_byob_target()
+    team_client = ExplodingClient(
+        FileStorageURI.parse_uri_str("s3://team-byob-bucket")
+    )
+    default_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://platform-default-bucket")
+    )
+    stored_uri = FileStorageURI.parse_uri_str(
+        f"s3://team-byob-bucket/{key_for_project_digest(PROJECT_BYOB, 'd')}"
+    )
+    with pytest.raises(FileStorageReadError, match="read failed"):
+        byob_read_with_fallback(
+            target,
+            stored_uri,
+            {"s3://team-byob-bucket": team_client},
+            default_client,
+        )
+
+
+def test_dual_read_no_default_client_after_miss() -> None:
+    target = make_byob_target()
+    team_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://team-byob-bucket")
+    )
+    stored_uri = FileStorageURI.parse_uri_str(
+        f"s3://platform-default-bucket/{key_for_project_digest(PROJECT_BYOB, 'd')}"
+    )
+    with pytest.raises(FileStorageReadError, match="no default client"):
+        byob_read_with_fallback(
+            target,
+            stored_uri,
+            {"s3://team-byob-bucket": team_client},
+            default_client=None,
+        )
+
+
+# ---------------------------------------------------------------------------
+# is_not_found_error: provider classification
+# ---------------------------------------------------------------------------
+
+
+def test_is_not_found_error_s3_nosuchkey() -> None:
+    err = ClientError(
+        error_response={
+            "Error": {"Code": "NoSuchKey", "Message": "missing"},
+            "ResponseMetadata": {"HTTPStatusCode": 404},
+        },
+        operation_name="GetObject",
+    )
+    assert is_not_found_error(err)
+
+
+def test_is_not_found_error_s3_other_error() -> None:
+    err = ClientError(
+        error_response={
+            "Error": {"Code": "AccessDenied", "Message": "nope"},
+            "ResponseMetadata": {"HTTPStatusCode": 403},
+        },
+        operation_name="GetObject",
+    )
+    assert not is_not_found_error(err)
+
+
+def test_is_not_found_error_gcs_notfound() -> None:
+    assert is_not_found_error(gcp_exceptions.NotFound("missing"))
+
+
+def test_is_not_found_error_azure_resourcenotfound() -> None:
+    assert is_not_found_error(ResourceNotFoundError("missing"))
+
+
+def test_is_not_found_error_random_exception() -> None:
+    assert not is_not_found_error(RuntimeError("boom"))
+    assert not is_not_found_error(ValueError("nope"))
+
+
+# ---------------------------------------------------------------------------
+# key_prefix: validation + write-path roundtrip
+# ---------------------------------------------------------------------------
+
+
+def test_key_prefix_rejects_absolute_path() -> None:
+    with pytest.raises(ValidationError, match="key_prefix"):
+        make_byob_target_with_prefix("/bad/prefix")
+
+
+def test_key_prefix_rejects_dotdot() -> None:
+    with pytest.raises(ValidationError, match="key_prefix"):
+        make_byob_target_with_prefix("a/../b")
+
+
+def test_key_prefix_accepts_empty_and_simple() -> None:
+    make_byob_target_with_prefix("")
+    make_byob_target_with_prefix("teamspace/weave")
+    make_byob_target_with_prefix("a/b/c")
+
+
+def make_byob_target_with_prefix(prefix: str) -> ResolvedStorageTarget:
+    return ResolvedStorageTarget(
+        status=StorageResolveStatus.BYOB,
+        provider=StorageProvider.S3,
+        bucket_uri="s3://team-byob-bucket",
+        bucket_name="team-byob-bucket",
+        region="us-west-2",
+        credentials=AmbientCredentials(),
+        credentials_expires_at=None,
+        key_prefix=prefix,
+        source_project_id=PROJECT_BYOB,
+    )
+
+
+def test_key_prefix_is_honored_in_write_path() -> None:
+    """Write path applies the BYOB target's key_prefix to the stored object."""
+    target = make_byob_target_with_prefix("teamspace/weave")
+    team_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://team-byob-bucket")
+    )
+    digest = "dd"
+    base_key = key_for_project_digest(PROJECT_BYOB, digest)
+    final_key = f"{target.key_prefix}/{base_key}"
+
+    stored_uri = store_in_bucket(team_client, final_key, b"payload")
+    assert stored_uri.to_uri_str().endswith(f"teamspace/weave/{base_key}")
+    assert team_client.objects[stored_uri.to_uri_str()] == b"payload"

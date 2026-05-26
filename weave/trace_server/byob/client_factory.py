@@ -30,11 +30,18 @@ from weave.trace_server.file_storage_uris import (
     FileStorageURI,
     GCSFileStorageURI,
     S3FileStorageURI,
+    URIParseError,
 )
 
 
 def build_storage_client(target: ResolvedStorageTarget) -> FileStorageClient:
-    base_uri = FileStorageURI.parse_uri_str(target.bucket_uri)
+    try:
+        base_uri = FileStorageURI.parse_uri_str(target.bucket_uri)
+    except URIParseError as e:
+        raise StorageResolutionError(
+            f"gorilla returned unparseable bucket_uri {target.bucket_uri!r} "
+            f"for project {target.source_project_id!r}: {e!s}"
+        ) from e
     if target.provider == StorageProvider.S3:
         if not isinstance(base_uri, S3FileStorageURI):
             raise StorageResolutionError(

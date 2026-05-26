@@ -1,8 +1,15 @@
-"""BYOB (Bring Your Own Bucket) storage resolver.
+"""Per-project (team-level) BYOB storage resolver for mtsaas.
 
-Routes weave-trace file writes/reads to a team-owned bucket when the team
-has BYOB configured in gorilla, falling back to the platform default bucket
-otherwise. Gated by `WF_BYOB_RESOLVER_ENABLED`.
+Two storage paths now exist in weave-trace; operators pick one:
+
+1. `WF_FILE_STORAGE_URI` (existing, single bucket per server). Right for
+   single-tenant self-hosted clusters - leave `WF_BYOB_RESOLVER_ENABLED` off.
+2. `WF_BYOB_RESOLVER_ENABLED` (this module, additive). Resolves
+   `project_id -> team-owned bucket` via gorilla, with dual-read fallback to
+   `WF_FILE_STORAGE_URI` for pre-flip files. Right for mtsaas.
+
+Fails closed when gorilla is unreachable for a project whose last known
+status was BYOB or unknown (spec §4.3).
 """
 
 from weave.trace_server.byob.client_factory import build_storage_client
