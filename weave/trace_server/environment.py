@@ -364,6 +364,21 @@ def wf_clickhouse_disable_lightweight_update() -> bool:
     )
 
 
+def wf_clickhouse_disable_query_condition_cache() -> bool:
+    """Disable ClickHouse's query condition cache via `use_query_condition_cache=0`.
+
+    Workaround for https://github.com/ClickHouse/ClickHouse/issues/104781:
+    PREWHERE pk-prefix + WHERE non-pk IN/= predicates against a table with a
+    skip-index on the WHERE column can poison the cache and return wrong
+    counts on subsequent reads. CI runs against an affected CH version, so we
+    flip this off there until the fix lands upstream.
+    """
+    return (
+        os.environ.get("WF_CLICKHOUSE_DISABLE_QUERY_CONDITION_CACHE", "false").lower()
+        == "true"
+    )
+
+
 def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
     """The maximum async insert busy timeout in milliseconds for ClickHouse.
 

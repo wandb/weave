@@ -239,6 +239,8 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           DD_TRACE_ENABLED: false
           OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
+          # TODO: remove once https://github.com/ClickHouse/ClickHouse/issues/104781 ships.
+          WF_CLICKHOUSE_DISABLE_QUERY_CONDITION_CACHE: "true"
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
