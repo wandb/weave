@@ -1,5 +1,6 @@
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {createOpenAIAgentsTracingProcessor} from '../../integrations/openai.agent';
+import type { Trace, Span } from '../../integrations/openai.agent.types';
 import {initWithCustomTraceServer} from '../clientMock';
 
 describe('OpenAI Agents Integration', () => {
@@ -14,12 +15,12 @@ describe('OpenAI Agents Integration', () => {
   test('trace lifecycle creates and finishes call', async () => {
     const processor = createOpenAIAgentsTracingProcessor();
     const trace = {
-      type: 'trace' as const,
+      type: 'trace',
       traceId: 'test-trace-123',
       name: 'Agent Workflow',
       groupId: null,
       metadata: {},
-    };
+    } as Trace;
 
     await processor.onTraceStart(trace);
     await processor.onTraceEnd(trace);
@@ -43,7 +44,7 @@ describe('OpenAI Agents Integration', () => {
       traceId: 'test-trace',
       name: 'Test',
       groupId: null,
-    });
+    } as Trace);
 
     // Test key span types
     const spans = [
@@ -62,7 +63,7 @@ describe('OpenAI Agents Integration', () => {
         startedAt: null,
         endedAt: null,
         error: null,
-      });
+      } as Span);
     }
 
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
@@ -81,7 +82,7 @@ describe('OpenAI Agents Integration', () => {
       traceId: 'trace-123',
       name: 'Workflow',
       groupId: null,
-    });
+    } as Trace);
 
     await processor.onSpanStart({
       type: 'trace.span',
@@ -92,7 +93,7 @@ describe('OpenAI Agents Integration', () => {
       startedAt: null,
       endedAt: null,
       error: null,
-    });
+    } as Span);
 
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(2);
