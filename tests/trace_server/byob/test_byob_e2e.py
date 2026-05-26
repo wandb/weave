@@ -1,10 +1,9 @@
 """End-to-end tests for the per-project BYOB storage path.
 
-These exercise the full resolver -> client-factory -> bucket-roundtrip flow.
-A local HTTP server (`_FakeGorilla`) stands in for the gorilla resolve
-endpoint so `GorillaHttpClient` is hit through real `requests` I/O; the
-bucket layer uses an `InMemoryStorageClient`. The trace_server itself is
-not started because the BYOB path is orthogonal to ClickHouse.
+A thread-local HTTP server (`fake_gorilla`) stands in for the gorilla
+resolve endpoint so `fetch_storage_target` is hit through real `requests`
+I/O; the bucket layer uses `InMemoryStorageClient`. The trace_server
+itself is not started because the BYOB path is orthogonal to ClickHouse.
 """
 
 from __future__ import annotations
@@ -16,6 +15,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from typing import ClassVar
 
 import pytest
@@ -25,11 +25,16 @@ from google.api_core import exceptions as gcp_exceptions
 from pydantic import SecretStr, ValidationError
 
 from weave.trace_server.byob.client_factory import build_storage_client
-from weave.trace_server.byob.gorilla_client import (
-    GorillaHttpClient,
-    GorillaTransportError,
+from weave.trace_server.byob.gorilla import (
+    GorillaUnknownProjectError,
+    fetch_storage_target,
 )
-from weave.trace_server.byob.models import (
+from weave.trace_server.byob.resolver import (
+    StorageResolver,
+    resolve_read,
+    resolve_write_target,
+)
+from weave.trace_server.byob.types import (
     AmbientCredentials,
     ResolvedStorageTarget,
     S3TemporaryCredentials,
@@ -38,16 +43,11 @@ from weave.trace_server.byob.models import (
     StorageResolvePurpose,
     StorageResolveStatus,
 )
-from weave.trace_server.byob.resolver import (
-    GorillaResolverTransport,
-    StorageResolver,
-)
 from weave.trace_server.file_storage import (
     FileStorageClient,
     FileStorageReadError,
     is_not_found_error,
     key_for_project_digest,
-    read_from_bucket,
     store_in_bucket,
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
@@ -61,11 +61,11 @@ PROJECT_DEFAULT = "team-default/project-b"
 # ---------------------------------------------------------------------------
 
 
-class FakeNotFound(Exception):
-    """Raised by `InMemoryStorageClient` on miss; classified as not-found."""
-
-
 class InMemoryStorageClient(FileStorageClient):
+    """Test bucket; raises a botocore NoSuchKey on miss so `is_not_found_error`
+    classifies it the same way production S3 misses are classified.
+    """
+
     def __init__(self, base_uri: FileStorageURI) -> None:
         super().__init__(base_uri)
         self.objects: dict[str, bytes] = {}
@@ -77,13 +77,17 @@ class InMemoryStorageClient(FileStorageClient):
     def read(self, uri: FileStorageURI) -> bytes:
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         if uri.to_uri_str() not in self.objects:
-            raise FakeNotFound(uri.to_uri_str())
+            raise ClientError(
+                error_response={
+                    "Error": {"Code": "NoSuchKey", "Message": uri.to_uri_str()},
+                    "ResponseMetadata": {"HTTPStatusCode": 404},
+                },
+                operation_name="GetObject",
+            )
         return self.objects[uri.to_uri_str()]
 
 
 class _FakeGorillaHandler(http.server.BaseHTTPRequestHandler):
-    """Returns canned resolve responses; per-instance state via class attr."""
-
     targets: ClassVar[dict[str, dict]] = {}
     calls: ClassVar[list[str]] = []
 
@@ -114,7 +118,6 @@ class _FakeGorillaHandler(http.server.BaseHTTPRequestHandler):
 
 @contextmanager
 def fake_gorilla(targets: dict[str, dict]) -> Iterator[tuple[str, list[str]]]:
-    """Start a thread-local HTTP fake-gorilla; yield `(base_url, calls)`."""
     _FakeGorillaHandler.targets = dict(targets)
     _FakeGorillaHandler.calls = []
     server = socketserver.TCPServer(("127.0.0.1", 0), _FakeGorillaHandler)
@@ -129,7 +132,7 @@ def fake_gorilla(targets: dict[str, dict]) -> Iterator[tuple[str, list[str]]]:
 
 
 # ---------------------------------------------------------------------------
-# Target factories + in-process transport for cache mechanics tests
+# Target factories
 # ---------------------------------------------------------------------------
 
 
@@ -149,7 +152,7 @@ def byob_target_dict(
         "status": "byob",
         "provider": "s3",
         "bucket_uri": bucket_uri,
-        "bucket_name": bucket_uri.removeprefix("s3://").removeprefix("gs://"),
+        "bucket_name": bucket_uri.removeprefix("s3://"),
         "region": "us-west-2",
         "credentials": {
             "credential_type": "s3_temporary",
@@ -219,24 +222,6 @@ def make_default_target() -> ResolvedStorageTarget:
     )
 
 
-class InProcessTransport(GorillaResolverTransport):
-    """Lets the fail-closed/cache-cap tests inject errors without HTTP setup."""
-
-    def __init__(self) -> None:
-        self.targets: dict[str, ResolvedStorageTarget] = {}
-        self.error: Exception | None = None
-        self.calls: list[str] = []
-
-    def resolve(self, project_id: str) -> ResolvedStorageTarget:
-        self.calls.append(project_id)
-        if self.error is not None:
-            raise self.error
-        target = self.targets.get(project_id)
-        if target is None:
-            raise KeyError(project_id)
-        return target
-
-
 class FakeClock:
     def __init__(self) -> None:
         self.now = 0.0
@@ -254,24 +239,17 @@ class FakeClock:
 
 
 def test_full_byob_and_default_flow_against_real_http_gorilla() -> None:
-    """Exercise GorillaHttpClient + StorageResolver + bucket roundtrip end-to-end.
+    """End-to-end through real HTTP + bucket roundtrip + cache.
 
-    Covers the four scenarios that matter for users:
-    1. BYOB project: write lands in team bucket, read pulls from team bucket.
-    2. Default project: write/read use platform bucket.
-    3. Second resolve for the same project is served from cache (no extra HTTP).
-    4. Routing decision matches the resolved target's `bucket_uri`.
+    Covers: BYOB write+read lands in team bucket, default project uses
+    platform bucket, second resolve served from cache.
     """
     targets = {
         PROJECT_BYOB: byob_target_dict(),
         PROJECT_DEFAULT: default_target_dict(),
     }
     with fake_gorilla(targets) as (base_url, calls):
-        transport = GorillaHttpClient(
-            base_url=base_url, service_identity_token="test-token"
-        )
-        resolver = StorageResolver(transport=transport, ttl_seconds=300)
-
+        resolver = StorageResolver(resolve_fn=partial(fetch_storage_target, base_url))
         team_client = InMemoryStorageClient(
             FileStorageURI.parse_uri_str("s3://team-byob-bucket")
         )
@@ -279,7 +257,6 @@ def test_full_byob_and_default_flow_against_real_http_gorilla() -> None:
             FileStorageURI.parse_uri_str("s3://platform-default-bucket")
         )
 
-        # BYOB write+read.
         byob_target = resolver.resolve(PROJECT_BYOB, StorageResolvePurpose.WRITE)
         assert byob_target.status == StorageResolveStatus.BYOB
         assert byob_target.bucket_uri == "s3://team-byob-bucket"
@@ -288,10 +265,9 @@ def test_full_byob_and_default_flow_against_real_http_gorilla() -> None:
             key_for_project_digest(PROJECT_BYOB, "deadbeef"),
             b"trace-payload",
         )
-        assert read_from_bucket(team_client, byob_uri) == b"trace-payload"
+        assert team_client.objects[byob_uri.to_uri_str()] == b"trace-payload"
         assert default_client.objects == {}, "BYOB write must not touch default bucket"
 
-        # Default write+read.
         default_target = resolver.resolve(PROJECT_DEFAULT, StorageResolvePurpose.WRITE)
         assert default_target.status == StorageResolveStatus.DEFAULT
         default_uri = store_in_bucket(
@@ -299,117 +275,137 @@ def test_full_byob_and_default_flow_against_real_http_gorilla() -> None:
             key_for_project_digest(PROJECT_DEFAULT, "feedface"),
             b"default-payload",
         )
-        assert read_from_bucket(default_client, default_uri) == b"default-payload"
+        assert default_client.objects[default_uri.to_uri_str()] == b"default-payload"
 
-        # Cache: second resolve does not hit gorilla again.
+        # Cache: second resolve doesn't hit gorilla.
         resolver.resolve(PROJECT_BYOB, StorageResolvePurpose.READ)
         resolver.resolve(PROJECT_DEFAULT, StorageResolvePurpose.READ)
         assert calls == [PROJECT_BYOB, PROJECT_DEFAULT]
 
 
-def test_gorilla_transport_unknown_project_raises() -> None:
-    """A 404 from gorilla becomes GorillaTransportError; resolver fails closed."""
+def test_gorilla_404_raises_unknown_project_and_resolver_fails_closed() -> None:
+    """A 404 from gorilla is GorillaUnknownProjectError; resolver fails closed."""
     with fake_gorilla({}) as (base_url, _):
-        transport = GorillaHttpClient(
-            base_url=base_url,
-            service_identity_token="t",
-            retries=1,
-        )
-        resolver = StorageResolver(transport=transport)
+        with pytest.raises(GorillaUnknownProjectError):
+            fetch_storage_target(base_url, "unknown/proj")
+
+        resolver = StorageResolver(resolve_fn=partial(fetch_storage_target, base_url))
         with pytest.raises(StorageResolutionError, match="no last-known status"):
             resolver.resolve("unknown/proj", StorageResolvePurpose.READ)
 
 
-def test_resolver_fail_closed_matrix() -> None:
-    """All three §4.3 cells exercised in one test, plus the cache cap.
+def test_gorilla_unparseable_response_fails_closed() -> None:
+    """Junk JSON from gorilla -> resolver wraps it in StorageResolutionError."""
+    bad = {PROJECT_BYOB: {"status": "byob"}}  # missing required fields
+    with fake_gorilla(bad) as (base_url, _):
+        resolver = StorageResolver(resolve_fn=partial(fetch_storage_target, base_url))
+        with pytest.raises(StorageResolutionError):
+            resolver.resolve(PROJECT_BYOB, StorageResolvePurpose.WRITE)
 
-    | last status | gorilla | behavior            |
-    |-------------|---------|---------------------|
-    | none        | down    | raise               |
-    | BYOB        | down    | raise               |
-    | DEFAULT     | down    | reuse stale target  |
-    """
-    transport = InProcessTransport()
-    transport.targets[PROJECT_BYOB] = make_byob_target()
-    transport.targets[PROJECT_DEFAULT] = make_default_target()
+
+def _scripted(targets: dict[str, ResolvedStorageTarget], error: list[Exception]):
+    """A `resolve_fn` driven by a dict + a mutable error slot for tests."""
+    calls: list[str] = []
+
+    def resolve_fn(project_id: str) -> ResolvedStorageTarget:
+        calls.append(project_id)
+        if error:
+            raise error[0]
+        if project_id not in targets:
+            raise KeyError(project_id)
+        return targets[project_id]
+
+    return resolve_fn, calls
+
+
+def test_resolver_fail_closed_matrix() -> None:
+    """All three §4.3 cells exercised in one test, plus the cache cap."""
+    targets = {
+        PROJECT_BYOB: make_byob_target(),
+        PROJECT_DEFAULT: make_default_target(),
+    }
+    error: list[Exception] = []
+    resolve_fn, _ = _scripted(targets, error)
     clock = FakeClock()
     r = StorageResolver(
-        transport=transport, ttl_seconds=300, max_entries=2, clock=clock
+        resolve_fn=resolve_fn, ttl_seconds=300, max_entries=2, clock=clock
     )
 
-    # Prime cache with both.
     r.resolve(PROJECT_BYOB, StorageResolvePurpose.WRITE)
     default_first = r.resolve(PROJECT_DEFAULT, StorageResolvePurpose.WRITE)
 
-    # Gorilla goes down; expire cache.
     clock.advance(400)
-    transport.error = TimeoutError("gorilla unreachable")
+    error.append(TimeoutError("gorilla unreachable"))
 
-    # last status BYOB -> raise.
     with pytest.raises(StorageResolutionError, match="BYOB project"):
         r.resolve(PROJECT_BYOB, StorageResolvePurpose.WRITE)
 
-    # last status DEFAULT -> reuse stale (ambient creds don't expire).
     default_second = r.resolve(PROJECT_DEFAULT, StorageResolvePurpose.WRITE)
     assert default_second is default_first
     assert default_second.status == StorageResolveStatus.DEFAULT
 
-    # No last status -> raise.
     with pytest.raises(StorageResolutionError, match="no last-known status"):
         r.resolve("fresh/project", StorageResolvePurpose.READ)
 
 
 def test_resolver_cache_ttl_and_credential_expiry() -> None:
     """Cache hit avoids RPC; TTL and credential expiry both force refetch."""
-    transport = InProcessTransport()
-    transport.targets[PROJECT_BYOB] = make_byob_target(expires_in_s=900)
+    targets = {PROJECT_BYOB: make_byob_target(expires_in_s=900)}
+    resolve_fn, calls = _scripted(targets, [])
     clock = FakeClock()
     r = StorageResolver(
-        transport=transport, ttl_seconds=300, max_entries=10, clock=clock
+        resolve_fn=resolve_fn, ttl_seconds=300, max_entries=10, clock=clock
     )
 
-    # Cache hits for 5 minutes.
     r.resolve(PROJECT_BYOB, StorageResolvePurpose.WRITE)
     r.resolve(PROJECT_BYOB, StorageResolvePurpose.READ)
     clock.advance(60)
     r.resolve(PROJECT_BYOB, StorageResolvePurpose.WRITE)
-    assert transport.calls == [PROJECT_BYOB]
+    assert calls == [PROJECT_BYOB]
 
-    # TTL crosses 300s -> refetch.
     clock.advance(300)
     r.resolve(PROJECT_BYOB, StorageResolvePurpose.WRITE)
-    assert transport.calls == [PROJECT_BYOB, PROJECT_BYOB]
-
-    # Credential expiry shorter than TTL caps the cache.
-    transport.targets[PROJECT_BYOB] = make_byob_target(expires_in_s=100)
-    transport.calls.clear()
-    r2 = StorageResolver(
-        transport=transport, ttl_seconds=300, max_entries=10, clock=FakeClock()
-    )
-    r2.resolve(PROJECT_BYOB, StorageResolvePurpose.WRITE)
-    # Within (expiry - skew) ~40s: cache hit.
-    # After 45s: re-fetch.
-    assert transport.calls == [PROJECT_BYOB]
+    assert calls == [PROJECT_BYOB, PROJECT_BYOB]
 
 
 def test_resolver_cache_cap_raises_loudly() -> None:
-    """Soft-cap excess raises StorageResolutionError instead of silently growing."""
-    transport = InProcessTransport()
-    for pid in ("a/1", "b/2", "c/3"):
-        transport.targets[pid] = make_byob_target()
-    r = StorageResolver(transport=transport, ttl_seconds=300, max_entries=2)
+    targets = {f"a/{i}": make_byob_target() for i in range(3)}
+    resolve_fn, _ = _scripted(targets, [])
+    r = StorageResolver(resolve_fn=resolve_fn, ttl_seconds=300, max_entries=2)
+    r.resolve("a/0", StorageResolvePurpose.WRITE)
     r.resolve("a/1", StorageResolvePurpose.WRITE)
-    r.resolve("b/2", StorageResolvePurpose.WRITE)
     with pytest.raises(StorageResolutionError, match="max entries"):
-        r.resolve("c/3", StorageResolvePurpose.WRITE)
+        r.resolve("a/2", StorageResolvePurpose.WRITE)
 
 
-def test_dual_read_fallback_covers_pre_flip_files_and_propagates_real_errors() -> None:
-    """Dual-read: team-bucket hit, team-bucket miss with fallback, real error, no default.
+def test_resolve_write_target_chooses_byob_default_or_passthrough() -> None:
+    """`resolve_write_target` is the production write-path routing helper."""
+    default_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://platform-default-bucket")
+    )
+    # No resolver -> passes through.
+    client, prefix = resolve_write_target(None, default_client, PROJECT_DEFAULT)
+    assert client is default_client
+    assert prefix == ""
 
-    Mirrors `ClickHouseTraceServer._read_byob_with_fallback`. Spec §8.
-    """
-    target = make_byob_target()
+    # BYOB -> builds team client, propagates key_prefix.
+    targets = {PROJECT_BYOB: make_byob_target(key_prefix="teamspace/weave")}
+    resolve_fn, _ = _scripted(targets, [])
+    r = StorageResolver(resolve_fn=resolve_fn)
+    client, prefix = resolve_write_target(r, default_client, PROJECT_BYOB)
+    assert client is not default_client
+    assert client.base_uri.to_uri_str() == "s3://team-byob-bucket"
+    assert prefix == "teamspace/weave"
+
+    # DEFAULT status -> default client, no prefix.
+    targets[PROJECT_DEFAULT] = make_default_target()
+    client, prefix = resolve_write_target(r, default_client, PROJECT_DEFAULT)
+    assert client is default_client
+    assert prefix == ""
+
+
+def test_resolve_read_dual_read_covers_pre_flip_and_propagates_real_errors() -> None:
+    """Dual-read: team-hit, team-miss-fallback, real error, no default."""
     team_client = InMemoryStorageClient(
         FileStorageURI.parse_uri_str("s3://team-byob-bucket")
     )
@@ -417,60 +413,57 @@ def test_dual_read_fallback_covers_pre_flip_files_and_propagates_real_errors() -
         FileStorageURI.parse_uri_str("s3://platform-default-bucket")
     )
 
-    def dual_read(
-        stored_uri: FileStorageURI,
-        default: InMemoryStorageClient | None = default_client,
-    ) -> bytes:
-        byob_client = team_client
-        team_uri = byob_client.base_uri.with_path(stored_uri.path)
-        try:
-            return byob_client.read(team_uri)
-        except Exception as e:
-            if not (isinstance(e, FakeNotFound) or is_not_found_error(e)):
-                raise FileStorageReadError(f"read failed: {e!s}") from e
-        if default is None:
-            raise FileStorageReadError("no default client and BYOB miss")
-        return read_from_bucket(default, stored_uri)
+    targets = {PROJECT_BYOB: make_byob_target()}
+    resolve_fn, _ = _scripted(targets, [])
+    r = StorageResolver(resolve_fn=resolve_fn)
 
-    # 1. Hit: post-BYOB-flip file lives in team bucket -> read team bucket.
-    team_uri = FileStorageURI.parse_uri_str(
-        f"s3://team-byob-bucket/{key_for_project_digest(PROJECT_BYOB, 'new')}"
+    # Patch build_storage_client used inside resolve_read to return our team_client
+    # (the real factory would build an S3StorageClient with boto3).
+    import weave.trace_server.byob.resolver as resolver_mod
+
+    original = resolver_mod.build_storage_client
+    resolver_mod.build_storage_client = lambda target: team_client
+    try:
+        # 1. Hit: post-flip file lives in team bucket.
+        team_key = key_for_project_digest(PROJECT_BYOB, "new")
+        team_client.objects[f"s3://team-byob-bucket/{team_key}"] = b"team-content"
+        stored = FileStorageURI.parse_uri_str(f"s3://team-byob-bucket/{team_key}")
+        assert resolve_read(r, default_client, stored, PROJECT_BYOB) == b"team-content"
+
+        # 2. Miss with fallback: pre-flip file in default bucket.
+        old_key = key_for_project_digest(PROJECT_BYOB, "old")
+        default_client.objects[f"s3://platform-default-bucket/{old_key}"] = b"pre-flip"
+        stored = FileStorageURI.parse_uri_str(f"s3://platform-default-bucket/{old_key}")
+        assert resolve_read(r, default_client, stored, PROJECT_BYOB) == b"pre-flip"
+
+        # 3. No default client + miss -> raise.
+        with pytest.raises(FileStorageReadError, match="no default client"):
+            resolve_read(r, None, stored, PROJECT_BYOB)
+
+        # 4. Real error from team bucket must propagate (no fallback).
+        class ExplodingClient(InMemoryStorageClient):
+            def read(self, uri: FileStorageURI) -> bytes:
+                raise RuntimeError("permission denied")
+
+        resolver_mod.build_storage_client = lambda target: ExplodingClient(
+            FileStorageURI.parse_uri_str("s3://team-byob-bucket")
+        )
+        with pytest.raises(FileStorageReadError, match="Failed to read"):
+            resolve_read(r, default_client, stored, PROJECT_BYOB)
+    finally:
+        resolver_mod.build_storage_client = original
+
+
+def test_resolve_read_without_resolver_uses_default_client() -> None:
+    default_client = InMemoryStorageClient(
+        FileStorageURI.parse_uri_str("s3://platform-default-bucket")
     )
-    team_client.objects[team_uri.to_uri_str()] = b"team-content"
-    assert dual_read(team_uri) == b"team-content"
-
-    # 2. Miss with fallback: pre-flip file lives in default bucket.
-    default_uri = FileStorageURI.parse_uri_str(
-        f"s3://platform-default-bucket/{key_for_project_digest(PROJECT_BYOB, 'old')}"
-    )
-    default_client.objects[default_uri.to_uri_str()] = b"pre-flip-content"
-    assert dual_read(default_uri) == b"pre-flip-content"
-
-    # 3. Real error (not 404) must propagate -> no fallback.
-    class ExplodingClient(InMemoryStorageClient):
-        def read(self, uri: FileStorageURI) -> bytes:
-            raise RuntimeError("permission denied")
-
-    exploding = ExplodingClient(FileStorageURI.parse_uri_str("s3://team-byob-bucket"))
-
-    def dual_read_with_exploding(stored_uri: FileStorageURI) -> bytes:
-        try:
-            return exploding.read(exploding.base_uri.with_path(stored_uri.path))
-        except Exception as e:
-            if not (isinstance(e, FakeNotFound) or is_not_found_error(e)):
-                raise FileStorageReadError(f"read failed: {e!s}") from e
-        return read_from_bucket(default_client, stored_uri)
-
-    with pytest.raises(FileStorageReadError, match="read failed"):
-        dual_read_with_exploding(team_uri)
-
-    # 4. No default client + miss -> raise.
-    with pytest.raises(FileStorageReadError, match="no default client"):
-        dual_read(default_uri, default=None)
-
-    # ResolvedStorageTarget is used only as input-shape for the production path;
-    # validate it constructs without error here for parity.
-    assert build_storage_client(target).base_uri.to_uri_str() == "s3://team-byob-bucket"
+    key = key_for_project_digest(PROJECT_DEFAULT, "d")
+    stored = FileStorageURI.parse_uri_str(f"s3://platform-default-bucket/{key}")
+    default_client.objects[stored.to_uri_str()] = b"payload"
+    assert resolve_read(None, default_client, stored, None) == b"payload"
+    # project_id passed but resolver None -> still uses default.
+    assert resolve_read(None, default_client, stored, PROJECT_DEFAULT) == b"payload"
 
 
 @pytest.mark.parametrize(
@@ -510,16 +503,12 @@ def test_is_not_found_error_classifies_all_provider_exceptions(
 
 def test_key_prefix_validation_and_write_path_roundtrip() -> None:
     """Pydantic rejects unsafe prefixes; the write path prepends safe ones."""
-    # Validation rejects `..` and absolute prefixes.
     for bad in ("/abs", "/", "a/../b", "..", "x/../y/z"):
         with pytest.raises(ValidationError, match="key_prefix"):
             make_byob_target(key_prefix=bad)
-
-    # Empty + simple prefixes accepted.
     for ok in ("", "teamspace/weave", "a/b/c", "weave"):
         make_byob_target(key_prefix=ok)
 
-    # Write path applies prefix.
     target = make_byob_target(key_prefix="teamspace/weave")
     team_client = InMemoryStorageClient(
         FileStorageURI.parse_uri_str("s3://team-byob-bucket")
@@ -531,12 +520,7 @@ def test_key_prefix_validation_and_write_path_roundtrip() -> None:
     assert team_client.objects[stored_uri.to_uri_str()] == b"payload"
 
 
-def test_gorilla_transport_unparseable_response_fails_closed() -> None:
-    """Junk JSON from gorilla -> GorillaTransportError -> StorageResolutionError."""
-    bad_targets = {PROJECT_BYOB: {"status": "byob"}}  # missing required fields
-    with fake_gorilla(bad_targets) as (base_url, _):
-        transport = GorillaHttpClient(
-            base_url=base_url, service_identity_token="t", retries=1
-        )
-        with pytest.raises(GorillaTransportError):
-            transport.resolve(PROJECT_BYOB)
+def test_build_storage_client_constructs_s3_from_target() -> None:
+    """`build_storage_client` materializes the right client type + URI."""
+    client = build_storage_client(make_byob_target())
+    assert client.base_uri.to_uri_str() == "s3://team-byob-bucket"

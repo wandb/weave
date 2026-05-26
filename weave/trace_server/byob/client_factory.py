@@ -6,7 +6,7 @@ MVP: build a fresh client per resolve. Post-MVP introduces a pool keyed by
 
 from __future__ import annotations
 
-from weave.trace_server.byob.models import (
+from weave.trace_server.byob.types import (
     AmbientCredentials,
     AzureSasCredentials,
     GCSAccessTokenCredentials,
