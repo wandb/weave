@@ -492,16 +492,6 @@ def wf_file_storage_project_ramp_pct() -> int | None:
     return pct
 
 
-def wf_byob_gorilla_base_url() -> str | None:
-    """Internal URL of gorilla's storage resolve endpoint.
-
-    Presence of this env var enables the per-project BYOB resolver. Unset
-    leaves weave-trace on the single-bucket WF_FILE_STORAGE_URI path.
-    Internal-network / mTLS handled at the network layer, not the app layer.
-    """
-    return os.environ.get("WF_BYOB_GORILLA_BASE_URL")
-
-
 # Inference Service Settings
 
 

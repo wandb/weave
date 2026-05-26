@@ -83,12 +83,7 @@ from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
 )
-from weave.trace_server.byob.resolver import (
-    StorageResolver,
-    maybe_build_storage_resolver_from_env,
-    resolve_read,
-    resolve_write_target,
-)
+from weave.trace_server.byob.resolver import BYOBResolver
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
     split_usage_metrics,
@@ -196,9 +191,11 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.file_storage import (
     FileStorageClient,
+    FileStorageReadError,
     FileStorageWriteError,
     key_for_project_digest,
     maybe_get_storage_client_from_env,
+    read_from_bucket,
     store_in_bucket,
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
@@ -368,6 +365,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         database: str = "default",
         use_async_insert: bool = False,
         evaluate_model_dispatcher: EvaluateModelDispatcher | None = None,
+        byob_resolver: BYOBResolver | None = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -381,8 +379,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._init_lock = threading.Lock()
         self._file_storage_client: FileStorageClient | None = None
         self._file_storage_client_initialized = False
-        self._byob_storage_resolver: StorageResolver | None = None
-        self._byob_storage_resolver_initialized = False
+        self._byob_resolver = byob_resolver
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
@@ -482,18 +479,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._file_storage_client = maybe_get_storage_client_from_env()
             self._file_storage_client_initialized = True
             return self._file_storage_client
-
-    @property
-    def byob_storage_resolver(self) -> StorageResolver | None:
-        """Lazily build the BYOB resolver if `WF_BYOB_RESOLVER_ENABLED` is set."""
-        if self._byob_storage_resolver_initialized:
-            return self._byob_storage_resolver
-        with self._init_lock:
-            if self._byob_storage_resolver_initialized:
-                return self._byob_storage_resolver
-            self._byob_storage_resolver = maybe_build_storage_resolver_from_env()
-            self._byob_storage_resolver_initialized = True
-            return self._byob_storage_resolver
 
     @property
     def kafka_producer(self) -> KafkaProducer | None:
@@ -5861,9 +5846,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.FileCreateRes(digest=digest)
 
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
-        client, key_prefix = resolve_write_target(
-            self.byob_storage_resolver, self.file_storage_client, req.project_id
-        )
+        if self._byob_resolver is not None:
+            client, key_prefix = self._byob_resolver.resolve_write(
+                req.project_id, self.file_storage_client
+            )
+        else:
+            client, key_prefix = self.file_storage_client, ""
 
         if client is not None and use_file_storage:
             try:
@@ -6062,12 +6050,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, file_storage_uri: FileStorageURI, project_id: str | None = None
     ) -> bytes:
         set_root_span_dd_tags({"storage_provider": "bucket"})
-        return resolve_read(
-            self.byob_storage_resolver,
-            self.file_storage_client,
-            file_storage_uri,
-            project_id,
-        )
+        if self._byob_resolver is not None:
+            return self._byob_resolver.resolve_read(
+                project_id, file_storage_uri, self.file_storage_client
+            )
+        client = self.file_storage_client
+        if client is None:
+            raise FileStorageReadError("File storage client is not configured")
+        return read_from_bucket(client, file_storage_uri)
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         pb = ParamBuilder()
