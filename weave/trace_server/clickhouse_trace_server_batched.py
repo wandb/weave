@@ -83,15 +83,15 @@ from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
 )
-from weave.trace_server.byob import (
-    GorillaHttpClient,
+from weave.trace_server.byob.client_factory import build_storage_client
+from weave.trace_server.byob.gorilla_client import GorillaHttpClient
+from weave.trace_server.byob.models import (
     ResolvedStorageTarget,
     StorageResolutionError,
     StorageResolvePurpose,
-    StorageResolver,
     StorageResolveStatus,
-    build_storage_client,
 )
+from weave.trace_server.byob.resolver import StorageResolver
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
     split_usage_metrics,
