@@ -119,7 +119,7 @@ class TestBase64Replacement:
             "nested": {"field3": f"data:image/png;base64,{b64_data}"},
         }
 
-        result = replace_base64_with_content_objects(
+        result, _refs = replace_base64_with_content_objects(
             input_data, "test_project", trace_server
         )
 
@@ -159,7 +159,7 @@ class TestBase64Replacement:
             {"nested": f"data:text/plain;base64,{b64_data}"},
         ]
 
-        result = replace_base64_with_content_objects(
+        result, _refs = replace_base64_with_content_objects(
             input_data, "test_project", trace_server
         )
 
@@ -202,7 +202,7 @@ class TestBase64Replacement:
             )
         )
 
-        processed_start = process_call_req_to_content(start_req, trace_server)
+        processed_start, _refs = process_call_req_to_content(start_req, trace_server)
         assert processed_start.start.inputs["text"] == "Some normal text"
         assert isinstance(processed_start.start.inputs["image"], dict)
         assert processed_start.start.inputs["image"]["_type"] == "CustomWeaveType"
@@ -219,8 +219,86 @@ class TestBase64Replacement:
             )
         )
 
-        processed_end = process_call_req_to_content(end_req, trace_server)
+        processed_end, _refs = process_call_req_to_content(end_req, trace_server)
         assert processed_end.end.output == long_b64
+
+    def test_fused_walk_extracts_refs_alongside_base64(self):
+        """Refs and base64 conversion both come out of a single traversal.
+
+        The fused walk replaces `replace_base64_with_content_objects` +
+        `extract_refs_from_values`, so refs must be returned alongside the
+        transformed tree (deduped, nested, co-located with base64).
+        """
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+
+        ref_a = "weave-trace-internal:///proj/object/obj_a:abc123"
+        ref_b = "weave-trace-internal:///proj/object/obj_b:def456"
+        b64_data = base64.b64encode(b"x" * LARGE_TEST_DATA_SIZE).decode("ascii")
+        data_uri = f"data:image/png;base64,{b64_data}"
+
+        result, refs = replace_base64_with_content_objects(
+            {
+                "messages": [
+                    {"role": "user", "content": ref_a},
+                    {"role": "assistant", "content": data_uri},
+                    {"role": "system", "content": ref_a},  # dup
+                ],
+                "image_ref": ref_b,
+            },
+            "test_project",
+            trace_server,
+        )
+
+        # Base64 was replaced in-place
+        assert isinstance(result["messages"][1]["content"], dict)
+        assert result["messages"][1]["content"]["_type"] == "CustomWeaveType"
+        # Refs are deduped and nesting-agnostic
+        assert sorted(refs) == sorted([ref_a, ref_b])
+        # And refs are left untouched in the transformed tree
+        assert result["messages"][0]["content"] == ref_a
+        assert result["image_ref"] == ref_b
+
+    def test_process_complete_call_to_content_returns_refs_for_both_sides(self):
+        """`process_complete_call_to_content` returns (call, input_refs, output_refs)."""
+        from datetime import datetime, timezone
+
+        from weave.trace_server.base64_content_conversion import (
+            process_complete_call_to_content,
+        )
+        from weave.trace_server.trace_server_interface import (
+            CompletedCallSchemaForInsert,
+        )
+
+        trace_server = MagicMock()
+        input_ref = "weave-trace-internal:///proj/object/in:v1"
+        output_ref = "weave-trace-internal:///proj/object/out:v1"
+
+        completed = CompletedCallSchemaForInsert(
+            project_id="proj",
+            id="call-id",
+            trace_id="trace-id",
+            op_name="op",
+            started_at=datetime.now(timezone.utc),
+            ended_at=datetime.now(timezone.utc),
+            attributes={},
+            inputs={"x": input_ref},
+            summary={"usage": {}, "status_counts": {}},
+            output={"y": output_ref},
+        )
+
+        processed, input_refs, output_refs = process_complete_call_to_content(
+            completed, trace_server
+        )
+
+        assert processed is completed
+        assert input_refs == [input_ref]
+        assert output_refs == [output_ref]
 
 
 class TestStandaloneBase64Detection:
@@ -257,7 +335,7 @@ class TestStandaloneBase64Detection:
             assert is_base64(test_str), f"Expected {test_str} to match base64 pattern"
 
             input_data = {"field": test_str}
-            result = replace_base64_with_content_objects(
+            result, _refs = replace_base64_with_content_objects(
                 input_data, "test_project", trace_server
             )
 
@@ -326,7 +404,7 @@ class TestStandaloneBase64Detection:
             "other_field": "normal string",
         }
 
-        result = replace_base64_with_content_objects(
+        result, _refs = replace_base64_with_content_objects(
             input_data, "test_project", trace_server
         )
 
@@ -376,7 +454,7 @@ class TestThresholdAndStructuralIdentity:
         # successfully under the old threshold and gone through the regex
         # path. Now it must be returned untouched.
         below_threshold = "A" * 4096
-        result = replace_base64_with_content_objects(
+        result, _refs = replace_base64_with_content_objects(
             {"field": below_threshold}, "test_project", trace_server
         )
         assert result["field"] == below_threshold
@@ -398,7 +476,7 @@ class TestThresholdAndStructuralIdentity:
             ],
             "metadata": {"trace_id": "abc"},
         }
-        result = replace_base64_with_content_objects(
+        result, _refs = replace_base64_with_content_objects(
             original, "test_project", trace_server
         )
         # The outer dict, the messages list, every inner message dict, and
@@ -432,7 +510,7 @@ class TestThresholdAndStructuralIdentity:
             "model": "claude-sonnet-4-6",
         }
 
-        result = replace_base64_with_content_objects(
+        result, _refs = replace_base64_with_content_objects(
             original, "test_project", trace_server
         )
 
@@ -473,7 +551,7 @@ class TestThresholdAndStructuralIdentity:
         ]
         original = {"messages": original_messages, "model": "claude-sonnet-4-6"}
 
-        result = replace_base64_with_content_objects(
+        result, _refs = replace_base64_with_content_objects(
             original, "test_project", trace_server
         )
 
@@ -508,7 +586,7 @@ class TestThresholdAndStructuralIdentity:
                 inputs=inputs_before,
             )
         )
-        processed = process_call_req_to_content(start_req, trace_server)
+        processed, _refs = process_call_req_to_content(start_req, trace_server)
         # Pydantic shallow-copies inputs at model construction, so we compare
         # by value rather than identity here — content must round-trip
         # unchanged regardless of the SDK copy.

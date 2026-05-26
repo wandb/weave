@@ -11,6 +11,8 @@ from typing import Any, TypeVar
 
 import ddtrace
 
+from weave.shared import refs_internal
+from weave.shared.trace_server_interface_util import valid_internal_schemes
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallEndV2Req,
@@ -117,11 +119,13 @@ def replace_base64_with_content_objects(
     vals: T,
     project_id: str,
     trace_server: TraceServerInterface,
-) -> T:
-    """Recursively replace base64 content with Content objects.
+) -> tuple[T, list[str]]:
+    """Single-pass walk that replaces base64 content AND extracts internal refs.
 
-    Follows the same pattern as extract_refs_from_values, visiting all values
-    and replacing base64 content where found.
+    Fuses what was previously two separate traversals (this function plus
+    `extract_refs_from_values`) so each call insert touches the inputs/output
+    tree once instead of twice. Identity-preservation on no-binary subtrees is
+    unchanged: untouched subtrees still round-trip by `is`, not by value.
 
     Args:
         vals: Value to process (can be dict, list, or primitive)
@@ -129,8 +133,9 @@ def replace_base64_with_content_objects(
         trace_server: Trace server instance for file storage
 
     Returns:
-        Tuple of (processed_value, list_of_created_refs)
+        Tuple of (processed_value, list_of_refs).
     """
+    seen_refs: dict[str, None] = {}
 
     def _visit_children(items: Any, original: Any, cls: type) -> Any:
         # Walk one level of a collection's children. We allocate a shallow
@@ -159,48 +164,60 @@ def replace_base64_with_content_objects(
             return _visit_children(val.items(), val, dict)
         if isinstance(val, list):
             return _visit_children(enumerate(val), val, list)
-        if isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
-            # Check for data URI pattern first
-            if is_data_uri(val):
+        if isinstance(val, str):
+            # Refs are always far shorter than the base64 threshold; the cheap
+            # startswith check eliminates the vast majority of strings before
+            # we touch the length guard at all.
+            if any(
+                val.startswith(scheme + ":///") for scheme in valid_internal_schemes
+            ):
                 try:
-                    # Create proper Content object structure
-                    return store_content_object(
-                        Content.from_data_url(val),
-                        project_id,
-                        trace_server,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "Failed to create and store content from data URI with error %s",
-                        e,
-                    )
-
-            if is_base64(val):
-                try:
-                    # All we care about here is if this is an object that we can handle in some way.
-                    # 'aaaa' is valid base64 and will come out as text/plain
-                    # More complicated false positives or failed detections will show 'application/octet-stream'
-                    # The uncovered scenario is if a user has encoded a plaintext document as Base64
-                    # We don't handle text content objects in a special way on the clients, so this is acceptable.
-                    content: Content[Any] = Content.from_base64(val)
-                    if content.mimetype not in {
-                        "text/plain",
-                        "application/octet-stream",
-                    }:
+                    parsed = refs_internal.parse_internal_uri(val)
+                    if parsed.uri == val:
+                        seen_refs[val] = None
+                except Exception:
+                    pass
+                return val
+            if len(val) > AUTO_CONVERSION_MIN_SIZE:
+                # Check for data URI pattern first
+                if is_data_uri(val):
+                    try:
+                        # Create proper Content object structure
                         return store_content_object(
-                            content,
+                            Content.from_data_url(val),
                             project_id,
                             trace_server,
                         )
-                except Exception as e:
-                    logger.warning(
-                        "Failed to create content from standalone base64: %s", e
-                    )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to create and store content from data URI with error %s",
+                            e,
+                        )
 
-            return val
+                if is_base64(val):
+                    try:
+                        # All we care about here is if this is an object that we can handle in some way.
+                        # 'aaaa' is valid base64 and will come out as text/plain
+                        # More complicated false positives or failed detections will show 'application/octet-stream'
+                        # The uncovered scenario is if a user has encoded a plaintext document as Base64
+                        # We don't handle text content objects in a special way on the clients, so this is acceptable.
+                        content: Content[Any] = Content.from_base64(val)
+                        if content.mimetype not in {
+                            "text/plain",
+                            "application/octet-stream",
+                        }:
+                            return store_content_object(
+                                content,
+                                project_id,
+                                trace_server,
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to create content from standalone base64: %s", e
+                        )
         return val
 
-    return _visit(vals)
+    return _visit(vals), list(seen_refs)
 
 
 R = TypeVar("R", bound=CallStartReq | CallEndReq | CallEndV2Req)
@@ -209,8 +226,8 @@ R = TypeVar("R", bound=CallStartReq | CallEndReq | CallEndV2Req)
 def process_call_req_to_content(
     req: R,
     trace_server: TraceServerInterface,
-) -> R:
-    """Process call inputs/outputs to replace base64 content.
+) -> tuple[R, list[str]]:
+    """Process call inputs/outputs to replace base64 content and extract refs.
 
     This is the main entry point for processing trace data before insertion.
 
@@ -219,37 +236,39 @@ def process_call_req_to_content(
         trace_server: Trace server instance
 
     Returns:
-        Request with base64 content replaced by Content objects.
+        Tuple of (request, refs). `refs` is `input_refs` for `CallStartReq`,
+        `output_refs` for `CallEndReq`/`CallEndV2Req`, `[]` otherwise.
     """
     if isinstance(req, CallStartReq):
-        req.start.inputs = replace_base64_with_content_objects(
+        req.start.inputs, refs = replace_base64_with_content_objects(
             req.start.inputs, req.start.project_id, trace_server
         )
-    elif isinstance(req, (CallEndReq, CallEndV2Req)):
-        req.end.output = replace_base64_with_content_objects(
+        return req, refs
+    if isinstance(req, (CallEndReq, CallEndV2Req)):
+        req.end.output, refs = replace_base64_with_content_objects(
             req.end.output, req.end.project_id, trace_server
         )
-
-    return req
+        return req, refs
+    return req, []
 
 
 def process_complete_call_to_content(
     complete_call: CompletedCallSchemaForInsert,
     trace_server: TraceServerInterface,
-) -> CompletedCallSchemaForInsert:
-    """Process a complete call to replace base64 content in inputs and outputs.
+) -> tuple[CompletedCallSchemaForInsert, list[str], list[str]]:
+    """Process a complete call to replace base64 content and extract refs.
 
     Args:
         complete_call: Complete call schema with both inputs and outputs.
         trace_server: Trace server instance for file storage.
 
     Returns:
-        CompletedCallSchemaForInsert with base64 content replaced by Content objects.
+        Tuple of (complete_call, input_refs, output_refs).
     """
-    complete_call.inputs = replace_base64_with_content_objects(
+    complete_call.inputs, input_refs = replace_base64_with_content_objects(
         complete_call.inputs, complete_call.project_id, trace_server
     )
-    complete_call.output = replace_base64_with_content_objects(
+    complete_call.output, output_refs = replace_base64_with_content_objects(
         complete_call.output, complete_call.project_id, trace_server
     )
-    return complete_call
+    return complete_call, input_refs, output_refs

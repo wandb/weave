@@ -126,14 +126,18 @@ def ch_call_to_row(ch_call: CallCHInsertable | CallCompleteCHInsertable) -> list
 def start_call_for_insert_to_ch_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
     retention_days: int,
+    input_refs: list[str] | None = None,
 ) -> CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
-    # Process inputs for base64 content if trace_server is provided
     inputs = start_call.inputs
-    input_refs = extract_refs_from_values(inputs)
+    # `input_refs` may be pre-computed by the fused base64+refs walk in
+    # `process_call_req_to_content`. Fall back to walking the tree when callers
+    # don't run that pre-pass (OTel export, restore paths).
+    if input_refs is None:
+        input_refs = extract_refs_from_values(inputs)
 
     otel_dump_str = None
     if start_call.otel_dump is not None:
@@ -201,11 +205,14 @@ def start_call_insertable_to_complete_start(
 def end_call_for_insert_to_ch_insertable(
     end_call: tsi.EndedCallSchemaForInsert,
     retention_days: int,
+    output_refs: list[str] | None = None,
 ) -> CallEndCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
     output = end_call.output
-    output_refs = extract_refs_from_values(output)
+    # See `start_call_for_insert_to_ch_insertable` for the pre-computed refs path.
+    if output_refs is None:
+        output_refs = extract_refs_from_values(output)
 
     return CallEndCHInsertable(
         project_id=end_call.project_id,
@@ -291,21 +298,28 @@ def ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
 def complete_call_to_ch_insertable(
     complete_call: tsi.CompletedCallSchemaForInsert,
     retention_days: int,
+    input_refs: list[str] | None = None,
+    output_refs: list[str] | None = None,
 ) -> CallCompleteCHInsertable:
     """Convert a completed call schema to a ClickHouse insertable format.
 
     Args:
         complete_call: The completed call schema from the API.
         retention_days: The project's retention policy in days (0 = no TTL).
+        input_refs: Pre-extracted refs from `process_complete_call_to_content`.
+        output_refs: Pre-extracted refs from `process_complete_call_to_content`.
 
     Returns:
         CallCompleteCHInsertable: The ClickHouse insertable representation.
     """
     inputs = complete_call.inputs
-    input_refs = extract_refs_from_values(inputs)
+    # See `start_call_for_insert_to_ch_insertable` for the pre-computed refs path.
+    if input_refs is None:
+        input_refs = extract_refs_from_values(inputs)
 
     output = complete_call.output
-    output_refs = extract_refs_from_values(output)
+    if output_refs is None:
+        output_refs = extract_refs_from_values(output)
 
     otel_dump_str = None
     if complete_call.otel_dump is not None:

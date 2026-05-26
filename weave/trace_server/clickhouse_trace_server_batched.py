@@ -867,11 +867,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # as enforcing business rules and defaults
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
 
-        req = process_call_req_to_content(req, self)
+        req, input_refs = process_call_req_to_content(req, self)
         retention_days = get_project_retention_days(
             req.start.project_id, self.ch_client
         )
-        ch_call = start_call_for_insert_to_ch_insertable(req.start, retention_days)
+        ch_call = start_call_for_insert_to_ch_insertable(
+            req.start, retention_days, input_refs=input_refs
+        )
 
         # Check write target - v1 call_start cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_v1_write_target(
@@ -900,9 +902,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        req = process_call_req_to_content(req, self)
+        req, output_refs = process_call_req_to_content(req, self)
         retention_days = get_project_retention_days(req.end.project_id, self.ch_client)
-        ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
+        ch_call = end_call_for_insert_to_ch_insertable(
+            req.end, retention_days, output_refs=output_refs
+        )
 
         # Check write target - v1 call_end cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_v1_write_target(
@@ -954,9 +958,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         with self.call_batch():
             for complete_call in req.batch:
-                processed_complete_call = process_complete_call_to_content(
-                    complete_call, self
-                )
+                (
+                    processed_complete_call,
+                    input_refs,
+                    output_refs,
+                ) = process_complete_call_to_content(complete_call, self)
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
@@ -971,7 +977,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     processed_complete_call.project_id, self.ch_client
                 )
                 ch_call = complete_call_to_ch_insertable(
-                    processed_complete_call, retention_days
+                    processed_complete_call,
+                    retention_days,
+                    input_refs=input_refs,
+                    output_refs=output_refs,
                 )
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
@@ -994,12 +1003,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         This is used for eager ops like Evaluation.evaluate that need
         their start to be visible immediately in the UI.
         """
-        start_req = process_call_req_to_content(tsi.CallStartReq(start=req.start), self)
+        start_req, input_refs = process_call_req_to_content(
+            tsi.CallStartReq(start=req.start), self
+        )
         retention_days = get_project_retention_days(
             start_req.start.project_id, self.ch_client
         )
         ch_start = start_call_for_insert_to_ch_insertable(
-            start_req.start, retention_days
+            start_req.start, retention_days, input_refs=input_refs
         )
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
@@ -1028,7 +1039,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             CallEndV2Res: Empty response on success.
         """
-        req = process_call_req_to_content(req, self)
+        req, output_refs = process_call_req_to_content(req, self)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.end.project_id,
@@ -1037,12 +1048,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # If writing to calls_complete, perform lightweight UPDATE
         if write_target == WriteTarget.CALLS_COMPLETE:
-            self._update_call_end_in_calls_complete(req.end)
+            self._update_call_end_in_calls_complete(req.end, output_refs=output_refs)
         elif write_target == WriteTarget.CALLS_MERGED:
             retention_days = get_project_retention_days(
                 req.end.project_id, self.ch_client
             )
-            ch_end = end_call_for_insert_to_ch_insertable(req.end, retention_days)
+            ch_end = end_call_for_insert_to_ch_insertable(
+                req.end, retention_days, output_refs=output_refs
+            )
             self._insert_call(ch_end)
             if self._flush_immediately:
                 self._flush_calls()
@@ -1061,7 +1074,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         name="clickhouse_trace_server_batched._update_call_end_in_calls_complete"
     )
     def _update_call_end_in_calls_complete(
-        self, end_call: tsi.EndedCallSchemaForInsert
+        self,
+        end_call: tsi.EndedCallSchemaForInsert,
+        output_refs: list[str] | None = None,
     ) -> None:
         """Update a call's end data in the calls_complete table using lightweight UPDATE.
 
@@ -1072,11 +1087,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             end_call: The end call data to update. If started_at is provided,
                 it enables more efficient queries by utilizing the ClickHouse
                 primary key (project_id, started_at, id).
+            output_refs: Pre-extracted refs from the fused base64+refs walk in
+                `process_call_req_to_content`. Computed locally if not provided.
         """
         table_name = self._get_calls_complete_table_name()
 
         output = end_call.output
-        output_refs = extract_refs_from_values(output)
+        if output_refs is None:
+            output_refs = extract_refs_from_values(output)
         output_dump = any_value_to_dump(output)
         summary_dump = dict_value_to_dump(dict(end_call.summary))
 
