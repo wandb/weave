@@ -739,7 +739,9 @@ def test_call_start_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     """
     # Build a payload larger than FILE_CHUNK_SIZE so the CH fallback actually
     # chunks (and we can assert chunk_index / n_chunks behavior end-to-end).
-    big_body = "fail-me-" + ("z" * (ch_settings.FILE_CHUNK_SIZE + AUTO_CONVERSION_MIN_SIZE))
+    big_body = "fail-me-" + (
+        "z" * (ch_settings.FILE_CHUNK_SIZE + AUTO_CONVERSION_MIN_SIZE)
+    )
     small_body = "ok-content"
 
     project_id = base64.b64encode(b"u/p_fallback").decode()
