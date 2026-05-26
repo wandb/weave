@@ -12,8 +12,14 @@ import pytest
 from azure.core.exceptions import ResourceNotFoundError
 from botocore.exceptions import ClientError
 from google.api_core import exceptions as gcp_exceptions
+from pydantic import SecretStr, ValidationError
 
-from weave.trace_server.byob.resolver import BYOBResolver, StorageResolutionError
+from weave.trace_server.byob.resolver import (
+    BYOBResolver,
+    ExportStorageCredentials,
+    ResolvedExportTarget,
+    StorageResolutionError,
+)
 from weave.trace_server.file_storage import (
     FileStorageClient,
     FileStorageReadError,
@@ -68,13 +74,16 @@ class _FakeBYOBResolver(BYOBResolver):
         byob_client: FileStorageClient,
         key_prefix: str = "",
         raise_on_resolve: bool = False,
+        export_target: ResolvedExportTarget | None = None,
     ) -> None:
         self.byob_project_id = byob_project_id
         self.byob_client = byob_client
         self.key_prefix = key_prefix
         self.raise_on_resolve = raise_on_resolve
+        self.export_target = export_target
         self.write_calls: list[str] = []
         self.read_calls: list[tuple[str | None, str]] = []
+        self.export_target_calls: list[str] = []
 
     def resolve_write(
         self,
@@ -112,6 +121,12 @@ class _FakeBYOBResolver(BYOBResolver):
             raise FileStorageReadError("BYOB miss and no default client")
         return read_from_bucket(default_client, stored_uri)
 
+    def resolve_export_target(self, project_id: str) -> ResolvedExportTarget:
+        self.export_target_calls.append(project_id)
+        if self.raise_on_resolve or self.export_target is None:
+            raise StorageResolutionError(f"no export target for {project_id}")
+        return self.export_target
+
 
 # ---------------------------------------------------------------------------
 # Abstract interface contract
@@ -120,17 +135,28 @@ class _FakeBYOBResolver(BYOBResolver):
 
 def test_byob_resolver_is_abstract() -> None:
     """`BYOBResolver` cannot be instantiated directly; subclasses must
-    implement both `resolve_write` and `resolve_read`.
+    implement `resolve_write`, `resolve_read`, AND `resolve_export_target`.
     """
     with pytest.raises(TypeError):
         BYOBResolver()  # type: ignore[abstract]
 
-    class PartialResolver(BYOBResolver):
+    class WriteOnly(BYOBResolver):
         def resolve_write(self, project_id, default_client):
             return default_client, ""
 
     with pytest.raises(TypeError):
-        PartialResolver()  # type: ignore[abstract]
+        WriteOnly()  # type: ignore[abstract]
+
+    class WriteAndRead(BYOBResolver):
+        def resolve_write(self, project_id, default_client):
+            return default_client, ""
+
+        def resolve_read(self, project_id, stored_uri, default_client):
+            return b""
+
+    # Still abstract: missing `resolve_export_target`.
+    with pytest.raises(TypeError):
+        WriteAndRead()  # type: ignore[abstract]
 
 
 def test_storage_resolution_error_is_distinct_exception() -> None:
@@ -278,3 +304,72 @@ def test_is_not_found_error_classifies_all_provider_exceptions() -> None:
 
     # Unrelated error
     assert is_not_found_error(RuntimeError("boom")) is False
+
+
+# ---------------------------------------------------------------------------
+# resolve_export_target (bulk-export STS path)
+# ---------------------------------------------------------------------------
+
+
+def _make_export_target(project_id: str = PROJECT_BYOB) -> ResolvedExportTarget:
+    return ResolvedExportTarget(
+        bucket_uri="s3://team-bucket",
+        bucket_name="team-bucket",
+        region="us-west-2",
+        credentials=ExportStorageCredentials(
+            access_key_id="AKIAIOSFODNN7EXAMPLE",
+            secret_access_key=SecretStr("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"),
+            session_token=SecretStr("FQoGZXIvYXdzEPL"),
+        ),
+        source_project_id=project_id,
+    )
+
+
+def test_export_credentials_secret_values_redact_in_repr() -> None:
+    """STS creds must not leak in `repr()`/`str()`. Pydantic's `SecretStr`
+    handles this; this test pins the behavior so callers can safely log.
+    """
+    creds = ExportStorageCredentials(
+        access_key_id="AKIAIOSFODNN7EXAMPLE",
+        secret_access_key=SecretStr("super-secret"),
+        session_token=SecretStr("temp-token"),
+    )
+    assert "super-secret" not in repr(creds)
+    assert "temp-token" not in repr(creds)
+    assert creds.secret_access_key.get_secret_value() == "super-secret"
+    assert creds.session_token.get_secret_value() == "temp-token"
+
+
+def test_resolved_export_target_rejects_missing_required_fields() -> None:
+    """`bucket_uri`, `bucket_name`, `credentials`, `source_project_id`
+    are all required; pydantic should refuse to construct without them.
+    """
+    with pytest.raises(ValidationError):
+        ResolvedExportTarget()  # type: ignore[call-arg]
+
+
+def test_resolve_export_target_returns_target_for_attached_project() -> None:
+    _, byob = _make_clients()
+    target = _make_export_target()
+    resolver = _FakeBYOBResolver(
+        byob_project_id=PROJECT_BYOB,
+        byob_client=byob,
+        export_target=target,
+    )
+    out = resolver.resolve_export_target(PROJECT_BYOB)
+    assert out is target
+    assert resolver.export_target_calls == [PROJECT_BYOB]
+
+
+def test_resolve_export_target_raises_when_no_target_attached() -> None:
+    """Fail-closed: when no team bucket is attached, the resolver must
+    raise `StorageResolutionError`, not silently return None.
+    """
+    _, byob = _make_clients()
+    resolver = _FakeBYOBResolver(
+        byob_project_id=PROJECT_BYOB,
+        byob_client=byob,
+        export_target=None,
+    )
+    with pytest.raises(StorageResolutionError):
+        resolver.resolve_export_target(PROJECT_BYOB)
