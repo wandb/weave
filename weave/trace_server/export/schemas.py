@@ -31,6 +31,14 @@ class ExportStartReq(BaseModel):
     time_range: TimeRange | None = None
     format: ExportFormat = "parquet"
     compression: Compression = "zstd"
+    include_costs: bool = False
+    """Tier 2: emit one row per (call, model) with cost columns inlined.
+
+    Row-count semantics differ from `include_costs=False` (tier 1): calls
+    with multiple models in `summary.usage` produce multiple Parquet rows.
+    Calls with no model (`summary.usage` empty or malformed) are dropped
+    rather than emitted with a sentinel `llm_id`.
+    """
 
 
 class ExportStartRes(BaseModel):

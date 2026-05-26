@@ -16,7 +16,7 @@ from weave.trace_server.byob.resolver import (
     ResolvedExportTarget,
     StorageResolutionError,
 )
-from weave.trace_server.export import audit, constants, sql
+from weave.trace_server.export import audit, constants, costs_sql, sql
 from weave.trace_server.export.escaping import (
     build_create_named_collection_sql,
     build_drop_named_collection_sql,
@@ -281,7 +281,12 @@ class ExportEngine:
         self._ch.command(create_sql, settings={"log_queries": "0"})
         submitted = False
         try:
-            insert = sql.build_export_insert_sql(
+            build = (
+                costs_sql.build_cost_join_export_sql
+                if req.include_costs
+                else sql.build_export_insert_sql
+            )
+            insert = build(
                 job_id=submission.job_id,
                 table=req.table,
                 project_id=req.project_id,

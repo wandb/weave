@@ -247,6 +247,38 @@ def test_insert_failure_drops_named_collection_on_failure() -> None:
     assert len(drops) == 2, drops  # DROP at start + DROP in cleanup
 
 
+def test_include_costs_routes_to_cost_join_sql() -> None:
+    """Tier 2: setting `include_costs=True` must submit the cost-join SQL.
+
+    The cost-join builder leaves a `LEFT JOIN llm_token_prices` and the dummy
+    filter behind that the tier-1 builder never emits; checking for both
+    pins the branch.
+    """
+    client = _FakeClient()
+    client.query_returns = [[(0,)], [(50,)]]
+    resolver = _FakeResolver(_make_target())
+
+    e = _build_engine(client, resolver)
+    e.start(
+        ExportStartReq(
+            project_id=PROJECT,
+            table="calls_complete",
+            include_costs=True,
+        ),
+        requested_by="user-a",
+    )
+
+    insert_cmd = next(
+        c
+        for c, _ in client.commands
+        if c.startswith("\nINSERT") or "INSERT INTO FUNCTION s3" in c
+    )
+    assert "LEFT JOIN" in insert_cmd
+    assert "llm_token_prices" in insert_cmd
+    assert "weave_dummy_llm_id" in insert_cmd
+    assert "ROW_NUMBER() OVER" in insert_cmd
+
+
 @pytest.mark.disable_logging_error_check
 def test_resolver_target_mismatch_refuses_to_proceed() -> None:
     """Defense-in-depth: target.source_project_id must match request."""
