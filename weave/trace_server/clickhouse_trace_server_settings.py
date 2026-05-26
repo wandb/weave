@@ -73,10 +73,6 @@ CLICKHOUSE_BASE_QUERY_SETTINGS: dict[str, int | str] = {
     "distributed_product_mode": "global",
 }
 
-# TODO: remove once https://github.com/ClickHouse/ClickHouse/issues/104781 ships.
-if wf_env.wf_clickhouse_disable_query_condition_cache():
-    CLICKHOUSE_BASE_QUERY_SETTINGS["use_query_condition_cache"] = 0
-
 CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS: dict[str, int | str] = {}
 
 if not _disable_query_failure_prediction:
