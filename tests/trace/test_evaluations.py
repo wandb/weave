@@ -636,7 +636,7 @@ def make_test_eval():
 
 
 @pytest.mark.asyncio
-async def test_eval_supports_model_as_op(client):
+async def test_eval_supports_model_as_op(weave_active):
     @weave.op
     def function_model(sentence: str) -> dict:
         return ""
@@ -658,7 +658,7 @@ class MyTestModel(Model):
 
 
 @pytest.mark.asyncio
-async def test_eval_supports_model_class(client):
+async def test_eval_supports_model_class(weave_active):
     evaluation = make_test_eval()
 
     model = MyTestModel()
@@ -671,7 +671,7 @@ async def test_eval_supports_model_class(client):
 
 
 @pytest.mark.asyncio
-async def test_eval_supports_non_op_funcs(client):
+async def test_eval_supports_non_op_funcs(weave_active):
     def function_model(sentence: str) -> dict:
         return ""
 
@@ -702,7 +702,7 @@ async def test_eval_supports_non_op_funcs(client):
 
 
 @pytest.mark.asyncio
-async def test_eval_is_robust_to_missing_values(client):
+async def test_eval_is_robust_to_missing_values(weave_active):
     # At least 1 None
     # All dicts have "d": None
     resp = [

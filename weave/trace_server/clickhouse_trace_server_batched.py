@@ -229,7 +229,7 @@ from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.project_version.types import ReadTable, WriteTarget
 from weave.trace_server.query_builder import eval_results_query_builder
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_annotator_progress_insert_query,
@@ -1160,8 +1160,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb, read_table)
-        raw_res = self._query(query, pb.get_params())
+        query, columns, settings = build_calls_stats_query(req, pb, read_table)
+        raw_res = self._query(query, pb.get_params(), settings=settings or None)
 
         res_dict = (
             dict(zip(columns, raw_res.result_rows[0], strict=False))
@@ -1171,6 +1171,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsQueryStatsRes(
             count=res_dict.get("count", 0),
+            has_more=bool(res_dict.get("has_more", 0)),
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 
@@ -1531,8 +1532,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
-        # Sort with empty list results in no sorting
-        if req.sort_by:
+        # sort_by=None -> default order; sort_by=[] -> explicit no sort
+        # (falls through with no order_fields, enabling stream-aggregate-in-order).
+        if req.sort_by is None:
+            cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
+        elif len(req.sort_by) > 0:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
             # If user isn't already sorting by id, add id as secondary sort for consistency.
@@ -1543,13 +1548,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     cq.add_order("id", last_sort.direction)
                 else:
                     cq.add_order("id", "desc")
-        else:
-            cq.add_order("started_at", "asc")
-            cq.add_order("id", "asc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
+
+        # Stream the GROUP BY in (project_id, id) order so LIMIT short-circuits;
+        # ORDER BY defeats this so we only inject when no order fields are set.
+        if (
+            read_table == ReadTable.CALLS_MERGED
+            and req.limit is not None
+            and len(cq.order_fields) == 0
+        ):
+            settings = ch_settings.update_settings_for_aggregation_in_order(settings)
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)

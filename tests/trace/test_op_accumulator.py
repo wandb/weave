@@ -155,7 +155,7 @@ def test_process_exit_closes_unfinished_iterator_wrapper(tmp_path):
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector):
+def test_resilience_to_accumulator_make_accumulator_errors(weave_active, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -188,7 +188,7 @@ def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_make_accumulator_errors_async(
-    client, log_collector
+    weave_active, log_collector
 ):
     async def do_test():
         @weave.op
@@ -222,7 +222,7 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
+def test_resilience_to_accumulator_accumulation_errors(weave_active, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -259,7 +259,7 @@ def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_accumulation_errors_async(
-    client, log_collector
+    weave_active, log_collector
 ):
     async def do_test():
         @weave.op
@@ -297,7 +297,9 @@ async def test_resilience_to_accumulator_accumulation_errors_async(
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_accumulator_should_accumulate_errors(client, log_collector):
+def test_resilience_to_accumulator_should_accumulate_errors(
+    weave_active, log_collector
+):
     def do_test():
         @weave.op
         def simple_op():
@@ -339,7 +341,7 @@ def test_resilience_to_accumulator_should_accumulate_errors(client, log_collecto
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_should_accumulate_errors_async(
-    client, log_collector
+    weave_active, log_collector
 ):
     async def do_test():
         @weave.op
@@ -389,7 +391,7 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_accumulator_on_finish_post_processor_errors(
-    client, log_collector
+    weave_active, log_collector
 ):
     def do_test():
         @weave.op
@@ -434,7 +436,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
-    client, log_collector
+    weave_active, log_collector
 ):
     async def do_test():
         @weave.op
@@ -478,7 +480,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
         assert log.msg.startswith("Error capturing call output")
 
 
-def test_resilience_to_accumulator_internal_errors(client):
+def test_resilience_to_accumulator_internal_errors(weave_active):
     def do_test():
         @weave.op(accumulator=lambda *args, **kwargs: {})
         def simple_op():
@@ -500,7 +502,7 @@ def test_resilience_to_accumulator_internal_errors(client):
 
 
 @pytest.mark.asyncio
-async def test_resilience_to_accumulator_internal_errors_async(client):
+async def test_resilience_to_accumulator_internal_errors_async(weave_active):
     async def do_test():
         @weave.op(accumulator=lambda *args, **kwargs: {})
         async def simple_op():

@@ -41,6 +41,12 @@ def make_project_stats_query(
 
     table_config = TableConfig.from_read_table(read_table)
     calls_stats_table = table_config.stats_table_name
+    # calls_merged_stats and calls_complete_stats name the otel column differently
+    otel_size_column = (
+        "otel_dump_size_bytes"
+        if read_table == ReadTable.CALLS_MERGED
+        else "otel_size_bytes"
+    )
 
     columns = []
     sub_sqls = []
@@ -52,7 +58,8 @@ def make_project_stats_query(
                 COALESCE(attributes_size_bytes, 0) +
                 COALESCE(inputs_size_bytes, 0) +
                 COALESCE(output_size_bytes, 0) +
-                COALESCE(summary_size_bytes, 0)
+                COALESCE(summary_size_bytes, 0) +
+                COALESCE({otel_size_column}, 0)
                 )
                 FROM {calls_stats_table}
                 WHERE project_id = {{{project_id_param}: String}}

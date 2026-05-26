@@ -69,6 +69,8 @@ export type CallStackEntry = {
   callId: string;
   traceId: string;
   childSummary: Record<string, any>;
+  opName?: string;
+  displayName?: string;
 };
 
 export interface GetCallsOptions {
@@ -154,6 +156,17 @@ export class CallStack {
    */
   pushCall(entry: CallStackEntry): CallStack {
     return new CallStack([...this.stack, entry]);
+  }
+
+  findLastByOpName(opNames: readonly string[]): CallStackEntry | null {
+    const opNameSet = new Set(opNames);
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      const entry = this.stack[i];
+      if (entry.opName && opNameSet.has(entry.opName)) {
+        return entry;
+      }
+    }
+    return null;
   }
 }
 
@@ -971,6 +984,14 @@ export class WeaveClient {
     displayName?: string,
     attributes?: Record<string, any>
   ) {
+    // EvalLinkSpanProcessor runs from OTel callbacks and only has access to
+    // the in-memory call stack. Store the short op name for stack lookup
+    // because the persisted `opName` below is a full ref URI; store the
+    // display name so eval metadata can use the user-facing evaluation name.
+    currentCall.opName =
+      opRef instanceof OpRef ? opRef.objectId : getOpName(opRef);
+    currentCall.displayName = displayName;
+
     const inputs = await this.paramsToCallInputs(
       params,
       thisArg,

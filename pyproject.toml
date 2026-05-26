@@ -54,6 +54,10 @@ dependencies = [
   "opentelemetry-api>=1.28.0",
   "opentelemetry-sdk>=1.28.0",
   "opentelemetry-exporter-otlp-proto-http>=1.28.0",
+  # The ADK integration imports GenAI semconv keys
+  # (gen_ai.tool.call.arguments, cache token names,
+  # gen_ai.usage.reasoning.output_tokens) added in 0.63b0.
+  "opentelemetry-semantic-conventions>=0.63b0",
 ]
 
 [project.optional-dependencies]
@@ -362,7 +366,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.41-dev0"
+current_version = "0.52.42-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

@@ -685,7 +685,7 @@ interface OpenAIAPI {
       };
     };
   };
-  responses: {
+  responses?: {
     create: any;
   };
 }

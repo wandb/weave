@@ -11,7 +11,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 )
 
 
-def test_publish_and_load_scorer_with_prompt_ref(client):
+def test_publish_and_load_scorer_with_prompt_ref(weave_active):
     """Test that LLMAsAJudgeScorer with a MessagesPrompt ref can be published and loaded.
 
     When the scorer is loaded via weave.get(), the scoring_prompt ref string
