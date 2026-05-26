@@ -41,7 +41,7 @@ const examples = [
 async function main() {
   await weave.init('examples');
   const ds = new weave.Dataset({
-    id: 'Fruit Dataset',
+    name: 'Fruit Dataset',
     rows: examples,
   });
 

@@ -1061,7 +1061,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         name="clickhouse_trace_server_batched._update_call_end_in_calls_complete"
     )
     def _update_call_end_in_calls_complete(
-        self, end_call: tsi.EndedCallSchemaForInsertWithStartedAt
+        self, end_call: tsi.EndedCallSchemaForInsert
     ) -> None:
         """Update a call's end data in the calls_complete table using lightweight UPDATE.
 
@@ -6392,6 +6392,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             end = tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=start_call.id,
+                started_at=start_call.started_at,
                 ended_at=end_time,
                 output=res.response,
                 summary=summary,
@@ -6539,10 +6540,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None
         if write_target == WriteTarget.CALLS_COMPLETE:
             end_call_handler = lambda end: self._update_call_end_in_calls_complete(
-                tsi.EndedCallSchemaForInsertWithStartedAt(
-                    **end.model_dump(),
-                    started_at=start_call.started_at,
-                )
+                end.model_copy(update={"started_at": start_call.started_at})
             )
 
         assert retention_days is not None  # narrowed by track_llm_call guard above
@@ -6643,6 +6641,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
             id=start_call.id,
+            started_at=start_call.started_at,
             ended_at=end_time,
             output=res.response,
             summary={},
@@ -7449,6 +7448,7 @@ def _create_tracked_stream_wrapper(
             end = tsi.EndedCallSchemaForInsert(
                 project_id=project_id,
                 id=start_call.id,
+                started_at=start_call.started_at,
                 ended_at=datetime.datetime.now(),
                 output=aggregated_output,
                 summary=summary,

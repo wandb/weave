@@ -1145,9 +1145,12 @@ class CallsQuery(BaseModel):
             )
         )
 
-        # For calls_merged: filter out orphaned call ends (started_at IS NULL).
-        # This can occur with out-of-order call part insertion or early client
-        # termination.  Also REQUIRED for proper pre-GROUP BY (WHERE) optimizations.
+        # For calls_merged: filter out orphaned call ends (op_name IS NULL).
+        # op_name is start-only (CallEndCHInsertable has no op_name), so its
+        # NULL-ness is the reliable signal that a row group is "missing its
+        # start." `started_at` used to serve here but is now populated on
+        # call_end rows too (so the SDK-provided value can pin
+        # `sortable_datetime`), making it ambiguous as an orphan signal.
         # For calls_complete: every row has a non-nullable started_at, so this
         # condition is always true -- skip it to avoid dead SQL.
         if self.read_table == ReadTable.CALLS_MERGED:
@@ -1157,7 +1160,7 @@ class CallsQuery(BaseModel):
                         "$not": [
                             {
                                 "$eq": [
-                                    {"$getField": "started_at"},
+                                    {"$getField": "op_name"},
                                     {"$literal": None},
                                 ]
                             }
@@ -1309,10 +1312,11 @@ class CallsQuery(BaseModel):
             WhereFilters object containing all filter SQL strings
         """
         # The op_name, trace_id, trace_roots, wb_run_id conditions REQUIRE conditioning
-        # on the started_at field after grouping in the HAVING clause. These filters
+        # on the op_name field after grouping in the HAVING clause. These filters
         # remove call starts before grouping, creating orphan call ends. By conditioning
-        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
-        # all rows returned at least have a call start.
+        # on `NOT any(op_name) is NULL`, we filter out orphaned call ends, ensuring
+        # all rows returned at least have a call start. op_name is the orphan-end
+        # signal (start-only) because started_at now rides on call_end rows too.
 
         op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_id = process_trace_id_filter_to_sql(
@@ -2588,8 +2592,11 @@ def process_object_refs_filter_to_opt_sql(
     # are filtering on.
     #
     # calls_merged has split start/end rows, so we must also include
-    # "naked call end" rows (started_at IS NULL) for input ref filters and
+    # "naked call end" rows (op_name IS NULL) for input ref filters and
     # "naked call start" rows (ended_at IS NULL) for output ref filters.
+    # op_name (not started_at) is the reliable end-row signal: started_at
+    # is now propagated onto call_end rows so it can pin sortable_datetime,
+    # but op_name remains start-only.
     #
     # calls_complete has one complete row per call -- started_at is always
     # set (non-nullable, no sentinel) and ended_at uses a sentinel for
@@ -2600,12 +2607,12 @@ def process_object_refs_filter_to_opt_sql(
         if read_table == ReadTable.CALLS_COMPLETE:
             refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0)"
         else:
-            started_at_field = get_field_by_name("started_at")
-            started_at_null = started_at_field.null_check_sql(
+            op_name_field = get_field_by_name("op_name")
+            op_name_null = op_name_field.null_check_sql(
                 param_builder, table_alias, read_table, use_agg_fn=False
             )
             refs_filter_opt_sql += (
-                f"AND (length({table_alias}.input_refs) > 0 OR {started_at_null})"
+                f"AND (length({table_alias}.input_refs) > 0 OR {op_name_null})"
             )
     if "output_dump" in object_ref_fields_consumed:
         ended_at_field = get_field_by_name("ended_at")
@@ -2937,6 +2944,17 @@ def _try_optimized_stats_query(
             req.project_id, param_builder, read_table
         )
 
+    # Pattern 3: Unfiltered distinct-call count on calls_merged.
+    #
+    # Replace the GROUP BY + argMax rollup with two parallel aggregators on one
+    # scan: uniqExact(id) - uniqExactIf(id, isNotNull(deleted_at)). Exact match
+    # to the GROUP BY path's deleted-call exclusion. calls_complete has its own
+    # flat path; limit=1 stays with Pattern 1.
+    if read_table == ReadTable.CALLS_MERGED and _is_unfiltered_stats_req(req):
+        return _optimized_unfiltered_calls_merged_count_query(
+            req.project_id, req.limit, param_builder
+        )
+
     return None
 
 
@@ -2991,6 +3009,51 @@ def _optimized_wb_run_id_not_null_query(
             LIMIT 1
         )
     """
+
+
+def _optimized_unfiltered_calls_merged_count_query(
+    project_id: str,
+    limit: int | None,
+    param_builder: ParamBuilder,
+) -> str:
+    """Flat distinct-id count for unfiltered calls_merged stats.
+
+    Two parallel aggregators in one scan: total distinct ids minus distinct ids
+    that have any row with deleted_at set. Matches the GROUP BY path's
+    `argMax(deleted_at) IS NULL` exclusion exactly.
+    """
+    table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
+    project_id_slot = param_slot(param_builder.add_param(project_id), "String")
+    raw_count_expr = (
+        f"uniqExact({table_name}.id) "
+        f"- uniqExactIf({table_name}.id, isNotNull({table_name}.deleted_at))"
+    )
+    inner = (
+        f"SELECT {raw_count_expr} AS raw_count "
+        f"FROM {table_name} "
+        f"WHERE {table_name}.project_id = {project_id_slot}"
+    )
+    if limit is None:
+        return f"SELECT raw_count AS count, toUInt8(0) AS has_more FROM ({inner})"
+    return (
+        f"SELECT least(raw_count, {limit}) AS count, "
+        f"toUInt8(raw_count > {limit}) AS has_more "
+        f"FROM ({inner})"
+    )
+
+
+def _is_unfiltered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
+    """True iff the request is a pure project-scope count with no narrowing.
+
+    Gates Pattern 3 (flat distinct-id count). limit=1 stays with Pattern 1.
+    """
+    return (
+        (req.limit is None or req.limit > 1)
+        and req.query is None
+        and not req.include_total_storage_size
+        and not req.expand_columns
+        and _is_minimal_filter(req.filter)
+    )
 
 
 def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
