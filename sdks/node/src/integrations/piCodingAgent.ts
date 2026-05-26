@@ -210,13 +210,16 @@ export class PiCodingAgentOtelAdapter {
   private readonly tracer: Tracer;
   private readonly captureContent: boolean;
 
-  // Session-level span
-  private sessionSpan: Span | null = null;
-  private sessionCtx: Context = ROOT_CONTEXT;
-
-  // Per-prompt span (gen_ai.invoke_agent) — one per user prompt → response cycle
+  // Per-prompt span (gen_ai.invoke_agent) — one per user prompt → response
+  // cycle. Each is started under ROOT_CONTEXT so every prompt gets its own
+  // trace id; sibling prompts in the same conversation are linked via
+  // `gen_ai.conversation.id`, not a shared parent span.
   private invokeAgentSpan: Span | null = null;
   private invokeAgentCtx: Context = ROOT_CONTEXT;
+
+  // cwd captured at session_start; stamped on each invoke_agent span as
+  // pi.session.cwd.
+  private sessionCwd: string | null = null;
 
   // Per-LLM-turn span (gen_ai.chat) — one per LLM API call within a cycle
   private chatSpan: Span | null = null;
@@ -249,7 +252,7 @@ export class PiCodingAgentOtelAdapter {
       // still open when the event loop drains must be ended before the
       // GenAI provider's own beforeExit handler flushes the exporter.
       process.once('beforeExit', () => {
-        this.endSessionSpan();
+        this.endInvokeAgentSpan();
       });
     }
   }
@@ -288,23 +291,11 @@ export class PiCodingAgentOtelAdapter {
   ): void => {
     this.currentModel = ctx.model ?? null;
     this.conversationId = ctx.sessionManager.getSessionId();
-    this.sessionSpan = this.tracer.startSpan(
-      'pi.coding_agent.session',
-      {
-        kind: SpanKind.INTERNAL,
-        attributes: {
-          [ATTR_GEN_AI_AGENT_NAME]: 'pi-coding-agent',
-          [ATTR_PI_SESSION_CWD]: ctx.cwd,
-          [ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId,
-        },
-      },
-      ROOT_CONTEXT
-    );
-    this.sessionCtx = trace.setSpan(ROOT_CONTEXT, this.sessionSpan);
+    this.sessionCwd = ctx.cwd;
   };
 
   private onSessionShutdown = (): void => {
-    this.endSessionSpan();
+    this.endInvokeAgentSpan();
   };
 
   private onModelSelect = (
@@ -335,11 +326,12 @@ export class PiCodingAgentOtelAdapter {
           ...(this.conversationId
             ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
             : {}),
+          ...(this.sessionCwd ? {[ATTR_PI_SESSION_CWD]: this.sessionCwd} : {}),
         },
       },
-      this.sessionCtx
+      ROOT_CONTEXT
     );
-    this.invokeAgentCtx = trace.setSpan(this.sessionCtx, this.invokeAgentSpan);
+    this.invokeAgentCtx = trace.setSpan(ROOT_CONTEXT, this.invokeAgentSpan);
     this.agentInputTokens = 0;
     this.agentOutputTokens = 0;
     this.agentTotalTokens = 0;
@@ -552,7 +544,7 @@ export class PiCodingAgentOtelAdapter {
             : {}),
         },
       },
-      this.sessionCtx
+      ROOT_CONTEXT
     );
     span.end();
   };
@@ -611,15 +603,6 @@ export class PiCodingAgentOtelAdapter {
       this.invokeAgentSpan.end();
       this.invokeAgentSpan = null;
       this.invokeAgentCtx = ROOT_CONTEXT;
-    }
-  }
-
-  private endSessionSpan(): void {
-    this.endInvokeAgentSpan();
-    if (this.sessionSpan) {
-      this.sessionSpan.end();
-      this.sessionSpan = null;
-      this.sessionCtx = ROOT_CONTEXT;
     }
   }
 }
