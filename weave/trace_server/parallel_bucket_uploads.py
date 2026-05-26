@@ -22,6 +22,15 @@ returned rows into the `files` table.
 
 The batch is request-scoped (constructed and discarded per `call_batch`) so
 the staging path needs no locking; only `flush()` spawns workers.
+
+Partial-failure semantics: if a worker raises something other than
+`FileStorageWriteError` (e.g. an unwrapped network error), `as_completed`
+re-raises it and `flush()` returns. Peer workers still complete via the
+`ThreadPoolExecutor.__exit__` join, so their bucket objects may land
+without a corresponding `files` row. On retry, the same `(project_id,
+digest)` triggers `if_generation_match=0 -> PreconditionFailed`, which
+`store_in_bucket` wraps as `FileStorageWriteError`, which falls back to
+inline-CH chunks. End state is content-addressable and consistent.
 """
 
 from __future__ import annotations
@@ -85,9 +94,8 @@ class BucketUploadBatch:
         """True if `(project_id, digest)` was already staged in this batch."""
         return (project_id, digest) in self._seen
 
-    @property
-    def is_empty(self) -> bool:
-        return not self._pending
+    def __bool__(self) -> bool:
+        return bool(self._pending)
 
     @ddtrace.tracer.wrap(name="bucket_upload_batch.flush")
     def flush(self) -> list[FileChunkCreateCHInsertable]:
@@ -119,7 +127,7 @@ def _upload_one(p: _Pending) -> list[FileChunkCreateCHInsertable]:
             p.client, key_for_project_digest(p.req.project_id, p.digest), p.req.content
         )
     except FileStorageWriteError:
-        return _clickhouse_chunks(p.req, p.digest)
+        return file_chunks_for(p.req, p.digest)
     return [
         FileChunkCreateCHInsertable(
             project_id=p.req.project_id,
@@ -134,9 +142,14 @@ def _upload_one(p: _Pending) -> list[FileChunkCreateCHInsertable]:
     ]
 
 
-def _clickhouse_chunks(
+def file_chunks_for(
     req: tsi.FileCreateReq, digest: str
 ) -> list[FileChunkCreateCHInsertable]:
+    """Split a file_create payload into inline ClickHouse chunk rows.
+
+    Shared between the synchronous file_create path and the bucket-upload
+    `FileStorageWriteError` fallback so the chunking shape stays in one place.
+    """
     pieces = [
         req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
         for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)

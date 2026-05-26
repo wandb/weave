@@ -226,7 +226,10 @@ from weave.trace_server.model_providers.model_providers import (
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
-from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
+from weave.trace_server.parallel_bucket_uploads import (
+    BucketUploadBatch,
+    file_chunks_for,
+)
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
@@ -401,7 +404,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._call_batch
             or self._calls_complete_batch
             or self._file_batch
-            or not self._bucket_uploads.is_empty
+            or self._bucket_uploads
         ):
             try:
                 self._flush_all_batches_in_order()
@@ -5890,25 +5893,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
-        chunks = [
-            req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
-            for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
-        ]
-        self._insert_file_chunks(
-            [
-                FileChunkCreateCHInsertable(
-                    project_id=req.project_id,
-                    digest=digest,
-                    chunk_index=i,
-                    n_chunks=len(chunks),
-                    name=req.name,
-                    val_bytes=chunk,
-                    bytes_stored=len(chunk),
-                    file_storage_uri=None,
-                )
-                for i, chunk in enumerate(chunks)
-            ]
-        )
+        self._insert_file_chunks(file_chunks_for(req, digest))
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
@@ -5918,6 +5903,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not self._flush_immediately:
             # Inside call_batch(): stage for the parallel flush at the end so
             # an N-attachment batch pays one fan-out round-trip instead of N.
+            # Per-file FileStorageWriteError fallback to inline-CH chunks is
+            # handled inside _upload_one, not by the caller's except arm.
             self._bucket_uploads.stage(req, digest, client)
             return
         target_file_storage_uri = store_in_bucket(

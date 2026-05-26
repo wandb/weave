@@ -474,9 +474,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
     elapsed = time.monotonic() - start
 
     # Parallelism: 4 uploads * 100ms = 400ms serial bound; the pool defaults
-    # to 8 workers, so a parallel run completes in ~150-300ms.
-    assert gcs.state.concurrent_peak >= 2, (
-        f"expected concurrent uploads, peak={gcs.state.concurrent_peak}"
+    # to 8 workers, so all 4 unique uploads should run concurrently.
+    assert gcs.state.concurrent_peak >= 4, (
+        f"expected 4 concurrent uploads, peak={gcs.state.concurrent_peak}"
     )
     assert elapsed < 0.35, f"flush was effectively serial: {elapsed:.3f}s"
 
@@ -489,14 +489,26 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
 
 @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
 @pytest.mark.disable_logging_error_check
+@pytest.mark.parametrize(
+    "fail_payload_size",
+    [
+        # Single inline-CH chunk fallback (< FILE_CHUNK_SIZE = 100_000).
+        50_000,
+        # Multi-chunk fallback: 250KB content splits into 3 inline-CH chunks,
+        # exercising the chunk_index / n_chunks reassembly on read.
+        250_000,
+    ],
+    ids=["single-chunk-fallback", "multi-chunk-fallback"],
+)
 def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
-    client: WeaveClient, gcs
+    client: WeaveClient, gcs, fail_payload_size: int
 ):
     """When one upload in a batch hits a non-retriable GCS error, the server
     should fall back to inline ClickHouse chunks for that file only; other
     uploads in the same batch keep their bucket URIs, and the whole batch
     still completes. We verify by reading the failed file back through the
-    server's read path — it must reassemble bit-for-bit from CH chunks.
+    server's read path -- it must reassemble bit-for-bit from CH chunks for
+    both single-chunk and multi-chunk payloads.
     """
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
@@ -506,7 +518,7 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
 
     # Upload one file first so we can compute the digest, then inject a
     # failure for that exact GCS key when it's re-uploaded inside the batch.
-    fail_payload = _unique_payload("fail", 50_000)
+    fail_payload = _unique_payload("fail", fail_payload_size)
     probe_res = server.file_create(
         FileCreateReq(
             project_id=client.project_id, name="probe.bin", content=fail_payload
@@ -538,6 +550,8 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     # The failing one is not present in the bucket.
     assert fail_key not in gcs.state.blob_data
     # ...but is readable via the server, because it landed as inline chunks.
+    # For multi-chunk payloads, byte-equality here implicitly verifies that
+    # all chunk_index rows reassembled correctly.
     fallback_read = server.file_content_read(
         FileContentReadReq(project_id=client.project_id, digest=probe_res.digest)
     )
