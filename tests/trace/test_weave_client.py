@@ -3,6 +3,7 @@ import json
 import platform
 import re
 import sys
+import threading
 import time
 import uuid
 
@@ -827,6 +828,62 @@ def test_call_display_name(client):
     assert call0.display_name is None
 
 
+def test_set_display_name_does_not_block_caller(client, no_autoflush):
+    """set_display_name must defer the server PATCH to future_executor.
+
+    Wraps the live server in a gate that blocks `call_update` until released,
+    then asserts the caller returns before the gate opens, that
+    `call.display_name` updates synchronously in-memory, and that the PATCH
+    eventually fires with the elided new name once the gate releases and the
+    executor drains.
+    """
+    gate = threading.Event()
+    seen: list[tsi.CallUpdateReq] = []
+
+    class GatedServer:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def call_update(self, req):
+            seen.append(req)
+            gate.wait(timeout=5.0)
+            return self._inner.call_update(req)
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    real_server = client.server
+    call = client.create_call("x", {"a": 1})
+    client.flush()  # drain start_call before installing the gate
+
+    client.server = GatedServer(real_server)
+    try:
+        start = time.perf_counter()
+        call.set_display_name("new_name")
+        caller_elapsed = time.perf_counter() - start
+
+        # Caller did not block on the PATCH; the closure is queued on the
+        # future_executor and the gated call_update is still waiting.
+        assert caller_elapsed < 1.0, (
+            f"set_display_name blocked caller for {caller_elapsed:.2f}s; "
+            "expected near-instant return (deferred via future_executor)"
+        )
+        # In-memory display_name is updated synchronously so user code that
+        # reads call.display_name right after the set sees the new value.
+        assert call.display_name == "new_name"
+
+        # Release the gate and drain the executor; the PATCH should now land
+        # with the elided new name.
+        gate.set()
+        client.flush()
+        assert len(seen) == 1
+        assert seen[0].call_id == call.id
+        assert seen[0].display_name == "new_name"
+    finally:
+        gate.set()
+        client.server = real_server
+
+
 def test_dataset_calls(client):
     rows = [{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]
     op_name = ""
@@ -1106,7 +1163,7 @@ def test_dataset_rows_ref(client):
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 @pytest.mark.asyncio
-async def test_evaluate(client):
+async def test_evaluate(weave_active):
     @weave.op
     async def model_predict(input) -> str:
         return eval(input)
@@ -1386,7 +1443,7 @@ def test_isinstance_checks(client):
     assert y3 is None
 
 
-def test_summary_tokens(client):
+def test_summary_tokens(weave_active):
     @weave.op
     def model_a(text):
         result = "a: " + text
@@ -1433,7 +1490,7 @@ def test_summary_tokens(client):
 
 
 @pytest.mark.skip("descendent error tracking disabled until we fix UI")
-def test_summary_descendents(client):
+def test_summary_descendents(weave_active):
     @weave.op
     def model_a(text):
         return "a: " + text
@@ -1516,7 +1573,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     test_settings = settings.UserSettings(
         use_parallel_table_upload=use_parallel_table_upload
     )
-    settings.parse_and_apply_settings(test_settings)
+    settings.replace_settings(test_settings)
 
     num_rows = 16
     rows = list(row_gen(num_rows, 1024))
@@ -2019,7 +2076,7 @@ def test_object_version_read(client):
 
 
 @pytest.mark.asyncio
-async def test_op_calltime_display_name(client):
+async def test_op_calltime_display_name(weave_active):
     @weave.op
     def my_op(a: int) -> int:
         return a
@@ -2040,7 +2097,7 @@ async def test_op_calltime_display_name(client):
     assert call.display_name == "custom_display_name"
 
 
-def test_long_display_names_are_elided(client):
+def test_long_display_names_are_elided(weave_active):
     @weave.op(call_display_name="a" * 2048)
     def func():
         pass
@@ -2118,7 +2175,7 @@ def test_object_deletion(client):
     assert len(versions.objs) == 0
 
 
-def test_recursive_object_deletion(client):
+def test_recursive_object_deletion(weave_active):
     # Create a bunch of objects that refer to each other
     obj1 = {"a": 5}
     obj1_ref = weave.publish(obj1, "obj1")
@@ -2148,7 +2205,7 @@ def test_recursive_object_deletion(client):
     assert obj3_ref.get() == {"c": obj2}
 
 
-def test_delete_op_version(client):
+def test_delete_op_version(weave_active):
     @weave.op
     def my_op(a: int) -> int:
         return a
@@ -4152,7 +4209,7 @@ def test_parallel_table_uploads_digest_consistency(
     test_settings = settings.UserSettings(
         use_parallel_table_upload=use_parallel_table_upload
     )
-    settings.parse_and_apply_settings(test_settings)
+    settings.replace_settings(test_settings)
 
     # Set up the mock before creating the client
     # We'll use a mutable container to control the chunk size dynamically

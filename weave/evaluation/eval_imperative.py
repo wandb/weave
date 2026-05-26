@@ -689,10 +689,10 @@ class EvaluationLogger:
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
     ) -> None:
-        eval_meta = {}
-        if "_eval_meta" in self.__dict__:
-            eval_meta = self.__dict__["_eval_meta"]
-        self._eval_meta = {**eval_meta, **IMPERATIVE_EVAL_META_MARKER}
+        self._eval_meta = {
+            **(self._client_eval_meta or {}),
+            **IMPERATIVE_EVAL_META_MARKER,
+        }
 
         self.name = name
         self.scorers = scorers
@@ -801,6 +801,10 @@ class EvaluationLogger:
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
 
+    # Pre-seeded by _create_with_meta() to inject caller-provided fields into
+    # _eval_meta during __init__.
+    _client_eval_meta: dict[str, Any] | None = None
+
     @classmethod
     def _create_with_meta(
         cls,
@@ -818,7 +822,7 @@ class EvaluationLogger:
         Note: Semi-internal; used by wandb/wandb SDK.
         """
         instance = cls.__new__(cls)
-        instance._eval_meta = eval_meta
+        instance._client_eval_meta = eval_meta
         EvaluationLogger.__init__(
             instance,
             name=name,

@@ -1,4 +1,4 @@
--- Migration 031: Add bloom filter index on ifNull(trace_id, '') to
+-- Migration 032: Add bloom filter index on ifNull(trace_id, '') to
 -- accelerate trace-scoped lookups (e.g. fetching every call in a trace).
 --
 -- trace_id values are random (UUIDs / OTel trace IDs), so the table's

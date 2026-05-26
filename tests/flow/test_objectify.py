@@ -41,7 +41,7 @@ def obj(request):
         return weave.EasyPrompt("Hello world!")
 
 
-def test_ref_get(client, obj):
+def test_ref_get(weave_active, obj):
     ref = weave.publish(obj)
 
     obj_cls = type(obj)
@@ -121,7 +121,7 @@ def resolve_ref_futures(ref: RefWithExtra) -> RefWithExtra:
     return ref
 
 
-def test_drill_down_dataset_refs_same_after_publishing(client):
+def test_drill_down_dataset_refs_same_after_publishing(weave_active):
     ds = weave.Dataset(
         name="test",
         rows=[{"a": {"b": 1}}, {"a": {"b": 2}}, {"a": {"b": 3}}],

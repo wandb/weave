@@ -10,7 +10,7 @@ import weave
 
 
 @pytest.fixture
-def flask_server(client):
+def flask_server(weave_active):
     app = Flask(__name__)
     server_port = 6789
     host = "127.0.0.1"
@@ -41,7 +41,7 @@ def test_flask_server(flask_server):
     assert response.text == "FkWFKCRcl9wsGp3yclN7v1IIAICTPenpZYrWo0otI4Y"
 
 
-def test_weave_client_global_accessible_in_thread(client):
+def test_weave_client_global_accessible_in_thread(weave_active):
     def thread_func(q: queue.Queue):
         try:
             d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])

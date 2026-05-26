@@ -48,7 +48,8 @@ class TestMakeProjectStatsQuery:
                     COALESCE(attributes_size_bytes, 0) +
                     COALESCE(inputs_size_bytes, 0) +
                     COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0)
+                    COALESCE(summary_size_bytes, 0) +
+                    COALESCE(otel_dump_size_bytes, 0)
                     )
                     FROM calls_merged_stats
                     WHERE project_id = {pb_0: String}
@@ -76,7 +77,8 @@ class TestMakeProjectStatsQuery:
                     COALESCE(attributes_size_bytes, 0) +
                     COALESCE(inputs_size_bytes, 0) +
                     COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0)
+                    COALESCE(summary_size_bytes, 0) +
+                    COALESCE(otel_size_bytes, 0)
                     )
                     FROM calls_complete_stats
                     WHERE project_id = {pb_0: String}
@@ -170,7 +172,8 @@ class TestMakeProjectStatsQuery:
                     COALESCE(attributes_size_bytes, 0) +
                     COALESCE(inputs_size_bytes, 0) +
                     COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0)
+                    COALESCE(summary_size_bytes, 0) +
+                    COALESCE(otel_dump_size_bytes, 0)
                     )
                     FROM calls_merged_stats
                     WHERE project_id = {pb_0: String}
@@ -215,7 +218,8 @@ class TestMakeProjectStatsQuery:
                     COALESCE(attributes_size_bytes, 0) +
                     COALESCE(inputs_size_bytes, 0) +
                     COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0)
+                    COALESCE(summary_size_bytes, 0) +
+                    COALESCE(otel_size_bytes, 0)
                     )
                     FROM calls_complete_stats
                     WHERE project_id = {pb_0: String}
@@ -272,7 +276,8 @@ class TestMakeProjectStatsQuery:
                     COALESCE(attributes_size_bytes, 0) +
                     COALESCE(inputs_size_bytes, 0) +
                     COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0)
+                    COALESCE(summary_size_bytes, 0) +
+                    COALESCE(otel_dump_size_bytes, 0)
                     )
                     FROM calls_merged_stats
                     WHERE project_id = {pb_0: String}
@@ -283,6 +288,33 @@ class TestMakeProjectStatsQuery:
         assert_sql(
             query, expected_sql, pb.get_params(), {"pb_0": "malicious'--project"}
         )
+
+    def test_trace_storage_includes_otel_bytes_regression(self) -> None:
+        """trace_storage_size_bytes must sum OTEL bytes for both stats tables.
+
+        Dropping OTEL underreports project storage (the calls_merged_stats column
+        is `otel_dump_size_bytes`, calls_complete_stats is `otel_size_bytes`).
+        """
+        for read_table, expected_otel_col, other_otel_col in [
+            (ReadTable.CALLS_MERGED, "otel_dump_size_bytes", "otel_size_bytes"),
+            (ReadTable.CALLS_COMPLETE, "otel_size_bytes", "otel_dump_size_bytes"),
+        ]:
+            pb = ParamBuilder("pb")
+            query, _ = make_project_stats_query(
+                project_id="test_project",
+                pb=pb,
+                include_trace_storage_size=True,
+                include_objects_storage_size=False,
+                include_tables_storage_size=False,
+                include_files_storage_size=False,
+                read_table=read_table,
+            )
+            assert f"COALESCE({expected_otel_col}, 0)" in query, (
+                f"trace_storage sum missing OTEL bytes for {read_table}"
+            )
+            assert other_otel_col not in query, (
+                f"wrong OTEL column {other_otel_col} used for {read_table}"
+            )
 
     def test_only_objects_storage_with_calls_complete(self) -> None:
         """Verify non-trace storage works without including calls stats table."""

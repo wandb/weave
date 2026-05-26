@@ -1,7 +1,7 @@
 import weave
 
 
-def test_dictifiable(client):
+def test_dictifiable(weave_active):
     class NonDictifiable:  # noqa: B903
         attr: int
 
