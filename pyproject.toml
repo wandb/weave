@@ -470,7 +470,7 @@ test = [
 
   # Integration Tests
   "pytest-recording>=0.13.2",
-  "vcrpy>=7.0.0; platform_python_implementation != 'PyPy'",
+  "vcrpy>=8.0.0; platform_python_implementation != 'PyPy'",
 
   # serving tests
   "flask",
