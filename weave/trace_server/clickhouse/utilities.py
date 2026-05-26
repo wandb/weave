@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from typing import Any, TypeVar, cast
 
 import ddtrace
+import orjson
 import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
@@ -106,29 +107,50 @@ def sanitize_invalid_utf8_surrogates(value: T) -> T:
     return value
 
 
+# orjson is 5-10x faster than stdlib json on the nested dicts trace data produces,
+# but it is stricter: it rejects NaN/Infinity and non-string dict keys that stdlib
+# tolerates. Fall back to stdlib on TypeError so callers see the same contract as
+# before, and so reads of historical rows containing NaN/Infinity literals still work.
+_ORJSON_DUMPS_OPTS = orjson.OPT_NON_STR_KEYS
+
+
+def _orjson_dumps(value: Any) -> str:
+    try:
+        return orjson.dumps(value, option=_ORJSON_DUMPS_OPTS).decode("utf-8")
+    except TypeError:
+        return json.dumps(value)
+
+
+def _orjson_loads(val: str) -> Any:
+    try:
+        return orjson.loads(val)
+    except orjson.JSONDecodeError:
+        return json.loads(val)
+
+
 def dict_value_to_dump(
     value: dict,
 ) -> str:
     if not isinstance(value, dict):
         raise TypeError(f"Value is not a dict: {value}")
-    return json.dumps(value)
+    return _orjson_dumps(value)
 
 
 def any_value_to_dump(
     value: Any,
 ) -> str:
-    return json.dumps(value)
+    return _orjson_dumps(value)
 
 
 def dict_dump_to_dict(val: str) -> dict[str, Any]:
-    res = json.loads(val)
+    res = _orjson_loads(val)
     if not isinstance(res, dict):
         raise TypeError(f"Value is not a dict: {val}")
     return res
 
 
 def any_dump_to_any(val: str) -> Any:
-    return json.loads(val)
+    return _orjson_loads(val)
 
 
 def nullable_any_dump_to_any(
