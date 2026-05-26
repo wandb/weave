@@ -18,6 +18,9 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
+from weave.trace_server import (
+    clickhouse_trace_server_settings as ch_settings,
+)
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
@@ -268,8 +271,6 @@ def _disable_query_condition_cache() -> None:
     # CH's query condition cache and returns wrong counts on subsequent reads.
     # Force-off the setting for the test session by mutating the trace server's
     # default settings dicts in place. Every query path goes through these.
-    from weave.trace_server import clickhouse_trace_server_settings as ch_settings
-
     ch_settings.CLICKHOUSE_BASE_QUERY_SETTINGS["use_query_condition_cache"] = 0
     ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS["use_query_condition_cache"] = 0
 
