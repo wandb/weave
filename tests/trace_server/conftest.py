@@ -260,6 +260,20 @@ def _ch_session_server(
         pass
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _disable_query_condition_cache() -> None:
+    # TODO: remove once https://github.com/ClickHouse/ClickHouse/issues/104781 ships.
+    # The bloom-filter CTE on calls_merged matches the trigger shape (PREWHERE
+    # pk-prefix + WHERE non-pk equality on a skip-indexed column) that poisons
+    # CH's query condition cache and returns wrong counts on subsequent reads.
+    # Force-off the setting for the test session by mutating the trace server's
+    # default settings dicts in place. Every query path goes through these.
+    from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+
+    ch_settings.CLICKHOUSE_BASE_QUERY_SETTINGS["use_query_condition_cache"] = 0
+    ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS["use_query_condition_cache"] = 0
+
+
 @pytest.fixture
 def get_ch_trace_server(
     _ch_session_server: ClickHouseSessionState | None,
