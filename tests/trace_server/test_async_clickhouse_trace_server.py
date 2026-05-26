@@ -13,6 +13,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_clickhouse_trace_server import (
     AsyncClickHouseTraceServer,
 )
+from weave.trace_server.clickhouse_trace_server_batched import CompletionPrepResult
 from weave.trace_server.datadog import _db_insert_path
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
@@ -23,6 +24,7 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 LITELLM_ACOMPLETION_PATCH = (
     "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion"
 )
+CONCURRENT_LLM_CALL_TARGET = 50
 
 
 def _make_req(
@@ -42,16 +44,36 @@ def _make_req(
     )
 
 
+@pytest.fixture
+def _mock_secret_fetcher() -> AsyncIterator[MagicMock]:
+    # Async fixtures + ContextVars don't mix under pytest-asyncio: the
+    # fixture's task context is separate from the test's, and
+    # `asyncio.to_thread` snapshots the test task's context — so a fetcher
+    # set inside the fixture is invisible on the executor thread. Patch the
+    # module-level bindings every reader (`clickhouse_trace_server_batched`
+    # and `llm_completion`) imports from `secret_fetcher_context` instead.
+    mock = MagicMock()
+    mock.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "k"}}
+    fake_var = MagicMock()
+    fake_var.get.return_value = mock
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched._secret_fetcher_context",
+            fake_var,
+        ),
+        patch(
+            "weave.trace_server.llm_completion._secret_fetcher_context",
+            fake_var,
+        ),
+    ):
+        yield mock
+
+
 @pytest_asyncio.fixture
-async def server() -> AsyncIterator[AsyncClickHouseTraceServer]:
-    srv = AsyncClickHouseTraceServer(host="test_host")
-    mock_secret_fetcher = MagicMock()
-    mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "k"}}
-    token = _secret_fetcher_context.set(mock_secret_fetcher)
-    try:
-        yield srv
-    finally:
-        _secret_fetcher_context.reset(token)
+async def server(
+    _mock_secret_fetcher: MagicMock,
+) -> AsyncIterator[AsyncClickHouseTraceServer]:
+    yield AsyncClickHouseTraceServer(host="test_host")
 
 
 @pytest.mark.asyncio
@@ -82,7 +104,8 @@ async def test_tracking_routes_through_log_completion_call(
         res = await server.acompletions_create(_make_req(track_llm_call=True))
     assert res.weave_call_id == "call-xyz"
     assert log_mock.call_count == 1
-    forwarded_res = log_mock.call_args.args[3]
+    # signature is (req, prep, res, start_time, end_time)
+    forwarded_res = log_mock.call_args.args[2]
     assert forwarded_res is llm_res
 
 
@@ -122,9 +145,11 @@ async def test_prep_runs_off_the_event_loop_thread(
     loop_thread_id = threading.get_ident()
     captured = {"thread_id": None}
 
-    def _capture_prep(req: object) -> tuple[list, object]:
+    def _capture_prep(req: object) -> CompletionPrepResult:
         captured["thread_id"] = threading.get_ident()
-        return ([{"role": "user", "content": "hi"}], MagicMock(api_key="k"))
+        return CompletionPrepResult(
+            [{"role": "user", "content": "hi"}], MagicMock(api_key="k")
+        )
 
     with (
         patch.object(server, "_prepare_completion_request", side_effect=_capture_prep),
@@ -139,58 +164,66 @@ async def test_prep_runs_off_the_event_loop_thread(
 
 
 @pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
     ("model", "prompt"),
     [
         ("custom::myprovider::mymodel", None),
-        ("gpt-4o-mini", "weave:///p/o/prompt:v1"),
+        ("gpt-4o-mini", "my_prompt:v1"),
     ],
     ids=["custom_provider", "prompt_request"],
 )
-async def test_blocking_prep_shapes_complete_via_to_thread(
+async def test_real_prep_blocking_calls_run_off_loop(
     server: AsyncClickHouseTraceServer,
     model: str,
     prompt: str | None,
 ) -> None:
-    # Requests that force obj_read inside prep (custom:: provider, prompt
-    # resolution) must complete end-to-end on the async path, not error out.
-    # Verified by stubbing prep to a known result and asserting we reach
-    # litellm and return the final response.
-    prep_result = ([{"role": "user", "content": "hi"}], MagicMock(api_key="k"))
+    # The async path's correctness rests on prep's blocking I/O (`self.obj_read`)
+    # running off-loop. Two real-world shapes force obj_read inside prep:
+    # (1) custom:: provider lookup, (2) prompt resolution. Stub obj_read to
+    # capture the executing thread id and short-circuit prep, then assert
+    # obj_read actually ran on a non-loop thread — proving asyncio.to_thread
+    # wrapped real prep, not just a stub.
+    loop_tid = threading.get_ident()
+    obj_read_tids: list[int] = []
+
+    def _stub_obj_read(_req: object) -> tsi.ObjReadRes:
+        obj_read_tids.append(threading.get_ident())
+        # Short-circuiting via exception is fine: prep catches it and returns
+        # a CompletionsCreateRes error response (see _prepare_completion_request).
+        raise RuntimeError("intentional - test only proves off-loop execution")
+
+    acompletion = AsyncMock()
     with (
-        patch.object(server, "_prepare_completion_request", return_value=prep_result),
-        patch(
-            LITELLM_ACOMPLETION_PATCH,
-            new=AsyncMock(
-                return_value=tsi.CompletionsCreateRes(response={"choices": []})
-            ),
-        ) as acompletion,
+        patch.object(server, "obj_read", side_effect=_stub_obj_read),
+        patch(LITELLM_ACOMPLETION_PATCH, new=acompletion),
     ):
         res = await server.acompletions_create(
             _make_req(track_llm_call=False, model=model, prompt=prompt)
         )
 
-    assert res.response == {"choices": []}
-    assert acompletion.await_count == 1
+    assert obj_read_tids, "obj_read was never called - prep did not exercise blocking shape"
+    assert all(tid != loop_tid for tid in obj_read_tids)
+    # prep returned a short-circuit error response, litellm was never invoked.
+    assert "error" in res.response
+    assert acompletion.await_count == 0
 
 
 @pytest.mark.asyncio
-async def test_log_completion_call_runs_on_executor_thread() -> None:
+async def test_log_completion_call_runs_on_executor_thread(
+    _mock_secret_fetcher: MagicMock,
+) -> None:
     # The whole point of the async path: CH insert hops to the executor so the
     # loop thread is free during the LLM wait. Assert _log_completion_call
     # actually executes on a thread from ch_executor, not the caller's thread.
     ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
     srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
-    mock_secret_fetcher = MagicMock()
-    mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "k"}}
-    token = _secret_fetcher_context.set(mock_secret_fetcher)
     caller_thread_id = threading.get_ident()
     observed = {"thread_id": None, "thread_name": None, "path": None}
 
     def _capture_log(
         req: object,
-        completion_model_info: object,
-        initial_messages: object,
+        prep: object,
         res: object,
         start_time: object,
         end_time: object,
@@ -218,18 +251,16 @@ async def test_log_completion_call_runs_on_executor_thread() -> None:
         # path tag must be visible on the executor thread.
         assert observed["path"] == "completions_create"
     finally:
-        _secret_fetcher_context.reset(token)
         ch_executor.shutdown(wait=True)
 
 
 @pytest.mark.asyncio
-async def test_many_in_flight_with_one_thread_ch_executor() -> None:
+async def test_many_in_flight_with_one_thread_ch_executor(
+    _mock_secret_fetcher: MagicMock,
+) -> None:
     """A 1-thread CH executor must not gate LLM-call concurrency."""
     ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="test-ch")
     srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
-    mock_secret_fetcher = MagicMock()
-    mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "k"}}
-    token = _secret_fetcher_context.set(mock_secret_fetcher)
     try:
         peak = {"in_flight": 0, "current": 0}
         entry_event = asyncio.Event()
@@ -238,7 +269,7 @@ async def test_many_in_flight_with_one_thread_ch_executor() -> None:
         async def slow_llm(**_kwargs: object) -> tsi.CompletionsCreateRes:
             peak["current"] += 1
             peak["in_flight"] = max(peak["in_flight"], peak["current"])
-            if peak["current"] >= 50:
+            if peak["current"] >= CONCURRENT_LLM_CALL_TARGET:
                 entry_event.set()
             await release_event.wait()
             peak["current"] -= 1
@@ -249,15 +280,40 @@ async def test_many_in_flight_with_one_thread_ch_executor() -> None:
                 asyncio.create_task(
                     srv.acompletions_create(_make_req(track_llm_call=False))
                 )
-                for _ in range(50)
+                for _ in range(CONCURRENT_LLM_CALL_TARGET)
             ]
             await asyncio.wait_for(entry_event.wait(), timeout=5)
-            assert peak["in_flight"] == 50
+            assert peak["in_flight"] == CONCURRENT_LLM_CALL_TARGET
             release_event.set()
             await asyncio.gather(*tasks)
     finally:
-        _secret_fetcher_context.reset(token)
         ch_executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_acompletion_propagates(
+    server: AsyncClickHouseTraceServer,
+) -> None:
+    # Codifies the docstring claim: cancelling the asyncio task while we're
+    # parked inside `await lite_llm_acompletion(...)` raises CancelledError
+    # out of acompletions_create. This is the only branch where cancellation
+    # is meaningful — prep and the CH insert run on threads and aren't
+    # cancellable mid-execution.
+    entered = asyncio.Event()
+
+    async def _hanging_llm(**_kwargs: object) -> tsi.CompletionsCreateRes:
+        entered.set()
+        await asyncio.sleep(60)
+        return tsi.CompletionsCreateRes(response={"ok": True})  # pragma: no cover
+
+    with patch(LITELLM_ACOMPLETION_PATCH, new=_hanging_llm):
+        task = asyncio.create_task(
+            server.acompletions_create(_make_req(track_llm_call=False))
+        )
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
 
 
 class _IdentityConverter(IdConverter):

@@ -3,6 +3,7 @@
 import asyncio
 import contextvars
 import datetime
+from collections.abc import Callable
 from concurrent.futures import Executor
 
 from weave.trace_server import trace_server_interface as tsi
@@ -43,6 +44,21 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         )
         self._ch_executor: Executor | None = ch_executor
 
+    async def _run_ch_insert(
+        self,
+        fn: Callable[..., tsi.CompletionsCreateRes],
+        *args: object,
+    ) -> tsi.CompletionsCreateRes:
+        # contextvars don't cross run_in_executor, so we copy here. Any future
+        # async method that hands off to ch_executor MUST go through this
+        # helper, otherwise `@tag_db_insert_path` tags are silently lost on
+        # the executor thread.
+        ctx = contextvars.copy_context()
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            self._ch_executor, lambda: ctx.run(fn, *args)
+        )
+
     @tag_db_insert_path("completions_create")
     async def acompletions_create(
         self, req: tsi.CompletionsCreateReq
@@ -51,32 +67,19 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         prep = await asyncio.to_thread(self._prepare_completion_request, req)
         if isinstance(prep, tsi.CompletionsCreateRes):
             return prep
-        initial_messages, completion_model_info = prep
 
+        info = prep.completion_model_info
         start_time = datetime.datetime.now()
         res = await lite_llm_acompletion(
-            api_key=completion_model_info.api_key,
+            api_key=info.api_key,
             inputs=req.inputs,
-            provider=completion_model_info.provider,
-            base_url=completion_model_info.base_url,
-            extra_headers=completion_model_info.extra_headers,
-            vertex_credentials=completion_model_info.vertex_credentials,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            vertex_credentials=info.vertex_credentials,
         )
         end_time = datetime.datetime.now()
 
-        # ContextVars don't cross run_in_executor; copy so _db_insert_path tags survive.
-        ctx = contextvars.copy_context()
-
-        def _log_in_ctx() -> tsi.CompletionsCreateRes:
-            return ctx.run(
-                self._log_completion_call,
-                req,
-                completion_model_info,
-                initial_messages,
-                res,
-                start_time,
-                end_time,
-            )
-
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self._ch_executor, _log_in_ctx)
+        return await self._run_ch_insert(
+            self._log_completion_call, req, prep, res, start_time, end_time
+        )

@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from re import sub
-from typing import Any, TypeVar, cast
+from typing import Any, NamedTuple, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -6272,7 +6272,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _prepare_completion_request(
         self, req: tsi.CompletionsCreateReq
-    ) -> "tuple[list[dict[str, Any]], CompletionModelInfo] | tsi.CompletionsCreateRes":
+    ) -> "CompletionPrepResult | tsi.CompletionsCreateRes":
         """Resolve prompt + model info, or return a short-circuit error response."""
         # --- Resolve prompt if provided and set messages
         prompt = getattr(req.inputs, "prompt", None)
@@ -6308,13 +6308,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except Exception as e:
             return tsi.CompletionsCreateRes(response={"error": str(e)})
 
-        return initial_messages, completion_model_info
+        return CompletionPrepResult(initial_messages, completion_model_info)
 
     def _log_completion_call(
         self,
         req: tsi.CompletionsCreateReq,
-        completion_model_info: "CompletionModelInfo",
-        initial_messages: list[dict[str, Any]],
+        prep: "CompletionPrepResult",
         res: tsi.CompletionsCreateRes,
         start_time: datetime.datetime,
         end_time: datetime.datetime,
@@ -6329,11 +6328,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
-        req.inputs.messages = initial_messages
+        req.inputs.messages = prep.initial_messages
         call_id = generate_id()
         trace_id = req.trace_id or generate_id()
         parent_id = req.parent_id
-        model_name = completion_model_info.model_name
+        model_name = prep.completion_model_info.model_name
 
         # Build summary with usage info if available
         summary: tsi.SummaryInsertMap = {}
@@ -6413,26 +6412,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prep = self._prepare_completion_request(req)
         if isinstance(prep, tsi.CompletionsCreateRes):
             return prep
-        initial_messages, completion_model_info = prep
 
-        # Now that we have all the fields for both cases, we can make the API call
+        info = prep.completion_model_info
         start_time = datetime.datetime.now()
-
-        # Make the API call
         res = lite_llm_completion(
-            api_key=completion_model_info.api_key,
+            api_key=info.api_key,
             inputs=req.inputs,
-            provider=completion_model_info.provider,
-            base_url=completion_model_info.base_url,
-            extra_headers=completion_model_info.extra_headers,
-            vertex_credentials=completion_model_info.vertex_credentials,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            vertex_credentials=info.vertex_credentials,
         )
-
         end_time = datetime.datetime.now()
 
-        return self._log_completion_call(
-            req, completion_model_info, initial_messages, res, start_time, end_time
-        )
+        return self._log_completion_call(req, prep, res, start_time, end_time)
 
     # -------------------------------------------------------------------
     # Streaming variant
@@ -7494,6 +7487,16 @@ class CompletionModelInfo:
     extra_headers: dict[str, str]
     return_type: str | None
     vertex_credentials: str | None = None
+
+
+class CompletionPrepResult(NamedTuple):
+    """Output of `_prepare_completion_request` shared by sync + async paths.
+
+    Named so a future field reorder is a type error, not a silent positional bug.
+    """
+
+    initial_messages: list[dict[str, Any]]
+    completion_model_info: CompletionModelInfo
 
 
 def _setup_completion_model_info(
