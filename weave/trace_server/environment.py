@@ -492,6 +492,25 @@ def wf_file_storage_project_ramp_pct() -> int | None:
     return pct
 
 
+def wf_byob_resolver_enabled() -> bool:
+    """Whether the per-project BYOB storage resolver is enabled."""
+    return os.environ.get("WF_BYOB_RESOLVER_ENABLED", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def wf_byob_gorilla_base_url() -> str | None:
+    """Base URL of the gorilla service hosting the BYOB resolve endpoint."""
+    return os.environ.get("WF_BYOB_GORILLA_BASE_URL")
+
+
+def wf_byob_gorilla_service_token() -> str | None:
+    """Bearer token weave-trace presents to the gorilla resolve endpoint."""
+    return os.environ.get("WF_BYOB_GORILLA_SERVICE_TOKEN")
+
+
 # Inference Service Settings
 
 
