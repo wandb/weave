@@ -46,12 +46,13 @@ const model = weave.op(async function myModel(input) {
 async function main() {
   await weave.init('examples');
   const ds = new weave.Dataset({
-    id: 'Fruit Dataset',
+    name: 'Fruit Dataset',
     rows: examples,
   });
   const evaluation = new weave.Evaluation({
     dataset: ds,
     scorers: [
+      // @ts-ignore
       weave.op(function fruitEqual({modelOutput, datasetRow}) {
         return {
           correct: modelOutput.fruit == datasetRow.target.fruit,

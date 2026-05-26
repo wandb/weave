@@ -7,6 +7,8 @@ We should never be breaking the user's program with an error.
 
 from __future__ import annotations
 
+import gc
+import weakref
 from collections import Counter
 from unittest.mock import MagicMock
 
@@ -14,6 +16,7 @@ import pytest
 
 import weave
 from tests.trace.util import DummyTestException
+from weave.trace import weave_client
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.op import _add_accumulator
@@ -29,7 +32,7 @@ def reset_call_context():
     call_context._call_stack.reset(token)
 
 
-def test_resilience_to_user_code_errors(client):
+def test_resilience_to_user_code_errors(weave_active):
     def do_test():
         @weave.op
         def throws():
@@ -81,8 +84,50 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     }
 
 
+class _Blob(weave.Object):
+    data: str
+
+
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_output_handler_errors(client, log_collector):
+@pytest.mark.parametrize(
+    "make_obj",
+    [
+        pytest.param(lambda: _Blob(data="X" * 4096), id="pydantic-object"),
+        pytest.param(
+            lambda: weave_client.Table([{"v": "X" * 256} for _ in range(16)]),
+            id="table",
+        ),
+    ],
+)
+def test_resilience_to_obj_create_failure_does_not_pin_payload(
+    client_with_throwing_server, make_obj
+):
+    """A failed save must release the user's object for GC.
+
+    Before WB-31070, the failed `digest_future` stayed attached to the
+    user's object via `obj.ref._digest`. The future's exception traceback
+    retains the serialized payload via frame locals, pinning the object
+    for its lifetime. Covers both the pydantic `client.save()` path and
+    the `_save_table` path, which share the same shape.
+    """
+    obj = make_obj()
+    obj_weak = weakref.ref(obj)
+
+    try:
+        client_with_throwing_server.save(obj, name="payload")
+    except Exception:
+        pass
+    client_with_throwing_server.future_executor.flush()
+
+    assert obj.ref is None
+
+    del obj
+    gc.collect()
+    assert obj_weak() is None
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_output_handler_errors(weave_active, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -113,7 +158,7 @@ def test_resilience_to_output_handler_errors(client, log_collector):
 
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
-async def test_resilience_to_output_handler_errors_async(client, log_collector):
+async def test_resilience_to_output_handler_errors_async(weave_active, log_collector):
     async def do_test():
         @weave.op
         async def simple_op():
@@ -143,7 +188,7 @@ async def test_resilience_to_output_handler_errors_async(client, log_collector):
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector):
+def test_resilience_to_accumulator_make_accumulator_errors(weave_active, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -176,7 +221,7 @@ def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_make_accumulator_errors_async(
-    client, log_collector
+    weave_active, log_collector
 ):
     async def do_test():
         @weave.op
@@ -210,7 +255,7 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
+def test_resilience_to_accumulator_accumulation_errors(weave_active, log_collector):
     def do_test():
         @weave.op
         def simple_op():
@@ -247,7 +292,7 @@ def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_accumulation_errors_async(
-    client, log_collector
+    weave_active, log_collector
 ):
     async def do_test():
         @weave.op
@@ -285,7 +330,9 @@ async def test_resilience_to_accumulator_accumulation_errors_async(
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_accumulator_should_accumulate_errors(client, log_collector):
+def test_resilience_to_accumulator_should_accumulate_errors(
+    weave_active, log_collector
+):
     def do_test():
         @weave.op
         def simple_op():
@@ -327,7 +374,7 @@ def test_resilience_to_accumulator_should_accumulate_errors(client, log_collecto
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_should_accumulate_errors_async(
-    client, log_collector
+    weave_active, log_collector
 ):
     async def do_test():
         @weave.op
@@ -377,7 +424,7 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_accumulator_on_finish_post_processor_errors(
-    client, log_collector
+    weave_active, log_collector
 ):
     def do_test():
         @weave.op
@@ -422,7 +469,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
-    client, log_collector
+    weave_active, log_collector
 ):
     async def do_test():
         @weave.op
@@ -466,7 +513,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
         assert log.msg.startswith("Error capturing call output")
 
 
-def test_resilience_to_accumulator_internal_errors(client):
+def test_resilience_to_accumulator_internal_errors(weave_active):
     def do_test():
         @weave.op(accumulator=lambda *args, **kwargs: {})
         def simple_op():
@@ -488,7 +535,7 @@ def test_resilience_to_accumulator_internal_errors(client):
 
 
 @pytest.mark.asyncio
-async def test_resilience_to_accumulator_internal_errors_async(client):
+async def test_resilience_to_accumulator_internal_errors_async(weave_active):
     async def do_test():
         @weave.op(accumulator=lambda *args, **kwargs: {})
         async def simple_op():
@@ -533,7 +580,7 @@ def _bad_finish_handler(call, output, exception):
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_postprocess_inputs_errors(client, log_collector):
+def test_resilience_to_postprocess_inputs_errors(weave_active, log_collector):
     """Test that errors in postprocess_inputs don't crash the user's program."""
 
     @weave.op(postprocess_inputs=_bad_postprocess_inputs)
@@ -551,7 +598,9 @@ def test_resilience_to_postprocess_inputs_errors(client, log_collector):
 
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
-async def test_resilience_to_postprocess_inputs_errors_async(client, log_collector):
+async def test_resilience_to_postprocess_inputs_errors_async(
+    weave_active, log_collector
+):
     """Test that errors in postprocess_inputs don't crash async ops."""
 
     @weave.op(postprocess_inputs=_bad_postprocess_inputs)
@@ -568,7 +617,7 @@ async def test_resilience_to_postprocess_inputs_errors_async(client, log_collect
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_postprocess_output_errors(client, log_collector):
+def test_resilience_to_postprocess_output_errors(weave_active, log_collector):
     """Test that errors in postprocess_output don't crash the user's program."""
 
     @weave.op(postprocess_output=_bad_postprocess_output)
@@ -586,7 +635,9 @@ def test_resilience_to_postprocess_output_errors(client, log_collector):
 
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
-async def test_resilience_to_postprocess_output_errors_async(client, log_collector):
+async def test_resilience_to_postprocess_output_errors_async(
+    weave_active, log_collector
+):
     """Test that errors in postprocess_output don't crash async ops."""
 
     @weave.op(postprocess_output=_bad_postprocess_output)
@@ -603,7 +654,7 @@ async def test_resilience_to_postprocess_output_errors_async(client, log_collect
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_call_display_name_errors(client, log_collector):
+def test_resilience_to_call_display_name_errors(weave_active, log_collector):
     """Test that errors in call_display_name callable don't crash the user's program."""
 
     @weave.op(call_display_name=_bad_display_name)
@@ -621,7 +672,9 @@ def test_resilience_to_call_display_name_errors(client, log_collector):
 
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
-async def test_resilience_to_call_display_name_errors_async(client, log_collector):
+async def test_resilience_to_call_display_name_errors_async(
+    weave_active, log_collector
+):
     """Test that errors in call_display_name callable don't crash async ops."""
 
     @weave.op(call_display_name=_bad_display_name)
@@ -638,7 +691,7 @@ async def test_resilience_to_call_display_name_errors_async(client, log_collecto
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_on_input_handler_errors(client, log_collector):
+def test_resilience_to_on_input_handler_errors(weave_active, log_collector):
     """Test that errors in _on_input_handler don't crash the user's program."""
 
     @weave.op
@@ -658,7 +711,7 @@ def test_resilience_to_on_input_handler_errors(client, log_collector):
 
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
-async def test_resilience_to_on_input_handler_errors_async(client, log_collector):
+async def test_resilience_to_on_input_handler_errors_async(weave_active, log_collector):
     """Test that errors in _on_input_handler don't crash async ops."""
 
     @weave.op
@@ -677,7 +730,7 @@ async def test_resilience_to_on_input_handler_errors_async(client, log_collector
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_on_finish_handler_errors(client, log_collector):
+def test_resilience_to_on_finish_handler_errors(weave_active, log_collector):
     """Test that errors in _on_finish_handler don't crash the user's program."""
 
     @weave.op
@@ -697,7 +750,9 @@ def test_resilience_to_on_finish_handler_errors(client, log_collector):
 
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
-async def test_resilience_to_on_finish_handler_errors_async(client, log_collector):
+async def test_resilience_to_on_finish_handler_errors_async(
+    weave_active, log_collector
+):
     """Test that errors in _on_finish_handler don't crash async ops."""
 
     @weave.op
@@ -739,7 +794,9 @@ def _make_leaking_create_call():
 
 
 @pytest.mark.disable_logging_error_check
-def test_create_call_leak_restores_call_stack_sync(client, monkeypatch, log_collector):
+def test_create_call_leak_restores_call_stack_sync(
+    weave_active, monkeypatch, log_collector
+):
     """If _create_call pushes a call then throws, the stack must be cleaned up."""
 
     @weave.op
@@ -756,7 +813,7 @@ def test_create_call_leak_restores_call_stack_sync(client, monkeypatch, log_coll
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_create_call_leak_restores_call_stack_async(
-    client, monkeypatch, log_collector
+    weave_active, monkeypatch, log_collector
 ):
     """Async variant: leaked call from _create_call is cleaned up."""
 
@@ -773,7 +830,7 @@ async def test_create_call_leak_restores_call_stack_async(
 
 @pytest.mark.disable_logging_error_check
 def test_create_call_leak_restores_call_stack_sync_gen(
-    client, monkeypatch, log_collector
+    weave_active, monkeypatch, log_collector
 ):
     """Sync generator variant: leaked call from _create_call is cleaned up."""
 
@@ -791,7 +848,7 @@ def test_create_call_leak_restores_call_stack_sync_gen(
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_create_call_leak_restores_call_stack_async_gen(
-    client, monkeypatch, log_collector
+    weave_active, monkeypatch, log_collector
 ):
     """Async generator variant: leaked call from _create_call is cleaned up."""
 
@@ -809,7 +866,9 @@ async def test_create_call_leak_restores_call_stack_async_gen(
 
 
 @pytest.mark.disable_logging_error_check
-def test_create_call_leak_preserves_parent_call(client, monkeypatch, log_collector):
+def test_create_call_leak_preserves_parent_call(
+    weave_active, monkeypatch, log_collector
+):
     """When a nested op's _create_call leaks, the parent call must remain current."""
     inner_saw_parent = None
 

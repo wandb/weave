@@ -5,6 +5,9 @@
  * the full agent lifecycle, conforming to the GenAI semantic conventions:
  * https://opentelemetry.io/docs/specs/semconv/gen-ai/
  *
+ * Spans are exported through the shared Weave GenAI tracer, which targets
+ * `/agents/otel/v1/traces` on the trace server.
+ *
  * Usage:
  * ```typescript
  * import { init } from 'weave';
@@ -31,17 +34,30 @@ import {
   SpanStatusCode,
   trace,
 } from '@opentelemetry/api';
-import {OTLPTraceExporter} from '@opentelemetry/exporter-trace-otlp-proto';
-import {Resource} from '@opentelemetry/resources';
+
+import {getWeaveTracer} from '../genai/provider';
 import {
-  BasicTracerProvider,
-  SimpleSpanProcessor,
-} from '@opentelemetry/sdk-trace-base';
-
-import {getGlobalClient} from '../clientApi';
-import {getWandbConfigs} from '../wandb/settings';
-
-import {GEN_AI_ATTR, GEN_AI_EVENT, OTEL_ATTR} from './common/genai';
+  ATTR_ERROR_TYPE,
+  ATTR_GEN_AI_AGENT_NAME,
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
+  ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
+  ATTR_GEN_AI_RESPONSE_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_ID,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
+  ATTR_GEN_AI_TOOL_NAME,
+  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
+} from '../genai/semconv';
 
 import type {
   PiAgentMessage,
@@ -67,21 +83,40 @@ export interface OtelExtensionOptions {
 // Attribute keys — GenAI semconv keys from common, pi-specific keys below
 // ---------------------------------------------------------------------------
 
-const ATTR = {
-  ...GEN_AI_ATTR,
-  ...OTEL_ATTR,
-  // Pi-specific (not in GenAI spec)
-  PI_SESSION_CWD: 'pi.session.cwd',
-  PI_USAGE_COST_USD: 'pi.usage.cost_usd',
-  PI_COMPACTION_REASON: 'pi.compaction.reason',
-  PI_COMPACTION_ABORTED: 'pi.compaction.aborted',
-  PI_COMPACTION_WILL_RETRY: 'pi.compaction.will_retry',
-  PI_AUTO_RETRY_ATTEMPT: 'auto_retry.attempt',
-  PI_AUTO_RETRY_MAX_ATTEMPTS: 'auto_retry.max_attempts',
-  PI_AUTO_RETRY_ERROR_MESSAGE: 'auto_retry.error_message',
-  PI_AUTO_RETRY_SUCCESS: 'auto_retry.success',
-  PI_AUTO_RETRY_FINAL_ERROR: 'auto_retry.final_error',
-} as const;
+const ATTR_PI_SESSION_CWD = 'pi.session.cwd';
+const ATTR_PI_USAGE_COST_USD = 'pi.usage.cost_usd';
+const ATTR_PI_COMPACTION_REASON = 'pi.compaction.reason';
+const ATTR_PI_COMPACTION_ABORTED = 'pi.compaction.aborted';
+const ATTR_PI_COMPACTION_WILL_RETRY = 'pi.compaction.will_retry';
+const ATTR_PI_AUTO_RETRY_ATTEMPT = 'auto_retry.attempt';
+const ATTR_PI_AUTO_RETRY_MAX_ATTEMPTS = 'auto_retry.max_attempts';
+const ATTR_PI_AUTO_RETRY_ERROR_MESSAGE = 'auto_retry.error_message';
+const ATTR_PI_AUTO_RETRY_SUCCESS = 'auto_retry.success';
+const ATTR_PI_AUTO_RETRY_FINAL_ERROR = 'auto_retry.final_error';
+
+const TRACER_NAME = 'pi-coding-agent';
+
+// ---------------------------------------------------------------------------
+// Message shape understood by the Weave GenAI extractor
+// (see weave/trace_server/opentelemetry/genai_extraction.py)
+// ---------------------------------------------------------------------------
+
+type WeaveMessagePart =
+  | {type: 'text'; content: string}
+  | {type: 'reasoning'; content: string}
+  | {
+      type: 'tool_call';
+      toolCallId: string;
+      toolName: string;
+      arguments?: string;
+    };
+
+interface WeaveMessage {
+  role: string;
+  content?: string;
+  parts?: WeaveMessagePart[];
+  finish_reason?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -117,6 +152,52 @@ function isAssistant(msg: PiAgentMessage): msg is PiAssistantMessage {
   return msg.role === 'assistant';
 }
 
+function mapAssistantParts(
+  content: PiAssistantMessage['content']
+): WeaveMessagePart[] {
+  return content.map(part => {
+    if (part.type === 'text') {
+      return {type: 'text', content: part.text};
+    }
+    if (part.type === 'thinking') {
+      return {type: 'reasoning', content: part.thinking};
+    }
+    // toolCall
+    return {
+      type: 'tool_call',
+      toolCallId: part.id,
+      toolName: part.name,
+      arguments: safeStringify(part.arguments),
+    };
+  });
+}
+
+function mapPiMessage(msg: PiAgentMessage): WeaveMessage {
+  if (isAssistant(msg)) {
+    return {
+      role: 'assistant',
+      parts: mapAssistantParts(msg.content),
+      finish_reason: msg.stopReason,
+    };
+  }
+  const content = msg.content;
+  return {
+    role: msg.role,
+    content: typeof content === 'string' ? content : safeStringify(content),
+  };
+}
+
+function safeStringify(val: unknown): string {
+  if (typeof val === 'string') {
+    return val;
+  }
+  try {
+    return JSON.stringify(val);
+  } catch {
+    return String(val);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Adapter
 // ---------------------------------------------------------------------------
@@ -129,13 +210,16 @@ export class PiCodingAgentOtelAdapter {
   private readonly tracer: Tracer;
   private readonly captureContent: boolean;
 
-  // Session-level span
-  private sessionSpan: Span | null = null;
-  private sessionCtx: Context = ROOT_CONTEXT;
-
-  // Per-prompt span (gen_ai.invoke_agent) — one per user prompt → response cycle
+  // Per-prompt span (gen_ai.invoke_agent) — one per user prompt → response
+  // cycle. Each is started under ROOT_CONTEXT so every prompt gets its own
+  // trace id; sibling prompts in the same conversation are linked via
+  // `gen_ai.conversation.id`, not a shared parent span.
   private invokeAgentSpan: Span | null = null;
   private invokeAgentCtx: Context = ROOT_CONTEXT;
+
+  // cwd captured at session_start; stamped on each invoke_agent span as
+  // pi.session.cwd.
+  private sessionCwd: string | null = null;
 
   // Per-LLM-turn span (gen_ai.chat) — one per LLM API call within a cycle
   private chatSpan: Span | null = null;
@@ -161,65 +245,15 @@ export class PiCodingAgentOtelAdapter {
     if (opts.tracer) {
       this.tracer = opts.tracer;
     } else {
-      const client = getGlobalClient();
-      if (client) {
-        try {
-          const [entity, project] = client.projectId.split('/');
-          const {apiKey} = getWandbConfigs();
-          const endpoint = `${client.traceServerApi.baseUrl}/otel/v1/traces`;
-
-          const authHeader = `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`;
-          const provider = new BasicTracerProvider({
-            resource: new Resource({
-              'wandb.entity': entity,
-              'wandb.project': project,
-            }),
-            spanProcessors: [
-              new SimpleSpanProcessor(
-                new OTLPTraceExporter({
-                  url: endpoint,
-                  headers: {
-                    Authorization: authHeader,
-                    project_id: client.projectId,
-                  },
-                })
-              ),
-            ],
-          });
-
-          this.tracer = provider.getTracer('pi-coding-agent-weave-ext');
-
-          // Ensure all spans are flushed before the process exits.
-          // The pi agent doesn't await async shutdown handlers, so
-          // endSessionSpan may not complete. This hook catches the
-          // event loop draining and flushes any remaining spans.
-          process.once('beforeExit', async () => {
-            this.endInvokeAgentSpan();
-            if (this.sessionSpan) {
-              this.sessionSpan.end();
-              this.sessionSpan = null;
-              this.sessionCtx = ROOT_CONTEXT;
-            }
-            await provider.shutdown().catch(err => {
-              console.warn(
-                '[weave] OTEL provider shutdown failed; some spans may not have been flushed.',
-                err instanceof Error ? err.message : err
-              );
-            });
-          });
-        } catch (err) {
-          console.warn(
-            '[weave] OTEL auto-configure failed; spans will not be sent. Check WANDB_API_KEY.',
-            err instanceof Error ? err.message : err
-          );
-          this.tracer = trace.getTracer('pi-coding-agent-weave-ext');
-        }
-      } else {
-        console.warn(
-          '[weave] No Weave client; spans will not be sent. Call weave.init() first or pass { tracer }.'
-        );
-        this.tracer = trace.getTracer('pi-coding-agent-weave-ext');
-      }
+      // The shared Weave GenAI tracer targets /agents/otel/v1/traces and
+      // owns auth, resource attrs, batching, and beforeExit flush.
+      this.tracer = getWeaveTracer(TRACER_NAME);
+      // Pi does not await async session_shutdown handlers, so any spans
+      // still open when the event loop drains must be ended before the
+      // GenAI provider's own beforeExit handler flushes the exporter.
+      process.once('beforeExit', () => {
+        this.endInvokeAgentSpan();
+      });
     }
   }
 
@@ -238,7 +272,6 @@ export class PiCodingAgentOtelAdapter {
     pi.on('before_agent_start', this.onBeforeAgentStart);
     pi.on('context', this.onContext);
     pi.on('turn_start', this.onTurnStart);
-    pi.on('message_end', this.onMessageEnd);
     pi.on('turn_end', this.onTurnEnd);
     pi.on('agent_end', this.onAgentEnd);
     pi.on('tool_call', this.onToolCall);
@@ -258,23 +291,11 @@ export class PiCodingAgentOtelAdapter {
   ): void => {
     this.currentModel = ctx.model ?? null;
     this.conversationId = ctx.sessionManager.getSessionId();
-    this.sessionSpan = this.tracer.startSpan(
-      'pi.coding_agent.session',
-      {
-        kind: SpanKind.INTERNAL,
-        attributes: {
-          [ATTR.GEN_AI_AGENT_NAME]: 'pi-coding-agent',
-          [ATTR.PI_SESSION_CWD]: ctx.cwd,
-          [ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId,
-        },
-      },
-      ROOT_CONTEXT
-    );
-    this.sessionCtx = trace.setSpan(ROOT_CONTEXT, this.sessionSpan);
+    this.sessionCwd = ctx.cwd;
   };
 
   private onSessionShutdown = (): void => {
-    this.endSessionSpan();
+    this.endInvokeAgentSpan();
   };
 
   private onModelSelect = (
@@ -293,23 +314,24 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          [ATTR.GEN_AI_OPERATION_NAME]: 'invoke_agent',
-          [ATTR.GEN_AI_AGENT_NAME]: 'pi-coding-agent',
+          [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
+          [ATTR_GEN_AI_AGENT_NAME]: 'pi-coding-agent',
           ...(model
             ? {
-                [ATTR.GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
+                [ATTR_GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
                   model.provider
                 ),
               }
             : {}),
           ...(this.conversationId
-            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
             : {}),
+          ...(this.sessionCwd ? {[ATTR_PI_SESSION_CWD]: this.sessionCwd} : {}),
         },
       },
-      this.sessionCtx
+      ROOT_CONTEXT
     );
-    this.invokeAgentCtx = trace.setSpan(this.sessionCtx, this.invokeAgentSpan);
+    this.invokeAgentCtx = trace.setSpan(ROOT_CONTEXT, this.invokeAgentSpan);
     this.agentInputTokens = 0;
     this.agentOutputTokens = 0;
     this.agentTotalTokens = 0;
@@ -317,23 +339,36 @@ export class PiCodingAgentOtelAdapter {
 
     if (this.captureContent) {
       if (event.systemPrompt) {
-        this.invokeAgentSpan.addEvent(GEN_AI_EVENT.SYSTEM_MESSAGE, {
-          [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
-            role: 'system',
-            content: event.systemPrompt,
-          }),
-        });
+        this.invokeAgentSpan.setAttribute(
+          ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+          JSON.stringify([event.systemPrompt])
+        );
       }
-      this.invokeAgentSpan.addEvent(GEN_AI_EVENT.USER_MESSAGE, {
-        [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
-          role: 'user',
-          content: event.prompt,
-        }),
-      });
+      this.invokeAgentSpan.setAttribute(
+        ATTR_GEN_AI_INPUT_MESSAGES,
+        JSON.stringify([{role: 'user', content: event.prompt}])
+      );
     }
   };
 
-  private onAgentEnd = (): void => {
+  private onAgentEnd = (
+    event: Extract<PiExtensionEvent, {type: 'agent_end'}>
+  ): void => {
+    if (
+      this.captureContent &&
+      this.invokeAgentSpan &&
+      event.messages.length > 0
+    ) {
+      const assistantMessages = event.messages
+        .filter(m => m.role === 'assistant')
+        .map(mapPiMessage);
+      if (assistantMessages.length > 0) {
+        this.invokeAgentSpan.setAttribute(
+          ATTR_GEN_AI_OUTPUT_MESSAGES,
+          JSON.stringify(assistantMessages)
+        );
+      }
+    }
     this.endInvokeAgentSpan();
   };
 
@@ -348,17 +383,17 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.CLIENT,
         attributes: {
-          [ATTR.GEN_AI_OPERATION_NAME]: 'chat',
+          [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
           ...(model
             ? {
-                [ATTR.GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
+                [ATTR_GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
                   model.provider
                 ),
-                [ATTR.GEN_AI_REQUEST_MODEL]: model.id,
+                [ATTR_GEN_AI_REQUEST_MODEL]: model.id,
               }
             : {}),
           ...(this.conversationId
-            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
             : {}),
         },
       },
@@ -369,37 +404,35 @@ export class PiCodingAgentOtelAdapter {
   private onContext = (
     event: Extract<PiExtensionEvent, {type: 'context'}>
   ): void => {
-    if (!this.chatSpan) return;
-    const systemMessages = event.messages.filter(m => m.role === 'system');
-    if (systemMessages.length === 0) return;
-    this.chatSpan.addEvent(
-      GEN_AI_EVENT.SYSTEM_MESSAGE,
-      this.captureContent
-        ? {
-            [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify(
-              systemMessages.map(m => ({role: 'system', content: m.content}))
-            ),
-          }
-        : {}
-    );
-  };
-
-  private onMessageEnd = (
-    event: Extract<PiExtensionEvent, {type: 'message_end'}>
-  ): void => {
-    if (!this.chatSpan) return;
-    if (!isAssistant(event.message)) return;
-    this.chatSpan.addEvent(
-      GEN_AI_EVENT.ASSISTANT_MESSAGE,
-      this.captureContent
-        ? {
-            [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
-              role: 'assistant',
-              content: event.message.content,
-            }),
-          }
-        : {}
-    );
+    if (!this.chatSpan || !this.captureContent) {
+      return;
+    }
+    const systemInstructions: string[] = [];
+    const inputMessages: WeaveMessage[] = [];
+    for (const msg of event.messages) {
+      if (msg.role === 'system') {
+        const content = msg.content;
+        const text =
+          typeof content === 'string' ? content : safeStringify(content);
+        if (text) {
+          systemInstructions.push(text);
+        }
+        continue;
+      }
+      inputMessages.push(mapPiMessage(msg));
+    }
+    if (systemInstructions.length > 0) {
+      this.chatSpan.setAttribute(
+        ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+        JSON.stringify(systemInstructions)
+      );
+    }
+    if (inputMessages.length > 0) {
+      this.chatSpan.setAttribute(
+        ATTR_GEN_AI_INPUT_MESSAGES,
+        JSON.stringify(inputMessages)
+      );
+    }
   };
 
   private onTurnEnd = (
@@ -414,21 +447,28 @@ export class PiCodingAgentOtelAdapter {
 
       if (this.chatSpan) {
         this.chatSpan.setAttributes({
-          [ATTR.GEN_AI_RESPONSE_MODEL]: event.message.model,
-          [ATTR.GEN_AI_RESPONSE_FINISH_REASONS]: [event.message.stopReason],
-          [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: usage.input,
-          [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output,
-          [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: usage.totalTokens,
-          [ATTR.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cacheRead,
-          [ATTR.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: usage.cacheWrite,
-          [ATTR.PI_USAGE_COST_USD]: usage.cost.total,
+          [ATTR_GEN_AI_RESPONSE_MODEL]: event.message.model,
+          [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: [event.message.stopReason],
+          [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: usage.input,
+          [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output,
+          [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: usage.totalTokens,
+          [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cacheRead,
+          [ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: usage.cacheWrite,
+          [ATTR_PI_USAGE_COST_USD]: usage.cost.total,
         });
+
+        if (this.captureContent) {
+          this.chatSpan.setAttribute(
+            ATTR_GEN_AI_OUTPUT_MESSAGES,
+            JSON.stringify([mapPiMessage(event.message)])
+          );
+        }
 
         if (
           event.message.stopReason === 'error' &&
           event.message.errorMessage
         ) {
-          this.chatSpan.setAttribute(ATTR.ERROR_TYPE, 'llm_error');
+          this.chatSpan.setAttribute(ATTR_ERROR_TYPE, 'llm_error');
           this.chatSpan.setStatus({
             code: SpanStatusCode.ERROR,
             message: event.message.errorMessage,
@@ -442,19 +482,20 @@ export class PiCodingAgentOtelAdapter {
   private onToolCall = (
     event: Extract<PiExtensionEvent, {type: 'tool_call'}>
   ): void => {
+    const attributes: Record<string, string> = {
+      [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
+      [ATTR_GEN_AI_TOOL_NAME]: event.toolName,
+      [ATTR_GEN_AI_TOOL_CALL_ID]: event.toolCallId,
+    };
+    if (this.conversationId) {
+      attributes[ATTR_GEN_AI_CONVERSATION_ID] = this.conversationId;
+    }
+    if (this.captureContent) {
+      attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = safeStringify(event.input);
+    }
     const span = this.tracer.startSpan(
       `execute_tool ${event.toolName}`,
-      {
-        kind: SpanKind.INTERNAL,
-        attributes: {
-          [ATTR.GEN_AI_OPERATION_NAME]: 'execute_tool',
-          [ATTR.GEN_AI_TOOL_NAME]: event.toolName,
-          [ATTR.GEN_AI_TOOL_CALL_ID]: event.toolCallId,
-          ...(this.conversationId
-            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
-            : {}),
-        },
-      },
+      {kind: SpanKind.INTERNAL, attributes},
       this.invokeAgentCtx
     );
     this.toolSpans.set(event.toolCallId, span);
@@ -464,25 +505,25 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'tool_result'}>
   ): void => {
     const span = this.toolSpans.get(event.toolCallId);
-    if (!span) return;
+    if (!span) {
+      return;
+    }
     this.toolSpans.delete(event.toolCallId);
     if (event.isError) {
-      span.setAttribute(ATTR.ERROR_TYPE, 'tool_error');
+      span.setAttribute(ATTR_ERROR_TYPE, 'tool_error');
       span.setStatus({
         code: SpanStatusCode.ERROR,
         message:
           typeof event.content === 'string'
             ? event.content
-            : JSON.stringify(event.content),
+            : safeStringify(event.content),
       });
     }
     if (this.captureContent) {
-      span.addEvent(GEN_AI_EVENT.TOOL_MESSAGE, {
-        [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
-          role: 'tool',
-          content: event.content,
-        }),
-      });
+      span.setAttribute(
+        ATTR_GEN_AI_TOOL_CALL_RESULT,
+        safeStringify(event.content)
+      );
     }
     span.end();
   };
@@ -495,15 +536,15 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          [ATTR.PI_COMPACTION_REASON]: event.reason,
-          [ATTR.PI_COMPACTION_ABORTED]: event.aborted,
-          [ATTR.PI_COMPACTION_WILL_RETRY]: event.willRetry,
+          [ATTR_PI_COMPACTION_REASON]: event.reason,
+          [ATTR_PI_COMPACTION_ABORTED]: event.aborted,
+          [ATTR_PI_COMPACTION_WILL_RETRY]: event.willRetry,
           ...(this.conversationId
-            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
             : {}),
         },
       },
-      this.sessionCtx
+      ROOT_CONTEXT
     );
     span.end();
   };
@@ -512,9 +553,9 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'auto_retry_start'}>
   ): void => {
     this.invokeAgentSpan?.addEvent('auto_retry_start', {
-      [ATTR.PI_AUTO_RETRY_ATTEMPT]: event.attempt,
-      [ATTR.PI_AUTO_RETRY_MAX_ATTEMPTS]: event.maxAttempts,
-      [ATTR.PI_AUTO_RETRY_ERROR_MESSAGE]: event.errorMessage,
+      [ATTR_PI_AUTO_RETRY_ATTEMPT]: event.attempt,
+      [ATTR_PI_AUTO_RETRY_MAX_ATTEMPTS]: event.maxAttempts,
+      [ATTR_PI_AUTO_RETRY_ERROR_MESSAGE]: event.errorMessage,
     });
   };
 
@@ -522,10 +563,10 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'auto_retry_end'}>
   ): void => {
     this.invokeAgentSpan?.addEvent('auto_retry_end', {
-      [ATTR.PI_AUTO_RETRY_SUCCESS]: event.success,
-      [ATTR.PI_AUTO_RETRY_ATTEMPT]: event.attempt,
+      [ATTR_PI_AUTO_RETRY_SUCCESS]: event.success,
+      [ATTR_PI_AUTO_RETRY_ATTEMPT]: event.attempt,
       ...(event.finalError
-        ? {[ATTR.PI_AUTO_RETRY_FINAL_ERROR]: event.finalError}
+        ? {[ATTR_PI_AUTO_RETRY_FINAL_ERROR]: event.finalError}
         : {}),
     });
   };
@@ -544,7 +585,7 @@ export class PiCodingAgentOtelAdapter {
   private endInvokeAgentSpan(): void {
     this.endChatSpan();
     for (const [, span] of this.toolSpans) {
-      span.setAttribute(ATTR.ERROR_TYPE, 'aborted');
+      span.setAttribute(ATTR_ERROR_TYPE, 'aborted');
       span.setStatus({
         code: SpanStatusCode.ERROR,
         message: 'Agent ended with open tool span',
@@ -554,23 +595,14 @@ export class PiCodingAgentOtelAdapter {
     this.toolSpans.clear();
     if (this.invokeAgentSpan) {
       this.invokeAgentSpan.setAttributes({
-        [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: this.agentInputTokens,
-        [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: this.agentOutputTokens,
-        [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: this.agentTotalTokens,
-        [ATTR.PI_USAGE_COST_USD]: this.agentCostUsd,
+        [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: this.agentInputTokens,
+        [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: this.agentOutputTokens,
+        [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: this.agentTotalTokens,
+        [ATTR_PI_USAGE_COST_USD]: this.agentCostUsd,
       });
       this.invokeAgentSpan.end();
       this.invokeAgentSpan = null;
       this.invokeAgentCtx = ROOT_CONTEXT;
-    }
-  }
-
-  private endSessionSpan(): void {
-    this.endInvokeAgentSpan();
-    if (this.sessionSpan) {
-      this.sessionSpan.end();
-      this.sessionSpan = null;
-      this.sessionCtx = ROOT_CONTEXT;
     }
   }
 }
@@ -584,8 +616,8 @@ export class PiCodingAgentOtelAdapter {
  * agent lifecycle, conforming to the GenAI semantic conventions.
  *
  * When `weave.init(...)` has been called, spans are automatically exported
- * to the Weave trace server. Otherwise, configure your own TracerProvider
- * before calling this function.
+ * to the Weave trace server at `/agents/otel/v1/traces`. Otherwise, pass a
+ * custom `tracer` in `opts`.
  *
  * @example
  * ```typescript

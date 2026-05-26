@@ -23,6 +23,42 @@ export {
   patchRealtimeSession,
   createOtelExtension,
 } from './integrations';
+export {
+  endLLM,
+  endSession,
+  endTurn,
+  flushOTel,
+  getCurrentLLM,
+  getCurrentSession,
+  getCurrentTurn,
+  runIsolated,
+  startLLM,
+  startSession,
+  startSubagent,
+  startTool,
+  startTurn,
+} from './genai';
+// Type-only: consumers can name these in their own signatures, but the
+// runtime values aren't reachable — construction is private to the SDK's
+// top-level entry-point functions.
+export type {
+  LLM,
+  LLMInit,
+  Message,
+  MessagePart,
+  Modality,
+  Reasoning,
+  Role,
+  Session,
+  SessionInit,
+  SubAgent,
+  SubAgentInit,
+  Tool,
+  ToolInit,
+  Turn,
+  TurnInit,
+  Usage,
+} from './genai';
 export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
 export {op} from './op';
 export * from './types';

@@ -16,6 +16,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
+    build_calls_stats_query,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -2131,16 +2132,16 @@ def test_build_calls_complete_update_end_query() -> None:
     expected = """
         UPDATE calls_complete
         SET
-            ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC'),
-            exception = {exception:String},
-            output_dump = {output_dump:String},
-            summary_dump = {summary_dump:String},
-            output_refs = {output_refs:Array(String)},
-            wb_run_step_end = {wb_run_step_end:UInt64},
+            ended_at = fromUnixTimestamp64Micro(%(ended_at)s, 'UTC'),
+            exception = %(exception)s,
+            output_dump = %(output_dump)s,
+            summary_dump = %(summary_dump)s,
+            output_refs = %(output_refs)s,
+            wb_run_step_end = %(wb_run_step_end)s,
             updated_at = now64(3)
-        WHERE project_id = {project_id:String}
-            AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')
-            AND id = {id:String}
+        WHERE project_id = %(project_id)s
+            AND started_at = fromUnixTimestamp64Micro(%(started_at)s, 'UTC')
+            AND id = %(id)s
     """
 
     exp_formatted = sqlparse.format(expected, reindent=True)
@@ -4063,7 +4064,7 @@ def test_stats_query_calls_complete_flat_count() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT count() AS count
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_1:String}
         WHERE 1
@@ -4086,7 +4087,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT count() AS count
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_2:String}
         WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
@@ -4112,6 +4113,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         req,
         """
         SELECT count() AS count,
+               toUInt8(0) AS has_more,
                sum(coalesce(CASE
                    WHEN calls_complete.parent_id = {pb_2:String}
                         THEN rolled_up_cms.total_storage_size_bytes
@@ -4163,7 +4165,7 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     assert_stats_sql(
         req,
         """
-        SELECT count(DISTINCT calls_complete.id) AS count
+        SELECT count(DISTINCT calls_complete.id) AS count, toUInt8(0) AS has_more
         FROM calls_complete
         LEFT JOIN (
             SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
@@ -4190,13 +4192,150 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     )
 
 
-def test_stats_query_calls_merged_uses_subquery() -> None:
-    """Stats query on calls_merged should use subquery wrapping (GROUP BY requires it)."""
-    req = tsi.CallsQueryStatsReq(project_id="project")
+def test_stats_query_calls_merged_unfiltered_limit_1_stays_with_pattern_1() -> None:
+    """limit=1 with no filter is the project-existence check (Pattern 1),
+    which uses `LIMIT 1` and is strictly cheaper than starting a uniqUpTo
+    aggregator. Pinning this boundary so Pattern 3 never intercepts.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project", limit=1)
     assert_stats_sql(
         req,
         """
-        SELECT count()
+        SELECT toUInt8(count()) AS has_any
+        FROM (
+            SELECT 1
+            FROM calls_merged
+            WHERE project_id = {pb_0:String}
+            LIMIT 1
+        )
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> None:
+    """Unfiltered calls_merged stats with no limit takes the flat distinct-id path.
+
+    Two parallel aggregators on one scan dedupe ids and subtract those with any
+    soft-delete row. Matches the GROUP BY path's exclusion semantics exactly.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project")
+    pb = ParamBuilder("pb")
+    _query, _columns, settings = build_calls_stats_query(
+        req, pb, ReadTable.CALLS_MERGED
+    )
+    assert settings == {}
+    assert_stats_sql(
+        req,
+        """
+        SELECT raw_count AS count,
+               toUInt8(0) AS has_more
+        FROM (
+            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_0:String})
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -> None:
+    """Caller-supplied limit caps `count` via least() and flips `has_more`
+    when the raw distinct count exceeds the cap. Inner aggregator is unchanged.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project", limit=5)
+    pb = ParamBuilder("pb")
+    _query, _columns, settings = build_calls_stats_query(
+        req, pb, ReadTable.CALLS_MERGED
+    )
+    assert settings == {}
+    assert_stats_sql(
+        req,
+        """
+        SELECT least(raw_count, 5) AS count,
+               toUInt8(raw_count > 5) AS has_more
+        FROM (
+            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_0:String})
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_filter_falls_back_to_group_by() -> None:
+    """Hardcoded filter forces the GROUP BY rollup -- filters need per-id state."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        filter=tsi.CallsFilter(op_names=["my_op"]),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                   OR (calls_merged.op_name IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND
+                ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        """,
+        {"pb_0": ["my_op"], "pb_1": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_query_falls_back_to_group_by() -> None:
+    """A `query` argument forces the GROUP BY rollup -- predicates live in HAVING."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=tsi.Query.model_validate(
+            {"$expr": {"$eq": [{"$getField": "id"}, {"$literal": "x"}]}}
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((calls_merged.id = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        """,
+        {"pb_0": "x", "pb_1": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_expand_columns_falls_back_to_group_by() -> None:
+    """expand_columns disables the flat path even when no filter/query references
+    the expansion -- treat any caller-supplied expansion as opting into rollup.
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        expand_columns=["inputs.model"],
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM (
             SELECT calls_merged.id AS id
             FROM calls_merged
@@ -4212,6 +4351,20 @@ def test_stats_query_calls_merged_uses_subquery() -> None:
         {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
     )
+
+
+def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
+    """include_total_storage_size needs every row, so no cap and no setting."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        include_total_storage_size=True,
+    )
+    query, _columns, settings = build_calls_stats_query(
+        req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
+    )
+    assert settings == {}
+    assert "LIMIT" not in query
+    assert "toUInt8(0) AS has_more" in query
 
 
 # ---------------------------------------------------------------------------
