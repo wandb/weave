@@ -7,13 +7,16 @@ ClickHouse insert operation for performance optimization.
 import base64
 import datetime
 import json
+import threading
+import time
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from tests.trace.util import client_is_sqlite
-from weave.shared.digest import str_digest
+from weave.shared.digest import compute_file_digest, str_digest
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
@@ -22,7 +25,13 @@ from weave.trace_server.errors import (
     ObjectDeletedError,
     handle_server_exception,
 )
+from weave.trace_server.file_storage import (
+    FileStorageWriteError,
+    key_for_project_digest,
+)
+from weave.trace_server.file_storage_uris import GCSFileStorageURI
 from weave.trace_server.validation_util import CHValidationError
+from weave.type_wrappers.Content.content import Content
 
 
 def make_base_64_content(content: str) -> str:
@@ -537,3 +546,276 @@ def test_obj_batch_mixed_projects_errors(trace_server, client):
         match="obj_create_batch only supports updating a single project.",
     ):
         server.obj_create_batch(batch=batch)
+
+
+# ---------------------------------------------------------------------------
+# Parallel bucket-upload fan-out (call_batch + bucket-backed file storage)
+# ---------------------------------------------------------------------------
+#
+# These exercise the full call_start_batch -> file_create -> bucket-flush path
+# in ClickHouseTraceServer with the bucket allow-list enabled. The CH client
+# is a MagicMock that records inserts (same pattern as test_clickhouse_batching
+# above); the bucket uploader is patched at both call sites with a recording
+# stand-in that tracks concurrency and can inject per-file failures.
+
+
+class _RecordingUploader:
+    """Drop-in replacement for `store_in_bucket`. Records calls, tracks
+    concurrent peak, can inject per-path failures, and supports a per-call
+    delay to make parallelism observable in wall time.
+    """
+
+    def __init__(
+        self,
+        *,
+        delay: float = 0.0,
+        fail_paths: set[str] | None = None,
+    ) -> None:
+        self.delay = delay
+        self.fail_paths = fail_paths or set()
+        self.calls: list[tuple[str, bytes]] = []
+        self.concurrent_peak = 0
+        self._inflight = 0
+        self._lock = threading.Lock()
+
+    def __call__(self, client, path, data):
+        with self._lock:
+            self._inflight += 1
+            self.concurrent_peak = max(self.concurrent_peak, self._inflight)
+        try:
+            if path in self.fail_paths:
+                raise FileStorageWriteError(f"injected failure for {path}")
+            if self.delay:
+                time.sleep(self.delay)
+            with self._lock:
+                self.calls.append((path, data))
+        finally:
+            with self._lock:
+                self._inflight -= 1
+        return GCSFileStorageURI("test-bucket", path)
+
+
+def _bucket_backed_trace_server(monkeypatch, uploader: _RecordingUploader):
+    """Spin up a ClickHouseTraceServer wired to a recording mock CH client and
+    a patched bucket uploader. Returns (server, mock_ch_client).
+
+    `_mint_client` is patched for the lifetime of the test via monkeypatch so
+    every thread-local first-use of `ch_client` resolves to the recording
+    mock, including inside ThreadPoolExecutor workers spawned by the parallel
+    bucket flush.
+    """
+    # Force the bucket write path for every project.
+    monkeypatch.setenv("WF_FILE_STORAGE_PROJECT_ALLOW_LIST", "*")
+    # Patch the actual upload at both call sites (sync + deferred).
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.store_in_bucket",
+        uploader,
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.parallel_bucket_uploads.store_in_bucket",
+        uploader,
+    )
+
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+    # Force the legacy-residence branch (call_parts).
+    query_result = MagicMock()
+    query_result.result_rows = [[0, 1]]
+    mock_ch_client.query.return_value = query_result
+
+    monkeypatch.setattr(
+        ClickHouseTraceServer, "_mint_client", lambda self: mock_ch_client
+    )
+    server = ClickHouseTraceServer(host="test_host")
+    # Inject a non-None storage client so the bucket branch fires; the actual
+    # client is opaque since the uploader is patched.
+    server._file_storage_client = MagicMock()
+    server._file_storage_client_initialized = True
+    return server, mock_ch_client
+
+
+def _files_insert(mock_ch_client) -> list:
+    """Pull the chunk rows from the recorded `files` insert call."""
+    for call in mock_ch_client.insert.call_args_list:
+        if call[0][0] == "files":
+            return call[1]["data"]
+    raise AssertionError("no `files` insert recorded")
+
+
+def _batch_with_inputs(project_id: str, inputs: list[str]) -> tsi.CallCreateBatchReq:
+    """N call_start items, each with one base64 input that triggers file_create."""
+    return tsi.CallCreateBatchReq(
+        batch=[
+            tsi.CallBatchStartMode(
+                mode="start",
+                req=tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        op_name=f"op_{i}",
+                        started_at=datetime.datetime.now(datetime.timezone.utc),
+                        attributes={},
+                        inputs={"v": content},
+                    )
+                ),
+            )
+            for i, content in enumerate(inputs)
+        ]
+    )
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_start_batch_uploads_files_to_bucket_in_parallel_and_dedupes(monkeypatch):
+    """Across a single call_start_batch we expect:
+
+    * bucket uploads run in parallel (concurrent peak > 1, wall time well
+      under the serial bound),
+    * every chunk row in the `files` insert carries a `gs://` URI and an
+      empty inline payload (i.e. nothing fell back to CH chunks),
+    * identical content shared across calls dedups to a single upload + one
+      pair of chunk rows (content + metadata.json),
+    * the `call_parts` insert still receives one row per call in the batch.
+    """
+    uploader = _RecordingUploader(delay=0.1)
+    server, mock_ch_client = _bucket_backed_trace_server(monkeypatch, uploader)
+
+    project_id = base64.b64encode(b"u/p_parallel").decode()
+    # 4 unique + 2 duplicates of the first one => 4 unique blobs, 5 distinct
+    # call rows. Each blob produces 2 GCS objects (content + metadata.json),
+    # so we expect 4 * 2 = 8 uploads, not 6 * 2 = 12.
+    inputs = [
+        create_file_sized_content("alpha"),
+        create_file_sized_content("beta"),
+        create_file_sized_content("gamma"),
+        create_file_sized_content("delta"),
+        create_file_sized_content("alpha"),  # dup
+        create_file_sized_content("alpha"),  # dup
+    ]
+    start = time.monotonic()
+    server.call_start_batch(_batch_with_inputs(project_id, inputs))
+    elapsed = time.monotonic() - start
+
+    # Parallelism: 8 uploads * 100ms = 800ms serial bound; should land well
+    # below that with the default 8-wide pool. Allow generous slack for CI.
+    assert uploader.concurrent_peak >= 2, (
+        f"expected concurrent uploads, peak={uploader.concurrent_peak}"
+    )
+    assert elapsed < 0.5, f"flush was effectively serial: {elapsed:.3f}s"
+
+    # Dedup at the upload layer: identical content collapses to one upload.
+    upload_paths = [path for path, _ in uploader.calls]
+    assert len(upload_paths) == len(set(upload_paths)), (
+        f"duplicate uploads slipped past dedup: {upload_paths}"
+    )
+    assert len(uploader.calls) == 8  # 4 unique blobs * 2 GCS objects each
+
+    # `files` insert: same dedup story, every row points at the bucket.
+    file_rows = _files_insert(mock_ch_client)
+    assert len(file_rows) == 8
+    # Column order is sorted(FileChunkCreateCHInsertable.model_fields):
+    # 0:bytes_stored 1:chunk_index 2:digest 3:file_storage_uri
+    # 4:n_chunks 5:name 6:project_id 7:val_bytes
+    for row in file_rows:
+        assert isinstance(row[3], str)
+        assert row[3].startswith("gs://test-bucket/")
+        assert row[7] == b""  # bucket rows carry no inline bytes
+
+    # `call_parts`: one row per call in the original batch (no dedup there).
+    call_parts = next(
+        call[1]["data"]
+        for call in mock_ch_client.insert.call_args_list
+        if call[0][0] == "call_parts"
+    )
+    assert len(call_parts) == len(inputs)
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_start_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
+    monkeypatch,
+):
+    """A FileStorageWriteError on one upload must not poison the rest of the
+    batch. The failing file lands as inline ClickHouse chunks; the others keep
+    their bucket URIs; every call in the batch still completes.
+    """
+    # Build a payload larger than FILE_CHUNK_SIZE so the CH fallback actually
+    # chunks (and we can assert chunk_index / n_chunks behavior end-to-end).
+    big_body = "fail-me-" + ("z" * (ch_settings.FILE_CHUNK_SIZE + AUTO_CONVERSION_MIN_SIZE))
+    small_body = "ok-content"
+
+    project_id = base64.b64encode(b"u/p_fallback").decode()
+    big_content = Content.from_data_url(create_file_sized_content(big_body)).data
+    big_digest = compute_file_digest(big_content)
+    fail_path = key_for_project_digest(project_id, big_digest)
+
+    uploader = _RecordingUploader(fail_paths={fail_path})
+    server, mock_ch_client = _bucket_backed_trace_server(monkeypatch, uploader)
+
+    inputs = [
+        create_file_sized_content(small_body),
+        create_file_sized_content(big_body),  # this one fails to upload
+    ]
+    server.call_start_batch(_batch_with_inputs(project_id, inputs))
+
+    file_rows = _files_insert(mock_ch_client)
+    # Column order is sorted(FileChunkCreateCHInsertable.model_fields):
+    # 0:bytes_stored 1:chunk_index 2:digest 3:file_storage_uri
+    # 4:n_chunks 5:name 6:project_id 7:val_bytes
+    bucket_rows = [r for r in file_rows if r[3] is not None]
+    ch_fallback_rows = [r for r in file_rows if r[3] is None]
+    assert bucket_rows, "expected at least one row from the successful upload"
+    assert ch_fallback_rows, "expected fallback rows for the failed upload"
+    for row in bucket_rows:
+        assert isinstance(row[3], str)
+        assert row[3].startswith("gs://test-bucket/")
+        assert row[7] == b""  # no inline bytes for bucket rows
+
+    # Reassembling the fallback rows by chunk_index must yield the original
+    # content (this is the contract the CH read path relies on).
+    digest_to_chunks: dict[str, list[tuple[int, bytes]]] = {}
+    for row in ch_fallback_rows:
+        digest_to_chunks.setdefault(row[2], []).append((row[1], row[7]))
+    assert big_digest in digest_to_chunks, (
+        f"failed-upload digest {big_digest} not present in fallback rows"
+    )
+    chunks = sorted(digest_to_chunks[big_digest])
+    reassembled = b"".join(chunk for _, chunk in chunks)
+    assert reassembled == big_content
+    assert [i for i, _ in chunks] == list(range(len(chunks)))
+
+    # And the rest of the batch still landed in call_parts: 2 call rows.
+    call_parts = next(
+        call[1]["data"]
+        for call in mock_ch_client.insert.call_args_list
+        if call[0][0] == "call_parts"
+    )
+    assert len(call_parts) == 2
+
+
+def test_serial_file_create_outside_call_batch_uploads_synchronously(monkeypatch):
+    """Non-batch `file_create` calls must keep going through the synchronous
+    bucket path (no defer, no thread pool). This is the regression guard for
+    everything that calls file_create outside of call_batch — obj_create_batch,
+    table writes, ad-hoc file_create endpoints, etc.
+    """
+    uploader = _RecordingUploader()
+    server, mock_ch_client = _bucket_backed_trace_server(monkeypatch, uploader)
+
+    project_id = base64.b64encode(b"u/p_serial").decode()
+    payload = b"some-file-bytes"
+    res = server.file_create(
+        tsi.FileCreateReq(project_id=project_id, name="thing.bin", content=payload)
+    )
+
+    # The upload ran inline: one call, no batched pool, peak concurrency 1.
+    assert len(uploader.calls) == 1
+    path, body = uploader.calls[0]
+    assert body == payload
+    assert path.endswith(res.digest)
+    assert uploader.concurrent_peak == 1
+
+    # And the file-chunk row was committed (synchronous insert path).
+    file_rows = _files_insert(mock_ch_client)
+    assert len(file_rows) == 1
+    assert any(
+        isinstance(v, str) and v.startswith("gs://test-bucket/") for v in file_rows[0]
+    )

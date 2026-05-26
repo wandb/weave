@@ -19,6 +19,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -176,6 +177,7 @@ def _reset_server_state(server: ClickHouseTraceServer) -> None:
     server._call_batch = []
     server._file_batch = []
     server._calls_complete_batch = []
+    server._bucket_uploads = BucketUploadBatch()
     server._flush_immediately = False
 
 
