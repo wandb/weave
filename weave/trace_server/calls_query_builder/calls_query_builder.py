@@ -86,6 +86,7 @@ from weave.trace_server.trace_server_common import assert_parameter_length_less_
 logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
+CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 CTE_ALL_CALLS = "all_calls"
 CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 
@@ -587,6 +588,21 @@ class WhereFilters(BaseModel):
             self.object_refs,
         ]
         return "\n        ".join(f for f in filters if f)
+
+    def to_where_clause(self) -> str:
+        """Render filters as a complete `WHERE ...` clause, or empty string.
+
+        `to_sql()` joins individual filters with leading `AND`, which is the
+        right shape when a `PREWHERE` already supplies the first predicate.
+        For a standalone `WHERE`, the leading `AND` of the first filter has
+        to be stripped. Centralizing that here keeps callers from
+        re-implementing the strip with regex.
+        """
+        body = self.to_sql()
+        if not body:
+            return ""
+        stripped = re.sub(r"^\s*AND\s+", "", body)
+        return f"WHERE {stripped}"
 
 
 class QueryJoins(BaseModel):
@@ -1108,10 +1124,22 @@ class CallsQuery(BaseModel):
         results in the following query:
 
         ```sql
-        WITH filtered_calls AS (
+        --- IF A HEAVY LIKE OPTIMIZATION EXISTS ON CALLS_MERGED ---
+        WITH filter_candidate_ids AS (
             SELECT id
             FROM calls_merged
             WHERE project_id = {PROJECT_ID}
+            AND ifNull(<dump>, '') LIKE ...     -- strict, no OR IS NULL, hits the ngram index
+            AND <other light WHERE filters>
+            ORDER BY <raw cols>                 -- no any(), no GROUP BY
+            LIMIT {LIMIT}                       -- mirrored from outer
+            OFFSET {OFFSET}                     -- mirrored from outer
+        ),
+        filtered_calls AS (
+            SELECT id
+            FROM calls_merged
+            WHERE project_id = {PROJECT_ID}
+            AND id IN filter_candidate_ids      -- optional, only when candidate CTE applies
             AND id IN {ID_MASK}                 -- optional
             GROUP BY (project_id, id)
             HAVING {LIGHT_FILTER_CONDITIONS}    -- optional
@@ -1186,25 +1214,15 @@ class CallsQuery(BaseModel):
 
         # Build object-ref and candidate-id CTEs up front so all downstream
         # code paths (early-return, single-pass, two-pass) can reference them.
+        # The candidate CTE unifies two bloom-filter pushdowns (trace_id and
+        # heavy-field LIKE) into a single filter_candidate_ids; see the
+        # _build_filter_candidate_ids_cte_sql docstring for the details.
         ctes, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, object_ref_conditions
         )
-
-        # Pre-narrow rows via the `idx_trace_id_bloom` skip-index when the
-        # query has a hardcoded trace_ids filter on calls_merged. The CTE
-        # uses the strict (no OR-IS-NULL) form so the bloom filter can prune
-        # granules; the outer query keeps the OR-IS-NULL form for unmerged-
-        # call-part correctness and restricts to `id IN filter_candidate_ids`.
-        #
-        # Always-on: independent of `should_use_filter_cte`, because the bloom
-        # prune pays for itself even on the trivial single-pass path and the
-        # CTE itself is cheap (one extra SELECT, no replicated ordering).
-        # TODO(WB-34494): as_sql is getting long. Follow-up to hoist the
-        # early-return predicate into a named local and extract the
-        # single-pass / two-pass branches into helpers.
         candidate_cte_name: str | None = None
         candidate_cte_sql = self._build_filter_candidate_ids_cte_sql(
-            pb, table_alias_resolved
+            pb, table_alias_resolved, self.expand_columns
         )
         if candidate_cte_sql is not None:
             ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
@@ -1285,6 +1303,8 @@ class CallsQuery(BaseModel):
         else:
             # Single-pass: the full query (with all filters, ordering, and
             # limit) is built directly — no filtered_calls CTE needed.
+            # The candidate CTE (if eligible) still injects
+            # `id IN filter_candidate_ids` here so the index can prune.
             #
             # When costs are included, ensure all fields used in ordering are
             # selected so they're available in the cost query's final
@@ -1295,6 +1315,7 @@ class CallsQuery(BaseModel):
             base_sql = self._as_sql_base_format(
                 pb,
                 table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
@@ -1336,6 +1357,8 @@ class CallsQuery(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None,
         id_subquery_name: str | None = None,
+        use_strict_heavy_filter: bool = False,
+        use_strict_trace_id_filter: bool = False,
     ) -> WhereFilters:
         """Build all WHERE clause optimization filters.
 
@@ -1347,6 +1370,14 @@ class CallsQuery(BaseModel):
             table_alias: The table alias to use in SQL
             expand_columns: List of columns that should be expanded for object refs
             id_subquery_name: Optional name of a CTE containing filtered IDs
+            use_strict_heavy_filter: When True, use the strict (no OR-IS-NULL)
+                form of the heavy-field LIKE filter. The candidate-id CTE uses
+                this so the ngram bloom filter index can prune granules; the
+                outer filter_query keeps the OR-IS-NULL form for correctness
+                over unmerged calls_merged parts.
+            use_strict_trace_id_filter: Same idea for the trace_id bloom-filter
+                index (migration 032). Set inside the candidate-id CTE so both
+                pushdowns prune; leave False outside it.
 
         Returns:
             WhereFilters object containing all filter SQL strings
@@ -1359,9 +1390,15 @@ class CallsQuery(BaseModel):
         # signal (start-only) because started_at now rides on call_end rows too.
 
         op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
-        trace_id = process_trace_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, self.read_table
-        )
+        if use_strict_trace_id_filter:
+            trace_id_strict_cond = process_trace_id_filter_to_sql_strict(
+                self.hardcoded_filter, pb, table_alias
+            )
+            trace_id = f" AND ({trace_id_strict_cond})" if trace_id_strict_cond else ""
+        else:
+            trace_id = process_trace_id_filter_to_sql(
+                self.hardcoded_filter, pb, table_alias, self.read_table
+            )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
         )
@@ -1397,7 +1434,10 @@ class CallsQuery(BaseModel):
             non_object_ref_conditions, pb, table_alias, self.read_table
         )
         sortable_datetime = optimization_conditions.sortable_datetime_filters_sql or ""
-        heavy_filter = optimization_conditions.heavy_filter_opt_sql or ""
+        if use_strict_heavy_filter:
+            heavy_filter = optimization_conditions.heavy_filter_opt_strict_sql or ""
+        else:
+            heavy_filter = optimization_conditions.heavy_filter_opt_sql or ""
 
         object_refs = process_object_refs_filter_to_opt_sql(
             pb, table_alias, object_ref_fields_consumed, self.read_table
@@ -1738,13 +1778,10 @@ class CallsQuery(BaseModel):
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
 
         # Use PREWHERE for project_id to filter data before reading from disk
-        # This is a ClickHouse optimization for high-selectivity filters
-        where_filters_sql = where_filters.to_sql()
-        # Strip leading "AND " from where_filters since PREWHERE handles the first condition
-        where_filters_stripped = re.sub(r"^\s*AND\s+", "", where_filters_sql)
-        where_clause = (
-            f"WHERE {where_filters_stripped}" if where_filters_stripped else ""
-        )
+        # This is a ClickHouse optimization for high-selectivity filters.
+        # `to_where_clause` strips the leading `AND ` since PREWHERE provides
+        # the first predicate.
+        where_clause = where_filters.to_where_clause()
 
         # Fix where_clause when empty but we have filter_sql
         # For calls_complete, filter_sql starts with "AND "
@@ -1774,34 +1811,135 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
+        expand_columns: list[str] | None,
     ) -> str | None:
         """Build the `filter_candidate_ids` CTE body, or None if not applicable.
 
-        The CTE pre-narrows rows by trace_id using the strict
-        `ifNull(trace_id, '')` form so the `idx_trace_id_bloom` skip-index
-        from migration 031 can prune granules. The outer query then keeps the
-        OR-IS-NULL form for unmerged-call-part correctness and restricts to
-        `id IN filter_candidate_ids` to inherit the pruning.
+        Unifies two bloom-filter pushdowns on calls_merged so the outer query
+        can `id IN filter_candidate_ids` and inherit both prunes:
 
-        Returns None when the optimization does not apply: non-calls_merged
-        read tables, or no hardcoded trace_ids filter to push down.
+        1. trace_id (migration 032 / idx_trace_id_bloom on ifNull(trace_id, '')).
+           Pushed when hardcoded_filter has trace_ids.
+        2. heavy-field LIKE (migration 033 / idx_<dump>_ngram on ifNull(<dump>, '')).
+           Pushed when the strict heavy-LIKE form is non-empty AND ORDER BY
+           does not reference a heavy field or aggregate-state column.
+
+        The outer filter_query keeps the OR-IS-NULL form for unmerged-call-part
+        correctness, which defeats both bloom indexes, so this CTE runs the
+        strict (no OR-IS-NULL) form alone. When only trace_id applies the CTE
+        is a minimal `WHERE trace_id = ?` SELECT (no ORDER BY/LIMIT). When
+        heavy LIKE applies the CTE mirrors the outer ORDER BY/LIMIT/OFFSET.
+
+        Returns None when neither source applies.
         """
         if self.read_table != ReadTable.CALLS_MERGED:
             return None
-        if self.hardcoded_filter is None or not self.hardcoded_filter.filter.trace_ids:
-            return None
 
-        trace_id_strict = process_trace_id_filter_to_sql_strict(
-            self.hardcoded_filter, pb, table_alias
+        has_trace_ids = bool(
+            self.hardcoded_filter and self.hardcoded_filter.filter.trace_ids
         )
-        if not trace_id_strict:
+
+        # Heavy-LIKE strict has extra ORDER-BY gates because the heavy-LIKE
+        # path mirrors the outer ORDER BY/LIMIT/OFFSET in this CTE. Aggregate-
+        # state ORDER BY columns (argMaxMerge over AggregateFunction(...)
+        # state, or CallsMergedSummaryField handlers that expand to
+        # display_name raw) raise ILLEGAL_TYPE_OF_ARGUMENT without a GROUP BY.
+        # SimpleAggregateFunction columns (`any`, `array_concat_agg`) are
+        # fine; their raw value IS the aggregated value.
+        heavy_eligible = not any(of.field.is_heavy() for of in self.order_fields)
+        if heavy_eligible:
+            for of in self.order_fields:
+                if isinstance(of.field, CallsMergedSummaryField):
+                    heavy_eligible = False
+                    break
+                if isinstance(
+                    of.field, CallsMergedAggField
+                ) and of.field.agg_fn.endswith("Merge"):
+                    heavy_eligible = False
+                    break
+
+        heavy_has_strict_filter = False
+        if heavy_eligible:
+            # Peek on a throwaway ParamBuilder so queries without a heavy-LIKE
+            # optimization don't shift the public param numbering or pay for
+            # duplicate hardcoded-filter params (op_names lists, etc.).
+            # TODO(WB-33883): _build_where_clause_optimizations couples
+            # hardcoded-filter param allocation with optimization-SQL
+            # computation; splitting them removes the duplicate optimizer pass.
+            non_object_ref_conditions = [
+                c
+                for c in self.query_conditions
+                if not (
+                    expand_columns and is_object_ref_operand(c.operand, expand_columns)
+                )
+            ]
+            peek_pb = ParamBuilder()
+            peek = process_query_to_optimization_sql(
+                non_object_ref_conditions, peek_pb, table_alias, self.read_table
+            )
+            heavy_has_strict_filter = bool(peek.heavy_filter_opt_strict_sql)
+
+        if not has_trace_ids and not heavy_has_strict_filter:
             return None
 
-        project_param = pb.add_param(self.project_id)
-        return f"""SELECT {table_alias}.id AS id
+        # trace_id-only: emit the minimal `WHERE trace_id = ?` CTE.
+        if not heavy_has_strict_filter:
+            trace_id_strict = process_trace_id_filter_to_sql_strict(
+                self.hardcoded_filter, pb, table_alias
+            )
+            if not trace_id_strict:
+                return None
+            project_param = pb.add_param(self.project_id)
+            return f"""SELECT {table_alias}.id AS id
         FROM {table_alias}
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         WHERE {trace_id_strict}"""
+
+        # Heavy-LIKE eligible. Build the full WHERE via the optimization
+        # pipeline (which also includes trace_id, op_name, etc. in OR-IS-NULL
+        # form for non-bloom predicates).
+        where_filters = self._build_where_clause_optimizations(
+            pb,
+            table_alias,
+            expand_columns=expand_columns,
+            id_subquery_name=None,
+            use_strict_heavy_filter=True,
+            use_strict_trace_id_filter=True,
+        )
+        if not where_filters.heavy_filter:
+            return None
+
+        order_by_sql = ""
+        if self.order_fields:
+            order_by_sqls = [
+                of.as_sql(
+                    pb,
+                    table_alias,
+                    expand_columns=None,
+                    field_to_object_join_alias_map=None,
+                    use_agg_fn=False,
+                    read_table=self.read_table,
+                )
+                for of in self.order_fields
+            ]
+            order_by_sql = "ORDER BY " + ", ".join(order_by_sqls)
+
+        limit_sql = f"LIMIT {self.limit}" if self.limit is not None else ""
+        offset_sql = f"OFFSET {self.offset}" if self.offset is not None else ""
+
+        project_param = pb.add_param(self.project_id)
+        where_clause = where_filters.to_where_clause()
+
+        raw_sql = f"""
+        SELECT {table_alias}.id AS id
+        FROM {table_alias}
+        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
+        {where_clause}
+        {order_by_sql}
+        {limit_sql}
+        {offset_sql}
+        """
+        return safely_format_sql(raw_sql, logger)
 
     def _as_sql_base_format(
         self,
