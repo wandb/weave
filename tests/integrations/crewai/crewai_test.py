@@ -340,7 +340,6 @@ async def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.flaky(reruns=3)
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
