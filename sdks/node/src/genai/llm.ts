@@ -45,11 +45,48 @@ export interface LLMRecordOpts {
   reasoning?: Reasoning;
 }
 
+/**
+ * An LLM call. Emits a `chat` span with `gen_ai.*` attributes.
+ *
+ * Created by `weave.startLLM()` (or `turn.startLLM()`) and terminated with
+ * `end()`. Only one LLM may be active in an async context at a time; nest
+ * tool/subagent calls under it via `startTool` / `startSubagent`.
+ *
+ * Populate `inputMessages` / `outputMessages` / `usage` / `reasoning` directly,
+ * or via the helper functions (`output`, `think`, `attachMedia`, `record`).
+ *
+ * All recorded data is flushed to the span at `end()`.
+ *
+ * @example
+ * const llm = weave.startLLM({model: 'gpt-4o-mini', providerName: 'openai'});
+ * try {
+ *   llm.inputMessages = [{role: 'user', content: prompt}];
+ *   const resp = await openai.chat.completions.create({...});
+ *   llm.output(resp.choices[0].message.content ?? '');
+ *   llm.record({usage: {inputTokens: resp.usage?.prompt_tokens}});
+ * } finally {
+ *   llm.end();
+ * }
+ */
 export class LLM {
   /** Mutable data populated between `create()` and `end()`. */
+
+  /**
+   * Input messages sent to the model. Flushed to `gen_ai.input.messages` on
+   * `end()`.
+   */
   inputMessages: Message[] = [];
+  /**
+   * Assistant messages returned by the model. Flushed to
+   * `gen_ai.output.messages` on `end()`.
+   */
   outputMessages: Message[] = [];
+  /** Token counts and cache stats. Flushed to `gen_ai.usage.*` on `end()`. */
   usage: Usage = {};
+  /**
+   * Chain-of-thought content. Folded into the last assistant message as a
+   * ReasoningPart at serialization time.
+   */
   reasoning?: Reasoning;
 
   private _ended = false;
@@ -153,7 +190,10 @@ export class LLM {
     return this.attachMedia({uri: url, modality: opts.modality});
   }
 
-  /** Bulk-set any subset of the mutable fields. Replaces (does not merge). */
+  /**
+   * Bulk-set any subset of the mutable fields. Replaces (does not merge).
+   * Useful for assigning everything at once after a provider call returns.
+   */
   record(opts: LLMRecordOpts): this {
     if (this._warnIfEnded('record')) {
       return this;
@@ -177,6 +217,7 @@ export class LLM {
   // Child factories
   // ---------------------------------------------------------------------------
 
+  /** Start a child Tool span nested under this LLM. */
   startTool(opts: ToolInit): Tool {
     return Tool.create({
       ...opts,
@@ -185,6 +226,7 @@ export class LLM {
     });
   }
 
+  /** Start a child SubAgent span nested under this LLM. */
   startSubagent(opts: SubAgentInit): SubAgent {
     return SubAgent.create({
       ...opts,
@@ -197,6 +239,10 @@ export class LLM {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
+  /**
+   * Flush accumulated state to the span and close it. Idempotent. Pass
+   * `error` to mark the span as failed.
+   */
   end(opts?: {error?: Error}): void {
     if (this._ended) {
       return;
