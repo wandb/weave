@@ -52,7 +52,7 @@ async function callLLM({
 }: {
   messages: Message[];
   tools: OpenAI.Chat.Completions.ChatCompletionTool[];
-  userMessage?: Message;
+  userMessage?: OpenAI.Chat.Completions.ChatCompletionUserMessageParam;
 }): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
   const llm = weave.startLLM({model: MODEL, providerName: 'openai'});
 
@@ -106,13 +106,12 @@ async function runTurn(
   history: Message[],
   prompt: string
 ): Promise<string | null> {
-  const userMessage = {role: 'user' as const, content: prompt};
-  history.push(userMessage);
+  history.push({role: 'user', content: prompt});
 
   const turn = weave.startTurn({model: MODEL});
   try {
     let msg = await callLLM({
-      userMessage: userMessage,
+      userMessage: {role: 'user', content: prompt},
       messages: history,
       tools: [wikipediaTool],
     });
