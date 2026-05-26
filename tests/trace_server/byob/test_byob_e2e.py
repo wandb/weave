@@ -204,7 +204,11 @@ def test_byob_write_then_read_lands_in_team_bucket(
     content = b"trace payload"
 
     write_client = route_client(
-        resolver, default_client, byob_clients, PROJECT_BYOB, StorageResolvePurpose.WRITE
+        resolver,
+        default_client,
+        byob_clients,
+        PROJECT_BYOB,
+        StorageResolvePurpose.WRITE,
     )
     stored_uri = store_in_bucket(
         write_client, key_for_project_digest(PROJECT_BYOB, digest), content
@@ -419,9 +423,7 @@ def test_dual_read_raises_on_real_error() -> None:
             raise RuntimeError("permission denied")
 
     target = make_byob_target()
-    team_client = ExplodingClient(
-        FileStorageURI.parse_uri_str("s3://team-byob-bucket")
-    )
+    team_client = ExplodingClient(FileStorageURI.parse_uri_str("s3://team-byob-bucket"))
     default_client = InMemoryStorageClient(
         FileStorageURI.parse_uri_str("s3://platform-default-bucket")
     )

@@ -53,7 +53,10 @@ class AmbientCredentials(BaseModel):
 
 
 StorageCredentials = Annotated[
-    S3TemporaryCredentials | GCSAccessTokenCredentials | AzureSasCredentials | AmbientCredentials,
+    S3TemporaryCredentials
+    | GCSAccessTokenCredentials
+    | AzureSasCredentials
+    | AmbientCredentials,
     Field(discriminator="credential_type"),
 ]
 

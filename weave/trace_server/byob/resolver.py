@@ -139,10 +139,7 @@ class StorageResolver:
     ) -> None:
         cache_seconds = self._cache_seconds_for(target)
         with self._lock:
-            if (
-                len(self._cache) >= self._max_entries
-                and project_id not in self._cache
-            ):
+            if len(self._cache) >= self._max_entries and project_id not in self._cache:
                 # Soft cap exceeded - raise loudly per spec §3.
                 raise StorageResolutionError(
                     f"BYOB resolver cache exceeded max entries ({self._max_entries})"
