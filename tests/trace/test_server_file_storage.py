@@ -7,12 +7,12 @@ specific setup requirements.
 
 import base64
 import os
+import time
 from unittest import mock
 
 import boto3
 import pytest
 from google.api_core import exceptions
-from google.auth.credentials import AnonymousCredentials
 from moto import mock_aws
 
 from tests.trace.util import client_is_sqlite
@@ -151,89 +151,23 @@ class TestS3Storage:
 
 
 class TestGCSStorage:
-    """Tests for Google Cloud Storage implementation."""
+    """Tests for Google Cloud Storage implementation.
 
-    @pytest.fixture
-    def mock_gcp_credentials(self):
-        """Mock GCP credentials to prevent authentication."""
-        with mock.patch(
-            "google.oauth2.service_account.Credentials.from_service_account_info"
-        ) as mock_creds:
-            mock_creds.return_value = AnonymousCredentials()
-            yield
-
-    @pytest.fixture
-    def gcs(self):
-        """Google Cloud Storage mock using method patches."""
-        mock_storage_client = mock.MagicMock()
-        mock_bucket = mock.MagicMock()
-        mock_blob = mock.MagicMock()
-
-        # Setup mock chain
-        mock_storage_client.bucket.return_value = mock_bucket
-        mock_bucket.blob.return_value = mock_blob
-
-        # In-memory storage for all blobs
-        blob_data = {}
-
-        def mock_upload_from_string(
-            data, timeout=None, if_generation_match=None, **kwargs
-        ):
-            # Get the blob name from the mock's name attribute
-            blob_name = mock_blob.name
-            # Simulate GCS if_generation_match=0 behavior (only write if not exists)
-            if if_generation_match == 0 and blob_name in blob_data:
-                raise exceptions.PreconditionFailed("Object already exists")
-            blob_data[blob_name] = data
-
-        def mock_download_as_bytes(timeout=None, **kwargs):
-            # Get the blob name from the mock's name attribute
-            blob_name = mock_blob.name
-            return blob_data.get(blob_name, b"")
-
-        mock_blob.upload_from_string.side_effect = mock_upload_from_string
-        mock_blob.download_as_bytes.side_effect = mock_download_as_bytes
-
-        with mock.patch(
-            "google.cloud.storage.Client", return_value=mock_storage_client
-        ):
-            yield mock_storage_client
-
-    @pytest.fixture
-    def gcp_storage_env(self):
-        """Setup GCP storage environment."""
-        with mock.patch.dict(
-            os.environ,
-            {
-                "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
-                    b"""{
-                    "type": "service_account",
-                    "project_id": "test-project",
-                    "private_key_id": "test-key-id",
-                    "private_key": "test-key",
-                    "client_email": "test@test-project.iam.gserviceaccount.com",
-                    "client_id": "test-client-id",
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test@test-project.iam.gserviceaccount.com"
-                }"""
-                ).decode(),
-                "WF_FILE_STORAGE_URI": f"gs://{TEST_BUCKET}",
-                "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
-            },
-        ):
-            yield
+    `gcs`, `gcp_storage_env`, and `mock_gcp_credentials` live in
+    `tests/trace/conftest.py` so other suites in the package can drive the
+    bucket write path without copy-pasting the SDK mock.
+    """
 
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
-    def test_gcp_storage(self, run_storage_test, gcs):
+    def test_gcp_storage(self, run_storage_test, gcs, client: WeaveClient):
         """Test file storage using Google Cloud Storage."""
         res = run_storage_test()
 
-        # Verify the object exists in GCS
-        bucket = gcs.bucket(TEST_BUCKET)
-        blob = bucket.blob(res.digest)
-        assert blob.download_as_bytes() == TEST_CONTENT
+        # GCS path uses the base64-encoded project_id (matches azure test).
+        project_b64 = base64.b64encode(client.project_id.encode()).decode()
+        expected_key = f"weave/projects/{project_b64}/files/{res.digest}"
+        assert gcs.state.blob_data[expected_key] == TEST_CONTENT
+        assert gcs.state.upload_count == 1
 
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
     def test_gcp_storage_skips_duplicate_write(self, client: WeaveClient):
@@ -487,3 +421,124 @@ def test_file_storage_retry_limit(client: WeaveClient):
 
         # Verify GCS was attempted exactly 3 times before fallback
         assert attempt_count == 3, f"Expected 3 GCS attempts, got {attempt_count}"
+
+
+# ---------------------------------------------------------------------------
+# Parallel bucket-upload fan-out during call_batch
+# ---------------------------------------------------------------------------
+#
+# These drive the trace server's bucket-storage path with the shared `gcs`
+# fixture (mocked at `google.cloud.storage.Client`). Multiple `file_create`
+# calls inside one `call_batch()` context should stage and then fan out to
+# GCS in parallel on context exit.
+
+
+def _unique_payload(unique: str, size: int) -> bytes:
+    """Build a deterministic, unique payload of the requested size."""
+    body = (unique + "_" + ("x" * size)).encode()
+    return body
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+@pytest.mark.disable_logging_error_check
+def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs):
+    """Multiple file_create calls inside one call_batch fan out to GCS in
+    parallel: concurrent uploads happen, wall time beats the serial bound,
+    identical content within the batch collapses to one upload, and every
+    stored object lands under the expected project prefix.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    gcs.state.delay = 0.1
+    # 4 unique blobs + 2 duplicates of the first => 4 GCS uploads after dedup.
+    payload_size = 50_000
+    payloads = [
+        _unique_payload("alpha", payload_size),
+        _unique_payload("beta", payload_size),
+        _unique_payload("gamma", payload_size),
+        _unique_payload("delta", payload_size),
+        _unique_payload("alpha", payload_size),  # dup
+        _unique_payload("alpha", payload_size),  # dup
+    ]
+    server = client.server
+
+    start = time.monotonic()
+    with server.call_batch():
+        for i, content in enumerate(payloads):
+            server.file_create(
+                FileCreateReq(
+                    project_id=client.project_id, name=f"f{i}.bin", content=content
+                )
+            )
+    elapsed = time.monotonic() - start
+
+    # Parallelism: 4 uploads * 100ms = 400ms serial bound; the pool defaults
+    # to 8 workers, so a parallel run completes in ~150-300ms.
+    assert gcs.state.concurrent_peak >= 2, (
+        f"expected concurrent uploads, peak={gcs.state.concurrent_peak}"
+    )
+    assert elapsed < 0.35, f"flush was effectively serial: {elapsed:.3f}s"
+
+    # Dedup: 4 unique blobs => 4 GCS uploads, not 6.
+    assert gcs.state.upload_count == 4
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+    expected_prefix = f"weave/projects/{project_b64}/files/"
+    assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+@pytest.mark.disable_logging_error_check
+def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
+    client: WeaveClient, gcs
+):
+    """When one upload in a batch hits a non-retriable GCS error, the server
+    should fall back to inline ClickHouse chunks for that file only; other
+    uploads in the same batch keep their bucket URIs, and the whole batch
+    still completes. We verify by reading the failed file back through the
+    server's read path — it must reassemble bit-for-bit from CH chunks.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    server = client.server
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+
+    # Upload one file first so we can compute the digest, then inject a
+    # failure for that exact GCS key when it's re-uploaded inside the batch.
+    fail_payload = _unique_payload("fail", 50_000)
+    probe_res = server.file_create(
+        FileCreateReq(
+            project_id=client.project_id, name="probe.bin", content=fail_payload
+        )
+    )
+    fail_key = f"weave/projects/{project_b64}/files/{probe_res.digest}"
+    gcs.state.blob_data.clear()
+    gcs.state.upload_count = 0
+    gcs.state.fail_paths.add(fail_key)
+
+    ok_payload = _unique_payload("ok", 50_000)
+    with server.call_batch():
+        server.file_create(
+            FileCreateReq(
+                project_id=client.project_id, name="ok.bin", content=ok_payload
+            )
+        )
+        server.file_create(
+            FileCreateReq(
+                project_id=client.project_id, name="fail.bin", content=fail_payload
+            )
+        )
+
+    # The successful upload made it through.
+    assert any(
+        k.startswith(f"weave/projects/{project_b64}/files/")
+        for k in gcs.state.blob_data
+    )
+    # The failing one is not present in the bucket.
+    assert fail_key not in gcs.state.blob_data
+    # ...but is readable via the server, because it landed as inline chunks.
+    fallback_read = server.file_content_read(
+        FileContentReadReq(project_id=client.project_id, digest=probe_res.digest)
+    )
+    assert fallback_read.content == fail_payload
