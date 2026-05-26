@@ -958,11 +958,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         with self.call_batch():
             for complete_call in req.batch:
-                (
-                    processed_complete_call,
-                    input_refs,
-                    output_refs,
-                ) = process_complete_call_to_content(complete_call, self)
+                processed = process_complete_call_to_content(complete_call, self)
+                processed_complete_call = processed["call"]
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
@@ -979,8 +976,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ch_call = complete_call_to_ch_insertable(
                     processed_complete_call,
                     retention_days,
-                    input_refs=input_refs,
-                    output_refs=output_refs,
+                    input_refs=processed["input_refs"],
+                    output_refs=processed["output_refs"],
                 )
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)

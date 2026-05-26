@@ -7,11 +7,12 @@ with content objects stored in bucket storage.
 import json
 import logging
 import re
-from typing import Any, TypeVar
+from typing import Any, TypedDict, TypeVar
 
 import ddtrace
 
 from weave.shared import refs_internal
+from weave.shared.refs_internal import InvalidInternalRef
 from weave.shared.trace_server_interface_util import valid_internal_schemes
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
@@ -22,6 +23,19 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.type_wrappers.Content.content import Content
+
+
+class ProcessedCompleteCall(TypedDict):
+    """Result of `process_complete_call_to_content`.
+
+    Carrying input_refs and output_refs as named fields here (instead of a
+    3-tuple) keeps the call-site call_complete_to_ch_insertable mapping
+    positionally unambiguous.
+    """
+
+    call: CompletedCallSchemaForInsert
+    input_refs: list[str]
+    output_refs: list[str]
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +189,10 @@ def replace_base64_with_content_objects(
                     parsed = refs_internal.parse_internal_uri(val)
                     if parsed.uri == val:
                         seen_refs[val] = None
-                except Exception:
+                except InvalidInternalRef:
+                    # Malformed ref URI: stay silent (matches the legacy
+                    # `extract_refs_from_values` behaviour). Anything else
+                    # is a bug and must propagate.
                     pass
                 return val
             if len(val) > AUTO_CONVERSION_MIN_SIZE:
@@ -255,7 +272,7 @@ def process_call_req_to_content(
 def process_complete_call_to_content(
     complete_call: CompletedCallSchemaForInsert,
     trace_server: TraceServerInterface,
-) -> tuple[CompletedCallSchemaForInsert, list[str], list[str]]:
+) -> ProcessedCompleteCall:
     """Process a complete call to replace base64 content and extract refs.
 
     Args:
@@ -263,7 +280,8 @@ def process_complete_call_to_content(
         trace_server: Trace server instance for file storage.
 
     Returns:
-        Tuple of (complete_call, input_refs, output_refs).
+        A `ProcessedCompleteCall` carrying the mutated call plus refs for
+        each side as named fields.
     """
     complete_call.inputs, input_refs = replace_base64_with_content_objects(
         complete_call.inputs, complete_call.project_id, trace_server
@@ -271,4 +289,6 @@ def process_complete_call_to_content(
     complete_call.output, output_refs = replace_base64_with_content_objects(
         complete_call.output, complete_call.project_id, trace_server
     )
-    return complete_call, input_refs, output_refs
+    return ProcessedCompleteCall(
+        call=complete_call, input_refs=input_refs, output_refs=output_refs
+    )

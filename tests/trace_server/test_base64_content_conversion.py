@@ -2,6 +2,7 @@
 
 import base64
 import json
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,12 +12,14 @@ from weave.trace_server.base64_content_conversion import (
     is_base64,
     is_data_uri,
     process_call_req_to_content,
+    process_complete_call_to_content,
     replace_base64_with_content_objects,
     store_content_object,
 )
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallStartReq,
+    CompletedCallSchemaForInsert,
     EndedCallSchemaForInsert,
     FileCreateRes,
     StartedCallSchemaForInsert,
@@ -193,7 +196,7 @@ class TestBase64Replacement:
             start=StartedCallSchemaForInsert(
                 project_id="proj",
                 op_name="op",
-                started_at=__import__("datetime").datetime.utcnow(),
+                started_at=datetime.now(timezone.utc),
                 attributes={},
                 inputs={
                     "image": f"data:image/png;base64,{b64_data}",
@@ -213,7 +216,7 @@ class TestBase64Replacement:
             end=EndedCallSchemaForInsert(
                 project_id="proj",
                 id="call-id",
-                ended_at=__import__("datetime").datetime.utcnow(),
+                ended_at=datetime.now(timezone.utc),
                 summary={"usage": {}, "status_counts": {}},
                 output=long_b64,
             )
@@ -265,16 +268,7 @@ class TestBase64Replacement:
         assert result["image_ref"] == ref_b
 
     def test_process_complete_call_to_content_returns_refs_for_both_sides(self):
-        """`process_complete_call_to_content` returns (call, input_refs, output_refs)."""
-        from datetime import datetime, timezone
-
-        from weave.trace_server.base64_content_conversion import (
-            process_complete_call_to_content,
-        )
-        from weave.trace_server.trace_server_interface import (
-            CompletedCallSchemaForInsert,
-        )
-
+        """`process_complete_call_to_content` returns a ProcessedCompleteCall with both refs."""
         trace_server = MagicMock()
         input_ref = "weave-trace-internal:///proj/object/in:v1"
         output_ref = "weave-trace-internal:///proj/object/out:v1"
@@ -292,13 +286,11 @@ class TestBase64Replacement:
             output={"y": output_ref},
         )
 
-        processed, input_refs, output_refs = process_complete_call_to_content(
-            completed, trace_server
-        )
+        processed = process_complete_call_to_content(completed, trace_server)
 
-        assert processed is completed
-        assert input_refs == [input_ref]
-        assert output_refs == [output_ref]
+        assert processed["call"] is completed
+        assert processed["input_refs"] == [input_ref]
+        assert processed["output_refs"] == [output_ref]
 
 
 class TestStandaloneBase64Detection:
@@ -573,8 +565,6 @@ class TestThresholdAndStructuralIdentity:
         ``CallStartReq`` machinery in ``process_call_req_to_content`` just
         rebinds the field, which is fine.
         """
-        from datetime import datetime, timezone
-
         trace_server = MagicMock()
         inputs_before = {"text": "no binary content here"}
         start_req = CallStartReq(
