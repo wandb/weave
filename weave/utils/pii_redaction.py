@@ -109,7 +109,9 @@ def redact_pii(
 def redact_pii_string(data: str) -> str:
     """Redact PII in a single string."""
     if not data:
-        return data  # _get_engines() is uncached; skip the engine-load cost on empty defaults
+        # Short-circuit empty input — _get_engines() is uncached and traces
+        # commonly contain empty strings, so loading Presidio every call is costly.
+        return data
     analyzer, anonymizer = _get_engines()
     entities = _get_redaction_entities()
     results = analyzer.analyze(text=data, language="en", entities=entities)
@@ -117,7 +119,7 @@ def redact_pii_string(data: str) -> str:
     return redacted.text
 
 
-def redact_messages(messages: list[Message] | None) -> list[Message] | None:
+def redact_messages(messages: list[Message]) -> list[Message]:
     """Redact PII in each Message via dump → redact → revalidate.
 
     Routes through the same recursive ``redact_pii`` used by ``@op`` so
@@ -135,10 +137,8 @@ def redact_messages(messages: list[Message] | None) -> list[Message] | None:
     return redacted
 
 
-def redact_system_instructions(
-    instructions: list[str] | None,
-) -> list[str] | None:
-    """Redact each system instruction. None/empty in → same out."""
+def redact_system_instructions(instructions: list[str]) -> list[str]:
+    """Redact each system instruction. Empty in → same out."""
     if not instructions:
         return instructions
     return [redact_pii_string(instruction) for instruction in instructions]
