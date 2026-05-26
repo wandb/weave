@@ -24,6 +24,14 @@ describe('Session', () => {
     expect(spans[0].name).toBe('invoke_agent');
     expect(spans[0].attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('s-1');
     expect(spans[0].attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('weather-bot');
+
+    expect(spans[0].attributes).toMatchInlineSnapshot(`
+      {
+        "gen_ai.agent.name": "weather-bot",
+        "gen_ai.conversation.id": "s-1",
+        "gen_ai.operation.name": "invoke_agent",
+      }
+    `);
   });
 
   it('auto-generates a sessionId when none is supplied', () => {
