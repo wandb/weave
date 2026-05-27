@@ -10,10 +10,14 @@ This module owns the deferred-upload buffer and the fan-out step:
 
     bucket_uploads = BucketUploadBatch()
     ...
-    bucket_uploads.stage(req, digest, client)   # cheap, in-memory only
+    bucket_uploads.stage(req, digest)        # cheap, in-memory only
     ...
-    rows = bucket_uploads.flush()               # parallel upload -> CH rows
+    rows = bucket_uploads.flush(client)      # parallel upload -> CH rows
     self._file_batch.extend(rows)
+
+The `FileStorageClient` is supplied once at flush time rather than carried
+on every staged item. The trace server's `file_storage_client` is per-
+instance, so a batch only ever needs one.
 
 `flush()` preserves per-file semantics from the original serial path: each
 worker either uploads to the bucket or, on `FileStorageWriteError`, returns
@@ -59,7 +63,6 @@ DEFAULT_BUCKET_UPLOAD_CONCURRENCY = 8
 class _Pending:
     req: tsi.FileCreateReq
     digest: str
-    client: FileStorageClient
 
 
 class BucketUploadBatch:
@@ -75,19 +78,14 @@ class BucketUploadBatch:
         self._pending: list[_Pending] = []
         self._seen: set[tuple[str, str]] = set()
 
-    def stage(
-        self,
-        req: tsi.FileCreateReq,
-        digest: str,
-        client: FileStorageClient,
-    ) -> None:
+    def stage(self, req: tsi.FileCreateReq, digest: str) -> None:
         """Defer a bucket upload until `flush()`.
 
         Caller computes the digest, validates `expected_digest`, and dedups
         against the in-flight ClickHouse chunk buffer. Within-batch dedup
         across bucket uploads is tracked here via `has()`.
         """
-        self._pending.append(_Pending(req=req, digest=digest, client=client))
+        self._pending.append(_Pending(req=req, digest=digest))
         self._seen.add((req.project_id, digest))
 
     def has(self, project_id: str, digest: str) -> bool:
@@ -98,15 +96,28 @@ class BucketUploadBatch:
         return bool(self._pending)
 
     @ddtrace.tracer.wrap(name="bucket_upload_batch.flush")
-    def flush(self) -> list[FileChunkCreateCHInsertable]:
+    def flush(
+        self, client: FileStorageClient | None
+    ) -> list[FileChunkCreateCHInsertable]:
         """Run staged uploads in parallel; return chunk rows for the caller to insert.
 
         Each pending upload becomes either a single bucket-URI chunk
         (success) or N inline ClickHouse chunks (FileStorageWriteError
         fallback). Order is not preserved.
+
+        `client` must be non-None whenever items have been staged. The
+        staging path is gated on a non-None client at the call site, so
+        receiving None here would indicate a broken invariant rather than a
+        valid empty-batch case.
         """
         if not self._pending:
             return []
+        if client is None:
+            raise RuntimeError(
+                "BucketUploadBatch.flush() received None client but "
+                f"{len(self._pending)} items were staged; staging is supposed "
+                "to gate on a non-None client."
+            )
         pending, self._pending = self._pending, []
         self._seen = set()
 
@@ -115,16 +126,18 @@ class BucketUploadBatch:
             max_workers=min(self._max_workers, len(pending)),
             thread_name_prefix="bucket-upload",
         ) as pool:
-            futs = [pool.submit(_upload_one, p) for p in pending]
+            futs = [pool.submit(_upload_one, p, client) for p in pending]
             for fut in as_completed(futs):
                 rows.extend(fut.result())
         return rows
 
 
-def _upload_one(p: _Pending) -> list[FileChunkCreateCHInsertable]:
+def _upload_one(
+    p: _Pending, client: FileStorageClient
+) -> list[FileChunkCreateCHInsertable]:
     try:
         uri = store_in_bucket(
-            p.client, key_for_project_digest(p.req.project_id, p.digest), p.req.content
+            client, key_for_project_digest(p.req.project_id, p.digest), p.req.content
         )
     except FileStorageWriteError:
         return file_chunks_for(p.req, p.digest)

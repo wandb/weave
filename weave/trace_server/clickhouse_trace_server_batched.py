@@ -851,7 +851,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         # Raises on fail
         try:
-            self._file_batch.extend(self._bucket_uploads.flush())
+            self._file_batch.extend(
+                self._bucket_uploads.flush(self.file_storage_client)
+            )
         except Exception:
             logger.exception("Failed to flush bucket uploads")
             raise
@@ -5905,7 +5907,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # an N-attachment batch pays one fan-out round-trip instead of N.
             # Per-file FileStorageWriteError fallback to inline-CH chunks is
             # handled inside _upload_one, not by the caller's except arm.
-            self._bucket_uploads.stage(req, digest, client)
+            self._bucket_uploads.stage(req, digest)
             return
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
