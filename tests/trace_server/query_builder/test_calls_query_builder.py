@@ -2114,6 +2114,28 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
     )
 
 
+def test_unsupported_summary_field_raises_invalid_field_error() -> None:
+    """Filtering by an unknown summary.weave.* field must surface as InvalidFieldError
+    (mapped to HTTP 403) rather than NotImplementedError (HTTP 500). Regression for
+    WB-34835: clients hitting /calls/query_stats with summary.weave.duration_ms were
+    getting 500s for what is actually invalid input.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "summary.weave.duration_ms"},
+                    {"$literal": 0},
+                ]
+            }
+        )
+    )
+    with pytest.raises(InvalidFieldError, match="duration_ms"):
+        cq.as_sql(ParamBuilder())
+
+
 def test_build_calls_complete_update_end_query() -> None:
     """Ensure the update-end helper builds the expected query."""
     query = build_calls_complete_update_end_query(

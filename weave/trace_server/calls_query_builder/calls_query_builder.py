@@ -285,8 +285,8 @@ class CallsMergedSummaryField(CallsMergedField):
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
-            raise NotImplementedError(
-                f"Summary field '{self.summary_field}' not implemented. "
+            raise InvalidFieldError(
+                f"Summary field '{self.summary_field}' is not allowed. "
                 f"Supported fields are: {supported_fields}"
             )
 
