@@ -55,9 +55,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         # the executor thread.
         ctx = contextvars.copy_context()
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            self._ch_executor, lambda: ctx.run(fn, *args)
-        )
+        return await loop.run_in_executor(self._ch_executor, lambda: ctx.run(fn, *args))
 
     @tag_db_insert_path("completions_create")
     async def acompletions_create(

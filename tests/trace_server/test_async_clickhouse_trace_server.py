@@ -19,7 +19,6 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
     IdConverter,
 )
-from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 LITELLM_ACOMPLETION_PATCH = (
     "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion"
@@ -202,7 +201,9 @@ async def test_real_prep_blocking_calls_run_off_loop(
             _make_req(track_llm_call=False, model=model, prompt=prompt)
         )
 
-    assert obj_read_tids, "obj_read was never called - prep did not exercise blocking shape"
+    assert obj_read_tids, (
+        "obj_read was never called - prep did not exercise blocking shape"
+    )
     assert all(tid != loop_tid for tid in obj_read_tids)
     # prep returned a short-circuit error response, litellm was never invoked.
     assert "error" in res.response
@@ -210,9 +211,8 @@ async def test_real_prep_blocking_calls_run_off_loop(
 
 
 @pytest.mark.asyncio
-async def test_log_completion_call_runs_on_executor_thread(
-    _mock_secret_fetcher: MagicMock,
-) -> None:
+@pytest.mark.usefixtures("_mock_secret_fetcher")
+async def test_log_completion_call_runs_on_executor_thread() -> None:
     # The whole point of the async path: CH insert hops to the executor so the
     # loop thread is free during the LLM wait. Assert _log_completion_call
     # actually executes on a thread from ch_executor, not the caller's thread.
@@ -255,9 +255,8 @@ async def test_log_completion_call_runs_on_executor_thread(
 
 
 @pytest.mark.asyncio
-async def test_many_in_flight_with_one_thread_ch_executor(
-    _mock_secret_fetcher: MagicMock,
-) -> None:
+@pytest.mark.usefixtures("_mock_secret_fetcher")
+async def test_many_in_flight_with_one_thread_ch_executor() -> None:
     """A 1-thread CH executor must not gate LLM-call concurrency."""
     ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="test-ch")
     srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
