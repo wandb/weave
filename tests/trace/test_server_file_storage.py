@@ -7,7 +7,6 @@ specific setup requirements.
 
 import base64
 import os
-import time
 from unittest import mock
 
 import boto3
@@ -443,9 +442,9 @@ def _unique_payload(unique: str, size: int) -> bytes:
 @pytest.mark.disable_logging_error_check
 def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs):
     """Multiple file_create calls inside one call_batch fan out to GCS in
-    parallel: concurrent uploads happen, wall time beats the serial bound,
-    identical content within the batch collapses to one upload, and every
-    stored object lands under the expected project prefix.
+    parallel: concurrent uploads happen, identical content within the batch
+    collapses to one upload, and every stored object lands under the
+    expected project prefix.
     """
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
@@ -463,7 +462,6 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
     ]
     server = client.server
 
-    start = time.monotonic()
     with server.call_batch():
         for i, content in enumerate(payloads):
             server.file_create(
@@ -471,14 +469,13 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
                     project_id=client.project_id, name=f"f{i}.bin", content=content
                 )
             )
-    elapsed = time.monotonic() - start
 
-    # Parallelism: 4 uploads * 100ms = 400ms serial bound; the pool defaults
-    # to 8 workers, so all 4 unique uploads should run concurrently.
+    # Pool defaults to 8 workers, so all 4 unique uploads should run
+    # concurrently. concurrent_peak is the load-bearing parallelism signal;
+    # wall-time assertions on top would flake on contended CI runners.
     assert gcs.state.concurrent_peak >= 4, (
         f"expected 4 concurrent uploads, peak={gcs.state.concurrent_peak}"
     )
-    assert elapsed < 0.35, f"flush was effectively serial: {elapsed:.3f}s"
 
     # Dedup: 4 unique blobs => 4 GCS uploads, not 6.
     assert gcs.state.upload_count == 4
