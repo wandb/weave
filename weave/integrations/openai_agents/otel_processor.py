@@ -461,10 +461,14 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         # wrapper wouldn't see our agent spans as the OTel parent.
         self._span_tokens: dict[str, Any] = {}
         self._conversation_ids: dict[str, str] = {}
-        # Set of in-flight openai span_ids per trace_id. Lets on_trace_end
-        # sweep any leftovers (e.g. spans the SDK never closed) so a misbehaving
-        # trace doesn't leak across multiple Runner.run calls in one process.
-        self._trace_spans: dict[str, set[str]] = {}
+        # In-flight openai span_ids per trace_id, kept as a dict acting as an
+        # ordered set so on_trace_end can detach leftover tokens in LIFO
+        # (reverse-insertion) order. ``otel_context.detach`` uses
+        # ``ContextVar.reset``, which silently corrupts the context stack if
+        # called out of LIFO order — a plain set's hash-bucket iteration would
+        # almost never match LIFO. Lets the sweep handle spans the SDK never
+        # closed without leaking state across Runner.run calls.
+        self._trace_spans: dict[str, dict[str, None]] = {}
 
     def _tracer(self) -> Any:
         return otel_trace.get_tracer(_TRACER_NAME)
@@ -482,15 +486,16 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
 
     def on_trace_start(self, trace: Trace) -> None:
         self._conversation_ids[trace.trace_id] = _conversation_id_for_trace(trace)
-        self._trace_spans.setdefault(trace.trace_id, set())
+        self._trace_spans.setdefault(trace.trace_id, {})
 
     def on_trace_end(self, trace: Trace) -> None:
         # Sweep any in-flight spans belonging to this trace. In healthy flows
         # on_span_end already removed them; this handler covers the case where
         # the SDK ends the trace without closing every span (errors, abrupt
         # cancellations) so we don't leak OTel spans / context tokens.
-        leftover = self._trace_spans.pop(trace.trace_id, set())
-        for span_id in leftover:
+        leftover = self._trace_spans.pop(trace.trace_id, {})
+        # Detach in LIFO order — see comment on ``self._trace_spans``.
+        for span_id in reversed(leftover):
             token = self._span_tokens.pop(span_id, None)
             if token is not None:
                 otel_context.detach(token)
@@ -509,7 +514,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         otel_span.set_attribute(f"{_WEAVE_ATTR_PREFIX}.span_id", span.span_id)
         otel_span.set_attribute(f"{_WEAVE_ATTR_PREFIX}.trace_id", span.trace_id)
         self._span_otel[span.span_id] = otel_span
-        self._trace_spans.setdefault(span.trace_id, set()).add(span.span_id)
+        self._trace_spans.setdefault(span.trace_id, {})[span.span_id] = None
         # Attach so any span the user creates inside an Agents-SDK span nests
         # under this one. Detached in on_span_end.
         self._span_tokens[span.span_id] = otel_context.attach(
@@ -522,7 +527,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
             return
         trace_spans = self._trace_spans.get(span.trace_id)
         if trace_spans is not None:
-            trace_spans.discard(span.span_id)
+            trace_spans.pop(span.span_id, None)
 
         token = self._span_tokens.pop(span.span_id, None)
         if token is not None:
@@ -573,7 +578,10 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         self._end_open_spans()
 
     def _end_open_spans(self) -> None:
-        for token in self._span_tokens.values():
+        # Detach in LIFO (reverse-insertion) order — see comment on
+        # ``self._trace_spans``. ``dict.values()`` iterates in insertion order
+        # in Python 3.7+, so reversing gives us the correct stack-unwind order.
+        for token in reversed(self._span_tokens.values()):
             otel_context.detach(token)
         for otel_span in self._span_otel.values():
             if otel_span.is_recording():

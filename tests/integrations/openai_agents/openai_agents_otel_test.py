@@ -27,6 +27,7 @@ from agents.tracing import (
     Trace,
     TurnSpanData,
 )
+from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -62,6 +63,60 @@ def setup_tests():
     Mirrors the calls-side fixture but uses ``WeaveOtelTracingProcessor``.
     """
     agents.set_trace_processors([WeaveOtelTracingProcessor()])
+
+
+# 5 spans gives ~0.8% chance (1/120) of a random set-iteration happening to
+# match reverse-insertion by accident — low enough to make the LIFO regression
+# checks reliable across PYTHONHASHSEED runs. count=3 would let the bug slip
+# through ~17% of the time (1/6).
+_LIFO_TEST_SPAN_COUNT = 5
+
+
+def _record_detach_calls(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    """Wrap ``otel_context.detach`` so the test can assert call order; returns the list."""
+    calls: list[Any] = []
+    original = otel_context.detach
+
+    def recording_detach(token: Any) -> None:
+        calls.append(token)
+        return original(token)
+
+    monkeypatch.setattr(
+        "weave.integrations.openai_agents.otel_processor.otel_context.detach",
+        recording_detach,
+    )
+    return calls
+
+
+def _make_processor_with_open_span_chain() -> tuple[WeaveOtelTracingProcessor, Any]:
+    """Build a processor + trace with N open spans already attached.
+
+    Each ``on_span_start`` attaches a fresh OTel context token; the resulting
+    stack is ``_LIFO_TEST_SPAN_COUNT`` levels deep with the last span current —
+    the precondition for LIFO-detach assertions. ``on_span_end`` is NOT called,
+    so the spans remain "leftover" for whichever cleanup path the test drives.
+    """
+    processor = WeaveOtelTracingProcessor()
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_lifo"
+    trace.name = "wf"
+    trace.group_id = None
+    processor.on_trace_start(trace)
+
+    last_span_id: str | None = None
+    for i in range(_LIFO_TEST_SPAN_COUNT):
+        s = Mock(spec=Span)
+        s.trace_id = "trace_lifo"
+        s.span_id = f"span_{i:02d}"
+        s.parent_id = last_span_id
+        s.span_data = AgentSpanData(name=f"Agent{i}")
+        s.started_at = None
+        s.ended_at = None
+        s.error = None
+        processor.on_span_start(s)
+        last_span_id = s.span_id
+
+    return processor, trace
 
 
 def _attrs(span: Any) -> dict[str, Any]:
@@ -760,7 +815,7 @@ def test_on_trace_end_sweeps_leftover_spans(
 
     assert "span_leaked" in processor._span_otel
     assert "span_leaked" in processor._span_tokens
-    assert processor._trace_spans["trace_leak"] == {"span_leaked"}
+    assert "span_leaked" in processor._trace_spans["trace_leak"]
 
     processor.on_trace_end(trace)
 
@@ -834,6 +889,48 @@ def test_on_span_end_still_ends_span_when_enrichment_raises(
     assert chat.status.status_code.name == "ERROR"
 
     processor.on_trace_end(trace)
+
+
+def test_on_trace_end_detaches_leftover_tokens_in_lifo_order(
+    client: WeaveClient,
+    otel_spans: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The leftover-sweep must detach context tokens in LIFO order.
+
+    ``otel_context.detach`` uses ``ContextVar.reset``, which restores the value
+    captured when the token was *created*. Out-of-order detach leaves the OTel
+    current-span context pointing at a stale span, corrupting any work that
+    happens after the sweep. Iterating a ``set`` (the previous storage shape
+    for ``_trace_spans``) gives hash-bucket order, not LIFO.
+    """
+    processor, trace = _make_processor_with_open_span_chain()
+    expected_lifo_tokens = list(reversed(list(processor._span_tokens.values())))
+    detach_calls = _record_detach_calls(monkeypatch)
+
+    # Deliberately do NOT call on_span_end — leave them as leftover for the sweep.
+    processor.on_trace_end(trace)
+
+    assert detach_calls == expected_lifo_tokens
+
+
+def test_end_open_spans_detaches_tokens_in_lifo_order(
+    client: WeaveClient,
+    otel_spans: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``_end_open_spans`` (shutdown/force_flush path) must detach in LIFO order.
+
+    Dict iteration is insertion order in Python 3.7+, but LIFO detach needs the
+    *reverse* of insertion order.
+    """
+    processor, _trace = _make_processor_with_open_span_chain()
+    expected_lifo_tokens = list(reversed(list(processor._span_tokens.values())))
+    detach_calls = _record_detach_calls(monkeypatch)
+
+    processor.force_flush()
+
+    assert detach_calls == expected_lifo_tokens
 
 
 def test_undo_patch_is_noop_when_not_patched() -> None:
