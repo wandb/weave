@@ -246,8 +246,9 @@ class CallsMergedDynamicField(CallsMergedAggField):
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         if self.extra_path:
-            raise NotImplementedError(
-                "Dynamic fields cannot be selected directly, yet - implement me!"
+            raise InvalidFieldError(
+                f"Field '{self.field}.{'.'.join(self.extra_path)}' cannot be selected directly; "
+                "select the parent column instead."
             )
         # Use the parent (CallsMergedAggField) as_sql to get the aggregate
         # expression without the JSON extraction that our own as_sql adds.
@@ -416,8 +417,9 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
-        raise NotImplementedError(
-            "Feedback fields cannot be selected directly, yet - implement me!"
+        raise InvalidFieldError(
+            "Feedback fields cannot be selected directly. "
+            "Use the feedback endpoints to read feedback payloads."
         )
 
 
@@ -458,8 +460,9 @@ class CallsMergedQueueItemField(CallsMergedField):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
-        raise NotImplementedError(
-            "Queue item fields cannot be selected directly, yet - implement me!"
+        raise InvalidFieldError(
+            "Annotation queue item fields cannot be selected directly; "
+            "use the annotation queue endpoints instead."
         )
 
 
@@ -537,8 +540,9 @@ class QueryBuilderDynamicField(QueryBuilderField):
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         if self.extra_path:
-            raise NotImplementedError(
-                "Dynamic fields cannot be selected directly, yet - implement me!"
+            raise InvalidFieldError(
+                f"Field '{self.field}.{'.'.join(self.extra_path)}' cannot be selected directly; "
+                "select the parent column instead."
             )
         return super().as_select_sql(pb, table_alias, use_agg_fn=use_agg_fn)
 

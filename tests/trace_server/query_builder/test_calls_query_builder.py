@@ -11,6 +11,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     ParamBuilder,
+    QueryBuilderDynamicField,
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
@@ -2134,6 +2135,37 @@ def test_unsupported_summary_field_raises_invalid_field_error() -> None:
     )
     with pytest.raises(InvalidFieldError, match="duration_ms"):
         cq.as_sql(ParamBuilder())
+
+
+def test_unselectable_columns_raise_invalid_field_error() -> None:
+    """Selecting columns that the SQL builder can't materialize as a select expression
+    must surface as InvalidFieldError (403), not NotImplementedError (500). Regression
+    for WB-34836: dynamic, feedback, and annotation-queue-item paths all hit the same
+    "implement me!" raise.
+    """
+    # Nested dynamic field (e.g. inputs.foo) - routed through CallsMergedDynamicField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("inputs.foo")
+    with pytest.raises(InvalidFieldError, match="cannot be selected directly"):
+        cq.as_sql(ParamBuilder())
+
+    # Feedback payload column - routed through CallsMergedFeedbackPayloadField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("feedback.[wandb.note].payload.note")
+    with pytest.raises(InvalidFieldError, match="Feedback fields"):
+        cq.as_sql(ParamBuilder())
+
+    # Annotation queue item column - routed through CallsMergedQueueItemField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("annotation_queue_items.queue_id")
+    with pytest.raises(InvalidFieldError, match="queue item fields"):
+        cq.as_sql(ParamBuilder())
+
+    # QueryBuilderDynamicField with extra_path (used by table_query, not CallsQuery,
+    # so we have to construct and select directly).
+    field = QueryBuilderDynamicField(field="val_dump", extra_path=["foo", "bar"])
+    with pytest.raises(InvalidFieldError, match="val_dump.foo.bar"):
+        field.as_select_sql(ParamBuilder(), "table")
 
 
 def test_build_calls_complete_update_end_query() -> None:
