@@ -329,8 +329,12 @@ def _chat_completion_messages(
     """Convert an openai chat-completions message list to ``Message`` objects.
 
     GenerationSpanData carries the legacy ``[{"role": "...", "content": "..."}]``
-    shape. Non-string content (block lists) flattens to an empty string here —
-    the legacy path is rare in agent flows; ResponseSpanData covers the new API.
+    shape. ``content`` can be a string, ``None`` (e.g. assistant messages
+    carrying tool_calls), or a multimodal block list. We keep the turn
+    structure in all three cases — string content passes through; everything
+    else surfaces as an empty-string message so the role/turn is preserved.
+    The legacy path is rare in agent flows; ResponseSpanData covers the new
+    API where multimodal content is preserved properly.
     """
     if not raw:
         return []
@@ -342,7 +346,7 @@ def _chat_completion_messages(
         content = entry.get("content")
         if isinstance(content, str):
             messages.append(Message(role=role, content=content))
-        elif content is None:
+        else:
             messages.append(Message(role=role, content=""))
     return messages
 
