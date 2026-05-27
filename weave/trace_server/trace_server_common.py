@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 from weave.shared import refs_internal as ri
+from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 
 CallStatus = Literal["running", "completed", "failed"]
@@ -355,6 +356,10 @@ def determine_call_status(call: tsi.CallSchema) -> CallStatus:
     return "failed"
 
 
+def _str_or_none(v: Any) -> str | None:
+    return v if isinstance(v, str) and v else None
+
+
 def eval_run_refs_from_call(
     call: tsi.CallSchema, attributes: dict[str, Any]
 ) -> tuple[str, str]:
@@ -370,12 +375,7 @@ def eval_run_refs_from_call(
     return a non-empty pair for those cases. Mirrors the pattern in
     ``eval_results_helpers.py``: ``inputs.get("self") or inputs.get("this")``.
     """
-    from weave.trace_server import constants
-
     inputs = call.inputs if isinstance(call.inputs, dict) else {}
-
-    def _str_or_none(v: Any) -> str | None:
-        return v if isinstance(v, str) and v else None
 
     evaluation_ref = (
         _str_or_none(attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY))

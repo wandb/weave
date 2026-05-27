@@ -4204,7 +4204,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         file_content_res = self._file_content_read_with_retry(file_content_req)
         source_code = file_content_res.content.decode("utf-8")
 
-        # Extract additional attributes (exclude system fields)
         excluded_fields = {
             "_type",
             "_class_name",
