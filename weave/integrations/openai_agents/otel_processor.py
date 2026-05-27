@@ -84,6 +84,12 @@ _TRACER_NAME = "weave.openai_agents"
 _WEAVE_ATTR_PREFIX = "weave.openai_agents"
 _PROVIDER_NAME = "openai"
 _DEFAULT_CHAT_OUTPUT_TYPE = "text"
+_WEAVE_ISSUES_URL = "https://github.com/wandb/weave/issues/"
+
+# Span-data subtypes we've already warned about in this process. Used by
+# ``_attrs_for_span`` to surface (once) any SpanData class the SDK starts
+# emitting that we don't have a handler for, without flooding the log.
+_warned_unhandled_span_types: set[type] = set()
 
 # Keys we extract from ``GenerationSpanData.model_config`` into the equivalent
 # ``llm_attributes`` request_* kwargs. The map keeps the wire shape (raw openai
@@ -428,6 +434,22 @@ def _attrs_for_span(span: Span, conversation_id: str) -> dict[str, Any]:
         return _mcp_list_tools_attrs(span)
     if isinstance(sd, CustomSpanData):
         return _custom_attrs(span)
+
+    # No handler matched. Most likely cause: a new SpanData subtype was
+    # introduced by openai-agents that this processor doesn't know about yet.
+    # Warn once per type so a future SDK bump surfaces the gap instead of
+    # silently emitting attributeless spans.
+    sd_type = type(sd)
+    if sd_type not in _warned_unhandled_span_types:
+        _warned_unhandled_span_types.add(sd_type)
+        logger.warning(
+            "No handler for span_data type %s.%s; spans of this type emit "
+            "without GenAI semconv attributes. Please open an issue at %s so "
+            "the Weave team can add support.",
+            sd_type.__module__,
+            sd_type.__name__,
+            _WEAVE_ISSUES_URL,
+        )
     return {}
 
 

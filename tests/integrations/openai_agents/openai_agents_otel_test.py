@@ -933,6 +933,56 @@ def test_end_open_spans_detaches_tokens_in_lifo_order(
     assert detach_calls == expected_lifo_tokens
 
 
+def test_unhandled_span_type_emits_warning(
+    client: WeaveClient,
+    otel_spans: InMemorySpanExporter,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """An unhandled SpanData subtype should emit a single WARNING.
+
+    Otherwise a future openai-agents SDK release could introduce a new span
+    type and we'd silently emit OTel spans with no GenAI semconv attributes —
+    no signal that the integration needs updating. The warning points the
+    user at the Weave issue tracker.
+    """
+
+    # Defined inside the test so the type is unique per invocation — the
+    # module-level once-per-type dedupe set won't suppress the warning if
+    # another test happened to use the same class.
+    class _UnknownSpanData:
+        type = "future_feature"
+
+    processor = WeaveOtelTracingProcessor()
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_unknown"
+    trace.name = "wf"
+    trace.group_id = None
+    processor.on_trace_start(trace)
+
+    span = Mock(spec=Span)
+    span.trace_id = "trace_unknown"
+    span.span_id = "span_unknown"
+    span.parent_id = None
+    span.span_data = _UnknownSpanData()
+    span.started_at = None
+    span.ended_at = None
+    span.error = None
+
+    with caplog.at_level(
+        "WARNING", logger="weave.integrations.openai_agents.otel_processor"
+    ):
+        processor.on_span_start(span)
+        processor.on_span_end(span)
+
+    warnings_for_class = [
+        r.getMessage()
+        for r in caplog.records
+        if r.levelname == "WARNING" and "_UnknownSpanData" in r.getMessage()
+    ]
+    assert len(warnings_for_class) == 1
+    assert "https://github.com/wandb/weave/issues/" in warnings_for_class[0]
+
+
 def test_undo_patch_is_noop_when_not_patched() -> None:
     """Calling undo_patch on a non-installed patcher returns True without error."""
     from weave.integrations.openai_agents.patcher import OpenAIAgentsOtelPatcher
