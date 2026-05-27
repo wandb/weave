@@ -56,7 +56,7 @@ def test_duplicate_stage_does_not_consume_budget() -> None:
     """Dedup hits raise ValueError before incrementing the byte counter."""
     batch = BucketUploadBatch(max_bytes=1024)
     batch.stage(_req(b"x" * 600), digest="d1")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="called twice"):
         batch.stage(_req(b"x" * 600), digest="d1")
     # Budget should still allow another 400 bytes.
     batch.stage(_req(b"y" * 400), digest="d2")
