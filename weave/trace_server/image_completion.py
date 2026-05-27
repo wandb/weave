@@ -5,6 +5,7 @@ from weave.trace_server.base64_content_conversion import store_content_object
 from weave.trace_server.errors import (
     InvalidRequest,
 )
+from weave.trace_server.url_safety import is_publicly_routable_url
 from weave.type_wrappers.Content.content import Content
 
 
@@ -46,6 +47,11 @@ def _process_image_data_item(
         # Handle URL-based images
         if "url" in data_item and data_item["url"] and trace_server and project_id:
             url = data_item["url"]
+            if not is_publicly_routable_url(url):
+                processed_item["error"] = (
+                    f"refusing to fetch image from disallowed URL at index {index}"
+                )
+                return processed_item
             # Use Content.from_url() to handle download and content creation
             content_obj = Content.from_url(
                 url, metadata={"source_index": index, "_original_schema": "url"}
