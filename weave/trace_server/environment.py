@@ -50,6 +50,19 @@ def kafka_producer_max_buffer_size() -> int | None:
         return None
 
 
+def wf_kafka_project_id_bucket_count() -> int:
+    """Sub-buckets applied to `project_id`-keyed Kafka messages. `1` disables bucketing."""
+    raw = os.environ.get("WF_KAFKA_PROJECT_ID_BUCKET_COUNT", "1")
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.exception(
+            "WF_KAFKA_PROJECT_ID_BUCKET_COUNT value '%s' is not a valid int", raw
+        )
+        return 1
+    return value if value >= 1 else 1
+
+
 # Scoring worker settings
 
 
