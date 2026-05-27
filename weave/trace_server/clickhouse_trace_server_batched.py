@@ -5992,16 +5992,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Insert Batch 2 (chunk_size=50): C0(0-49), C1(50-99), C2(100-149), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
             # Insert Batch 3 (chunk_size=200): C0(0-199), C1(200-399), C2(400-499)
             #
-            # When Clickhouse runs it's merge operation, it keeps the last inserted rows according to the index (project, digest, chunk_index).
-            # Similarly, the inner select statement in the query above (partitioned and keep row 1) does the same thing.
+            # The inner SELECT picks one row per (project, digest, chunk_index)
+            # via `row_number() OVER (... ORDER BY file_storage_uri IS NULL DESC)`
+            # — inline-CH rows win ties; otherwise the pick follows ClickHouse's
+            # part scan order. File contents are content-addressable by digest,
+            # so whichever row wins per chunk_index carries valid bytes.
             #
-            # As a result, the resulting query gives you all the chunks from batch 3, then any "extra" chunks from previous batches.
+            # The resulting query gives you the chunks of the "winning" batch,
+            # then any "extra" chunks from other batches whose chunk_index ran
+            # higher than that batch's n_chunks. e.g. winning batch 3:
             # |--------- Insert Batch 3 --------| |-------------------------- Extra Chunks from Batch 2 -----------------------------------|
             # C0(0-199), C1(200-399), C2(400-499), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
             #
             #
-            # Those "extra" chunks are no long valid, but will be returned by the query. By design, we include the expected number of chunks in the response
-            # and since the last insert batch is the valid one, we can truncate the response to the expected number of chunks to isolate the valid chunks.
+            # Those "extra" chunks are not part of the winning batch but are returned by the query.
+            # `n_chunks` from row 0 (the c0 chunk of the winning batch) is the valid count,
+            # so we truncate the response to that to isolate the winning batch's chunks.
             #
             #
             # Now, practically, we have never changed the `FILE_CHUNK_SIZE` - nor should we!
