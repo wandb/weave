@@ -1,6 +1,6 @@
 import {InMemoryTraceServer} from '../../inMemoryTraceServer';
 import {createOpenAIAgentsTracingProcessor} from '../../integrations/openai.agent';
-import type { Trace, Span } from '../../integrations/openai.agent.types';
+import type {Trace, Span} from '../../integrations/openai.agent.types';
 import {initWithCustomTraceServer} from '../clientMock';
 
 describe('OpenAI Agents Integration', () => {
