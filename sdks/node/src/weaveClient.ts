@@ -803,7 +803,9 @@ export class WeaveClient {
     imageData: Buffer,
     imageType: ImageType = DEFAULT_IMAGE_TYPE
   ): Promise<SerializedFileBlob> {
-    const blob = new Blob([imageData], {type: `image/${imageType}`});
+    const blob = new Blob([new Uint8Array(imageData)], {
+      type: `image/${imageType}`,
+    });
     return this.serializedFileBlob('PIL.Image.Image', 'image.png', blob);
   }
 
@@ -811,7 +813,9 @@ export class WeaveClient {
     audioData: Buffer,
     audioType: AudioType = DEFAULT_AUDIO_TYPE
   ): Promise<SerializedFileBlob> {
-    const blob = new Blob([audioData], {type: `audio/${audioType}`});
+    const blob = new Blob([new Uint8Array(audioData)], {
+      type: `audio/${audioType}`,
+    });
     return this.serializedFileBlob('wave.Wave_read', 'audio.wav', blob);
   }
 
