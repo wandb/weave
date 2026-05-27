@@ -410,6 +410,117 @@ def test_runnable_feedback(client: WeaveClient) -> None:
     assert typed_row["scorer_rating_confidences"] == {"_rating_": 0.88}
 
 
+def test_runnable_feedback_derives_scorer_columns_from_score_output(
+    client: WeaveClient,
+) -> None:
+    """Runnable score outputs in the structured shape backfill typed scorer columns."""
+    project_id = client.project_id
+    runnable_name = "signal_monitor"
+    feedback_type = f"wandb.runnable.{runnable_name}"
+    runnable_ref = f"weave:///{project_id}/op/{runnable_name}:op_id_123"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+
+    def read_feedback(feedback_id: str) -> dict:
+        query_res = client.server.feedback_query(
+            tsi.FeedbackQueryReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "id"},
+                                {"$literal": feedback_id},
+                            ]
+                        }
+                    }
+                ),
+            )
+        )
+        assert len(query_res.result) == 1
+        return query_res.result[0]
+
+    test_cases = [
+        (
+            "single_tag",
+            {
+                "output": {
+                    "value": "unsafe",
+                    "reason": "contains disallowed content",
+                    "confidence": "0.91",
+                }
+            },
+            {
+                "scorer_tags": ["unsafe"],
+                "scorer_tag_reasons": {"unsafe": "contains disallowed content"},
+                "scorer_tag_confidences": {"unsafe": 0.91},
+                "scorer_ratings": {},
+                "scorer_rating_reasons": {},
+                "scorer_rating_confidences": {},
+            },
+        ),
+        (
+            "list_mixed",
+            {
+                "output": [
+                    {
+                        "value": "bug",
+                        "reason": "runtime error",
+                        "confidence": 0.8,
+                    },
+                    {
+                        "value": 0.2,
+                        "reason": "low quality response",
+                        "confidence": "0.88",
+                    },
+                ]
+            },
+            {
+                "scorer_tags": ["bug"],
+                "scorer_tag_reasons": {"bug": "runtime error"},
+                "scorer_tag_confidences": {"bug": 0.8},
+                "scorer_ratings": {"_rating_": 0.2},
+                "scorer_rating_reasons": {"_rating_": "low quality response"},
+                "scorer_rating_confidences": {"_rating_": 0.88},
+            },
+        ),
+        (
+            "nested_scores",
+            {
+                "output": {
+                    "scores": [
+                        {"value": "PII", "reason": None, "confidence": None},
+                        {"value": 0.7},
+                    ]
+                }
+            },
+            {
+                "scorer_tags": ["PII"],
+                "scorer_tag_reasons": {},
+                "scorer_tag_confidences": {},
+                "scorer_ratings": {"_rating_": 0.7},
+                "scorer_rating_reasons": {},
+                "scorer_rating_confidences": {},
+            },
+        ),
+    ]
+
+    for suffix, payload, expected in test_cases:
+        create_res = client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/call_id_{suffix}",
+                feedback_type=feedback_type,
+                payload=payload,
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+            )
+        )
+        row = read_feedback(create_res.id)
+        assert row["payload"] == payload
+        for key, value in expected.items():
+            assert row[key] == value
+
+
 def test_agent_monitor_feedback(client: WeaveClient) -> None:
     """End-to-end create/query for wandb.agent_monitor feedback with typed scorer columns."""
     project_id = client.project_id
