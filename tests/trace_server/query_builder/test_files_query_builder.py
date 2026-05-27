@@ -36,7 +36,10 @@ def test_make_file_content_read_query() -> None:
         SELECT *
         FROM (
                 SELECT *,
-                    row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
+                    row_number() OVER (
+                        PARTITION BY project_id, digest, chunk_index
+                        ORDER BY file_storage_uri IS NULL DESC
+                    ) AS rn
                 FROM files
                 WHERE project_id = {pb_0: String} AND digest = {pb_1: String}
             )

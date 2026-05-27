@@ -10,9 +10,14 @@ def make_file_content_read_query(
 ) -> str:
     """Generate a query to read file chunks for a given digest.
 
-    The inner subquery deduplicates chunks by (project_id, digest, chunk_index)
-    using row_number() so that only the most recently inserted chunk per index
-    is returned from the ReplacingMergeTree parts.
+    The inner window deduplicates chunks by (project_id, digest, chunk_index)
+    across unmerged ReplacingMergeTree parts. The `ORDER BY file_storage_uri
+    IS NULL DESC` makes the pick deterministic: when an inline-CH row and a
+    bucket-URI row coexist at the same PK (e.g. bucket write succeeded for
+    one writer, fell back to inline CH for another), the inline-CH row wins.
+    File contents are content-addressable by digest, so either row carries
+    the correct bytes; preferring inline-CH avoids a hard read failure when
+    the bucket is unreachable.
     """
     project_id_param = pb.add_param(project_id)
     digest_param = pb.add_param(digest)
@@ -23,7 +28,10 @@ def make_file_content_read_query(
         SELECT *
         FROM (
                 SELECT *,
-                    row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
+                    row_number() OVER (
+                        PARTITION BY project_id, digest, chunk_index
+                        ORDER BY file_storage_uri IS NULL DESC
+                    ) AS rn
                 FROM files
                 WHERE project_id = {{{project_id_param}: String}} AND digest = {{{digest_param}: String}}
             )

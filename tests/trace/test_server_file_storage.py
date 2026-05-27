@@ -16,8 +16,13 @@ from google.auth.credentials import AnonymousCredentials
 from moto import mock_aws
 
 from tests.trace.util import client_is_sqlite
+from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings
+from weave.trace_server.clickhouse_schema import (
+    ALL_FILE_CHUNK_INSERT_COLUMNS,
+    FileChunkCreateCHInsertable,
+)
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 # Test Data Constants
@@ -487,3 +492,183 @@ def test_file_storage_retry_limit(client: WeaveClient):
 
         # Verify GCS was attempted exactly 3 times before fallback
         assert attempt_count == 3, f"Expected 3 GCS attempts, got {attempt_count}"
+
+
+# ---------------------------------------------------------------------------
+# Duplicate-PK read determinism
+#
+# The `files` table key is (project_id, digest, chunk_index). Two writes
+# of the same content via different storage paths (bucket then inline-CH
+# fallback, or vice versa) leave two rows at the same PK until
+# ReplacingMergeTree merges them. The read query's window function picks
+# non-deterministically until the fix below; this test pins the contract.
+# ---------------------------------------------------------------------------
+
+
+_GCS_CREDENTIALS_JSON = base64.b64encode(
+    b"""{
+        "type": "service_account",
+        "project_id": "test-project",
+        "private_key_id": "test-key-id",
+        "private_key": "test-key",
+        "client_email": "test@test-project.iam.gserviceaccount.com",
+        "client_id": "test-client-id",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test@test-project.iam.gserviceaccount.com"
+    }"""
+).decode()
+
+
+@pytest.fixture
+def gcp_storage_env_module():
+    """Module-scope version of TestGCSStorage.gcp_storage_env."""
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": _GCS_CREDENTIALS_JSON,
+            "WF_FILE_STORAGE_URI": f"gs://{TEST_BUCKET}",
+            "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
+        },
+    ):
+        yield
+
+
+@pytest.fixture
+def mock_gcp_credentials_module():
+    """Module-scope version of TestGCSStorage.mock_gcp_credentials."""
+    with mock.patch(
+        "google.oauth2.service_account.Credentials.from_service_account_info"
+    ) as mock_creds:
+        mock_creds.return_value = AnonymousCredentials()
+        yield
+
+
+@pytest.fixture
+def gcs_unreachable():
+    """Mock GCS where every read raises NotFound.
+
+    Models a bucket that has gone unreachable at read time: regional
+    outage, lifecycle-deleted object, cross-region read failure. Lets
+    us assert the read does NOT depend on the bucket when an inline-CH
+    row is available at the same key.
+    """
+    mock_storage_client = mock.MagicMock()
+    mock_bucket = mock.MagicMock()
+    mock_blob = mock.MagicMock()
+    mock_storage_client.bucket.return_value = mock_bucket
+    mock_bucket.blob.return_value = mock_blob
+
+    def fail_download(*args, **kwargs):
+        raise exceptions.NotFound("bucket unreachable")
+
+    mock_blob.download_as_bytes.side_effect = fail_download
+
+    with mock.patch("google.cloud.storage.Client", return_value=mock_storage_client):
+        yield mock_storage_client
+
+
+@pytest.mark.usefixtures("gcp_storage_env_module", "mock_gcp_credentials_module")
+@pytest.mark.disable_logging_error_check
+def test_read_returns_inline_ch_when_bucket_uri_row_coexists_and_bucket_unreachable(
+    client: WeaveClient, internal_server, gcs_unreachable
+):
+    """Read must return the inline-CH row's bytes when an inline-CH row
+    and a bucket-URI row share `(project_id, digest, chunk_index)` and
+    the bucket is unreachable.
+
+    Production scenarios that produce two rows at the same PK:
+    - Two pods writing the same content via different storage paths
+      (one bucket, one inline-CH). The bucket path's
+      `if_generation_match=0` makes the second bucket write a no-op,
+      but if the first bucket write failed transiently on pod B,
+      pod B's `_file_create_bucket -> FileStorageWriteError ->
+      _file_create_clickhouse` fallback inserts an inline-CH row.
+    - Backfill / migration scripts that re-insert old inline content
+      after the project gains bucket storage, or vice versa.
+    - The same fallback codepath inside a multi-batch sequence on a
+      single pod when the bucket has a transient outage between
+      flushes (the in-batch dedup only spans one batch).
+
+    All converge on the same data state: two rows at the same PK
+    until `ReplacingMergeTree` merges them.
+
+    Setup uses two separate synchronous INSERTs (one per row) so each
+    lands in its own part -- ReplacingMergeTree would collapse same-PK
+    rows within a single INSERT. The inline-CH row is inserted first
+    so that under the unfixed query (no ORDER BY inside the window),
+    the newer bucket-URI part deterministically wins row_number=1 on
+    this engine, the read tries the unreachable bucket, and surfaces
+    `FileStorageReadError` despite valid bytes existing in CH. The fix
+    adds `ORDER BY file_storage_uri IS NULL DESC` inside the window
+    so the inline-CH row deterministically wins.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    # Direct CH server: bypass the external -> internal id adapter and
+    # the caching middleware so we can write to the same project_id the
+    # read query will scan.
+    ch_server = internal_server
+    internal_project_id = base64.b64encode(client.project_id.encode()).decode()
+
+    # 50KB fits in one chunk (FILE_CHUNK_SIZE = 100_000), so both rows
+    # share the same chunk_index = 0 PK.
+    payload = b"the_real_content_" + (b"x" * 50_000)
+    digest = compute_file_digest(payload)
+    bucket_uri = (
+        f"gs://{TEST_BUCKET}/weave/projects/{internal_project_id}/files/{digest}"
+    )
+
+    def _insert_one(chunk: FileChunkCreateCHInsertable) -> None:
+        row = [chunk.model_dump().get(col) for col in ALL_FILE_CHUNK_INSERT_COLUMNS]
+        ch_server._insert(
+            "files",
+            data=[row],
+            column_names=ALL_FILE_CHUNK_INSERT_COLUMNS,
+            do_sync_insert=True,
+        )
+
+    # Insert inline first, bucket-URI second. Two parts; on this engine
+    # the newer (URI) part wins the unordered window function.
+    _insert_one(
+        FileChunkCreateCHInsertable(
+            project_id=internal_project_id,
+            digest=digest,
+            chunk_index=0,
+            n_chunks=1,
+            name="inline.bin",
+            val_bytes=payload,
+            bytes_stored=len(payload),
+            file_storage_uri=None,
+        )
+    )
+    _insert_one(
+        FileChunkCreateCHInsertable(
+            project_id=internal_project_id,
+            digest=digest,
+            chunk_index=0,
+            n_chunks=1,
+            name="bucket.bin",
+            val_bytes=b"",
+            bytes_stored=len(payload),
+            file_storage_uri=bucket_uri,
+        )
+    )
+
+    # Confirm both parts are still visible; if background merge has
+    # collapsed them the test premise no longer holds.
+    diag = ch_server.ch_client.query(
+        "SELECT count() FROM files WHERE project_id = {p:String} AND digest = {d:String}",
+        parameters={"p": internal_project_id, "d": digest},
+    )
+    assert diag.result_rows[0][0] == 2, (
+        f"Setup invariant violated: expected 2 unmerged rows but found "
+        f"{diag.result_rows[0][0]}"
+    )
+
+    res = client.server.file_content_read(
+        FileContentReadReq(project_id=client.project_id, digest=digest)
+    )
+    assert res.content == payload
