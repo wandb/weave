@@ -18,6 +18,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
+from weave.trace_server import environment as wf_env
 from weave.trace_server import (
     clickhouse_trace_server_settings as ch_settings,
 )
@@ -228,7 +229,12 @@ def _ch_session_server(
 
     def patched_run_migrations():
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            ch_server._mint_client(), management_db=management_db
+            ch_server._mint_client(),
+            management_db=management_db,
+            replicated=wf_env.wf_clickhouse_replicated(),
+            replicated_path=wf_env.wf_clickhouse_replicated_path(),
+            replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
+            use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
         )
         migrator.apply_migrations(ch_server._database)
 
