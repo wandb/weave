@@ -4,7 +4,7 @@ from pydantic import Field
 import weave
 
 
-def test_object_mutation_saving(client):
+def test_object_mutation_saving(weave_active):
     class Thing(weave.Object):
         a: str
         b: int
@@ -29,7 +29,7 @@ def test_object_mutation_saving(client):
     assert thing3.c == 4.2
 
 
-def test_list_mutation_saving(client):
+def test_list_mutation_saving(weave_active):
     lst = [1, 2, 3]
     ref = weave.publish(lst)
 
@@ -46,7 +46,7 @@ def test_list_mutation_saving(client):
     assert lst3 == [100, 2, 3, 4, 5, 6]
 
 
-def test_dict_mutation_saving(client):
+def test_dict_mutation_saving(weave_active):
     # TODO: Today we assume all the keys must be str?
     d = {"a": 1, "b": 2}
     ref = weave.publish(d)
@@ -62,7 +62,7 @@ def test_dict_mutation_saving(client):
     assert d3 == {"a": 1, "b": "new_value", "new_key": 3}
 
 
-def test_object_mutation_saving_nested(client):
+def test_object_mutation_saving_nested(weave_active):
     class A(weave.Object):
         b: int = 1
 
@@ -89,7 +89,7 @@ def test_object_mutation_saving_nested(client):
     assert d3.c.a.b == 3
 
 
-def test_list_mutation_saving_nested(client):
+def test_list_mutation_saving_nested(weave_active):
     lst = [1, 2, 3]
     ref = weave.publish(lst)
 
@@ -109,7 +109,7 @@ def test_list_mutation_saving_nested(client):
     assert lst5 == [1, 2, 3, [4, 5, 6]]
 
 
-def test_dict_mutation_saving_nested(client):
+def test_dict_mutation_saving_nested(weave_active):
     d = {"a": 1, "b": 2}
     ref = weave.publish(d)
 
@@ -133,7 +133,7 @@ def test_dict_mutation_saving_nested(client):
     }
 
 
-def test_object_mutation_saving_nested_lists_and_dicts(client):
+def test_object_mutation_saving_nested_lists_and_dicts(weave_active):
     class A(weave.Object):
         b: int
 
@@ -185,7 +185,7 @@ def test_object_mutation_saving_nested_lists_and_dicts(client):
     assert g3.b.f == {"d": {"e": "f"}}
 
 
-def test_list_mutation_saving_nested_objects(client):
+def test_list_mutation_saving_nested_objects(weave_active):
     class A(weave.Object):
         b: int
 
@@ -203,7 +203,7 @@ def test_list_mutation_saving_nested_objects(client):
     assert lst3[2].b == 3
 
 
-def test_list_mutation_saving_nested_dicts(client):
+def test_list_mutation_saving_nested_dicts(weave_active):
     lst = [{"a": {"b": 1}}, {"a": {"b": 2}}]
     ref = weave.publish(lst)
 
@@ -218,7 +218,7 @@ def test_list_mutation_saving_nested_dicts(client):
     assert lst3[2]["a"]["b"] == 3
 
 
-def test_dict_mutation_saving_nested_objects(client):
+def test_dict_mutation_saving_nested_objects(weave_active):
     class A(weave.Object):
         b: int
 
@@ -235,7 +235,7 @@ def test_dict_mutation_saving_nested_objects(client):
     assert d3["c"].b == 3
 
 
-def test_dict_mutation_saving_nested_lists(client):
+def test_dict_mutation_saving_nested_lists(weave_active):
     d = {"a": [1, 2], "b": [3, 4]}
     ref = weave.publish(d)
 
@@ -249,7 +249,7 @@ def test_dict_mutation_saving_nested_lists(client):
     assert d3["c"] == [5, 6]
 
 
-def test_table_mutation_saving_append_rows(client):
+def test_table_mutation_saving_append_rows(weave_active):
     t = weave.Table(rows=[{"a": 1, "b": 2}])
     t.append({"a": 3, "b": 4})
     ref = weave.publish(t)
@@ -270,7 +270,7 @@ def test_table_mutation_saving_append_rows(client):
     ]
 
 
-def test_table_mutation_saving_pop_rows(client):
+def test_table_mutation_saving_pop_rows(weave_active):
     t = weave.Table(
         rows=[
             {"a": 1, "b": 2},
@@ -293,7 +293,7 @@ def test_table_mutation_saving_pop_rows(client):
     assert t3.rows == [{"a": 5, "b": 6}]
 
 
-def test_table_mutation_saving_replace_rows(client):
+def test_table_mutation_saving_replace_rows(weave_active):
     t = weave.Table(
         rows=[
             {"a": 1, "b": 2},
@@ -310,7 +310,7 @@ def test_table_mutation_saving_replace_rows(client):
     assert t3.rows == [{"a": 5, "b": 6}]
 
 
-def test_table_cant_append_bad_data(client):
+def test_table_cant_append_bad_data(weave_active):
     t = weave.Table(rows=[{"a": 1, "b": 2}])
     with pytest.raises(TypeError):
         t.append(1)
@@ -325,7 +325,7 @@ def test_table_cant_append_bad_data(client):
         t2.append([1, 2, 3])
 
 
-def test_table_cant_set_bad_data(client):
+def test_table_cant_set_bad_data(weave_active):
     t = weave.Table(rows=[{"a": 1, "b": 2}])
     with pytest.raises(ValueError, match="must be (a list of )?dicts"):
         t.rows = [1, 2, 3]

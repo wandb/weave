@@ -9,21 +9,24 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.server.fastmcp import FastMCP
 
+from weave.integrations.fastmcp import (
+    get_fastmcp_client_patcher,
+    get_fastmcp_server_patcher,
+)
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
-from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.fixture(autouse=True)
-def patch_mcp() -> Generator[None, None, None]:
-    """Patch MCP for all tests in this file."""
-    # Patch both client and server for MCP
-    client_patcher = get_mcp_client_patcher()
-    server_patcher = get_mcp_server_patcher()
+def patch_fastmcp() -> Generator[None, None, None]:
+    """Patch FastMCP for all tests in this file."""
+    # Patch both client and server for FastMCP
+    client_patcher = get_fastmcp_client_patcher()
+    server_patcher = get_fastmcp_server_patcher()
 
     client_patcher.attempt_patch()
     server_patcher.attempt_patch()
@@ -34,7 +37,7 @@ def patch_mcp() -> Generator[None, None, None]:
     server_patcher.undo_patch()
 
 
-def mcp_server():
+def fastmcp_server():
     mcp = FastMCP("Demo")
 
     @mcp.tool()
@@ -53,7 +56,7 @@ def mcp_server():
 
 
 async def run_client():
-    """Run the client and connect to the MCP server."""
+    """Run the client and connect to the FastMCP server."""
     # Get the repository root directory (4 levels up from this test file)
     # The subprocess needs this in PYTHONPATH to import the tests module
     repo_root = Path(__file__).resolve().parent.parent.parent.parent
@@ -67,7 +70,7 @@ async def run_client():
         command="python",
         args=[
             "-c",
-            "from tests.integrations.mcp.mcp_test import mcp_server; mcp_server().run()",
+            "from tests.integrations.fastmcp.fastmcp_test import fastmcp_server; fastmcp_server().run()",
         ],
         env=env,
     )
@@ -118,7 +121,7 @@ def main():
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_mcp_client(client: WeaveClient) -> None:
+def test_fastmcp_client(client: WeaveClient) -> None:
     main()
 
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
@@ -173,8 +176,8 @@ def test_mcp_client(client: WeaveClient) -> None:
     reason="Currently not working on Windows",
 )
 @pytest.mark.asyncio
-async def test_mcp_server(client: WeaveClient) -> None:
-    fastmcp = mcp_server()
+async def test_fastmcp_server(client: WeaveClient) -> None:
+    fastmcp = fastmcp_server()
 
     result = await fastmcp.call_tool("add", {"a": 1, "b": 2})
     resource = await fastmcp.read_resource("greeting://cw")

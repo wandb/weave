@@ -8,7 +8,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 )
 
 
-def test_publish_and_load_evaluation(client):
+def test_publish_and_load_evaluation(weave_active):
     """This test just verifies the round trip for the evaluation.
 
     We do not actually run it here,

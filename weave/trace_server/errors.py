@@ -2,7 +2,7 @@ import datetime
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
@@ -218,7 +218,7 @@ class ErrorDefinition:
 
 
 # Global registry instance
-_error_registry: Optional["ErrorRegistry"] = None
+_error_registry: "ErrorRegistry | None" = None
 
 
 class ErrorRegistry:
@@ -428,6 +428,11 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         raise LightweightUpdateNotAllowedError(
             "Lightweight update queries are not supported by this ClickHouse version or configuration. "
             "This is a ClickHouse version issue that needs to be resolved."
+        ) from e
+    if "Max query size exceeded" in error_str:
+        raise RequestTooLarge(
+            "Call payload exceeded the storage backend's max query size. "
+            "Reduce the size of `output` or `summary` and retry."
         ) from e
 
     # Re-raise the original exception if no known pattern matches

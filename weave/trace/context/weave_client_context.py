@@ -31,7 +31,7 @@ def set_weave_client_global(client: WeaveClient | None) -> None:
 
 
 # This is no longer a concept, but should be
-# def set_weave_client_context(client: Optional["WeaveClient"]) -> None:
+# def set_weave_client_context(client: "WeaveClient | None") -> None:
 #     context_state._graph_client.set(client)
 
 

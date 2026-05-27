@@ -1,7 +1,7 @@
 import weave
 
 
-def test_dataset(client):
+def test_dataset(weave_active):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
     d2 = weave.ref(ref.uri).get()

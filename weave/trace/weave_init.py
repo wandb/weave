@@ -125,6 +125,8 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
     except ImportError as e:
         logger.warning(
             "Session SDK tracing skipped: opentelemetry not available (%s)", e
@@ -168,6 +170,10 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
         exporter._certificate_file = False
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(BatchSpanProcessor(exporter))
+    # Auto-link GenAI OTel spans to eval predictions and inject eval
+    # metadata (call ID, project, evaluation name) onto spans for
+    # deep-linking in the agent traces UI.
+    provider.add_span_processor(EvalLinkSpanProcessor())
     trace.set_tracer_provider(provider)
 
 
@@ -209,7 +215,7 @@ def init_weave(
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
-    remote_server = init_weave_get_server(api_key, entity=entity_name)
+    remote_server = init_weave_get_server(api_key)
     server_info = _get_server_info(remote_server)
     if server_info is None:
         raise RuntimeError(
@@ -320,8 +326,6 @@ def init_weave_disabled(
 def init_weave_get_server(
     api_key: str | None = None,
     should_batch: bool = True,
-    *,
-    entity: str | None = None,
 ) -> TraceServerClientInterface:
     res: TraceServerClientInterface
     if should_use_stainless_server():
@@ -331,9 +335,7 @@ def init_weave_get_server(
 
         res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     else:
-        # `entity` enables the wandb/* dogfood gate for the calls_complete
-        # write path; StainlessRemoteHTTPTraceServer does not use it.
-        res = RemoteHTTPTraceServer.from_env(should_batch, entity=entity)
+        res = RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res

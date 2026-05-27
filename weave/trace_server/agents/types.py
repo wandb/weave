@@ -12,15 +12,22 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
+    DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
     DEFAULT_AGENT_QUERY_LIMIT,
     DEFAULT_AGENT_STATS_GROUP_LIMIT,
     DEFAULT_SEARCH_LIMIT,
+    MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_BINS,
+    MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_SPECS,
+    MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_TOP_N,
+    MAX_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
     MAX_AGENT_QUERY_LIMIT,
     MAX_AGENT_STATS_GROUP_LIMIT,
     MAX_AGENT_STATS_RANGE_DAYS,
     MAX_CONVERSATION_CHAT_TURNS,
     MAX_SEARCH_LIMIT,
+    SPAN_GROUP_RESULT_COLS,
 )
 from weave.trace_server.agents.schema import (
     NormalizedMessage,
@@ -71,8 +78,29 @@ AgentSpanValueSource = Literal[
     "custom_attrs_float",
     "custom_attrs_bool",
 ]
+AgentCustomAttrSource = Literal[
+    "custom_attrs_string",
+    "custom_attrs_int",
+    "custom_attrs_float",
+    "custom_attrs_bool",
+]
+AgentCustomAttrValueType = Literal["string", "int", "float", "bool"]
+AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES: dict[
+    AgentCustomAttrSource, AgentCustomAttrValueType
+] = {
+    "custom_attrs_string": "string",
+    "custom_attrs_int": "int",
+    "custom_attrs_float": "float",
+    "custom_attrs_bool": "bool",
+}
+AGENT_CUSTOM_ATTR_SOURCES: frozenset[AgentCustomAttrSource] = frozenset(
+    AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES
+)
 
 _IDENT_RE = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
+# AgentGroupByRef sources that resolve to a plain span column rather than a
+# typed custom-attribute map; used to pick alias/value resolution paths.
+_FIELD_GROUP_BY_SOURCES = {"field", "column"}
 AGENT_SPAN_STATS_DERIVED_VALUE_TYPES: dict[
     AgentSpanStatsDerivedMetric, AgentSpanStatsValueType
 ] = {
@@ -449,6 +477,10 @@ class AgentSpanSchema(BaseModel):
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
+    # Only populated when AgentSpansQueryReq.include_details is set; the raw
+    # OTel JSON dump for the span is large, so it's omitted from list queries
+    # by default.
+    raw_span_dump: str | None = None
 
 
 class AgentSortBy(BaseModel):
@@ -480,6 +512,84 @@ class AgentGroupByRef(BaseModel):
     alias: str | None = None  # output key in AgentSpanGroupRow.group_keys
 
 
+def group_by_ref_alias(ref: AgentGroupByRef) -> str:
+    """Return the SQL-safe output alias for a group-by ref.
+
+    Used for both request validation here and SQL projection in the query
+    builder, so both call sites agree on what shows up in `group_keys`.
+    """
+    if ref.alias is not None:
+        return ref.alias
+    if ref.source in _FIELD_GROUP_BY_SOURCES:
+        return semconv.FILTERABLE_KEY_TO_COLUMN.get(ref.key, ref.key)
+    return ref.key
+
+
+class AgentSpanGroupDistributionSpec(BaseModel):
+    """One custom attribute distribution to compute per returned span group."""
+
+    alias: str = Field(pattern=_IDENT_RE)
+    value: AgentSpanValueRef
+    bins: int = Field(default=12, ge=1, le=MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_BINS)
+    top_n: int = Field(default=5, ge=1, le=MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_TOP_N)
+
+    @model_validator(mode="after")
+    def validate_distribution_spec(self) -> AgentSpanGroupDistributionSpec:
+        if self.value.source not in AGENT_CUSTOM_ATTR_SOURCES:
+            raise ValueError("distribution specs must reference custom attr sources")
+        return self
+
+    def custom_attr_source(self) -> AgentCustomAttrSource:
+        """Return ``value.source`` narrowed to ``AgentCustomAttrSource``.
+
+        The model validator guarantees this at construction time; this helper
+        re-checks each literal so callers avoid `cast()` at use sites.
+        """
+        source = self.value.source
+        if source == "custom_attrs_string":
+            return source
+        if source == "custom_attrs_int":
+            return source
+        if source == "custom_attrs_float":
+            return source
+        if source == "custom_attrs_bool":
+            return source
+        raise ValueError(f"distribution spec source is not custom attr: {source!r}")
+
+
+class AgentSpanGroupDistributionBin(BaseModel):
+    """One numeric histogram bin for a custom attribute in a span group."""
+
+    # 0-based bucket position within the histogram; clients render bins in
+    # `index` order so this can double as a stable sort key.
+    index: int
+    min: float
+    max: float
+    count: int
+
+
+class AgentSpanGroupDistributionValue(BaseModel):
+    """One categorical custom attribute value count in a span group."""
+
+    value: str
+    count: int
+
+
+class AgentSpanGroupDistributionItem(BaseModel):
+    """Distribution data for one span-group/custom-attribute pair."""
+
+    alias: str
+    source: AgentCustomAttrSource
+    key: str
+    value_type: AgentCustomAttrValueType
+    total_count: int = 0
+    present_count: int = 0
+    missing_count: int = 0
+    other_count: int = 0
+    bins: list[AgentSpanGroupDistributionBin] = Field(default_factory=list)
+    values: list[AgentSpanGroupDistributionValue] = Field(default_factory=list)
+
+
 class AgentSpanGroupRow(BaseModel):
     """A single row in a grouped spans query response.
 
@@ -492,7 +602,10 @@ class AgentSpanGroupRow(BaseModel):
     invocation_count: int = 0  # countIf(operation_name = 'invoke_agent')
     conversation_count: int = 0
     total_input_tokens: int = 0
+    total_cache_creation_input_tokens: int = 0
+    total_cache_read_input_tokens: int = 0
     total_output_tokens: int = 0
+    total_reasoning_tokens: int = 0
     total_duration_ms: int = 0
     error_count: int = 0
     agent_names: list[str] = Field(default_factory=list)
@@ -503,6 +616,9 @@ class AgentSpanGroupRow(BaseModel):
     first_seen: datetime.datetime | None = None
     last_seen: datetime.datetime | None = None
     metrics: dict[str, AgentSpanStatsCell] = Field(default_factory=dict)
+    distributions: dict[str, AgentSpanGroupDistributionItem] = Field(
+        default_factory=dict
+    )
 
 
 class AgentSpansQueryReq(BaseModel):
@@ -520,6 +636,15 @@ class AgentSpansQueryReq(BaseModel):
     group_by: list[AgentGroupByRef] | None = None
     measures: list[AgentSpanMeasureSpec] = Field(default_factory=list)
     group_filters: list[AgentSpanGroupFilter] = Field(default_factory=list)
+    group_distributions: list[AgentSpanGroupDistributionSpec] = Field(
+        default_factory=list,
+        max_length=MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_SPECS,
+    )
+    custom_attr_columns: list[AgentSpanValueRef] = Field(default_factory=list)
+    # When true, include heavy fields (messages, tool payloads, raw_span_dump,
+    # etc.) in each row. Intended for single-trace detail fetches; do not set
+    # for broad list queries.
+    include_details: bool = False
     sort_by: list[AgentSortBy] | None = None
     limit: int = Field(
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
@@ -530,14 +655,62 @@ class AgentSpansQueryReq(BaseModel):
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
-        if (self.measures or self.group_filters) and not self.group_by:
-            raise ValueError("grouped measures and group filters require group_by")
+        if (
+            self.measures or self.group_filters or self.group_distributions
+        ) and not self.group_by:
+            raise ValueError(
+                "grouped measures, distributions, and filters require group_by"
+            )
+        if self.group_distributions and len(self.group_by or []) != 1:
+            raise ValueError("group_distributions currently support one group_by ref")
+        if self.group_by and self.custom_attr_columns:
+            raise ValueError(
+                "custom_attr_columns are only supported for ungrouped spans"
+            )
+        if self.group_by and self.include_details:
+            raise ValueError("include_details is only supported for ungrouped spans")
+        invalid_custom_attr_columns = [
+            col.source
+            for col in self.custom_attr_columns
+            if col.source not in AGENT_CUSTOM_ATTR_SOURCES
+        ]
+        if invalid_custom_attr_columns:
+            raise ValueError("custom_attr_columns must reference custom attr sources")
         aliases = [measure.alias for measure in self.measures]
         duplicate_aliases = sorted(
             {alias for alias in aliases if aliases.count(alias) > 1}
         )
         if duplicate_aliases:
             raise ValueError(f"duplicate measure aliases: {duplicate_aliases!r}")
+        if self.group_by:
+            group_aliases = [group_by_ref_alias(ref) for ref in self.group_by]
+            reserved = SPAN_GROUP_RESULT_COLS.union(frozenset(group_aliases))
+            measure_alias_collisions = sorted(
+                {
+                    measure.alias
+                    for measure in self.measures
+                    if measure.alias in reserved
+                }
+            )
+            if measure_alias_collisions:
+                raise ValueError(
+                    "measure aliases collide with grouped row fields: "
+                    f"{measure_alias_collisions!r}"
+                )
+        distribution_aliases = [
+            distribution.alias for distribution in self.group_distributions
+        ]
+        duplicate_distribution_aliases = sorted(
+            {
+                alias
+                for alias in distribution_aliases
+                if distribution_aliases.count(alias) > 1
+            }
+        )
+        if duplicate_distribution_aliases:
+            raise ValueError(
+                f"duplicate distribution aliases: {duplicate_distribution_aliases!r}"
+            )
         return self
 
 
@@ -551,6 +724,39 @@ class AgentSpansQueryRes(BaseModel):
     spans: list[AgentSpanSchema] = Field(default_factory=list)
     groups: list[AgentSpanGroupRow] = Field(default_factory=list)
     total_count: int = 0
+
+
+class AgentCustomAttrsSchemaReq(BaseModel):
+    """Request to discover typed custom attribute keys for matching spans."""
+
+    project_id: str
+    query: Query | None = None
+    started_after: datetime.datetime | None = None
+    started_before: datetime.datetime | None = None
+    limit: int = Field(
+        default=DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+        ge=1,
+        le=MAX_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+    )
+    offset: int = Field(default=0, ge=0)
+
+
+class AgentCustomAttrSchemaItem(BaseModel):
+    """One custom attribute key/type observed in the matching spans."""
+
+    source: AgentCustomAttrSource
+    key: str
+    value_type: AgentCustomAttrValueType
+    span_count: int
+
+
+class AgentCustomAttrsSchemaRes(BaseModel):
+    """Typed custom attribute keys available for spans query/group/stats APIs."""
+
+    attributes: list[AgentCustomAttrSchemaItem] = Field(default_factory=list)
+    limit: int = DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT
+    offset: int = 0
+    has_more: bool = False
 
 
 # ---------------------------------------------------------------------------

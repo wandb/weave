@@ -2589,6 +2589,21 @@
           "default": null,
           "title": "Column Order"
         },
+        "expand_columns": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expand Columns"
+        },
         "header_depth": {
           "anyOf": [
             {

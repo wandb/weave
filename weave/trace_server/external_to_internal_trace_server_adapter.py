@@ -1,12 +1,65 @@
 import abc
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any, TypeVar
+
+from opentelemetry.proto.common.v1.common_pb2 import KeyValue
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
+    replace_external_weave_ref,
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
+    weave_prefix,
 )
+
+# OTel attribute keys whose values are typed `Array(String)` ref columns
+# in the agents `spans` table. Refs in these columns are surfaced as bare
+# strings by the read-path response, so they must be in internal form on
+# disk for the int→ext converter to round-trip them.
+_OTEL_REF_ATTR_KEYS = frozenset(
+    {
+        "weave.content_refs",
+        "weave.artifact_refs",
+        "weave.object_refs",
+    }
+)
+
+
+def _rewrite_otel_ref_attrs_inplace(
+    attrs: Iterable[KeyValue],
+    ext_to_int_project_id: Callable[[str], str],
+    cache: dict[str, str],
+    prefix: str = "",
+) -> None:
+    """Recursively rewrite typed ref attributes from external to internal form.
+
+    OTel encodes attributes either flat (`weave.object_refs`) or nested as
+    a `kvlist_value` (top-level key `weave` with a child `object_refs`),
+    so we descend through `kvlist_value`s and accumulate dotted prefixes.
+    Only `Array(String)` values under the known ref keys are touched;
+    everything else (including refs embedded in event payloads, message
+    content, `raw_span_dump`, etc.) is left exactly as the client sent it.
+    `cache` is a shared per-request dict that memoizes ext→int project_id
+    lookups across every ref in the batch.
+    """
+    for kv in attrs:
+        full_key = f"{prefix}{kv.key}" if prefix else kv.key
+        value = kv.value
+        if full_key in _OTEL_REF_ATTR_KEYS and value.HasField("array_value"):
+            for item in value.array_value.values:
+                if item.HasField("string_value") and item.string_value.startswith(
+                    weave_prefix
+                ):
+                    item.string_value = replace_external_weave_ref(
+                        item.string_value, ext_to_int_project_id, cache
+                    )
+        elif value.HasField("kvlist_value"):
+            _rewrite_otel_ref_attrs_inplace(
+                value.kvlist_value.values,
+                ext_to_int_project_id,
+                cache,
+                prefix=f"{full_key}.",
+            )
 
 
 class IdConverter:
@@ -1170,6 +1223,23 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        # `_ref_apply`'s universal walker can't descend into the raw
+        # protobuf `ResourceSpans` payload, so the typed-ref OTel
+        # attribute values (`weave.content_refs`, `weave.artifact_refs`,
+        # `weave.object_refs`) escape the standard ext→int conversion.
+        # Rewrite them in-place here so the inner trace server sees a
+        # request that's already in internal-ref form, matching the
+        # invariant every other resolver relies on. The cache is shared
+        # across every span in the batch so ext→int_project_id runs at
+        # most once per distinct entity/project pair per request.
+        ext_to_int = self._idc.ext_to_int_project_id
+        project_id_cache: dict[str, str] = {}
+        for processed_span in req.processed_spans:
+            for scope_spans in processed_span.resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    _rewrite_otel_ref_attrs_inplace(
+                        span.attributes, ext_to_int, project_id_cache
+                    )
         return self._internal_trace_server.genai_otel_export(req)
 
     def agent_spans_query(
@@ -1193,6 +1263,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         return self._ref_apply(
             self._internal_trace_server.agent_spans_stats, req, req.project_id
+        )
+
+    def agent_custom_attrs_schema(
+        self, req: tsi.agent_types.AgentCustomAttrsSchemaReq
+    ) -> tsi.agent_types.AgentCustomAttrsSchemaRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_custom_attrs_schema,
+            req,
+            req.project_id,
         )
 
     def agent_agents_query(

@@ -8,10 +8,11 @@ import pytest
 
 from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.calls_query_builder.utils import param_slot
-from weave.trace_server.errors import CallsCompleteModeRequired
+from weave.trace_server.errors import CallsCompleteModeRequired, RequestTooLarge
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import (
     reset_project_residence_cache,
@@ -705,6 +706,60 @@ def test_call_start_end_v2_updates_calls_complete(
     updated_call = _find_call_by_id(calls, call_id)
     assert updated_call is not None
     assert updated_call.ended_at == ended_at
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_end_v2_oversized_output_returns_request_too_large(
+    trace_server, clickhouse_trace_server, monkeypatch
+):
+    """Oversized `output` on the update path surfaces as RequestTooLarge."""
+    monkeypatch.setitem(
+        ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        "max_query_size",
+        1024,
+    )
+
+    project_id = f"{TEST_ENTITY}/calls_complete_oversize_update"
+    seed_call = _make_completed_call(
+        project_id,
+        str(uuid.uuid4()),
+        str(uuid.uuid4()),
+        datetime.datetime.now(),
+        datetime.datetime.now() + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
+
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    trace_server.call_start_v2(
+        tsi.CallStartV2Req(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=trace_id,
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    huge_output = {"blob": "x" * (8 * 1024)}
+    with pytest.raises(RequestTooLarge):
+        trace_server.call_end_v2(
+            tsi.CallEndV2Req(
+                end=tsi.EndedCallSchemaForInsertWithStartedAt(
+                    project_id=project_id,
+                    id=call_id,
+                    started_at=started_at,
+                    ended_at=started_at + datetime.timedelta(seconds=1),
+                    output=huge_output,
+                    summary={"usage": {}, "status_counts": {}},
+                )
+            )
+        )
 
 
 def test_call_start_end_v2_writes_calls_complete_for_empty_project(

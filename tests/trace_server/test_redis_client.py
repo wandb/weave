@@ -33,7 +33,10 @@ def test_client_resolution_from_url(monkeypatch):
         monkeypatch.setenv("WEAVE_REDIS_URL", "redis://redis.example:6379")
         client = redis_client.get_redis_client()
         mock_from_url.assert_called_once_with(
-            "redis://redis.example:6379", decode_responses=True, **timeouts
+            "redis://redis.example:6379",
+            decode_responses=True,
+            ssl_ca_certs=None,
+            **timeouts,
         )
         assert client is mock_from_url.return_value
 
@@ -56,6 +59,60 @@ def test_client_resolution_from_url(monkeypatch):
         monkeypatch.setenv("WEAVE_REDIS_URL", "redis://redis.example?master=gorilla")
         redis_client.get_redis_client()
         assert mock_sentinel.call_args.args[0] == [("redis.example", 26379)]
+
+
+def test_direct_url_strips_wandb_query_params(monkeypatch):
+    """Wandb-specific query params must not leak into redis-py kwargs.
+
+    The Go connector at `services/connectors/redis.go` consumes params like
+    `tls`, `caCertPath`, `ttlInSeconds`. redis-py treats unknown URL params as
+    Connection.__init__ kwargs, so leaving them in raises `AbstractConnection.
+    __init__() got an unexpected keyword argument 'tls'` at first command.
+    """
+    timeouts = {
+        "socket_connect_timeout": redis_client.REDIS_CONNECT_TIMEOUT_SECS,
+        "socket_timeout": redis_client.REDIS_SOCKET_TIMEOUT_SECS,
+    }
+
+    # tls=true rewrites the scheme to rediss:// and adds ssl_ca_certs.
+    with patch.object(redis_client.redis, "from_url") as mock_from_url:
+        redis_client.get_redis_client.cache_clear()
+        monkeypatch.setenv(
+            "WEAVE_REDIS_URL",
+            "redis://:pw@host:6378?tls=true&ttlInSeconds=604800"
+            "&caCertPath=/etc/ssl/certs/server_ca.pem",
+        )
+        redis_client.get_redis_client()
+        mock_from_url.assert_called_once_with(
+            "rediss://:pw@host:6378",
+            decode_responses=True,
+            ssl_ca_certs="/etc/ssl/certs/server_ca.pem",
+            **timeouts,
+        )
+
+    # tls=true without caCertPath -> rediss:// scheme, ssl_ca_certs stays None.
+    with patch.object(redis_client.redis, "from_url") as mock_from_url:
+        redis_client.get_redis_client.cache_clear()
+        monkeypatch.setenv("WEAVE_REDIS_URL", "redis://host:6379?tls=true")
+        redis_client.get_redis_client()
+        mock_from_url.assert_called_once_with(
+            "rediss://host:6379",
+            decode_responses=True,
+            ssl_ca_certs=None,
+            **timeouts,
+        )
+
+    # Non-tls wandb params are still stripped, scheme left as-is.
+    with patch.object(redis_client.redis, "from_url") as mock_from_url:
+        redis_client.get_redis_client.cache_clear()
+        monkeypatch.setenv("WEAVE_REDIS_URL", "redis://host:6379?ttlInSeconds=604800")
+        redis_client.get_redis_client()
+        mock_from_url.assert_called_once_with(
+            "redis://host:6379",
+            decode_responses=True,
+            ssl_ca_certs=None,
+            **timeouts,
+        )
 
 
 @pytest.mark.disable_logging_error_check

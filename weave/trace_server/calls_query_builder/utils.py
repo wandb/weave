@@ -6,7 +6,12 @@ from collections.abc import Generator
 import sqlparse
 
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import ParamBuilder, clickhouse_cast, quote_json_path_parts
+from weave.trace_server.orm import (
+    ParamBuilder,
+    clickhouse_cast_json_value,
+    quote_json_path_parts,
+)
+from weave.trace_server.project_version.types import ReadTable
 
 
 def safe_alias(field_name: str) -> str:
@@ -17,6 +22,23 @@ def safe_alias(field_name: str) -> str:
 def param_slot(param_name: str, param_type: str) -> str:
     """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"
+
+
+def trace_id_index_expr(trace_id_sql: str, read_table: ReadTable) -> str:
+    """Wrap `trace_id_sql` to match the table's trace_id index expression.
+
+    Migration 031 builds `idx_trace_id_bloom` on `ifNull(trace_id, '')` because
+    `calls_merged.trace_id` is `SimpleAggregateFunction(any, Nullable(String))`
+    and a bloom filter on a Nullable column is not pruned by direct equality.
+    Predicates must match the index expression character-for-character to enable
+    granule pruning. On `calls_complete`, `trace_id` is non-nullable `String`
+    with an index on the raw column, so the raw expression is used.
+    """
+    if read_table == ReadTable.CALLS_MERGED:
+        return f"ifNull({trace_id_sql}, '')"
+    if read_table == ReadTable.CALLS_COMPLETE:
+        return trace_id_sql
+    raise ValueError(f"Unhandled read_table: {read_table}")
 
 
 def timestamp_to_datetime_str(timestamp: float) -> str:
@@ -175,16 +197,7 @@ def json_dump_field_as_sql(
             param_name = pb.add_param(quote_json_path_parts(extra_path))
             path_str = param_slot(param_name, "String")
         val = f"coalesce(nullIf(JSON_VALUE({root_field_sanitized}, {path_str}), 'null'), '')"
-        if cast == "bool":
-            # JSON_VALUE on a JSON bool emits the literal strings 'true'/
-            # 'false', which `toUInt8OrNull` would turn into NULL. Match those
-            # first; fall back to `toUInt8OrNull` for legacy rows that stored
-            # 1/0 (or any numeric-string) so a plain Bool comparison still
-            # works in CH.
-            return (
-                f"multiIf({val} = 'true', 1, {val} = 'false', 0, toUInt8OrNull({val}))"
-            )
-        return clickhouse_cast(val, cast)
+        return clickhouse_cast_json_value(val, cast)
     else:
         # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
         # This workaround helps to handle these cases.

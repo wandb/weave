@@ -261,7 +261,7 @@ def test_to_json_object_excludes_ref(client) -> None:
     assert "ref" not in serialized
 
 
-def test_to_json_function_with_memory_address_in_op(client) -> None:
+def test_to_json_function_with_memory_address_in_op(weave_active) -> None:
     opaque = object()
 
     @weave.op
