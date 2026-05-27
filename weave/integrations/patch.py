@@ -36,14 +36,7 @@ _SUPPRESSED_INTEGRATIONS: set[str] = set()
 # Global reference to the import hook, so we can unregister it if needed
 _IMPORT_HOOK: WeaveImportHook | None = None
 
-# RLock guarding _PATCHED_INTEGRATIONS, _IMPORT_HOOK, and the attempt_patch
-# critical section. RLock (not Lock) because the import hook path is
-# re-entrant: PatchingLoader.exec_module -> _patch_if_needed -> patch_X() ->
-# _patch_integration -> importlib.import_module(...) may transitively trigger
-# WeaveImportHook.find_spec for another mapped integration, which re-enters.
-# IMPORTANT: never hold this lock across importlib.import_module(...) — Python
-# has its own per-module import locks, and bracketing one around the other
-# risks A-then-B vs B-then-A deadlocks across threads.
+# Guards _PATCHED_INTEGRATIONS, _IMPORT_HOOK, and attempt_patch calls.
 _PATCH_LOCK = threading.RLock()
 
 
@@ -62,9 +55,10 @@ def _patch_integration(
         triggering_symbols: Symbols to add to _PATCHED_INTEGRATIONS on success (e.g. ["openai"])
         settings: Optional integration settings
     """
-    # Cheap pre-check; importing the patcher module is not free. Skip if
-    # already patched, or if another integration has claimed this symbol
-    # (and ours should defer).
+    # Double-checked locking: pre-check, import_module outside the lock to
+    # avoid nesting it under Python's per-module import locks, then re-check
+    # under the lock before mutating. Both checks also honor suppression — if
+    # another integration has claimed this symbol, we defer.
     with _PATCH_LOCK:
         if any(
             name in _PATCHED_INTEGRATIONS or name in _SUPPRESSED_INTEGRATIONS
@@ -75,14 +69,11 @@ def _patch_integration(
     if settings is None:
         settings = IntegrationSettings()
 
-    # Build the patcher outside the lock — see _PATCH_LOCK docstring.
     module = importlib.import_module(module_path)
     patcher_func = getattr(module, patcher_func_getter_name)
     patcher = patcher_func(settings)
 
     with _PATCH_LOCK:
-        # Re-check: another thread may have finished patching (or suppressed
-        # us) while we were importing. If so, drop our patcher on the floor.
         if any(
             name in _PATCHED_INTEGRATIONS or name in _SUPPRESSED_INTEGRATIONS
             for name in triggering_symbols
@@ -285,6 +276,7 @@ def patch_notdiamond(settings: IntegrationSettings | None = None) -> None:
 
 def patch_fastmcp(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for FastMCP (Model Context Protocol)."""
+    # Double-checked locking — see _patch_integration.
     with _PATCH_LOCK:
         if "mcp" in _PATCHED_INTEGRATIONS:
             return
@@ -380,6 +372,7 @@ def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
 
 def patch_langchain() -> None:
     """Enable Weave tracing for LangChain."""
+    # Double-checked locking — see _patch_integration.
     with _PATCH_LOCK:
         if "langchain" in _PATCHED_INTEGRATIONS:
             return
@@ -396,6 +389,7 @@ def patch_langchain() -> None:
 
 def patch_llamaindex() -> None:
     """Enable Weave tracing for LlamaIndex."""
+    # Double-checked locking — see _patch_integration.
     with _PATCH_LOCK:
         if "llama_index" in _PATCHED_INTEGRATIONS:
             return
