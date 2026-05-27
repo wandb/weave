@@ -3274,9 +3274,6 @@ class ObjectInterface(Protocol):
     def score_delete(self, req: ScoreDeleteReq) -> ScoreDeleteRes: ...
     def eval_results_query(self, req: EvalResultsQueryReq) -> EvalResultsQueryRes: ...
 
-    # Rescore API
-    def rescore(self, req: RescoreReq) -> RescoreRes: ...
-
 
 class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):
     """Complete trace server interface supporting both V1 and Object APIs.
