@@ -1809,3 +1809,30 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
 
     assert res.buckets == []
     assert res.granularity == 3600
+
+
+def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None:
+    """Ensure `feedback_query` returns tz-aware `created_at`."""
+    if client_is_sqlite(client):
+        pytest.skip("created_at is a string on sqlite; tz semantics only apply to CH")
+
+    project_id = client.project_id
+    client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref="weave:///entity/project/object/test:digest",
+            feedback_type="custom",
+            payload={"k": "v"},
+            wb_user_id="",
+        )
+    )
+    res = client.server.feedback_query(tsi.FeedbackQueryReq(project_id=project_id))
+    assert len(res.result) == 1
+    created_at = res.result[0]["created_at"]
+    assert isinstance(created_at, datetime.datetime)
+    assert created_at.tzinfo is not None, (
+        "feedback_query returned a naive datetime; browsers will misinterpret it"
+    )
+    assert created_at.utcoffset() == datetime.timedelta(0), (
+        "feedback created_at must be tz-aware UTC"
+    )
