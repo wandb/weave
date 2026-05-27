@@ -47,6 +47,7 @@ import ddtrace
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import FileChunkCreateCHInsertable
+from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.file_storage import (
     FileStorageClient,
     FileStorageWriteError,
@@ -57,6 +58,13 @@ from weave.trace_server.file_storage import (
 # Hides GCS RTT (~60ms p50, ~150ms p95) without exhausting the per-pod
 # google-cloud-storage HTTP session pool.
 DEFAULT_BUCKET_UPLOAD_CONCURRENCY = 8
+
+# Hard ceiling on bytes buffered in a single batch between stage() and
+# flush(). The /call/* request-body cap is 32 MiB, so 256 MiB leaves 8x
+# headroom for legitimate multi-attachment traffic while preventing a
+# misbehaving client from OOMing the pod by stuffing one call_batch with
+# huge file_create payloads.
+MAX_BUCKET_UPLOAD_BATCH_BYTES = 256 * 1024 * 1024
 
 
 @dataclass(slots=True)
@@ -73,10 +81,16 @@ class BucketUploadBatch:
     inline ClickHouse chunks for that one file; other files are unaffected.
     """
 
-    def __init__(self, max_workers: int = DEFAULT_BUCKET_UPLOAD_CONCURRENCY) -> None:
+    def __init__(
+        self,
+        max_workers: int = DEFAULT_BUCKET_UPLOAD_CONCURRENCY,
+        max_bytes: int = MAX_BUCKET_UPLOAD_BATCH_BYTES,
+    ) -> None:
         self._max_workers = max_workers
+        self._max_bytes = max_bytes
         self._pending: list[_Pending] = []
         self._seen: set[tuple[str, str]] = set()
+        self._total_bytes = 0
 
     def stage(self, req: tsi.FileCreateReq, digest: str) -> None:
         """Defer a bucket upload until `flush()`.
@@ -87,6 +101,10 @@ class BucketUploadBatch:
         True; staging a duplicate would double-upload the same object and
         race on `if_generation_match=0`, so we raise instead of silently
         accepting it.
+
+        Raises `RequestTooLarge` if accepting this item would push the
+        batch over `max_bytes`. Bounds worst-case memory for a single
+        call_batch so one client can't OOM the pod.
         """
         key = (req.project_id, digest)
         if key in self._seen:
@@ -94,8 +112,15 @@ class BucketUploadBatch:
                 f"BucketUploadBatch.stage() called twice for {key}; callers "
                 "must pre-check via `has()` and skip duplicates."
             )
+        size = len(req.content)
+        if self._total_bytes + size > self._max_bytes:
+            raise RequestTooLarge(
+                f"BucketUploadBatch would exceed max_bytes={self._max_bytes}: "
+                f"staged={self._total_bytes}, new={size}"
+            )
         self._pending.append(_Pending(req=req, digest=digest))
         self._seen.add(key)
+        self._total_bytes += size
 
     def has(self, project_id: str, digest: str) -> bool:
         """True if `(project_id, digest)` was already staged in this batch."""
@@ -129,6 +154,7 @@ class BucketUploadBatch:
             )
         pending, self._pending = self._pending, []
         self._seen = set()
+        self._total_bytes = 0
 
         rows: list[FileChunkCreateCHInsertable] = []
         with ThreadPoolExecutor(
