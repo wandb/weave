@@ -528,29 +528,41 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         if token is not None:
             otel_context.detach(token)
 
-        # Re-compute the span name now that we have the full data (e.g. the
-        # openai Response's model is only available on on_span_end, so the
-        # chat span starts as "chat" and gains the model suffix here).
-        otel_span.update_name(_otel_span_name(span))
+        # Enrich-then-end. The enrichment block walks SDK payloads (e.g.
+        # response.output items expected to expose ``model_dump``) and can
+        # raise on unexpected shapes. We must still end the OTel span on any
+        # failure or it leaks: dropped from our maps above but never exported.
+        try:
+            # Re-compute the span name now that we have the full data (e.g. the
+            # openai Response's model is only available on on_span_end, so the
+            # chat span starts as "chat" and gains the model suffix here).
+            otel_span.update_name(_otel_span_name(span))
 
-        conversation_id = self._conversation_ids.get(span.trace_id, "")
-        attrs = _attrs_for_span(span, conversation_id)
-        _set_attrs(otel_span, attrs)
+            conversation_id = self._conversation_ids.get(span.trace_id, "")
+            attrs = _attrs_for_span(span, conversation_id)
+            _set_attrs(otel_span, attrs)
 
-        if span.error:
-            otel_span.set_status(
-                StatusCode.ERROR, str(span.error.get("message", "")) or ""
-            )
-            if data := span.error.get("data"):
-                otel_span.set_attribute(
-                    f"{_WEAVE_ATTR_PREFIX}.error.data", str(data)
+            if span.error:
+                otel_span.set_status(
+                    StatusCode.ERROR, str(span.error.get("message", "")) or ""
                 )
-
-        end_ns = _iso_to_ns(span.ended_at)
-        if end_ns is not None:
-            otel_span.end(end_time=end_ns)
-        else:
-            otel_span.end()
+                if data := span.error.get("data"):
+                    otel_span.set_attribute(
+                        f"{_WEAVE_ATTR_PREFIX}.error.data", str(data)
+                    )
+        except Exception as exc:
+            logger.exception(
+                "Failed to enrich OTel span for openai span_id=%s", span.span_id
+            )
+            otel_span.set_status(
+                StatusCode.ERROR, f"weave enrichment failed: {exc}"
+            )
+        finally:
+            end_ns = _iso_to_ns(span.ended_at)
+            if end_ns is not None:
+                otel_span.end(end_time=end_ns)
+            else:
+                otel_span.end()
 
     def shutdown(self) -> None:
         """End any open spans so they don't leak on interpreter exit."""

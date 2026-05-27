@@ -771,6 +771,71 @@ def test_on_trace_end_sweeps_leftover_spans(
     assert "trace_leak" not in processor._conversation_ids
 
 
+@pytest.mark.disable_logging_error_check(
+    reason="the test deliberately triggers the enrichment-failure logger.exception"
+)
+def test_on_span_end_still_ends_span_when_enrichment_raises(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """Enrichment failures must not leak the OTel span.
+
+    If anything in the attribute-building path raises (e.g. a malformed
+    ``response.output`` item that doesn't expose ``model_dump``), the OTel
+    span is already popped from internal maps and its context token detached
+    before enrichment runs. Without a try/finally the span would never be
+    ``.end()``-ed and would never reach the exporter.
+    """
+    processor = WeaveOtelTracingProcessor()
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_boom"
+    trace.name = "wf"
+    trace.group_id = None
+    processor.on_trace_start(trace)
+
+    bad_output_item = Mock()
+    bad_output_item.model_dump.side_effect = RuntimeError("boom")
+    response = Mock()
+    response.id = "resp_boom"
+    response.model = "gpt-4o"
+    response.output = [bad_output_item]
+    usage = Mock()
+    usage.input_tokens = 0
+    usage.output_tokens = 0
+    usage.output_tokens_details = None
+    usage.input_tokens_details = None
+    response.usage = usage
+
+    response_data = Mock(spec=ResponseSpanData)
+    response_data.__class__ = ResponseSpanData
+    response_data.input = "hi"
+    response_data.response = response
+    response_data.usage = None
+
+    response_span = Mock(spec=Span)
+    response_span.trace_id = "trace_boom"
+    response_span.span_id = "span_boom"
+    response_span.parent_id = None
+    response_span.span_data = response_data
+    response_span.started_at = None
+    response_span.ended_at = None
+    response_span.error = None
+
+    processor.on_span_start(response_span)
+    processor.on_span_end(response_span)
+
+    # State is cleaned up despite the enrichment exception.
+    assert "span_boom" not in processor._span_otel
+    assert "span_boom" not in processor._span_tokens
+    assert "span_boom" not in processor._trace_spans["trace_boom"]
+
+    # The OTel span made it to the exporter and carries an error status.
+    finished = otel_spans.get_finished_spans()
+    chat = next(s for s in finished if s.context.span_id is not None and "boom" in (s.status.description or ""))
+    assert chat.status.status_code.name == "ERROR"
+
+    processor.on_trace_end(trace)
+
+
 def test_undo_patch_is_noop_when_not_patched() -> None:
     """Calling undo_patch on a non-installed patcher returns True without error."""
     from weave.integrations.openai_agents.patcher import OpenAIAgentsOtelPatcher
