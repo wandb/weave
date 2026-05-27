@@ -885,7 +885,11 @@ def test_on_span_end_still_ends_span_when_enrichment_raises(
 
     # The OTel span made it to the exporter and carries an error status.
     finished = otel_spans.get_finished_spans()
-    chat = next(s for s in finished if s.context.span_id is not None and "boom" in (s.status.description or ""))
+    chat = next(
+        s
+        for s in finished
+        if s.context.span_id is not None and "boom" in (s.status.description or "")
+    )
     assert chat.status.status_code.name == "ERROR"
 
     processor.on_trace_end(trace)

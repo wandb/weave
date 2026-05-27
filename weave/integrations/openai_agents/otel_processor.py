@@ -279,7 +279,9 @@ def _generation_chat_attrs(
 
     usage = Usage()
     if isinstance(sd.usage, dict):
-        input_tokens = sd.usage.get("input_tokens") or sd.usage.get("prompt_tokens") or 0
+        input_tokens = (
+            sd.usage.get("input_tokens") or sd.usage.get("prompt_tokens") or 0
+        )
         output_tokens = (
             sd.usage.get("output_tokens") or sd.usage.get("completion_tokens") or 0
         )
@@ -323,9 +325,7 @@ def _request_kwargs_from_model_config(model_config: Any) -> dict[str, Any]:
     return out
 
 
-def _chat_completion_messages(
-    raw: Any, *, default_role: str
-) -> list[Message]:
+def _chat_completion_messages(raw: Any, *, default_role: str) -> list[Message]:
     """Convert an openai chat-completions message list to ``Message`` objects.
 
     GenerationSpanData carries the legacy ``[{"role": "...", "content": "..."}]``
@@ -585,9 +585,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
             logger.exception(
                 "Failed to enrich OTel span for openai span_id=%s", span.span_id
             )
-            otel_span.set_status(
-                StatusCode.ERROR, f"weave enrichment failed: {exc}"
-            )
+            otel_span.set_status(StatusCode.ERROR, f"weave enrichment failed: {exc}")
         finally:
             end_ns = _iso_to_ns(span.ended_at)
             if end_ns is not None:
