@@ -7,6 +7,7 @@ emitted OTel spans instead of Weave calls.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 from unittest.mock import Mock
 
@@ -85,85 +86,203 @@ def test_openai_agents_quickstart_otel(
     Runner.run_sync(agent, "Write a haiku about recursion in programming.")
 
     spans = otel_spans.get_finished_spans()
-
-    # No chat spans — Response/Generation are skipped in OTel mode.
-    assert not _by_name(spans, "chat ")
-
-    # Trace root + Task + Agent + Turn = 4 spans (matches calls-side count).
-    assert len(spans) == 4
-
-    # Spans are ordered by end time. The leaf (turn) finishes first, parents
-    # finish last. Build a name → span map for stable assertions.
     by_name = {s.name: s for s in spans}
 
-    assert "invoke_agent Agent workflow" in by_name
-    workflow = by_name["invoke_agent Agent workflow"]
+    # No synthetic trace root: TaskSpan is the OTel root, named "workflow ..."
+    # so the Agents-tab events panel doesn't treat it as a sub-agent.
+    workflow = by_name["workflow Agent workflow"]
     workflow_attrs = _attrs(workflow)
-    assert workflow_attrs["gen_ai.operation.name"] == "invoke_agent"
-    assert workflow_attrs["gen_ai.agent.name"] == "Agent workflow"
-    # Without an explicit group_id, conversation.id falls back to trace_id.
+    assert workflow.parent is None
+    assert "gen_ai.operation.name" not in workflow_attrs
+    assert workflow_attrs["weave.openai_agents.task.workflow_name"] == "Agent workflow"
     assert workflow_attrs["gen_ai.conversation.id"].startswith("trace_")
-    assert workflow_attrs["weave.openai_agents.trace_id"].startswith("trace_")
 
-    assert "invoke_agent Assistant" in by_name
-    agent_span = by_name["invoke_agent Assistant"]
+    # AgentSpan is the only invoke_agent — TaskSpan and TurnSpan are structural,
+    # so handoff/multi-agent flows show one agent_start event per agent only.
+    invoke_agent_spans = [
+        s for s in spans if _attrs(s).get("gen_ai.operation.name") == "invoke_agent"
+    ]
+    assert len(invoke_agent_spans) == 1
+    agent_span = invoke_agent_spans[0]
+    assert agent_span.name == "invoke_agent Assistant"
     assert _attrs(agent_span)["gen_ai.agent.name"] == "Assistant"
+    assert agent_span.parent.span_id == workflow.context.span_id
 
-    turn_spans = _by_name(spans, "invoke_agent Assistant turn ")
-    assert len(turn_spans) == 1
-    assert _attrs(turn_spans[0])["weave.openai_agents.turn.number"] == 1
+    # TurnSpan is structural — name has no invoke_agent prefix, no semconv op.
+    turn_spans = [s for s in spans if "turn " in s.name and s.name != agent_span.name]
+    assert turn_spans
+    for turn in turn_spans:
+        turn_attrs = _attrs(turn)
+        assert "gen_ai.operation.name" not in turn_attrs
+        assert turn_attrs["weave.openai_agents.turn.agent_name"] == "Assistant"
+        assert turn.parent.span_id == agent_span.context.span_id
+
+    # At least one chat span lifted from ResponseSpanData, nested under a turn.
+    chat_spans = _by_name(spans, "chat ")
+    assert chat_spans, "expected at least one chat span"
+    chat = chat_spans[0]
+    assert chat.parent.span_id == turn_spans[0].context.span_id
+    chat_attrs = _attrs(chat)
+    assert chat_attrs["gen_ai.operation.name"] == "chat"
+    assert chat_attrs["gen_ai.provider.name"] == "openai"
 
 
-def test_response_and_generation_spans_are_skipped(
+def test_agent_span_carries_provider_name(
     client: WeaveClient, otel_spans: InMemorySpanExporter
 ) -> None:
-    """ResponseSpan and GenerationSpan don't produce OTel spans.
+    """AgentSpan sets ``gen_ai.provider.name`` so the Agents tab can filter by provider."""
+    processor = WeaveOtelTracingProcessor()
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_p"
+    trace.name = "wf"
+    trace.group_id = None
+    processor.on_trace_start(trace)
 
-    The openai-OTel patcher (forthcoming) is the source of truth for chat spans
-    — see module docstring on WeaveOtelTracingProcessor.
+    agent_span = Mock(spec=Span)
+    agent_span.trace_id = "trace_p"
+    agent_span.span_id = "span_p"
+    agent_span.parent_id = None
+    agent_span.span_data = AgentSpanData(name="Bot")
+    agent_span.started_at = None
+    agent_span.ended_at = None
+    agent_span.error = None
+    processor.on_span_start(agent_span)
+    processor.on_span_end(agent_span)
+    processor.on_trace_end(trace)
+
+    spans = otel_spans.get_finished_spans()
+    agent = next(s for s in spans if s.name == "invoke_agent Bot")
+    assert _attrs(agent)["gen_ai.provider.name"] == "openai"
+
+
+def test_response_span_emits_chat_with_messages(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """ResponseSpan is lifted into a ``chat`` semconv span.
+
+    Pulls model, response id, input/output messages, usage, finish_reasons,
+    and output_type directly off ``ResponseSpanData`` — the Agents SDK already
+    serializes the openai Response on the span.
     """
     processor = WeaveOtelTracingProcessor()
 
     trace = Mock(spec=Trace)
-    trace.trace_id = "trace_abc"
-    trace.name = "test"
+    trace.trace_id = "trace_r"
+    trace.name = "wf"
     trace.group_id = None
     processor.on_trace_start(trace)
 
+    output_item = Mock()
+    output_item.model_dump.return_value = {
+        "role": "assistant",
+        "content": [{"type": "output_text", "text": "Hi!"}],
+        "finish_reason": "stop",
+    }
+    response = Mock()
+    response.id = "resp_42"
+    response.model = "gpt-4o"
+    response.output = [output_item]
+    usage = Mock()
+    usage.input_tokens = 5
+    usage.output_tokens = 7
+    usage.output_tokens_details = None
+    usage.input_tokens_details = None
+    response.usage = usage
+
     response_data = Mock(spec=ResponseSpanData)
     response_data.__class__ = ResponseSpanData
+    response_data.input = "Say hi"
+    response_data.response = response
+    response_data.usage = None
+
     response_span = Mock(spec=Span)
-    response_span.trace_id = "trace_abc"
+    response_span.trace_id = "trace_r"
     response_span.span_id = "span_resp"
     response_span.parent_id = None
     response_span.span_data = response_data
     response_span.started_at = None
     response_span.ended_at = None
     response_span.error = None
-
     processor.on_span_start(response_span)
     processor.on_span_end(response_span)
-
-    generation_data = Mock(spec=GenerationSpanData)
-    generation_data.__class__ = GenerationSpanData
-    generation_span = Mock(spec=Span)
-    generation_span.trace_id = "trace_abc"
-    generation_span.span_id = "span_gen"
-    generation_span.parent_id = None
-    generation_span.span_data = generation_data
-    generation_span.started_at = None
-    generation_span.ended_at = None
-    generation_span.error = None
-
-    processor.on_span_start(generation_span)
-    processor.on_span_end(generation_span)
-
     processor.on_trace_end(trace)
 
-    # Only the trace root span; no children for Response/Generation.
     spans = otel_spans.get_finished_spans()
-    assert len(spans) == 1
-    assert spans[0].name == "invoke_agent test"
+    chat = next(s for s in spans if s.name == "chat gpt-4o")
+    attrs = _attrs(chat)
+    assert attrs["gen_ai.operation.name"] == "chat"
+    assert attrs["gen_ai.request.model"] == "gpt-4o"
+    assert attrs["gen_ai.response.id"] == "resp_42"
+    assert attrs["gen_ai.response.model"] == "gpt-4o"
+    assert attrs["gen_ai.usage.input_tokens"] == 5
+    assert attrs["gen_ai.usage.output_tokens"] == 7
+    assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
+    assert attrs["gen_ai.output.type"] == "text"
+
+    input_messages = json.loads(attrs["gen_ai.input.messages"])
+    assert input_messages == [
+        {"role": "user", "parts": [{"type": "text", "content": "Say hi"}]}
+    ]
+    output_messages = json.loads(attrs["gen_ai.output.messages"])
+    assert output_messages == [
+        {
+            "role": "assistant",
+            "parts": [{"type": "text", "content": "Hi!"}],
+            "finish_reason": "stop",
+        }
+    ]
+
+
+def test_generation_span_emits_chat_with_messages(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """GenerationSpan is lifted into a ``chat`` semconv span.
+
+    The legacy chat-completions shape uses flat ``[{role, content}]`` messages,
+    plain string content, and a ``prompt_tokens``/``completion_tokens`` usage
+    dict.
+    """
+    processor = WeaveOtelTracingProcessor()
+
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_g"
+    trace.name = "wf"
+    trace.group_id = None
+    processor.on_trace_start(trace)
+
+    gen_span = Mock(spec=Span)
+    gen_span.trace_id = "trace_g"
+    gen_span.span_id = "span_gen"
+    gen_span.parent_id = None
+    gen_span.span_data = GenerationSpanData(
+        input=[{"role": "user", "content": "Say hi"}],
+        output=[{"role": "assistant", "content": "Hi!"}],
+        model="gpt-4o",
+        usage={"input_tokens": 5, "output_tokens": 7},
+    )
+    gen_span.started_at = None
+    gen_span.ended_at = None
+    gen_span.error = None
+    processor.on_span_start(gen_span)
+    processor.on_span_end(gen_span)
+    processor.on_trace_end(trace)
+
+    spans = otel_spans.get_finished_spans()
+    chat = next(s for s in spans if s.name == "chat gpt-4o")
+    attrs = _attrs(chat)
+    assert attrs["gen_ai.operation.name"] == "chat"
+    assert attrs["gen_ai.request.model"] == "gpt-4o"
+    assert attrs["gen_ai.usage.input_tokens"] == 5
+    assert attrs["gen_ai.usage.output_tokens"] == 7
+
+    input_messages = json.loads(attrs["gen_ai.input.messages"])
+    assert input_messages == [
+        {"role": "user", "parts": [{"type": "text", "content": "Say hi"}]}
+    ]
+    output_messages = json.loads(attrs["gen_ai.output.messages"])
+    assert output_messages == [
+        {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+    ]
 
 
 def test_handoff_emits_custom_attrs(
@@ -271,34 +390,58 @@ def test_function_emits_execute_tool(
 def test_conversation_id_uses_group_id_when_set(
     client: WeaveClient, otel_spans: InMemorySpanExporter
 ) -> None:
-    """``group_id`` (when set) becomes ``gen_ai.conversation.id``; otherwise trace_id."""
+    """``group_id`` (when set) becomes ``gen_ai.conversation.id``; otherwise trace_id.
+
+    The conversation_id is propagated onto every emitted child span (the trace
+    object itself emits no span — TaskSpan is the natural root).
+    """
     processor = WeaveOtelTracingProcessor()
 
-    trace_with_group = Mock(spec=Trace)
-    trace_with_group.trace_id = "trace_1"
-    trace_with_group.name = "wf1"
-    trace_with_group.group_id = "chat_456"
-    processor.on_trace_start(trace_with_group)
-    processor.on_trace_end(trace_with_group)
+    def _emit_task(trace_id: str, group_id: str | None) -> None:
+        trace = Mock(spec=Trace)
+        trace.trace_id = trace_id
+        trace.name = "wf"
+        trace.group_id = group_id
+        processor.on_trace_start(trace)
 
-    trace_no_group = Mock(spec=Trace)
-    trace_no_group.trace_id = "trace_2"
-    trace_no_group.name = "wf2"
-    trace_no_group.group_id = None
-    processor.on_trace_start(trace_no_group)
-    processor.on_trace_end(trace_no_group)
+        task_span = Mock(spec=Span)
+        task_span.trace_id = trace_id
+        task_span.span_id = f"task_{trace_id}"
+        task_span.parent_id = None
+        task_span.span_data = TaskSpanData(name="wf")
+        task_span.started_at = None
+        task_span.ended_at = None
+        task_span.error = None
+        processor.on_span_start(task_span)
+        processor.on_span_end(task_span)
+        processor.on_trace_end(trace)
 
-    spans = otel_spans.get_finished_spans()
-    wf1 = next(s for s in spans if s.name == "invoke_agent wf1")
-    wf2 = next(s for s in spans if s.name == "invoke_agent wf2")
-    assert _attrs(wf1)["gen_ai.conversation.id"] == "chat_456"
-    assert _attrs(wf2)["gen_ai.conversation.id"] == "trace_2"
+    _emit_task("trace_1", "chat_456")
+    _emit_task("trace_2", None)
+
+    by_trace_attr = {
+        _attrs(s)["weave.openai_agents.trace_id"]: _attrs(s)
+        for s in otel_spans.get_finished_spans()
+    }
+    assert by_trace_attr["trace_1"]["gen_ai.conversation.id"] == "chat_456"
+    assert by_trace_attr["trace_2"]["gen_ai.conversation.id"] == "trace_2"
+    # TaskSpan is structural — no invoke_agent semconv on it.
+    assert "gen_ai.operation.name" not in by_trace_attr["trace_1"]
+    assert "gen_ai.operation.name" not in by_trace_attr["trace_2"]
 
 
-def test_newer_agent_task_and_turn_fields(
+def test_task_and_turn_emit_structural_spans(
     client: WeaveClient, otel_spans: InMemorySpanExporter
 ) -> None:
-    """Task/Turn spans emit invoke_agent OTel spans with structured metadata."""
+    """Task/Turn spans are structural — no invoke_agent semconv on them.
+
+    TaskSpan wraps a workflow (not an agent invocation) and TurnSpan is one
+    loop iteration within an agent (not a separate agent), so emitting
+    ``gen_ai.operation.name=invoke_agent`` on either would surface them as
+    redundant "sub-agent" events in the Agents tab Events panel. They still
+    emit OTel spans (queryable, parent-child trace tree, metadata preserved
+    under ``weave.openai_agents.*``) — just not as semconv agent invocations.
+    """
     processor = WeaveOtelTracingProcessor()
 
     trace = Mock(spec=Trace)
@@ -341,16 +484,16 @@ def test_newer_agent_task_and_turn_fields(
     processor.on_trace_end(trace)
 
     spans = otel_spans.get_finished_spans()
-    task = next(s for s in spans if s.name == "invoke_agent Runner task")
+    task = next(s for s in spans if s.name == "workflow Runner task")
     task_attrs = _attrs(task)
-    assert task_attrs["gen_ai.operation.name"] == "invoke_agent"
-    assert task_attrs["gen_ai.agent.name"] == "Runner task"
+    assert "gen_ai.operation.name" not in task_attrs
+    assert task_attrs["weave.openai_agents.task.workflow_name"] == "Runner task"
     assert task_attrs["weave.openai_agents.task.metadata.session_id"] == "session-1"
 
-    turn = next(s for s in spans if s.name == "invoke_agent Assistant turn 2")
+    turn = next(s for s in spans if s.name == "Assistant turn 2")
     turn_attrs = _attrs(turn)
-    assert turn_attrs["gen_ai.operation.name"] == "invoke_agent"
-    assert turn_attrs["gen_ai.agent.name"] == "Assistant"
+    assert "gen_ai.operation.name" not in turn_attrs
+    assert turn_attrs["weave.openai_agents.turn.agent_name"] == "Assistant"
     assert turn_attrs["weave.openai_agents.turn.number"] == 2
     assert turn_attrs["weave.openai_agents.turn.metadata.callback"] == "session_input"
 
@@ -435,7 +578,7 @@ def test_processor_cleanup(
     trace.name = "wf"
     trace.group_id = None
     processor.on_trace_start(trace)
-    assert "trace_x" in processor._trace_root_spans
+    assert "trace_x" in processor._conversation_ids
 
     agent_span = Mock(spec=Span)
     agent_span.trace_id = "trace_x"
@@ -450,13 +593,13 @@ def test_processor_cleanup(
 
     # force_flush ends any open spans and clears dicts.
     processor.force_flush()
-    assert processor._trace_root_spans == {}
     assert processor._span_otel == {}
+    assert processor._span_tokens == {}
     assert processor._conversation_ids == {}
 
     # shutdown is idempotent when state is already empty.
     processor.shutdown()
-    assert processor._trace_root_spans == {}
+    assert processor._span_otel == {}
 
 
 def test_iso_to_ns_roundtrip() -> None:
@@ -470,3 +613,169 @@ def test_iso_to_ns_roundtrip() -> None:
     assert ns == int(now.timestamp() * 1_000_000_000)
     assert _iso_to_ns(None) is None
     assert _iso_to_ns("") is None
+
+
+def test_patcher_install_and_uninstall_lifecycle() -> None:
+    """``attempt_patch`` adds the processor; ``undo_patch`` removes it cleanly.
+
+    Verifies the uninstall path doesn't blow away other registered
+    processors — we install a sentinel processor first, then install our
+    patcher, then uninstall, and confirm the sentinel is still there.
+    """
+    from agents.tracing import TracingProcessor, set_trace_processors
+
+    from weave.integrations.openai_agents.patcher import (
+        OpenAIAgentsOtelPatcher,
+        _registered_processors,
+    )
+    from weave.trace.autopatch import IntegrationSettings
+
+    original = _registered_processors() or []
+
+    class _Sentinel(TracingProcessor):
+        def on_trace_start(self, trace):
+            return None
+
+        def on_trace_end(self, trace):
+            return None
+
+        def on_span_start(self, span):
+            return None
+
+        def on_span_end(self, span):
+            return None
+
+        def shutdown(self):
+            return None
+
+        def force_flush(self):
+            return None
+
+    sentinel = _Sentinel()
+    set_trace_processors([sentinel])
+
+    patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
+    assert patcher.attempt_patch() is True
+    installed_processor = patcher.processor
+    assert installed_processor is not None
+
+    registered = _registered_processors() or []
+    assert sentinel in registered, "sentinel processor was clobbered on install"
+    assert installed_processor in registered
+
+    # Track that shutdown is called as part of uninstall.
+    shutdown_calls: list[bool] = []
+    original_shutdown = installed_processor.shutdown
+
+    def _tracking_shutdown() -> None:
+        shutdown_calls.append(True)
+        original_shutdown()
+
+    installed_processor.shutdown = _tracking_shutdown  # type: ignore[method-assign]
+
+    assert patcher.undo_patch() is True
+    assert patcher.patched is False
+    assert patcher.processor is None
+    assert shutdown_calls == [True]
+
+    registered_after = _registered_processors() or []
+    assert sentinel in registered_after, "sentinel was removed by uninstall"
+    assert installed_processor not in registered_after
+
+    # Restore the prior state so the test doesn't leak processors.
+    set_trace_processors(original)
+
+
+def test_generation_span_threads_model_config_request_params(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """``GenerationSpanData.model_config`` flows into ``gen_ai.request.*`` attrs."""
+    processor = WeaveOtelTracingProcessor()
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_g2"
+    trace.name = "wf"
+    trace.group_id = None
+    processor.on_trace_start(trace)
+
+    gen_span = Mock(spec=Span)
+    gen_span.trace_id = "trace_g2"
+    gen_span.span_id = "span_g2"
+    gen_span.parent_id = None
+    gen_span.span_data = GenerationSpanData(
+        input=[{"role": "user", "content": "hi"}],
+        output=[{"role": "assistant", "content": "hello"}],
+        model="gpt-4o",
+        model_config={
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "max_tokens": 256,
+            "frequency_penalty": 0.1,
+            "presence_penalty": 0.2,
+            "seed": 42,
+            "stop": ["END"],
+        },
+        usage={"input_tokens": 1, "output_tokens": 1},
+    )
+    gen_span.started_at = None
+    gen_span.ended_at = None
+    gen_span.error = None
+    processor.on_span_start(gen_span)
+    processor.on_span_end(gen_span)
+    processor.on_trace_end(trace)
+
+    chat = next(s for s in otel_spans.get_finished_spans() if s.name == "chat gpt-4o")
+    attrs = _attrs(chat)
+    assert attrs["gen_ai.request.temperature"] == 0.7
+    assert attrs["gen_ai.request.top_p"] == 0.9
+    assert attrs["gen_ai.request.max_tokens"] == 256
+    assert attrs["gen_ai.request.frequency_penalty"] == 0.1
+    assert attrs["gen_ai.request.presence_penalty"] == 0.2
+    assert attrs["gen_ai.request.seed"] == 42
+    assert attrs["gen_ai.request.stop_sequences"] == ("END",)
+    assert attrs["gen_ai.output.type"] == "text"
+
+
+def test_on_trace_end_sweeps_leftover_spans(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """Spans the SDK never closed are swept on on_trace_end so state doesn't leak."""
+    processor = WeaveOtelTracingProcessor()
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_leak"
+    trace.name = "wf"
+    trace.group_id = None
+    processor.on_trace_start(trace)
+
+    leaked_span = Mock(spec=Span)
+    leaked_span.trace_id = "trace_leak"
+    leaked_span.span_id = "span_leaked"
+    leaked_span.parent_id = None
+    leaked_span.span_data = AgentSpanData(name="Ghost")
+    leaked_span.started_at = None
+    leaked_span.ended_at = None
+    leaked_span.error = None
+    processor.on_span_start(leaked_span)
+    # Deliberately do NOT call on_span_end — simulate an abrupt failure where
+    # the SDK ends the trace without closing the span.
+
+    assert "span_leaked" in processor._span_otel
+    assert "span_leaked" in processor._span_tokens
+    assert processor._trace_spans["trace_leak"] == {"span_leaked"}
+
+    processor.on_trace_end(trace)
+
+    # Trace-scoped state is cleared; the leaked span got ended.
+    assert "span_leaked" not in processor._span_otel
+    assert "span_leaked" not in processor._span_tokens
+    assert "trace_leak" not in processor._trace_spans
+    assert "trace_leak" not in processor._conversation_ids
+
+
+def test_undo_patch_is_noop_when_not_patched() -> None:
+    """Calling undo_patch on a non-installed patcher returns True without error."""
+    from weave.integrations.openai_agents.patcher import OpenAIAgentsOtelPatcher
+    from weave.trace.autopatch import IntegrationSettings
+
+    patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
+    assert patcher.patched is False
+    assert patcher.undo_patch() is True
