@@ -10,7 +10,7 @@ from weave.trace_server.agents.kafka_events import (
     SCORE_AGENT_SPANS_TOPIC,
     ScoreAgentSpansEvent,
 )
-from weave.trace_server.kafka import KafkaProducer
+from weave.trace_server.kafka import KafkaProducer, _bucketed_project_key
 
 
 def _make_event(**overrides) -> ScoreAgentSpansEvent:
@@ -75,3 +75,25 @@ def test_producer_publishes_under_buffer_limit() -> None:
     producer.produce.assert_called_once()
     call_kwargs = producer.produce.call_args.kwargs
     assert call_kwargs["topic"] == "weave.score_agent_spans"
+
+
+@pytest.mark.disable_logging_error_check
+def test_bucketed_project_key(monkeypatch):
+    """Bucket suffix is deterministic per salt, scoped to N, off by default."""
+    key = "WF_KAFKA_PROJECT_ID_BUCKET_COUNT"
+
+    monkeypatch.delenv(key, raising=False)
+    assert _bucketed_project_key("proj-a", "call-1") == "proj-a"
+
+    monkeypatch.setenv(key, "4")
+    first = _bucketed_project_key("proj-a", "call-1")
+    assert first == _bucketed_project_key("proj-a", "call-1")
+    prefix, _, bucket = first.partition(":")
+    assert prefix == "proj-a"
+    assert 0 <= int(bucket) < 4
+
+    seen = {
+        _bucketed_project_key("proj-a", f"call-{i}").split(":")[1] for i in range(100)
+    }
+    assert len(seen) > 1
+    assert _bucketed_project_key("proj-b", "call-1").startswith("proj-b:")
