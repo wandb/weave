@@ -243,7 +243,7 @@ export class PiCodingAgentOtelAdapter {
   private readonly toolSpans = new Map<string, Span>();
 
   // Current model, updated on model_select events
-  private currentModel: PiModel | null = null;
+  private currentModel: PiModel<any> | null = null;
 
   // Conversation ID for the session — set once in onSessionStart, attached to every span
   private conversationId: string | null = null;

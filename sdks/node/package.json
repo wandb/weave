@@ -176,6 +176,9 @@
     "uuidv7": "^1.0.1"
   },
   "devDependencies": {
+    "@earendil-works/pi-agent-core": "^0.76.0",
+    "@earendil-works/pi-ai": "^0.76.0",
+    "@earendil-works/pi-coding-agent": "^0.76.0",
     "@openai/agents": "^0.11.4",
     "@openai/agents-realtime": "^0.11.5",
     "@types/cli-progress": "^3.11.6",
