@@ -198,6 +198,7 @@ def _publish_media_content(
     from weave.trace.api import publish
     from weave.type_wrappers.Content.content import Content
 
+    content_obj: Content
     if content:
         if isinstance(content, str):
             content_obj = Content.from_base64(content, mimetype=mime_type or None)

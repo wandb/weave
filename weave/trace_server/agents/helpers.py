@@ -72,7 +72,7 @@ def normalize_span_row(d: dict[str, Any]) -> dict[str, Any]:
         normalized: list[dict[str, Any]] = []
         for m in msgs:
             if isinstance(m, tuple):
-                if len(m) not in (3, 4):
+                if len(m) not in {3, 4}:
                     raise ValueError(
                         f"{key} tuple must have 3 or 4 values, got {len(m)}"
                     )

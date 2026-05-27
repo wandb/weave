@@ -25,7 +25,7 @@ def test_genai_span_to_row_converts_messages_to_named_tuples() -> None:
     row = genai_span_to_row(span)
 
     input_messages_idx = ALL_SPAN_INSERT_COLUMNS.index("input_messages")
-    assert row[input_messages_idx] == [("user", "hi", "")]
+    assert row[input_messages_idx] == [("user", "hi", "", "")]
 
 
 def test_normalize_span_row_returns_new_dict() -> None:
@@ -44,7 +44,7 @@ def test_normalize_span_row_returns_new_dict() -> None:
 
 
 def test_normalize_span_row_rejects_invalid_message_shape() -> None:
-    with pytest.raises(ValueError, match="tuple must have 3 values"):
+    with pytest.raises(ValueError, match="tuple must have 3 or 4 values"):
         normalize_span_row({"input_messages": [("user", "hi")]})
 
     with pytest.raises(TypeError, match="must be a tuple or dict"):

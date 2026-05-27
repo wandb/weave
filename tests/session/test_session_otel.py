@@ -808,9 +808,7 @@ class TestExplicitMessageParts:
         """media_attachments still extend the last user message even with explicit parts."""
         ref = "weave:///test/project/object/img:v1"
         msg = Message(role="user", parts=[TextPart(content="see this")])
-        media = [
-            MediaAttachment(ref=ref, modality="image", mime_type="image/png")
-        ]
+        media = [MediaAttachment(ref=ref, modality="image", mime_type="image/png")]
         attrs = llm_attributes(
             model="gpt-4o", input_messages=[msg], media_attachments=media
         )
