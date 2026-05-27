@@ -195,6 +195,27 @@ function mapPiMessage(msg: PiAgentMessage): WeaveMessage {
       finish_reason: msg.stopReason,
     };
   }
+
+  if (msg.role === 'bashExecution') {
+    return {
+      role: msg.role,
+      content: msg.command,
+    };
+  }
+
+  if (msg.role === 'branchSummary') {
+    return {
+      role: msg.role,
+      content: msg.summary,
+    };
+  }
+
+  if (msg.role === 'compactionSummary') {
+    return {
+      role: msg.role,
+      content: msg.summary,
+    };
+  }
   const content = msg.content;
   return {
     role: msg.role,
@@ -292,8 +313,6 @@ export class PiCodingAgentOtelAdapter {
     pi.on('tool_call', this.onToolCall);
     pi.on('tool_result', this.onToolResult);
     pi.on('session_compact', this.onSessionCompact);
-    pi.on('auto_retry_start', this.onAutoRetryStart);
-    pi.on('auto_retry_end', this.onAutoRetryEnd);
   }
 
   // ---------------------------------------------------------------------------
@@ -422,25 +441,9 @@ export class PiCodingAgentOtelAdapter {
     if (!this.chatSpan || !this.captureContent) {
       return;
     }
-    const systemInstructions: string[] = [];
     const inputMessages: WeaveMessage[] = [];
     for (const msg of event.messages) {
-      if (msg.role === 'system') {
-        const content = msg.content;
-        const text =
-          typeof content === 'string' ? content : safeStringify(content);
-        if (text) {
-          systemInstructions.push(text);
-        }
-        continue;
-      }
       inputMessages.push(mapPiMessage(msg));
-    }
-    if (systemInstructions.length > 0) {
-      this.chatSpan.setAttribute(
-        ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
-        JSON.stringify(systemInstructions)
-      );
     }
     if (inputMessages.length > 0) {
       this.chatSpan.setAttribute(
@@ -551,9 +554,6 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          [ATTR_PI_COMPACTION_REASON]: event.reason,
-          [ATTR_PI_COMPACTION_ABORTED]: event.aborted,
-          [ATTR_PI_COMPACTION_WILL_RETRY]: event.willRetry,
           ...(this.conversationId
             ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
             : {}),
@@ -562,28 +562,6 @@ export class PiCodingAgentOtelAdapter {
       ROOT_CONTEXT
     );
     span.end();
-  };
-
-  private onAutoRetryStart = (
-    event: Extract<PiExtensionEvent, {type: 'auto_retry_start'}>
-  ): void => {
-    this.invokeAgentSpan?.addEvent('auto_retry_start', {
-      [ATTR_PI_AUTO_RETRY_ATTEMPT]: event.attempt,
-      [ATTR_PI_AUTO_RETRY_MAX_ATTEMPTS]: event.maxAttempts,
-      [ATTR_PI_AUTO_RETRY_ERROR_MESSAGE]: event.errorMessage,
-    });
-  };
-
-  private onAutoRetryEnd = (
-    event: Extract<PiExtensionEvent, {type: 'auto_retry_end'}>
-  ): void => {
-    this.invokeAgentSpan?.addEvent('auto_retry_end', {
-      [ATTR_PI_AUTO_RETRY_SUCCESS]: event.success,
-      [ATTR_PI_AUTO_RETRY_ATTEMPT]: event.attempt,
-      ...(event.finalError
-        ? {[ATTR_PI_AUTO_RETRY_FINAL_ERROR]: event.finalError}
-        : {}),
-    });
   };
 
   // ---------------------------------------------------------------------------
