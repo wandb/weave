@@ -82,11 +82,20 @@ class BucketUploadBatch:
         """Defer a bucket upload until `flush()`.
 
         Caller computes the digest, validates `expected_digest`, and dedups
-        against the in-flight ClickHouse chunk buffer. Within-batch dedup
-        across bucket uploads is tracked here via `has()`.
+        against the in-flight ClickHouse chunk buffer. The caller MUST
+        pre-check `has(project_id, digest)` and skip the call if it returns
+        True; staging a duplicate would double-upload the same object and
+        race on `if_generation_match=0`, so we raise instead of silently
+        accepting it.
         """
+        key = (req.project_id, digest)
+        if key in self._seen:
+            raise ValueError(
+                f"BucketUploadBatch.stage() called twice for {key}; callers "
+                "must pre-check via `has()` and skip duplicates."
+            )
         self._pending.append(_Pending(req=req, digest=digest))
-        self._seen.add((req.project_id, digest))
+        self._seen.add(key)
 
     def has(self, project_id: str, digest: str) -> bool:
         """True if `(project_id, digest)` was already staged in this batch."""
