@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from weave.session.session import _publish_media_content
 from weave.session.types import (
     MediaAttachment,
     Message,
@@ -220,15 +221,9 @@ def _collect_image_attachments(
 def _url_to_attachment(url: str) -> MediaAttachment:
     if url.startswith("data:"):
         mime_type, payload = _parse_data_url(url)
-        return MediaAttachment(
-            kind="blob",
-            modality="image",
-            mime_type=mime_type,
-            content=payload,
+        ref_uri = _publish_media_content(
+            content=payload, uri="", file_id="", mime_type=mime_type
         )
-    return MediaAttachment(
-        kind="uri",
-        modality="image",
-        mime_type="",
-        uri=url,
-    )
+        return MediaAttachment(ref=ref_uri, modality="image", mime_type=mime_type)
+    ref_uri = _publish_media_content(content="", uri=url, file_id="", mime_type="")
+    return MediaAttachment(ref=ref_uri, modality="image", mime_type="")

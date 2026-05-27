@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from weave.session.session import (
@@ -25,6 +27,25 @@ from weave.session.session import (
     start_tool,
     start_turn,
 )
+
+_fake_ref_counter = iter(range(1, 10_000))
+
+
+def _fake_publish_media_content(**kwargs: object) -> str:
+    return f"weave:///test/project/object/content:{next(_fake_ref_counter)}"
+
+
+@pytest.fixture(autouse=True)
+def _reset_contextvars():
+    """Reset contextvar state after each test to prevent leakage."""
+    yield
+    if (llm := get_current_llm()) is not None:
+        llm.end()
+    if (turn := get_current_turn()) is not None:
+        turn.end()
+    if (session := get_current_session()) is not None:
+        session.end()
+
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -134,8 +155,12 @@ class TestLLM:
         assert c.reasoning.content == "Let me consider..."
 
     def test_attach_media_returns_self(self) -> None:
-        c = LLM(model="gpt-4o")
-        assert c.attach_media(content=b"png_bytes", mime_type="image/png") is c
+        with patch(
+            "weave.session.session._publish_media_content",
+            side_effect=_fake_publish_media_content,
+        ):
+            c = LLM(model="gpt-4o")
+            assert c.attach_media(content=b"png_bytes", mime_type="image/png") is c
 
     def test_context_manager_sets_timestamps(self) -> None:
         with LLM(model="gpt-4o") as c:
@@ -149,16 +174,23 @@ class TestLLM:
 
 
 class TestAttachMedia:
+    @pytest.fixture(autouse=True)
+    def _mock_publish(self) -> None:
+        with patch(
+            "weave.session.session._publish_media_content",
+            side_effect=_fake_publish_media_content,
+        ):
+            yield  # type: ignore[misc]
+
     def test_attach_inline_image(self) -> None:
         llm = LLM(model="gpt-4o")
         result = llm.attach_media(content=b"png_bytes", mime_type="image/png")
         assert result is llm
         assert len(llm.media_attachments) == 1
         att = llm.media_attachments[0]
-        assert att.kind == "blob"
+        assert att.ref.startswith("weave:///")
         assert att.modality == "image"
         assert att.mime_type == "image/png"
-        assert att.content == b"png_bytes"
 
     def test_attach_uri(self) -> None:
         llm = LLM(model="gpt-4o")
@@ -169,20 +201,18 @@ class TestAttachMedia:
         )
         assert len(llm.media_attachments) == 1
         att = llm.media_attachments[0]
-        assert att.kind == "uri"
+        assert att.ref.startswith("weave:///")
         assert att.modality == "image"
         assert att.mime_type == "image/jpeg"
-        assert att.uri == "https://example.com/photo.jpg"
 
     def test_attach_file_id(self) -> None:
         llm = LLM(model="gpt-4o")
         llm.attach_media(file_id="file-abc123", mime_type="audio/wav")
         assert len(llm.media_attachments) == 1
         att = llm.media_attachments[0]
-        assert att.kind == "file"
+        assert att.ref.startswith("weave:///")
         assert att.modality == "audio"
         assert att.mime_type == "audio/wav"
-        assert att.file_id == "file-abc123"
 
     def test_modality_inferred_from_mime_type(self) -> None:
         llm = LLM(model="gpt-4o")

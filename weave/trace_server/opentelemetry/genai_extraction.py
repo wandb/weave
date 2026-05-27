@@ -252,9 +252,11 @@ def _normalize_single_message(
     role = str(msg.get("role") or default_role)
 
     content = ""
+    parts_json = ""
     raw_parts = msg.get("parts")
     if isinstance(raw_parts, list):
         content = _text_from_parts(raw_parts)
+        parts_json = _json_str(raw_parts)
     elif isinstance(msg.get("content"), str):
         content = msg["content"]
     elif isinstance(msg.get("content"), list):
@@ -264,6 +266,7 @@ def _normalize_single_message(
         role=role,
         content=content,
         finish_reason=str(msg.get("finish_reason") or ""),
+        parts=parts_json,
     )
 
 

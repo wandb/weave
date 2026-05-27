@@ -184,6 +184,37 @@ class _SpanBase(BaseModel):
         self._otel_span.record_exception(exc_val)
 
 
+def _publish_media_content(
+    *,
+    content: bytes | str,
+    uri: str,
+    file_id: str,
+    mime_type: str,
+) -> str:
+    """Create a Content object from raw media data and publish it.
+
+    Returns the ``weave://`` ref URI string.
+    """
+    from weave.trace.api import publish
+    from weave.type_wrappers.Content.content import Content
+
+    if content:
+        if isinstance(content, str):
+            content_obj = Content.from_base64(content, mimetype=mime_type or None)
+        else:
+            content_obj = Content.from_bytes(content, mimetype=mime_type or None)
+    elif uri:
+        if uri.startswith("data:"):
+            content_obj = Content.from_data_url(uri)
+        else:
+            content_obj = Content.from_url(uri)
+    else:
+        content_obj = Content.from_text(file_id, mimetype=mime_type or None)
+
+    ref = publish(content_obj)
+    return str(ref)
+
+
 class Tool(_SpanBase):
     """One tool execution. Maps to an execute_tool OTel span.
 
@@ -328,8 +359,9 @@ class LLM(_SpanBase):
     ) -> LLM:
         """Attach media to this LLM call.
 
-        Exactly one of content, uri, or file_id must be provided.
-        Modality is inferred from mime_type when not set explicitly.
+        Creates a ``Content`` object from the provided data, publishes it
+        to get a ``weave://`` ref, and stores only that ref.  Exactly one
+        of ``content``, ``uri``, or ``file_id`` must be provided.
         """
         sources = sum(bool(s) for s in (content, uri, file_id))
         if sources != 1:
@@ -340,21 +372,14 @@ class LLM(_SpanBase):
             if prefix in {"image", "audio", "video"}:
                 modality = prefix
 
-        if content:
-            kind: Literal["blob", "uri", "file"] = "blob"
-        elif uri:
-            kind = "uri"
-        else:
-            kind = "file"
-
+        ref_uri = _publish_media_content(
+            content=content, uri=uri, file_id=file_id, mime_type=mime_type
+        )
         self.media_attachments.append(
             MediaAttachment(
-                kind=kind,
+                ref=ref_uri,
                 modality=modality or "unknown",
                 mime_type=mime_type,
-                content=content,
-                uri=uri,
-                file_id=file_id,
             )
         )
         return self
@@ -363,10 +388,9 @@ class LLM(_SpanBase):
         """Attach a media URL to this LLM call.
 
         Convenience over ``attach_media`` for the common case where the
-        caller has a URL string from an upstream message and doesn't want
-        to inspect it. ``data:`` URLs are parsed into ``mime_type`` +
-        inline content (kind=blob); plain URIs become ``kind=uri``. Empty
-        URLs are ignored. Returns ``self`` for chaining.
+        caller has a URL string from an upstream message. ``data:`` URLs
+        are parsed into bytes and published; plain URIs are fetched and
+        published. Empty URLs are ignored. Returns ``self`` for chaining.
         """
         if not url:
             return self
