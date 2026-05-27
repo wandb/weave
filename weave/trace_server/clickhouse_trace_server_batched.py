@@ -5901,14 +5901,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
-        set_root_span_dd_tags({"storage_provider": "bucket"})
         if not self._flush_immediately:
             # Inside call_batch(): stage for the parallel flush at the end so
             # an N-attachment batch pays one fan-out round-trip instead of N.
             # Per-file FileStorageWriteError fallback to inline-CH chunks is
-            # handled inside _upload_one, not by the caller's except arm.
+            # handled inside _upload_one, not by the caller's except arm; root-
+            # span attribution is deferred to bucket_upload_batch.flush so the
+            # tag matches where the bytes actually land.
             self._bucket_uploads.stage(req, digest)
             return
+        set_root_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
         )

@@ -29,16 +29,18 @@ the staging path needs no locking; only `flush()` spawns workers.
 
 Partial-failure semantics: if a worker raises something other than
 `FileStorageWriteError` (e.g. an unwrapped network error), `as_completed`
-re-raises it and `flush()` returns. Peer workers still complete via the
-`ThreadPoolExecutor.__exit__` join, so their bucket objects may land
-without a corresponding `files` row. On retry, the same `(project_id,
-digest)` triggers `if_generation_match=0 -> PreconditionFailed`, which
-`store_in_bucket` wraps as `FileStorageWriteError`, which falls back to
-inline-CH chunks. End state is content-addressable and consistent.
+re-raises it and `flush()` logs a warning and re-raises. Peer workers
+still complete via the `ThreadPoolExecutor.__exit__` join, so their
+bucket objects may land without a corresponding `files` row. On retry,
+the same `(project_id, digest)` triggers
+`if_generation_match=0 -> PreconditionFailed`, which `store_in_bucket`
+wraps as `FileStorageWriteError`, which falls back to inline-CH chunks.
+End state is content-addressable and consistent.
 """
 
 from __future__ import annotations
 
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
@@ -47,6 +49,7 @@ import ddtrace
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import FileChunkCreateCHInsertable
+from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.file_storage import (
     FileStorageClient,
@@ -54,6 +57,8 @@ from weave.trace_server.file_storage import (
     key_for_project_digest,
     store_in_bucket,
 )
+
+logger = logging.getLogger(__name__)
 
 # Hides GCS RTT (~60ms p50, ~150ms p95) without exhausting the per-pod
 # google-cloud-storage HTTP session pool.
@@ -81,12 +86,7 @@ class BucketUploadBatch:
     inline ClickHouse chunks for that one file; other files are unaffected.
     """
 
-    def __init__(
-        self,
-        max_workers: int = DEFAULT_BUCKET_UPLOAD_CONCURRENCY,
-        max_bytes: int = MAX_BUCKET_UPLOAD_BATCH_BYTES,
-    ) -> None:
-        self._max_workers = max_workers
+    def __init__(self, max_bytes: int = MAX_BUCKET_UPLOAD_BATCH_BYTES) -> None:
         self._max_bytes = max_bytes
         self._pending: list[_Pending] = []
         self._seen: set[tuple[str, str]] = set()
@@ -157,13 +157,38 @@ class BucketUploadBatch:
         self._total_bytes = 0
 
         rows: list[FileChunkCreateCHInsertable] = []
+        bucket_success = 0
+        ch_fallback = 0
         with ThreadPoolExecutor(
-            max_workers=min(self._max_workers, len(pending)),
+            max_workers=min(DEFAULT_BUCKET_UPLOAD_CONCURRENCY, len(pending)),
             thread_name_prefix="bucket-upload",
         ) as pool:
             futs = [pool.submit(_upload_one, p, client) for p in pending]
-            for fut in as_completed(futs):
-                rows.extend(fut.result())
+            try:
+                for fut in as_completed(futs):
+                    fut_rows = fut.result()
+                    # Single bucket-URI row vs N inline-CH rows; we use the URI
+                    # presence to classify the per-file outcome.
+                    if fut_rows and fut_rows[0].file_storage_uri is not None:
+                        bucket_success += 1
+                    else:
+                        ch_fallback += 1
+                    rows.extend(fut_rows)
+            except Exception:
+                logger.warning(
+                    "BucketUploadBatch worker raised an unwrapped exception; "
+                    "peer uploads may have completed without a files row. "
+                    "Retry will reconcile via if_generation_match=0.",
+                    exc_info=True,
+                )
+                raise
+        set_current_span_dd_tags(
+            {
+                "bucket_upload_batch.bucket_success": bucket_success,
+                "bucket_upload_batch.ch_fallback": ch_fallback,
+                "bucket_upload_batch.staged": len(pending),
+            }
+        )
         return rows
 
 
