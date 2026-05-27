@@ -1,0 +1,71 @@
+# End-to-end stack for the bulk-export integration test.
+#
+# Ports are deliberately offset from the .tilt/* dev compose files so this
+# stack can run alongside Tilt without colliding. The test connects via the
+# `localhost:<host-port>` mappings below; ClickHouse reaches MinIO over the
+# internal docker network at `minio:9000`.
+#
+# Bring up:
+#   docker compose -f services/weave-python/weave-public/tests/trace_server/export/docker-compose.export-e2e.yml up -d
+#
+# Tear down:
+#   docker compose -f services/weave-python/weave-public/tests/trace_server/export/docker-compose.export-e2e.yml down -v
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.12
+    container_name: weave-export-e2e-ch
+    ports:
+      - "8224:8123"  # HTTP
+      - "9224:9000"  # native TCP
+    volumes:
+      # `:ro` would block the entrypoint's default-user.xml writeback; the
+      # mount is read/write but the file we ship is never edited.
+      # Filename must sort AFTER `default-user.xml` (entrypoint-generated)
+      # so its merge wins and `named_collection_control` survives the
+      # entrypoint's `<default remove="remove">` reset.
+      - ./clickhouse-config/users.d/zz-access.xml:/etc/clickhouse-server/users.d/zz-access.xml
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - export-e2e
+
+  minio:
+    image: minio/minio
+    container_name: weave-export-e2e-minio
+    ports:
+      - "9200:9000"  # S3 API
+      - "9201:9001"  # console
+    environment:
+      - MINIO_ROOT_USER=weave-e2e
+      - MINIO_ROOT_PASSWORD=weave-e2e-secret
+    command: server /data --console-address ":9001"
+    networks:
+      - export-e2e
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    environment:
+      - MINIO_ROOT_USER=weave-e2e
+      - MINIO_ROOT_PASSWORD=weave-e2e-secret
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 weave-e2e weave-e2e-secret; do
+          echo "waiting for minio..."; sleep 1;
+        done
+        mc mb -p local/weave-export-e2e || true
+        echo "bucket weave-export-e2e ready"
+    networks:
+      - export-e2e
+
+networks:
+  export-e2e:
