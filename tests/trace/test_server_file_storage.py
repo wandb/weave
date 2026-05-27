@@ -379,9 +379,7 @@ class TestAzureStorage:
         assert blob_client.download_blob().readall() == TEST_CONTENT
 
     @pytest.mark.usefixtures("azure_storage_env")
-    def test_azure_storage_does_not_overwrite_existing_blob(
-        self, client: WeaveClient
-    ):
+    def test_azure_storage_does_not_overwrite_existing_blob(self, client: WeaveClient):
         """Azure store must not clobber an existing content-addressable blob.
 
         Mirrors `test_gcp_storage_skips_duplicate_write`. Content-addressable
@@ -398,9 +396,7 @@ class TestAzureStorage:
         mock_service_client = mock.MagicMock()
         mock_container_client = mock.MagicMock()
         mock_blob_client = mock.MagicMock()
-        mock_service_client.get_container_client.return_value = (
-            mock_container_client
-        )
+        mock_service_client.get_container_client.return_value = mock_container_client
 
         def mock_get_blob_client(name):
             mock_blob_client.blob_name = name
@@ -449,17 +445,15 @@ class TestAzureStorage:
 
             assert res1.digest == res2.digest
             assert upload_calls, "upload_blob was never invoked"
-            assert all(
-                call["overwrite"] is False for call in upload_calls
-            ), f"upload_blob called with overwrite=True: {upload_calls}"
+            assert all(call["overwrite"] is False for call in upload_calls), (
+                f"upload_blob called with overwrite=True: {upload_calls}"
+            )
 
             stored = blob_data[next(iter(blob_data))]
             assert stored == original
 
             file = client.server.file_content_read(
-                FileContentReadReq(
-                    project_id=client.project_id, digest=res1.digest
-                )
+                FileContentReadReq(project_id=client.project_id, digest=res1.digest)
             )
             assert file.content == original
 
