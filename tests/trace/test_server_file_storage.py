@@ -15,6 +15,7 @@ from google.api_core import exceptions
 from moto import mock_aws
 
 from tests.trace.util import client_is_sqlite
+from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
@@ -513,17 +514,14 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     server = client.server
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
 
-    # Upload one file first so we can compute the digest, then inject a
-    # failure for that exact GCS key when it's re-uploaded inside the batch.
+    # Compute the digest directly so the only `files` row at
+    # (project, digest, chunk_index=0) comes from the in-batch fallback.
+    # Doing a probe file_create first would write a bucket-URI row with the
+    # same primary key, and the read query's row_number() pick across two
+    # rows at the same key is non-deterministic.
     fail_payload = _unique_payload("fail", fail_payload_size)
-    probe_res = server.file_create(
-        FileCreateReq(
-            project_id=client.project_id, name="probe.bin", content=fail_payload
-        )
-    )
-    fail_key = f"weave/projects/{project_b64}/files/{probe_res.digest}"
-    gcs.state.blob_data.clear()
-    gcs.state.upload_count = 0
+    fail_digest = compute_file_digest(fail_payload)
+    fail_key = f"weave/projects/{project_b64}/files/{fail_digest}"
     gcs.state.fail_paths.add(fail_key)
 
     ok_payload = _unique_payload("ok", 50_000)
@@ -550,6 +548,6 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     # For multi-chunk payloads, byte-equality here implicitly verifies that
     # all chunk_index rows reassembled correctly.
     fallback_read = server.file_content_read(
-        FileContentReadReq(project_id=client.project_id, digest=probe_res.digest)
+        FileContentReadReq(project_id=client.project_id, digest=fail_digest)
     )
     assert fallback_read.content == fail_payload
