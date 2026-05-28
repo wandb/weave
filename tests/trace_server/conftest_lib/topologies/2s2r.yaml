@@ -27,10 +27,11 @@
 #   bug surface.
 #
 # Resource limits target the GH Actions ubuntu-latest runner (7 GB RAM,
-# 2 vCPU). Each CH node caps at 1.5 GB; total committed memory across
-# 4 CH nodes is 6 GB — tighter than 1s3r's 4.5 GB, but observed actual
-# usage is ~800 MB per node (~3.2 GB total) so real headroom is
-# comfortable. If CI OOMs, first lever is lowering per-node cap to 1 GB.
+# 2 vCPU). ch-s1-r1 hosts the embedded Keeper alongside CH, so it gets
+# a larger cap (2 GB) than the keeper-less replicas (1.5 GB). Total
+# committed memory: 2 + 1.5 * 3 = 6.5 GB. The Keeper-host bump fixes
+# OOMs in the heavier nightly suites (test_genai_agent_queries), where
+# embedded Keeper + CH was hitting the 90% soft cap at 1.35 GiB.
 #
 # Host port 8131 is used (1s3r uses 8130) to avoid collision when both
 # topologies are up simultaneously for local dev. CI runs them in
@@ -70,8 +71,14 @@ services:
     <<: *ch-node
     container_name: weave-ci-ch-2s2r-s1-r1
     hostname: ch-s1-r1
+    # Larger memory cap than the other nodes because this one also
+    # runs the embedded Keeper.
+    deploy:
+      resources:
+        limits:
+          memory: 2048M
     ports:
-      # Host port 8131 → container 8123. 1s3r uses 8130.
+      # Host port 8131 -> container 8123. 1s3r uses 8130.
       - "8131:8123"
       - "9001:9000"
     volumes:

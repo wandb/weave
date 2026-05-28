@@ -18,9 +18,11 @@
 #   Keeper HA is part of our bug surface.
 #
 # Resource limits target the GH Actions ubuntu-latest runner (7 GB RAM,
-# 2 vCPU). Each CH node caps at 1.5 GB; total committed memory across
-# 3 CH nodes is 4.5 GB, leaving ~2.5 GB headroom for the test runner
-# and OS. Do not raise without verifying CI runner capacity.
+# 2 vCPU). ch-s1-r1 hosts the embedded Keeper alongside CH, so it gets
+# a larger cap (2 GB) than the keeper-less replicas (1.5 GB). Total
+# committed memory: 2 + 1.5 + 1.5 = 5 GB, leaving ~2 GB headroom.
+# Without the Keeper-host bump, heavy nightly suites OOM at the 90%
+# soft cap (1.35 GiB on a 1.5 GB cgroup).
 #
 # Usage (local):
 #   docker compose -f 1s3r.yaml up -d --wait
@@ -55,6 +57,12 @@ services:
     <<: *ch-node
     container_name: weave-ci-ch-s1-r1
     hostname: ch-s1-r1
+    # Larger memory cap than the other replicas because this node also
+    # runs the embedded Keeper.
+    deploy:
+      resources:
+        limits:
+          memory: 2048M
     ports:
       # Host-side port 8130 matches the default expected by
       # tests/trace_server_migrator/conftest.py::_DEFAULT_PORT,
