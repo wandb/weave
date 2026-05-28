@@ -6,6 +6,7 @@ following the same patterns as threads_query_builder.py and other query builders
 
 import datetime
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     ReadTable,
     _format_table_name_with_cluster,
@@ -15,6 +16,18 @@ from weave.trace_server.common_interface import (
     SortBy,
 )
 from weave.trace_server.orm import ParamBuilder
+
+
+def _update_target(table: str, cluster_name: str | None) -> str:
+    """Resolve the UPDATE/DELETE target for a table in (optionally) distributed mode.
+
+    Lightweight `UPDATE`/`DELETE` are not supported on the Distributed engine,
+    so in distributed mode the mutation must run against the `_local` shard
+    table with `ON CLUSTER` fanning it out via Keeper.
+    """
+    if cluster_name is None:
+        return table
+    return f"{table}{ch_settings.LOCAL_TABLE_SUFFIX}"
 
 # Valid sort fields for annotation queues
 VALID_QUEUE_SORT_FIELDS = {
@@ -254,8 +267,9 @@ def make_queue_delete_query(
     project_id_param = pb.add_param(project_id)
     queue_id_param = pb.add_param(queue_id)
 
-    # Format table name with ON CLUSTER if cluster_name is provided
-    formatted_table = _format_table_name_with_cluster("annotation_queues", cluster_name)
+    formatted_table = _format_table_name_with_cluster(
+        _update_target("annotation_queues", cluster_name), cluster_name
+    )
 
     query = f"""
     UPDATE {formatted_table} SET
@@ -319,8 +333,9 @@ def make_queue_update_query(
 
     set_clause = ",\n            ".join(set_clauses)
 
-    # Format table name with ON CLUSTER if cluster_name is provided
-    formatted_table = _format_table_name_with_cluster("annotation_queues", cluster_name)
+    formatted_table = _format_table_name_with_cluster(
+        _update_target("annotation_queues", cluster_name), cluster_name
+    )
 
     query = f"""
         UPDATE {formatted_table}
@@ -671,9 +686,8 @@ def make_annotator_progress_update_query(
     annotator_id_param = pb.add_param(annotator_id)
     annotation_state_param = pb.add_param(annotation_state)
 
-    # Format table name with ON CLUSTER if cluster_name is provided
     formatted_table = _format_table_name_with_cluster(
-        "annotator_queue_items_progress", cluster_name
+        _update_target("annotator_queue_items_progress", cluster_name), cluster_name
     )
 
     query = f"""
