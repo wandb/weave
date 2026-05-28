@@ -12,10 +12,10 @@ span per tool call. The SDK reports token usage only on the final
 
 from __future__ import annotations
 
-import dataclasses
 import importlib
 import logging
 from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any
 
@@ -52,30 +52,61 @@ _PROVIDER_NAME = "anthropic"
 _claude_agent_sdk_otel_patcher: MultiPatcher | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _AssistantOutput:
+    """Parsed content of one assistant message.
+
+    ``message`` is the chat span's output message, ``text`` the plain text
+    (used as the turn's final result), and ``reasoning`` any thinking content.
+    """
+
+    message: Message
+    text: str
+    reasoning: Reasoning
+
+
+@dataclass(frozen=True, slots=True)
+class _PendingChat:
+    """A chat span whose end is deferred until the aggregate usage is known.
+
+    ``attrs`` is mutated in place (usage keys added) before the span is ended.
+    """
+
+    span: Any
+    attrs: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class _OpenTool:
+    """An in-flight execute_tool span awaiting its tool_result."""
+
+    span: Any
+    name: str
+
+
 def _tracer() -> Any:
     return otel_trace.get_tracer(_TRACER_NAME)
 
 
 def _usage_from_result(usage: dict[str, Any] | None) -> Usage:
     """Build a Usage from a ResultMessage's aggregate usage dict."""
-    u = usage or {}
+    raw = usage or {}
     return Usage(
-        input_tokens=int(u.get("input_tokens", 0) or 0),
-        output_tokens=int(u.get("output_tokens", 0) or 0),
-        cache_creation_input_tokens=int(u.get("cache_creation_input_tokens", 0) or 0),
-        cache_read_input_tokens=int(u.get("cache_read_input_tokens", 0) or 0),
+        input_tokens=int(raw.get("input_tokens", 0) or 0),
+        output_tokens=int(raw.get("output_tokens", 0) or 0),
+        cache_creation_input_tokens=int(raw.get("cache_creation_input_tokens", 0) or 0),
+        cache_read_input_tokens=int(raw.get("cache_read_input_tokens", 0) or 0),
     )
 
 
 def _assistant_output_message(
     msg: AssistantMessage, buffered_thinking: list[str]
-) -> tuple[Message, str, Reasoning]:
-    """Build the chat span's output Message from an assistant message.
+) -> _AssistantOutput:
+    """Build the chat span's output from an assistant message.
 
-    Returns ``(output_message, plain_text, reasoning)``. ``buffered_thinking``
-    holds thinking text from preceding thinking-only assistant messages so it
-    folds into this response's reasoning rather than splitting into its own
-    chat span.
+    ``buffered_thinking`` holds thinking text from preceding thinking-only
+    assistant messages so it folds into this response's reasoning rather than
+    splitting into its own chat span.
     """
     text_chunks: list[str] = []
     thinking_chunks: list[str] = list(buffered_thinking)
@@ -90,17 +121,19 @@ def _assistant_output_message(
                 ToolCallPart(id=block.id, name=block.name, arguments=block.input)
             )
     text = "\n".join(text_chunks)
-    reasoning = Reasoning(content="\n".join(c for c in thinking_chunks if c))
-    out = Message.assistant(text=text, tool_calls=tool_calls or None)
-    return out, text, reasoning
+    reasoning = Reasoning(
+        content="\n".join(chunk for chunk in thinking_chunks if chunk)
+    )
+    message = Message.assistant(text=text, tool_calls=tool_calls or None)
+    return _AssistantOutput(message=message, text=text, reasoning=reasoning)
 
 
-@dataclasses.dataclass
+@dataclass(slots=True)
 class _TurnState:
     """Mutable per-turn accumulator (one invoke_agent span and its children).
 
-    Intentionally not frozen: it accumulates as the message stream is consumed.
-    Scope is one turn, owned by ``_trace_turn``.
+    Not frozen: it accumulates as the message stream is consumed. Scope is one
+    turn, owned by ``_trace_turn``.
     """
 
     user_prompt: str | None
@@ -108,22 +141,21 @@ class _TurnState:
     model: str = ""
     final_text: str = ""
     is_error: bool = False
-    accumulated: list[Message] = dataclasses.field(default_factory=list)
-    pending_thinking: list[str] = dataclasses.field(default_factory=list)
-    # (otel_span, attrs) for the most recent chat span, whose end is deferred so
-    # the aggregate usage from ResultMessage can be attached before it closes.
-    pending_chat: tuple[Any, dict[str, Any]] | None = None
-    # tool_use_id -> (otel_span, tool_name) for in-flight execute_tool spans.
-    open_tool_spans: dict[str, tuple[Any, str]] = dataclasses.field(
-        default_factory=dict
-    )
+    accumulated: list[Message] = field(default_factory=list)
+    pending_thinking: list[str] = field(default_factory=list)
+    # The most recent chat span, whose end is deferred so the aggregate usage
+    # from ResultMessage can be attached before it closes.
+    pending_chat: _PendingChat | None = None
+    # tool_use_id -> in-flight execute_tool span.
+    open_tool_spans: dict[str, _OpenTool] = field(default_factory=dict)
 
 
 def _flush_pending_chat(state: _TurnState, *, usage: Usage | None = None) -> None:
     """Set attrs (optionally usage) on the deferred chat span and end it."""
-    if state.pending_chat is None:
+    pending = state.pending_chat
+    if pending is None:
         return
-    span, attrs = state.pending_chat
+    attrs = pending.attrs
     if usage is not None:
         if usage.input_tokens:
             attrs["gen_ai.usage.input_tokens"] = usage.input_tokens
@@ -137,9 +169,9 @@ def _flush_pending_chat(state: _TurnState, *, usage: Usage | None = None) -> Non
             attrs["gen_ai.usage.cache_read.input_tokens"] = (
                 usage.cache_read_input_tokens
             )
-    for k, v in attrs.items():
-        span.set_attribute(k, v)
-    span.end()
+    for key, value in attrs.items():
+        pending.span.set_attribute(key, value)
+    pending.span.end()
     state.pending_chat = None
 
 
@@ -164,12 +196,10 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
         if msg.model:
             state.model = msg.model
 
-        out_msg, text, reasoning = _assistant_output_message(
-            msg, state.pending_thinking
-        )
+        output = _assistant_output_message(msg, state.pending_thinking)
         state.pending_thinking.clear()
-        if text:
-            state.final_text = text
+        if output.text:
+            state.final_text = output.text
 
         chat = tracer.start_span(f"chat {msg.model or ''}".rstrip())
         chat_attrs = llm_attributes(
@@ -177,16 +207,18 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             provider_name=_PROVIDER_NAME,
             conversation_id=state.conversation_id,
             input_messages=list(state.accumulated),
-            output_messages=[out_msg],
-            reasoning=reasoning if reasoning.content else None,
+            output_messages=[output.message],
+            reasoning=output.reasoning if output.reasoning.content else None,
         )
-        state.pending_chat = (chat, chat_attrs)
-        state.accumulated.append(out_msg)
+        state.pending_chat = _PendingChat(span=chat, attrs=chat_attrs)
+        state.accumulated.append(output.message)
 
         for block in msg.content:
             if isinstance(block, ToolUseBlock):
                 tool_span = tracer.start_span(f"execute_tool {block.name}")
-                state.open_tool_spans[block.id] = (tool_span, block.name)
+                state.open_tool_spans[block.id] = _OpenTool(
+                    span=tool_span, name=block.name
+                )
         return
 
     if isinstance(msg, UserMessage):
@@ -197,21 +229,20 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             state.accumulated.append(
                 Message.tool_result(block.tool_use_id, block.content)
             )
-            entry = state.open_tool_spans.pop(block.tool_use_id, None)
-            if entry is None:
+            open_tool = state.open_tool_spans.pop(block.tool_use_id, None)
+            if open_tool is None:
                 continue
-            tool_span, tool_name = entry
             attrs = execute_tool_attributes(
-                tool_name=tool_name,
+                tool_name=open_tool.name,
                 conversation_id=state.conversation_id,
                 tool_call_result=str(block.content),
                 tool_call_id=block.tool_use_id,
             )
-            for k, v in attrs.items():
-                tool_span.set_attribute(k, v)
+            for key, value in attrs.items():
+                open_tool.span.set_attribute(key, value)
             if block.is_error:
-                tool_span.set_status(StatusCode.ERROR, "tool reported an error")
-            tool_span.end()
+                open_tool.span.set_status(StatusCode.ERROR, "tool reported an error")
+            open_tool.span.end()
         return
 
     if isinstance(msg, ResultMessage):
@@ -226,8 +257,8 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
 def _finalize_turn(root: Any, state: _TurnState) -> None:
     """Close any open child spans and finish the root invoke_agent span."""
     _flush_pending_chat(state)
-    for tool_span, _name in state.open_tool_spans.values():
-        tool_span.end()
+    for open_tool in state.open_tool_spans.values():
+        open_tool.span.end()
     state.open_tool_spans.clear()
 
     attrs = invoke_agent_attributes(
@@ -242,8 +273,8 @@ def _finalize_turn(root: Any, state: _TurnState) -> None:
         if state.final_text
         else None,
     )
-    for k, v in attrs.items():
-        root.set_attribute(k, v)
+    for key, value in attrs.items():
+        root.set_attribute(key, value)
     if state.is_error:
         root.set_status(StatusCode.ERROR, state.final_text or "agent run failed")
     root.end()
@@ -255,7 +286,7 @@ async def _trace_turn(
     user_prompt: str | None,
     conversation_id_holder: list[str] | None = None,
 ) -> AsyncIterator[Any]:
-    """Wrap a message stream, emitting the option-C span tree for one turn.
+    """Wrap a message stream, emitting the span tree for one turn.
 
     ``conversation_id_holder`` carries the SDK ``session_id`` across turns of a
     single ``ClaudeSDKClient``: the ``system/init`` message (which holds the
