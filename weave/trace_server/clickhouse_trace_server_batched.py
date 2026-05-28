@@ -529,9 +529,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             str: Table name to use for UPDATE statements.
         """
+        return self._mutation_table_name("calls_complete")
+
+    def _mutation_table_name(self, table: str) -> str:
+        """Resolve the concrete mutation target for `table`.
+
+        Lightweight UPDATE/DELETE don't run on Distributed engines, so
+        distributed mode targets `{table}_local` and lets `ON CLUSTER`
+        fan the mutation across shards via Keeper.
+        """
         if self.use_distributed_mode:
-            return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
-        return "calls_complete"
+            return f"{table}{ch_settings.LOCAL_TABLE_SUFFIX}"
+        return table
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -3027,6 +3036,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
             cluster_name=self.clickhouse_cluster_name,
+            table_name=self._mutation_table_name("annotation_queues"),
             name=req.name,
             description=req.description,
             scorer_refs=req.scorer_refs,
@@ -3092,6 +3102,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
             cluster_name=self.clickhouse_cluster_name,
+            table_name=self._mutation_table_name("annotation_queues"),
         )
 
         self._command(
@@ -3435,6 +3446,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 annotation_state=req.annotation_state,
                 pb=update_pb,
                 cluster_name=self.clickhouse_cluster_name,
+                table_name=self._mutation_table_name("annotator_queue_items_progress"),
             )
             self._command(
                 update_query,
