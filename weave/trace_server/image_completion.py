@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
@@ -5,8 +6,10 @@ from weave.trace_server.base64_content_conversion import store_content_object
 from weave.trace_server.errors import (
     InvalidRequest,
 )
-from weave.trace_server.url_safety import is_publicly_routable_url
+from weave.trace_server.helpers.url_safety import is_publicly_routable_url
 from weave.type_wrappers.Content.content import Content
+
+logger = logging.getLogger(__name__)
 
 
 def _process_image_data_item(
@@ -51,6 +54,7 @@ def _process_image_data_item(
                 processed_item["error"] = (
                     f"refusing to fetch image from disallowed URL at index {index}"
                 )
+                logger.warning("Blocked non-publicly routable url %s", url)
                 return processed_item
             # Use Content.from_url() to handle download and content creation
             content_obj = Content.from_url(

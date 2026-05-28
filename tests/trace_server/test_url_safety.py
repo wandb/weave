@@ -1,10 +1,10 @@
-"""Tests for `weave.trace_server.url_safety.is_publicly_routable_url`."""
+"""Tests for `weave.trace_server.helpers.url_safety.is_publicly_routable_url`."""
 
 from __future__ import annotations
 
 import pytest
 
-from weave.trace_server.url_safety import is_publicly_routable_url
+from weave.trace_server.helpers.url_safety import is_publicly_routable_url
 
 
 @pytest.mark.parametrize(
