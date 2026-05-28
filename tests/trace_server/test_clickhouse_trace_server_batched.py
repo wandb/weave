@@ -1244,6 +1244,8 @@ def test_file_content_read_retries_eventual_consistency():
         assert mock_read_once.call_count == 2
 
     # Real miss: after exhausting retries, the original NotFoundError still surfaces.
+    # `_file_content_read_with_retry` defaults to 5 attempts so chunked-file reads
+    # can absorb replication lag across multiple shards/replicas.
     with patch.object(
         server,
         "_file_content_read_once",
@@ -1255,7 +1257,7 @@ def test_file_content_read_retries_eventual_consistency():
         ):
             server.file_content_read(req)
 
-        assert mock_read_once.call_count == 2
+        assert mock_read_once.call_count == 5
 
 
 @pytest.mark.disable_logging_error_check
