@@ -195,7 +195,11 @@ jobs:
   nightly-tests-replicated-1s3r:
     name: Nightly Tests (replicated 1s3r)
     timeout-minutes: 90
-    runs-on: ubuntu-latest
+    # `trace` shard is CH-heavy and was hitting ~2h on the 2-core default;
+    # mirror test.yaml's pattern and bump just that shard to 8-core. Other
+    # shards stay on free 2-core. 8-core is billed at $0.022/min, so a
+    # typical 30 min trace leg ~= $0.66.
+    runs-on: ${{ (matrix.shard == 'trace' || matrix.shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     env:
       MAX_ATTEMPTS: 3
     strategy:
@@ -372,7 +376,9 @@ jobs:
   nightly-tests-replicated-2s2r:
     name: Nightly Tests (replicated 2s2r)
     timeout-minutes: 120
-    runs-on: ubuntu-latest
+    # See note on 1s3r above. 2s2r has the heaviest CH footprint (4 CH
+    # nodes + Keeper), so the bump matters even more here.
+    runs-on: ${{ (matrix.shard == 'trace' || matrix.shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     env:
       MAX_ATTEMPTS: 3
     strategy:
