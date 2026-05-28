@@ -5,7 +5,7 @@ Abstracts away some of their differences and allows building up SQL queries in a
 import datetime
 import json
 import re
-from collections.abc import Callable, Hashable, Sequence
+from collections.abc import Callable, Collection, Hashable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, TypeAlias
 
@@ -144,12 +144,14 @@ class Table:
     # Fields derived from cols
     col_types: dict[str, ColumnType]
     json_cols: list[str]
+    datetime_cols: list[str]
 
     def __init__(self, name: str, cols: Columns | None = None):
         self.name = name
         self.cols = cols or []
         self.col_types = {c.name: c.type for c in self.cols}
         self.json_cols = [c.name for c in self.cols if c.type == "json"]
+        self.datetime_cols = [c.name for c in self.cols if c.type == "datetime"]
 
     def create_sql(self) -> str:
         sql = f"CREATE TABLE IF NOT EXISTS {self.name} (\n"
@@ -219,6 +221,7 @@ class Join:
 class Select:
     table: Table
     all_columns: list[str]
+    datetime_columns: list[str]
     joins: list[Join]
 
     action: Action
@@ -239,6 +242,7 @@ class Select:
         self.table = table
         self.action = action
         self.all_columns = [c.dbname() for c in table.cols]
+        self.datetime_columns = list(table.datetime_cols)
         self.joins = []
 
         self._project_id = None
@@ -256,6 +260,7 @@ class Select:
         self.joins.append(Join(table, query, join_type))
         for col in table.cols:
             self.all_columns.append(col.dbname())
+        self.datetime_columns.extend(table.datetime_cols)
         return self
 
     def project_id(self, project_id: str | None) -> "Select":
@@ -344,7 +349,11 @@ class Select:
         # Returns {join type} JOIN {table name} ON {join condition}
         for j in self.joins:
             query_conds, fields_used = _process_query_to_conditions(
-                j.query, self.all_columns, self.table.json_cols, param_builder
+                j.query,
+                self.all_columns,
+                self.table.json_cols,
+                param_builder,
+                datetime_columns=self.datetime_columns,
             )
             joined = combine_conditions(query_conds, "AND")
             sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
@@ -357,7 +366,11 @@ class Select:
             conditions = [f"project_id = {param_project_id}"]
         if self._query:
             query_conds, fields_used = _process_query_to_conditions(
-                self._query, self.all_columns, self.table.json_cols, param_builder
+                self._query,
+                self.all_columns,
+                self.table.json_cols,
+                param_builder,
+                datetime_columns=self.datetime_columns,
             )
             conditions.extend(query_conds)
 
@@ -512,6 +525,85 @@ def python_value_to_ch_type(value: Any) -> str:
         raise ValueError(f"Unknown value type: {value}")
 
 
+def timestamp_to_datetime_str(timestamp: float) -> str:
+    """Convert a unix timestamp to a ClickHouse-compatible datetime string.
+
+    Args:
+        timestamp (int | float): Unix timestamp in seconds.
+
+    Returns:
+        str: Datetime string in the format `YYYY-MM-DD HH:MM:SS.ffffff`,
+            matching the precision of ClickHouse `DateTime64(6)` columns.
+
+    Examples:
+        >>> timestamp_to_datetime_str(1709251200)
+        '2024-03-01 00:00:00.000000'
+    """
+    return datetime.datetime.fromtimestamp(
+        timestamp, tz=datetime.timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%S.%f")
+
+
+def parse_string_to_utc_timestamp(value: str) -> float | None:
+    """Parse a string date or datetime into a UTC unix timestamp (seconds).
+
+    Rules:
+
+    * `YYYY-MM-DD` (exactly 10 characters after strip) is interpreted as
+      midnight UTC on that calendar day.
+    * ISO-8601 datetimes are parsed via `datetime.datetime.fromisoformat`.
+      `Z` / `z` suffix is accepted as UTC. Naive datetimes are treated as UTC
+      wall time.
+    * Unparsable strings return `None` (no conversion).
+
+    Args:
+        value: User-provided string literal.
+
+    Returns:
+        Unix timestamp in seconds in UTC, or `None` if not parseable.
+
+    Examples:
+        >>> parse_string_to_utc_timestamp("2024-03-01")
+        1709251200.0
+        >>> parse_string_to_utc_timestamp("2024-03-01T12:00:00Z") == parse_string_to_utc_timestamp(
+        ...     "2024-03-01T12:00:00+00:00"
+        ... )
+        True
+        >>> parse_string_to_utc_timestamp("not a date") is None
+        True
+    """
+    s = value.strip()
+    if not s:
+        return None
+
+    # Check for a date without a time
+    # string: 'YYYY-MM-DD'
+    # index:   0123456789
+    # length: 10
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        try:
+            d = datetime.date.fromisoformat(s)
+        except ValueError:
+            return None
+        dt = datetime.datetime.combine(
+            d, datetime.time.min, tzinfo=datetime.timezone.utc
+        )
+        return dt.timestamp()
+
+    iso = s
+    if iso.endswith(("Z", "z")):
+        iso = iso[:-1] + "+00:00"
+    try:
+        dt = datetime.datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    else:
+        dt = dt.astimezone(datetime.timezone.utc)
+    return dt.timestamp()
+
+
 def clickhouse_cast(inner_sql: str, cast: tsi_query.CastTo | None = None) -> str:
     """Helper function to cast a sql expression to a clickhouse type."""
     if cast is None:
@@ -657,19 +749,76 @@ def _transform_external_field_to_internal_field(
     return field, param_builder, raw_fields_used
 
 
+def maybe_convert_datetime_operands(
+    operands: Sequence[tsi_query.Operand],
+    datetime_columns: Collection[str],
+) -> Sequence[tsi_query.Operand]:
+    """Normalize a literal compared against a DateTime column to a CH-native string.
+
+    ClickHouse rejects ISO-8601 strings carrying a `T` separator / `Z` suffix
+    (e.g. `2026-05-27T17:49:15.491230Z`) when comparing against a `DateTime64`
+    column (TYPE_MISMATCH, code 53). Numeric unix timestamps and parseable
+    strings are rewritten to the canonical `YYYY-MM-DD HH:MM:SS.ffffff` form,
+    which ClickHouse parses against DateTime columns and uses for index pruning.
+
+    Returns a new sequence with the conversion applied, or the original
+    sequence if neither operand is a DateTime field/parseable literal pair.
+    """
+    if len(operands) != 2:
+        return operands
+
+    field_idx = None
+    literal_idx = None
+    timestamp: float | None = None
+    for i, op in enumerate(operands):
+        if (
+            isinstance(op, tsi_query.GetFieldOperator)
+            and op.get_field_ in datetime_columns
+        ):
+            field_idx = i
+        elif isinstance(op, tsi_query.LiteralOperation):
+            lit = op.literal_
+            # bool is a subclass of int, but comparing a datetime to a bool is
+            # nonsensical -> leave it untouched.
+            if isinstance(lit, bool):
+                continue
+            if isinstance(lit, (int, float)):
+                literal_idx = i
+                timestamp = float(lit)
+            elif isinstance(lit, str):
+                parsed = parse_string_to_utc_timestamp(lit)
+                if parsed is not None:
+                    literal_idx = i
+                    timestamp = parsed
+
+    if field_idx is None or literal_idx is None or timestamp is None:
+        return operands
+
+    datetime_str = timestamp_to_datetime_str(timestamp)
+    new_operands = list(operands)
+    new_operands[literal_idx] = tsi_query.LiteralOperation(**{"$literal": datetime_str})
+    return new_operands
+
+
 def _process_query_to_conditions(
     query: tsi.Query,
     all_columns: Sequence[str],
     json_columns: Sequence[str],
     param_builder: ParamBuilder | None = None,
     field_resolver: Callable[[str, ParamBuilder], tuple[str, set[str]]] | None = None,
+    datetime_columns: Collection[str] | None = None,
 ) -> tuple[list[str], set[str]]:
     """Converts a Query to a list of conditions for a clickhouse query.
 
     field_resolver, when provided, overrides the default field-to-SQL mapping
     for $getField operators. Used by eval_results to map fields like
     "scores.accuracy" to aggregated expressions (e.g. avg(...)).
+
+    datetime_columns names the top-level columns typed as DateTime so that
+    literals compared against them are normalized via
+    `maybe_convert_datetime_operands`.
     """
+    dt_columns = datetime_columns or ()
     pb = param_builder or ParamBuilder()
     conditions = []
     raw_fields_used = set()
@@ -696,19 +845,29 @@ def _process_query_to_conditions(
             operand_part = process_operand(operation.not_[0])
             cond = f"(NOT ({operand_part}))"
         elif isinstance(operation, tsi_query.EqOperation):
-            lhs_part, rhs_part = process_binary_operands(*operation.eq_)
+            lhs_part, rhs_part = process_binary_operands(
+                *maybe_convert_datetime_operands(operation.eq_, dt_columns)
+            )
             cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
-            lhs_part, rhs_part = process_binary_operands(*operation.gt_)
+            lhs_part, rhs_part = process_binary_operands(
+                *maybe_convert_datetime_operands(operation.gt_, dt_columns)
+            )
             cond = f"({lhs_part} > {rhs_part})"
         elif isinstance(operation, tsi_query.LtOperation):
-            lhs_part, rhs_part = process_binary_operands(*operation.lt_)
+            lhs_part, rhs_part = process_binary_operands(
+                *maybe_convert_datetime_operands(operation.lt_, dt_columns)
+            )
             cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
-            lhs_part, rhs_part = process_binary_operands(*operation.gte_)
+            lhs_part, rhs_part = process_binary_operands(
+                *maybe_convert_datetime_operands(operation.gte_, dt_columns)
+            )
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.LteOperation):
-            lhs_part, rhs_part = process_binary_operands(*operation.lte_)
+            lhs_part, rhs_part = process_binary_operands(
+                *maybe_convert_datetime_operands(operation.lte_, dt_columns)
+            )
             cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(
