@@ -30,6 +30,7 @@ def test_skip_clickhouse_client(
 # _reset_server_state in conftest.py needs to reset it between tests.
 KNOWN_SERVER_ATTRS = frozenset(
     {
+        "_byob_resolver",
         "_database",
         "_database_ensured",
         "_evaluate_model_dispatcher",

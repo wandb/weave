@@ -83,6 +83,7 @@ from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
 )
+from weave.trace_server.byob.resolver import BYOBResolver
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
     split_usage_metrics,
@@ -364,6 +365,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         database: str = "default",
         use_async_insert: bool = False,
         evaluate_model_dispatcher: EvaluateModelDispatcher | None = None,
+        byob_resolver: BYOBResolver | None = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -377,6 +379,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._init_lock = threading.Lock()
         self._file_storage_client: FileStorageClient | None = None
         self._file_storage_client_initialized = False
+        self._byob_resolver = byob_resolver
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
@@ -5843,11 +5846,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.FileCreateRes(digest=digest)
 
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
-        client = self.file_storage_client
+        if self._byob_resolver is not None:
+            client, key_prefix = self._byob_resolver.resolve_write(
+                req.project_id, self.file_storage_client
+            )
+        else:
+            client, key_prefix = self.file_storage_client, ""
 
         if client is not None and use_file_storage:
             try:
-                self._file_create_bucket(req, digest, client)
+                self._file_create_bucket(req, digest, client, key_prefix)
             except FileStorageWriteError:
                 self._file_create_clickhouse(req, digest)
         else:
@@ -5880,12 +5888,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
-        self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
+        self,
+        req: tsi.FileCreateReq,
+        digest: str,
+        client: FileStorageClient,
+        key_prefix: str = "",
     ) -> None:
         set_root_span_dd_tags({"storage_provider": "bucket"})
-        target_file_storage_uri = store_in_bucket(
-            client, key_for_project_digest(req.project_id, digest), req.content
-        )
+        base_key = key_for_project_digest(req.project_id, digest)
+        final_key = f"{key_prefix.rstrip('/')}/{base_key}" if key_prefix else base_key
+        target_file_storage_uri = store_in_bucket(client, final_key, req.content)
         self._insert_file_chunks(
             [
                 FileChunkCreateCHInsertable(
@@ -6024,7 +6036,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 file_storage_uri = FileStorageURI.parse_uri_str(
                     chunk_file_storage_uri_str
                 )
-                bytes += self._file_read_bucket(file_storage_uri)
+                bytes += self._file_read_bucket(file_storage_uri, req.project_id)
             else:
                 chunk_bytes = result_row[1]
                 bytes += chunk_bytes
@@ -6034,8 +6046,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.FileContentReadRes(content=bytes)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_read_bucket")
-    def _file_read_bucket(self, file_storage_uri: FileStorageURI) -> bytes:
+    def _file_read_bucket(
+        self, file_storage_uri: FileStorageURI, project_id: str | None = None
+    ) -> bytes:
         set_root_span_dd_tags({"storage_provider": "bucket"})
+        if self._byob_resolver is not None:
+            return self._byob_resolver.resolve_read(
+                project_id, file_storage_uri, self.file_storage_client
+            )
         client = self.file_storage_client
         if client is None:
             raise FileStorageReadError("File storage client is not configured")

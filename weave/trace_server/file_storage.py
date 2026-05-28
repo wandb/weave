@@ -46,7 +46,11 @@ from collections.abc import Callable
 from typing import TypeVar, cast
 
 import boto3
-from azure.core.exceptions import HttpResponseError, ResourceExistsError
+from azure.core.exceptions import (
+    HttpResponseError,
+    ResourceExistsError,
+    ResourceNotFoundError,
+)
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -191,6 +195,24 @@ def _is_rate_limit_error(exception: BaseException | None) -> bool:
     if isinstance(exception, HttpResponseError) and exception.status_code == 429:
         return True
 
+    return False
+
+
+def is_not_found_error(exception: BaseException) -> bool:
+    """Check if the exception indicates the object does not exist in the bucket.
+
+    Used by the BYOB dual-read path to distinguish "miss" from real failure.
+    """
+    if isinstance(exception, gcp_exceptions.NotFound):
+        return True
+    if isinstance(exception, ClientError):
+        error_code = exception.response.get("Error", {}).get("Code", "")
+        if error_code in {"NoSuchKey", "NoSuchBucket", "404"}:
+            return True
+        if exception.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+            return True
+    if isinstance(exception, ResourceNotFoundError):
+        return True
     return False
 
 
