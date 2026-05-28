@@ -23,7 +23,6 @@ class MessageTuple(NamedTuple):
     role: str
     content: str
     finish_reason: str
-    parts: str
 
 
 def genai_span_to_row(span: AgentSpanCHInsertable) -> list[Any]:
@@ -40,9 +39,7 @@ def _message_dict_to_tuple(key: str, msg: Any) -> MessageTuple:
     if not isinstance(msg, dict):
         raise TypeError(f"{key} message must be a dict, got {type(msg).__name__}")
     try:
-        return MessageTuple(
-            msg["role"], msg["content"], msg["finish_reason"], msg.get("parts", "")
-        )
+        return MessageTuple(msg["role"], msg["content"], msg["finish_reason"])
     except KeyError as e:
         raise ValueError(f"{key} message missing required field {e.args[0]!r}") from e
 
@@ -72,14 +69,13 @@ def normalize_span_row(d: dict[str, Any]) -> dict[str, Any]:
         normalized: list[dict[str, Any]] = []
         for m in msgs:
             if isinstance(m, tuple):
-                if len(m) not in {3, 4}:
+                if len(m) != 3:
                     raise ValueError(
-                        f"{key} tuple must have 3 or 4 values, got {len(m)}"
+                        f"{key} tuple must have 3 values, got {len(m)}"
                     )
-                row = {"role": m[0], "content": m[1], "finish_reason": m[2]}
-                if len(m) == 4:
-                    row["parts"] = m[3]
-                normalized.append(row)
+                normalized.append(
+                    {"role": m[0], "content": m[1], "finish_reason": m[2]}
+                )
             elif isinstance(m, dict):
                 normalized.append(m)
             else:

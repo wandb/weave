@@ -209,8 +209,15 @@ def _publish_media_content(
             content_obj = Content.from_data_url(uri)
         else:
             content_obj = Content.from_url(uri)
+    elif file_id:
+        raise ValueError(
+            f"Cannot publish file_id {file_id!r} as Content; "
+            "fetch the content from the provider first or use a URI"
+        )
     else:
-        content_obj = Content.from_text(file_id, mimetype=mime_type or None)
+        raise ValueError(
+            "_publish_media_content requires content or uri"
+        )
 
     ref = publish(content_obj)
     return str(ref)
