@@ -108,6 +108,9 @@ def init(
                     call data (start and end) into a single request instead of separate start/end requests.
                     This reduces server load and improves performance, especially for short-lived ops.
                     Default: `True`
+                - `autocreate_project` (bool): Allows `weave.init` to create the project on the
+                    server if it does not already exist. When `False`, `weave.init` raises an
+                    error instead of creating the project. Default: `True`
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         postprocess_inputs: A function applied to the inputs of every op traced by this client.
         postprocess_output: A function applied to the output of every op traced by this client.

@@ -317,6 +317,16 @@ class UserSettings:
     Can be overridden with the environment variable `WEAVE_USE_OTEL_V2`
     """
 
+    autocreate_project: bool = True
+    """Toggles automatic project creation on `weave.init()`.
+
+    If True (default), `weave.init('entity/project')` upserts the project,
+    creating it on the server if it does not yet exist. If False, `weave.init`
+    raises `UnableToCreateProjectError` when the project does not exist; the
+    project must be created out-of-band (e.g. via the W&B UI).
+    Can be overridden with the environment variable `WEAVE_AUTOCREATE_PROJECT`
+    """
+
 
 class _SettingsOverrides(TypedDict, total=False):
     """Typed kwargs accepted by :func:`override_settings`.
@@ -360,6 +370,7 @@ class _SettingsOverrides(TypedDict, total=False):
     enable_wal: bool
     disable_wal_sender: bool
     use_otel_v2: bool
+    autocreate_project: bool
 
 
 # Resolve string annotations once at import; used for env-var coercion.
@@ -634,3 +645,10 @@ def should_disable_wal_sender() -> bool:
 def should_use_otel_v2() -> bool:
     """Returns whether OTel-capable integrations should use their OTel variant."""
     return _env_or_default("use_otel_v2", _current_settings.get().use_otel_v2)
+
+
+def should_autocreate_project() -> bool:
+    """Returns whether `weave.init` may create the project if it does not exist."""
+    return _env_or_default(
+        "autocreate_project", _current_settings.get().autocreate_project
+    )

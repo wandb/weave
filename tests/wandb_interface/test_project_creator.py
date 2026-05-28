@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from weave.compat.wandb import AuthenticationError, CommError
+from weave.trace.settings import override_settings
 from weave.wandb_interface.project_creator import (
     UnableToCreateProjectError,
     ensure_project_exists,
@@ -136,6 +137,30 @@ def test_ensure_project_exists_authentication_error(mock_api_with_no_project):
     mock_api_with_no_project.upsert_project.assert_called_once_with(
         entity="test_entity", project="test_project"
     )
+
+
+def test_ensure_project_exists_autocreate_disabled_existing_project_ok(
+    mock_api_with_existing_project,
+):
+    """With autocreate disabled, an existing project still resolves normally."""
+    with override_settings(autocreate_project=False):
+        result = ensure_project_exists("test_entity", "test_project")
+
+    assert result == {"project_name": "existing_project"}
+    mock_api_with_existing_project.upsert_project.assert_not_called()
+
+
+def test_ensure_project_exists_autocreate_disabled_missing_project_errors(
+    mock_api_with_no_project,
+):
+    """With autocreate disabled, a missing project raises without upserting."""
+    with (
+        override_settings(autocreate_project=False),
+        pytest.raises(UnableToCreateProjectError, match="autocreate_project is disabled"),
+    ):
+        ensure_project_exists("test_entity", "test_project")
+
+    mock_api_with_no_project.upsert_project.assert_not_called()
 
 
 @pytest.mark.disable_logging_error_check

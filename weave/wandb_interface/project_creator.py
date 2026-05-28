@@ -23,7 +23,11 @@ from tenacity import (
 
 from weave.compat import wandb
 from weave.compat.wandb import wandb_logger
-from weave.trace.settings import retry_max_attempts, retry_max_interval
+from weave.trace.settings import (
+    retry_max_attempts,
+    retry_max_interval,
+    should_autocreate_project,
+)
 
 
 class UnableToCreateProjectError(Exception): ...
@@ -119,6 +123,13 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
         return _format_project_result(project_response["project"])
     if project_exception is not None:
         _raise_project_access_error(entity_name, project_name, project_exception)
+
+    if not should_autocreate_project():
+        raise UnableToCreateProjectError(
+            f"Project `{entity_name}/{project_name}` does not exist and "
+            "autocreate_project is disabled. Create the project in the W&B UI "
+            "or set WEAVE_AUTOCREATE_PROJECT=true."
+        )
 
     # Try to create the project
     exception = None
