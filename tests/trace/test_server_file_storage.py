@@ -11,6 +11,7 @@ from unittest import mock
 
 import boto3
 import pytest
+from azure.core.exceptions import ResourceExistsError
 from google.api_core import exceptions
 from google.auth.credentials import AnonymousCredentials
 from moto import mock_aws
@@ -376,6 +377,85 @@ class TestAzureStorage:
             f"weave/projects/{project}/files/{res.digest}"
         )
         assert blob_client.download_blob().readall() == TEST_CONTENT
+
+    @pytest.mark.usefixtures("azure_storage_env")
+    def test_azure_storage_does_not_overwrite_existing_blob(self, client: WeaveClient):
+        """Azure store must not clobber an existing content-addressable blob.
+
+        Mirrors `test_gcp_storage_skips_duplicate_write`. Content-addressable
+        storage is a write-once contract: re-uploading at a known digest must
+        be a no-op, not an overwrite. Otherwise any project with write scope
+        can substitute content at a known URI.
+        """
+        if client_is_sqlite(client):
+            pytest.skip("Not implemented in SQLite")
+
+        blob_data: dict[str, bytes] = {}
+        upload_calls: list[dict] = []
+
+        mock_service_client = mock.MagicMock()
+        mock_container_client = mock.MagicMock()
+        mock_blob_client = mock.MagicMock()
+        mock_service_client.get_container_client.return_value = mock_container_client
+
+        def mock_get_blob_client(name):
+            mock_blob_client.blob_name = name
+            return mock_blob_client
+
+        def mock_upload_blob(data, overwrite=False, **kwargs):
+            blob_name = mock_blob_client.blob_name
+            upload_calls.append({"name": blob_name, "overwrite": overwrite})
+            # Azure semantics: overwrite=False on an existing blob raises.
+            if blob_name in blob_data and not overwrite:
+                raise ResourceExistsError("blob already exists")
+            blob_data[blob_name] = data
+
+        def mock_download_blob(**kwargs):
+            blob_name = mock_blob_client.blob_name
+            download = mock.MagicMock()
+            download.readall.return_value = blob_data.get(blob_name, b"")
+            return download
+
+        mock_container_client.get_blob_client.side_effect = mock_get_blob_client
+        mock_blob_client.upload_blob.side_effect = mock_upload_blob
+        mock_blob_client.download_blob.side_effect = mock_download_blob
+
+        original = b"original-content"
+
+        with mock.patch(
+            "weave.trace_server.file_storage.BlobServiceClient",
+            return_value=mock_service_client,
+        ) as mock_cls:
+            mock_cls.from_connection_string.return_value = mock_service_client
+
+            res1 = client.server.file_create(
+                FileCreateReq(
+                    project_id=client.project_id,
+                    name="test.txt",
+                    content=original,
+                )
+            )
+            res2 = client.server.file_create(
+                FileCreateReq(
+                    project_id=client.project_id,
+                    name="test.txt",
+                    content=original,
+                )
+            )
+
+            assert res1.digest == res2.digest
+            assert upload_calls, "upload_blob was never invoked"
+            assert all(call["overwrite"] is False for call in upload_calls), (
+                f"upload_blob called with overwrite=True: {upload_calls}"
+            )
+
+            stored = blob_data[next(iter(blob_data))]
+            assert stored == original
+
+            file = client.server.file_content_read(
+                FileContentReadReq(project_id=client.project_id, digest=res1.digest)
+            )
+            assert file.content == original
 
 
 def test_support_for_variable_length_chunks(client: WeaveClient):
