@@ -25,8 +25,6 @@ from weave.integrations.claude_agent_sdk.otel_integration import (
     get_claude_agent_sdk_otel_patcher,
 )
 
-_ISOLATED_ENV = "WEAVE_CLAUDE_AGENT_SDK_ISOLATED_TRACES"
-
 
 @pytest.fixture
 def otel_spans(monkeypatch: pytest.MonkeyPatch) -> Generator[InMemorySpanExporter]:
@@ -58,33 +56,37 @@ def patch_claude_agent_sdk_otel() -> Generator[None]:
 # --- helpers ----------------------------------------------------------------
 
 
-def _attrs(span: Any) -> dict[str, Any]:
+def get_attrs(span: Any) -> dict[str, Any]:
     return dict(span.attributes) if span.attributes is not None else {}
 
 
-def _by_op(spans: list[Any], op: str) -> list[Any]:
-    return [s for s in spans if _attrs(s).get("gen_ai.operation.name") == op]
+def get_spans_by_op(spans: list[Any], op: str) -> list[Any]:
+    return [
+        span for span in spans if get_attrs(span).get("gen_ai.operation.name") == op
+    ]
 
 
-def _messages(span: Any, key: str) -> list[dict[str, Any]]:
-    raw = _attrs(span).get(key)
+def get_messages(span: Any, key: str) -> list[dict[str, Any]]:
+    raw = get_attrs(span).get(key)
     return json.loads(raw) if raw else []
 
 
-def _all_text(messages: list[dict[str, Any]]) -> str:
+def get_all_text(messages: list[dict[str, Any]]) -> str:
     return " ".join(
-        p.get("content", "")
-        for m in messages
-        for p in m.get("parts", [])
-        if p.get("type") == "text"
+        part.get("content", "")
+        for message in messages
+        for part in message.get("parts", [])
+        if part.get("type") == "text"
     )
 
 
-def _part_types(messages: list[dict[str, Any]]) -> set[str]:
-    return {p.get("type") for m in messages for p in m.get("parts", [])}
+def get_part_types(messages: list[dict[str, Any]]) -> set[str]:
+    return {
+        part.get("type") for message in messages for part in message.get("parts", [])
+    }
 
 
-async def _drain_query(cassette: str, prompt: str) -> None:
+async def run_query(cassette: str, prompt: str) -> None:
     async for _ in query(
         prompt=prompt,
         options=ClaudeAgentOptions(),
@@ -98,35 +100,35 @@ async def _drain_query(cassette: str, prompt: str) -> None:
 
 @pytest.mark.asyncio
 async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
-    await _drain_query("simple_text_response", "What is 2+2?")
+    await run_query("simple_text_response", "What is 2+2?")
     spans = otel_spans.get_finished_spans()
 
-    agent = _by_op(spans, "invoke_agent")
-    chats = _by_op(spans, "chat")
-    assert len(agent) == 1
-    assert len(chats) == 1
+    agent_spans = get_spans_by_op(spans, "invoke_agent")
+    chat_spans = get_spans_by_op(spans, "chat")
+    assert len(agent_spans) == 1
+    assert len(chat_spans) == 1
 
-    agent_span = agent[0]
-    a = _attrs(agent_span)
+    agent_span = agent_spans[0]
+    agent_attrs = get_attrs(agent_span)
     assert agent_span.name == "invoke_agent claude_agent_sdk"
-    assert a["gen_ai.agent.name"] == "claude_agent_sdk"
-    assert a["gen_ai.provider.name"] == "anthropic"
-    assert a["gen_ai.conversation.id"] == "s-abc123"
-    assert a["weave.claude_agent_sdk.cost.total_usd"] == 0.003
-    assert a["weave.claude_agent_sdk.num_turns"] == 1
-    assert "What is 2+2?" in _all_text(_messages(agent_span, "gen_ai.input.messages"))
-    assert "The answer is 4." in _all_text(
-        _messages(agent_span, "gen_ai.output.messages")
+    assert agent_attrs["gen_ai.agent.name"] == "claude_agent_sdk"
+    assert agent_attrs["gen_ai.provider.name"] == "anthropic"
+    assert agent_attrs["gen_ai.conversation.id"] == "s-abc123"
+    assert "What is 2+2?" in get_all_text(
+        get_messages(agent_span, "gen_ai.input.messages")
+    )
+    assert "The answer is 4." in get_all_text(
+        get_messages(agent_span, "gen_ai.output.messages")
     )
 
-    chat = chats[0]
-    c = _attrs(chat)
-    assert c["gen_ai.request.model"] == "claude-sonnet-4-6"
-    assert c["gen_ai.conversation.id"] == "s-abc123"
-    assert c["gen_ai.usage.input_tokens"] == 25
-    assert c["gen_ai.usage.output_tokens"] == 10
+    chat_span = chat_spans[0]
+    chat_attrs = get_attrs(chat_span)
+    assert chat_attrs["gen_ai.request.model"] == "claude-sonnet-4-6"
+    assert chat_attrs["gen_ai.conversation.id"] == "s-abc123"
+    assert chat_attrs["gen_ai.usage.input_tokens"] == 25
+    assert chat_attrs["gen_ai.usage.output_tokens"] == 10
     # chat nests under the invoke_agent root
-    assert chat.parent.span_id == agent_span.context.span_id
+    assert chat_span.parent.span_id == agent_span.context.span_id
 
 
 # --- query(): tool use ------------------------------------------------------
@@ -134,37 +136,41 @@ async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
 
 @pytest.mark.asyncio
 async def test_tool_use_query_otel(otel_spans: InMemorySpanExporter) -> None:
-    await _drain_query("tool_use_response", "List files in the current directory")
+    await run_query("tool_use_response", "List files in the current directory")
     spans = otel_spans.get_finished_spans()
 
-    agent = _by_op(spans, "invoke_agent")[0]
-    chats = _by_op(spans, "chat")
-    tools = _by_op(spans, "execute_tool")
-    assert len(chats) == 2
-    assert len(tools) == 1
+    agent_span = get_spans_by_op(spans, "invoke_agent")[0]
+    chat_spans = get_spans_by_op(spans, "chat")
+    tool_spans = get_spans_by_op(spans, "execute_tool")
+    assert len(chat_spans) == 2
+    assert len(tool_spans) == 1
 
-    tool = tools[0]
-    t = _attrs(tool)
-    assert tool.name == "execute_tool Bash"
-    assert t["gen_ai.tool.name"] == "Bash"
-    assert t["gen_ai.tool.call.id"] == "toolu_01ABC"
-    assert "file1.py" in t["gen_ai.tool.call.result"]
-    assert tool.parent.span_id == agent.context.span_id
+    tool_span = tool_spans[0]
+    tool_attrs = get_attrs(tool_span)
+    assert tool_span.name == "execute_tool Bash"
+    assert tool_attrs["gen_ai.tool.name"] == "Bash"
+    assert tool_attrs["gen_ai.tool.call.id"] == "toolu_01ABC"
+    assert "file1.py" in tool_attrs["gen_ai.tool.call.result"]
+    assert tool_span.parent.span_id == agent_span.context.span_id
 
     # Aggregate usage lands on exactly one (the final) chat span.
-    with_usage = [c for c in chats if "gen_ai.usage.input_tokens" in _attrs(c)]
-    assert len(with_usage) == 1
-    assert _attrs(with_usage[0])["gen_ai.usage.input_tokens"] == 150
-    assert _attrs(with_usage[0])["gen_ai.usage.output_tokens"] == 75
+    chats_with_usage = [
+        chat_span
+        for chat_span in chat_spans
+        if "gen_ai.usage.input_tokens" in get_attrs(chat_span)
+    ]
+    assert len(chats_with_usage) == 1
+    assert get_attrs(chats_with_usage[0])["gen_ai.usage.input_tokens"] == 150
+    assert get_attrs(chats_with_usage[0])["gen_ai.usage.output_tokens"] == 75
 
     # The first chat (the one requesting the tool) carries a tool_call part.
-    tool_call_chat = [
-        c
-        for c in chats
-        if "tool_call" in _part_types(_messages(c, "gen_ai.output.messages"))
+    tool_call_chats = [
+        chat_span
+        for chat_span in chat_spans
+        if "tool_call"
+        in get_part_types(get_messages(chat_span, "gen_ai.output.messages"))
     ]
-    assert len(tool_call_chat) == 1
-    assert _attrs(agent)["weave.claude_agent_sdk.cost.total_usd"] == 0.008
+    assert len(tool_call_chats) == 1
 
 
 # --- query(): multiple tools in one response --------------------------------
@@ -172,18 +178,23 @@ async def test_tool_use_query_otel(otel_spans: InMemorySpanExporter) -> None:
 
 @pytest.mark.asyncio
 async def test_multi_tool_query_otel(otel_spans: InMemorySpanExporter) -> None:
-    await _drain_query("multi_tool_response", "Check both files")
+    await run_query("multi_tool_response", "Check both files")
     spans = otel_spans.get_finished_spans()
 
-    agent = _by_op(spans, "invoke_agent")[0]
-    tools = _by_op(spans, "execute_tool")
-    assert {t.name for t in tools} == {"execute_tool Read", "execute_tool Bash"}
-    for t in tools:
-        assert t.parent.span_id == agent.context.span_id
+    agent_span = get_spans_by_op(spans, "invoke_agent")[0]
+    tool_spans = get_spans_by_op(spans, "execute_tool")
+    assert {tool_span.name for tool_span in tool_spans} == {
+        "execute_tool Read",
+        "execute_tool Bash",
+    }
+    for tool_span in tool_spans:
+        assert tool_span.parent.span_id == agent_span.context.span_id
 
     results = {
-        _attrs(t)["gen_ai.tool.name"]: _attrs(t)["gen_ai.tool.call.result"]
-        for t in tools
+        get_attrs(tool_span)["gen_ai.tool.name"]: get_attrs(tool_span)[
+            "gen_ai.tool.call.result"
+        ]
+        for tool_span in tool_spans
     }
     assert "print('hello')" in results["Read"]
     assert "/tmp" in results["Bash"]
@@ -194,24 +205,24 @@ async def test_multi_tool_query_otel(otel_spans: InMemorySpanExporter) -> None:
 
 @pytest.mark.asyncio
 async def test_thinking_query_otel(otel_spans: InMemorySpanExporter) -> None:
-    await _drain_query("thinking_response", "Think about it")
+    await run_query("thinking_response", "Think about it")
     spans = otel_spans.get_finished_spans()
 
     # Thinking-only messages are buffered into the following response, so the
     # extended-thinking turn produces a single chat span, not two.
-    chats = _by_op(spans, "chat")
-    assert len(chats) == 1
+    chat_spans = get_spans_by_op(spans, "chat")
+    assert len(chat_spans) == 1
 
-    out = _messages(chats[0], "gen_ai.output.messages")
-    assert "reasoning" in _part_types(out)
+    output_messages = get_messages(chat_spans[0], "gen_ai.output.messages")
+    assert "reasoning" in get_part_types(output_messages)
     reasoning_text = " ".join(
-        p.get("content", "")
-        for m in out
-        for p in m.get("parts", [])
-        if p.get("type") == "reasoning"
+        part.get("content", "")
+        for message in output_messages
+        for part in message.get("parts", [])
+        if part.get("type") == "reasoning"
     )
     assert "Let me think about this carefully" in reasoning_text
-    assert "the answer is 42" in _all_text(out)
+    assert "the answer is 42" in get_all_text(output_messages)
 
 
 # --- query(): error result sets span status ---------------------------------
@@ -219,46 +230,29 @@ async def test_thinking_query_otel(otel_spans: InMemorySpanExporter) -> None:
 
 @pytest.mark.asyncio
 async def test_error_response_otel(otel_spans: InMemorySpanExporter) -> None:
-    await _drain_query("error_response", "Do something")
+    await run_query("error_response", "Do something")
     spans = otel_spans.get_finished_spans()
 
-    agent = _by_op(spans, "invoke_agent")[0]
-    assert agent.status.status_code == StatusCode.ERROR
+    agent_span = get_spans_by_op(spans, "invoke_agent")[0]
+    assert agent_span.status.status_code == StatusCode.ERROR
 
 
-# --- trace isolation: ambient (default) vs isolated -------------------------
+# --- trace nesting: turns nest under the ambient OTel context ---------------
 
 
 @pytest.mark.asyncio
 async def test_ambient_trace_nesting_otel(otel_spans: InMemorySpanExporter) -> None:
-    """By default a turn nests under whatever OTel span is already active."""
+    """A turn nests under whatever OTel span is already active."""
     tracer = otel_trace.get_tracer("test.app")
-    with tracer.start_as_current_span("app.request") as outer:
-        outer_ctx = outer.get_span_context()
-        await _drain_query("simple_text_response", "What is 2+2?")
+    with tracer.start_as_current_span("app.request") as outer_span:
+        outer_context = outer_span.get_span_context()
+        await run_query("simple_text_response", "What is 2+2?")
 
     spans = otel_spans.get_finished_spans()
-    agent = _by_op(spans, "invoke_agent")[0]
-    assert agent.parent is not None
-    assert agent.parent.span_id == outer_ctx.span_id
-    assert agent.context.trace_id == outer_ctx.trace_id
-
-
-@pytest.mark.asyncio
-async def test_isolated_trace_mode_otel(
-    otel_spans: InMemorySpanExporter, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """With the isolated-traces env set, a turn ignores the ambient span."""
-    monkeypatch.setenv(_ISOLATED_ENV, "1")
-    tracer = otel_trace.get_tracer("test.app")
-    with tracer.start_as_current_span("app.request") as outer:
-        outer_ctx = outer.get_span_context()
-        await _drain_query("simple_text_response", "What is 2+2?")
-
-    spans = otel_spans.get_finished_spans()
-    agent = _by_op(spans, "invoke_agent")[0]
-    assert agent.parent is None
-    assert agent.context.trace_id != outer_ctx.trace_id
+    agent_span = get_spans_by_op(spans, "invoke_agent")[0]
+    assert agent_span.parent is not None
+    assert agent_span.parent.span_id == outer_context.span_id
+    assert agent_span.context.trace_id == outer_context.trace_id
 
 
 # --- ClaudeSDKClient: multi-turn --------------------------------------------
@@ -273,20 +267,27 @@ async def test_multi_turn_client_otel(otel_spans: InMemorySpanExporter) -> None:
     await sdk_client.connect()
 
     await sdk_client.query("Hello")
-    _ = [m async for m in sdk_client.receive_response()]
+    _ = [message async for message in sdk_client.receive_response()]
     await sdk_client.query("What is the capital of France?")
-    _ = [m async for m in sdk_client.receive_response()]
+    _ = [message async for message in sdk_client.receive_response()]
 
     await sdk_client.disconnect()
 
     spans = otel_spans.get_finished_spans()
-    agents = _by_op(spans, "invoke_agent")
-    assert len(agents) == 2
+    agent_spans = get_spans_by_op(spans, "invoke_agent")
+    assert len(agent_spans) == 2
 
     # Both turns share one conversation id (the SDK session_id)...
-    assert {_attrs(a)["gen_ai.conversation.id"] for a in agents} == {"s-mt001"}
+    conversation_ids = {
+        get_attrs(agent_span)["gen_ai.conversation.id"] for agent_span in agent_spans
+    }
+    assert conversation_ids == {"s-mt001"}
     # ...but each turn is its own trace (no ambient span held across turns).
-    assert len({a.context.trace_id for a in agents}) == 2
+    trace_ids = {agent_span.context.trace_id for agent_span in agent_spans}
+    assert len(trace_ids) == 2
 
-    prompts = {_all_text(_messages(a, "gen_ai.input.messages")) for a in agents}
+    prompts = {
+        get_all_text(get_messages(agent_span, "gen_ai.input.messages"))
+        for agent_span in agent_spans
+    }
     assert prompts == {"Hello", "What is the capital of France?"}

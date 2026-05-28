@@ -1,37 +1,13 @@
-"""OTel-emitting variant of the Claude Agent SDK integration.
+"""Weave OTel tracing for the Claude Agent SDK.
 
-Sibling of ``claude_agent_sdk_integration.py`` (the calls-based variant).
-Emits OpenTelemetry spans using GenAI semantic conventions to Weave's
-Agents tab — the OTLP traces endpoint configured by ``weave.init()`` via
-``_setup_session_tracing``. Mirrors the OpenAI Agents v2 OTel processor.
+Emits OpenTelemetry GenAI spans to Weave's Agents tab; the sibling
+``claude_agent_sdk_integration.py`` emits legacy Weave calls instead. The
+dispatcher selects this variant when ``WEAVE_USE_OTEL_V2`` is set.
 
-Span model ("option C"):
-
-    invoke_agent              one per query() call / per ClaudeSDKClient turn
-      ├── chat                one per assistant model response. The aggregate
-      │                       token usage (only reported on the final
-      │                       ResultMessage) is attached to the LAST chat span.
-      └── execute_tool        one per tool_use block, closed on its tool_result
-
-Why this shape: the Claude Agent SDK only reports usage/cost in aggregate on
-the final ``ResultMessage`` (never per assistant message), so per-call usage
-is unknowable. Attributing the aggregate to the final chat span keeps the
-token/cost roll-up correct while preserving the turn-by-turn chat structure
-the Agents tab is built around. ``total_cost_usd`` has no GenAI semconv field,
-so it rides a ``weave.claude_agent_sdk.*`` attribute on the root span.
-
-Trace isolation: by default each turn nests under the ambient OTel context
-(``continue_parent_trace`` semantics), so a turn run inside a Weave-traced
-application joins that trace. Set ``WEAVE_CLAUDE_AGENT_SDK_ISOLATED_TRACES=1``
-to force one isolated trace per turn instead (matching the Session SDK
-``Turn`` default). When no ambient span is active the two are identical.
-
-Tool capture is message-stream based (ToolUseBlock -> ToolResultBlock): the
-chat span is built from the same stream, so the tool_use blocks are already
-in hand — a single source of truth, no ``options.hooks`` mutation, and the
-existing replay cassettes drive it unchanged. The SDK's PreToolUse/PostToolUse
-hooks would only add tighter tool timing and explicit failure events; that is
-a deferred, additive enhancement, not a replacement.
+Each ``query()`` call / ``ClaudeSDKClient`` turn becomes an ``invoke_agent``
+span, with a child ``chat`` span per model response and an ``execute_tool``
+span per tool call. The SDK reports token usage only on the final
+``ResultMessage``, so it is attached to the last ``chat`` span.
 """
 
 from __future__ import annotations
@@ -39,14 +15,22 @@ from __future__ import annotations
 import dataclasses
 import importlib
 import logging
-import os
 from collections.abc import AsyncIterator
 from functools import wraps
 from typing import Any
 
+from claude_agent_sdk import (
+    AssistantMessage,
+    ResultMessage,
+    SystemMessage,
+    TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+)
 from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
-from opentelemetry.context import Context
 from opentelemetry.trace import StatusCode
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -65,35 +49,11 @@ _TRACER_NAME = "weave.claude_agent_sdk"
 _AGENT_NAME = "claude_agent_sdk"
 _PROVIDER_NAME = "anthropic"
 
-# weave.* attrs for data that has no GenAI semconv home.
-_COST_ATTR = "weave.claude_agent_sdk.cost.total_usd"
-_NUM_TURNS_ATTR = "weave.claude_agent_sdk.num_turns"
-_DURATION_MS_ATTR = "weave.claude_agent_sdk.duration_ms"
-
-# When set to a truthy value, force one isolated OTel trace per turn instead of
-# nesting under the ambient context. See the module docstring.
-_ISOLATED_TRACES_ENV = "WEAVE_CLAUDE_AGENT_SDK_ISOLATED_TRACES"
-_TRUTHY = {"1", "true", "yes", "on"}
-
 _claude_agent_sdk_otel_patcher: MultiPatcher | None = None
 
 
 def _tracer() -> Any:
     return otel_trace.get_tracer(_TRACER_NAME)
-
-
-def _isolated_traces() -> bool:
-    """Whether each turn should start its own trace (default: no -> ambient)."""
-    return os.environ.get(_ISOLATED_TRACES_ENV, "").strip().lower() in _TRUTHY
-
-
-def _root_context() -> Context | None:
-    """Parent context for a turn's root invoke_agent span.
-
-    ``None`` -> use the current (ambient) context so the turn nests under any
-    active span. An empty ``Context()`` -> force a brand-new trace root.
-    """
-    return Context() if _isolated_traces() else None
 
 
 def _usage_from_result(usage: dict[str, Any] | None) -> Usage:
@@ -108,7 +68,7 @@ def _usage_from_result(usage: dict[str, Any] | None) -> Usage:
 
 
 def _assistant_output_message(
-    msg: Any, buffered_thinking: list[str]
+    msg: AssistantMessage, buffered_thinking: list[str]
 ) -> tuple[Message, str, Reasoning]:
     """Build the chat span's output Message from an assistant message.
 
@@ -117,8 +77,6 @@ def _assistant_output_message(
     folds into this response's reasoning rather than splitting into its own
     chat span.
     """
-    from claude_agent_sdk import TextBlock, ThinkingBlock, ToolUseBlock
-
     text_chunks: list[str] = []
     thinking_chunks: list[str] = list(buffered_thinking)
     tool_calls: list[ToolCallPart] = []
@@ -187,16 +145,6 @@ def _flush_pending_chat(state: _TurnState, *, usage: Usage | None = None) -> Non
 
 def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
     """Handle one streamed message, creating/closing child spans as needed."""
-    from claude_agent_sdk import (
-        AssistantMessage,
-        ResultMessage,
-        SystemMessage,
-        ThinkingBlock,
-        ToolResultBlock,
-        ToolUseBlock,
-        UserMessage,
-    )
-
     if isinstance(msg, SystemMessage):
         session_id = (msg.data or {}).get("session_id")
         if session_id:
@@ -275,7 +223,7 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
         return
 
 
-def _finalize_turn(root: Any, state: _TurnState, result_msg: Any) -> None:
+def _finalize_turn(root: Any, state: _TurnState) -> None:
     """Close any open child spans and finish the root invoke_agent span."""
     _flush_pending_chat(state)
     for tool_span, _name in state.open_tool_spans.values():
@@ -294,13 +242,6 @@ def _finalize_turn(root: Any, state: _TurnState, result_msg: Any) -> None:
         if state.final_text
         else None,
     )
-    if result_msg is not None:
-        if result_msg.total_cost_usd is not None:
-            attrs[_COST_ATTR] = result_msg.total_cost_usd
-        if result_msg.num_turns is not None:
-            attrs[_NUM_TURNS_ATTR] = result_msg.num_turns
-        if result_msg.duration_ms is not None:
-            attrs[_DURATION_MS_ATTR] = result_msg.duration_ms
     for k, v in attrs.items():
         root.set_attribute(k, v)
     if state.is_error:
@@ -320,19 +261,14 @@ async def _trace_turn(
     single ``ClaudeSDKClient``: the ``system/init`` message (which holds the
     session_id) is only sent on the first turn, so later turns must inherit it.
     """
-    from claude_agent_sdk import ResultMessage
-
     tracer = _tracer()
-    root = tracer.start_span("invoke_agent " + _AGENT_NAME, context=_root_context())
+    root = tracer.start_span("invoke_agent " + _AGENT_NAME)
     token = otel_context.attach(otel_trace.set_span_in_context(root))
     state = _TurnState(user_prompt=user_prompt)
     if conversation_id_holder and conversation_id_holder[0]:
         state.conversation_id = conversation_id_holder[0]
-    result_msg = None
     try:
         async for msg in messages:
-            if isinstance(msg, ResultMessage):
-                result_msg = msg
             try:
                 _process_message(msg, tracer, state)
                 if conversation_id_holder is not None and state.conversation_id:
@@ -346,7 +282,7 @@ async def _trace_turn(
         root.record_exception(exc)
         raise
     finally:
-        _finalize_turn(root, state, result_msg)
+        _finalize_turn(root, state)
         otel_context.detach(token)
 
 
