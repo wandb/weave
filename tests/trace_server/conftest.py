@@ -18,10 +18,10 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
-from weave.trace_server import environment as wf_env
 from weave.trace_server import (
     clickhouse_trace_server_settings as ch_settings,
 )
+from weave.trace_server import environment as wf_env
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
@@ -234,9 +234,7 @@ def _ch_session_server(
     ch_server.ch_client.command(
         f"DROP DATABASE IF EXISTS {management_db}{on_cluster} SYNC"
     )
-    ch_server.ch_client.command(
-        f"DROP DATABASE IF EXISTS {unique_db}{on_cluster} SYNC"
-    )
+    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}{on_cluster} SYNC")
     ch_server._database_ensured = False
 
     def patched_run_migrations():
