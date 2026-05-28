@@ -194,10 +194,21 @@ jobs:
 
   nightly-tests-replicated-1s3r:
     name: Nightly Tests (replicated 1s3r)
-    timeout-minutes: 90
-    runs-on: ubuntu-latest
+    # Successful 8-core trace leg ran in ~16 min; cap at 25 min so any hang
+    # fails fast and we can RCA from the captured CH logs + faulthandler dump.
+    timeout-minutes: 25
+    # `trace` shard is CH-heavy and was hitting ~2h on the 2-core default;
+    # mirror test.yaml's pattern and bump just that shard to 8-core. Other
+    # shards stay on free 2-core. 8-core is billed at $0.022/min, so a
+    # typical 30 min trace leg ~= $0.66.
+    runs-on: ${{ (matrix.shard == 'trace' || matrix.shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     env:
-      MAX_ATTEMPTS: 3
+      # MAX_ATTEMPTS=1 (no retry). Retries on replicated topologies amplify
+      # failures: each attempt re-runs against the same docker-compose CH
+      # cluster, which accumulates data/parts and starts OOMing. In one
+      # RCA, test fixture setup grew 52s -> 297s between attempt 1 and 2.
+      # A single attempt + uploaded CH logs is more diagnostic.
+      MAX_ATTEMPTS: 1
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -332,8 +343,14 @@ jobs:
           DD_TRACE_ENABLED: false
           OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
         run: |
+          # --timeout=300: per-test cap so a single hung test fails with a
+          # thread-stack dump instead of stalling the whole job. Thread method
+          # works under pytest-xdist; signal method would be unreliable across
+          # workers. 300s is well above any clean-cluster setup (~50s observed)
+          # but tight enough that a wedged ClickHouse query fails fast.
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
+            -m "trace_server and not skip_clickhouse_client" \
+            --timeout=300 --timeout-method=thread
       - name: Run nox (No marker filters for integration-only shards)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
         env:
@@ -371,10 +388,16 @@ jobs:
 
   nightly-tests-replicated-2s2r:
     name: Nightly Tests (replicated 2s2r)
-    timeout-minutes: 120
-    runs-on: ubuntu-latest
+    # Successful 8-core trace leg ran in ~16 min; cap at 25 min so any hang
+    # fails fast and we can RCA from the captured CH logs + faulthandler dump.
+    timeout-minutes: 25
+    # See note on 1s3r above. 2s2r has the heaviest CH footprint (4 CH
+    # nodes + Keeper), so the bump matters even more here.
+    runs-on: ${{ (matrix.shard == 'trace' || matrix.shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     env:
-      MAX_ATTEMPTS: 3
+      # See 1s3r note above: retries against a shared docker-compose cluster
+      # amplify failures rather than smoothing them.
+      MAX_ATTEMPTS: 1
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -510,8 +533,10 @@ jobs:
           DD_TRACE_ENABLED: false
           OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
         run: |
+          # See 1s3r note: --timeout=300 gives us thread-stack dumps on hang.
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
+            -m "trace_server and not skip_clickhouse_client" \
+            --timeout=300 --timeout-method=thread
       - name: Run nox (No marker filters for integration-only shards)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
         env:
