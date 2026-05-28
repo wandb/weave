@@ -25,6 +25,28 @@ export interface TurnInit {
   model?: string;
 }
 
+/**
+ * An agent invocation. Typically wraps the work to respond to a single
+ * user message. Emits an `invoke_agent` span and acts as the root of the
+ * trace for that turn: it is always started under `ROOT_CONTEXT` so it
+ * never accidentally inherits a parent from another OTel-instrumented
+ * library.
+ *
+ * Created by `weave.startTurn()` (or `session.startTurn()`) and
+ * terminated with `end()`. Only one Turn may be active in an async chain.
+ * Children (LLM, Tool, SubAgent) attach via the `startLLM`, `startTool`,
+ * `startSubagent` methods.
+ *
+ * @example
+ * const turn = weave.startTurn({agentName: 'research-bot', model: MODEL});
+ * try {
+ *   const llm = turn.startLLM({model: MODEL, providerName: 'openai'});
+ *   // ...
+ *   llm.end();
+ * } finally {
+ *   turn.end();
+ * }
+ */
 export class Turn {
   private _ended = false;
 
@@ -75,6 +97,7 @@ export class Turn {
     return turn;
   }
 
+  /** Start a child LLM span under this Turn. */
   startLLM(opts: LLMInit): LLM {
     return LLM.create({
       ...opts,
@@ -83,6 +106,7 @@ export class Turn {
     });
   }
 
+  /** Start a child Tool span under this Turn. */
   startTool(opts: ToolInit): Tool {
     return Tool.create({
       ...opts,
@@ -91,6 +115,7 @@ export class Turn {
     });
   }
 
+  /** Start a child SubAgent span under this Turn. */
   startSubagent(opts: SubAgentInit): SubAgent {
     return SubAgent.create({
       ...opts,
@@ -99,6 +124,7 @@ export class Turn {
     });
   }
 
+  /** Close the Turn span. Idempotent. Pass `error` to mark it as failed. */
   end(opts?: {error?: Error}): void {
     if (this._ended) {
       return;

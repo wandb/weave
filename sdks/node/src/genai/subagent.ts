@@ -15,6 +15,23 @@ export interface SubAgentInit {
   model?: string;
 }
 
+/**
+ * A nested agent invocation — used when the current agent hands work to
+ * another named agent (e.g. a planner calling a researcher). Emits an
+ * `invoke_agent` span tagged with the sub-agent's name and (optionally)
+ * its model.
+ *
+ * Created by `weave.startSubagent()` (or `turn.startAgent()`, or
+ * `llm.startAgent()`) and terminated with `end()`.
+ *
+ * @example
+ * const sub = weave.startSubagent({name: 'researcher', model: 'gpt-4o'});
+ * try {
+ *   // ... orchestrate the sub-agent's LLM/Tool calls ...
+ * } finally {
+ *   sub.end();
+ * }
+ */
 export class SubAgent {
   private _ended = false;
 
@@ -44,6 +61,7 @@ export class SubAgent {
     return new SubAgent(span, opts.name, opts.model ?? '');
   }
 
+  /** Close the SubAgent span. Idempotent. Pass `error` to mark it as failed. */
   end(opts?: {error?: Error}): void {
     if (this._ended) {
       return;
