@@ -245,24 +245,25 @@ def test_feedback_query_created_at_filter(client):
 
     ClickHouse rejects ISO `T`/`Z` strings against the `created_at`
     DateTime64 column unless the server normalizes them, so this exercises the
-    feedback_query path end-to-end with a `created_at` bound.
+    feedback_query path end-to-end with a `created_at` bound and asserts on the
+    returned rows.
     """
     project_id = client.project_id
-    client.server.feedback_create(
+    created = client.server.feedback_create(
         tsi.FeedbackCreateReq(
             project_id=project_id,
             wb_user_id="VXNlcjoxOQ==",
             weave_ref="weave:///entity/project/object/name:digest",
-            feedback_type="wandb.reaction.1",
-            payload={"emoji": "👍"},
+            feedback_type="custom",
+            payload={"key": "value123"},
         )
     )
 
-    def count_since(bound: str) -> int:
+    def query_since(bound: str) -> list[dict]:
         res = client.server.feedback_query(
             tsi.FeedbackQueryReq(
                 project_id=project_id,
-                fields=["count(*)"],
+                fields=["id", "feedback_type", "payload"],
                 query=Query(
                     **{
                         "$expr": {
@@ -275,9 +276,15 @@ def test_feedback_query_created_at_filter(client):
                 ),
             )
         )
-        return res.result[0]["count(*)"]
+        return res.result
 
-    # A far-past bound matches the row just created; a far-future bound matches
+    # A far-past bound returns the row just created; a far-future bound returns
     # nothing. Both bounds carry the ISO `T`/`Z` shape that previously 500'd.
-    assert count_since("2000-01-01T00:00:00.000000Z") == 1
-    assert count_since("2999-01-01T00:00:00.000000Z") == 0
+    rows = query_since("2000-01-01T00:00:00.000000Z")
+    assert len(rows) == 1
+    assert rows[0] == {
+        "id": created.id,
+        "feedback_type": "custom",
+        "payload": {"key": "value123"},
+    }
+    assert query_since("2999-01-01T00:00:00.000000Z") == []

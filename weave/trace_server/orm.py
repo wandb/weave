@@ -733,7 +733,7 @@ def maybe_convert_datetime_operands(
     (e.g. `2026-05-27T17:49:15.491230Z`) when comparing against a `DateTime64`
     column (TYPE_MISMATCH, code 53). Numeric unix timestamps and parseable
     strings are rewritten to the canonical `YYYY-MM-DD HH:MM:SS.ffffff` form,
-    which ClickHouse parses against DateTime columns and uses for index pruning.
+    which ClickHouse parses against DateTime columns.
 
     Returns a new sequence with the conversion applied, or the original
     sequence if neither operand is a DateTime field/parseable literal pair.
