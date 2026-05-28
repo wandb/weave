@@ -36,13 +36,22 @@ the same `(project_id, digest)` triggers
 `if_generation_match=0 -> PreconditionFailed`, which `store_in_bucket`
 wraps as `FileStorageWriteError`, which falls back to inline-CH chunks.
 End state is content-addressable and consistent.
+
+Circuit breaker: an isolated `FileStorageWriteError` falls back to inline-CH
+chunks for that one file. But a dead bucket fails every file the same way,
+and each upload independently burns `store_in_bucket`'s tenacity retries
+(3 attempts, exponential backoff) before falling back, so a 100-file batch
+grinds through ~N/workers serial waves of backoff for a backend that is
+plainly down. After `max_failures` fallbacks in one batch, `flush()` stops
+draining results, cancels the uploads that have not started, and raises so
+the request fails fast instead of paying the full retry cost for every file.
 """
 
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 
 import ddtrace
 
@@ -71,11 +80,31 @@ DEFAULT_BUCKET_UPLOAD_CONCURRENCY = 8
 # huge file_create payloads.
 MAX_BUCKET_UPLOAD_BATCH_BYTES = 256 * 1024 * 1024
 
+# Circuit-breaker threshold: how many per-file bucket failures we tolerate in
+# one batch before declaring the storage backend down and failing the request.
+# A live bucket fails the odd file (transient 5xx) and the inline-CH fallback
+# absorbs it; a dead bucket fails every file, so a low ceiling bails after one
+# wave of workers instead of retrying all N.
+MAX_BUCKET_UPLOAD_FAILURES = 3
+
+
+_UploadRows = list[FileChunkCreateCHInsertable]
+
 
 @dataclass(slots=True)
 class _Pending:
     req: tsi.FileCreateReq
     digest: str
+
+
+@dataclass(slots=True)
+class _FlushOutcome:
+    """Running tally of one flush(): collected rows + per-file classification."""
+
+    rows: _UploadRows = field(default_factory=list)
+    bucket_success: int = 0
+    ch_fallback: int = 0
+    breaker_tripped: bool = False
 
 
 class BucketUploadBatch:
@@ -84,10 +113,17 @@ class BucketUploadBatch:
     Single-threaded staging, parallel flush. Not thread-safe across threads.
     A bucket upload that fails with `FileStorageWriteError` falls back to
     inline ClickHouse chunks for that one file; other files are unaffected.
+    Once `max_failures` files fall back in one batch the backend is treated as
+    down and `flush()` raises instead of retrying the remainder.
     """
 
-    def __init__(self, max_bytes: int = MAX_BUCKET_UPLOAD_BATCH_BYTES) -> None:
+    def __init__(
+        self,
+        max_bytes: int = MAX_BUCKET_UPLOAD_BATCH_BYTES,
+        max_failures: int = MAX_BUCKET_UPLOAD_FAILURES,
+    ) -> None:
         self._max_bytes = max_bytes
+        self._max_failures = max_failures
         self._pending: list[_Pending] = []
         self._seen: set[tuple[str, str]] = set()
         self._total_bytes = 0
@@ -139,6 +175,10 @@ class BucketUploadBatch:
         (success) or N inline ClickHouse chunks (FileStorageWriteError
         fallback). Order is not preserved.
 
+        Raises `FileStorageWriteError` if `max_failures` uploads fall back in
+        one batch: the storage backend looks down, so we cancel the not-yet-
+        started uploads and fail the request instead of retrying every file.
+
         `client` must be non-None whenever items have been staged. The
         staging path is gated on a non-None client at the call site, so
         receiving None here would indicate a broken invariant rather than a
@@ -156,24 +196,13 @@ class BucketUploadBatch:
         self._seen = set()
         self._total_bytes = 0
 
-        rows: list[FileChunkCreateCHInsertable] = []
-        bucket_success = 0
-        ch_fallback = 0
         with ThreadPoolExecutor(
             max_workers=min(DEFAULT_BUCKET_UPLOAD_CONCURRENCY, len(pending)),
             thread_name_prefix="bucket-upload",
         ) as pool:
             futs = [pool.submit(_upload_one, p, client) for p in pending]
             try:
-                for fut in as_completed(futs):
-                    fut_rows = fut.result()
-                    # Single bucket-URI row vs N inline-CH rows; we use the URI
-                    # presence to classify the per-file outcome.
-                    if fut_rows and fut_rows[0].file_storage_uri is not None:
-                        bucket_success += 1
-                    else:
-                        ch_fallback += 1
-                    rows.extend(fut_rows)
+                outcome = self._collect(futs)
             except Exception:
                 logger.warning(
                     "BucketUploadBatch worker raised an unwrapped exception; "
@@ -184,12 +213,43 @@ class BucketUploadBatch:
                 raise
         set_current_span_dd_tags(
             {
-                "bucket_upload_batch.bucket_success": bucket_success,
-                "bucket_upload_batch.ch_fallback": ch_fallback,
+                "bucket_upload_batch.bucket_success": outcome.bucket_success,
+                "bucket_upload_batch.ch_fallback": outcome.ch_fallback,
                 "bucket_upload_batch.staged": len(pending),
+                "bucket_upload_batch.breaker_tripped": outcome.breaker_tripped,
             }
         )
-        return rows
+        if outcome.breaker_tripped:
+            raise FileStorageWriteError(
+                f"Bucket uploads failed {outcome.ch_fallback} times in a single "
+                f"batch of {len(pending)} files; bailing instead of retrying the "
+                "rest (storage backend appears unavailable)."
+            )
+        return outcome.rows
+
+    def _collect(self, futs: list[Future[_UploadRows]]) -> _FlushOutcome:
+        """Drain completed uploads, classifying each as bucket-URI or fallback.
+
+        Trips the circuit breaker once `max_failures` files fall back: cancels
+        the uploads that have not started so the rest of the batch doesn't each
+        burn a full tenacity retry, and signals the caller to fail the request.
+        """
+        outcome = _FlushOutcome()
+        for fut in as_completed(futs):
+            fut_rows = fut.result()
+            # Single bucket-URI row vs N inline-CH rows; URI presence
+            # classifies the per-file outcome.
+            if fut_rows and fut_rows[0].file_storage_uri is not None:
+                outcome.bucket_success += 1
+            else:
+                outcome.ch_fallback += 1
+            outcome.rows.extend(fut_rows)
+            if outcome.ch_fallback >= self._max_failures:
+                for f in futs:
+                    f.cancel()
+                outcome.breaker_tripped = True
+                break
+        return outcome
 
 
 def _upload_one(
