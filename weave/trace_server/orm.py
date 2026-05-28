@@ -547,20 +547,10 @@ def timestamp_to_datetime_str(timestamp: float) -> str:
 def parse_string_to_utc_timestamp(value: str) -> float | None:
     """Parse a string date or datetime into a UTC unix timestamp (seconds).
 
-    Rules:
-
-    * `YYYY-MM-DD` (exactly 10 characters after strip) is interpreted as
-      midnight UTC on that calendar day.
-    * ISO-8601 datetimes are parsed via `datetime.datetime.fromisoformat`.
-      `Z` / `z` suffix is accepted as UTC. Naive datetimes are treated as UTC
-      wall time.
-    * Unparsable strings return `None` (no conversion).
-
-    Args:
-        value: User-provided string literal.
-
-    Returns:
-        Unix timestamp in seconds in UTC, or `None` if not parseable.
+    Parsing is delegated to `datetime.datetime.fromisoformat`, which accepts
+    both date-only strings (`YYYY-MM-DD`, read as midnight) and full ISO-8601
+    datetimes. A trailing `Z` / `z` is treated as UTC, and naive datetimes are
+    assumed to be UTC wall time. Unparsable strings return `None`.
 
     Examples:
         >>> parse_string_to_utc_timestamp("2024-03-01")
@@ -575,26 +565,10 @@ def parse_string_to_utc_timestamp(value: str) -> float | None:
     s = value.strip()
     if not s:
         return None
-
-    # Check for a date without a time
-    # string: 'YYYY-MM-DD'
-    # index:   0123456789
-    # length: 10
-    if len(s) == 10 and s[4] == "-" and s[7] == "-":
-        try:
-            d = datetime.date.fromisoformat(s)
-        except ValueError:
-            return None
-        dt = datetime.datetime.combine(
-            d, datetime.time.min, tzinfo=datetime.timezone.utc
-        )
-        return dt.timestamp()
-
-    iso = s
-    if iso.endswith(("Z", "z")):
-        iso = iso[:-1] + "+00:00"
+    if s.endswith(("Z", "z")):
+        s = s[:-1] + "+00:00"
     try:
-        dt = datetime.datetime.fromisoformat(iso)
+        dt = datetime.datetime.fromisoformat(s)
     except ValueError:
         return None
     if dt.tzinfo is None:
@@ -845,29 +819,19 @@ def _process_query_to_conditions(
             operand_part = process_operand(operation.not_[0])
             cond = f"(NOT ({operand_part}))"
         elif isinstance(operation, tsi_query.EqOperation):
-            lhs_part, rhs_part = process_binary_operands(
-                *maybe_convert_datetime_operands(operation.eq_, dt_columns)
-            )
+            lhs_part, rhs_part = process_binary_operands(*operation.eq_)
             cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
-            lhs_part, rhs_part = process_binary_operands(
-                *maybe_convert_datetime_operands(operation.gt_, dt_columns)
-            )
+            lhs_part, rhs_part = process_binary_operands(*operation.gt_)
             cond = f"({lhs_part} > {rhs_part})"
         elif isinstance(operation, tsi_query.LtOperation):
-            lhs_part, rhs_part = process_binary_operands(
-                *maybe_convert_datetime_operands(operation.lt_, dt_columns)
-            )
+            lhs_part, rhs_part = process_binary_operands(*operation.lt_)
             cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
-            lhs_part, rhs_part = process_binary_operands(
-                *maybe_convert_datetime_operands(operation.gte_, dt_columns)
-            )
+            lhs_part, rhs_part = process_binary_operands(*operation.gte_)
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.LteOperation):
-            lhs_part, rhs_part = process_binary_operands(
-                *maybe_convert_datetime_operands(operation.lte_, dt_columns)
-            )
+            lhs_part, rhs_part = process_binary_operands(*operation.lte_)
             cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(
@@ -902,6 +866,10 @@ def _process_query_to_conditions(
     def process_binary_operands(
         lhs: tsi_query.Operand, rhs: tsi_query.Operand
     ) -> tuple[str, str]:
+        # Normalize datetime literals before cast inference: a literal compared
+        # against a DateTime column becomes a CH-native datetime string, so the
+        # peer-literal cast below correctly sees a string (not a numeric).
+        lhs, rhs = maybe_convert_datetime_operands((lhs, rhs), dt_columns)
         # Each side's cast is inferred from the peer literal: a numeric RHS
         # tells us to cast the LHS field, and vice versa. Without this, a
         # JSON_VALUE-extracted field comes through as a String while the
