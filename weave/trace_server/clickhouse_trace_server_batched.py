@@ -6260,7 +6260,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.ActionsExecuteBatchRes()
         if len(req.call_ids) > 1:
             # This is temporary until we setup our batching infrastructure
-            raise NotImplementedError("Batching actions is not yet supported")
+            raise InvalidRequest(
+                "Batching actions is not yet supported; submit one call_id at a time."
+            )
 
         # For now, we just execute in-process if it is a single action
         execute_batch(
