@@ -17,12 +17,13 @@
 #   bugs we're trying to catch. Revisit only if an incident proves
 #   Keeper HA is part of our bug surface.
 #
-# Resource limits target the GH Actions ubuntu-latest runner (7 GB RAM,
-# 2 vCPU). ch-s1-r1 hosts the embedded Keeper alongside CH, so it gets
-# a larger cap (2 GB) than the keeper-less replicas (1.5 GB). Total
-# committed memory: 2 + 1.5 + 1.5 = 5 GB, leaving ~2 GB headroom.
-# Without the Keeper-host bump, heavy nightly suites OOM at the 90%
-# soft cap (1.35 GiB on a 1.5 GB cgroup).
+# Resource limits target the GH Actions ubuntu-latest-8-cores runner
+# (32 GB RAM, 8 vCPU) used by the `trace`/`trace_calls_complete_only`
+# shards. ch-s1-r1 hosts the embedded Keeper alongside CH, so it gets
+# a larger cap (4 GB) than the keeper-less replicas (3 GB). Total
+# committed memory: 4 + 3 + 3 = 10 GB, well under the runner's 32 GB.
+# Caps were doubled (from 2/1.5) after an 8-worker xdist test hit the
+# 1.04 GiB / 1.80 GiB OvercommitTracker ceiling on a JOIN query.
 #
 # Usage (local):
 #   docker compose -f 1s3r.yaml up -d --wait
@@ -44,7 +45,7 @@ x-ch-node: &ch-node
   deploy:
     resources:
       limits:
-        memory: 1536M
+        memory: 3072M
   healthcheck:
     test: ["CMD-SHELL", "wget -q -O- http://localhost:8123/ping || exit 1"]
     interval: 3s
@@ -62,7 +63,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2048M
+          memory: 4096M
     ports:
       # Host-side port 8130 matches the default expected by
       # tests/trace_server_migrator/conftest.py::_DEFAULT_PORT,

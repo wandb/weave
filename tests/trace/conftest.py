@@ -54,9 +54,13 @@ def pytest_collection_modifyitems(config, items):
         nodeid = item.nodeid
         # Strip parametrize suffix so the bare test id matches the map.
         base = nodeid.split("[")[0]
-        reason = _DISTRIBUTED_KNOWN_FAILURES.get(base) or _DISTRIBUTED_KNOWN_FAILURES.get(nodeid)
+        reason = _DISTRIBUTED_KNOWN_FAILURES.get(
+            base
+        ) or _DISTRIBUTED_KNOWN_FAILURES.get(nodeid)
         if reason:
-            item.add_marker(skip_distributed(reason=f"distributed-mode known failure: {reason}"))
+            item.add_marker(
+                skip_distributed(reason=f"distributed-mode known failure: {reason}")
+            )
 
 
 @pytest.fixture

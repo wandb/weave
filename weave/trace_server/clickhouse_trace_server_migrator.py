@@ -175,6 +175,12 @@ ID_SHARDED_TABLES: dict[str, str] = {
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",
     "agent_versions": "project_id, agent_name",
+    # Files are chunked: `_file_content_read_once` selects all rows for a
+    # (project_id, digest) and checks the count against `n_chunks`. With
+    # rand() sharding chunks land on different shards, so any per-shard
+    # replication lag manifests as "Missing chunks". Co-locate chunks of
+    # one file on one shard so the read sees an atomic set.
+    "files": "project_id, digest",
 }
 
 
@@ -1169,9 +1175,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         select_query_local = self._rename_from_tables_to_local(select_query)
 
         on_cluster = self._get_on_cluster_clause(self.ch_client.database)
-        self._run_ddl_with_retry(
-            f"DROP TABLE IF EXISTS {view_name_local}{on_cluster}"
-        )
+        self._run_ddl_with_retry(f"DROP TABLE IF EXISTS {view_name_local}{on_cluster}")
         self._run_ddl_with_retry(
             f"CREATE MATERIALIZED VIEW {view_name_local}{on_cluster}\n"
             f"TO {target_table_local}\n"
