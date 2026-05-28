@@ -19,7 +19,7 @@ type SpanDataBase = {
 /**
  * Agent execution span data
  */
-export type AgentSpanData = SpanDataBase & {
+type AgentSpanData = SpanDataBase & {
   type: 'agent';
   name: string;
   handoffs?: string[];
@@ -30,7 +30,7 @@ export type AgentSpanData = SpanDataBase & {
 /**
  * Function/tool execution span data
  */
-export type FunctionSpanData = SpanDataBase & {
+type FunctionSpanData = SpanDataBase & {
   type: 'function';
   name: string;
   input: string;
@@ -41,7 +41,7 @@ export type FunctionSpanData = SpanDataBase & {
 /**
  * LLM generation span data
  */
-export type GenerationSpanData = SpanDataBase & {
+type GenerationSpanData = SpanDataBase & {
   type: 'generation';
   input?: Array<Record<string, any>>;
   output?: Array<Record<string, any>>;
@@ -58,7 +58,7 @@ export type GenerationSpanData = SpanDataBase & {
 /**
  * Response span data
  */
-export type ResponseSpanData = SpanDataBase & {
+type ResponseSpanData = SpanDataBase & {
   type: 'response';
   response_id?: string;
   _input?: string | Record<string, any>[];
@@ -68,7 +68,7 @@ export type ResponseSpanData = SpanDataBase & {
 /**
  * Agent handoff span data
  */
-export type HandoffSpanData = SpanDataBase & {
+type HandoffSpanData = SpanDataBase & {
   type: 'handoff';
   from_agent?: string;
   to_agent?: string;
@@ -86,7 +86,7 @@ export type CustomSpanData = SpanDataBase & {
 /**
  * Guardrail span data
  */
-export type GuardrailSpanData = SpanDataBase & {
+type GuardrailSpanData = SpanDataBase & {
   type: 'guardrail';
   name: string;
   triggered: boolean;
