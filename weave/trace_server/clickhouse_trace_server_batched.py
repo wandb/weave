@@ -5603,9 +5603,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         name="clickhouse_trace_server_batched._file_content_read_with_retry"
     )
     def _file_content_read_with_retry(
-        self, req: tsi.FileContentReadReq, max_attempts: int = 2
+        self, req: tsi.FileContentReadReq, max_attempts: int = 5
     ) -> tsi.FileContentReadRes:
-        """Read file content with retry for ClickHouse eventual consistency."""
+        """Read file content with retry for ClickHouse eventual consistency.
+
+        Higher attempt count than `_obj_read_with_retry` because chunked-file
+        reads need all chunks visible across all shards/replicas: in
+        replicated/distributed mode each missing chunk on any replica trips
+        the retry, and lag can briefly exceed the 50ms-1s window.
+        """
         return self._read_with_retry(
             lambda: self._file_content_read_once(req), max_attempts=max_attempts
         )
@@ -6036,7 +6042,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result_rows = list(query_result.result_rows)
 
         if len(result_rows) < n_chunks:
-            raise ValueError("Missing chunks")
+            # Treat as not-found so the tenacity retry in `_read_with_retry`
+            # picks it up. Replicated/distributed reads can transiently see
+            # fewer rows than `n_chunks` while replication catches up.
+            raise NotFoundError(
+                f"File with digest {req.digest} has {len(result_rows)}/{n_chunks} chunks visible"
+            )
         elif len(result_rows) > n_chunks:
             # The general case where this can occur is when there are multiple
             # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
