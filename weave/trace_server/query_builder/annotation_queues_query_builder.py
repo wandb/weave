@@ -237,6 +237,7 @@ def make_queue_delete_query(
     queue_id: str,
     pb: ParamBuilder,
     cluster_name: str | None = None,
+    table_name: str = "annotation_queues",
 ) -> str:
     """Generate an UPDATE query to soft-delete an annotation queue.
 
@@ -247,6 +248,9 @@ def make_queue_delete_query(
         queue_id: The queue ID (UUID as string)
         pb: Parameter builder for safe SQL parameter injection
         cluster_name: Optional ClickHouse cluster name for distributed mutations
+        table_name: Concrete table to mutate. Callers in distributed mode pass
+            `annotation_queues_local` because lightweight UPDATE/DELETE are
+            unsupported on the Distributed engine.
 
     Returns:
         SQL query string for soft-deleting a queue
@@ -254,8 +258,7 @@ def make_queue_delete_query(
     project_id_param = pb.add_param(project_id)
     queue_id_param = pb.add_param(queue_id)
 
-    # Format table name with ON CLUSTER if cluster_name is provided
-    formatted_table = _format_table_name_with_cluster("annotation_queues", cluster_name)
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
 
     query = f"""
     UPDATE {formatted_table} SET
@@ -274,6 +277,7 @@ def make_queue_update_query(
     queue_id: str,
     pb: ParamBuilder,
     cluster_name: str | None = None,
+    table_name: str = "annotation_queues",
     *,
     name: str | None = None,
     description: str | None = None,
@@ -319,8 +323,7 @@ def make_queue_update_query(
 
     set_clause = ",\n            ".join(set_clauses)
 
-    # Format table name with ON CLUSTER if cluster_name is provided
-    formatted_table = _format_table_name_with_cluster("annotation_queues", cluster_name)
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
 
     query = f"""
         UPDATE {formatted_table}
@@ -652,6 +655,7 @@ def make_annotator_progress_update_query(
     annotation_state: str,
     pb: ParamBuilder,
     cluster_name: str | None = None,
+    table_name: str = "annotator_queue_items_progress",
 ) -> str:
     """Generate an UPDATE query to update annotator progress for a queue item.
 
@@ -662,6 +666,9 @@ def make_annotator_progress_update_query(
         annotation_state: The new annotation state
         pb: Parameter builder for safe SQL parameter injection
         cluster_name: Optional ClickHouse cluster name for distributed mutations
+        table_name: Concrete table to mutate. Callers in distributed mode pass
+            `annotator_queue_items_progress_local` because lightweight UPDATE
+            is unsupported on the Distributed engine.
 
     Returns:
         SQL query string for updating annotator progress
@@ -671,10 +678,7 @@ def make_annotator_progress_update_query(
     annotator_id_param = pb.add_param(annotator_id)
     annotation_state_param = pb.add_param(annotation_state)
 
-    # Format table name with ON CLUSTER if cluster_name is provided
-    formatted_table = _format_table_name_with_cluster(
-        "annotator_queue_items_progress", cluster_name
-    )
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
 
     query = f"""
     UPDATE {formatted_table}
