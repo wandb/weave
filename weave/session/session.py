@@ -215,9 +215,7 @@ def _publish_media_content(
             "fetch the content from the provider first or use a URI"
         )
     else:
-        raise ValueError(
-            "_publish_media_content requires content or uri"
-        )
+        raise ValueError("_publish_media_content requires content or uri")
 
     ref = publish(content_obj)
     return str(ref)
