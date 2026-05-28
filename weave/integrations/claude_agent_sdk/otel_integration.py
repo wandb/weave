@@ -302,10 +302,10 @@ async def _trace_turn(
     session_id) is only sent on the first turn, so later turns must inherit it.
     """
     tracer = _tracer()
-    root = tracer.start_span("invoke_agent " + _AGENT_NAME)
+    root = tracer.start_span(f"invoke_agent {_AGENT_NAME}")
     token = otel_context.attach(otel_trace.set_span_in_context(root))
     state = _TurnState(user_prompt=user_prompt)
-    if conversation_id_holder and conversation_id_holder[0]:
+    if conversation_id_holder is not None and conversation_id_holder[0]:
         state.conversation_id = conversation_id_holder[0]
     try:
         async for msg in messages:

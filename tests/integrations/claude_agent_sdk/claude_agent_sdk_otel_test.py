@@ -108,25 +108,38 @@ async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
     assert len(agent_spans) == 1
     assert len(chat_spans) == 1
 
+    # Assert the full attribute dicts so the emitted GenAI shape is visible at a
+    # glance and any spec drift (added/removed/renamed keys) fails the test.
     agent_span = agent_spans[0]
-    agent_attrs = get_attrs(agent_span)
     assert agent_span.name == "invoke_agent claude_agent_sdk"
-    assert agent_attrs["gen_ai.agent.name"] == "claude_agent_sdk"
-    assert agent_attrs["gen_ai.provider.name"] == "anthropic"
-    assert agent_attrs["gen_ai.conversation.id"] == "s-abc123"
-    assert "What is 2+2?" in get_all_text(
-        get_messages(agent_span, "gen_ai.input.messages")
-    )
-    assert "The answer is 4." in get_all_text(
-        get_messages(agent_span, "gen_ai.output.messages")
-    )
+    assert get_attrs(agent_span) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "claude_agent_sdk",
+        "gen_ai.provider.name": "anthropic",
+        "gen_ai.conversation.id": "s-abc123",
+        "gen_ai.request.model": "claude-sonnet-4-6",
+        "gen_ai.input.messages": (
+            '[{"role": "user", "parts": [{"type": "text", "content": "What is 2+2?"}]}]'
+        ),
+        "gen_ai.output.messages": (
+            '[{"role": "assistant", "parts": '
+            '[{"type": "text", "content": "The answer is 4."}]}]'
+        ),
+    }
 
     chat_span = chat_spans[0]
-    chat_attrs = get_attrs(chat_span)
-    assert chat_attrs["gen_ai.request.model"] == "claude-sonnet-4-6"
-    assert chat_attrs["gen_ai.conversation.id"] == "s-abc123"
-    assert chat_attrs["gen_ai.usage.input_tokens"] == 25
-    assert chat_attrs["gen_ai.usage.output_tokens"] == 10
+    assert get_attrs(chat_span) == {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": "anthropic",
+        "gen_ai.conversation.id": "s-abc123",
+        "gen_ai.request.model": "claude-sonnet-4-6",
+        "gen_ai.output.messages": (
+            '[{"role": "assistant", "parts": '
+            '[{"type": "text", "content": "The answer is 4."}]}]'
+        ),
+        "gen_ai.usage.input_tokens": 25,
+        "gen_ai.usage.output_tokens": 10,
+    }
     # chat nests under the invoke_agent root
     assert chat_span.parent.span_id == agent_span.context.span_id
 
