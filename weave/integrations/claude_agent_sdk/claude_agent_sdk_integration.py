@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import importlib
 import logging
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -14,13 +13,10 @@ from weave.integrations.claude_agent_sdk.display_utils import (
     tool_use_display_name,
     turn_display_name,
 )
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context.weave_client_context import get_weave_client
 
 logger = logging.getLogger(__name__)
-
-_claude_agent_sdk_patcher: MultiPatcher | None = None
 
 
 # ── Shared helpers ───────────────────────────────────────────────────
@@ -394,34 +390,3 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
         return patched_init
 
     return wrapper
-
-
-def get_claude_agent_sdk_patcher(
-    settings: IntegrationSettings | None = None,
-) -> MultiPatcher | NoOpPatcher:
-    if settings is None:
-        settings = IntegrationSettings()
-
-    if not settings.enabled:
-        return NoOpPatcher()
-
-    global _claude_agent_sdk_patcher  # noqa: PLW0603
-    if _claude_agent_sdk_patcher is not None:
-        return _claude_agent_sdk_patcher
-
-    _claude_agent_sdk_patcher = MultiPatcher(
-        [
-            SymbolPatcher(
-                lambda: importlib.import_module("claude_agent_sdk._internal.client"),
-                "InternalClient.process_query",
-                _patched_process_query_wrapper(settings),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("claude_agent_sdk"),
-                "ClaudeSDKClient.__init__",
-                _patched_init_wrapper(settings),
-            ),
-        ]
-    )
-
-    return _claude_agent_sdk_patcher

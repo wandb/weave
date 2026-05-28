@@ -373,13 +373,35 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
 
 
 def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for Claude Agent SDK."""
+    """Enable Weave tracing for Claude Agent SDK (calls-based processor)."""
     _patch_integration(
         module_path="weave.integrations.claude_agent_sdk",
         patcher_func_getter_name="get_claude_agent_sdk_patcher",
         triggering_symbols=["claude_agent_sdk"],
         settings=settings,
     )
+
+
+def patch_claude_agent_sdk_otel(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave OTel tracing for Claude Agent SDK (Agents-tab destination)."""
+    _patch_integration(
+        module_path="weave.integrations.claude_agent_sdk",
+        patcher_func_getter_name="get_claude_agent_sdk_otel_patcher",
+        triggering_symbols=["claude_agent_sdk_otel"],
+        settings=settings,
+    )
+
+
+def _dispatch_claude_agent_sdk() -> None:
+    """Implicit-patch entry: route to OTel processor when WEAVE_USE_OTEL_V2 is set.
+
+    Explicit ``patch_claude_agent_sdk()`` / ``patch_claude_agent_sdk_otel()``
+    calls are unaffected — they always do exactly what their name says.
+    """
+    if should_use_otel_v2():
+        patch_claude_agent_sdk_otel()
+        return
+    patch_claude_agent_sdk()
 
 
 def patch_langchain() -> None:
@@ -438,7 +460,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
     "agents": _dispatch_openai_agents,
-    "claude_agent_sdk": patch_claude_agent_sdk,
+    "claude_agent_sdk": _dispatch_claude_agent_sdk,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,
     "autogen": patch_autogen,

@@ -20,15 +20,13 @@ from claude_agent_sdk import (
 
 import weave
 from tests.integrations.claude_agent_sdk.conftest import ReplayTransport, load_cassette
-from weave.integrations.claude_agent_sdk.claude_agent_sdk_integration import (
-    get_claude_agent_sdk_patcher,
-)
+from weave.integrations.claude_agent_sdk.patcher import get_claude_agent_sdk_patcher
 from weave.integrations.integration_utilities import op_name_from_call
 
 
 @pytest.fixture(autouse=True)
 def patch_claude_agent_sdk() -> Generator[None, None, None]:
-    import weave.integrations.claude_agent_sdk.claude_agent_sdk_integration as mod
+    import weave.integrations.claude_agent_sdk.patcher as mod
 
     mod._claude_agent_sdk_patcher = None
     patcher = get_claude_agent_sdk_patcher()
