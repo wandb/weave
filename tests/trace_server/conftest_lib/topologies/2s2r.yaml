@@ -76,6 +76,7 @@ services:
       - "9001:9000"
     volumes:
       - ../keeper_2s2r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ../test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro
       - ./macros_s1_r1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
 
   ch-s1-r2:
@@ -84,6 +85,7 @@ services:
     hostname: ch-s1-r2
     volumes:
       - ../keeper_2s2r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ../test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro
       - ./macros_s1_r2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
     depends_on:
       ch-s1-r1:
@@ -95,6 +97,7 @@ services:
     hostname: ch-s2-r1
     volumes:
       - ../keeper_2s2r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ../test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro
       - ./macros_s2_r1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
     depends_on:
       ch-s1-r1:
@@ -106,6 +109,7 @@ services:
     hostname: ch-s2-r2
     volumes:
       - ../keeper_2s2r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ../test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro
       - ./macros_s2_r2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
     depends_on:
       ch-s1-r1:

@@ -1,0 +1,17 @@
+<!-- Server-side defaults applied only to test CH clusters. Mounted into
+     /etc/clickhouse-server/users.d/ by the topology compose files so every
+     connection from every test thread inherits these as profile defaults.
+
+     distributed_foreground_insert=1: by default ClickHouse buffers a
+     Distributed INSERT locally and forwards async to the destination shard,
+     so an immediate SELECT against the Distributed wrapper can miss the
+     row. Tests rely on read-after-write semantics, so we force foreground
+     fan-out here. Production servers do NOT mount this file; deployments
+     that want sync semantics set it themselves. -->
+<clickhouse>
+    <profiles>
+        <default>
+            <distributed_foreground_insert>1</distributed_foreground_insert>
+        </default>
+    </profiles>
+</clickhouse>
