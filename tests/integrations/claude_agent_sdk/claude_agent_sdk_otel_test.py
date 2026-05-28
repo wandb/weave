@@ -150,6 +150,7 @@ async def test_tool_use_query_otel(otel_spans: InMemorySpanExporter) -> None:
     assert tool_span.name == "execute_tool Bash"
     assert tool_attrs["gen_ai.tool.name"] == "Bash"
     assert tool_attrs["gen_ai.tool.call.id"] == "toolu_01ABC"
+    assert "ls -la" in tool_attrs["gen_ai.tool.call.arguments"]
     assert "file1.py" in tool_attrs["gen_ai.tool.call.result"]
     assert tool_span.parent.span_id == agent_span.context.span_id
 

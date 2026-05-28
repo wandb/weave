@@ -13,6 +13,7 @@ span per tool call. The SDK reports token usage only on the final
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -78,10 +79,15 @@ class _PendingChat:
 
 @dataclass(frozen=True, slots=True)
 class _OpenTool:
-    """An in-flight execute_tool span awaiting its tool_result."""
+    """An in-flight execute_tool span awaiting its tool_result.
+
+    ``arguments`` is the JSON-encoded tool input, captured when the tool_use
+    block is seen so it can be attached to the span at its tool_result.
+    """
 
     span: Any
     name: str
+    arguments: str
 
 
 def _tracer() -> Any:
@@ -217,7 +223,9 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             if isinstance(block, ToolUseBlock):
                 tool_span = tracer.start_span(f"execute_tool {block.name}")
                 state.open_tool_spans[block.id] = _OpenTool(
-                    span=tool_span, name=block.name
+                    span=tool_span,
+                    name=block.name,
+                    arguments=json.dumps(block.input, default=str),
                 )
         return
 
@@ -235,6 +243,7 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             attrs = execute_tool_attributes(
                 tool_name=open_tool.name,
                 conversation_id=state.conversation_id,
+                tool_call_arguments=open_tool.arguments,
                 tool_call_result=str(block.content),
                 tool_call_id=block.tool_use_id,
             )
