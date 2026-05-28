@@ -8,13 +8,11 @@ import weave
 from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.refs import ObjectRef, Ref
+from weave.trace.refs import ObjectRef, OpRef, Ref
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
-from weave.trace_server.validation import assert_safe_payload
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
@@ -43,10 +41,16 @@ def evaluate_model(args: EvaluateModelArgs) -> None:
 def _evaluate_model(args: EvaluateModelArgs) -> None:
     client = require_weave_client()
 
-    # Validate raw payloads before deserialization.
-    # https://coreweave.atlassian.net/browse/VULNMGMT-1007
-    _assert_safe_ref(client, args.evaluation_ref, "evaluation_ref")
-    _assert_safe_ref(client, args.model_ref, "model_ref")
+    # This worker reconstructs user-supplied objects; it must never
+    # deserialize code-bearing custom objects (Op / load_op). The decode guard
+    # in custom_objs.py enforces this for every payload, including dataset rows
+    # fetched lazily during evaluation. https://coreweave.atlassian.net/browse/WB-34909
+    client.allow_unsafe_custom_obj_decode = False
+
+    # An op ref passed as the evaluation/model ref would be loaded and run by
+    # `client.get` directly, before the decode guard applies, so reject it here.
+    _assert_object_ref(args.evaluation_ref, "evaluation_ref")
+    _assert_object_ref(args.model_ref, "model_ref")
 
     loaded_evaluation = _get_valid_evaluation(client, args.evaluation_ref)
 
@@ -105,18 +109,10 @@ def _run_evaluation(
         )
 
 
-def _assert_safe_ref(client: WeaveClient, ref_uri: str, label: str) -> None:
-    """Read the raw object for a ref and reject it if it contains unsafe CustomWeaveType payloads."""
+def _assert_object_ref(ref_uri: str, label: str) -> None:
+    """Reject anything but a plain object ref. `OpRef` subclasses `ObjectRef`, so
+    exclude it explicitly: an op ref here would be loaded and executed.
+    """
     ref = Ref.parse_uri(ref_uri)
-    if not isinstance(ref, ObjectRef):
+    if not isinstance(ref, ObjectRef) or isinstance(ref, OpRef):
         raise TypeError(f"Expected an object ref for {label}, got: {ref_uri}")
-
-    project_id = f"{ref.entity}/{ref.project}"
-    read_res = client.server.obj_read(
-        tsi.ObjReadReq(
-            project_id=project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-        )
-    )
-    assert_safe_payload(read_res.obj.val, label)

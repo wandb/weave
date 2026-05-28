@@ -4,7 +4,10 @@ import logging
 from collections.abc import Mapping
 from typing import Any, Literal, TypedDict
 
-from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    require_weave_client,
+)
 from weave.trace.op import op
 from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef
@@ -64,6 +67,48 @@ KNOWN_TYPES = {
     "moviepy.video.VideoClip.VideoClip",
     "weave.type_wrappers.Content.content.Content",
 }
+
+# The one type whose serializer loads code (imports a user-uploaded `.py`).
+OP_CUSTOM_WEAVE_TYPE = "Op"
+
+# Custom types whose registered serializer only reconstructs data (images, audio,
+# etc.). Everything else -- "Op" and any unknown type -- routes through a
+# code-loading path in `_decode_custom_obj`, so a client that forbids unsafe
+# decode (server-side workers) refuses them. Kept in sync with KNOWN_TYPES minus
+# "Op" by `test_safe_custom_weave_types_in_sync`; a new KNOWN_TYPE fails that test
+# until it is consciously classified here.
+SAFE_CUSTOM_WEAVE_TYPES = frozenset(
+    {
+        "PIL.Image.Image",
+        "wave.Wave_read",
+        "weave.type_handlers.Audio.audio.Audio",
+        "datetime.datetime",
+        "rich.markdown.Markdown",
+        "moviepy.video.VideoClip.VideoClip",
+        "weave.type_wrappers.Content.content.Content",
+    }
+)
+
+
+class UnsafeDeserializationError(Exception):
+    """Raised when a client that forbids unsafe decode is asked to reconstruct a
+    code-bearing custom object (`Op`, or any type that falls back to `load_op`).
+    """
+
+
+def is_safe_to_decode(
+    weave_type_id: str, load_op_uri: str | None, *, allow_unsafe: bool
+) -> bool:
+    """Whether reconstructing this custom type is permitted.
+
+    `allow_unsafe` is the active client's policy. When False (server-side workers)
+    only registered data-only serializers with no `load_op` may be reconstructed;
+    a non-null `load_op` runs via the fallback path even for known types, so it is
+    never safe.
+    """
+    if allow_unsafe:
+        return True
+    return weave_type_id in SAFE_CUSTOM_WEAVE_TYPES and load_op_uri is None
 
 
 def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
@@ -193,6 +238,15 @@ def _decode_custom_obj(
     load_instance_op_uri: str | None = None,
 ) -> Any:
     type_ = weave_type["type"]
+
+    client = get_weave_client()
+    allow_unsafe = client is None or client.allow_unsafe_custom_obj_decode
+    if not is_safe_to_decode(type_, load_instance_op_uri, allow_unsafe=allow_unsafe):
+        raise UnsafeDeserializationError(
+            f"Refusing to reconstruct custom object of type `{type_}`: the active "
+            f"client does not allow deserializing code-bearing custom objects."
+        )
+
     found_serializer = False
 
     # First, try to load the object using a known serializer
