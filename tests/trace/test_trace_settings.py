@@ -31,6 +31,7 @@ from weave.trace.settings import (
     should_disable_weave,
     should_print_call_link,
     should_redact_pii,
+    tracing_sample_rate,
 )
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
@@ -617,6 +618,33 @@ class TestBackCompat:
         assert should_disable_weave() is True
         parse_and_apply_settings(None)
         assert should_disable_weave() is False
+
+
+@pytest.mark.usefixtures("clean_settings_env")
+class TestTracingSampleRate:
+    def test_default_is_one(self):
+        assert tracing_sample_rate() == 1.0
+
+    def test_reads_snapshot(self):
+        replace_settings(UserSettings(tracing_sample_rate=0.25))
+        assert tracing_sample_rate() == 0.25
+
+    def test_clamps_above_one(self):
+        replace_settings(UserSettings(tracing_sample_rate=2.0))
+        assert tracing_sample_rate() == 1.0
+
+    def test_clamps_below_zero(self):
+        replace_settings(UserSettings(tracing_sample_rate=-1.0))
+        assert tracing_sample_rate() == 0.0
+
+    def test_env_coerces_to_float_and_wins(self, monkeypatch):
+        replace_settings(UserSettings(tracing_sample_rate=1.0))
+        monkeypatch.setenv("WEAVE_TRACING_SAMPLE_RATE", "0.1")
+        assert tracing_sample_rate() == 0.1
+
+    def test_env_is_clamped(self, monkeypatch):
+        monkeypatch.setenv("WEAVE_TRACING_SAMPLE_RATE", "5")
+        assert tracing_sample_rate() == 1.0
 
 
 class TestUserSettingsValue:

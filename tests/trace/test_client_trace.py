@@ -46,6 +46,7 @@ from weave.trace.context.weave_client_context import (
     set_weave_client_global,
 )
 from weave.trace.refs import TableRef
+from weave.trace.settings import override_settings
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
@@ -4185,6 +4186,145 @@ def test_op_sampling_child_follows_parent(weave_active):
 
     assert parent_traces == num_runs  # Parent was always traced
     assert child_traces == num_runs  # Child was traced whenever parent was
+
+
+def test_tracing_sample_rate_off_by_default_and_drops_roots(client):
+    random.seed(0)
+    executed = 0
+
+    @weave.op
+    def my_op(x: int) -> int:
+        nonlocal executed
+        executed += 1
+        return x + 1
+
+    weave.publish(my_op)
+
+    # Off by default: with no centralized rate set, every root is kept.
+    for i in range(5):
+        my_op(i)
+    assert len(list(my_op.calls())) == 5
+
+    # Centralized rate 0.0: the root is sampled out, but the wrapped function
+    # still runs — sampling only skips tracing, never the user's code.
+    with override_settings(tracing_sample_rate=0.0):
+        for i in range(5):
+            my_op(i)
+
+    assert executed == 10  # function ran all ten times
+    assert len(list(my_op.calls())) == 5  # only the first five were traced
+
+
+def test_tracing_sample_rate_env_var(client, monkeypatch):
+    @weave.op
+    def my_op(x: int) -> int:
+        return x + 1
+
+    weave.publish(my_op)
+
+    monkeypatch.setenv("WEAVE_TRACING_SAMPLE_RATE", "0.0")
+    for i in range(5):
+        my_op(i)
+
+    assert len(list(my_op.calls())) == 0
+
+
+def test_tracing_sample_rate_composition_is_multiplicative(client, monkeypatch):
+    # A per-op rate of 0.5 composed with a centralized rate of 0.5 yields an
+    # effective keep-rate of 0.25. A fixed random draw of 0.3 falls between the
+    # two thresholds: it is kept by 0.5 alone but dropped by the composed 0.25,
+    # which is exactly what proves the composition is multiplicative.
+    monkeypatch.setattr(random, "random", lambda: 0.3)
+
+    @weave.op(tracing_sample_rate=0.5)
+    def half_op(x: int) -> int:
+        return x + 1
+
+    weave.publish(half_op)
+
+    with override_settings(tracing_sample_rate=0.5):
+        half_op(1)  # effective 0.25; 0.3 > 0.25 -> dropped
+    assert len(list(half_op.calls())) == 0
+
+    with override_settings(tracing_sample_rate=1.0):
+        half_op(2)  # effective 0.5; 0.3 <= 0.5 -> kept
+    assert len(list(half_op.calls())) == 1
+
+
+class SamplingCarveoutModel(weave.Model):
+    @weave.op
+    def predict(self, question: str) -> dict:
+        return {"generated_text": question}
+
+
+@weave.op
+def sampling_carveout_score(expected: str, output: dict) -> dict:
+    return {"match": expected == output["generated_text"]}
+
+
+@pytest.mark.asyncio
+async def test_tracing_sample_rate_eval_carveout_declarative(client):
+    random.seed(0)
+
+    @weave.op
+    def plain_op(x: int) -> int:
+        return x + 1
+
+    examples = [
+        {"question": "a", "expected": "a"},
+        {"question": "b", "expected": "x"},
+    ]
+    evaluation = weave.Evaluation(dataset=examples, scorers=[sampling_carveout_score])
+
+    # A centralized rate of 0.0 would drop every root, but evaluations are exempt.
+    with override_settings(tracing_sample_rate=0.0):
+        for i in range(5):
+            plain_op(i)  # control: a non-eval root, expected to be dropped
+        await evaluation.evaluate(SamplingCarveoutModel())
+
+    client.flush()
+    op_names = [
+        c.op_name
+        for c in client.server.calls_query(
+            tsi.CallsQueryReq(project_id=client.project_id)
+        ).calls
+    ]
+
+    # The control op was dropped, proving sampling is active at 0.0 ...
+    assert not any("plain_op" in name for name in op_names)
+    # ... yet the whole evaluation tree (root + children) survived.
+    assert any("Evaluation.evaluate" in name for name in op_names)
+    assert any("Evaluation.predict_and_score" in name for name in op_names)
+    assert any("SamplingCarveoutModel.predict" in name for name in op_names)
+
+
+def test_tracing_sample_rate_eval_carveout_imperative(client):
+    random.seed(0)
+
+    @weave.op
+    def plain_op(x: int) -> int:
+        return x + 1
+
+    with override_settings(tracing_sample_rate=0.0):
+        for i in range(5):
+            plain_op(i)  # control: a non-eval root, expected to be dropped
+
+        ev = weave.EvaluationLogger()
+        pred = ev.log_prediction(inputs={"q": "hello"}, output="world")
+        pred.log_score(scorer="accuracy", score=True)
+        pred.finish()
+        ev.log_summary({"accuracy_mean": 1.0})
+
+    client.flush()
+    op_names = [
+        c.op_name
+        for c in client.server.calls_query(
+            tsi.CallsQueryReq(project_id=client.project_id)
+        ).calls
+    ]
+
+    assert not any("plain_op" in name for name in op_names)
+    assert any("Evaluation.evaluate" in name for name in op_names)
 
 
 def test_calls_len(client):

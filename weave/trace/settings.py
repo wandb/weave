@@ -317,6 +317,23 @@ class UserSettings:
     Can be overridden with the environment variable `WEAVE_USE_OTEL_V2`
     """
 
+    tracing_sample_rate: float = 1.0
+    """
+    Centralized fraction of root traces to keep, from 0.0 to 1.0. Defaults to
+    1.0 (keep everything), so sampling is off unless this is set.
+
+    The decision is made once on the root call and composed multiplicatively
+    with the per-op `tracing_sample_rate` decorator argument, so the stricter of
+    the two wins (e.g. 0.5 here and 0.5 on the op keeps ~25% of traces). Child
+    calls inherit the root's decision, so a trace is always kept or dropped as a
+    whole. Evaluation traces are never sampled out regardless of this value.
+
+    Unlike the per-op rate, this is meant to be set in one place (for example as
+    a deployment-wide environment variable) so individual engineers do not each
+    have to opt in per op.
+    Can be overridden with the environment variable `WEAVE_TRACING_SAMPLE_RATE`
+    """
+
 
 class _SettingsOverrides(TypedDict, total=False):
     """Typed kwargs accepted by :func:`override_settings`.
@@ -360,6 +377,7 @@ class _SettingsOverrides(TypedDict, total=False):
     enable_wal: bool
     disable_wal_sender: bool
     use_otel_v2: bool
+    tracing_sample_rate: float
 
 
 # Resolve string annotations once at import; used for env-var coercion.
@@ -634,3 +652,11 @@ def should_disable_wal_sender() -> bool:
 def should_use_otel_v2() -> bool:
     """Returns whether OTel-capable integrations should use their OTel variant."""
     return _env_or_default("use_otel_v2", _current_settings.get().use_otel_v2)
+
+
+def tracing_sample_rate() -> float:
+    """Returns the centralized fraction of root traces to keep, clamped to [0.0, 1.0]."""
+    rate = _env_or_default(
+        "tracing_sample_rate", _current_settings.get().tracing_sample_rate
+    )
+    return max(0.0, min(1.0, rate))

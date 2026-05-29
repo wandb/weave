@@ -67,6 +67,7 @@ from weave.trace.op_protocol import (
     ProcessedInputs,
 )
 from weave.trace.util import log_once
+from weave.trace_server import constants
 
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
@@ -417,11 +418,32 @@ def should_skip_tracing_for_op(op: Op) -> bool:
     return not op._tracing_enabled
 
 
+def _is_sampling_exempt(op: Op) -> bool:
+    """Root evaluation calls are never sampled out.
+
+    Preserving evaluations is the whole point of the carve-out: an evaluation
+    that silently vanished under sampling would be far more surprising than a
+    dropped ad-hoc trace. Both the declarative `Evaluation.evaluate` op and the
+    imperative `EvaluationLogger` op resolve to the same op name, so a single
+    name check covers both entry points. The check runs only for root calls
+    (see `_should_sample_traces`), so the whole eval subtree is kept.
+    """
+    return getattr(op, "name", None) == constants.EVALUATION_RUN_OP_NAME
+
+
 def _should_sample_traces(op: Op) -> bool:
     if call_context.get_current_call():
         return False  # Don't sample traces for child calls
 
-    if random.random() > op.tracing_sample_rate:
+    if _is_sampling_exempt(op):
+        return False  # Never sample out evaluation roots
+
+    # Compose the centralized rate with the per-op rate multiplicatively: both
+    # express "fraction to keep", so the stricter of the two wins (e.g. global
+    # 0.5 and per-op 0.5 keep ~25%). Defaults are 1.0 * 1.0 = 1.0 (keep all).
+    effective_rate = settings.tracing_sample_rate() * op.tracing_sample_rate
+
+    if random.random() > effective_rate:
         return True  # Sample traces for this call
 
     return False
