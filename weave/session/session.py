@@ -41,6 +41,9 @@ from weave.session.types import (
     Usage,
     _parse_data_url,
 )
+from weave.trace.settings import should_disable_weave, should_redact_pii
+from weave.utils import pii_redaction
+from weave.utils.capture_info import get_capture_info
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -107,6 +110,15 @@ __all__ = [
 _TRACER_NAME = "weave.session"
 
 
+def _capture_info_attrs() -> dict[str, str]:
+    """Build weave.* client / system info attrs, gated by settings.
+
+    Per-span (not OTel ``Resource``) so env-var toggles take effect on
+    every emit, matching ``@op`` semantics in ``weave_client.py``.
+    """
+    return {f"weave.{k}": v for k, v in get_capture_info().items()}
+
+
 class _SpanBase(BaseModel):
     """Shared config for span classes that use ``model`` as a field name."""
 
@@ -129,7 +141,7 @@ class _SpanBase(BaseModel):
         OTel span timestamp matches the user-visible start, not the moment
         ``__enter__`` happened to run.
         """
-        if not _OTEL_AVAILABLE:
+        if not _OTEL_AVAILABLE or should_disable_weave():
             return
         tracer = otel_trace.get_tracer(_TRACER_NAME)
         kwargs: dict[str, Any] = {}
@@ -196,6 +208,36 @@ class Tool(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
+    def _build_attrs(self, *, session_id: str, include_content: bool) -> dict[str, Any]:
+        """Build the full OTel attribute dict for this tool span.
+
+        Single chokepoint shared by streaming (``end``) and batch
+        (``_attrs_for_span``). Strips arguments/result when content is
+        gated off; otherwise routes them through ``redact_pii_string``
+        when redaction is enabled.
+        """
+        if include_content:
+            arguments = self.arguments
+            result = self.result
+            if should_redact_pii():
+                arguments = pii_redaction.redact_pii_string(arguments)
+                result = pii_redaction.redact_pii_string(result)
+        else:
+            arguments = ""
+            result = ""
+        attrs = execute_tool_attributes(
+            tool_name=self.name,
+            conversation_id=session_id,
+            tool_call_arguments=arguments,
+            tool_call_result=result,
+            tool_call_id=self.tool_call_id,
+            tool_type=self.tool_type,
+            tool_description=self.tool_description,
+            tool_definitions=self.tool_definitions,
+        )
+        attrs.update(_capture_info_attrs())
+        return attrs
+
     def end(self) -> None:
         if self._ended:
             return
@@ -206,17 +248,10 @@ class Tool(_SpanBase):
             elapsed = self.ended_at - self.started_at
             self.duration_ms = int(elapsed.total_seconds() * 1000)
 
-        session = _current_session.get()
-        include = session.include_content if session else True
-        attrs = execute_tool_attributes(
-            tool_name=self.name,
-            conversation_id=session.session_id if session else "",
-            tool_call_arguments=self.arguments if include else "",
-            tool_call_result=self.result if include else "",
-            tool_call_id=self.tool_call_id,
-            tool_type=self.tool_type,
-            tool_description=self.tool_description,
-            tool_definitions=self.tool_definitions,
+        session = get_current_session()
+        attrs = self._build_attrs(
+            session_id=session.session_id if session else "",
+            include_content=session.include_content if session else True,
         )
         self._end_otel_span(attrs)
 
@@ -392,24 +427,52 @@ class LLM(_SpanBase):
             self.output_type = output_type
         return self
 
-    def end(self) -> None:
-        if self._ended:
-            return
-        self._ended = True
-        self.ended_at = datetime.now(timezone.utc)
+    def _build_attrs(self, *, session_id: str, include_content: bool) -> dict[str, Any]:
+        """Build the full OTel attribute dict for this chat span.
 
-        session = _current_session.get()
-        include = session.include_content if session else True
+        Single chokepoint shared by streaming (``end``) and batch
+        (``_attrs_for_span``). All five content-bearing fields go
+        ``None`` when content is gated off — notably this includes
+        ``reasoning``, which previously bypassed the gate and leaked
+        into ``gen_ai.output.messages``.
+        """
+        input_messages: list[Message] | None
+        output_messages: list[Message] | None
+        system_instructions: list[str] | None
+        media_attachments: list[MediaAttachment] | None
+        reasoning: Reasoning | None
+        if include_content:
+            input_messages = self.input_messages
+            output_messages = self.output_messages
+            system_instructions = self.system_instructions
+            media_attachments = self.media_attachments
+            reasoning = self.reasoning
+            if should_redact_pii():
+                input_messages = pii_redaction.redact_messages(input_messages)
+                output_messages = pii_redaction.redact_messages(output_messages)
+                system_instructions = pii_redaction.redact_system_instructions(
+                    system_instructions
+                )
+                if reasoning.content:
+                    reasoning = Reasoning(
+                        content=pii_redaction.redact_pii_string(reasoning.content)
+                    )
+        else:
+            input_messages = None
+            output_messages = None
+            system_instructions = None
+            media_attachments = None
+            reasoning = None
         attrs = llm_attributes(
             model=self.model,
             provider_name=self.provider_name,
-            conversation_id=session.session_id if session else "",
-            input_messages=self.input_messages if include else None,
-            output_messages=self.output_messages if include else None,
-            media_attachments=self.media_attachments if include else None,
-            system_instructions=self.system_instructions if include else None,
+            conversation_id=session_id,
+            input_messages=input_messages,
+            output_messages=output_messages,
+            media_attachments=media_attachments,
+            system_instructions=system_instructions,
             usage=self.usage,
-            reasoning=self.reasoning,
+            reasoning=reasoning,
             finish_reasons=self.finish_reasons,
             response_id=self.response_id,
             response_model=self.response_model,
@@ -422,6 +485,20 @@ class LLM(_SpanBase):
             request_seed=self.request_seed,
             request_stop_sequences=self.request_stop_sequences,
             request_choice_count=self.request_choice_count,
+        )
+        attrs.update(_capture_info_attrs())
+        return attrs
+
+    def end(self) -> None:
+        if self._ended:
+            return
+        self._ended = True
+        self.ended_at = datetime.now(timezone.utc)
+
+        session = get_current_session()
+        attrs = self._build_attrs(
+            session_id=session.session_id if session else "",
+            include_content=session.include_content if session else True,
         )
 
         if self._token is not None:
@@ -493,21 +570,35 @@ class SubAgent(_SpanBase):
         """Start a tool execution within this sub-agent."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
+    def _build_attrs(self, *, session_id: str, session_name: str) -> dict[str, Any]:
+        """Build the full OTel attribute dict for this sub-agent span.
+
+        Sub-agents have no content fields — the dispatch only needs
+        identifiers and capture-info. Shared between streaming (``end``)
+        and batch (``_attrs_for_span``).
+        """
+        attrs = invoke_agent_attributes(
+            agent_name=self.name,
+            model=self.model,
+            conversation_id=session_id,
+            conversation_name=session_name,
+            agent_id=self.agent_id,
+            agent_description=self.agent_description,
+            agent_version=self.agent_version,
+        )
+        attrs.update(_capture_info_attrs())
+        return attrs
+
     def end(self) -> None:
         if self._ended:
             return
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
 
-        session = _current_session.get()
-        attrs = invoke_agent_attributes(
-            agent_name=self.name,
-            model=self.model,
-            conversation_id=session.session_id if session else "",
-            conversation_name=session.session_name if session else "",
-            agent_id=self.agent_id,
-            agent_description=self.agent_description,
-            agent_version=self.agent_version,
+        session = get_current_session()
+        attrs = self._build_attrs(
+            session_id=session.session_id if session else "",
+            session_name=session.session_name if session else "",
         )
         self._end_otel_span(attrs)
 
@@ -594,23 +685,46 @@ class Turn(_SpanBase):
         """Start a sub-agent invocation (nested invoke_agent span, same trace)."""
         return SubAgent(name=name, model=model or self.model)
 
+    def _build_attrs(
+        self, *, session_id: str, session_name: str, include_content: bool
+    ) -> dict[str, Any]:
+        """Build the full OTel attribute dict for this turn span.
+
+        Shared by streaming (``end``) and batch (``log_turn``). The Turn
+        carries user messages; ``include_content=False`` strips them at
+        source so Presidio is never called for already-dropped content.
+        """
+        messages: list[Message] | None
+        if include_content:
+            messages = self.messages
+            if should_redact_pii():
+                messages = pii_redaction.redact_messages(messages)
+        else:
+            messages = None
+        attrs = invoke_agent_attributes(
+            agent_name=self.agent_name,
+            conversation_id=session_id,
+            conversation_name=session_name,
+            model=self.model,
+            input_messages=messages,
+            agent_id=self.agent_id,
+            agent_description=self.agent_description,
+            agent_version=self.agent_version,
+        )
+        attrs.update(_capture_info_attrs())
+        return attrs
+
     def end(self) -> None:
         if self._ended:
             return
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
 
-        session = _current_session.get()
-        include = session.include_content if session else True
-        attrs = invoke_agent_attributes(
-            agent_name=self.agent_name,
-            conversation_id=session.session_id if session else "",
-            conversation_name=session.session_name if session else "",
-            model=self.model,
-            input_messages=self.messages if include else None,
-            agent_id=self.agent_id,
-            agent_description=self.agent_description,
-            agent_version=self.agent_version,
+        session = get_current_session()
+        attrs = self._build_attrs(
+            session_id=session.session_id if session else "",
+            session_name=session.session_name if session else "",
+            include_content=session.include_content if session else True,
         )
 
         if self._token is not None:
@@ -950,55 +1064,22 @@ def _attrs_for_span(
     session_name: str,
     include_content: bool,
 ) -> tuple[str, dict[str, Any]]:
-    """Build (otel_span_name, attribute_dict) for a child span."""
+    """Build (otel_span_name, attribute_dict) for a child span.
+
+    Delegates to each class's ``_build_attrs`` so streaming (``.end()``)
+    and batch (``log_turn``) produce byte-identical output.
+    """
     if isinstance(span, LLM):
-        attrs = llm_attributes(
-            model=span.model,
-            provider_name=span.provider_name,
-            conversation_id=session_id,
-            input_messages=span.input_messages if include_content else None,
-            output_messages=span.output_messages if include_content else None,
-            media_attachments=span.media_attachments if include_content else None,
-            system_instructions=span.system_instructions if include_content else None,
-            usage=span.usage,
-            reasoning=span.reasoning,
-            finish_reasons=span.finish_reasons,
-            response_id=span.response_id,
-            response_model=span.response_model,
-            output_type=span.output_type,
-            request_temperature=span.request_temperature,
-            request_max_tokens=span.request_max_tokens,
-            request_top_p=span.request_top_p,
-            request_frequency_penalty=span.request_frequency_penalty,
-            request_presence_penalty=span.request_presence_penalty,
-            request_seed=span.request_seed,
-            request_stop_sequences=span.request_stop_sequences,
-            request_choice_count=span.request_choice_count,
+        return f"chat {span.model}", span._build_attrs(
+            session_id=session_id, include_content=include_content
         )
-        return f"chat {span.model}", attrs
     if isinstance(span, Tool):
-        attrs = execute_tool_attributes(
-            tool_name=span.name,
-            conversation_id=session_id,
-            tool_call_arguments=span.arguments if include_content else "",
-            tool_call_result=span.result if include_content else "",
-            tool_call_id=span.tool_call_id,
-            tool_type=span.tool_type,
-            tool_description=span.tool_description,
-            tool_definitions=span.tool_definitions,
+        return f"execute_tool {span.name}", span._build_attrs(
+            session_id=session_id, include_content=include_content
         )
-        return f"execute_tool {span.name}", attrs
-    # SubAgent
-    attrs = invoke_agent_attributes(
-        agent_name=span.name,
-        model=span.model,
-        conversation_id=session_id,
-        conversation_name=session_name,
-        agent_id=span.agent_id,
-        agent_description=span.agent_description,
-        agent_version=span.agent_version,
+    return f"invoke_agent {span.name}", span._build_attrs(
+        session_id=session_id, session_name=session_name
     )
-    return f"invoke_agent {span.name}", attrs
 
 
 def log_turn(
@@ -1022,7 +1103,7 @@ def log_turn(
     Falls back to the earliest/latest child timestamp, then ``now()``, when
     the turn doesn't supply its own.
     """
-    if not _OTEL_AVAILABLE:
+    if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(session_id=session_id)
 
     resolved_spans = spans or []
@@ -1041,15 +1122,10 @@ def log_turn(
         continue_parent_trace=continue_parent_trace,
     )
 
-    turn_attrs = invoke_agent_attributes(
-        agent_name=turn.agent_name,
-        conversation_id=session_id,
-        conversation_name=session_name,
-        model=turn.model,
-        input_messages=turn.messages if include_content else None,
-        agent_id=turn.agent_id,
-        agent_description=turn.agent_description,
-        agent_version=turn.agent_version,
+    turn_attrs = turn._build_attrs(
+        session_id=session_id,
+        session_name=session_name,
+        include_content=include_content,
     )
 
     parent_ctx = Context() if not continue_parent_trace else None
@@ -1103,7 +1179,7 @@ def log_session(
     ``session_id`` if empty. By default each turn gets its own OTel trace.
     """
     sid = session_id or str(uuid.uuid4())
-    if not _OTEL_AVAILABLE:
+    if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(session_id=sid)
 
     trace_ids: list[str] = []
