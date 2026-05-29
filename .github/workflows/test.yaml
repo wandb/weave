@@ -105,6 +105,9 @@ jobs:
   trace-tests:
     name: Trace nox tests
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
     # TODO: refactor to use matrix.include for runner selection
     # Use 8-core runners for trace and trace_calls_complete_only shards (resource-intensive)
     runs-on: ${{ (matrix.nox-shard == 'trace' || matrix.nox-shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
@@ -164,24 +167,6 @@ jobs:
             nox-shard: "verifiers_test"
       fail-fast: false
     services:
-      wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-        credentials:
-          username: _json_key
-          password: ${{ secrets.gcp_wb_sa_key }}
-        env:
-          CI: 1
-          WANDB_ENABLE_TEST_CONTAINER: true
-          LOGGING_ENABLED: true
-        ports:
-          - "8080:8080"
-          - "8083:8083"
-          - "9015:9015"
-        options: >-
-          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
-          --health-interval=5s
-          --health-timeout=3s
-          --health-start-period=10s
       weave_clickhouse:
         image: clickhouse/clickhouse-server:25.11.2.24
         env:
@@ -195,6 +180,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
+          token_format: access_token
+      - name: Start wandb service
+        run: |
+          set -euo pipefail
+          echo "${{ steps.auth.outputs.access_token }}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+          docker run --detach --name wandbservice \
+            --env CI=1 \
+            --env WANDB_ENABLE_TEST_CONTAINER=true \
+            --env LOGGING_ENABLED=true \
+            --publish 8080:8080 \
+            --publish 8083:8083 \
+            --publish 9015:9015 \
+            us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+          for _i in {1..30}; do
+            if curl --silent --fail --show-error http://localhost:8080/healthz >/dev/null; then
+              echo "wandb service is healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs wandbservice
+          exit 1
       - name: Enable debug logging
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Install SQLite dev package
@@ -214,7 +227,7 @@ jobs:
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
-          WB_SERVER_HOST: http://wandbservice
+          WB_SERVER_HOST: http://localhost
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
@@ -234,7 +247,7 @@ jobs:
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
-          WB_SERVER_HOST: http://wandbservice
+          WB_SERVER_HOST: http://localhost
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           DD_TRACE_ENABLED: false
