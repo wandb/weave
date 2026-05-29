@@ -99,10 +99,6 @@ export function getOpName(opValue: Op<any>): string {
   return opValue.__name;
 }
 
-export function getOpParameterNames(opValue: Op<any>): ParameterNamesOption {
-  return opValue.__parameterNames;
-}
-
 export class OpRef {
   constructor(
     public projectId: string,
