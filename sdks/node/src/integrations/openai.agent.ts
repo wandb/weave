@@ -192,6 +192,7 @@ const globalWeaveCallDataMap = globalSingleton<
 // Why: When @openai/agents is loaded across CJS/ESM module boundaries, Node.js
 // may create a separate module instance. Each instance runs its top-level init
 // code, which calls setDefaultOpenAITracingExporter() → setTraceProcessors(),
+// (https://github.com/openai/openai-agents-js/blob/6f0a2a98910c2e1bf9bfd556e3d1cc5093f371b7/packages/agents-openai/src/openaiTracingExporter.ts#L824)
 // resetting all registered TracingProcessors. This shuts down the active Weave
 // processor and wipes its in-flight trace data mid-run.
 //
@@ -245,15 +246,6 @@ function getCurrentSpan(): any | null {
 // ============================================================================
 // Public helpers
 // ============================================================================
-
-/**
- * Get Weave call data for an OpenAI Agent span or trace by its ID
- */
-export function getWeaveCallDataForAgent(
-  spanOrTraceId: string
-): {weaveCallId: string; weaveTraceId: string} | undefined {
-  return globalWeaveCallDataMap.get(spanOrTraceId);
-}
 
 /**
  * Attempts to recover the Weave call stack from the current OpenAI Agents trace/span context.
