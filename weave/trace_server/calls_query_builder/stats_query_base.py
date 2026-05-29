@@ -11,7 +11,10 @@ import datetime
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.calls_query_builder.utils import (
+    param_slot,
+    trace_id_index_expr,
+)
 from weave.trace_server.ch_sentinel_values import (
     null_check_literal_sql,
     null_check_sql,
@@ -220,8 +223,9 @@ def build_calls_filter_sql(
     # Handle trace_ids
     if calls_filter.trace_ids:
         trace_ids_param = pb.add_param(calls_filter.trace_ids)
+        trace_id_expr = trace_id_index_expr("trace_id", read_table)
         where_clauses.append(
-            f"trace_id IN {param_slot(trace_ids_param, 'Array(String)')}"
+            f"{trace_id_expr} IN {param_slot(trace_ids_param, 'Array(String)')}"
         )
 
     # Handle call_ids
