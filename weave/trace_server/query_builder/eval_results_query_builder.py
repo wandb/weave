@@ -325,8 +325,15 @@ def _build_having_clause(
     filters: list[tsi.EvalResultsFilter] | None,
     require_intersection: bool,
     pb: ParamBuilder,
+    filter_logic_operator: str = "and",
 ) -> str:
-    """Build the HAVING clause for ranked_digests."""
+    """Build the HAVING clause for ranked_digests.
+
+    Args:
+        filter_logic_operator: 'and' (Match All) or 'or' (Match Any).
+            - 'and': Row must match filters in ALL evals (default, backward compat)
+            - 'or': Row must match filters in ANY eval
+    """
     having_parts: list[str] = ["1=1"]
 
     if require_intersection and len(eval_root_ids) > 1:
@@ -334,12 +341,31 @@ def _build_having_clause(
         having_parts.append(f"countDistinct(eval_call_id) >= {num_param}")
 
     if filters:
-        for f in filters:
-            resolver = _make_field_resolver(f.evaluation_call_id)
-            conditions, _ = _process_query_to_conditions(
-                f.query, param_builder=pb, field_resolver=resolver
-            )
-            having_parts.extend(conditions)
+        if filter_logic_operator == "or":
+            # Match Any: group conditions by eval, OR between groups
+            eval_groups: dict[str | None, list[str]] = {}
+            for f in filters:
+                resolver = _make_field_resolver(f.evaluation_call_id)
+                conditions, _ = _process_query_to_conditions(
+                    f.query, param_builder=pb, field_resolver=resolver
+                )
+                eval_groups.setdefault(f.evaluation_call_id, []).extend(conditions)
+
+            # Each eval's conditions are AND'd, then OR'd between evals
+            group_clauses = []
+            for conds in eval_groups.values():
+                if conds:
+                    group_clauses.append(f"({' AND '.join(conds)})")
+            if group_clauses:
+                having_parts.append(f"({' OR '.join(group_clauses)})")
+        else:
+            # Match All (default): flat AND of all conditions
+            for f in filters:
+                resolver = _make_field_resolver(f.evaluation_call_id)
+                conditions, _ = _process_query_to_conditions(
+                    f.query, param_builder=pb, field_resolver=resolver
+                )
+                having_parts.extend(conditions)
 
     return "\n                    AND ".join(having_parts)
 
@@ -352,6 +378,7 @@ def build_ranked_digests_cte(
     limit: int | None,
     offset: int,
     pb: ParamBuilder,
+    filter_logic_operator: str = "and",
 ) -> str:
     """Build ranked_digests, ranked_digest_count, and page_digests CTEs.
 
@@ -361,7 +388,7 @@ def build_ranked_digests_cte(
     """
     sort_expr = build_sort_expression(sort_by, eval_root_ids, pb)
     having_clause = _build_having_clause(
-        eval_root_ids, filters, require_intersection, pb
+        eval_root_ids, filters, require_intersection, pb, filter_logic_operator
     )
 
     pagination = ""
@@ -470,6 +497,7 @@ def build_eval_results_query(
     offset: int,
     pb: ParamBuilder,
     read_table: str,
+    filter_logic_operator: str = "and",
 ) -> str:
     """Build the complete eval_results SQL query.
 
@@ -487,6 +515,7 @@ def build_eval_results_query(
         offset,
         pb,
         read_table,
+        filter_logic_operator,
     )
     project_id_param = param_slot(pb.add_param(project_id), "String")
     page_calls_cte = _build_page_calls_cte(project_id_param, read_table)
@@ -525,6 +554,7 @@ def build_eval_results_cte_chain(
     offset: int,
     pb: ParamBuilder,
     read_table: str,
+    filter_logic_operator: str = "and",
 ) -> str:
     """Build the CTE chain body (without WITH keyword).
 
@@ -572,6 +602,7 @@ def build_eval_results_cte_chain(
         limit,
         offset,
         pb,
+        filter_logic_operator,
     )
     page_resolved_cte = build_page_resolved_inputs_cte(project_id_param)
     page_rows_cte = build_page_rows_cte()

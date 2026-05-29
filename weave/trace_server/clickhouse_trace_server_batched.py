@@ -5551,6 +5551,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_offset,
             pb,
             read_table,
+            req.filter_logic_operator,
         )
 
         result = self._query(page_query, pb.get_params())
