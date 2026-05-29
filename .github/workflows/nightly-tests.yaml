@@ -13,9 +13,26 @@ on:
         default: ""
 
 jobs:
+  gcp-auth:
+    name: Mint GCP access token (WIF)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      access_token: ${{ steps.auth.outputs.access_token }}
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
+          token_format: access_token
+
   nightly-tests:
     name: Nightly Tests
     timeout-minutes: 30
+    needs: gcp-auth
     runs-on: ubuntu-latest
     env:
       MAX_ATTEMPTS: 3
@@ -68,8 +85,8 @@ jobs:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
         credentials:
-          username: _json_key
-          password: ${{ secrets.gcp_wb_sa_key }}
+          username: oauth2accesstoken
+          password: ${{ needs.gcp-auth.outputs.access_token }}
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
