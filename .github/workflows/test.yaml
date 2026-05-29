@@ -201,6 +201,7 @@ jobs:
             us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
           for _i in {1..30}; do
             if curl --silent --fail --show-error http://localhost:8080/healthz >/dev/null; then
+              echo "wandb service is healthy"
               exit 0
             fi
             sleep 5
