@@ -96,12 +96,12 @@ def test_flush_resets_byte_counter(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_flush_trips_breaker_and_cancels_remaining(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A dead bucket (every upload falls back) bails after max_failures.
+    """A dead bucket (every upload falls back) bails after the breaker ceiling.
 
     Without the breaker each of the 100 files would burn a full tenacity
-    retry before its inline-CH fallback. The breaker raises after the third
-    fallback and cancels the uploads that have not started, so the vast
-    majority of files are never attempted.
+    retry before its inline-CH fallback. The breaker raises after
+    MAX_BUCKET_UPLOAD_FAILURES fallbacks and cancels the uploads that have not
+    started, so the vast majority of files are never attempted.
     """
     calls: list[str] = []
     lock = threading.Lock()
@@ -114,7 +114,7 @@ def test_flush_trips_breaker_and_cancels_remaining(
         return pbu.file_chunks_for(p.req, p.digest)  # inline-CH fallback
 
     monkeypatch.setattr(pbu, "_upload_one", fake_upload)
-    batch = BucketUploadBatch(max_failures=3)
+    batch = BucketUploadBatch()
     for i in range(100):
         batch.stage(_req(b"x" * 8, name=f"f{i}.bin"), digest=f"d{i}")
 
@@ -129,13 +129,13 @@ def test_flush_below_threshold_falls_back_without_raising(
     """Isolated failures under the ceiling still fall back inline, no raise."""
 
     def fake_upload(p: pbu._Pending, client: FileStorageClient) -> list:
-        # Two files fail; the rest succeed -> under max_failures=3.
+        # Two files fail; the rest succeed -> under MAX_BUCKET_UPLOAD_FAILURES.
         if p.digest in {"d0", "d1"}:
             return pbu.file_chunks_for(p.req, p.digest)
         return _success_row(p)
 
     monkeypatch.setattr(pbu, "_upload_one", fake_upload)
-    batch = BucketUploadBatch(max_failures=3)
+    batch = BucketUploadBatch()
     for i in range(10):
         batch.stage(_req(b"x" * 8, name=f"f{i}.bin"), digest=f"d{i}")
 

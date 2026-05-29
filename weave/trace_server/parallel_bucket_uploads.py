@@ -42,9 +42,10 @@ chunks for that one file. But a dead bucket fails every file the same way,
 and each upload independently burns `store_in_bucket`'s tenacity retries
 (3 attempts, exponential backoff) before falling back, so a 100-file batch
 grinds through ~N/workers serial waves of backoff for a backend that is
-plainly down. After `max_failures` fallbacks in one batch, `flush()` stops
-draining results, cancels the uploads that have not started, and raises so
-the request fails fast instead of paying the full retry cost for every file.
+plainly down. After `MAX_BUCKET_UPLOAD_FAILURES` fallbacks in one batch,
+`flush()` stops draining results, cancels the uploads that have not started,
+and raises so the request fails fast instead of paying the full retry cost
+for every file.
 """
 
 from __future__ import annotations
@@ -113,17 +114,12 @@ class BucketUploadBatch:
     Single-threaded staging, parallel flush. Not thread-safe across threads.
     A bucket upload that fails with `FileStorageWriteError` falls back to
     inline ClickHouse chunks for that one file; other files are unaffected.
-    Once `max_failures` files fall back in one batch the backend is treated as
-    down and `flush()` raises instead of retrying the remainder.
+    Once `MAX_BUCKET_UPLOAD_FAILURES` files fall back in one batch the backend
+    is treated as down and `flush()` raises instead of retrying the remainder.
     """
 
-    def __init__(
-        self,
-        max_bytes: int = MAX_BUCKET_UPLOAD_BATCH_BYTES,
-        max_failures: int = MAX_BUCKET_UPLOAD_FAILURES,
-    ) -> None:
+    def __init__(self, max_bytes: int = MAX_BUCKET_UPLOAD_BATCH_BYTES) -> None:
         self._max_bytes = max_bytes
-        self._max_failures = max_failures
         self._pending: list[_Pending] = []
         self._seen: set[tuple[str, str]] = set()
         self._total_bytes = 0
@@ -175,9 +171,10 @@ class BucketUploadBatch:
         (success) or N inline ClickHouse chunks (FileStorageWriteError
         fallback). Order is not preserved.
 
-        Raises `FileStorageWriteError` if `max_failures` uploads fall back in
-        one batch: the storage backend looks down, so we cancel the not-yet-
-        started uploads and fail the request instead of retrying every file.
+        Raises `FileStorageWriteError` if `MAX_BUCKET_UPLOAD_FAILURES` uploads
+        fall back in one batch: the storage backend looks down, so we cancel the
+        not-yet-started uploads and fail the request instead of retrying every
+        file.
 
         `client` must be non-None whenever items have been staged. The
         staging path is gated on a non-None client at the call site, so
@@ -230,7 +227,8 @@ class BucketUploadBatch:
     def _collect(self, futs: list[Future[_UploadRows]]) -> _FlushOutcome:
         """Drain completed uploads, classifying each as bucket-URI or fallback.
 
-        Trips the circuit breaker once `max_failures` files fall back: cancels
+        Trips the circuit breaker once `MAX_BUCKET_UPLOAD_FAILURES` files fall
+        back: cancels
         the uploads that have not started so the rest of the batch doesn't each
         burn a full tenacity retry, and signals the caller to fail the request.
         """
@@ -244,7 +242,7 @@ class BucketUploadBatch:
             else:
                 outcome.ch_fallback += 1
             outcome.rows.extend(fut_rows)
-            if outcome.ch_fallback >= self._max_failures:
+            if outcome.ch_fallback >= MAX_BUCKET_UPLOAD_FAILURES:
                 for f in futs:
                     f.cancel()
                 outcome.breaker_tripped = True
