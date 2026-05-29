@@ -6242,7 +6242,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         # Make `created_at` tz-aware (otherwise the client will assume local time)
         for row in result:
-            if "created_at" in row:
+            if "created_at" in row and isinstance(row["created_at"], datetime.datetime):
                 row["created_at"] = ensure_datetimes_have_tz(row["created_at"])
         return tsi.FeedbackQueryRes(result=result)
 
