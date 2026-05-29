@@ -18,7 +18,7 @@ on:
 jobs:
   promote-typescript-sdk:
     name: Add TypeScript SDK dist-tag on npm
-    runs-on: ubuntu-8core
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     environment:
       name: release
