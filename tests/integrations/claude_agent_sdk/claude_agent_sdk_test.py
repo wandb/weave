@@ -183,6 +183,54 @@ async def test_multi_tool_query(
 
 
 # =====================================================================
+# query() — subagent tool calls nest under the spawning Task/Agent call
+# =====================================================================
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.asyncio
+async def test_subagent_nesting(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """A subagent's tool calls should nest under the lead agent's Task/Agent
+    call (via parent_tool_use_id), not flatten under the root query."""
+    cassette = load_cassette("subagent_response")
+    transport = ReplayTransport(cassette)
+
+    async for _ in query(
+        prompt="Delegate listing files to a subagent",
+        options=ClaudeAgentOptions(),
+        transport=transport,
+    ):
+        pass
+
+    calls = list(client.get_calls())
+
+    root_call = next(
+        c for c in calls if op_name_from_call(c) == "claude_agent_sdk.query"
+    )
+    agent_call = next(
+        c for c in calls if op_name_from_call(c) == "claude_agent_sdk.tool_use.Agent"
+    )
+    sub_bash_call = next(
+        c for c in calls if op_name_from_call(c) == "claude_agent_sdk.tool_use.Bash"
+    )
+
+    # The lead agent's Agent tool call hangs off the root query.
+    assert agent_call.parent_id == root_call.id
+
+    # The subagent's Bash call nests under the Agent call — NOT the root.
+    assert sub_bash_call.parent_id == agent_call.id
+    assert sub_bash_call.parent_id != root_call.id
+
+    # The lead agent's own text still hangs off the root.
+    text_call = next(
+        c for c in calls if op_name_from_call(c) == "claude_agent_sdk.text"
+    )
+    assert text_call.parent_id == root_call.id
+
+
+# =====================================================================
 # query() — thinking blocks
 # =====================================================================
 

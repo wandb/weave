@@ -79,6 +79,15 @@ def _process_message_inline(
     open_tool_calls = state["open_tool_calls"]
     accumulated = state["accumulated_messages"]
 
+    def _parent_for(message: Any) -> Any:
+        """Nest under the spawning tool call when this message comes from a
+        subagent. A subagent's messages carry ``parent_tool_use_id`` equal to
+        the id of the lead agent's Task/Agent tool-use block, whose Call is
+        still open in ``open_tool_calls`` while the subagent runs. Falls back
+        to ``root_call`` for the lead agent (parent_tool_use_id is None)."""
+        ptid = getattr(message, "parent_tool_use_id", None)
+        return open_tool_calls.get(ptid, root_call) if ptid else root_call
+
     def _is_thinking_only(m: Any) -> bool:
         return isinstance(m, AssistantMessage) and all(
             isinstance(b, ThinkingBlock) for b in m.content
@@ -107,6 +116,10 @@ def _process_message_inline(
         history = list(accumulated)
         accumulated.append(serialized)
 
+        # Subagent messages nest under the Task/Agent call that spawned them;
+        # lead-agent messages nest under the root.
+        parent_call = _parent_for(msg)
+
         # Create child calls for thinking blocks
         thinking_blocks = [b for b in msg.content if isinstance(b, ThinkingBlock)]
         if thinking_blocks:
@@ -115,7 +128,7 @@ def _process_message_inline(
                 op="claude_agent_sdk.thinking",
                 inputs={},
                 display_name=thinking_display_name(thinking_text),
-                parent=root_call,
+                parent=parent_call,
                 attributes={"kind": "llm"},
                 use_stack=False,
             )
@@ -129,7 +142,7 @@ def _process_message_inline(
                 op="claude_agent_sdk.text",
                 inputs={},
                 display_name=text_display_name(text_content),
-                parent=root_call,
+                parent=parent_call,
                 attributes={"kind": "llm"},
                 use_stack=False,
             )
@@ -143,7 +156,7 @@ def _process_message_inline(
                 op=f"claude_agent_sdk.tool_use.{tool_block.name}",
                 inputs={"message": serialized},
                 display_name=tool_use_display_name(tool_block.name, tool_block.input),
-                parent=root_call,
+                parent=parent_call,
                 attributes={"kind": "tool"},
                 use_stack=False,
             )

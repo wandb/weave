@@ -1,0 +1,97 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-sub789"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll delegate this to a subagent."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_lead_task",
+          "name": "Agent",
+          "input": {
+            "description": "investigate files",
+            "prompt": "List the files"
+          }
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "assistant",
+    "parent_tool_use_id": "toolu_lead_task",
+    "message": {
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_sub_bash",
+          "name": "Bash",
+          "input": {
+            "command": "ls -la"
+          }
+        }
+      ],
+      "model": "claude-haiku-4-5"
+    }
+  },
+  {
+    "type": "user",
+    "parent_tool_use_id": "toolu_lead_task",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_sub_bash",
+          "content": "file1.py\nfile2.py"
+        }
+      ]
+    }
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_lead_task",
+          "content": "The subagent found file1.py and file2.py."
+        }
+      ]
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The subagent found 2 files: file1.py and file2.py."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 4200,
+    "duration_api_ms": 3600,
+    "is_error": false,
+    "num_turns": 2,
+    "session_id": "s-sub789",
+    "total_cost_usd": 0.012,
+    "usage": {
+      "input_tokens": 200,
+      "output_tokens": 90
+    },
+    "result": "The subagent found 2 files: file1.py and file2.py."
+  }
+]
