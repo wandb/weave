@@ -678,7 +678,7 @@ export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
  * and registers a TracingProcessor. If the package is not installed, it returns false without
  * throwing an error.
  *
- * @returns Promise<boolean> - true if registration succeeded, false if @openai/agents not available
+ * @returns `Promise<boolean>` - `true` if registration succeeded, `false` if `@openai/agents` not available
  *
  * @example
  * ```typescript
