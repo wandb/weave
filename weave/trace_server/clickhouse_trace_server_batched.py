@@ -3291,9 +3291,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         dup_result = self._query(dup_query, parameters=pb.get_params())
-        existing_refs = {
-            (row[0], row[1]) for row in dup_result.result_rows
-        }
+        existing_refs = {(row[0], row[1]) for row in dup_result.result_rows}
         new_refs = [ref for ref in span_refs if ref not in existing_refs]
 
         if not new_refs:
