@@ -2,7 +2,6 @@ import asyncio
 from abc import ABC, abstractmethod
 
 import ddtrace
-from pydantic import BaseModel, ConfigDict
 
 import weave
 from weave.evaluation.eval import Evaluation
@@ -13,18 +12,16 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
+from weave.trace_server.trace_server_interface import EvaluateModelArgs
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
-
-class EvaluateModelArgs(BaseModel):
-    project_id: str
-    evaluation_ref: str
-    model_ref: str
-    wb_user_id: str
-    evaluation_call_id: str
-
-    model_config = ConfigDict(protected_namespaces=())
+# Re-exported for backward compatibility with downstream callers (e.g. the
+# Kafka dispatcher in services/weave-trace) that historically imported
+# EvaluateModelArgs from this module. The canonical definition now lives in
+# trace_server_interface alongside RescoringArgs so both job types can share
+# the EvalWorkerJob discriminated union.
+__all__ = ["EvaluateModelArgs", "EvaluateModelDispatcher", "evaluate_model"]
 
 
 class EvaluateModelDispatcher(ABC):
