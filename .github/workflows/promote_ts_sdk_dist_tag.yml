@@ -24,7 +24,6 @@ jobs:
       name: release
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -49,6 +48,7 @@ jobs:
 
       - name: Add dist-tag
         env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           PACKAGE_NAME: ${{ steps.package_meta.outputs.package_name }}
           PACKAGE_VERSION: ${{ steps.package_meta.outputs.package_version }}
         working-directory: sdks/node
