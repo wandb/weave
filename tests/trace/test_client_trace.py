@@ -4899,6 +4899,48 @@ def test_calls_query_stats_with_limit(client):
     assert result.total_storage_size_bytes is not None
 
 
+def test_calls_query_stats_started_at_window_excludes_deletes(client):
+    """A started_at lower-bound count must match across backends and exclude
+    soft-deleted calls. On ClickHouse this exercises the windowed distinct-id
+    fast path; on SQLite it exercises the reference implementation, so equal
+    results pin the optimization to the GROUP BY semantics.
+    """
+
+    @weave.op
+    def stats_window_op() -> int:
+        return 1
+
+    for _ in range(3):
+        stats_window_op()
+
+    project_id = get_client_project_id(client)
+    all_calls = client.get_calls()
+    assert len(all_calls) == 3
+
+    def count(literal_seconds: int) -> int:
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$gt": [{"$getField": "started_at"}, {"$literal": literal_seconds}]
+                }
+            }
+        )
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id=project_id, query=query)
+        ).count
+
+    # Lower bound in the distant past counts every (non-deleted) call.
+    assert count(1) == 3
+    # Lower bound in the far future counts nothing.
+    assert count(99999999999) == 0
+
+    # Deleting a call removes it from the windowed count (anti-set exclusion).
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[all_calls[0].id])
+    )
+    assert count(1) == 2
+
+
 @pytest.mark.parametrize(
     "thread_ids",
     [

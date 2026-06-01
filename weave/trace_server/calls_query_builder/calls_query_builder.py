@@ -53,6 +53,7 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     process_query_for_object_refs,
 )
 from weave.trace_server.calls_query_builder.optimization_builder import (
+    DATETIME_BUFFER_TIME_SECONDS,
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
@@ -3078,6 +3079,27 @@ def _try_optimized_stats_query(
             req.project_id, req.limit, param_builder
         )
 
+    # Pattern 4: Time-windowed distinct-call count on calls_merged.
+    #
+    # Generalizes Pattern 3 to a count whose only narrowing is a started_at
+    # time bound: count windowed start rows with uniqExact (started_at lives
+    # only on the start row, so the per-row filter equals the GROUP BY path's
+    # `any(started_at) <op> T` HAVING), and exclude soft-deleted ids via an
+    # anti-set instead of a parallel aggregator (deleted_at lives on a separate
+    # delete row, so it cannot be correlated to started_at in one scan). A lower
+    # bound is required so the anti-set can be windowed too: a call's deleted_at
+    # is always >= its started_at, so deletes of in-window calls land in-window.
+    if (
+        read_table == ReadTable.CALLS_MERGED
+        and req.query is not None
+        and _is_time_filtered_stats_req(req)
+    ):
+        bounds = _extract_started_at_only_bounds(req.query.expr_)
+        if bounds is not None and any(op in {">", ">="} for op, _ in bounds):
+            return _optimized_time_filtered_calls_merged_count_query(
+                req.project_id, req.limit, bounds, param_builder
+            )
+
     return None
 
 
@@ -3156,6 +3178,79 @@ def _optimized_unfiltered_calls_merged_count_query(
         f"FROM {table_name} "
         f"WHERE {table_name}.project_id = {project_id_slot}"
     )
+    return _wrap_raw_count_with_limit(inner, limit)
+
+
+def _optimized_time_filtered_calls_merged_count_query(
+    project_id: str,
+    limit: int | None,
+    bounds: list[tuple[str, float]],
+    param_builder: ParamBuilder,
+) -> str:
+    """Distinct-call count for a calls_merged stats request filtered only by time.
+
+    Counts windowed start rows directly with uniqExact -- started_at lives only
+    on the start row, so the per-row predicate equals the GROUP BY path's
+    `any(started_at) <op> T` HAVING (and implies its `op_name IS NOT NULL`).
+    Soft-deleted ids are removed with an anti-set rather than a parallel
+    aggregator, because deleted_at lives on a separate delete row and cannot be
+    correlated to started_at in a single scan.
+
+    The loose `sortable_datetime` prefilter is kept for granule pruning via the
+    migration-012 minmax index; the exact `started_at` predicate removes its
+    buffer slop. The anti-set is windowed by the lower bound only: a call's
+    deleted_at is always >= its started_at, so every delete of an in-window call
+    also lands in-window and none is missed.
+    """
+    table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
+    project_id_slot = param_slot(param_builder.add_param(project_id), "String")
+
+    exact_conditions: list[str] = []
+    prefilter_by_bound: dict[tuple[str, float], str] = {}
+    for op_str, timestamp in bounds:
+        exact_slot = param_slot(
+            param_builder.add_param(timestamp_to_datetime_str(timestamp)), "String"
+        )
+        exact_conditions.append(f"{table_name}.started_at {op_str} {exact_slot}")
+
+        # Loosen toward the past for lower bounds (and toward the future for
+        # upper bounds) so the prefilter is a superset of the exact predicate.
+        buffer = (
+            DATETIME_BUFFER_TIME_SECONDS
+            if op_str in {"<", "<="}
+            else -DATETIME_BUFFER_TIME_SECONDS
+        )
+        prefilter_slot = param_slot(
+            param_builder.add_param(timestamp_to_datetime_str(int(timestamp) + buffer)),
+            "String",
+        )
+        prefilter_by_bound[op_str, timestamp] = (
+            f"{table_name}.sortable_datetime {op_str} {prefilter_slot}"
+        )
+
+    outer_prefilter = " AND ".join(prefilter_by_bound[b] for b in bounds)
+    lower_prefilter = " AND ".join(
+        prefilter_by_bound[b] for b in bounds if b[0] in {">", ">="}
+    )
+
+    deleted_ids = (
+        f"SELECT {table_name}.id FROM {table_name} "
+        f"PREWHERE {table_name}.project_id = {project_id_slot} "
+        f"WHERE {lower_prefilter} AND isNotNull({table_name}.deleted_at)"
+    )
+    inner = (
+        f"SELECT uniqExact({table_name}.id) AS raw_count "
+        f"FROM {table_name} "
+        f"PREWHERE {table_name}.project_id = {project_id_slot} "
+        f"WHERE {outer_prefilter} "
+        f"AND {' AND '.join(exact_conditions)} "
+        f"AND {table_name}.id NOT IN ({deleted_ids})"
+    )
+    return _wrap_raw_count_with_limit(inner, limit)
+
+
+def _wrap_raw_count_with_limit(inner: str, limit: int | None) -> str:
+    """Wrap a `SELECT ... AS raw_count` inner query in the stats count/has_more shape."""
     if limit is None:
         return f"SELECT raw_count AS count, toUInt8(0) AS has_more FROM ({inner})"
     return (
@@ -3177,6 +3272,98 @@ def _is_unfiltered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
         and not req.expand_columns
         and _is_minimal_filter(req.filter)
     )
+
+
+def _is_time_filtered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
+    """True iff the request is a project-scope count narrowed only by a query.
+
+    Gates Pattern 4. The query is further validated to be started_at-only by
+    `_extract_started_at_only_bounds`; here we require a present query, no
+    storage-size rollup, no column expansion, a minimal hardcoded filter, and a
+    non-existence-check limit (limit=1 stays with Patterns 1/2).
+    """
+    return (
+        (req.limit is None or req.limit > 1)
+        and req.query is not None
+        and not req.include_total_storage_size
+        and not req.expand_columns
+        and _is_minimal_filter(req.filter)
+    )
+
+
+_STARTED_AT_FIELD = "started_at"
+_STARTED_AT_BOUND_OPS: dict[type, str] = {
+    tsi_query.GtOperation: ">",
+    tsi_query.GteOperation: ">=",
+    tsi_query.LtOperation: "<",
+    tsi_query.LteOperation: "<=",
+}
+
+
+def _extract_started_at_only_bounds(
+    operand: tsi_query.Operand,
+) -> list[tuple[str, float]] | None:
+    """Return the started_at bounds iff `operand` filters on nothing else.
+
+    Accepts a single gt/gte/lt/lte comparison of `started_at` against a numeric
+    literal (field on the left), or an AND tree of such comparisons. Returns
+    None for any other shape (other fields, OR/NOT, non-numeric literal, field
+    on the right, ...) so the caller falls back to the GROUP BY path.
+    """
+    if isinstance(operand, tsi_query.AndOperation):
+        bounds: list[tuple[str, float]] = []
+        for sub in operand.and_:
+            sub_bounds = _extract_started_at_only_bounds(sub)
+            if sub_bounds is None:
+                return None
+            bounds.extend(sub_bounds)
+        return bounds or None
+
+    if not isinstance(
+        operand,
+        (
+            tsi_query.GtOperation,
+            tsi_query.GteOperation,
+            tsi_query.LtOperation,
+            tsi_query.LteOperation,
+        ),
+    ):
+        return None
+    bound = _started_at_bound_from_comparison(
+        operand, _STARTED_AT_BOUND_OPS[type(operand)]
+    )
+    return [bound] if bound is not None else None
+
+
+def _started_at_bound_from_comparison(
+    operand: tsi_query.GtOperation
+    | tsi_query.GteOperation
+    | tsi_query.LtOperation
+    | tsi_query.LteOperation,
+    op_str: str,
+) -> tuple[str, float] | None:
+    """Return (op_str, unix_seconds) iff `operand` is `started_at <op> <number>`."""
+    if isinstance(operand, tsi_query.GtOperation):
+        left, right = operand.gt_
+    elif isinstance(operand, tsi_query.GteOperation):
+        left, right = operand.gte_
+    elif isinstance(operand, tsi_query.LtOperation):
+        left, right = operand.lt_
+    else:
+        left, right = operand.lte_
+
+    if (
+        not isinstance(left, tsi_query.GetFieldOperator)
+        or left.get_field_ != _STARTED_AT_FIELD
+    ):
+        return None
+    if not isinstance(right, tsi_query.LiteralOperation):
+        return None
+    literal = right.literal_
+    # bool is a subclass of int -- exclude it explicitly.
+    if isinstance(literal, bool) or not isinstance(literal, (int, float)):
+        return None
+    return (op_str, float(literal))
 
 
 def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
