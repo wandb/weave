@@ -3141,9 +3141,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.AnnotationQueueAddCallsRes:
         """Add calls to an annotation queue in batch with duplicate prevention."""
         assert_non_null_wb_user_id(req)
+
+        # Step 0a: Validate queue exists and is a call queue
+        pb_read = ParamBuilder()
+        read_query = make_queue_read_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb_read,
+        )
+        read_result = self._query(read_query, parameters=pb_read.get_params())
+        rows = list(read_result.named_results())
+        if not rows:
+            raise NotFoundError(f"Queue {req.queue_id} not found")
+        queue_type = rows[0].get("queue_type", "call")
+        if queue_type != "call":
+            raise InvalidRequest(
+                f"Cannot add calls to queue {req.queue_id}: queue type is '{queue_type}', expected 'call'"
+            )
+
         pb = ParamBuilder()
 
-        # Step 0: Determine which table to query based on project data residence
+        # Step 0b: Determine which table to query based on project data residence
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
