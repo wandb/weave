@@ -1,0 +1,31 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "What is 1+1?"}], "model": "gpt-4.1-mini",
+      "n": 1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: '{"id": "chatcmpl-verifiers-mock", "object": "chat.completion", "created":
+        1748462400, "model": "gpt-4.1-mini-2025-04-14", "choices": [{"index": 0, "message":
+        {"role": "assistant", "content": "<think>1 plus 1 equals 2.</think>\n2"},
+        "logprobs": null, "finish_reason": "stop"}], "usage": {"prompt_tokens": 12,
+        "completion_tokens": 9, "total_tokens": 21}, "system_fingerprint": "fp_verifiers_mock"}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1
