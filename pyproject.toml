@@ -54,6 +54,10 @@ dependencies = [
   "opentelemetry-api>=1.28.0",
   "opentelemetry-sdk>=1.28.0",
   "opentelemetry-exporter-otlp-proto-http>=1.28.0",
+  # The ADK integration imports GenAI semconv keys
+  # (gen_ai.tool.call.arguments, cache token names,
+  # gen_ai.usage.reasoning.output_tokens) added in 0.63b0.
+  "opentelemetry-semantic-conventions>=0.63b0",
 ]
 
 [project.optional-dependencies]
@@ -466,7 +470,7 @@ test = [
 
   # Integration Tests
   "pytest-recording>=0.13.2",
-  "vcrpy>=7.0.0; platform_python_implementation != 'PyPy'",
+  "vcrpy>=8.0.0; platform_python_implementation != 'PyPy'",
 
   # serving tests
   "flask",

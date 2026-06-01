@@ -229,6 +229,10 @@ from weave.trace_server.model_providers.model_providers import (
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.parallel_bucket_uploads import (
+    BucketUploadBatch,
+    file_chunks_for,
+)
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
@@ -403,7 +407,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def __del__(self) -> None:
         """Flush batches and the Kafka producer on cleanup."""
-        if self._call_batch or self._calls_complete_batch or self._file_batch:
+        if (
+            self._call_batch
+            or self._calls_complete_batch
+            or self._file_batch
+            or self._bucket_uploads
+        ):
             try:
                 self._flush_all_batches_in_order()
             except Exception:
@@ -412,6 +421,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._file_batch = []
                 self._call_batch = []
                 self._calls_complete_batch = []
+                self._bucket_uploads = BucketUploadBatch()
                 self._flush_immediately = True
 
         # Always drain remaining kafka messages at shutdown.
@@ -450,6 +460,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_file_batch.setter
     def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None:
         self._thread_local.file_batch = value
+
+    @property
+    def _bucket_uploads(self) -> BucketUploadBatch:
+        if not hasattr(self._thread_local, "bucket_uploads"):
+            self._thread_local.bucket_uploads = BucketUploadBatch()
+        return self._thread_local.bucket_uploads
+
+    @_bucket_uploads.setter
+    def _bucket_uploads(self, value: BucketUploadBatch) -> None:
+        self._thread_local.bucket_uploads = value
 
     @property
     def _calls_complete_batch(self) -> list[list[Any]]:
@@ -820,18 +840,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._file_batch = []
             self._call_batch = []
             self._calls_complete_batch = []
+            self._bucket_uploads = BucketUploadBatch()
             self._flush_immediately = True
 
     def _flush_all_batches_in_order(self) -> None:
         """Flush all batches in order of dependency.
-        1. File chunks, if this fails, we raise so that we don't insert calls that
+        1. Bucket uploads, fanned out in parallel. Resulting chunks join
+           _file_batch before the file_chunks insert so URIs are persisted
+           atomically with any inline-CH chunks accumulated alongside.
+        2. File chunks, if this fails, we raise so that we don't insert calls that
            are missing file data. Forces retry.
-        2. Calls, if this fails, we raise so that clients can retry, and so we don't
+        3. Calls, if this fails, we raise so that clients can retry, and so we don't
            continue and push bad ids to the queue.
-        3. Produce to kafka, if this fails, we don't raise because all of the data
+        4. Produce to kafka, if this fails, we don't raise because all of the data
            is already in the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
+        # Raises on fail
+        try:
+            self._file_batch.extend(
+                self._bucket_uploads.flush(self.file_storage_client)
+            )
+        except Exception:
+            logger.exception("Failed to flush bucket uploads")
+            raise
+
         # Raises on fail
         try:
             self._flush_file_chunks()
@@ -1068,7 +1101,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         name="clickhouse_trace_server_batched._update_call_end_in_calls_complete"
     )
     def _update_call_end_in_calls_complete(
-        self, end_call: tsi.EndedCallSchemaForInsertWithStartedAt
+        self, end_call: tsi.EndedCallSchemaForInsert
     ) -> None:
         """Update a call's end data in the calls_complete table using lightweight UPDATE.
 
@@ -6146,6 +6179,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for c in self._file_batch
         ):
             return tsi.FileCreateRes(digest=digest)
+        # Same dedup, but for bucket uploads staged in this batch but not yet
+        # flushed into _file_batch.
+        if self._bucket_uploads.has(req.project_id, digest):
+            return tsi.FileCreateRes(digest=digest)
 
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
@@ -6163,30 +6200,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
-        chunks = [
-            req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
-            for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
-        ]
-        self._insert_file_chunks(
-            [
-                FileChunkCreateCHInsertable(
-                    project_id=req.project_id,
-                    digest=digest,
-                    chunk_index=i,
-                    n_chunks=len(chunks),
-                    name=req.name,
-                    val_bytes=chunk,
-                    bytes_stored=len(chunk),
-                    file_storage_uri=None,
-                )
-                for i, chunk in enumerate(chunks)
-            ]
-        )
+        self._insert_file_chunks(file_chunks_for(req, digest))
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
+        if not self._flush_immediately:
+            # Inside call_batch(): stage for the parallel flush at the end so
+            # an N-attachment batch pays one fan-out round-trip instead of N.
+            # Per-file FileStorageWriteError fallback to inline-CH chunks is
+            # handled inside _upload_one, not by the caller's except arm; root-
+            # span attribution is deferred to bucket_upload_batch.flush so the
+            # tag matches where the bytes actually land.
+            self._bucket_uploads.stage(req, digest)
+            return
         set_root_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
@@ -6697,6 +6725,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             end = tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=start_call.id,
+                started_at=start_call.started_at,
                 ended_at=end_time,
                 output=res.response,
                 summary=summary,
@@ -6844,10 +6873,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None
         if write_target == WriteTarget.CALLS_COMPLETE:
             end_call_handler = lambda end: self._update_call_end_in_calls_complete(
-                tsi.EndedCallSchemaForInsertWithStartedAt(
-                    **end.model_dump(),
-                    started_at=start_call.started_at,
-                )
+                end.model_copy(update={"started_at": start_call.started_at})
             )
 
         assert retention_days is not None  # narrowed by track_llm_call guard above
@@ -6948,6 +6974,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
             id=start_call.id,
+            started_at=start_call.started_at,
             ended_at=end_time,
             output=res.response,
             summary={},
@@ -7754,6 +7781,7 @@ def _create_tracked_stream_wrapper(
             end = tsi.EndedCallSchemaForInsert(
                 project_id=project_id,
                 id=start_call.id,
+                started_at=start_call.started_at,
                 ended_at=datetime.datetime.now(),
                 output=aggregated_output,
                 summary=summary,

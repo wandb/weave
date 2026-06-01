@@ -36,6 +36,35 @@ class InvalidInternalRef(ValueError):
     pass
 
 
+def replace_external_weave_ref(
+    ref_str: str,
+    convert_ext_to_int_project_id: Callable[[str], str],
+    cache: dict[str, str] | None = None,
+) -> str:
+    """Convert a single `weave:///entity/project/tail` ref to internal form.
+
+    Pass a shared `cache` dict to amortize ext→int project lookups across
+    repeated calls. Raises ``ValueError`` if the input does not start with
+    the external scheme prefix, and ``InvalidExternalRef`` if the tail does
+    not parse as ``entity/project/...``.
+    """
+    if not ref_str.startswith(weave_prefix):
+        raise ValueError(f"Invalid URI: {ref_str}")
+    rest = ref_str[len(weave_prefix) :]
+    parts = rest.split("/", 2)
+    if len(parts) != 3:
+        raise InvalidExternalRef(f"Invalid URI: {ref_str}")
+    entity, project, tail = parts
+    project_key = f"{entity}/{project}"
+    if cache is None:
+        internal_project_id = convert_ext_to_int_project_id(project_key)
+    else:
+        if project_key not in cache:
+            cache[project_key] = convert_ext_to_int_project_id(project_key)
+        internal_project_id = cache[project_key]
+    return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
+
+
 def universal_ext_to_int_ref_converter(
     obj: A,
     convert_ext_to_int_project_id: Callable[[str], str],
@@ -63,20 +92,9 @@ def universal_ext_to_int_ref_converter(
     ext_to_int_project_cache: dict[str, str] = {}
 
     def replace_ref(ref_str: str) -> str:
-        if not ref_str.startswith(weave_prefix):
-            raise ValueError(f"Invalid URI: {ref_str}")
-        rest = ref_str[len(weave_prefix) :]
-        parts = rest.split("/", 2)
-        if len(parts) != 3:
-            raise InvalidExternalRef(f"Invalid URI: {ref_str}")
-        entity, project, tail = parts
-        project_key = f"{entity}/{project}"
-        if project_key not in ext_to_int_project_cache:
-            ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(
-                project_key
-            )
-        internal_project_id = ext_to_int_project_cache[project_key]
-        return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
+        return replace_external_weave_ref(
+            ref_str, convert_ext_to_int_project_id, ext_to_int_project_cache
+        )
 
     def mapper(obj: B) -> B:
         if isinstance(obj, str):

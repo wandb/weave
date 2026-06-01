@@ -26,19 +26,6 @@ from weave.session.session import (
     start_turn,
 )
 
-
-@pytest.fixture(autouse=True)
-def _reset_contextvars():
-    """Reset contextvar state after each test to prevent leakage."""
-    yield
-    if (llm := get_current_llm()) is not None:
-        llm.end()
-    if (turn := get_current_turn()) is not None:
-        turn.end()
-    if (session := get_current_session()) is not None:
-        session.end()
-
-
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------

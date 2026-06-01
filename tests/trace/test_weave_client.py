@@ -3,6 +3,7 @@ import json
 import platform
 import re
 import sys
+import threading
 import time
 import uuid
 
@@ -825,6 +826,62 @@ def test_call_display_name(client):
     call0.set_display_name(None)
     call0 = client.get_call(call0.id)
     assert call0.display_name is None
+
+
+def test_set_display_name_does_not_block_caller(client, no_autoflush):
+    """set_display_name must defer the server PATCH to future_executor.
+
+    Wraps the live server in a gate that blocks `call_update` until released,
+    then asserts the caller returns before the gate opens, that
+    `call.display_name` updates synchronously in-memory, and that the PATCH
+    eventually fires with the elided new name once the gate releases and the
+    executor drains.
+    """
+    gate = threading.Event()
+    seen: list[tsi.CallUpdateReq] = []
+
+    class GatedServer:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def call_update(self, req):
+            seen.append(req)
+            gate.wait(timeout=5.0)
+            return self._inner.call_update(req)
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    real_server = client.server
+    call = client.create_call("x", {"a": 1})
+    client.flush()  # drain start_call before installing the gate
+
+    client.server = GatedServer(real_server)
+    try:
+        start = time.perf_counter()
+        call.set_display_name("new_name")
+        caller_elapsed = time.perf_counter() - start
+
+        # Caller did not block on the PATCH; the closure is queued on the
+        # future_executor and the gated call_update is still waiting.
+        assert caller_elapsed < 1.0, (
+            f"set_display_name blocked caller for {caller_elapsed:.2f}s; "
+            "expected near-instant return (deferred via future_executor)"
+        )
+        # In-memory display_name is updated synchronously so user code that
+        # reads call.display_name right after the set sees the new value.
+        assert call.display_name == "new_name"
+
+        # Release the gate and drain the executor; the PATCH should now land
+        # with the elided new name.
+        gate.set()
+        client.flush()
+        assert len(seen) == 1
+        assert seen[0].call_id == call.id
+        assert seen[0].display_name == "new_name"
+    finally:
+        gate.set()
+        client.server = real_server
 
 
 def test_dataset_calls(client):

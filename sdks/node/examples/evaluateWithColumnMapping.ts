@@ -1,11 +1,10 @@
 import 'source-map-support/register';
 import * as weave from 'weave';
-
 async function main() {
   await weave.init('examples');
 
   const ds = new weave.Dataset({
-    id: 'My Dataset',
+    name: 'My Dataset',
     description: 'This is a dataset',
     rows: [
       {firstName: 'Alice', yearsOld: 25},
@@ -16,6 +15,7 @@ async function main() {
   const evaluation = new weave.Evaluation({
     dataset: ds,
     scorers: [
+      // @ts-ignore
       weave.op(({modelOutput, datasetRow}) => modelOutput == datasetRow.age, {
         name: 'isEqual',
       }),

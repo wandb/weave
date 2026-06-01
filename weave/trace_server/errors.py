@@ -429,6 +429,11 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Lightweight update queries are not supported by this ClickHouse version or configuration. "
             "This is a ClickHouse version issue that needs to be resolved."
         ) from e
+    if "Max query size exceeded" in error_str:
+        raise RequestTooLarge(
+            "Call payload exceeded the storage backend's max query size. "
+            "Reduce the size of `output` or `summary` and retry."
+        ) from e
 
     # Re-raise the original exception if no known pattern matches
     raise e

@@ -7,6 +7,8 @@ We should never be breaking the user's program with an error.
 
 from __future__ import annotations
 
+import gc
+import weakref
 from collections import Counter
 from unittest.mock import MagicMock
 
@@ -14,6 +16,7 @@ import pytest
 
 import weave
 from tests.trace.util import DummyTestException
+from weave.trace import weave_client
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.op import _add_accumulator
@@ -79,6 +82,48 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
         "Task failed: DummyTestException: ('FAILURE - file_create": 1,
         "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
     }
+
+
+class _Blob(weave.Object):
+    data: str
+
+
+@pytest.mark.disable_logging_error_check
+@pytest.mark.parametrize(
+    "make_obj",
+    [
+        pytest.param(lambda: _Blob(data="X" * 4096), id="pydantic-object"),
+        pytest.param(
+            lambda: weave_client.Table([{"v": "X" * 256} for _ in range(16)]),
+            id="table",
+        ),
+    ],
+)
+def test_resilience_to_obj_create_failure_does_not_pin_payload(
+    client_with_throwing_server, make_obj
+):
+    """A failed save must release the user's object for GC.
+
+    Before WB-31070, the failed `digest_future` stayed attached to the
+    user's object via `obj.ref._digest`. The future's exception traceback
+    retains the serialized payload via frame locals, pinning the object
+    for its lifetime. Covers both the pydantic `client.save()` path and
+    the `_save_table` path, which share the same shape.
+    """
+    obj = make_obj()
+    obj_weak = weakref.ref(obj)
+
+    try:
+        client_with_throwing_server.save(obj, name="payload")
+    except Exception:
+        pass
+    client_with_throwing_server.future_executor.flush()
+
+    assert obj.ref is None
+
+    del obj
+    gc.collect()
+    assert obj_weak() is None
 
 
 @pytest.mark.disable_logging_error_check
