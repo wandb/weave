@@ -815,9 +815,7 @@ def _make_span_ref_tuples_sql(
     for trace_id, span_id in span_refs:
         t_param = pb.add_param(trace_id)
         s_param = pb.add_param(span_id)
-        value_parts.append(
-            f"({{{t_param}: String}}, {{{s_param}: String}})"
-        )
+        value_parts.append(f"({{{t_param}: String}}, {{{s_param}: String}})")
 
     values_list = ", ".join(value_parts)
     return f"SELECT * FROM VALUES('t String, s String', {values_list})"

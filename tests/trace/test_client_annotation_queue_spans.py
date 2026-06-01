@@ -345,9 +345,7 @@ def test_annotation_queue_span_items_query_with_pagination(client):
         tsi.AnnotationQueueAddSpansReq(
             project_id=client.project_id,
             queue_id=queue_id,
-            span_refs=[
-                SpanRef(trace_id=s.trace_id, span_id=s.span_id) for s in spans
-            ],
+            span_refs=[SpanRef(trace_id=s.trace_id, span_id=s.span_id) for s in spans],
             display_mode="chat_view",
             wb_user_id="test_user",
         )
@@ -475,9 +473,7 @@ def test_annotation_queue_span_items_query_with_position(client):
         tsi.AnnotationQueueAddSpansReq(
             project_id=client.project_id,
             queue_id=queue_id,
-            span_refs=[
-                SpanRef(trace_id=s.trace_id, span_id=s.span_id) for s in spans
-            ],
+            span_refs=[SpanRef(trace_id=s.trace_id, span_id=s.span_id) for s in spans],
             display_mode="chat_view",
             wb_user_id="test_user",
         )
