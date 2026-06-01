@@ -26,6 +26,7 @@ from weave.trace_server.common_interface import (
     WB_USER_ID_DESCRIPTION,
     AnnotationState,
     BaseModelStrict,
+    QueueType,
     SortBy,
 )
 from weave.trace_server.interface.query import Query
@@ -1611,6 +1612,7 @@ class AnnotationQueueSchema(BaseModel):
     project_id: str
     name: str
     description: str
+    queue_type: QueueType = "call"
     scorer_refs: list[str]  # Array of weave:// refs to scorers
     created_at: datetime.datetime
     created_by: str  # wb_user_id
@@ -1624,6 +1626,10 @@ class AnnotationQueueCreateReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     name: str = Field(examples=["Error Review Queue"])
     description: str = Field(default="", examples=["Review calls with exceptions"])
+    queue_type: QueueType = Field(
+        default="call",
+        description="Type of queue: 'call' for call-based queues, 'span' for agent span queues",
+    )
     scorer_refs: list[str] = Field(
         examples=[
             [
@@ -1837,6 +1843,88 @@ class AnnotatorQueueItemsProgressUpdateRes(BaseModel):
     """Response from updating annotation state."""
 
     item: AnnotationQueueItemSchema
+
+
+# Annotation Queue Span Items API
+# ================================
+# These schemas support span-based annotation queues for agent observability.
+
+
+class AnnotationQueueSpanItemSchema(BaseModel):
+    """Schema for annotation queue span item responses."""
+
+    id: str  # UUID
+    project_id: str
+    queue_id: str  # UUID
+    trace_id: str
+    span_id: str
+    started_at: datetime.datetime
+    ended_at: datetime.datetime | None = None
+    operation_name: str = ""
+    agent_name: str = ""
+    provider_name: str = ""
+    request_model: str = ""
+    status_code: str = "UNSET"
+    input_tokens: int = 0
+    output_tokens: int = 0
+    conversation_id: str = ""
+    display_mode: str = "chat_view"
+    added_by: str | None = None  # wb_user_id (nullable)
+    annotation_state: AnnotationState
+    annotator_user_id: str | None = None
+    created_at: datetime.datetime
+    created_by: str  # wb_user_id
+    updated_at: datetime.datetime
+    deleted_at: datetime.datetime | None = None
+    position_in_queue: int | None = None
+
+
+class AnnotationQueueAddSpansReq(his.AnnotationQueueAddSpansBody):
+    """Request to add spans to an annotation queue in batch.
+
+    Extends AnnotationQueueAddSpansBody by adding queue_id for internal API usage.
+    """
+
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueAddSpansRes(BaseModel):
+    """Response from adding spans to a queue."""
+
+    added_count: int  # Number of spans successfully added
+    duplicates: int  # Number of spans already in queue (skipped)
+
+
+class AnnotationQueueSpanItemsQueryReq(his.AnnotationQueueSpanItemsQueryBody):
+    """Request to query span items in an annotation queue.
+
+    Extends AnnotationQueueSpanItemsQueryBody by adding queue_id for internal API usage.
+    """
+
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+
+
+class AnnotationQueueSpanItemsQueryRes(BaseModel):
+    """Response from querying annotation queue span items."""
+
+    items: list[AnnotationQueueSpanItemSchema]
+
+
+class AnnotationQueueSpanItemChatReq(his.AnnotationQueueSpanItemChatBody):
+    """Request to get the chat view for a span queue item.
+
+    Extends AnnotationQueueSpanItemChatBody by adding queue_id and item_id for internal API usage.
+    """
+
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    item_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440001"])
+
+
+class AnnotationQueueSpanItemChatRes(BaseModel):
+    """Response with the chat view for a span queue item."""
+
+    chat: agent_types.AgentTraceChatRes
 
 
 # Thread API
@@ -3091,6 +3179,19 @@ class TraceServerInterface(Protocol):
     def annotator_queue_items_progress_update(
         self, req: AnnotatorQueueItemsProgressUpdateReq
     ) -> AnnotatorQueueItemsProgressUpdateRes: ...
+
+    # Annotation Queue Span Items API
+    def annotation_queue_add_spans(
+        self, req: AnnotationQueueAddSpansReq
+    ) -> AnnotationQueueAddSpansRes: ...
+
+    def annotation_queue_span_items_query(
+        self, req: AnnotationQueueSpanItemsQueryReq
+    ) -> AnnotationQueueSpanItemsQueryRes: ...
+
+    def annotation_queue_span_item_chat(
+        self, req: AnnotationQueueSpanItemChatReq
+    ) -> AnnotationQueueSpanItemChatRes: ...
 
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...

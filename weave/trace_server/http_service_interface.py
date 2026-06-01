@@ -10,6 +10,7 @@ from pydantic import Field
 
 from weave.trace_server.common_interface import (
     AnnotationQueueItemsFilter,
+    AnnotationQueueSpanItemsFilter,
     BaseModelStrict,
     SortBy,
 )
@@ -76,6 +77,58 @@ class AnnotationQueueItemProgressUpdateBody(BaseModelStrict):
     annotation_state: str = Field(
         examples=["in_progress", "completed", "skipped"],
         description="New state: 'in_progress', 'completed', or 'skipped'",
+    )
+
+
+class SpanRef(BaseModelStrict):
+    """Reference to a specific span by trace_id and span_id."""
+
+    trace_id: str = Field(examples=["abc123"])
+    span_id: str = Field(examples=["def456"])
+
+
+class AnnotationQueueAddSpansBody(BaseModelStrict):
+    """Request body for adding spans to an annotation queue (queue_id comes from path)."""
+
+    project_id: str = Field(examples=["entity/project"])
+    span_refs: list[SpanRef] = Field(
+        examples=[[{"trace_id": "trace-1", "span_id": "span-1"}]],
+        description="List of (trace_id, span_id) pairs identifying spans to add",
+    )
+    display_mode: str = Field(
+        default="chat_view",
+        examples=["chat_view", "span_detail"],
+        description="How the annotation UI renders this item: 'chat_view' or 'span_detail'",
+    )
+
+
+class AnnotationQueueSpanItemsQueryBody(BaseModelStrict):
+    """Request body for querying span items in an annotation queue (queue_id comes from path)."""
+
+    project_id: str = Field(examples=["entity/project"])
+    filter: AnnotationQueueSpanItemsFilter | None = Field(
+        default=None,
+        description="Filter queue items by span metadata and annotation state",
+    )
+    sort_by: list[SortBy] | None = Field(
+        default=None,
+        description="Sort by multiple fields (e.g., started_at, agent_name, created_at)",
+    )
+    limit: int | None = Field(default=None, examples=[50])
+    offset: int | None = Field(default=None, examples=[0])
+    include_position: bool = Field(
+        default=False,
+        description="Include position_in_queue field (1-based index in full queue)",
+    )
+
+
+class AnnotationQueueSpanItemChatBody(BaseModelStrict):
+    """Request body for getting the chat view of a span queue item (queue_id and item_id come from path)."""
+
+    project_id: str = Field(examples=["entity/project"])
+    include_feedback: bool = Field(
+        default=False,
+        description="Include feedback data in the chat view response",
     )
 
 

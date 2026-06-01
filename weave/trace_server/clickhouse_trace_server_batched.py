@@ -157,7 +157,10 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHObjSchema,
     TagCHInsertable,
 )
-from weave.trace_server.common_interface import AnnotationQueueItemsFilter
+from weave.trace_server.common_interface import (
+    AnnotationQueueItemsFilter,
+    AnnotationQueueSpanItemsFilter,
+)
 from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
@@ -237,11 +240,15 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_annotator_progress_update_query,
     make_queue_add_calls_check_duplicates_query,
     make_queue_add_calls_fetch_calls_query,
+    make_queue_add_spans_check_duplicates_query,
+    make_queue_add_spans_fetch_spans_query,
     make_queue_create_query,
     make_queue_delete_query,
     make_queue_item_existence_query,
     make_queue_items_query,
     make_queue_read_query,
+    make_queue_span_item_existence_query,
+    make_queue_span_items_query,
     make_queue_update_query,
     make_queues_query,
     make_queues_stats_query,
@@ -2872,6 +2879,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             scorer_refs=req.scorer_refs,
             created_by=created_by,
             pb=pb,
+            queue_type=req.queue_type,
         )
 
         self._command(query, parameters=pb.get_params())
@@ -2905,6 +2913,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id,
                 name,
                 description,
+                queue_type,
                 scorer_refs,
                 created_at,
                 created_by,
@@ -2926,6 +2935,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=project_id,
                 name=name,
                 description=description,
+                queue_type=queue_type,
                 scorer_refs=scorer_refs,
                 created_at=created_at_with_tz,
                 created_by=created_by,
@@ -2958,6 +2968,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=row["project_id"],
             name=row["name"],
             description=row["description"],
+            queue_type=row["queue_type"],
             scorer_refs=row["scorer_refs"],
             created_at=ensure_datetimes_have_tz(row["created_at"]),
             created_by=row["created_by"],
@@ -3012,6 +3023,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=row["project_id"],
                 name=row["name"],
                 description=row["description"],
+                queue_type=row["queue_type"],
                 scorer_refs=row["scorer_refs"],
                 created_at=ensure_datetimes_have_tz(row["created_at"]),
                 created_by=row["created_by"],
@@ -3054,6 +3066,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=row["project_id"],
             name=name,
             description=description,
+            queue_type=row["queue_type"],
             scorer_refs=scorer_refs,
             created_at=ensure_datetimes_have_tz(row["created_at"]),
             created_by=row["created_by"],
@@ -3109,6 +3122,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=row["project_id"],
             name=row["name"],
             description=row["description"],
+            queue_type=row["queue_type"],
             scorer_refs=row["scorer_refs"],
             created_at=ensure_datetimes_have_tz(row["created_at"]),
             created_by=row["created_by"],
@@ -3216,6 +3230,208 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             added_count=len(calls_data), duplicates=len(existing_call_ids)
         )
 
+    @tag_db_insert_path("annotation_queue_add_spans")
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.annotation_queue_add_spans"
+    )
+    def annotation_queue_add_spans(
+        self, req: tsi.AnnotationQueueAddSpansReq
+    ) -> tsi.AnnotationQueueAddSpansRes:
+        """Add spans to an annotation queue in batch with duplicate prevention."""
+        assert_non_null_wb_user_id(req)
+
+        # Build list of (trace_id, span_id) tuples
+        span_refs = [(ref.trace_id, ref.span_id) for ref in req.span_refs]
+
+        if not span_refs:
+            return tsi.AnnotationQueueAddSpansRes(added_count=0, duplicates=0)
+
+        # Step 1: Check for existing spans (duplicate prevention)
+        pb = ParamBuilder()
+        dup_query = make_queue_add_spans_check_duplicates_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            span_refs=span_refs,
+            pb=pb,
+        )
+
+        dup_result = self._query(dup_query, parameters=pb.get_params())
+        existing_refs = {
+            (row[0], row[1]) for row in dup_result.result_rows
+        }
+        new_refs = [ref for ref in span_refs if ref not in existing_refs]
+
+        if not new_refs:
+            return tsi.AnnotationQueueAddSpansRes(
+                added_count=0, duplicates=len(span_refs)
+            )
+
+        # Step 2: Fetch span details for caching
+        pb2 = ParamBuilder()
+        spans_query = make_queue_add_spans_fetch_spans_query(
+            project_id=req.project_id,
+            span_refs=new_refs,
+            pb=pb2,
+        )
+
+        spans_result = self._query(spans_query, parameters=pb2.get_params())
+        spans_data = list(spans_result.named_results())
+
+        if not spans_data:
+            return tsi.AnnotationQueueAddSpansRes(
+                added_count=0, duplicates=len(existing_refs)
+            )
+
+        # Step 3: Create queue items
+        queue_items_rows = []
+        added_by = req.wb_user_id
+
+        for span in spans_data:
+            queue_item_id = generate_id()
+            queue_items_rows.append(
+                (
+                    queue_item_id,
+                    req.project_id,
+                    req.queue_id,
+                    span["trace_id"],
+                    span["span_id"],
+                    span["started_at"],
+                    span["ended_at"],
+                    span["operation_name"] or "",
+                    span["agent_name"] or "",
+                    span["provider_name"] or "",
+                    span["request_model"] or "",
+                    span["status_code"] or "UNSET",
+                    span["input_tokens"] or 0,
+                    span["output_tokens"] or 0,
+                    span["conversation_id"] or "",
+                    req.display_mode,
+                    added_by,
+                    added_by,
+                )
+            )
+
+        # Step 4: Batch insert queue items
+        self._insert(
+            "annotation_queue_span_items",
+            queue_items_rows,
+            column_names=[
+                "id",
+                "project_id",
+                "queue_id",
+                "trace_id",
+                "span_id",
+                "started_at",
+                "ended_at",
+                "operation_name",
+                "agent_name",
+                "provider_name",
+                "request_model",
+                "status_code",
+                "input_tokens",
+                "output_tokens",
+                "conversation_id",
+                "display_mode",
+                "added_by",
+                "created_by",
+            ],
+        )
+
+        return tsi.AnnotationQueueAddSpansRes(
+            added_count=len(spans_data), duplicates=len(existing_refs)
+        )
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.annotation_queue_span_items_query"
+    )
+    def annotation_queue_span_items_query(
+        self, req: tsi.AnnotationQueueSpanItemsQueryReq
+    ) -> tsi.AnnotationQueueSpanItemsQueryRes:
+        """Query span items in an annotation queue with pagination, sorting, and filtering."""
+        pb = ParamBuilder()
+
+        query = make_queue_span_items_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+            filter=req.filter,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+            include_position=req.include_position,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        items = []
+        for row in result.named_results():
+            items.append(
+                tsi.AnnotationQueueSpanItemSchema(
+                    id=row["id"],
+                    project_id=row["project_id"],
+                    queue_id=row["queue_id"],
+                    trace_id=row["trace_id"],
+                    span_id=row["span_id"],
+                    started_at=row["started_at"],
+                    ended_at=row["ended_at"],
+                    operation_name=row["operation_name"],
+                    agent_name=row["agent_name"],
+                    provider_name=row["provider_name"],
+                    request_model=row["request_model"],
+                    status_code=row["status_code"],
+                    input_tokens=row["input_tokens"],
+                    output_tokens=row["output_tokens"],
+                    conversation_id=row["conversation_id"],
+                    display_mode=row["display_mode"],
+                    added_by=row["added_by"],
+                    annotation_state=row["annotation_state"],
+                    created_at=row["created_at"],
+                    created_by=row["created_by"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                    position_in_queue=row.get("position_in_queue"),
+                    annotator_user_id=row.get("annotator_user_id"),
+                )
+            )
+
+        return tsi.AnnotationQueueSpanItemsQueryRes(items=items)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.annotation_queue_span_item_chat"
+    )
+    def annotation_queue_span_item_chat(
+        self, req: tsi.AnnotationQueueSpanItemChatReq
+    ) -> tsi.AnnotationQueueSpanItemChatRes:
+        """Get the chat view for a span queue item by looking up its trace_id."""
+        from weave.trace_server.agents.types import AgentTraceChatReq
+
+        # Fetch the span item to get the trace_id
+        pb = ParamBuilder()
+        existence_query = make_queue_span_item_existence_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            queue_item_id=req.item_id,
+            pb=pb,
+        )
+        result = self.ch_client.query(existence_query, parameters=pb.get_params())
+        rows = list(result.named_results())
+        if not rows:
+            raise NotFoundError(
+                f"Span queue item '{req.item_id}' not found in queue '{req.queue_id}'"
+            )
+
+        trace_id = rows[0]["trace_id"]
+
+        # Delegate to the existing agent chat view
+        chat_req = AgentTraceChatReq(
+            project_id=req.project_id,
+            trace_id=trace_id,
+            include_feedback=req.include_feedback,
+        )
+        chat_res = self.agent_traces_chat(chat_req)
+
+        return tsi.AnnotationQueueSpanItemChatRes(chat=chat_res)
+
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.annotation_queue_items_query"
     )
@@ -3300,7 +3516,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _fetch_queue_item_for_progress_update(
         self, project_id: str, queue_id: str, item_id: str
     ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
-        """Fetch a queue item and return it wrapped in progress update response."""
+        """Fetch a queue item and return it wrapped in progress update response.
+
+        Checks call items table first, then falls back to span items table.
+        """
+        # Try call items table first
         pb = ParamBuilder()
         fetch_query = make_queue_items_query(
             project_id=project_id,
@@ -3325,6 +3545,46 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 call_op_name=row["call_op_name"],
                 call_trace_id=row["call_trace_id"],
                 display_fields=row["display_fields"],
+                added_by=row["added_by"],
+                annotation_state=row["annotation_state"],
+                created_at=row["created_at"],
+                created_by=row["created_by"],
+                updated_at=row["updated_at"],
+                deleted_at=row["deleted_at"],
+                position_in_queue=None,
+                annotator_user_id=row.get("annotator_user_id"),
+            )
+            return tsi.AnnotatorQueueItemsProgressUpdateRes(item=item)
+
+        # Fall back to span items table
+        pb2 = ParamBuilder()
+        span_fetch_query = make_queue_span_items_query(
+            project_id=project_id,
+            queue_id=queue_id,
+            pb=pb2,
+            filter=AnnotationQueueSpanItemsFilter(id=item_id),
+            sort_by=None,
+            limit=1,
+            offset=None,
+            include_position=False,
+        )
+        span_fetch_result = self.ch_client.query(
+            span_fetch_query, parameters=pb2.get_params()
+        )
+
+        for row in span_fetch_result.named_results():
+            # Return a call item schema with span data mapped to call fields
+            # for backward compatibility with the progress update response
+            item = tsi.AnnotationQueueItemSchema(
+                id=row["id"],
+                project_id=row["project_id"],
+                queue_id=row["queue_id"],
+                call_id=row["span_id"],
+                call_started_at=row["started_at"],
+                call_ended_at=row["ended_at"],
+                call_op_name=row["operation_name"],
+                call_trace_id=row["trace_id"],
+                display_fields=[],
                 added_by=row["added_by"],
                 annotation_state=row["annotation_state"],
                 created_at=row["created_at"],
@@ -3409,7 +3669,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"Only transitions from 'in_progress' or 'unstarted' are allowed."
             )
 
-        # Also verify the queue item exists in annotation_queue_items
+        # Verify the queue item exists in either call items or span items table
         existence_pb = ParamBuilder()
         item_check_query = make_queue_item_existence_query(
             project_id=req.project_id,
@@ -3421,9 +3681,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             item_check_query, parameters=existence_pb.get_params()
         )
         if not list(item_check_result.named_results()):
-            raise ValueError(
-                f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
+            # Try span items table
+            span_existence_pb = ParamBuilder()
+            span_item_check_query = make_queue_span_item_existence_query(
+                project_id=req.project_id,
+                queue_id=req.queue_id,
+                queue_item_id=req.item_id,
+                pb=span_existence_pb,
             )
+            span_item_check_result = self.ch_client.query(
+                span_item_check_query, parameters=span_existence_pb.get_params()
+            )
+            if not list(span_item_check_result.named_results()):
+                raise ValueError(
+                    f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
+                )
 
         if has_record:
             # Use ClickHouse lightweight UPDATE for existing record

@@ -769,6 +769,39 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
         )
 
+    def annotation_queue_add_spans(
+        self, req: tsi.AnnotationQueueAddSpansReq
+    ) -> tsi.AnnotationQueueAddSpansRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.annotation_queue_add_spans,
+            req,
+            req.project_id,
+        )
+
+    def annotation_queue_span_items_query(
+        self, req: tsi.AnnotationQueueSpanItemsQueryReq
+    ) -> tsi.AnnotationQueueSpanItemsQueryRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.annotation_queue_span_items_query,
+            req,
+            req.project_id,
+        )
+
+    def annotation_queue_span_item_chat(
+        self, req: tsi.AnnotationQueueSpanItemChatReq
+    ) -> tsi.AnnotationQueueSpanItemChatRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.annotation_queue_span_item_chat,
+            req,
+            req.project_id,
+        )
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)

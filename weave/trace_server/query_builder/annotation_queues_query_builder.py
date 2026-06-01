@@ -12,6 +12,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 )
 from weave.trace_server.common_interface import (
     AnnotationQueueItemsFilter,
+    AnnotationQueueSpanItemsFilter,
     SortBy,
 )
 from weave.trace_server.orm import ParamBuilder
@@ -28,6 +29,15 @@ VALID_QUEUE_SORT_FIELDS = {
 VALID_QUEUE_ITEM_SORT_FIELDS = {
     "call_started_at",
     "call_op_name",
+    "created_at",
+    "updated_at",
+}
+
+# Valid sort fields for annotation queue span items
+VALID_QUEUE_SPAN_ITEM_SORT_FIELDS = {
+    "started_at",
+    "operation_name",
+    "agent_name",
     "created_at",
     "updated_at",
 }
@@ -121,6 +131,7 @@ def make_queues_query(
         project_id,
         name,
         description,
+        queue_type,
         scorer_refs,
         created_at,
         created_by,
@@ -166,6 +177,7 @@ def make_queue_read_query(
         project_id,
         name,
         description,
+        queue_type,
         scorer_refs,
         created_at,
         created_by,
@@ -189,6 +201,7 @@ def make_queue_create_query(
     scorer_refs: list[str],
     created_by: str,
     pb: ParamBuilder,
+    queue_type: str = "call",
 ) -> str:
     """Generate an INSERT query to create a new annotation queue.
 
@@ -200,6 +213,7 @@ def make_queue_create_query(
         scorer_refs: Array of scorer weave refs
         created_by: W&B user ID of creator
         pb: Parameter builder for safe SQL parameter injection
+        queue_type: Type of queue ('call' or 'span')
 
     Returns:
         SQL query string for inserting a queue
@@ -210,6 +224,7 @@ def make_queue_create_query(
     description_param = pb.add_param(description)
     scorer_refs_param = pb.add_param(scorer_refs)
     created_by_param = pb.add_param(created_by)
+    queue_type_param = pb.add_param(queue_type)
 
     query = f"""
     INSERT INTO annotation_queues (
@@ -217,6 +232,7 @@ def make_queue_create_query(
         project_id,
         name,
         description,
+        queue_type,
         scorer_refs,
         created_by
     ) VALUES (
@@ -224,6 +240,7 @@ def make_queue_create_query(
         {{{project_id_param}: String}},
         {{{name_param}: String}},
         {{{description_param}: Nullable(String)}},
+        {{{queue_type_param}: String}},
         {{{scorer_refs_param}: Array(String)}},
         {{{created_by_param}: String}}
     )
@@ -452,15 +469,26 @@ def make_queues_stats_query(
 
     # Using LEFT JOIN to get stats for queues even if they have no items or progress
     # Only count items where annotation_state is 'completed' or 'skipped', not 'in_progress' or 'unstarted'
+    # UNION both call and span items tables so stats work for both queue types
     query = f"""
-    WITH total_items_per_queue AS (
-        SELECT
-            queue_id,
-            count(*) as total_items
+    WITH all_items AS (
+        SELECT queue_id, id as item_id
         FROM annotation_queue_items
         WHERE project_id = {{{project_id_param}: String}}
             AND queue_id IN {{{queue_ids_param}: Array(String)}}
             AND deleted_at IS NULL
+        UNION ALL
+        SELECT queue_id, id as item_id
+        FROM annotation_queue_span_items
+        WHERE project_id = {{{project_id_param}: String}}
+            AND queue_id IN {{{queue_ids_param}: Array(String)}}
+            AND deleted_at IS NULL
+    ),
+    total_items_per_queue AS (
+        SELECT
+            queue_id,
+            count(*) as total_items
+        FROM all_items
         GROUP BY queue_id
     ),
     completed_items_per_queue AS (
@@ -763,4 +791,284 @@ def make_annotator_progress_insert_query(
         ({{{progress_id_param}: String}}, {{{project_id_param}: String}}, {{{queue_item_id_param}: String}},
          {{{queue_id_param}: String}}, {{{annotator_id_param}: String}}, {{{annotation_state_param}: String}},
          {{{now_param}: DateTime64(3)}}, {{{now_param}: DateTime64(3)}}, NULL)
+    """
+
+
+# =============================================================================
+# Span Queue Items queries
+# =============================================================================
+
+
+def _make_span_ref_tuples_sql(
+    span_refs: list[tuple[str, str]],
+    pb: ParamBuilder,
+) -> str:
+    """Build a SQL VALUES list for (trace_id, span_id) pairs.
+
+    Returns a subquery that produces rows of (trace_id, span_id).
+    Uses individual parameters for each value to avoid cross-product from arrayJoin.
+    """
+    if not span_refs:
+        return "SELECT '' AS t, '' AS s WHERE 0"
+
+    value_parts = []
+    for trace_id, span_id in span_refs:
+        t_param = pb.add_param(trace_id)
+        s_param = pb.add_param(span_id)
+        value_parts.append(
+            f"({{{t_param}: String}}, {{{s_param}: String}})"
+        )
+
+    values_list = ", ".join(value_parts)
+    return f"SELECT * FROM VALUES('t String, s String', {values_list})"
+
+
+def make_queue_add_spans_check_duplicates_query(
+    project_id: str,
+    queue_id: str,
+    span_refs: list[tuple[str, str]],
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query to check for existing spans in a queue (duplicate prevention).
+
+    Checks (queue_id, trace_id, span_id) uniqueness in annotation_queue_span_items.
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID (UUID as string)
+        span_refs: List of (trace_id, span_id) tuples to check
+        pb: Parameter builder for safe SQL parameter injection
+
+    Returns:
+        SQL query string to find existing (trace_id, span_id) pairs in the queue
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+    refs_subquery = _make_span_ref_tuples_sql(span_refs, pb)
+
+    return f"""
+    SELECT trace_id, span_id
+    FROM annotation_queue_span_items
+    WHERE project_id = {{{project_id_param}: String}}
+        AND queue_id = {{{queue_id_param}: String}}
+        AND (trace_id, span_id) IN (
+            {refs_subquery}
+        )
+        AND deleted_at IS NULL
+    """
+
+
+def make_queue_add_spans_fetch_spans_query(
+    project_id: str,
+    span_refs: list[tuple[str, str]],
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query to fetch span details for adding to a queue.
+
+    Fetches fields to cache in annotation_queue_span_items for performance.
+    Uses FINAL to handle ReplacingMergeTree deduplication.
+
+    Args:
+        project_id: The project ID
+        span_refs: List of (trace_id, span_id) tuples to fetch
+        pb: Parameter builder for safe SQL parameter injection
+
+    Returns:
+        SQL query string to fetch span details
+    """
+    project_id_param = pb.add_param(project_id)
+    refs_subquery = _make_span_ref_tuples_sql(span_refs, pb)
+
+    return f"""
+    SELECT
+        trace_id,
+        span_id,
+        started_at,
+        ended_at,
+        operation_name,
+        agent_name,
+        provider_name,
+        request_model,
+        toString(status_code) as status_code,
+        input_tokens,
+        output_tokens,
+        conversation_id
+    FROM spans FINAL
+    WHERE project_id = {{{project_id_param}: String}}
+        AND (trace_id, span_id) IN (
+            {refs_subquery}
+        )
+    """
+
+
+def make_queue_span_items_query(
+    project_id: str,
+    queue_id: str,
+    pb: ParamBuilder,
+    *,
+    filter: AnnotationQueueSpanItemsFilter | None = None,
+    sort_by: list[SortBy] | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    include_position: bool = False,
+) -> str:
+    """Generate a query to fetch span items in an annotation queue.
+
+    Joins with annotator_queue_items_progress to include annotation state.
+    Mirrors make_queue_items_query but for the span items table.
+
+    Args:
+        project_id: The project ID to filter by
+        queue_id: The queue ID to filter by
+        pb: Parameter builder for safe SQL parameter injection
+        filter: Optional filter for span metadata and annotation state
+        sort_by: Optional list of sort specifications
+        limit: Maximum number of items to return
+        offset: Number of items to skip
+        include_position: If True, include position_in_queue field
+
+    Returns:
+        SQL query string for span queue items query
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+
+    where_clauses = [
+        f"qi.project_id = {{{project_id_param}: String}}",
+        f"qi.queue_id = {{{queue_id_param}: String}}",
+        "qi.deleted_at IS NULL",
+    ]
+
+    if filter is not None:
+        if filter.id is not None:
+            param = pb.add(filter.id, None, "String")
+            where_clauses.append(f"qi.id = {param}")
+
+        if filter.span_id is not None:
+            param = pb.add(filter.span_id, None, "String")
+            where_clauses.append(f"qi.span_id = {param}")
+
+        if filter.trace_id is not None:
+            param = pb.add(filter.trace_id, None, "String")
+            where_clauses.append(f"qi.trace_id = {param}")
+
+        if filter.operation_name is not None:
+            param = pb.add(filter.operation_name, None, "String")
+            where_clauses.append(f"qi.operation_name = {param}")
+
+        if filter.agent_name is not None:
+            param = pb.add(filter.agent_name, None, "String")
+            where_clauses.append(f"qi.agent_name = {param}")
+
+        if filter.conversation_id is not None:
+            param = pb.add(filter.conversation_id, None, "String")
+            where_clauses.append(f"qi.conversation_id = {param}")
+
+        if filter.status_code is not None:
+            param = pb.add(filter.status_code, None, "String")
+            where_clauses.append(f"qi.status_code = {param}")
+
+        if filter.added_by is not None:
+            param = pb.add(filter.added_by, None, "String")
+            where_clauses.append(f"qi.added_by = {param}")
+
+    where_clause = " AND ".join(where_clauses)
+
+    sort_fields = _make_sort_clause(
+        sort_by,
+        VALID_QUEUE_SPAN_ITEM_SORT_FIELDS,
+        "created_at ASC, id ASC",
+        table_prefix="",
+    )
+
+    inner_query = f"""
+    SELECT
+        qi.id,
+        any(qi.project_id) as project_id,
+        any(qi.queue_id) as queue_id,
+        any(qi.trace_id) as trace_id,
+        any(qi.span_id) as span_id,
+        any(qi.started_at) as started_at,
+        any(qi.ended_at) as ended_at,
+        any(qi.operation_name) as operation_name,
+        any(qi.agent_name) as agent_name,
+        any(qi.provider_name) as provider_name,
+        any(qi.request_model) as request_model,
+        any(qi.status_code) as status_code,
+        any(qi.input_tokens) as input_tokens,
+        any(qi.output_tokens) as output_tokens,
+        any(qi.conversation_id) as conversation_id,
+        any(toString(qi.display_mode)) as display_mode,
+        any(qi.added_by) as added_by,
+        any(qi.created_at) as created_at,
+        any(qi.created_by) as created_by,
+        any(qi.updated_at) as updated_at,
+        any(qi.deleted_at) as deleted_at,
+        toString(argMax(p.annotation_state, p.updated_at)) as annotation_state,
+        argMax(p.annotator_id, p.updated_at) as annotator_user_id
+    FROM annotation_queue_span_items qi
+    LEFT JOIN annotator_queue_items_progress p
+        ON p.queue_item_id = qi.id
+        AND p.project_id = qi.project_id
+        AND p.deleted_at IS NULL
+    WHERE {where_clause}
+    GROUP BY qi.id
+    """
+
+    if include_position:
+        inner_query = f"""
+        SELECT
+            *,
+            ROW_NUMBER() OVER (ORDER BY {sort_fields}) as position_in_queue
+        FROM (
+            {inner_query}
+        )
+        """
+
+    if (
+        filter is not None
+        and filter.annotation_states is not None
+        and len(filter.annotation_states) > 0
+    ):
+        param = pb.add(filter.annotation_states, None, "Array(String)")
+        sql_query = f"""
+        SELECT * FROM (
+            {inner_query}
+        )
+        WHERE annotation_state IN {param}
+        ORDER BY {sort_fields}
+        """
+    else:
+        sql_query = f"{inner_query}\nORDER BY {sort_fields}"
+
+    if limit is not None:
+        limit_param = pb.add_param(limit)
+        sql_query += f" LIMIT {{{limit_param}: Int64}}"
+
+    if offset is not None:
+        offset_param = pb.add_param(offset)
+        sql_query += f" OFFSET {{{offset_param}: Int64}}"
+
+    return sql_query
+
+
+def make_queue_span_item_existence_query(
+    project_id: str,
+    queue_id: str,
+    queue_item_id: str,
+    pb: ParamBuilder,
+) -> str:
+    """Generate a SELECT query to verify a span queue item exists."""
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+    queue_item_id_param = pb.add_param(queue_item_id)
+
+    return f"""
+    SELECT id, trace_id
+    FROM annotation_queue_span_items
+    WHERE id = {{{queue_item_id_param}: String}}
+      AND project_id = {{{project_id_param}: String}}
+      AND queue_id = {{{queue_id_param}: String}}
+      AND deleted_at IS NULL
+    LIMIT 1
     """

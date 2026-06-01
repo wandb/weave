@@ -30,6 +30,8 @@ class SortBy(BaseModelStrict):
 
 AnnotationState = Literal["unstarted", "in_progress", "completed", "skipped"]
 
+QueueType = Literal["call", "span"]
+
 
 class AnnotationQueueItemsFilter(BaseModel):
     """Simple filter for annotation queue items.
@@ -47,6 +49,37 @@ class AnnotationQueueItemsFilter(BaseModel):
     )
     added_by: str | None = Field(
         default=None, description="Filter by W&B user ID who added the call"
+    )
+    annotation_states: list[AnnotationState] | None = Field(
+        default=None,
+        description="Filter by annotation states (unstarted, in_progress, completed, skipped)",
+        examples=[["unstarted", "in_progress"]],
+    )
+
+
+class AnnotationQueueSpanItemsFilter(BaseModel):
+    """Simple filter for annotation queue span items.
+
+    Supports equality filtering on span metadata fields and IN filtering on annotation state.
+    """
+
+    id: str | None = Field(default=None, description="Filter by exact queue item ID")
+    span_id: str | None = Field(default=None, description="Filter by exact span ID")
+    trace_id: str | None = Field(default=None, description="Filter by exact trace ID")
+    operation_name: str | None = Field(
+        default=None, description="Filter by exact operation name"
+    )
+    agent_name: str | None = Field(
+        default=None, description="Filter by exact agent name"
+    )
+    conversation_id: str | None = Field(
+        default=None, description="Filter by exact conversation ID"
+    )
+    status_code: str | None = Field(
+        default=None, description="Filter by status code (UNSET, OK, ERROR)"
+    )
+    added_by: str | None = Field(
+        default=None, description="Filter by W&B user ID who added the span"
     )
     annotation_states: list[AnnotationState] | None = Field(
         default=None,

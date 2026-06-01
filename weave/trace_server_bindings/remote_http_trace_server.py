@@ -1159,6 +1159,53 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.AnnotatorQueueItemsProgressUpdateRes,
         )
 
+    def annotation_queue_add_spans(
+        self, req: tsi.AnnotationQueueAddSpansReq
+    ) -> tsi.AnnotationQueueAddSpansRes:
+        body = his.AnnotationQueueAddSpansBody(
+            project_id=req.project_id,
+            span_refs=req.span_refs,
+            display_mode=req.display_mode,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}/span_items",
+            body,
+            his.AnnotationQueueAddSpansBody,
+            tsi.AnnotationQueueAddSpansRes,
+        )
+
+    def annotation_queue_span_items_query(
+        self, req: tsi.AnnotationQueueSpanItemsQueryReq
+    ) -> tsi.AnnotationQueueSpanItemsQueryRes:
+        body = his.AnnotationQueueSpanItemsQueryBody(
+            project_id=req.project_id,
+            filter=req.filter,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+            include_position=req.include_position,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}/span_items/query",
+            body,
+            his.AnnotationQueueSpanItemsQueryBody,
+            tsi.AnnotationQueueSpanItemsQueryRes,
+        )
+
+    def annotation_queue_span_item_chat(
+        self, req: tsi.AnnotationQueueSpanItemChatReq
+    ) -> tsi.AnnotationQueueSpanItemChatRes:
+        body = his.AnnotationQueueSpanItemChatBody(
+            project_id=req.project_id,
+            include_feedback=req.include_feedback,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}/span_items/{req.item_id}/chat",
+            body,
+            his.AnnotationQueueSpanItemChatBody,
+            tsi.AnnotationQueueSpanItemChatRes,
+        )
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         raise NotImplementedError("evaluate_model is not implemented")
 
