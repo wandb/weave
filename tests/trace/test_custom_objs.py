@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
 import rich.markdown
 from PIL import Image
 
@@ -9,6 +10,7 @@ import weave
 from tests.trace.test_utils import FailingSaveType
 from weave.trace.serialization.custom_objs import (
     KNOWN_TYPES,
+    UnsafeDeserializationError,
     decode_custom_obj,
     encode_custom_obj,
 )
@@ -64,16 +66,16 @@ def test_inline_custom_obj_needs_load_op(client):
     _, call = return_markdown.call(md)
     client.flush()
 
-    # Temporarily modify KNOWN_TYPES to remove markdown
-    global KNOWN_TYPES  # noqa: PLW0603
-    original_known_types = KNOWN_TYPES.copy()
+    # Drop markdown from the shared KNOWN_TYPES so decode must fall back to the saved
+    # load op. Mutate-and-restore the same set object; rebinding the name would leak
+    # the removal into later tests.
     KNOWN_TYPES.remove("rich.markdown.Markdown")
     try:
         loaded = client.get_call(call.id)
         loaded_markdown = loaded.inputs["md"]
         assert isinstance(loaded_markdown, rich.markdown.Markdown)
     finally:
-        KNOWN_TYPES = original_known_types
+        KNOWN_TYPES.add("rich.markdown.Markdown")
 
 
 def test_no_extra_calls_created(client):
@@ -93,6 +95,46 @@ def test_no_extra_calls_created(client):
     # due to deserializing a custom object
     calls = client.get_calls()
     assert len(calls) == 1
+
+
+def test_safe_type_decodes_when_unsafe_decode_disabled(client):
+    # Data-only types must still decode on a worker client that forbids unsafe decode:
+    # they reconstruct via the in-process serializer and run no user code. Breaking
+    # this would break evals on multimodal (image/audio) datasets.
+    img = Image.new("RGB", (32, 32))
+    encoded = encode_custom_obj(img)
+    assert encoded["weave_type"]["type"] == "PIL.Image.Image"
+
+    client.allow_unsafe_custom_obj_decode = False
+    decoded = decode_custom_obj(encoded)
+    assert isinstance(decoded, Image.Image)
+    assert decoded.tobytes() == img.tobytes()
+
+
+@pytest.mark.parametrize(
+    "encoded",
+    [
+        # "Op" loads user code via its own registered serializer -> refused by type.
+        {
+            "_type": "CustomWeaveType",
+            "weave_type": {"type": "Op"},
+            "files": {"obj.py": b"print('hi')"},
+            "load_op": None,
+        },
+        # A forged payload names a safe type but ships bytes its serializer can't load,
+        # so decode would fall back to the packaged op -> that fallback must be refused.
+        {
+            "_type": "CustomWeaveType",
+            "weave_type": {"type": "PIL.Image.Image"},
+            "files": {"image.png": b"not a real image"},
+            "load_op": "weave:///e/p/op/evil:abc123",
+        },
+    ],
+)
+def test_unsafe_decode_disabled_refuses_code_bearing(client, encoded):
+    client.allow_unsafe_custom_obj_decode = False
+    with pytest.raises(UnsafeDeserializationError):
+        decode_custom_obj(encoded)
 
 
 def test_encode_custom_obj_save_exception_returns_none(client, failing_serializer):

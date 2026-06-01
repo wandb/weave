@@ -71,12 +71,13 @@ KNOWN_TYPES = {
 # The one type whose serializer loads code (imports a user-uploaded `.py`).
 OP_CUSTOM_WEAVE_TYPE = "Op"
 
-# Custom types whose registered serializer only reconstructs data (images, audio,
-# etc.). Everything else -- "Op" and any unknown type -- routes through a
-# code-loading path in `_decode_custom_obj`, so a client that forbids unsafe
-# decode (server-side workers) refuses them. Kept in sync with KNOWN_TYPES minus
-# "Op" by `test_safe_custom_weave_types_in_sync`; a new KNOWN_TYPE fails that test
-# until it is consciously classified here.
+# Custom types whose registered serializer reconstructs data only (images, audio,
+# etc.) using code already in this process -- no user-uploaded code runs. "Op" and
+# any unknown type instead load and run a user `.py`, so a client that forbids unsafe
+# decode (server-side workers) refuses them; the packaged `load_op` fallback is
+# blocked separately in `_decode_custom_obj`. Kept in sync with KNOWN_TYPES minus
+# `OP_CUSTOM_WEAVE_TYPE` by `test_safe_custom_weave_types_in_sync`; a new KNOWN_TYPE
+# fails that test until it is consciously classified here.
 SAFE_CUSTOM_WEAVE_TYPES = frozenset(
     {
         "PIL.Image.Image",
@@ -96,19 +97,15 @@ class UnsafeDeserializationError(Exception):
     """
 
 
-def is_safe_to_decode(
-    weave_type_id: str, load_op_uri: str | None, *, allow_unsafe: bool
-) -> bool:
+def is_safe_to_decode(weave_type_id: str, *, allow_unsafe: bool) -> bool:
     """Whether reconstructing this custom type is permitted.
 
     `allow_unsafe` is the active client's policy. When False (server-side workers)
-    only registered data-only serializers with no `load_op` may be reconstructed;
-    a non-null `load_op` runs via the fallback path even for known types, so it is
-    never safe.
+    only data-only types decode, via their in-process serializer. `Op` and unknown
+    types load and run user-uploaded code, so they are refused here; the packaged
+    `load_op` fallback is blocked separately in `_decode_custom_obj`.
     """
-    if allow_unsafe:
-        return True
-    return weave_type_id in SAFE_CUSTOM_WEAVE_TYPES and load_op_uri is None
+    return allow_unsafe or weave_type_id in SAFE_CUSTOM_WEAVE_TYPES
 
 
 def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
@@ -239,9 +236,20 @@ def _decode_custom_obj(
 ) -> Any:
     type_ = weave_type["type"]
 
+    # Decode policy lives on the process-global client (`get_weave_client`); workers
+    # flip it off there and this guard -- including dataset rows decoded in worker
+    # threads -- reads it back. If client lookup becomes context-local, re-plumb this
+    # or it fails open in those threads.
     client = get_weave_client()
-    allow_unsafe = client is None or client.allow_unsafe_custom_obj_decode
-    if not is_safe_to_decode(type_, load_instance_op_uri, allow_unsafe=allow_unsafe):
+    # No client -> no policy in effect; fail closed (data-only types still decode below).
+    allow_unsafe = client is not None and client.allow_unsafe_custom_obj_decode
+    if not is_safe_to_decode(type_, allow_unsafe=allow_unsafe):
+        if client is None:
+            logger.warning(
+                "Refusing to decode code-bearing custom object `%s`: no active Weave "
+                "client, so no decode policy is set. Call `weave.init()` to permit it.",
+                type_,
+            )
         raise UnsafeDeserializationError(
             f"Refusing to reconstruct custom object of type `{type_}`: the active "
             f"client does not allow deserializing code-bearing custom objects."
@@ -267,6 +275,15 @@ def _decode_custom_obj(
     if not found_serializer:
         if load_instance_op_uri is None:
             raise ValueError(f"No serializer found for `{type_}`")
+
+        # The fallback runs a user-uploaded op. A forged payload reaches here by naming
+        # a safe type whose data serializer then fails on bad bytes, so the decode
+        # policy must cover this path too, not just the type check above.
+        if not allow_unsafe:
+            raise UnsafeDeserializationError(
+                f"Refusing to load the packaged op needed to decode `{type_}`: the "
+                f"active client does not allow deserializing code-bearing custom objects."
+            )
 
         obj_ref = ObjectRef.parse_uri(load_instance_op_uri)
         wc = require_weave_client()

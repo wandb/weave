@@ -2,6 +2,7 @@ import pytest
 
 from weave.trace.serialization.custom_objs import (
     KNOWN_TYPES,
+    OP_CUSTOM_WEAVE_TYPE,
     SAFE_CUSTOM_WEAVE_TYPES,
     is_safe_to_decode,
 )
@@ -11,29 +12,30 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 
 
 @pytest.mark.parametrize(
-    ("type_id", "load_op", "allow_unsafe", "expected"),
+    ("type_id", "allow_unsafe", "expected"),
     [
         # allow_unsafe (normal client) -> anything decodes.
-        ("Op", None, True, True),
-        ("TotallyMadeUp", None, True, True),
-        # Worker client (allow_unsafe=False): only data-only serializers, no load_op.
-        ("Op", None, False, False),
-        ("TotallyMadeUp", None, False, False),
-        ("PIL.Image.Image", None, False, True),
-        ("weave.type_wrappers.Content.content.Content", None, False, True),
-        # A load_op routes through the fallback code path even for known types.
-        ("PIL.Image.Image", "weave:///e/p/op/x:1", False, False),
+        ("Op", True, True),
+        ("TotallyMadeUp", True, True),
+        # Worker client (allow_unsafe=False): data-only types decode via their
+        # in-process serializer; code-loading ("Op") and unknown types are refused.
+        # The packaged load_op fallback is blocked separately in _decode_custom_obj
+        # (see test_decode_custom_obj_* in tests/trace/test_custom_objs.py).
+        ("Op", False, False),
+        ("TotallyMadeUp", False, False),
+        ("PIL.Image.Image", False, True),
+        ("weave.type_wrappers.Content.content.Content", False, True),
     ],
 )
-def test_is_safe_to_decode(type_id, load_op, allow_unsafe, expected):
-    assert is_safe_to_decode(type_id, load_op, allow_unsafe=allow_unsafe) is expected
+def test_is_safe_to_decode(type_id, allow_unsafe, expected):
+    assert is_safe_to_decode(type_id, allow_unsafe=allow_unsafe) is expected
 
 
 def test_safe_custom_weave_types_in_sync():
-    # Every known custom type must be classified: safe data-only serializers go in
-    # SAFE_CUSTOM_WEAVE_TYPES, and "Op" is the lone code-loading type. A newly
-    # added KNOWN_TYPE fails here until it is consciously placed on one side.
-    assert SAFE_CUSTOM_WEAVE_TYPES | {"Op"} == set(KNOWN_TYPES)
+    # Every known custom type must be classified: data-only serializers go in
+    # SAFE_CUSTOM_WEAVE_TYPES, and OP_CUSTOM_WEAVE_TYPE is the lone code-loading type.
+    # A newly added KNOWN_TYPE fails here until it is consciously placed on one side.
+    assert SAFE_CUSTOM_WEAVE_TYPES | {OP_CUSTOM_WEAVE_TYPE} == set(KNOWN_TYPES)
 
 
 def test_assert_object_ref_rejects_op_and_non_object_refs():
