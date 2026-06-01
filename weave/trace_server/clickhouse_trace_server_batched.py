@@ -226,6 +226,10 @@ from weave.trace_server.model_providers.model_providers import (
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.parallel_bucket_uploads import (
+    BucketUploadBatch,
+    file_chunks_for,
+)
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
@@ -400,7 +404,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def __del__(self) -> None:
         """Flush batches and the Kafka producer on cleanup."""
-        if self._call_batch or self._calls_complete_batch or self._file_batch:
+        if (
+            self._call_batch
+            or self._calls_complete_batch
+            or self._file_batch
+            or self._bucket_uploads
+        ):
             try:
                 self._flush_all_batches_in_order()
             except Exception:
@@ -409,6 +418,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._file_batch = []
                 self._call_batch = []
                 self._calls_complete_batch = []
+                self._bucket_uploads = BucketUploadBatch()
                 self._flush_immediately = True
 
         # Always drain remaining kafka messages at shutdown.
@@ -447,6 +457,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_file_batch.setter
     def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None:
         self._thread_local.file_batch = value
+
+    @property
+    def _bucket_uploads(self) -> BucketUploadBatch:
+        if not hasattr(self._thread_local, "bucket_uploads"):
+            self._thread_local.bucket_uploads = BucketUploadBatch()
+        return self._thread_local.bucket_uploads
+
+    @_bucket_uploads.setter
+    def _bucket_uploads(self, value: BucketUploadBatch) -> None:
+        self._thread_local.bucket_uploads = value
 
     @property
     def _calls_complete_batch(self) -> list[list[Any]]:
@@ -817,18 +837,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._file_batch = []
             self._call_batch = []
             self._calls_complete_batch = []
+            self._bucket_uploads = BucketUploadBatch()
             self._flush_immediately = True
 
     def _flush_all_batches_in_order(self) -> None:
         """Flush all batches in order of dependency.
-        1. File chunks, if this fails, we raise so that we don't insert calls that
+        1. Bucket uploads, fanned out in parallel. Resulting chunks join
+           _file_batch before the file_chunks insert so URIs are persisted
+           atomically with any inline-CH chunks accumulated alongside.
+        2. File chunks, if this fails, we raise so that we don't insert calls that
            are missing file data. Forces retry.
-        2. Calls, if this fails, we raise so that clients can retry, and so we don't
+        3. Calls, if this fails, we raise so that clients can retry, and so we don't
            continue and push bad ids to the queue.
-        3. Produce to kafka, if this fails, we don't raise because all of the data
+        4. Produce to kafka, if this fails, we don't raise because all of the data
            is already in the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
+        # Raises on fail
+        try:
+            self._file_batch.extend(
+                self._bucket_uploads.flush(self.file_storage_client)
+            )
+        except Exception:
+            logger.exception("Failed to flush bucket uploads")
+            raise
+
         # Raises on fail
         try:
             self._flush_file_chunks()
@@ -5855,6 +5888,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for c in self._file_batch
         ):
             return tsi.FileCreateRes(digest=digest)
+        # Same dedup, but for bucket uploads staged in this batch but not yet
+        # flushed into _file_batch.
+        if self._bucket_uploads.has(req.project_id, digest):
+            return tsi.FileCreateRes(digest=digest)
 
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
@@ -5872,30 +5909,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
-        chunks = [
-            req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
-            for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
-        ]
-        self._insert_file_chunks(
-            [
-                FileChunkCreateCHInsertable(
-                    project_id=req.project_id,
-                    digest=digest,
-                    chunk_index=i,
-                    n_chunks=len(chunks),
-                    name=req.name,
-                    val_bytes=chunk,
-                    bytes_stored=len(chunk),
-                    file_storage_uri=None,
-                )
-                for i, chunk in enumerate(chunks)
-            ]
-        )
+        self._insert_file_chunks(file_chunks_for(req, digest))
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
+        if not self._flush_immediately:
+            # Inside call_batch(): stage for the parallel flush at the end so
+            # an N-attachment batch pays one fan-out round-trip instead of N.
+            # Per-file FileStorageWriteError fallback to inline-CH chunks is
+            # handled inside _upload_one, not by the caller's except arm; root-
+            # span attribution is deferred to bucket_upload_batch.flush so the
+            # tag matches where the bytes actually land.
+            self._bucket_uploads.stage(req, digest)
+            return
         set_root_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
@@ -6134,7 +6162,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
-            query_result.result_rows, prepared.fields
+            query_result.result_rows, prepared.fields, database_type="clickhouse"
         )
         return tsi.CostQueryRes(results=results)
 
@@ -6224,8 +6252,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
-            query_result.result_rows, prepared.fields
+            query_result.result_rows, prepared.fields, database_type="clickhouse"
         )
+        # Make `created_at` tz-aware (otherwise the client will assume local time)
+        for row in result:
+            if "created_at" in row and isinstance(row["created_at"], datetime.datetime):
+                row["created_at"] = ensure_datetimes_have_tz(row["created_at"])
         return tsi.FeedbackQueryRes(result=result)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
@@ -6242,7 +6274,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
-        # To replace, first purge, then if successful, create.
+        # Validate the replacement payload before purging — if validation
+        # rejects we want the old row preserved, not destroyed. This duplicates
+        # the validation that feedback_create() runs internally (one extra
+        # ref-lookup network call on annotation/agent-monitor paths), which is
+        # acceptable to preserve the no-data-loss guarantee on replace.
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        validate_feedback_create_req(create_req, self)
         query = tsi.Query(
             **{
                 "$expr": {
@@ -6258,7 +6296,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             query=query,
         )
         self.feedback_purge(purge_request)
-        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
         create_result = self.feedback_create(create_req)
         return tsi.FeedbackReplaceRes(
             id=create_result.id,

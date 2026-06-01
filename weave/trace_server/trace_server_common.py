@@ -24,6 +24,12 @@ FEEDBACK_QUERY_FIELDS = [
     "call_ref",
     "trigger_ref",
     "annotation_ref",
+    "scorer_tags",
+    "scorer_tag_reasons",
+    "scorer_tag_confidences",
+    "scorer_ratings",
+    "scorer_rating_reasons",
+    "scorer_rating_confidences",
 ]
 
 

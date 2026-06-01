@@ -18,8 +18,11 @@ from weave.trace_server.validation import assert_safe_payload
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
-# Re-export EvaluateModelArgs for backwards compatibility — callers that import it
-# from this module (e.g. evaluate_model_dispatcher.py in weave-trace) still work.
+# Re-exported for backward compatibility with downstream callers (e.g. the
+# Kafka dispatcher in services/weave-trace) that historically imported
+# EvaluateModelArgs from this module. The canonical definition now lives in
+# trace_server_interface alongside RescoringArgs so both job types can share
+# the EvalWorkerJob discriminated union.
 __all__ = ["EvaluateModelArgs", "EvaluateModelDispatcher", "evaluate_model"]
 
 
