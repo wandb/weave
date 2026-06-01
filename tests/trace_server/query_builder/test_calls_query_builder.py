@@ -4478,7 +4478,12 @@ def test_stats_query_calls_merged_started_at_fast_path_gates() -> None:
             query=_started_at_query(
                 {
                     "$and": [
-                        {"$gt": [{"$getField": "started_at"}, {"$literal": 1709251200}]},
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": 1709251200},
+                            ]
+                        },
                         {"$eq": [{"$getField": "op_name"}, {"$literal": "x"}]},
                     ]
                 }
