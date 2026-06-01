@@ -41,11 +41,11 @@ def evaluate_model(args: EvaluateModelArgs) -> None:
 def _evaluate_model(args: EvaluateModelArgs) -> None:
     client = require_weave_client()
 
-    # This worker reconstructs user-supplied objects; it must never
-    # deserialize code-bearing custom objects (Op / load_op). The decode guard
-    # in custom_objs.py enforces this for every payload, including dataset rows
-    # fetched lazily during evaluation. https://coreweave.atlassian.net/browse/WB-34909
-    client.allow_unsafe_custom_obj_decode = False
+    # This worker reconstructs user-supplied objects; it must never deserialize
+    # code-bearing custom objects (Op / load_op). The decode guard in custom_objs.py
+    # enforces this for every payload, including dataset rows fetched lazily during
+    # evaluation. https://coreweave.atlassian.net/browse/WB-34909
+    client._allow_unsafe_custom_obj_decode = False
 
     # An op ref passed as the evaluation/model ref would be loaded and run by
     # `client.get` directly, before the decode guard applies, so reject it here.

@@ -17,10 +17,9 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
         # allow_unsafe (normal client) -> anything decodes.
         ("Op", True, True),
         ("TotallyMadeUp", True, True),
-        # Worker client (allow_unsafe=False): data-only types decode via their
-        # in-process serializer; code-loading ("Op") and unknown types are refused.
-        # The packaged load_op fallback is blocked separately in _decode_custom_obj
-        # (see test_decode_custom_obj_* in tests/trace/test_custom_objs.py).
+        # Worker client (allow_unsafe=False): data-only types decode, code-loading
+        # ("Op") and unknown types are refused. The load_op fallback is gated separately
+        # (see test_unsafe_decode_disabled_refuses_code_bearing in test_custom_objs.py).
         ("Op", False, False),
         ("TotallyMadeUp", False, False),
         ("PIL.Image.Image", False, True),

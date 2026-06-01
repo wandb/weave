@@ -71,13 +71,11 @@ KNOWN_TYPES = {
 # The one type whose serializer loads code (imports a user-uploaded `.py`).
 OP_CUSTOM_WEAVE_TYPE = "Op"
 
-# Custom types whose registered serializer reconstructs data only (images, audio,
-# etc.) using code already in this process -- no user-uploaded code runs. "Op" and
-# any unknown type instead load and run a user `.py`, so a client that forbids unsafe
-# decode (server-side workers) refuses them; the packaged `load_op` fallback is
-# blocked separately in `_decode_custom_obj`. Kept in sync with KNOWN_TYPES minus
-# `OP_CUSTOM_WEAVE_TYPE` by `test_safe_custom_weave_types_in_sync`; a new KNOWN_TYPE
-# fails that test until it is consciously classified here.
+# Custom types whose serializer reconstructs data only, using code already in this
+# process. "Op" and unknown types instead load and run a user `.py`, so a client with
+# unsafe decode off (server workers) refuses them; the `load_op` fallback is gated
+# separately in `_decode_custom_obj`. Kept in sync with KNOWN_TYPES minus
+# `OP_CUSTOM_WEAVE_TYPE` by `test_safe_custom_weave_types_in_sync`.
 SAFE_CUSTOM_WEAVE_TYPES = frozenset(
     {
         "PIL.Image.Image",
@@ -236,13 +234,12 @@ def _decode_custom_obj(
 ) -> Any:
     type_ = weave_type["type"]
 
-    # Decode policy lives on the process-global client (`get_weave_client`); workers
-    # flip it off there and this guard -- including dataset rows decoded in worker
-    # threads -- reads it back. If client lookup becomes context-local, re-plumb this
-    # or it fails open in those threads.
+    # Decode policy lives on the process-global client (`get_weave_client`): workers
+    # flip it off there and this guard reads it back, even from worker decode threads.
+    # If client lookup becomes context-local, re-plumb this or it fails open there.
     client = get_weave_client()
-    # No client -> no policy in effect; fail closed (data-only types still decode below).
-    allow_unsafe = client is not None and client.allow_unsafe_custom_obj_decode
+    # No client -> no policy set; fall back to the safe default (data-only still decodes).
+    allow_unsafe = client is not None and client._allow_unsafe_custom_obj_decode
     if not is_safe_to_decode(type_, allow_unsafe=allow_unsafe):
         if client is None:
             logger.warning(
@@ -276,9 +273,9 @@ def _decode_custom_obj(
         if load_instance_op_uri is None:
             raise ValueError(f"No serializer found for `{type_}`")
 
-        # The fallback runs a user-uploaded op. A forged payload reaches here by naming
-        # a safe type whose data serializer then fails on bad bytes, so the decode
-        # policy must cover this path too, not just the type check above.
+        # The fallback runs a packaged op; with unsafe decode off we never run one. A
+        # safe type lands here only when its in-process serializer failed, so the policy
+        # gates this path too, not just the type check above.
         if not allow_unsafe:
             raise UnsafeDeserializationError(
                 f"Refusing to load the packaged op needed to decode `{type_}`: the "

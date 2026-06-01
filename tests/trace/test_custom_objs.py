@@ -105,7 +105,7 @@ def test_safe_type_decodes_when_unsafe_decode_disabled(client):
     encoded = encode_custom_obj(img)
     assert encoded["weave_type"]["type"] == "PIL.Image.Image"
 
-    client.allow_unsafe_custom_obj_decode = False
+    client._allow_unsafe_custom_obj_decode = False
     decoded = decode_custom_obj(encoded)
     assert isinstance(decoded, Image.Image)
     assert decoded.tobytes() == img.tobytes()
@@ -114,15 +114,15 @@ def test_safe_type_decodes_when_unsafe_decode_disabled(client):
 @pytest.mark.parametrize(
     "encoded",
     [
-        # "Op" loads user code via its own registered serializer -> refused by type.
+        # "Op" loads user code via its own serializer -> refused by type.
         {
             "_type": "CustomWeaveType",
             "weave_type": {"type": "Op"},
             "files": {"obj.py": b"print('hi')"},
             "load_op": None,
         },
-        # A forged payload names a safe type but ships bytes its serializer can't load,
-        # so decode would fall back to the packaged op -> that fallback must be refused.
+        # A safe type whose serializer fails falls through to the packaged op, which
+        # must be refused too.
         {
             "_type": "CustomWeaveType",
             "weave_type": {"type": "PIL.Image.Image"},
@@ -132,7 +132,7 @@ def test_safe_type_decodes_when_unsafe_decode_disabled(client):
     ],
 )
 def test_unsafe_decode_disabled_refuses_code_bearing(client, encoded):
-    client.allow_unsafe_custom_obj_decode = False
+    client._allow_unsafe_custom_obj_decode = False
     with pytest.raises(UnsafeDeserializationError):
         decode_custom_obj(encoded)
 
