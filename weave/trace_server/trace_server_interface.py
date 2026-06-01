@@ -7,7 +7,9 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    SerializationInfo,
     field_serializer,
+    model_serializer,
     model_validator,
 )
 from typing_extensions import TypedDict
@@ -1626,9 +1628,9 @@ class AnnotationQueueCreateReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     name: str = Field(examples=["Error Review Queue"])
     description: str = Field(default="", examples=["Review calls with exceptions"])
-    queue_type: QueueType = Field(
-        default="call",
-        description="Type of queue: 'call' for call-based queues, 'span' for agent span queues",
+    queue_type: QueueType | None = Field(
+        default=None,
+        description="Type of queue: 'call' for call-based queues, 'span' for agent span queues. Defaults to 'call' if not specified.",
     )
     scorer_refs: list[str] = Field(
         examples=[
@@ -1639,6 +1641,15 @@ class AnnotationQueueCreateReq(BaseModelStrict):
         ]
     )
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    @model_serializer(mode="wrap")
+    def _exclude_none_queue_type(
+        self, handler: Any, info: SerializationInfo
+    ) -> dict[str, Any]:
+        data = handler(self)
+        if self.queue_type is None:
+            data.pop("queue_type", None)
+        return data
 
 
 class AnnotationQueueCreateRes(BaseModel):

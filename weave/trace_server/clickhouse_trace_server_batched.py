@@ -2879,7 +2879,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             scorer_refs=req.scorer_refs,
             created_by=created_by,
             pb=pb,
-            queue_type=req.queue_type,
+            queue_type=req.queue_type or "call",
         )
 
         self._command(query, parameters=pb.get_params())
@@ -3239,6 +3239,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.AnnotationQueueAddSpansRes:
         """Add spans to an annotation queue in batch with duplicate prevention."""
         assert_non_null_wb_user_id(req)
+
+        # Step 0: Validate queue exists and is a span queue
+        pb_read = ParamBuilder()
+        read_query = make_queue_read_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb_read,
+        )
+        read_result = self._query(read_query, parameters=pb_read.get_params())
+        rows = list(read_result.named_results())
+        if not rows:
+            raise NotFoundError(f"Queue {req.queue_id} not found")
+        queue_type = rows[0].get("queue_type", "call")
+        if queue_type != "span":
+            raise InvalidRequest(
+                f"Cannot add spans to queue {req.queue_id}: queue type is '{queue_type}', expected 'span'"
+            )
 
         # Build list of (trace_id, span_id) tuples
         span_refs = [(ref.trace_id, ref.span_id) for ref in req.span_refs]
