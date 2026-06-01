@@ -6240,6 +6240,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = TABLE_FEEDBACK.tuples_to_rows(
             query_result.result_rows, prepared.fields, database_type="clickhouse"
         )
+        # Make `created_at` tz-aware (otherwise the client will assume local time)
+        for row in result:
+            if "created_at" in row and isinstance(row["created_at"], datetime.datetime):
+                row["created_at"] = ensure_datetimes_have_tz(row["created_at"])
         return tsi.FeedbackQueryRes(result=result)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
