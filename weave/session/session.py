@@ -222,7 +222,9 @@ def _publish_media_content(
         raise ValueError("_publish_media_content requires content or uri")
 
     ref = publish(content_obj)
-    return str(ref)
+    # Coerce to a plain ``str``: ``ref.uri`` may be a ``_CallableStr`` subclass
+    # that OTel attribute validation rejects.
+    return str(getattr(ref, "uri", ref))
 
 
 class Tool(_SpanBase):
