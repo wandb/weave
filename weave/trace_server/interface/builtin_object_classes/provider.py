@@ -1,11 +1,10 @@
-import ipaddress
 import re
-import socket
 from enum import Enum
 from urllib.parse import urlparse
 
 from pydantic import ConfigDict, Field, field_validator
 
+from weave.trace_server.helpers.url_safety import is_publicly_routable_url
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
 # Headers that must not appear in user-supplied extra_headers.
@@ -14,18 +13,6 @@ BLOCKED_HEADER_RE = re.compile(
     r"^(?:metadata-flavor"
     r"|x-aws-ec2-metadata-token(?:-ttl-seconds)?"
     r")$",
-    re.IGNORECASE,
-)
-
-# Hostnames that must not appear in user-supplied base_url values.
-# https://coreweave.atlassian.net/browse/VULNMGMT-770
-BLOCKED_HOSTNAME_RE = re.compile(
-    r"(?:^|\.)"
-    r"(?:metadata\.google\.internal"
-    r"|metadata\.goog"
-    r"|metadata\.internal"
-    r"|metadata\.azure\.com"
-    r")\.?$",
     re.IGNORECASE,
 )
 
@@ -38,41 +25,17 @@ def _validate_provider_base_url(url: str) -> str:
 
     See https://coreweave.atlassian.net/browse/VULNMGMT-770
     """
+    # urlparse silently strips a bare trailing '?', so check the raw string too.
+    if "?" in url:
+        raise ValueError(INVALID_BASE_URL_MSG)
     try:
         parsed = urlparse(url)
-    except Exception as exc:
+    except ValueError as exc:
         raise ValueError(INVALID_BASE_URL_MSG) from exc
-
-    if parsed.scheme not in {"http", "https"}:
+    if parsed.fragment:
         raise ValueError(INVALID_BASE_URL_MSG)
-
-    # urlparse silently strips a bare trailing '?', so check the raw string too.
-    if "?" in url or parsed.fragment:
+    if not is_publicly_routable_url(url):
         raise ValueError(INVALID_BASE_URL_MSG)
-
-    host = (parsed.hostname or "").lower().rstrip(".")
-    if not host:
-        raise ValueError(INVALID_BASE_URL_MSG)
-
-    if BLOCKED_HOSTNAME_RE.search(host):
-        raise ValueError(INVALID_BASE_URL_MSG)
-
-    # Reject non-globally-routable IP addresses.  socket.inet_aton handles
-    # alternative IPv4 encodings that ipaddress.ip_address does not.
-    addr = None
-    try:
-        addr = ipaddress.ip_address(host)
-    except ValueError:
-        # Not a strict IP literal — try inet_aton for alternative IPv4 forms.
-        try:
-            packed = socket.inet_aton(host)
-            addr = ipaddress.ip_address(packed)
-        except OSError:
-            pass  # Not any form of IP — hostname checks above are sufficient.
-
-    if addr is not None and not addr.is_global:
-        raise ValueError(INVALID_BASE_URL_MSG)
-
     return url
 
 

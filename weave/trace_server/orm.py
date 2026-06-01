@@ -47,7 +47,7 @@ class ParamBuilder:
         param_builder_count += 1
         self._params: dict[str, Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
-        self._database_type = database_type
+        self.database_type = database_type
         self._param_to_name: dict[Any, str] = {}
 
     def add_param(self, param_value: Any) -> str:
@@ -76,7 +76,7 @@ class ParamBuilder:
         """
         param_name = param_name or self._prefix + str(len(self._params))
         self._params[param_name] = param_value
-        if self._database_type == "clickhouse":
+        if self.database_type == "clickhouse":
             ptype = param_type or python_value_to_ch_type(param_value)
             return f"{{{param_name}:{ptype}}}"
         return ":" + param_name
@@ -97,7 +97,22 @@ ColumnType = Literal[
     "datetime",
     "json",  # Represented as string in ClickHouse
     "float",
+    # Array(String) in ClickHouse; JSON text in SQLite.
+    "array_string",
+    # Map(String, String) in ClickHouse; JSON text in SQLite.
+    "map_string_string",
+    # Map(String, Float64) in ClickHouse; JSON text in SQLite.
+    "map_string_float",
 ]
+
+# Column types that ClickHouse stores natively as Array/Map but SQLite stores
+# as JSON-encoded text. The ClickHouse driver round-trips these as native
+# Python list/dict, so coercion is only needed on the SQLite path.
+_JSON_TEXT_BACKED_COL_TYPES: set[ColumnType] = {
+    "array_string",
+    "map_string_string",
+    "map_string_float",
+}
 
 
 class Column:
@@ -144,12 +159,22 @@ class Table:
     # Fields derived from cols
     col_types: dict[str, ColumnType]
     json_cols: list[str]
+    array_string_cols: list[str]
+    map_string_cols: list[str]
+    map_float_cols: list[str]
 
     def __init__(self, name: str, cols: Columns | None = None):
         self.name = name
         self.cols = cols or []
         self.col_types = {c.name: c.type for c in self.cols}
         self.json_cols = [c.name for c in self.cols if c.type == "json"]
+        self.array_string_cols = [c.name for c in self.cols if c.type == "array_string"]
+        self.map_string_cols = [
+            c.name for c in self.cols if c.type == "map_string_string"
+        ]
+        self.map_float_cols = [
+            c.name for c in self.cols if c.type == "map_string_float"
+        ]
 
     def create_sql(self) -> str:
         sql = f"CREATE TABLE IF NOT EXISTS {self.name} (\n"
@@ -178,24 +203,41 @@ class Table:
         if database_type == "sqlite":
             return f"DELETE FROM {self.name}"
 
-    def tuple_to_row(self, tup: tuple, fields: list[str]) -> Row:
+    def tuple_to_row(
+        self,
+        tup: tuple,
+        fields: list[str],
+        database_type: DatabaseType,
+    ) -> Row:
         d = {}
         for i, field in enumerate(fields):
             normalized_field = field[:-5] if field.endswith("_dump") else field
             value = tup[i]
-            if (
-                normalized_field in self.col_types
-                and self.col_types[normalized_field] == "json"
-            ):
+            col_type = self.col_types.get(normalized_field)
+            if col_type == "json":
+                d[normalized_field] = json.loads(value)
+            elif col_type in _JSON_TEXT_BACKED_COL_TYPES and database_type == "sqlite":
+                # SQLite stores Array/Map columns as JSON text; ClickHouse
+                # returns them as native list/dict already.
+                if not isinstance(value, str):
+                    raise ValueError(
+                        f"Unexpected value for {normalized_field}: "
+                        f"expected str, got {type(value).__name__}"
+                    )
                 d[normalized_field] = json.loads(value)
             else:
                 d[normalized_field] = value
         return d
 
-    def tuples_to_rows(self, tuples: list[tuple], fields: list[str]) -> Rows:
+    def tuples_to_rows(
+        self,
+        tuples: list[tuple],
+        fields: list[str],
+        database_type: DatabaseType,
+    ) -> Rows:
         rows = []
         for t in tuples:
-            rows.append(self.tuple_to_row(t, fields))
+            rows.append(self.tuple_to_row(t, fields, database_type))
         return rows
 
 
@@ -315,7 +357,7 @@ class Select:
         param_builder: ParamBuilder | None = None,
     ) -> PreparedSelect:
         param_builder = param_builder or ParamBuilder(None, database_type)
-        assert database_type == param_builder._database_type
+        assert database_type == param_builder.database_type
 
         sql = ""
         if self.action == "SELECT":
@@ -323,8 +365,10 @@ class Select:
             internal_fields = [
                 _transform_external_field_to_internal_field(
                     f,
-                    self.all_columns,
-                    self.table.json_cols,
+                    all_columns=self.all_columns,
+                    json_columns=self.table.json_cols,
+                    map_string_columns=self.table.map_string_cols,
+                    map_float_columns=self.table.map_float_cols,
                     param_builder=param_builder,
                 )[0]
                 for f in fieldnames
@@ -344,7 +388,13 @@ class Select:
         # Returns {join type} JOIN {table name} ON {join condition}
         for j in self.joins:
             query_conds, fields_used = _process_query_to_conditions(
-                j.query, self.all_columns, self.table.json_cols, param_builder
+                j.query,
+                all_columns=self.all_columns,
+                json_columns=self.table.json_cols,
+                array_string_columns=self.table.array_string_cols,
+                map_string_columns=self.table.map_string_cols,
+                map_float_columns=self.table.map_float_cols,
+                param_builder=param_builder,
             )
             joined = combine_conditions(query_conds, "AND")
             sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
@@ -357,7 +407,13 @@ class Select:
             conditions = [f"project_id = {param_project_id}"]
         if self._query:
             query_conds, fields_used = _process_query_to_conditions(
-                self._query, self.all_columns, self.table.json_cols, param_builder
+                self._query,
+                all_columns=self.all_columns,
+                json_columns=self.table.json_cols,
+                array_string_columns=self.table.array_string_cols,
+                map_string_columns=self.table.map_string_cols,
+                map_float_columns=self.table.map_float_cols,
+                param_builder=param_builder,
             )
             conditions.extend(query_conds)
 
@@ -369,8 +425,10 @@ class Select:
             internal_fields = [
                 _transform_external_field_to_internal_field(
                     f,
-                    self.all_columns,
-                    self.table.json_cols,
+                    all_columns=self.all_columns,
+                    json_columns=self.table.json_cols,
+                    map_string_columns=self.table.map_string_cols,
+                    map_float_columns=self.table.map_float_cols,
                     param_builder=param_builder,
                 )[0]
                 for f in self._group_by
@@ -386,6 +444,7 @@ class Select:
                 # For each order by field, if it is a dynamic field, we generate
                 # 3 order by terms: one for existence, one for float casting, and one for string casting.
                 # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
+                options: list[tuple[tsi_query.CastTo | None, str]]
                 if _is_dynamic_field(field, self.table.json_cols):
                     # Prioritize existence, then cast to double, then str
                     options = [
@@ -394,7 +453,9 @@ class Select:
                         ("string", direction),
                     ]
                 else:
-                    options = [(field, direction)]
+                    # Static columns don't need a cast; the function ignores
+                    # the param when no JSON/Map extraction is happening.
+                    options = [(None, direction)]
 
                 # For each option, build the order by term
                 for cast, direct in options:
@@ -406,9 +467,11 @@ class Select:
                         _,
                     ) = _transform_external_field_to_internal_field(
                         field,
-                        self.all_columns,
-                        self.table.json_cols,
-                        cast,
+                        all_columns=self.all_columns,
+                        json_columns=self.table.json_cols,
+                        map_string_columns=self.table.map_string_cols,
+                        map_float_columns=self.table.map_float_cols,
+                        cast=cast,
                         param_builder=param_builder,
                     )
                     order_parts.append(f"{inner_field} {direct}")
@@ -461,10 +524,15 @@ class Insert:
         for row in self.rows:
             r: list[Any] = []
             for field in given_column_names:
-                if (
-                    field in self.table.col_types
-                    and self.table.col_types[field] == "json"
+                col_type = self.table.col_types.get(field)
+                if col_type == "json":
+                    r.append(json.dumps(row[field]))
+                elif (
+                    col_type in _JSON_TEXT_BACKED_COL_TYPES
+                    and database_type == "sqlite"
                 ):
+                    # SQLite has no Array/Map types; store as JSON text. The
+                    # ClickHouse driver accepts native list/dict directly.
                     r.append(json.dumps(row[field]))
                 else:
                     r.append(row[field])
@@ -600,20 +668,39 @@ def quote_json_path_parts(parts: list[str]) -> str:
 
 def _transform_external_field_to_internal_field(
     field: str,
-    all_columns: Sequence[str],
-    json_columns: Sequence[str],
-    cast: str | None = None,
+    *,
+    all_columns: Sequence[str] = (),
+    json_columns: Sequence[str] = (),
+    map_string_columns: Sequence[str] = (),
+    map_float_columns: Sequence[str] = (),
+    cast: tsi_query.CastTo | None = None,
     param_builder: ParamBuilder | None = None,
 ) -> tuple[str, ParamBuilder, set[str]]:
-    """Transforms a request for a dot-notation field to a clickhouse field."""
+    """Transforms a request for a dot-notation field to a clickhouse field.
+
+    For Map(String, *) columns, a dotted path like `scorer_ratings._rating_`
+    resolves to a typed map access (`col['key']` in ClickHouse,
+    `json_extract(col, '$."key"')` in SQLite). Bare references to a map
+    column pass through to the column itself.
+    """
     param_builder = param_builder or ParamBuilder()
     raw_fields_used = set()
     json_path = None
+    map_access_key: str | None = None
+    for prefix in (*map_string_columns, *map_float_columns):
+        if field == prefix:
+            # Bare map column — return as-is and let the caller compare it.
+            break
+        if field.startswith(prefix + "."):
+            map_access_key = field[len(prefix) + 1 :]
+            raw_fields_used.add(field)
+            field = prefix
+            break
     for prefix in json_columns:
         if field == prefix:
             field = prefix + "_dump"
         elif field.startswith(prefix + "."):
-            json_path = quote_json_path(field[len(prefix + ".") :])
+            json_path = quote_json_path(field[len(prefix) + 1 :])
             field = prefix + "_dump"
 
     # pops of table_prefix
@@ -640,12 +727,30 @@ def _transform_external_field_to_internal_field(
         raise ValueError(f"Unknown field: {field}")
 
     raw_fields_used.add(unprefixed_field)
-    if json_path is not None:
+    if map_access_key is not None:
+        is_sqlite = param_builder.database_type == "sqlite"
+        if is_sqlite:
+            json_path_val = quote_json_path_parts([map_access_key])
+            json_path_param = param_builder.add(json_path_val, None, "String")
+            field = f"json_extract({field}, {json_path_param})"
+        else:
+            key_param = param_builder.add(map_access_key, None, "String")
+            # Missing CH map keys default to 0 / "" — guard with mapContains
+            # so absent keys read as NULL (matches SQLite's json_extract).
+            field = f"if(mapContains({field}, {key_param}), {field}[{key_param}], NULL)"
+            # Pass-through casts (string/exists/None) are always safe.
+            # Numeric `OrNull` casts only work on String inputs, so skip them
+            # for `Map(String, Float64)` columns where the value is already
+            # numeric.
+            map_col_was_string = unprefixed_field.split(".", 1)[0] in map_string_columns
+            if map_col_was_string or cast in {None, "string", "exists"}:
+                field = clickhouse_cast(field, cast)
+    elif json_path is not None:
         json_path_param = param_builder.add(json_path, None, "String")
         if cast == "exists":
             field = "(JSON_EXISTS(" + field + ", " + json_path_param + "))"
         else:
-            is_sqlite = param_builder._database_type == "sqlite"
+            is_sqlite = param_builder.database_type == "sqlite"
             json_func = "json_extract(" if is_sqlite else "JSON_VALUE("
             field = json_func + field + ", " + json_path_param + ")"
             if not is_sqlite:
@@ -657,10 +762,30 @@ def _transform_external_field_to_internal_field(
     return field, param_builder, raw_fields_used
 
 
+def _operand_array_string_column(
+    operand: tsi_query.Operand, array_string_columns: Sequence[str]
+) -> str | None:
+    """Return the column name if `operand` is a bare $getField on an
+    Array(String) column, else None. Used by ContainsOperation to switch
+    from substring search to array membership.
+    """
+    if not array_string_columns:
+        return None
+    if isinstance(operand, tsi_query.GetFieldOperator):
+        name = operand.get_field_
+        if name in array_string_columns:
+            return name
+    return None
+
+
 def _process_query_to_conditions(
     query: tsi.Query,
-    all_columns: Sequence[str],
-    json_columns: Sequence[str],
+    *,
+    all_columns: Sequence[str] = (),
+    json_columns: Sequence[str] = (),
+    array_string_columns: Sequence[str] = (),
+    map_string_columns: Sequence[str] = (),
+    map_float_columns: Sequence[str] = (),
     param_builder: ParamBuilder | None = None,
     field_resolver: Callable[[str, ParamBuilder], tuple[str, set[str]]] | None = None,
 ) -> tuple[list[str], set[str]]:
@@ -718,23 +843,52 @@ def _process_query_to_conditions(
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
             cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
-            lhs_part = process_operand(operation.contains_.input)
-            rhs_part = process_operand(operation.contains_.substr)
-            is_sqlite = pb._database_type == "sqlite"
-
-            if is_sqlite:
-                # SQLite uses INSTR function and doesn't have case-insensitive variant
-                if operation.contains_.case_insensitive:
-                    # For case-insensitive, convert both to lowercase
-                    cond = f"INSTR(LOWER({lhs_part}), LOWER({rhs_part})) > 0"
+            # If LHS is a bare Array(String) column, treat $contains as array
+            # membership, not substring search — `has(col, value)` in CH and
+            # a json_each subquery in SQLite. Falls back to the string-contains
+            # behavior for every other operand shape.
+            array_col = _operand_array_string_column(
+                operation.contains_.input, array_string_columns
+            )
+            if array_col is not None:
+                rhs_part = process_operand(operation.contains_.substr)
+                raw_fields_used.add(array_col)
+                case_insensitive = operation.contains_.case_insensitive
+                if pb.database_type == "sqlite":
+                    if case_insensitive:
+                        cond = (
+                            f"EXISTS (SELECT 1 FROM json_each({array_col}) "
+                            f"WHERE LOWER(value) = LOWER({rhs_part}))"
+                        )
+                    else:
+                        cond = (
+                            f"EXISTS (SELECT 1 FROM json_each({array_col}) "
+                            f"WHERE value = {rhs_part})"
+                        )
+                elif case_insensitive:
+                    cond = (
+                        f"arrayExists(x -> lower(x) = lower({rhs_part}), {array_col})"
+                    )
                 else:
-                    cond = f"INSTR({lhs_part}, {rhs_part}) > 0"
+                    cond = f"has({array_col}, {rhs_part})"
             else:
-                # ClickHouse uses position/positionCaseInsensitive
-                position_operation = "position"
-                if operation.contains_.case_insensitive:
-                    position_operation = "positionCaseInsensitive"
-                cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+                lhs_part = process_operand(operation.contains_.input)
+                rhs_part = process_operand(operation.contains_.substr)
+                is_sqlite = pb.database_type == "sqlite"
+
+                if is_sqlite:
+                    # SQLite uses INSTR function and doesn't have case-insensitive variant
+                    if operation.contains_.case_insensitive:
+                        # For case-insensitive, convert both to lowercase
+                        cond = f"INSTR(LOWER({lhs_part}), LOWER({rhs_part})) > 0"
+                    else:
+                        cond = f"INSTR({lhs_part}, {rhs_part}) > 0"
+                else:
+                    # ClickHouse uses position/positionCaseInsensitive
+                    position_operation = "position"
+                    if operation.contains_.case_insensitive:
+                        position_operation = "positionCaseInsensitive"
+                    cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 
@@ -768,7 +922,7 @@ def _process_query_to_conditions(
                 # SQL, so the cast has to be reapplied here for the typed
                 # comparison to type-check in CH. Sqlite drops the cast for
                 # the same reason it's dropped in the JSON extraction path.
-                if cast is not None and pb._database_type == "clickhouse":
+                if cast is not None and pb.database_type == "clickhouse":
                     field = clickhouse_cast_json_value(field, cast)
             else:
                 (
@@ -776,7 +930,13 @@ def _process_query_to_conditions(
                     _,
                     fields_used,
                 ) = _transform_external_field_to_internal_field(
-                    operand.get_field_, all_columns, json_columns, cast, pb
+                    operand.get_field_,
+                    all_columns=all_columns,
+                    json_columns=json_columns,
+                    map_string_columns=map_string_columns,
+                    map_float_columns=map_float_columns,
+                    cast=cast,
+                    param_builder=pb,
                 )
             raw_fields_used.update(fields_used)
             return field

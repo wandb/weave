@@ -22,6 +22,7 @@ from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     AnnotationPayloadSchema,
     RunnablePayloadSchema,
+    feedback_type_is_agent_monitor,
     feedback_type_is_annotation,
     feedback_type_is_runnable,
 )
@@ -48,6 +49,12 @@ TABLE_FEEDBACK = Table(
         Column("call_ref", "string", nullable=True),
         Column("trigger_ref", "string", nullable=True),
         Column("queue_id", "string", nullable=True),
+        Column("scorer_tags", "array_string"),
+        Column("scorer_tag_reasons", "map_string_string"),
+        Column("scorer_tag_confidences", "map_string_float"),
+        Column("scorer_ratings", "map_string_float"),
+        Column("scorer_rating_reasons", "map_string_string"),
+        Column("scorer_rating_confidences", "map_string_float"),
     ],
 )
 
@@ -148,12 +155,38 @@ def validate_feedback_create_req(
             raise InvalidRequest(
                 f"Invalid payload for feedback_type {req.feedback_type}: {e}"
             ) from e
+    elif feedback_type_is_agent_monitor(req.feedback_type):
+        if not req.runnable_ref:
+            raise InvalidRequest("runnable_ref is required for agent monitor feedback")
+        if req.call_ref is None:
+            raise InvalidRequest("call_ref is required for agent monitor feedback")
+        if req.trigger_ref is None:
+            raise InvalidRequest("trigger_ref is required for agent monitor feedback")
     elif req.runnable_ref:
         raise InvalidRequest("runnable_ref is not allowed for non-runnable feedback")
     elif req.call_ref:
         raise InvalidRequest("call_ref is not allowed for non-runnable feedback")
     elif req.trigger_ref:
         raise InvalidRequest("trigger_ref is not allowed for non-runnable feedback")
+
+    # Typed scorer columns are reserved for agent monitor feedback.
+    scorer_fields_set = any(
+        getattr(req, name)
+        for name in (
+            "scorer_tags",
+            "scorer_tag_reasons",
+            "scorer_tag_confidences",
+            "scorer_ratings",
+            "scorer_rating_reasons",
+            "scorer_rating_confidences",
+        )
+    )
+    if scorer_fields_set and not feedback_type_is_agent_monitor(req.feedback_type):
+        raise InvalidRequest(
+            "scorer_tags, scorer_tag_reasons, scorer_tag_confidences, "
+            "scorer_ratings, scorer_rating_reasons, and scorer_rating_confidences "
+            "are only allowed on wandb.agent_monitor feedback"
+        )
 
     # Validate the ref formats (we could even query the DB to ensure they exist and are valid)
     if req.annotation_ref:
@@ -257,6 +290,12 @@ def format_feedback_to_row(
         "call_ref": feedback_req.call_ref,
         "trigger_ref": feedback_req.trigger_ref,
         "queue_id": feedback_req.queue_id,
+        "scorer_tags": feedback_req.scorer_tags,
+        "scorer_tag_reasons": feedback_req.scorer_tag_reasons,
+        "scorer_tag_confidences": feedback_req.scorer_tag_confidences,
+        "scorer_ratings": feedback_req.scorer_ratings,
+        "scorer_rating_reasons": feedback_req.scorer_rating_reasons,
+        "scorer_rating_confidences": feedback_req.scorer_rating_confidences,
     }
 
 

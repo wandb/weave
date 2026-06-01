@@ -1,0 +1,54 @@
+name: promote-typescript-sdk-npm
+
+# This workflow promotes an already-published Weave TypeScript SDK version
+# to a dist-tag (e.g. next → latest).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: "dist-tag to apply to version"
+        required: true
+        type: choice
+        options:
+          - latest
+          - next
+        default: latest
+
+jobs:
+  promote-typescript-sdk:
+    name: Add TypeScript SDK dist-tag on npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+          run_install: false
+
+      - id: package_meta
+        run: |
+          PACKAGE_NAME=$(node -p "require('./sdks/node/package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./sdks/node/package.json').version")
+          echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "package_version=${PACKAGE_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Add dist-tag
+        env:
+          PACKAGE_NAME: ${{ steps.package_meta.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.package_meta.outputs.package_version }}
+        working-directory: sdks/node
+        run: npm dist-tag add "${PACKAGE_NAME}@${PACKAGE_VERSION}" "${{ inputs.dist_tag }}"

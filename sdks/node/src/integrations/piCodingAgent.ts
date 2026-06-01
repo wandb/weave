@@ -10,18 +10,33 @@
  *
  * Usage:
  * ```typescript
- * import { init } from 'weave';
- * import { createOtelExtension } from 'weave';
- * import { createAgentSession, DefaultResourceLoader } from '@mariozechner/pi-coding-agent';
+ * import { init, createOtelExtension } from 'weave';
+ *
+ * import {
+ *   createAgentSession,
+ *   DefaultResourceLoader,
+ *   SessionManager,
+ *   getAgentDir,
+ * } from '@earendil-works/pi-coding-agent';
  *
  * await init('my-entity/my-project');
  *
  * const resourceLoader = new DefaultResourceLoader({
+ *   cwd: process.cwd(),
+ *   agentDir: getAgentDir(),
  *   extensionFactories: [createOtelExtension()],
  * });
  * await resourceLoader.reload();
  *
- * const { session } = await createAgentSession({ resourceLoader });
+ * const { session } = await createAgentSession({
+ *   resourceLoader,
+ *   sessionManager: SessionManager.inMemory(),
+ * });
+ *
+ * await session.bindExtensions({});
+ *
+ * await session.prompt('What files are in the current directory?');
+ *
  * ```
  */
 
