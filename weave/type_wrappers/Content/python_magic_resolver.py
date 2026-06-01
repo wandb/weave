@@ -139,9 +139,7 @@ def _is_wav_buffer(buffer: bytes) -> bool:
     never move regardless of the audio payload, so a 12-byte prefix suffices.
     """
     return (
-        len(buffer) >= 12
-        and buffer[:4] == _RIFF_MARKER
-        and buffer[8:12] == _WAVE_FORM
+        len(buffer) >= 12 and buffer[:4] == _RIFF_MARKER and buffer[8:12] == _WAVE_FORM
     )
 
 
