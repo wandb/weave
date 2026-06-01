@@ -541,9 +541,9 @@ def test_custom_provider_trailing_slash_normalization(client):
             # Verify the trailing slash was stripped from api_base
             mock_completion.assert_called_once()
             call_args = mock_completion.call_args[1]
-            assert call_args["api_base"] == "http://my-ollama-server.example.com:11434", (
-                f"Expected trailing slash to be stripped. Got '{call_args['api_base']}'"
-            )
+            assert (
+                call_args["api_base"] == "http://my-ollama-server.example.com:11434"
+            ), f"Expected trailing slash to be stripped. Got '{call_args['api_base']}'"
         finally:
             _secret_fetcher_context.reset(token)
 
