@@ -130,6 +130,7 @@ def test_safe_type_decodes_when_unsafe_decode_disabled(client):
             "load_op": "weave:///e/p/op/evil:abc123",
         },
     ],
+    ids=["op-type-refused", "safe-type-load-op-fallback-refused"],
 )
 def test_unsafe_decode_disabled_refuses_code_bearing(client, encoded):
     client._allow_unsafe_custom_obj_decode = False

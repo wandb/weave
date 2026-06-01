@@ -398,8 +398,9 @@ class WeaveClient:
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
 
-        # Internal: server-side workers (eval, scoring) flip this off so deserialization
-        # never reconstructs code-bearing custom objects. See custom_objs.py.
+        # Internal: server-side workers (eval, scoring) flip this off via
+        # `require_secure_weave_client` so deserialization never reconstructs
+        # code-bearing custom objects. See custom_objs.py.
         self._allow_unsafe_custom_obj_decode = True
 
         if ensure_project_exists:

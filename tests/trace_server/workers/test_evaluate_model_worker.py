@@ -7,7 +7,7 @@ from weave.trace.serialization.custom_objs import (
     is_safe_to_decode,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
-    _assert_object_ref,
+    _assert_non_op_ref,
 )
 
 
@@ -25,6 +25,14 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
         ("PIL.Image.Image", False, True),
         ("weave.type_wrappers.Content.content.Content", False, True),
     ],
+    ids=[
+        "op-allowed-when-unsafe",
+        "unknown-allowed-when-unsafe",
+        "op-refused-when-secure",
+        "unknown-refused-when-secure",
+        "image-allowed-when-secure",
+        "content-allowed-when-secure",
+    ],
 )
 def test_is_safe_to_decode(type_id, allow_unsafe, expected):
     assert is_safe_to_decode(type_id, allow_unsafe=allow_unsafe) is expected
@@ -37,11 +45,11 @@ def test_safe_custom_weave_types_in_sync():
     assert SAFE_CUSTOM_WEAVE_TYPES | {OP_CUSTOM_WEAVE_TYPE} == set(KNOWN_TYPES)
 
 
-def test_assert_object_ref_rejects_op_and_non_object_refs():
+def test_assert_non_op_ref_rejects_op_and_non_object_refs():
     # Op ref would be loaded/executed by client.get; table/other refs aren't models.
     with pytest.raises(TypeError):
-        _assert_object_ref("weave:///ent/proj/op/some_op:abc123", "evaluation_ref")
+        _assert_non_op_ref("weave:///ent/proj/op/some_op:abc123", "evaluation_ref")
     with pytest.raises(TypeError):
-        _assert_object_ref("weave:///ent/proj/table/abc123", "evaluation_ref")
+        _assert_non_op_ref("weave:///ent/proj/table/abc123", "evaluation_ref")
     # A plain object ref is accepted.
-    _assert_object_ref("weave:///ent/proj/object/MyEval:abc123", "evaluation_ref")
+    _assert_non_op_ref("weave:///ent/proj/object/MyEval:abc123", "evaluation_ref")
