@@ -4388,10 +4388,12 @@ def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> 
 
     uniqExact counts start rows in the window -- the exact `started_at`
     predicates match the GROUP BY path's `any(started_at) <op> T` HAVING (and
-    drop the prefilter buffer slop) -- and soft-deleted ids are removed with an
-    anti-set. Both bounds prefilter the outer scan, but only the lower bound
-    windows the anti-set: deletes can land after the upper bound, never before
-    the lower one. Limit capping reuses the shared count/has_more wrapper.
+    drop the prefilter buffer slop), and `op_name IS NOT NULL` reproduces its
+    orphaned-call-end exclusion (since #6933 end rows carry started_at too).
+    Soft-deleted ids are removed with an anti-set. Both bounds prefilter the
+    outer scan, but only the lower bound windows the anti-set: deletes can land
+    after the upper bound, never before the lower one. Limit capping reuses the
+    shared count/has_more wrapper.
     """
     req = tsi.CallsQueryStatsReq(
         project_id="project",
@@ -4418,6 +4420,7 @@ def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> 
               AND calls_merged.sortable_datetime < {pb_4:String}
               AND calls_merged.started_at > {pb_1:String}
               AND calls_merged.started_at < {pb_3:String}
+              AND calls_merged.op_name IS NOT NULL
               AND calls_merged.id NOT IN (
                   SELECT calls_merged.id
                   FROM calls_merged

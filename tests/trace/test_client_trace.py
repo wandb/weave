@@ -4901,9 +4901,10 @@ def test_calls_query_stats_with_limit(client):
 
 def test_calls_query_stats_started_at_window_excludes_deletes(client):
     """A started_at lower-bound count must match across backends and exclude
-    soft-deleted calls. On ClickHouse this exercises the windowed distinct-id
-    fast path; on SQLite it exercises the reference implementation, so equal
-    results pin the optimization to the GROUP BY semantics.
+    soft-deleted calls and orphaned call-ends. On ClickHouse this exercises the
+    windowed distinct-id fast path; on SQLite it exercises the reference
+    implementation, so equal results pin the optimization to the GROUP BY
+    semantics.
     """
 
     @weave.op
@@ -4937,6 +4938,22 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
     # Deleting a call removes it from the windowed count (anti-set exclusion).
     client.server.calls_delete(
         tsi.CallsDeleteReq(project_id=project_id, call_ids=[all_calls[0].id])
+    )
+    assert count(1) == 2
+
+    # An orphaned call-end (end row, no start) carries started_at since #6933 but
+    # has no op_name; the op_name guard must keep it out of the windowed count.
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=generate_id(),
+                started_at=now,
+                ended_at=now,
+                summary={},
+            )
+        )
     )
     assert count(1) == 2
 

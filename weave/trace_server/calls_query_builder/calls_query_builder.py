@@ -3189,12 +3189,12 @@ def _optimized_time_filtered_calls_merged_count_query(
 ) -> str:
     """Distinct-call count for a calls_merged stats request filtered only by time.
 
-    Counts windowed start rows directly with uniqExact -- started_at lives only
-    on the start row, so the per-row predicate equals the GROUP BY path's
-    `any(started_at) <op> T` HAVING (and implies its `op_name IS NOT NULL`).
-    Soft-deleted ids are removed with an anti-set rather than a parallel
-    aggregator, because deleted_at lives on a separate delete row and cannot be
-    correlated to started_at in a single scan.
+    Counts windowed start rows with uniqExact. started_at gates the window;
+    since #6933 call-end rows carry started_at too, we also require op_name
+    (start-only) to be non-null -- that selects the start row and reproduces the
+    GROUP BY path's orphaned-call-end exclusion. Soft-deleted ids are removed
+    with an anti-set rather than a parallel aggregator, because deleted_at lives
+    on a separate delete row and cannot be correlated to started_at in one scan.
 
     The loose `sortable_datetime` prefilter is kept for granule pruning via the
     migration-012 minmax index; the exact `started_at` predicate removes its
@@ -3205,8 +3205,16 @@ def _optimized_time_filtered_calls_merged_count_query(
     table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
     project_id_slot = param_slot(param_builder.add_param(project_id), "String")
 
+    # op_name is start-only, so its non-null-ness selects the start row and
+    # drops orphaned call-ends -- matching the GROUP BY path's HAVING. Required
+    # because since #6933 the end row carries started_at too.
+    op_name_not_null = get_field_by_name("op_name").null_check_sql(
+        param_builder, table_name, ReadTable.CALLS_MERGED, use_agg_fn=False, negate=True
+    )
+
     exact_conditions: list[str] = []
-    prefilter_by_bound: dict[tuple[str, float], str] = {}
+    prefilter_conditions: list[str] = []
+    lower_prefilter_conditions: list[str] = []
     for op_str, timestamp in bounds:
         exact_slot = param_slot(
             param_builder.add_param(timestamp_to_datetime_str(timestamp)), "String"
@@ -3215,23 +3223,21 @@ def _optimized_time_filtered_calls_merged_count_query(
 
         # Loosen toward the past for lower bounds (and toward the future for
         # upper bounds) so the prefilter is a superset of the exact predicate.
+        is_lower = op_str in {">", ">="}
         buffer = (
-            DATETIME_BUFFER_TIME_SECONDS
-            if op_str in {"<", "<="}
-            else -DATETIME_BUFFER_TIME_SECONDS
+            -DATETIME_BUFFER_TIME_SECONDS if is_lower else DATETIME_BUFFER_TIME_SECONDS
         )
         prefilter_slot = param_slot(
             param_builder.add_param(timestamp_to_datetime_str(int(timestamp) + buffer)),
             "String",
         )
-        prefilter_by_bound[op_str, timestamp] = (
-            f"{table_name}.sortable_datetime {op_str} {prefilter_slot}"
-        )
+        prefilter = f"{table_name}.sortable_datetime {op_str} {prefilter_slot}"
+        prefilter_conditions.append(prefilter)
+        if is_lower:
+            lower_prefilter_conditions.append(prefilter)
 
-    outer_prefilter = " AND ".join(prefilter_by_bound[b] for b in bounds)
-    lower_prefilter = " AND ".join(
-        prefilter_by_bound[b] for b in bounds if b[0] in {">", ">="}
-    )
+    outer_prefilter = " AND ".join(prefilter_conditions)
+    lower_prefilter = " AND ".join(lower_prefilter_conditions)
 
     deleted_ids = (
         f"SELECT {table_name}.id FROM {table_name} "
@@ -3244,6 +3250,7 @@ def _optimized_time_filtered_calls_merged_count_query(
         f"PREWHERE {table_name}.project_id = {project_id_slot} "
         f"WHERE {outer_prefilter} "
         f"AND {' AND '.join(exact_conditions)} "
+        f"AND {op_name_not_null} "
         f"AND {table_name}.id NOT IN ({deleted_ids})"
     )
     return _wrap_raw_count_with_limit(inner, limit)
@@ -3292,7 +3299,7 @@ def _is_time_filtered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
 
 
 _STARTED_AT_FIELD = "started_at"
-_STARTED_AT_BOUND_OPS: dict[type, str] = {
+_STARTED_AT_BOUND_OPS: dict[type[tsi_query.Operation], str] = {
     tsi_query.GtOperation: ">",
     tsi_query.GteOperation: ">=",
     tsi_query.LtOperation: "<",
