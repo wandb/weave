@@ -12,7 +12,6 @@
     "examples",
     "dist",
     "node_modules",
-    "src/integrations/checkOpenai.ts",
     "src/__tests__/**/*",
     "src/esm/**"
   ]

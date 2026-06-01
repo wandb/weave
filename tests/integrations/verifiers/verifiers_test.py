@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import pytest
@@ -29,11 +28,17 @@ def patch_verifiers() -> None:
 
 
 @pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+    allow_playback_repeats=True,
+)
 def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> None:
     """Run verifiers evaluation with a mocked environment and assert patched ops.
 
-    This test avoids external dependencies and focuses purely on the Weave
-    patching applied in `weave.integrations.verifiers.verifiers`.
+    The model call is replayed from a VCR cassette so the test never hits a live
+    provider; it focuses purely on the Weave patching applied in
+    `weave.integrations.verifiers.verifiers`.
     """
 
     class MockEnv(vf.MultiTurnEnv):
@@ -95,7 +100,7 @@ def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> No
 
     env = MockEnv()
 
-    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "DUMMY_API_KEY"))
+    openai_client = OpenAI(api_key="DUMMY_API_KEY")
     results = env.evaluate(
         openai_client,
         "gpt-4.1-mini",
