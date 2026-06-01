@@ -35,6 +35,14 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "Qwen/Qwen3.6-27B": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "Qwen/Qwen3.6-35B-A3B": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "Qwen/Qwen3.5-27B": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -411,6 +419,26 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "anthropic.claude-opus-4-8": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "global.anthropic.claude-opus-4-8": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "us.anthropic.claude-opus-4-8": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "eu.anthropic.claude-opus-4-8": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "au.anthropic.claude-opus-4-8": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "anthropic.claude-sonnet-4-6": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -516,6 +544,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/claude-opus-4-7": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/claude-opus-4-8": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1228,6 +1260,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/speech/azure-tts-hd": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/speech/azure-stt": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -2290,6 +2326,10 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "claude-opus-4-8": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
   "claude-sonnet-4-20250514": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
@@ -2534,6 +2574,10 @@
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
   },
+  "fireworks_ai/accounts/fireworks/models/glm-5p1": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
   "fireworks_ai/accounts/fireworks/models/gpt-oss-120b": {
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
@@ -2611,6 +2655,10 @@
     "api_key_name": "FIREWORKS_API_KEY"
   },
   "fireworks_ai/glm-4p7": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
+  "fireworks_ai/glm-5p1": {
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
   },
@@ -2703,6 +2751,10 @@
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
   "gemini-3.1-flash-lite-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "gemini-3.1-flash-lite": {
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
@@ -2914,6 +2966,10 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-3.1-flash-lite-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-3.1-flash-lite": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -4034,6 +4090,10 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/ministral-8b-2512": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/mistral-tiny": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
@@ -4595,6 +4655,10 @@
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
   "vertex_ai/gemini-3.1-flash-lite-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-flash-lite": {
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
