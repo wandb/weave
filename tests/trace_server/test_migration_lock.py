@@ -1,4 +1,5 @@
-from unittest.mock import Mock
+import threading
+from unittest.mock import Mock, patch
 
 import clickhouse_connect
 import pytest
@@ -6,10 +7,13 @@ from clickhouse_connect.driver.exceptions import OperationalError
 
 from weave.trace_server.migration_lock import (
     MigrationLockError,
+    _active_owner,
     _generate_holder_id,
+    _heartbeat_loop,
     _validate_holder,
     acquire_with_retry,
     create_lock_table_sql,
+    heartbeat,
     migration_lock,
     release,
     try_acquire,
@@ -133,8 +137,8 @@ def test_migration_lock_acquires_releases_and_handles_errors():
 
     ch_client.command.assert_called_once()
     assert ch_client.command.call_args[0][0] == (
-        "ALTER TABLE db_management.migration_lock "
-        "DELETE WHERE lock_id = 'migration' AND holder = %(holder)s"
+        "DELETE FROM db_management.migration_lock "
+        "WHERE lock_id = 'migration' AND holder = %(holder)s"
     )
 
     # Release swallows errors (lock will expire via TTL)
@@ -142,6 +146,94 @@ def test_migration_lock_acquires_releases_and_handles_errors():
     error_client = Mock()
     error_client.command.side_effect = RuntimeError("connection lost")
     release(error_client, MANAGEMENT_DB, release_holder)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# Heartbeat / lease liveness
+# ---------------------------------------------------------------------------
+
+
+def test_active_owner_returns_holder_or_none():
+    holder = _generate_holder_id()
+    ch_client = Mock()
+
+    present = Mock()
+    present.result_rows = [(holder,)]
+    ch_client.query.return_value = present
+    assert _active_owner(ch_client, MANAGEMENT_DB) == holder
+
+    empty = Mock()
+    empty.result_rows = []
+    ch_client.query.return_value = empty
+    assert _active_owner(ch_client, MANAGEMENT_DB) is None
+
+
+def test_heartbeat_inserts_fresh_row():
+    ch_client = Mock()
+    holder = _generate_holder_id()
+
+    heartbeat(ch_client, MANAGEMENT_DB, holder)
+
+    ch_client.insert.assert_called_once()
+    assert ch_client.insert.call_args.kwargs["data"] == [["migration", holder]]
+    assert ch_client.insert.call_args.kwargs["column_names"] == ["lock_id", "holder"]
+
+
+def test_heartbeat_loop_refreshes_until_stopped(monkeypatch):
+    """The loop refreshes on its own connection and closes it on exit."""
+    monkeypatch.setattr(
+        "weave.trace_server.migration_lock.LOCK_HEARTBEAT_INTERVAL_SECONDS", 0.01
+    )
+    hb_client = Mock()
+    stop = threading.Event()
+    # Stop right after the first heartbeat so the test is deterministic.
+    hb_client.insert.side_effect = lambda *a, **k: stop.set()
+
+    _heartbeat_loop(lambda: hb_client, MANAGEMENT_DB, _generate_holder_id(), stop)
+
+    hb_client.insert.assert_called_once()
+    hb_client.close.assert_called_once()
+
+
+def _acquire_then_own_client() -> Mock:
+    """Mock CH client whose acquire sequence: no owner, then we own it."""
+    ch_client = Mock()
+    empty = Mock()
+    empty.result_rows = []
+
+    def _query(*_args, **_kwargs):
+        if ch_client.insert.call_count == 0:
+            return empty
+        won = Mock()
+        won.result_rows = [(ch_client.insert.call_args.kwargs["data"][0][1],)]
+        return won
+
+    ch_client.query.side_effect = _query
+    return ch_client
+
+
+def test_migration_lock_thread_lifecycle():
+    """A heartbeat thread runs only when a client factory is supplied; the lock
+    is always released via a lightweight delete on exit.
+    """
+    with patch("weave.trace_server.migration_lock.threading.Thread") as mock_thread:
+        with migration_lock(
+            _acquire_then_own_client(),
+            MANAGEMENT_DB,
+            timeout_seconds=5.0,
+            heartbeat_client_factory=Mock(),
+        ):
+            pass
+        mock_thread.assert_called_once()
+        mock_thread.return_value.start.assert_called_once()
+        mock_thread.return_value.join.assert_called_once()
+
+    with patch("weave.trace_server.migration_lock.threading.Thread") as mock_thread:
+        ch_client = _acquire_then_own_client()
+        with migration_lock(ch_client, MANAGEMENT_DB, timeout_seconds=5.0):
+            pass
+        mock_thread.assert_not_called()
+    assert ch_client.command.call_args[0][0].startswith("DELETE FROM")
 
 
 def test_acquire_with_retry_times_out_when_lock_held():
