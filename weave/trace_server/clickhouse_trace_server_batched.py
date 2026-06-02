@@ -5577,6 +5577,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 page_calls.extend(self.calls_query_stream(child_req))
 
+        score_ref_warnings = eval_helpers.resolve_eval_score_refs(self, page_calls)
+
         all_rows = eval_helpers.build_eval_rows(
             page_calls,
             eval_root_ids,
@@ -5604,7 +5606,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # apply pagination in python if include_summary is True; otherwise, we already applied pagination in the CH query
         rows: list[tsi.EvalResultsRow] = []
-        warnings: list[str] = []
+        warnings: list[str] = list(score_ref_warnings)
         if req.include_rows:
             if req.include_summary:
                 # all_rows has everything; apply pagination in Python

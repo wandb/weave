@@ -148,3 +148,26 @@ def test_extract_genai_span_refs_skips_invalid_items() -> None:
     assert eval_helpers.extract_genai_span_refs(call) == [
         tsi.GenAISpanRef.model_validate(_genai_span_ref("valid-trace"))
     ]
+
+
+def test_build_eval_rows_handles_ref_extracted_scores() -> None:
+    predict_and_score_call = _call(
+        call_id="pas-1",
+        inputs={"example": {"x": 1}, "model": "model://agent"},
+        output={
+            "output": "result",
+            "scores": "weave-trace-internal:///project-1/object/scores:abc123/key/scores",
+        },
+    )
+
+    rows = eval_helpers.build_eval_rows(
+        [predict_and_score_call],
+        ["eval-1"],
+        {"pas-1": "row-1"},
+        include_raw_data_rows=False,
+        include_predict_and_score_children=False,
+    )
+
+    trial = rows[0].evaluations[0].trials[0]
+    assert trial.scores == {}
+    assert trial.scorer_call_ids == {}
