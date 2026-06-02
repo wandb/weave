@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "prepare": "npm run build",
+    "prepare": "pnpm run build",
     "test": "jest --silent",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
