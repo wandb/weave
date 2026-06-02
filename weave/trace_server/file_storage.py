@@ -46,7 +46,11 @@ from collections.abc import Callable
 from typing import TypeVar, cast
 
 import boto3
-from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
+from azure.core.exceptions import (
+    HttpResponseError,
+    ResourceExistsError,
+    ResourceNotFoundError,
+)
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -387,13 +391,21 @@ class AzureStorageClient(FileStorageClient):
 
     @create_retry_decorator("azure_storage")
     def store(self, uri: FileStorageURI, data: bytes) -> None:
-        """Store data in Azure container with automatic retries on failure."""
+        """Store data in Azure container with automatic retries on failure.
+
+        Uses `overwrite=False` so content-addressable blobs are write-once:
+        a second writer at the same digest no-ops instead of clobbering.
+        Mirrors GCS's `if_generation_match=0` path.
+        """
         assert isinstance(uri, AzureFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         client = self._get_client(uri.account)
         container_client = client.get_container_client(uri.container)
         blob_client = container_client.get_blob_client(uri.path)
-        blob_client.upload_blob(data, overwrite=True)
+        try:
+            blob_client.upload_blob(data, overwrite=False)
+        except ResourceExistsError:
+            logger.debug("Object already exists at %s, skipping write", uri)
 
     @create_retry_decorator("azure_read")
     def read(self, uri: FileStorageURI) -> bytes:

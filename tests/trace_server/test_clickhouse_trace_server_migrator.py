@@ -1055,14 +1055,20 @@ def test_execute_views_in_replicated_and_distributed_modes(
         call_sql == "CREATE VIEW my_view ON CLUSTER test_cluster AS SELECT * FROM test"
     )
 
-    # Test in distributed mode (should be identical)
+    # Distributed mode also drops the `_local` twin so materialized views
+    # written via _execute_materialized_view_create are actually removed.
+    # Plain views have no `_local` twin, so the second DROP is a no-op via
+    # IF EXISTS but is still emitted.
     distributed_migrator.ch_client.command.reset_mock()
     distributed_migrator._execute_migration_command(
         "test_db", "DROP VIEW IF EXISTS my_view"
     )
-    assert distributed_migrator.ch_client.command.call_count == 1
-    call_sql = distributed_migrator.ch_client.command.call_args_list[0][0][0]
-    assert call_sql == "DROP VIEW IF EXISTS my_view ON CLUSTER test_cluster"
+    assert distributed_migrator.ch_client.command.call_count == 2
+    call_sqls = [
+        call.args[0] for call in distributed_migrator.ch_client.command.call_args_list
+    ]
+    assert call_sqls[0] == "DROP VIEW IF EXISTS my_view ON CLUSTER test_cluster"
+    assert call_sqls[1] == "DROP VIEW IF EXISTS my_view_local ON CLUSTER test_cluster"
 
     distributed_migrator.ch_client.command.reset_mock()
 

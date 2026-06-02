@@ -1,14 +1,43 @@
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_common import (
+    FEEDBACK_QUERY_FIELDS,
     group_agent_feedback_by_target,
     make_agent_feedback_query_req,
+    make_feedback_query_req,
 )
 
 
 def _extract_ref_literals(req) -> list[str]:
     expr = req.query.model_dump(by_alias=True)["$expr"]
     return [lit["$literal"] for lit in expr["$in"][1]]
+
+
+def test_feedback_query_fields_include_typed_scorer_columns():
+    """Calls/agent-chat feedback hydration goes through FEEDBACK_QUERY_FIELDS.
+    The typed scorer columns must be in this list or wandb.agent_monitor
+    rows surface to the UI without their tags/ratings/reasons/confidences.
+    """
+    typed_columns = (
+        "scorer_tags",
+        "scorer_tag_reasons",
+        "scorer_tag_confidences",
+        "scorer_ratings",
+        "scorer_rating_reasons",
+        "scorer_rating_confidences",
+    )
+    for column in typed_columns:
+        assert column in FEEDBACK_QUERY_FIELDS
+
+    # Both helpers must request these columns — they're the two paths that
+    # fold feedback into calls / agent chat responses.
+    calls_req = make_feedback_query_req(
+        project_id="p", calls=[{"project_id": "p", "id": "c1"}]
+    )
+    agent_req = make_agent_feedback_query_req(project_id="p", refs=[])
+    for column in typed_columns:
+        assert column in calls_req.fields
+        assert column in agent_req.fields
 
 
 def test_make_agent_feedback_query_req_unions_arbitrary_ref_kinds():
