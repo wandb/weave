@@ -186,7 +186,7 @@ async def _score_one_prediction(
     for i, (result, scorer_ref) in enumerate(
         zip(results, args.scorer_refs, strict=True)
     ):
-        if isinstance(result, Exception):
+        if isinstance(result, BaseException):
             logger.warning(
                 "Scorer %s failed on prediction %s: %s",
                 scorer_ref,
