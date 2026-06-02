@@ -22,6 +22,7 @@ from weave.trace.serialization.serializer import (
     is_probably_legacy_file_load,
     is_probably_legacy_inline_load,
 )
+from weave.trace.settings import should_allow_unsafe_custom_obj_decode
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     TraceServerInterface,
@@ -66,6 +67,7 @@ KNOWN_TYPES = {
     "rich.markdown.Markdown",
     "moviepy.video.VideoClip.VideoClip",
     "weave.type_wrappers.Content.content.Content",
+    "weave.type_handlers.File.file.File",
 }
 
 # The one type whose serializer loads code (imports a user-uploaded `.py`).
@@ -85,6 +87,7 @@ SAFE_CUSTOM_WEAVE_TYPES = frozenset(
         "rich.markdown.Markdown",
         "moviepy.video.VideoClip.VideoClip",
         "weave.type_wrappers.Content.content.Content",
+        "weave.type_handlers.File.file.File",
     }
 )
 
@@ -234,12 +237,17 @@ def _decode_custom_obj(
 ) -> Any:
     type_ = weave_type["type"]
 
-    # Decode policy lives on the process-global client (`get_weave_client`): workers
-    # flip it off there and this guard reads it back, even from worker decode threads.
-    # If client lookup becomes context-local, re-plumb this or it fails open there.
+    # Unsafe decode requires BOTH gates open: the `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE`
+    # setting (deployments/users can force-close it globally) and the active client's
+    # flag (workers force-close it in code via `require_secure_weave_client`). Either
+    # closed -> only data-only types decode. With no client we also fail closed, so a
+    # missing process-global client never opens the gate.
     client = get_weave_client()
-    # No client -> no policy set; fall back to the safe default (data-only still decodes).
-    allow_unsafe = client is not None and client._allow_unsafe_custom_obj_decode
+    allow_unsafe = (
+        should_allow_unsafe_custom_obj_decode()
+        and client is not None
+        and client._allow_unsafe_custom_obj_decode
+    )
     if not is_safe_to_decode(type_, allow_unsafe=allow_unsafe):
         if client is None:
             logger.warning(

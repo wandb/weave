@@ -14,6 +14,7 @@ from weave.trace.serialization.custom_objs import (
     decode_custom_obj,
     encode_custom_obj,
 )
+from weave.trace.settings import override_settings
 
 
 def test_encode_custom_obj_unknown_type():
@@ -136,6 +137,28 @@ def test_unsafe_decode_disabled_refuses_code_bearing(client, encoded):
     client._allow_unsafe_custom_obj_decode = False
     with pytest.raises(UnsafeDeserializationError):
         decode_custom_obj(encoded)
+
+
+def test_setting_disables_unsafe_decode_globally(client):
+    # `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false` (here via override_settings) closes
+    # the gate even on a normal client whose own flag still allows unsafe decode, so a
+    # deployment can harden every client at once. Data-only types keep decoding.
+    op_encoded = {
+        "_type": "CustomWeaveType",
+        "weave_type": {"type": "Op"},
+        "files": {"obj.py": b"print('hi')"},
+        "load_op": None,
+    }
+    img = Image.new("RGB", (32, 32))
+    img_encoded = encode_custom_obj(img)
+
+    assert client._allow_unsafe_custom_obj_decode is True
+    with override_settings(allow_unsafe_custom_obj_decode=False):
+        with pytest.raises(UnsafeDeserializationError):
+            decode_custom_obj(op_encoded)
+        decoded = decode_custom_obj(img_encoded)
+        assert isinstance(decoded, Image.Image)
+        assert decoded.tobytes() == img.tobytes()
 
 
 def test_encode_custom_obj_save_exception_returns_none(client, failing_serializer):

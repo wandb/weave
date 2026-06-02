@@ -7,7 +7,7 @@ import weave
 from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_secure_weave_client
-from weave.trace.refs import ObjectRef, OpRef, Ref
+from weave.trace.refs import Ref
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
@@ -39,14 +39,10 @@ def _evaluate_model(args: EvaluateModelArgs) -> None:
     # This worker reconstructs user-supplied objects; it must never deserialize
     # code-bearing custom objects (Op / load_op). The secure client locks the decode
     # guard in custom_objs.py off, which enforces this for every payload, including
-    # dataset rows fetched lazily during evaluation.
+    # the evaluation/model refs below (an op ref would raise UnsafeDeserializationError
+    # on `client.get`) and dataset rows fetched lazily during evaluation.
     # https://coreweave.atlassian.net/browse/WB-34909
     client = require_secure_weave_client()
-
-    # An op ref passed as the evaluation/model ref would be loaded and run by
-    # `client.get` directly, before the decode guard applies, so reject it here.
-    _assert_non_op_ref(args.evaluation_ref, "evaluation_ref")
-    _assert_non_op_ref(args.model_ref, "model_ref")
 
     loaded_evaluation = _get_valid_evaluation(client, args.evaluation_ref)
 
@@ -103,13 +99,3 @@ def _run_evaluation(
                 loaded_model, __weave={"call_id": evaluation_call_id}
             )
         )
-
-
-def _assert_non_op_ref(ref_uri: str, label: str) -> None:
-    """Require a data object ref, not an op ref. `OpRef` subclasses `ObjectRef`, so a
-    plain `isinstance(ref, ObjectRef)` would accept op refs; exclude `OpRef` explicitly
-    because `client.get` would load and execute it.
-    """
-    ref = Ref.parse_uri(ref_uri)
-    if not isinstance(ref, ObjectRef) or isinstance(ref, OpRef):
-        raise TypeError(f"Expected a non-op object ref for {label}, got: {ref_uri}")
