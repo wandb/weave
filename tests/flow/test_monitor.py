@@ -85,3 +85,47 @@ def test_activate(weave_active):
 
     deactivated_ref = monitor.deactivate()
     assert deactivated_ref.get().active == False
+
+
+def test_activate_normalizes_short_op_names(weave_active):
+    """WB-33908: a short op name must be stored as a full weave:// op ref."""
+    client = weave_active
+    monitor = Monitor(
+        name="test_monitor",
+        scorers=[],
+        op_names=["my_op"],
+    )
+
+    stored = monitor.activate().get()
+
+    expected = f"weave:///{client.entity}/{client.project}/op/my_op:*"
+    assert stored.op_names == [expected]
+    # The in-memory monitor is normalized too (activate mutates before publish).
+    assert monitor.op_names == [expected]
+
+
+def test_activate_preserves_full_refs_and_agent_spans(weave_active):
+    """Full weave:// refs and agent-span literals are left unchanged."""
+    client = weave_active
+    full_ref = f"weave:///{client.entity}/{client.project}/op/already:*"
+    monitor = Monitor(
+        name="test_monitor",
+        scorers=[],
+        op_names=[full_ref, "weave.genai.turn_ended"],
+    )
+
+    stored = monitor.activate().get()
+
+    assert stored.op_names == [full_ref, "weave.genai.turn_ended"]
+
+
+def test_activate_rejects_ambiguous_slashed_op_name(weave_active):
+    """A slashed value that isn't a weave:// ref is rejected, not mangled."""
+    monitor = Monitor(
+        name="test_monitor",
+        scorers=[],
+        op_names=["entity/project/op/foo"],
+    )
+
+    with pytest.raises(ValueError, match="weave URI"):
+        monitor.activate()
