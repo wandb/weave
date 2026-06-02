@@ -307,6 +307,19 @@ def test_table_query_stats_missing(client: WeaveClient):
     assert len(stats_res.tables) == 0
 
 
+def test_table_query_stats_legacy_missing(client: WeaveClient):
+    # The legacy single-digest endpoint must not IndexError when the digest
+    # doesn't exist; it should report count=0.
+    stats_res = client.server.table_query_stats(
+        tsi.TableQueryStatsReq(
+            project_id=client.project_id,
+            digest="missing",
+        )
+    )
+
+    assert stats_res.count == 0
+
+
 def generate_duplication_simple_table_data(
     client: WeaveClient, n_rows: int, copy_count: int
 ):
