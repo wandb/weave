@@ -82,8 +82,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from re import Pattern
+from typing import TypedDict
 
-import clickhouse_connect
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
 from tenacity import (
@@ -101,13 +101,7 @@ from weave.trace_server.database_engine import (
     EngineDiscoveryError,
     wait_for_database_engine,
 )
-from weave.trace_server.environment import (
-    wf_clickhouse_calls_shard_key,
-    wf_clickhouse_host,
-    wf_clickhouse_pass,
-    wf_clickhouse_port,
-    wf_clickhouse_user,
-)
+from weave.trace_server.environment import wf_clickhouse_calls_shard_key
 from weave.trace_server.migration_lock import (
     LOCK_ROW_GC_SECONDS,
     LOCK_TABLE,
@@ -193,19 +187,11 @@ def _default_trace_server_costs_post_migration_hook(
         insert_costs(ctx.ch_client, ctx.target_db)
 
 
-def _env_clickhouse_client_factory() -> CHClient:
-    """Build a fresh ClickHouse client from env for the lock heartbeat thread.
+class MigrationStatus(TypedDict):
+    """Current schema version of a database, read from the migrations table."""
 
-    The heartbeat needs its own connection (clients are not thread-safe). It
-    reads the same `WF_CLICKHOUSE_*` env the migrator runs against, so the
-    heartbeat works without the caller threading connection params through.
-    """
-    return clickhouse_connect.get_client(
-        host=wf_clickhouse_host(),
-        port=wf_clickhouse_port(),
-        user=wf_clickhouse_user(),
-        password=wf_clickhouse_pass(),
-    )
+    curr_version: int
+    partially_applied_version: int | None
 
 
 class BaseClickHouseTraceServerMigrator(ABC):
@@ -326,7 +312,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         attention, so the locked path can surface it as an error.
         """
         status = self._read_migration_status(target_db)
-        if status["partially_applied_version"]:
+        if status["partially_applied_version"] is not None:
             return True
         migration_map = self._get_migrations()
         return (
@@ -338,7 +324,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
             > 0
         )
 
-    def _read_migration_status(self, db_name: str) -> dict:
+    def _read_migration_status(self, db_name: str) -> MigrationStatus:
         """Read migration status without writing.
 
         Unlike `_get_migration_status`, this never seeds a row, so it is safe to
@@ -1432,8 +1418,7 @@ def get_clickhouse_trace_server_migrator(
     migration_dir: str | None = None,
     post_migration_hook: PostMigrationHook
     | None = _default_trace_server_costs_post_migration_hook,
-    heartbeat_client_factory: Callable[[], CHClient]
-    | None = _env_clickhouse_client_factory,
+    heartbeat_client_factory: Callable[[], CHClient] | None = None,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
 

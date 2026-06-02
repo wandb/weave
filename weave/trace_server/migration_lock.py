@@ -37,6 +37,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from weave.trace_server.environment import wf_clickhouse_disable_lightweight_update
+
 logger = logging.getLogger(__name__)
 
 LOCK_TABLE = "migration_lock"
@@ -177,17 +179,17 @@ def heartbeat(ch_client: CHClient, management_db: str, holder: str) -> None:
 def release(ch_client: CHClient, management_db: str, holder: str) -> None:
     """Release the lock by deleting our rows.
 
-    Uses a lightweight `DELETE FROM` (synchronously visible) rather than an
-    `ALTER TABLE ... DELETE` mutation, so waiters see the release promptly
-    instead of falling back to the lease TTL.
+    Prefers lightweight `DELETE FROM` (promptly visible); old ClickHouse without
+    it falls back to the async `ALTER ... DELETE` mutation via the env flag.
     """
     _validate_holder(holder)
+    where = "WHERE lock_id = 'migration' AND holder = %(holder)s"
+    if wf_clickhouse_disable_lightweight_update():
+        statement = f"ALTER TABLE {management_db}.{LOCK_TABLE} DELETE {where}"
+    else:
+        statement = f"DELETE FROM {management_db}.{LOCK_TABLE} {where}"
     try:
-        ch_client.command(
-            f"DELETE FROM {management_db}.{LOCK_TABLE} "
-            f"WHERE lock_id = 'migration' AND holder = %(holder)s",
-            parameters={"holder": holder},
-        )
+        ch_client.command(statement, parameters={"holder": holder})
     except Exception:
         logger.warning(
             "Failed to release migration lock (will expire via lease)", exc_info=True
@@ -293,5 +295,7 @@ def migration_lock(
     finally:
         stop.set()
         if hb_thread is not None:
-            hb_thread.join(timeout=LOCK_HEARTBEAT_INTERVAL_SECONDS)
+            # Drain any in-flight heartbeat before deleting, else a late insert
+            # resurrects the lock row after release.
+            hb_thread.join()
         release(ch_client, management_db, holder)

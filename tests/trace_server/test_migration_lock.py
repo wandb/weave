@@ -148,6 +148,31 @@ def test_migration_lock_acquires_releases_and_handles_errors():
     release(error_client, MANAGEMENT_DB, release_holder)  # should not raise
 
 
+@pytest.mark.parametrize(
+    ("disable_lightweight", "expected_prefix"),
+    [
+        (False, "DELETE FROM db_management.migration_lock"),
+        (True, "ALTER TABLE db_management.migration_lock DELETE"),
+    ],
+)
+def test_release_respects_lightweight_delete_flag(
+    monkeypatch, disable_lightweight, expected_prefix
+):
+    """Old ClickHouse without lightweight delete falls back to ALTER ... DELETE."""
+    monkeypatch.setattr(
+        "weave.trace_server.migration_lock.wf_clickhouse_disable_lightweight_update",
+        lambda: disable_lightweight,
+    )
+    ch_client = Mock()
+    holder = _generate_holder_id()
+
+    release(ch_client, MANAGEMENT_DB, holder)
+
+    stmt = ch_client.command.call_args[0][0]
+    assert stmt.startswith(expected_prefix)
+    assert ch_client.command.call_args.kwargs["parameters"] == {"holder": holder}
+
+
 # ---------------------------------------------------------------------------
 # Heartbeat / lease liveness
 # ---------------------------------------------------------------------------
