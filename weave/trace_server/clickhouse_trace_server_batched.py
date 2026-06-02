@@ -214,6 +214,9 @@ from weave.trace_server.llm_completion import (
     resolve_and_apply_prompt,
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
+from weave.trace_server.methods.feedback_aggregate import (
+    feedback_aggregate as feedback_aggregate_handler,
+)
 from weave.trace_server.methods.feedback_stats import (
     feedback_payload_schema as feedback_payload_schema_handler,
 )
@@ -1460,6 +1463,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Also includes window-level stats (min, max, avg, percentiles) over the full range.
         """
         return feedback_stats_handler(self, req)
+
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Query the feedback table for aggregate scores over time."""
+        return feedback_aggregate_handler(self, req)
 
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
