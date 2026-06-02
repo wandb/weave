@@ -4288,7 +4288,7 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
         SELECT raw_count AS count,
                toUInt8(0) AS has_more
         FROM (
-            SELECT uniqExactIf(calls_merged.id, calls_merged.op_name IS NOT NULL OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4313,7 +4313,7 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExactIf(calls_merged.id, calls_merged.op_name IS NOT NULL OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4421,7 +4421,7 @@ def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> 
               AND calls_merged.sortable_datetime < {pb_4:String}
               AND calls_merged.started_at > {pb_1:String}
               AND calls_merged.started_at < {pb_3:String}
-              AND calls_merged.op_name IS NOT NULL
+              AND isNotNull(calls_merged.op_name)
               AND calls_merged.id NOT IN (
                   SELECT calls_merged.id
                   FROM calls_merged

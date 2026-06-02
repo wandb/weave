@@ -3172,12 +3172,10 @@ def _optimized_unfiltered_calls_merged_count_query(
     """
     table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
     project_id_slot = param_slot(param_builder.add_param(project_id), "String")
-    op_name_not_null = get_field_by_name("op_name").null_check_sql(
-        param_builder, table_name, ReadTable.CALLS_MERGED, use_agg_fn=False, negate=True
-    )
+    started = f"isNotNull({table_name}.op_name)"  # op_name is start-only
     deleted = f"isNotNull({table_name}.deleted_at)"
     raw_count_expr = (
-        f"uniqExactIf({table_name}.id, {op_name_not_null} OR {deleted}) "
+        f"uniqExactIf({table_name}.id, {started} OR {deleted}) "
         f"- uniqExactIf({table_name}.id, {deleted})"
     )
     inner = (
@@ -3215,9 +3213,7 @@ def _optimized_time_filtered_calls_merged_count_query(
     # op_name is start-only, so its non-null-ness selects the start row and
     # drops orphaned call-ends -- matching the GROUP BY path's HAVING. Required
     # because since #6933 the end row carries started_at too.
-    op_name_not_null = get_field_by_name("op_name").null_check_sql(
-        param_builder, table_name, ReadTable.CALLS_MERGED, use_agg_fn=False, negate=True
-    )
+    started = f"isNotNull({table_name}.op_name)"
 
     exact_conditions: list[str] = []
     prefilter_conditions: list[str] = []
@@ -3257,7 +3253,7 @@ def _optimized_time_filtered_calls_merged_count_query(
         f"PREWHERE {table_name}.project_id = {project_id_slot} "
         f"WHERE {outer_prefilter} "
         f"AND {' AND '.join(exact_conditions)} "
-        f"AND {op_name_not_null} "
+        f"AND {started} "
         f"AND {table_name}.id NOT IN ({deleted_ids})"
     )
     return _wrap_raw_count_with_limit(inner, limit)
