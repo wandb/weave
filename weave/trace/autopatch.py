@@ -60,6 +60,7 @@ class AutopatchSettings(BaseModel):
     nvidia: IntegrationSettings | None = None
     smolagents: IntegrationSettings | None = None
     openai_agents: IntegrationSettings | None = None
+    openai_agents_otel: IntegrationSettings | None = None
     claude_agent_sdk: IntegrationSettings | None = None
     verdict: IntegrationSettings | None = None
     autogen: IntegrationSettings | None = None

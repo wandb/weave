@@ -18,8 +18,30 @@ export interface ToolInit {
   toolCallId?: string;
 }
 
+/**
+ * A tool invocation. Emits an `execute_tool` span carrying the tool name,
+ * the JSON-encoded arguments, the tool-call id, and the result.
+ *
+ * Created by `weave.startTool()` (or `turn.startTool()`, or
+ * `llm.startTool()`) and terminated with `end()`. Assign `result` before
+ * calling `end()` to record the tool's output on the span.
+ *
+ * @example
+ * const tool = weave.startTool({
+ *   name: tc.function.name,
+ *   args: tc.function.arguments,
+ *   toolCallId: tc.id,
+ * });
+ * try {
+ *   tool.result = await wikipediaSearch(JSON.parse(tc.function.arguments));
+ * } finally {
+ *   tool.end();
+ * }
+ */
 export class Tool {
-  /** Free-form result captured before `end()`. */
+  /**
+   * Tool output as a string. Recorded on `gen_ai.tool.call.result` at `end()`.
+   */
   result?: string;
 
   private _ended = false;
@@ -54,6 +76,10 @@ export class Tool {
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
   }
 
+  /**
+   * Flush `result` to the span and close it. Idempotent. Pass `error` to
+   * mark the span as failed.
+   */
   end(opts?: {error?: Error}): void {
     if (this._ended) {
       return;

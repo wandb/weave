@@ -305,6 +305,18 @@ class UserSettings:
     Can be overridden with the environment variable `WEAVE_DISABLE_WAL_SENDER`
     """
 
+    use_otel_v2: bool = False
+    """
+    Routes OTel-capable integrations through their OTel variant.
+
+    When True, integrations that ship a sibling OTel patcher (e.g. ``openai_agents``
+    → ``openai_agents_otel``) dispatch to the OTel variant on implicit
+    import-hook patching. Explicit ``patch_*`` calls are unaffected — they
+    always do exactly what their name says.
+
+    Can be overridden with the environment variable `WEAVE_USE_OTEL_V2`
+    """
+
 
 class _SettingsOverrides(TypedDict, total=False):
     """Typed kwargs accepted by :func:`override_settings`.
@@ -347,6 +359,7 @@ class _SettingsOverrides(TypedDict, total=False):
     enable_client_side_digests: bool
     enable_wal: bool
     disable_wal_sender: bool
+    use_otel_v2: bool
 
 
 # Resolve string annotations once at import; used for env-var coercion.
@@ -616,3 +629,8 @@ def should_disable_wal_sender() -> bool:
     return _env_or_default(
         "disable_wal_sender", _current_settings.get().disable_wal_sender
     )
+
+
+def should_use_otel_v2() -> bool:
+    """Returns whether OTel-capable integrations should use their OTel variant."""
+    return _env_or_default("use_otel_v2", _current_settings.get().use_otel_v2)

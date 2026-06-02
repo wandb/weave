@@ -33,7 +33,7 @@ def test_query_light_column_with_costs() -> None:
                         OR (calls_merged.op_name IS NULL))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING (((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
                 )
             ),
             all_calls AS (
@@ -189,7 +189,7 @@ def test_query_with_costs_and_attributes_order() -> None:
    GROUP BY (calls_merged.project_id,
              calls_merged.id)
    HAVING (((any(calls_merged.deleted_at) IS NULL))
-           AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+           AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
    ORDER BY (NOT (JSONType(any(calls_merged.attributes_dump)) = 'Null'
                   OR JSONType(any(calls_merged.attributes_dump)) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, CASE
                                                                                                                                                                                                                                                                                             WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
@@ -330,7 +330,7 @@ def test_query_with_costs_and_dynamic_summary_order() -> None:
    GROUP BY (calls_merged.project_id,
              calls_merged.id)
    HAVING (((any(calls_merged.deleted_at) IS NULL))
-           AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+           AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
    ORDER BY (NOT (JSONType(any(calls_merged.summary_dump), {pb_0:String}) = 'Null'
                   OR JSONType(any(calls_merged.summary_dump), {pb_0:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_1:String}), 'null'), '')) DESC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_1:String}), 'null'), '')) DESC),
      all_calls AS
@@ -452,7 +452,7 @@ def test_query_with_costs_and_feedback_order() -> None:
              GROUP BY (calls_merged.project_id,
                        calls_merged.id)
              HAVING (((any(calls_merged.deleted_at) IS NULL))
-                     AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                     AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
              ORDER BY (NOT (JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}, {pb_2:String}) = 'Null'
                             OR JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}, {pb_2:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_3:String}), 'null'), '')) DESC, toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_3:String}), 'null'), '')) DESC),
              all_calls AS
@@ -577,7 +577,7 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
                  GROUP BY (calls_merged.project_id,
                            calls_merged.id)
                  HAVING (((any(calls_merged.deleted_at) IS NULL))
-                         AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                         AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
                  ORDER BY (NOT (JSONType(any(calls_merged.attributes_dump), {pb_0:String}) = 'Null'
                                 OR JSONType(any(calls_merged.attributes_dump), {pb_0:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), '')) ASC),
                  all_calls AS
@@ -1034,7 +1034,7 @@ def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))),
              all_calls AS
           (SELECT calls_merged.id AS id,
                   CASE

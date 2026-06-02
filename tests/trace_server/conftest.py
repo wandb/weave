@@ -18,7 +18,11 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
+from weave.trace_server import (
+    clickhouse_trace_server_settings as ch_settings,
+)
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -176,6 +180,7 @@ def _reset_server_state(server: ClickHouseTraceServer) -> None:
     server._call_batch = []
     server._file_batch = []
     server._calls_complete_batch = []
+    server._bucket_uploads = BucketUploadBatch()
     server._flush_immediately = False
 
 
@@ -258,6 +263,18 @@ def _ch_session_server(
         ch_server.ch_client.close()
     except Exception:
         pass
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _disable_query_condition_cache() -> None:
+    # TODO: remove once https://github.com/ClickHouse/ClickHouse/issues/104781 ships.
+    # The bloom-filter CTE on calls_merged matches the trigger shape (PREWHERE
+    # pk-prefix + WHERE non-pk equality on a skip-indexed column) that poisons
+    # CH's query condition cache and returns wrong counts on subsequent reads.
+    # Force-off the setting for the test session by mutating the trace server's
+    # default settings dicts in place. Every query path goes through these.
+    ch_settings.CLICKHOUSE_BASE_QUERY_SETTINGS["use_query_condition_cache"] = 0
+    ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS["use_query_condition_cache"] = 0
 
 
 @pytest.fixture

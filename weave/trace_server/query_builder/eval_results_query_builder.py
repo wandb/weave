@@ -69,7 +69,7 @@ def _sort_filter_uses_inputs(
     pb = ParamBuilder()
     for f in filters:
         _process_query_to_conditions(
-            f.query, [], [], param_builder=pb, field_resolver=collector
+            f.query, param_builder=pb, field_resolver=collector
         )
     return found
 
@@ -337,7 +337,7 @@ def _build_having_clause(
         for f in filters:
             resolver = _make_field_resolver(f.evaluation_call_id)
             conditions, _ = _process_query_to_conditions(
-                f.query, [], [], param_builder=pb, field_resolver=resolver
+                f.query, param_builder=pb, field_resolver=resolver
             )
             having_parts.extend(conditions)
 
