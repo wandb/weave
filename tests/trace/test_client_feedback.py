@@ -238,3 +238,53 @@ def test_feedback_create_too_large(client):
     )
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(req)
+
+
+def test_feedback_query_created_at_filter(client):
+    """created_at filters accept ISO-8601 strings (regression for WB-34897).
+
+    ClickHouse rejects ISO `T`/`Z` strings against the `created_at`
+    DateTime64 column unless the server normalizes them, so this exercises the
+    feedback_query path end-to-end with a `created_at` bound and asserts on the
+    returned rows.
+    """
+    project_id = client.project_id
+    created = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            wb_user_id="VXNlcjoxOQ==",
+            weave_ref="weave:///entity/project/object/name:digest",
+            feedback_type="custom",
+            payload={"key": "value123"},
+        )
+    )
+
+    def query_since(bound: str) -> list[dict]:
+        res = client.server.feedback_query(
+            tsi.FeedbackQueryReq(
+                project_id=project_id,
+                fields=["id", "feedback_type", "payload"],
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$gte": [
+                                {"$getField": "created_at"},
+                                {"$literal": bound},
+                            ]
+                        }
+                    }
+                ),
+            )
+        )
+        return res.result
+
+    # A far-past bound returns the row just created; a far-future bound returns
+    # nothing. Both bounds carry the ISO `T`/`Z` shape that previously 500'd.
+    rows = query_since("2000-01-01T00:00:00.000000Z")
+    assert len(rows) == 1
+    assert rows[0] == {
+        "id": created.id,
+        "feedback_type": "custom",
+        "payload": {"key": "value123"},
+    }
+    assert query_since("2999-01-01T00:00:00.000000Z") == []
