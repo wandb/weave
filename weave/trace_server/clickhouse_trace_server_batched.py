@@ -2688,10 +2688,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         res = self.table_query_stats_batch(batch_req)
 
-        if len(res.tables) != 1:
-            logger.warning(
-                "Unexpected number of table_query_stats results: %d", len(res.tables)
-            )
+        if len(res.tables) == 0:
+            logger.warning("No table_query_stats results for digest %s", req.digest)
             return tsi.TableQueryStatsRes(count=0)
 
         count = res.tables[0].count
