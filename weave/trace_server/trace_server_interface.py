@@ -1188,6 +1188,38 @@ class FeedbackCreateReq(BaseModelStrict):
         examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
     )
 
+    # typed scorer outputs; populated by agent-monitor scorers
+    scorer_tags: list[str] = Field(
+        default_factory=list,
+        description="Tags applied to the ref by a scorer",
+        examples=[["nsfw", "high-quality"]],
+    )
+    scorer_tag_reasons: dict[str, str] = Field(
+        default_factory=dict,
+        description="reason text per tag, keyed by tag name",
+        examples=[{"nsfw": "Contains explicit language"}],
+    )
+    scorer_tag_confidences: dict[str, float] = Field(
+        default_factory=dict,
+        description="confidence (0-1) per tag, keyed by tag name",
+        examples=[{"nsfw": 0.92}],
+    )
+    scorer_ratings: dict[str, float] = Field(
+        default_factory=dict,
+        description="numeric ratings (0-1) keyed by rating name",
+        examples=[{"_rating_": 0.87}],
+    )
+    scorer_rating_reasons: dict[str, str] = Field(
+        default_factory=dict,
+        description="reason text per rating, keyed by rating name",
+        examples=[{"_rating_": "very confident response"}],
+    )
+    scorer_rating_confidences: dict[str, float] = Field(
+        default_factory=dict,
+        description="confidence (0-1) per rating, keyed by rating name",
+        examples=[{"_rating_": 0.92}],
+    )
+
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
