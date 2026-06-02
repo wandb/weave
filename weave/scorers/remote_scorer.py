@@ -1,6 +1,6 @@
 """Customer-hosted remote HTTP scorer configuration."""
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -110,6 +110,11 @@ class RemoteScorer(Scorer):
         >>> rs.endpoint_url
         'https://scoring.example.com/v1/score'
     """
+
+    # score()/summarize() are never executed in user code (the scoring worker
+    # POSTs to endpoint_url), so don't serialize them as op refs on publish.
+    # See pydantic_object_record / WB-33909.
+    _weave_exclude_ops_from_record: ClassVar[bool] = True
 
     @field_validator("endpoint_url", mode="before")
     @classmethod

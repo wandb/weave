@@ -3,12 +3,14 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
+from weave.flow.scorer import Scorer
 from weave.scorers.remote_scorer import (
     OAuthClientCredentialsConfig,
     RemoteScorer,
     StaticBearerAuthConfig,
     _validate_remote_scorer_endpoint_url,
 )
+from weave.trace.object_record import pydantic_object_record
 
 pytestmark = pytest.mark.trace_server
 
@@ -22,6 +24,29 @@ def test_remote_scorer_fields() -> None:
     assert rs.endpoint_url == "https://scoring.example.com/v1/score"
     assert rs.config == {"threshold": 0.9}
     assert rs.auth_config is None
+
+
+def test_remote_scorer_record_excludes_op_methods() -> None:
+    """WB-33909: RemoteScorer must not serialize score/summarize as op refs.
+
+    Publishing those embeds CustomWeaveType(Op) payloads that the scoring worker
+    rejects (``_assert_safe_scorer_payload``). RemoteScorer opts out via
+    ``_weave_exclude_ops_from_record``; a normal Scorer subclass still records
+    its ops.
+    """
+    rs = RemoteScorer(name="remote", endpoint_url="https://x.example.com/score")
+    record = pydantic_object_record(rs)
+    assert "score" not in record.__dict__
+    assert "summarize" not in record.__dict__
+    assert record.endpoint_url == "https://x.example.com/score"
+    assert record._class_name == "RemoteScorer"
+
+    class _PlainScorer(Scorer):
+        pass
+
+    plain_record = pydantic_object_record(_PlainScorer(name="plain"))
+    assert "score" in plain_record.__dict__
+    assert "summarize" in plain_record.__dict__
 
 
 def test_remote_scorer_oauth_auth_config_serializes_and_deserializes() -> None:
