@@ -28,6 +28,7 @@ from weave.trace_server.interface.feedback_types import (
 )
 from weave.trace_server.orm import Column, Row, Table
 from weave.trace_server.refs_internal_server_util import ensure_ref_is_valid
+from weave.trace_server.scorer_feedback import ScorerColumns, ScorerFeedbackFields
 from weave.trace_server.validation import (
     validate_purge_req_multiple,
     validate_purge_req_one,
@@ -96,97 +97,31 @@ def process_feedback_payload(
     return processed_payload
 
 
-def _optional_float(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        try:
-            return float(value)
-        except ValueError:
-            return None
-    return None
-
-
-def _optional_reason(value: Any) -> str | None:
-    if isinstance(value, str) and value:
-        return value
-    return None
-
-
-def _output_to_score_items(output: Any) -> list[dict[str, Any]]:
-    if isinstance(output, list):
-        return [item for item in output if isinstance(item, dict)]
-
-    if not isinstance(output, dict):
-        return []
-
-    scores = output.get("scores")
-    if isinstance(scores, list):
-        return [item for item in scores if isinstance(item, dict)]
-
-    if "value" in output:
-        return [output]
-
-    return []
+_MISSING_OUTPUT = object()
 
 
 def _derive_scorer_fields_from_payload(
     feedback_req: tsi.FeedbackCreateReq,
     processed_payload: dict[str, Any],
-) -> dict[str, Any]:
+) -> ScorerFeedbackFields:
     if not (
         feedback_type_is_runnable(feedback_req.feedback_type)
         or feedback_type_is_agent_monitor(feedback_req.feedback_type)
     ):
         return {}
 
-    output = processed_payload.get("output")
-    scorer_tags = []
-    scorer_tag_reasons = {}
-    scorer_tag_confidences = {}
-    scorer_ratings = {}
-    scorer_rating_reasons = {}
-    scorer_rating_confidences = {}
-    has_score_item = False
-
-    for score_item in _output_to_score_items(output):
-        value = score_item.get("value")
-        reason = _optional_reason(score_item.get("reason"))
-        confidence = _optional_float(score_item.get("confidence"))
-
-        if isinstance(value, str) and value:
-            has_score_item = True
-            scorer_tags.append(value)
-            if reason is not None:
-                scorer_tag_reasons[value] = reason
-            if confidence is not None:
-                scorer_tag_confidences[value] = confidence
-            continue
-
-        rating = _optional_float(value)
-        if rating is None:
-            continue
-
-        has_score_item = True
-        rating_name = "_rating_"
-        scorer_ratings[rating_name] = rating
-        if reason is not None:
-            scorer_rating_reasons[rating_name] = reason
-        if confidence is not None:
-            scorer_rating_confidences[rating_name] = confidence
-
-    if not has_score_item:
+    output = processed_payload.get("output", _MISSING_OUTPUT)
+    if output is _MISSING_OUTPUT:
         return {}
-    return {
-        "scorer_tags": scorer_tags,
-        "scorer_tag_reasons": scorer_tag_reasons,
-        "scorer_tag_confidences": scorer_tag_confidences,
-        "scorer_ratings": scorer_ratings,
-        "scorer_rating_reasons": scorer_rating_reasons,
-        "scorer_rating_confidences": scorer_rating_confidences,
-    }
+
+    try:
+        return ScorerColumns.from_raw_output(output).to_feedback_fields()
+    except (TypeError, ValueError, ValidationError) as e:
+        if feedback_type_is_agent_monitor(feedback_req.feedback_type):
+            raise InvalidRequest(
+                f"Invalid scorer output for feedback_type {feedback_req.feedback_type}: {e}"
+            ) from e
+        return {}
 
 
 def validate_feedback_create_req(
@@ -374,7 +309,7 @@ def format_feedback_to_row(
     feedback_id = feedback_req.id or generate_id()
     created_at = datetime.datetime.now(ZoneInfo("UTC"))
 
-    request_scorer_fields = {
+    request_scorer_fields: ScorerFeedbackFields = {
         "scorer_tags": feedback_req.scorer_tags,
         "scorer_tag_reasons": feedback_req.scorer_tag_reasons,
         "scorer_tag_confidences": feedback_req.scorer_tag_confidences,
@@ -383,7 +318,7 @@ def format_feedback_to_row(
         "scorer_rating_confidences": feedback_req.scorer_rating_confidences,
     }
 
-    scorer_fields = None
+    scorer_fields: ScorerFeedbackFields
 
     # If typed fields (scorer_*) exist on the feedback req object,
     # use those values. Otherwise, try to derive them from the output

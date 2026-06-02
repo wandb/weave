@@ -494,7 +494,7 @@ def test_runnable_feedback_derives_scorer_columns_from_score_output(
                 }
             },
             {
-                "scorer_tags": ["PII"],
+                "scorer_tags": ["pii"],
                 "scorer_tag_reasons": {},
                 "scorer_tag_confidences": {},
                 "scorer_ratings": {"_rating_": 0.7},
@@ -519,6 +519,58 @@ def test_runnable_feedback_derives_scorer_columns_from_score_output(
         assert row["payload"] == payload
         for key, value in expected.items():
             assert row[key] == value
+
+
+def test_scorer_output_derivation_handles_invalid_shapes_by_feedback_type(
+    client: WeaveClient,
+) -> None:
+    project_id = client.project_id
+    runnable_name = "signal_monitor"
+    runnable_ref = f"weave:///{project_id}/op/{runnable_name}:op_id_123"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+
+    create_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=f"weave:///{project_id}/call/call_id_runnable",
+            feedback_type=f"wandb.runnable.{runnable_name}",
+            payload={"output": {"passed": False}},
+            runnable_ref=runnable_ref,
+            call_ref=call_ref,
+        )
+    )
+    query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "id"},
+                            {"$literal": create_res.id},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert query_res.result[0]["scorer_tags"] == []
+    assert query_res.result[0]["scorer_ratings"] == {}
+
+    with pytest.raises(InvalidRequest, match="Invalid scorer output"):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/call_id_agent_monitor",
+                feedback_type="wandb.agent_monitor",
+                payload={"output": {"passed": False}},
+                runnable_ref=f"weave:///{project_id}/object/{runnable_name}:obj_id_123",
+                call_ref=call_ref,
+                trigger_ref=(
+                    f"weave:///{project_id}/object/{runnable_name}:trigger_id_123"
+                ),
+            )
+        )
 
 
 def test_agent_monitor_feedback(client: WeaveClient) -> None:
