@@ -4272,8 +4272,9 @@ def test_stats_query_calls_merged_unfiltered_limit_1_stays_with_pattern_1() -> N
 def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> None:
     """Unfiltered calls_merged stats with no limit takes the flat distinct-id path.
 
-    Two parallel aggregators on one scan dedupe ids and subtract those with any
-    soft-delete row. Matches the GROUP BY path's exclusion semantics exactly.
+    Inclusion-exclusion on one scan: count(started or deleted) - count(deleted)
+    = distinct non-deleted started ids. op_name (start-only) drops orphaned
+    call-ends, matching the GROUP BY path's exclusion semantics exactly.
     """
     req = tsi.CallsQueryStatsReq(project_id="project")
     pb = ParamBuilder("pb")
@@ -4287,7 +4288,7 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
         SELECT raw_count AS count,
                toUInt8(0) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqExactIf(calls_merged.id, calls_merged.op_name IS NOT NULL OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4312,7 +4313,7 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqExactIf(calls_merged.id, calls_merged.op_name IS NOT NULL OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,

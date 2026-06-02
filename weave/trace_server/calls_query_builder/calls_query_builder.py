@@ -3163,15 +3163,22 @@ def _optimized_unfiltered_calls_merged_count_query(
 ) -> str:
     """Flat distinct-id count for unfiltered calls_merged stats.
 
-    Two parallel aggregators in one scan: total distinct ids minus distinct ids
-    that have any row with deleted_at set. Matches the GROUP BY path's
-    `argMax(deleted_at) IS NULL` exclusion exactly.
+    Counts distinct non-deleted started ids in one scan via inclusion-exclusion:
+    count(started not deleted) = count(started or deleted) - count(deleted).
+    op_name is start-only and deleted_at is delete-row-only (never on the same
+    row), so this matches the GROUP BY path's `op_name IS NOT NULL AND
+    deleted_at IS NULL` HAVING -- dropping orphaned call-ends -- without the
+    second scan an anti-set needs.
     """
     table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
     project_id_slot = param_slot(param_builder.add_param(project_id), "String")
+    op_name_not_null = get_field_by_name("op_name").null_check_sql(
+        param_builder, table_name, ReadTable.CALLS_MERGED, use_agg_fn=False, negate=True
+    )
+    deleted = f"isNotNull({table_name}.deleted_at)"
     raw_count_expr = (
-        f"uniqExact({table_name}.id) "
-        f"- uniqExactIf({table_name}.id, isNotNull({table_name}.deleted_at))"
+        f"uniqExactIf({table_name}.id, {op_name_not_null} OR {deleted}) "
+        f"- uniqExactIf({table_name}.id, {deleted})"
     )
     inner = (
         f"SELECT {raw_count_expr} AS raw_count "
