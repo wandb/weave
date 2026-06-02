@@ -5,7 +5,7 @@ Abstracts away some of their differences and allows building up SQL queries in a
 import datetime
 import json
 import re
-from collections.abc import Callable, Hashable, Sequence
+from collections.abc import Callable, Collection, Hashable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, TypeAlias
 
@@ -159,6 +159,7 @@ class Table:
     # Fields derived from cols
     col_types: dict[str, ColumnType]
     json_cols: list[str]
+    datetime_cols: list[str]
     array_string_cols: list[str]
     map_string_cols: list[str]
     map_float_cols: list[str]
@@ -168,6 +169,7 @@ class Table:
         self.cols = cols or []
         self.col_types = {c.name: c.type for c in self.cols}
         self.json_cols = [c.name for c in self.cols if c.type == "json"]
+        self.datetime_cols = [c.name for c in self.cols if c.type == "datetime"]
         self.array_string_cols = [c.name for c in self.cols if c.type == "array_string"]
         self.map_string_cols = [
             c.name for c in self.cols if c.type == "map_string_string"
@@ -261,6 +263,7 @@ class Join:
 class Select:
     table: Table
     all_columns: list[str]
+    datetime_columns: list[str]
     joins: list[Join]
 
     action: Action
@@ -281,6 +284,7 @@ class Select:
         self.table = table
         self.action = action
         self.all_columns = [c.dbname() for c in table.cols]
+        self.datetime_columns = list(table.datetime_cols)
         self.joins = []
 
         self._project_id = None
@@ -298,6 +302,7 @@ class Select:
         self.joins.append(Join(table, query, join_type))
         for col in table.cols:
             self.all_columns.append(col.dbname())
+        self.datetime_columns.extend(table.datetime_cols)
         return self
 
     def project_id(self, project_id: str | None) -> "Select":
@@ -395,6 +400,7 @@ class Select:
                 map_string_columns=self.table.map_string_cols,
                 map_float_columns=self.table.map_float_cols,
                 param_builder=param_builder,
+                datetime_columns=self.datetime_columns,
             )
             joined = combine_conditions(query_conds, "AND")
             sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
@@ -414,6 +420,7 @@ class Select:
                 map_string_columns=self.table.map_string_cols,
                 map_float_columns=self.table.map_float_cols,
                 param_builder=param_builder,
+                datetime_columns=self.datetime_columns,
             )
             conditions.extend(query_conds)
 
@@ -578,6 +585,59 @@ def python_value_to_ch_type(value: Any) -> str:
         return "Nullable(String)"
     else:
         raise ValueError(f"Unknown value type: {value}")
+
+
+def timestamp_to_datetime_str(timestamp: float) -> str:
+    """Convert a unix timestamp to a ClickHouse-compatible datetime string.
+
+    Args:
+        timestamp (int | float): Unix timestamp in seconds.
+
+    Returns:
+        str: Datetime string in the format `YYYY-MM-DD HH:MM:SS.ffffff`,
+            matching the precision of ClickHouse `DateTime64(6)` columns.
+
+    Examples:
+        >>> timestamp_to_datetime_str(1709251200)
+        '2024-03-01 00:00:00.000000'
+    """
+    return datetime.datetime.fromtimestamp(
+        timestamp, tz=datetime.timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%S.%f")
+
+
+def parse_string_to_utc_timestamp(value: str) -> float | None:
+    """Parse a string date or datetime into a UTC unix timestamp (seconds).
+
+    Parsing is delegated to `datetime.datetime.fromisoformat`, which accepts
+    both date-only strings (`YYYY-MM-DD`, read as midnight) and full ISO-8601
+    datetimes. A trailing `Z` / `z` is treated as UTC, and naive datetimes are
+    assumed to be UTC wall time. Unparsable strings return `None`.
+
+    Examples:
+        >>> parse_string_to_utc_timestamp("2024-03-01")
+        1709251200.0
+        >>> parse_string_to_utc_timestamp("2024-03-01T12:00:00Z") == parse_string_to_utc_timestamp(
+        ...     "2024-03-01T12:00:00+00:00"
+        ... )
+        True
+        >>> parse_string_to_utc_timestamp("not a date") is None
+        True
+    """
+    s = value.strip()
+    if not s:
+        return None
+    if s.endswith(("Z", "z")):
+        s = s[:-1] + "+00:00"
+    try:
+        dt = datetime.datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    else:
+        dt = dt.astimezone(datetime.timezone.utc)
+    return dt.timestamp()
 
 
 def clickhouse_cast(inner_sql: str, cast: tsi_query.CastTo | None = None) -> str:
@@ -762,6 +822,57 @@ def _transform_external_field_to_internal_field(
     return field, param_builder, raw_fields_used
 
 
+def maybe_convert_datetime_operands(
+    operands: Sequence[tsi_query.Operand],
+    datetime_columns: Collection[str],
+) -> Sequence[tsi_query.Operand]:
+    """Normalize a literal compared against a DateTime column to a CH-native string.
+
+    ClickHouse rejects ISO-8601 strings carrying a `T` separator / `Z` suffix
+    (e.g. `2026-05-27T17:49:15.491230Z`) when comparing against a `DateTime64`
+    column (TYPE_MISMATCH, code 53). Numeric unix timestamps and parseable
+    strings are rewritten to the canonical `YYYY-MM-DD HH:MM:SS.ffffff` form,
+    which ClickHouse parses against DateTime columns.
+
+    Returns a new sequence with the conversion applied, or the original
+    sequence if neither operand is a DateTime field/parseable literal pair.
+    """
+    if len(operands) != 2:
+        return operands
+
+    field_idx = None
+    literal_idx = None
+    timestamp: float | None = None
+    for i, op in enumerate(operands):
+        if (
+            isinstance(op, tsi_query.GetFieldOperator)
+            and op.get_field_ in datetime_columns
+        ):
+            field_idx = i
+        elif isinstance(op, tsi_query.LiteralOperation):
+            lit = op.literal_
+            # bool is a subclass of int, but comparing a datetime to a bool is
+            # nonsensical -> leave it untouched.
+            if isinstance(lit, bool):
+                continue
+            if isinstance(lit, (int, float)):
+                literal_idx = i
+                timestamp = float(lit)
+            elif isinstance(lit, str):
+                parsed = parse_string_to_utc_timestamp(lit)
+                if parsed is not None:
+                    literal_idx = i
+                    timestamp = parsed
+
+    if field_idx is None or literal_idx is None or timestamp is None:
+        return operands
+
+    datetime_str = timestamp_to_datetime_str(timestamp)
+    new_operands = list(operands)
+    new_operands[literal_idx] = tsi_query.LiteralOperation(**{"$literal": datetime_str})
+    return new_operands
+
+
 def _operand_array_string_column(
     operand: tsi_query.Operand, array_string_columns: Sequence[str]
 ) -> str | None:
@@ -788,13 +899,19 @@ def _process_query_to_conditions(
     map_float_columns: Sequence[str] = (),
     param_builder: ParamBuilder | None = None,
     field_resolver: Callable[[str, ParamBuilder], tuple[str, set[str]]] | None = None,
+    datetime_columns: Collection[str] | None = None,
 ) -> tuple[list[str], set[str]]:
     """Converts a Query to a list of conditions for a clickhouse query.
 
     field_resolver, when provided, overrides the default field-to-SQL mapping
     for $getField operators. Used by eval_results to map fields like
     "scores.accuracy" to aggregated expressions (e.g. avg(...)).
+
+    datetime_columns names the top-level columns typed as DateTime so that
+    literals compared against them are normalized via
+    `maybe_convert_datetime_operands`.
     """
+    dt_columns = datetime_columns or ()
     pb = param_builder or ParamBuilder()
     conditions = []
     raw_fields_used = set()
@@ -897,6 +1014,10 @@ def _process_query_to_conditions(
     def process_binary_operands(
         lhs: tsi_query.Operand, rhs: tsi_query.Operand
     ) -> tuple[str, str]:
+        # Normalize datetime literals before cast inference: a literal compared
+        # against a DateTime column becomes a CH-native datetime string, so the
+        # peer-literal cast below correctly sees a string (not a numeric).
+        lhs, rhs = maybe_convert_datetime_operands((lhs, rhs), dt_columns)
         # Each side's cast is inferred from the peer literal: a numeric RHS
         # tells us to cast the LHS field, and vice versa. Without this, a
         # JSON_VALUE-extracted field comes through as a String while the
