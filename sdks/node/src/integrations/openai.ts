@@ -295,7 +295,7 @@ interface ResultState {
   _outputStaging?: Array<string>;
 }
 
-export const openAIStreamAPIstreamReducer: StreamReducer<
+const openAIStreamAPIstreamReducer: StreamReducer<
   StreamChunk,
   ResultState
 > = {
@@ -427,7 +427,7 @@ export const openAIStreamAPIstreamReducer: StreamReducer<
   },
 };
 
-export function summarizer(result: any) {
+function summarizer(result: any) {
   // Non-streaming mode
   if (result.usage != null && result.model != null) {
     return {
@@ -463,7 +463,7 @@ export function summarizer(result: any) {
   return {};
 }
 
-export function wrapOpenAIResponsesCreate(originalCreate: any) {
+function wrapOpenAIResponsesCreate(originalCreate: any) {
   const opRef = {
     __isOp: true as const,
     __name: 'create',
