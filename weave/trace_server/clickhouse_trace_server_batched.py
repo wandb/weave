@@ -6298,6 +6298,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ActionsExecuteBatchRes()
 
+    @tag_db_insert_path("completions_create")
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        prep = self._prepare_completion_request(req)
+        if isinstance(prep, tsi.CompletionsCreateRes):
+            return prep
+
+        info = prep.completion_model_info
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(
+            api_key=info.api_key,
+            inputs=req.inputs,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            vertex_credentials=info.vertex_credentials,
+        )
+        end_time = datetime.datetime.now()
+
+        return self._log_completion_call(req, prep, res, start_time, end_time)
+
     def _prepare_completion_request(
         self, req: tsi.CompletionsCreateReq
     ) -> "CompletionPrepResult | tsi.CompletionsCreateRes":
@@ -6433,28 +6455,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._insert_call_batch(batch_data)
 
         return tsi.CompletionsCreateRes(response=res.response, weave_call_id=call_id)
-
-    @tag_db_insert_path("completions_create")
-    def completions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
-        prep = self._prepare_completion_request(req)
-        if isinstance(prep, tsi.CompletionsCreateRes):
-            return prep
-
-        info = prep.completion_model_info
-        start_time = datetime.datetime.now()
-        res = lite_llm_completion(
-            api_key=info.api_key,
-            inputs=req.inputs,
-            provider=info.provider,
-            base_url=info.base_url,
-            extra_headers=info.extra_headers,
-            vertex_credentials=info.vertex_credentials,
-        )
-        end_time = datetime.datetime.now()
-
-        return self._log_completion_call(req, prep, res, start_time, end_time)
 
     # -------------------------------------------------------------------
     # Streaming variant
