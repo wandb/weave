@@ -7,7 +7,7 @@ from pydantic import Field
 import weave
 
 
-def test_weaveflow_op_wandb(client):
+def test_weaveflow_op_wandb(weave_active):
     @weave.op
     def custom_adder(a: int, b: int) -> int:
         return a + b
@@ -16,7 +16,7 @@ def test_weaveflow_op_wandb(client):
     assert res == 3
 
 
-def test_weaveflow_op_wandb_return_list(client):
+def test_weaveflow_op_wandb_return_list(weave_active):
     @weave.op
     def custom_adder(a: int, b: int) -> list[int]:
         return [a + b]
@@ -25,7 +25,7 @@ def test_weaveflow_op_wandb_return_list(client):
     assert res == [3]
 
 
-def test_weaveflow_object_wandb_with_opmethod(client):
+def test_weaveflow_object_wandb_with_opmethod(weave_active):
     class ATestObj(weave.Object):
         a: int
 
@@ -38,7 +38,7 @@ def test_weaveflow_object_wandb_with_opmethod(client):
     assert res == 3
 
 
-def test_weaveflow_nested_op(client):
+def test_weaveflow_nested_op(weave_active):
     @weave.op
     def adder(a: int, b: int) -> int:
         return a + b
@@ -52,7 +52,7 @@ def test_weaveflow_nested_op(client):
 
 
 @pytest.mark.asyncio
-async def test_async_ops(client):
+async def test_async_ops(weave_active):
     @weave.op
     async def async_op_add1(v: int) -> int:
         return v + 1
@@ -70,7 +70,7 @@ async def test_async_ops(client):
     assert len(list(async_op_add1.calls())) == 5
 
 
-def test_weaveflow_publish_numpy(client):
+def test_weaveflow_publish_numpy(weave_active):
     v = {"a": np.array([[1, 2, 3], [4, 5, 6]])}
     ref = weave.publish(v, "dict-with-numpy")
 
@@ -167,7 +167,7 @@ def test_construct_eval_with_dataset_get(client):
     weave.Evaluation(dataset=dataset2)
 
 
-def test_weave_op_mutates_and_returns_same_object(client):
+def test_weave_op_mutates_and_returns_same_object(weave_active):
     class Thing(weave.Object):
         tools: list = Field(default_factory=list)
 

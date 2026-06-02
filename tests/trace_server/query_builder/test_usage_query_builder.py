@@ -1050,7 +1050,7 @@ def test_trace_ids_filter():
                       AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
                       AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
                       AND cm.deleted_at IS NULL
-                      AND trace_id IN {pb_5:Array(String)}
+                      AND ifNull(trace_id, '') IN {pb_5:Array(String)}
                     GROUP BY project_id,
                              id)) ARRAY
               JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)

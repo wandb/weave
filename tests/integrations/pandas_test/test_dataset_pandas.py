@@ -4,7 +4,7 @@ import weave
 from weave import Dataset
 
 
-def test_op_save_with_global_df(client):
+def test_op_save_with_global_df(weave_active):
     df = pd.DataFrame({"a": ["a", "b", "c"]})
 
     @weave.op
@@ -23,7 +23,7 @@ def test_op_save_with_global_df(client):
     assert call.output == "a"
 
 
-def test_dataset(client):
+def test_dataset(weave_active):
     rows = [{"a": 1, "b": 2}, {"a": 3, "b": 4}, {"a": 5, "b": 6}]
     ds = Dataset(rows=rows)
     df = ds.to_pandas()
@@ -37,7 +37,7 @@ def test_dataset(client):
     assert ds.rows == ds2.rows
 
 
-def test_calls_to_dataframe(client):
+def test_calls_to_dataframe(weave_active):
     @weave.op
     def greet(name: str, age: int) -> str:
         return f"Hello, {name}! You are {age} years old."

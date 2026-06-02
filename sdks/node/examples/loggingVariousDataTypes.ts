@@ -25,7 +25,7 @@ const audioOp = weave.op(async function audio() {
 
 const datasetOp = weave.op(async function dataset() {
   return new weave.Dataset({
-    id: 'my-dataset',
+    name: 'my-dataset',
     rows: [
       {name: 'Alice', age: 10},
       {name: 'Bob', age: 20},

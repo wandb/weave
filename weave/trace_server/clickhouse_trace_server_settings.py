@@ -96,10 +96,18 @@ CLICKHOUSE_DEFAULT_COMMAND_SETTINGS = CLICKHOUSE_BASE_QUERY_SETTINGS
 # Only applied to endpoints that use lightweight updates: calls_complete updates,
 # annotation queue updates/deletes, and annotation queue progress updates.
 # Gated by WF_CLICKHOUSE_DISABLE_LIGHTWEIGHT_UPDATE env var for old CH versions.
+# `max_query_size` (default 256 KiB) gates the parser buffer; `_update_call_end_*`
+# uses client-side substitution that inlines `output_dump`/`summary_dump` into the
+# SQL body, so this needs headroom for realistic call outputs. 32 MiB matches the
+# `/call/*` request-body cap so the storage path doesn't reject what the request
+# layer already accepted.
 CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
     {}
     if wf_env.wf_clickhouse_disable_lightweight_update()
-    else {"allow_experimental_lightweight_update": 1}
+    else {
+        "allow_experimental_lightweight_update": 1,
+        "max_query_size": 32 * 1024 * 1024,
+    }
 )
 
 # The new ClickHouse query analyzer (v24+) has a bug serializing SortingStep
@@ -158,3 +166,17 @@ def update_settings_for_async_insert(
     if settings is not None:
         merged_settings.update(settings)
     return merged_settings
+
+
+# Streams the GROUP BY in (project_id, id) order so a LIMIT short-circuits.
+# Only safe when there is no ORDER BY — ClickHouse otherwise inserts a
+# SortingTransform after the in-order aggregate that nullifies the win.
+CLICKHOUSE_AGGREGATION_IN_ORDER_SETTINGS: dict[str, int | str] = {
+    "optimize_aggregation_in_order": 1,
+}
+
+
+def update_settings_for_aggregation_in_order(
+    settings: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
+    return {**(settings or {}), **CLICKHOUSE_AGGREGATION_IN_ORDER_SETTINGS}

@@ -546,6 +546,20 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
 
 
 @pytest.fixture
+def weave_active(client):
+    """Side-effect-only dependency on the `client` fixture.
+
+    Some tests don't reference the client object directly, but their body
+    uses `weave.publish` / `weave.ref` / `@weave.op` / `Evaluation` / etc.,
+    which all require a global Weave client to be set. Those tests declare
+    `weave_active` instead of `client` so the dependency on the *side effect*
+    (the global client being installed) is explicit at the call site, and so
+    we can later swap in a lighter setup without touching each test.
+    """
+    return client
+
+
+@pytest.fixture
 def no_autoflush(client):
     """Disable per-method autoflush for speed; call client.flush() before reads."""
     client.set_autoflush(False)

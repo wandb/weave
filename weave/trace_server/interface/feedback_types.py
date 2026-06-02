@@ -15,6 +15,7 @@ class FeedbackPayloadNoteReq(BaseModel):
 
 REACTION_FEEDBACK_TYPE = "wandb.reaction.1"
 NOTE_FEEDBACK_TYPE = "wandb.note.1"
+AGENT_MONITOR_FEEDBACK_TYPE = "wandb.agent_monitor"
 
 # Feedback types where multiple entries can exist per call per type.
 # When filtering on these, we use groupArrayIf (collect all values) + has()
@@ -48,6 +49,10 @@ def feedback_type_is_annotation(feedback_type: str) -> bool:
 
 def feedback_type_is_runnable(feedback_type: str) -> bool:
     return feedback_type.startswith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
+
+
+def feedback_type_is_agent_monitor(feedback_type: str) -> bool:
+    return feedback_type == AGENT_MONITOR_FEEDBACK_TYPE
 
 
 def runnable_feedback_selector(name: str) -> str:

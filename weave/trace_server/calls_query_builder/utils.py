@@ -1,5 +1,4 @@
 import contextlib
-import datetime
 import logging
 from collections.abc import Generator
 
@@ -11,6 +10,7 @@ from weave.trace_server.orm import (
     clickhouse_cast_json_value,
     quote_json_path_parts,
 )
+from weave.trace_server.project_version.types import ReadTable
 
 
 def safe_alias(field_name: str) -> str:
@@ -23,83 +23,21 @@ def param_slot(param_name: str, param_type: str) -> str:
     return f"{{{param_name}:{param_type}}}"
 
 
-def timestamp_to_datetime_str(timestamp: float) -> str:
-    """Convert a unix timestamp to a ClickHouse-compatible datetime string.
+def trace_id_index_expr(trace_id_sql: str, read_table: ReadTable) -> str:
+    """Wrap `trace_id_sql` to match the table's trace_id index expression.
 
-    Args:
-        timestamp (int | float): Unix timestamp in seconds.
-
-    Returns:
-        str: Datetime string in the format ``YYYY-MM-DD HH:MM:SS.ffffff``,
-            matching the precision of ClickHouse ``DateTime64(6)`` columns.
-
-    Examples:
-        >>> timestamp_to_datetime_str(1709251200)
-        '2024-03-01 00:00:00.000000'
+    Migration 031 builds `idx_trace_id_bloom` on `ifNull(trace_id, '')` because
+    `calls_merged.trace_id` is `SimpleAggregateFunction(any, Nullable(String))`
+    and a bloom filter on a Nullable column is not pruned by direct equality.
+    Predicates must match the index expression character-for-character to enable
+    granule pruning. On `calls_complete`, `trace_id` is non-nullable `String`
+    with an index on the raw column, so the raw expression is used.
     """
-    return datetime.datetime.fromtimestamp(
-        timestamp, tz=datetime.timezone.utc
-    ).strftime("%Y-%m-%d %H:%M:%S.%f")
-
-
-def parse_string_to_utc_timestamp(value: str) -> float | None:
-    """Parse a string date or datetime into a UTC unix timestamp (seconds).
-
-    Rules:
-
-    * ``YYYY-MM-DD`` (exactly 10 characters after strip) is interpreted as
-      midnight UTC on that calendar day.
-    * ISO-8601 datetimes are parsed via :func:`datetime.datetime.fromisoformat`.
-      ``Z`` / ``z`` suffix is accepted as UTC. Naive datetimes are treated as UTC
-      wall time.
-    * Unparsable strings return ``None`` (no conversion).
-
-    Args:
-        value: User-provided string literal.
-
-    Returns:
-        Unix timestamp in seconds in UTC, or ``None`` if not parseable.
-
-    Examples:
-        >>> parse_string_to_utc_timestamp("2024-03-01")
-        1709251200.0
-        >>> parse_string_to_utc_timestamp("2024-03-01T12:00:00Z") == parse_string_to_utc_timestamp(
-        ...     "2024-03-01T12:00:00+00:00"
-        ... )
-        True
-        >>> parse_string_to_utc_timestamp("not a date") is None
-        True
-    """
-    s = value.strip()
-    if not s:
-        return None
-
-    # Check for a date without a time
-    # string: 'YYYY-MM-DD'
-    # index:   0123456789
-    # length: 10
-    if len(s) == 10 and s[4] == "-" and s[7] == "-":
-        try:
-            d = datetime.date.fromisoformat(s)
-        except ValueError:
-            return None
-        dt = datetime.datetime.combine(
-            d, datetime.time.min, tzinfo=datetime.timezone.utc
-        )
-        return dt.timestamp()
-
-    iso = s
-    if iso.endswith(("Z", "z")):
-        iso = iso[:-1] + "+00:00"
-    try:
-        dt = datetime.datetime.fromisoformat(iso)
-    except ValueError:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
-    else:
-        dt = dt.astimezone(datetime.timezone.utc)
-    return dt.timestamp()
+    if read_table == ReadTable.CALLS_MERGED:
+        return f"ifNull({trace_id_sql}, '')"
+    if read_table == ReadTable.CALLS_COMPLETE:
+        return trace_id_sql
+    raise ValueError(f"Unhandled read_table: {read_table}")
 
 
 def safely_format_sql(

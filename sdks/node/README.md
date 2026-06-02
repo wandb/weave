@@ -242,4 +242,5 @@ Get your wandb API key from [here](https://wandb.ai/authorize).
 
 ## License
 
-This project is licensed under the Apaache2 License - see the [LICENSE](../LICENSE) file for details.
+This project is licensed under the Apache2 License - see the [LICENSE](../../LICENSE) file for details.
+
