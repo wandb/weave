@@ -2,6 +2,24 @@ import pytest
 
 from weave.trace_server import validation
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.validation_util import CHValidationError
+
+
+def test_parent_id_validator_normalizes_empty_string_to_none():
+    # None and "" both mean "root call, no parent" and must normalize to None.
+    # Some clients serialize a missing parent_id as "" instead of null; that
+    # empty string must not reach the UUID validator (doing so rejects the
+    # whole ingest batch with a 400).
+    assert validation.parent_id_validator(None) is None
+    assert validation.parent_id_validator("") is None
+
+    # A real parent_id is still validated and returned unchanged.
+    valid_uuid = "5f0b9b1e-0e2a-4a7e-9c3a-2b1c0d4e5f6a"
+    assert validation.parent_id_validator(valid_uuid) == valid_uuid
+
+    # A genuinely malformed (non-empty) parent_id is still rejected.
+    with pytest.raises(CHValidationError):
+        validation.parent_id_validator("not-a-uuid")
 
 
 def test_validate_dict_one_key():

@@ -519,6 +519,56 @@ def test_call_start_batch_invalid_trace_id_returns_400():
             assert "Invalid UUID" in error_with_status.message["reason"]
 
 
+def test_call_start_batch_empty_parent_id_accepted():
+    """An empty-string parent_id must be treated as null (root call), not rejected.
+
+    Regression test for: a root call whose missing parent_id is serialized as ""
+    (instead of null) was run through the UUID validator and rejected with a
+    CHValidationError, which dropped the entire batch with a 400 -- taking any
+    valid sibling calls down with it. parent_id is optional, so "" is now
+    normalized to None and the batch is accepted.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+
+    project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+    mock_query_result = MagicMock()
+    mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
+
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        trace_server = ClickHouseTraceServer(host="test_host")
+        mock_ch_client.query.return_value = mock_query_result
+
+        batch_req = tsi.CallCreateBatchReq(
+            batch=[
+                tsi.CallBatchStartMode(
+                    mode="start",
+                    req=tsi.CallStartReq(
+                        start=tsi.StartedCallSchemaForInsert(
+                            project_id=project_id,
+                            op_name="root_op",
+                            trace_id="11111111-1111-1111-1111-111111111111",
+                            parent_id="",  # empty string => root call, must be accepted
+                            started_at=datetime.datetime.now(datetime.timezone.utc),
+                            attributes={},
+                            inputs={},
+                        )
+                    ),
+                ),
+            ]
+        )
+
+        # The empty parent_id must not raise; the batch should be accepted and
+        # flushed (one insert), not rejected.
+        res = trace_server.call_start_batch(batch_req)
+        assert len(res.res) == 1
+        mock_ch_client.insert.assert_called()
+
+
 def test_obj_batch_mixed_projects_errors(trace_server, client):
     """Uploading objects to different projects in one batch should error."""
     if client_is_sqlite(client):

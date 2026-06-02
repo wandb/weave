@@ -26,7 +26,10 @@ def trace_id_validator(s: str) -> str:
 
 
 def parent_id_validator(s: str | None) -> str | None:
-    if s is None:
+    # An empty string means "no parent" (root call), same as None; some clients
+    # send "" instead of null/omitting it. Normalize so it skips the UUID check
+    # (otherwise "" is rejected and takes down the whole ingest batch).
+    if not s:
         return None
     return call_id_validator(s)
 
