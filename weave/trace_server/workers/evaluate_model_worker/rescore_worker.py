@@ -62,93 +62,10 @@ async def rescore_predictions(args: RescoringArgs) -> None:
     scorers = [_get_valid_scorer(client, ref) for ref in args.scorer_refs]
     scorer_attributes_list = [get_scorer_attributes(s) for s in scorers]
 
-    # raw_scores_by_scorer: indexed by scorer index (not ref URI, not name) to avoid
-    # collisions if two scorers share a name. Summary is keyed by scorer_name at the end.
-    raw_scores_by_scorer: list[list[Any]] = [[] for _ in scorers]
-    # failed_score_counts: tracks per-scorer failures so they surface in the summary
-    # and logs — a scorer failing on 50% of predictions is invisible without this.
-    failed_score_counts: list[int] = [0 for _ in scorers]
-
     try:
-        with weave.attributes(RESCORE_WORKER_MARKER):
-            offset = 0
-            while True:
-                page = list(
-                    client.server.prediction_list(
-                        tsi.PredictionListReq(
-                            project_id=args.project_id,
-                            evaluation_run_id=args.source_evaluation_run_id,
-                            limit=PREDICTION_PAGE_SIZE,
-                            offset=offset,
-                        )
-                    )
-                )
-                if not page:
-                    break
-
-                for prediction in page:
-                    # apply_scorer_async handles column_map, op tracing, kwargs — do not
-                    # call scorer.score() directly. signature: (scorer, example, model_output)
-                    # return_exceptions=True so one scorer failure doesn't abort the whole batch.
-                    results = await asyncio.gather(
-                        *[
-                            apply_scorer_async(
-                                scorer, prediction.inputs, prediction.output
-                            )
-                            for scorer in scorers
-                        ],
-                        return_exceptions=True,
-                    )
-
-                    for i, (result, scorer_ref) in enumerate(
-                        zip(results, args.scorer_refs, strict=True)
-                    ):
-                        if isinstance(result, Exception):
-                            logger.warning(
-                                "Scorer %s failed on prediction %s: %s",
-                                scorer_ref,
-                                prediction.prediction_id,
-                                result,
-                            )
-                            failed_score_counts[i] += 1
-                            continue
-                        raw_value = result.result  # raw Any — dict, bool, float, etc.
-                        client.server.score_create(
-                            tsi.ScoreCreateReq(
-                                project_id=args.project_id,
-                                prediction_id=prediction.prediction_id,
-                                scorer=scorer_ref,
-                                value=raw_value,
-                                evaluation_run_id=args.new_evaluation_run_id,
-                                wb_user_id=args.wb_user_id,
-                            )
-                        )
-                        raw_scores_by_scorer[i].append(raw_value)
-
-                offset += len(page)
-                if len(page) < PREDICTION_PAGE_SIZE:
-                    break
-
-        # Log per-scorer failure counts so partial failures are visible.
-        for i, scorer_attrs in enumerate(scorer_attributes_list):
-            if failed_score_counts[i] > 0:
-                logger.warning(
-                    "Scorer %s failed on %d prediction(s) — summary computed on %d/%d results",
-                    scorer_attrs.scorer_name,
-                    failed_score_counts[i],
-                    len(raw_scores_by_scorer[i]),
-                    len(raw_scores_by_scorer[i]) + failed_score_counts[i],
-                )
-
-        # Mirrors eval.py:230-235: summarize_fn handles both Scorer subclasses
-        # (scorer.summarize) and Op-based scorers (auto_summarize).
-        # Summary keyed by scorer_attributes.scorer_name — NOT the ref URI.
-        summary: dict[str, Any] = {}
-        for i, scorer_attrs in enumerate(scorer_attributes_list):
-            summary[scorer_attrs.scorer_name] = scorer_attrs.summarize_fn(
-                raw_scores_by_scorer[i]
-            )
-
+        summary = await _score_all_predictions(
+            client, args, scorers, scorer_attributes_list
+        )
         client.server.evaluation_run_finish(
             tsi.EvaluationRunFinishReq(
                 project_id=args.project_id,
@@ -179,6 +96,117 @@ async def rescore_predictions(args: RescoringArgs) -> None:
                 args.new_evaluation_run_id,
             )
         raise
+
+
+async def _score_all_predictions(
+    client: WeaveClient,
+    args: RescoringArgs,
+    scorers: list[Scorer],
+    scorer_attributes_list: list[Any],
+) -> dict[str, Any]:
+    """Paginate through source predictions, apply each scorer, persist scores, and return summary.
+
+    Summary is keyed by scorer_attributes.scorer_name (NOT the scorer ref URI) to match
+    eval.py:230-235. raw_scores_by_scorer is indexed by scorer position rather than name
+    to avoid collisions when two scorers share a name.
+    """
+    # failed_score_counts tracks per-scorer failures so partial failures surface in logs —
+    # a scorer failing on 50% of predictions is invisible without this.
+    raw_scores_by_scorer: list[list[Any]] = [[] for _ in scorers]
+    failed_score_counts: list[int] = [0 for _ in scorers]
+
+    with weave.attributes(RESCORE_WORKER_MARKER):
+        offset = 0
+        while True:
+            page = list(
+                client.server.prediction_list(
+                    tsi.PredictionListReq(
+                        project_id=args.project_id,
+                        evaluation_run_id=args.source_evaluation_run_id,
+                        limit=PREDICTION_PAGE_SIZE,
+                        offset=offset,
+                    )
+                )
+            )
+            if not page:
+                break
+
+            for prediction in page:
+                await _score_one_prediction(
+                    client,
+                    args,
+                    scorers,
+                    prediction,
+                    raw_scores_by_scorer,
+                    failed_score_counts,
+                )
+
+            offset += len(page)
+            if len(page) < PREDICTION_PAGE_SIZE:
+                break
+
+    for i, scorer_attrs in enumerate(scorer_attributes_list):
+        if failed_score_counts[i] > 0:
+            logger.warning(
+                "Scorer %s failed on %d prediction(s) — summary computed on %d/%d results",
+                scorer_attrs.scorer_name,
+                failed_score_counts[i],
+                len(raw_scores_by_scorer[i]),
+                len(raw_scores_by_scorer[i]) + failed_score_counts[i],
+            )
+
+    # Mirrors eval.py:230-235: summarize_fn handles both Scorer subclasses
+    # (scorer.summarize) and Op-based scorers (auto_summarize).
+    summary: dict[str, Any] = {}
+    for i, scorer_attrs in enumerate(scorer_attributes_list):
+        summary[scorer_attrs.scorer_name] = scorer_attrs.summarize_fn(
+            raw_scores_by_scorer[i]
+        )
+    return summary
+
+
+async def _score_one_prediction(
+    client: WeaveClient,
+    args: RescoringArgs,
+    scorers: list[Scorer],
+    prediction: tsi.PredictionReadRes,
+    raw_scores_by_scorer: list[list[Any]],
+    failed_score_counts: list[int],
+) -> None:
+    # apply_scorer_async handles column_map, op tracing, kwargs — do not call scorer.score()
+    # directly. return_exceptions=True so one scorer failure doesn't abort the batch.
+    results = await asyncio.gather(
+        *[
+            apply_scorer_async(scorer, prediction.inputs, prediction.output)
+            for scorer in scorers
+        ],
+        return_exceptions=True,
+    )
+
+    for i, (result, scorer_ref) in enumerate(
+        zip(results, args.scorer_refs, strict=True)
+    ):
+        if isinstance(result, Exception):
+            logger.warning(
+                "Scorer %s failed on prediction %s: %s",
+                scorer_ref,
+                prediction.prediction_id,
+                result,
+            )
+            failed_score_counts[i] += 1
+            continue
+        raw_value = result.result  # raw Any — dict, bool, float, etc.
+        client.server.score_create(
+            tsi.ScoreCreateReq(
+                project_id=args.project_id,
+                prediction_id=prediction.prediction_id,
+                scorer=scorer_ref,
+                value=raw_value,
+                evaluation_run_id=args.new_evaluation_run_id,
+                wb_user_id=args.wb_user_id,
+            )
+        )
+        raw_scores_by_scorer[i].append(raw_value)
 
 
 def _get_valid_scorer(client: WeaveClient, scorer_ref: str) -> Scorer:
