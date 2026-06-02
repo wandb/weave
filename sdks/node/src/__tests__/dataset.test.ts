@@ -4,7 +4,7 @@
 
 import {Dataset} from '../dataset';
 import {ObjectRef} from '../weaveObject';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 import {initWithCustomTraceServer} from './clientMock';
 import {requireGlobalClient} from '../clientApi';
 
