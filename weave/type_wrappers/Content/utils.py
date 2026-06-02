@@ -49,8 +49,8 @@ def _get_mimetypes_module() -> ModuleType:
     if _mimetypes_module is None:
         import mimetypes as _m
 
-        # Mimetypes is missing text/markdown, add it on first use.
         _m.add_type("text/markdown", ".md")
+        _m.add_type("audio/wav", ".wav")
         _mimetypes_module = _m
     return _mimetypes_module
 
