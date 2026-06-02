@@ -169,7 +169,7 @@ def validate_feedback_create_req(
     elif req.trigger_ref:
         raise InvalidRequest("trigger_ref is not allowed for non-runnable feedback")
 
-    # Typed scorer columns are reserved for agent monitor feedback.
+    # Typed scorer columns are reserved for scorer-generated feedback.
     scorer_fields_set = any(
         getattr(req, name)
         for name in (
@@ -181,11 +181,16 @@ def validate_feedback_create_req(
             "scorer_rating_confidences",
         )
     )
-    if scorer_fields_set and not feedback_type_is_agent_monitor(req.feedback_type):
+
+    is_runnable = feedback_type_is_runnable(req.feedback_type)
+    is_agent_monitor = feedback_type_is_agent_monitor(req.feedback_type)
+    scorer_fields_allowed = is_runnable or is_agent_monitor
+
+    if scorer_fields_set and not scorer_fields_allowed:
         raise InvalidRequest(
             "scorer_tags, scorer_tag_reasons, scorer_tag_confidences, "
             "scorer_ratings, scorer_rating_reasons, and scorer_rating_confidences "
-            "are only allowed on wandb.agent_monitor feedback"
+            "are only allowed on wandb.agent_monitor or wandb.runnable feedback"
         )
 
     # Validate the ref formats (we could even query the DB to ensure they exist and are valid)
