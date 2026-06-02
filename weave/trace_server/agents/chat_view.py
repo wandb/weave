@@ -434,6 +434,21 @@ def _extract_user_text(
     return "\n\n".join(texts)
 
 
+def first_user_preview_text(messages: list[NormalizedMessage]) -> str:
+    """Public: opening user-prompt text from a span's `input_messages`.
+
+    Used to build the conversation table's "first message" preview directly
+    from the grouped spans query, applying the same role resolution as the
+    full chat view so previews match the opened conversation.
+    """
+    return _extract_user_text(messages, last_only=True)
+
+
+def last_assistant_preview_text(messages: list[NormalizedMessage]) -> str:
+    """Public: final assistant/output text from a span's `output_messages`."""
+    return _extract_non_user_output_text(messages)
+
+
 def _extract_non_user_output_text(messages: list[NormalizedMessage]) -> str:
     """Extract renderable output text from normalized output_messages.
 
