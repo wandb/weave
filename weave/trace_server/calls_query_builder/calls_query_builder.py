@@ -58,10 +58,8 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
-    parse_string_to_utc_timestamp,
     safe_alias,
     safely_format_sql,
-    timestamp_to_datetime_str,
     trace_id_index_expr,
 )
 from weave.trace_server.common_interface import SortBy
@@ -76,6 +74,7 @@ from weave.trace_server.orm import (
     ParamBuilder,
     clickhouse_cast,
     combine_conditions,
+    maybe_convert_datetime_operands,
     python_value_to_ch_type,
     split_escaped_field_path,
 )
@@ -248,8 +247,9 @@ class CallsMergedDynamicField(CallsMergedAggField):
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         if self.extra_path:
-            raise NotImplementedError(
-                "Dynamic fields cannot be selected directly, yet - implement me!"
+            raise InvalidFieldError(
+                f"Field '{self.field}.{'.'.join(self.extra_path)}' cannot be selected directly; "
+                "select the parent column instead."
             )
         # Use the parent (CallsMergedAggField) as_sql to get the aggregate
         # expression without the JSON extraction that our own as_sql adds.
@@ -287,8 +287,8 @@ class CallsMergedSummaryField(CallsMergedField):
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
-            raise NotImplementedError(
-                f"Summary field '{self.summary_field}' not implemented. "
+            raise InvalidFieldError(
+                f"Summary field '{self.summary_field}' is not allowed. "
                 f"Supported fields are: {supported_fields}"
             )
 
@@ -418,8 +418,9 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
-        raise NotImplementedError(
-            "Feedback fields cannot be selected directly, yet - implement me!"
+        raise InvalidFieldError(
+            "Feedback fields cannot be selected directly. "
+            "Use the feedback endpoints to read feedback payloads."
         )
 
 
@@ -460,8 +461,9 @@ class CallsMergedQueueItemField(CallsMergedField):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
-        raise NotImplementedError(
-            "Queue item fields cannot be selected directly, yet - implement me!"
+        raise InvalidFieldError(
+            "Annotation queue item fields cannot be selected directly; "
+            "use the annotation queue endpoints instead."
         )
 
 
@@ -539,8 +541,9 @@ class QueryBuilderDynamicField(QueryBuilderField):
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         if self.extra_path:
-            raise NotImplementedError(
-                "Dynamic fields cannot be selected directly, yet - implement me!"
+            raise InvalidFieldError(
+                f"Field '{self.field}.{'.'.join(self.extra_path)}' cannot be selected directly; "
+                "select the parent column instead."
             )
         return super().as_select_sql(pb, table_alias, use_agg_fn=use_agg_fn)
 
@@ -2109,40 +2112,7 @@ def _maybe_convert_datetime_operands(
         >>> ops2[1].literal_
         '2024-03-01 00:00:00.000000'
     """
-    if len(operands) != 2:
-        return operands
-
-    field_idx = None
-    literal_idx = None
-    timestamp: float | None = None
-
-    for i, op in enumerate(operands):
-        if (
-            isinstance(op, tsi_query.GetFieldOperator)
-            and op.get_field_ in DATETIME_COLUMN_FIELDS
-        ):
-            field_idx = i
-        elif isinstance(op, tsi_query.LiteralOperation):
-            lit = op.literal_
-            if isinstance(lit, (int, float)):
-                literal_idx = i
-                timestamp = float(lit)
-            elif isinstance(lit, str):
-                parsed = parse_string_to_utc_timestamp(lit)
-                if parsed is not None:
-                    literal_idx = i
-                    timestamp = parsed
-
-    if field_idx is None or literal_idx is None or timestamp is None:
-        return operands
-
-    # Convert numeric timestamp to datetime string for proper DateTime64 comparison
-    assert isinstance(timestamp, float)
-    datetime_str = timestamp_to_datetime_str(timestamp)
-
-    new_operands = list(operands)
-    new_operands[literal_idx] = tsi_query.LiteralOperation(**{"$literal": datetime_str})
-    return new_operands
+    return maybe_convert_datetime_operands(operands, DATETIME_COLUMN_FIELDS)
 
 
 def _extract_field_name(operand: "tsi_query.Operand") -> str | None:

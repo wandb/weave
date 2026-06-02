@@ -414,6 +414,8 @@ def _feedback_table() -> Table:
         "feedback",
         [
             Column("id", "string"),
+            Column("feedback_type", "string"),
+            Column("created_at", "datetime"),
             Column("payload", "json", db_name="payload_dump"),
         ],
     )
@@ -710,3 +712,47 @@ def test_feedback_query_in_mixed_literal_list_keeps_uncast_path() -> None:
         "WHERE (toString(JSON_VALUE(payload_dump, {pb_0:String})) "
         "IN ({pb_1:Int64},{pb_2:String}))"
     )
+
+
+@pytest.mark.parametrize(
+    ("field", "literal", "expected_param"),
+    [
+        # Regression for WB-34897: the exact ISO-8601 shape (T separator + Z
+        # suffix) ClickHouse rejected against a DateTime64 column.
+        ("created_at", "2026-05-27T17:49:15.491230Z", "2026-05-27 17:49:15.491230"),
+        ("created_at", "2026-05-27T17:49:15", "2026-05-27 17:49:15.000000"),
+        ("created_at", "2026-05-27", "2026-05-27 00:00:00.000000"),
+        # Numeric unix timestamps normalize to the same canonical form.
+        ("created_at", 1709251200, "2024-03-01 00:00:00.000000"),
+        # A non-DateTime column with an ISO-looking string is left untouched.
+        (
+            "feedback_type",
+            "2026-05-27T17:49:15.491230Z",
+            "2026-05-27T17:49:15.491230Z",
+        ),
+    ],
+)
+def test_feedback_query_normalizes_datetime_literal(
+    field, literal, expected_param
+) -> None:
+    """DateTime-column literals are rewritten to CH-native datetime strings.
+
+    ClickHouse cannot convert ISO-8601 `T`/`Z` strings to DateTime64, so a
+    literal compared against a DateTime column is normalized to the canonical
+    `YYYY-MM-DD HH:MM:SS.ffffff` form. Non-DateTime columns are unaffected.
+    """
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{"$expr": {"$gte": [{"$getField": field}, {"$literal": literal}]}}
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    assert prepared.sql == (
+        f"SELECT id\nFROM feedback\nWHERE ({field} >= {{pb_0:String}})"
+    )
+    assert prepared.parameters == {"pb_0": expected_param}

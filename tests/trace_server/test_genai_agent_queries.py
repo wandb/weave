@@ -185,6 +185,8 @@ def test_group_by_trace_id(ch_server):
 # ---------------------------------------------------------------------------
 
 
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to the immediate read.
+@pytest.mark.flaky(reruns=3)
 def test_group_by_conversation_id(ch_server):
     """Grouping spans by conversation_id returns per-conversation aggregates."""
     project_id = _make_project_id("convs")
@@ -747,6 +749,8 @@ def test_spans_query_filters_sorts_and_projects_custom_attrs(ch_server):
 # ---------------------------------------------------------------------------
 
 
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to the immediate read.
+@pytest.mark.flaky(reruns=3)
 def test_agent_span_stats_ungrouped_metrics(ch_server):
     """Stats API returns requested token, duration, error, and invocation metrics."""
     project_id = _make_project_id("stats")

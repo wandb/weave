@@ -2688,8 +2688,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         res = self.table_query_stats_batch(batch_req)
 
-        if len(res.tables) != 1:
-            logger.exception(RuntimeError("Unexpected number of results", res))
+        if len(res.tables) == 0:
+            logger.warning("No table_query_stats results for digest %s", req.digest)
+            return tsi.TableQueryStatsRes(count=0)
 
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)
@@ -6311,7 +6312,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.ActionsExecuteBatchRes()
         if len(req.call_ids) > 1:
             # This is temporary until we setup our batching infrastructure
-            raise NotImplementedError("Batching actions is not yet supported")
+            raise InvalidRequest(
+                "Batching actions is not yet supported; submit one call_id at a time."
+            )
 
         # For now, we just execute in-process if it is a single action
         execute_batch(

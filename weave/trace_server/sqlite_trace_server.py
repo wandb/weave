@@ -2547,8 +2547,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         res = self.table_query_stats_batch(batch_req)
 
-        if len(res.tables) != 1:
-            raise RuntimeError("Unexpected number of results", res)
+        if len(res.tables) == 0:
+            logger.warning("No table_query_stats results for digest %s", req.digest)
+            return tsi.TableQueryStatsRes(count=0)
 
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)
