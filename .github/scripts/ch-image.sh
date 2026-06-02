@@ -19,7 +19,10 @@ if docker pull "$ghcr" 1>&2 2>/dev/null; then
 fi
 
 echo "Mirroring ${hub} -> ${ghcr}" 1>&2
-docker pull "$hub" 1>&2
+if ! docker pull "$hub" 1>&2; then
+  echo "Failed to pull ${hub}" 1>&2
+  exit 1
+fi
 docker tag "$hub" "$ghcr"
 if docker push "$ghcr" 1>&2; then
   echo "$ghcr"
