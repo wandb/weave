@@ -11,7 +11,14 @@ T = TypeVar("T")
 TEST_ENTITY = "shawn"
 
 # Attribute names used by each middleware layer to reference the next server.
-_NEXT_SERVER_ATTRS = ("server", "_next_trace_server", "_internal_trace_server")
+# `_inner` (EventuallyConsistentServer) is checked first: its __getattr__ would
+# otherwise delegate `_internal_trace_server` to the layer below, skipping it.
+_NEXT_SERVER_ATTRS = (
+    "_inner",
+    "server",
+    "_next_trace_server",
+    "_internal_trace_server",
+)
 
 
 def find_server_layer(server: tsi.TraceServerInterface, layer_type: type[T]) -> T:

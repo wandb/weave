@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
+from tests.trace_server.eventually_consistent import EventuallyConsistentServer
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
@@ -460,6 +461,11 @@ def create_client(
         server = RemoteHTTPTraceServer(trace_server_flag)
     else:
         server = trace_server
+
+    # On ClickHouse, retry reads once on empty/not-found below the cache to mask
+    # rare read-your-write lag (WB-35048). SQLite is synchronous, so skip it.
+    if trace_server_flag == "clickhouse":
+        server = EventuallyConsistentServer(server)
 
     # Removing this as it lead to passing tests that were not passing in prod!
     # Keeping off for now until it is the default behavior.

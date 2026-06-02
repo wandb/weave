@@ -13,7 +13,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     UserInjectingExternalTraceServer,
     externalize_trace_server,
 )
-from tests.trace_server.eventually_consistent import EventuallyConsistentAgentServer
+from tests.trace_server.eventually_consistent import EventuallyConsistentServer
 from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
@@ -393,7 +393,7 @@ def ch_server(trace_server):
     server = trace_server._internal_trace_server
     if not isinstance(server, ClickHouseTraceServer):
         pytest.skip("ClickHouse-only test")
-    return EventuallyConsistentAgentServer(server)
+    return EventuallyConsistentServer(server)
 
 
 @pytest.fixture
