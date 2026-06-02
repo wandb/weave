@@ -1,5 +1,6 @@
 import base64
 import json
+from dataclasses import dataclass
 from typing import TypedDict
 
 from google.oauth2.credentials import Credentials as GCPCredentials
@@ -20,17 +21,32 @@ class AWSCredentials(TypedDict):
     region: NotRequired[str | None]
 
 
-class AzureConnectionCredentials(TypedDict):
+@dataclass
+class AzureConnectionCredentials:
     """Azure authentication using connection string format."""
 
     connection_string: str
 
 
-class AzureAccountCredentials(TypedDict):
+@dataclass
+class AzureAccountCredentials:
     """Azure authentication using account-based credentials."""
 
     access_key: str
-    account_url: NotRequired[str | None]
+    account_url: str | None = None
+
+
+@dataclass
+class AzureFederatedCredentials:
+    """Azure authentication via workload-identity federation (BYOB).
+
+    Mirrors gorilla's `azidentity.NewWorkloadIdentityCredential`: the pod's
+    federated token plus the customer tenant/client ID, no shared secret.
+    """
+
+    tenant_id: str
+    client_id: str
+    account_url: str | None = None
 
 
 def get_aws_credentials() -> AWSCredentials:

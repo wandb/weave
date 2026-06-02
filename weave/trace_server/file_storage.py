@@ -51,6 +51,7 @@ from azure.core.exceptions import (
     ResourceExistsError,
     ResourceNotFoundError,
 )
+from azure.identity import WorkloadIdentityCredential
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -72,6 +73,7 @@ from weave.trace_server.file_storage_credentials import (
     AWSCredentials,
     AzureAccountCredentials,
     AzureConnectionCredentials,
+    AzureFederatedCredentials,
     get_aws_credentials,
     get_azure_credentials,
     get_gcp_credentials,
@@ -360,34 +362,48 @@ class AzureStorageClient(FileStorageClient):
     def __init__(
         self,
         base_uri: FileStorageURI,
-        credentials: AzureConnectionCredentials | AzureAccountCredentials,
+        credentials: AzureConnectionCredentials
+        | AzureAccountCredentials
+        | AzureFederatedCredentials,
     ):
-        """Initialize Azure client with either connection string or account credentials."""
+        """Initialize Azure client with connection string, account, or federated credentials."""
         assert isinstance(base_uri, AzureFileStorageURI)
         super().__init__(base_uri)
         self.credentials = credentials
 
     def _get_client(self, account: str) -> BlobServiceClient:
-        """Create Azure client based on available credentials (connection string or account)."""
-        if "connection_string" in self.credentials:
-            connection_creds = cast(AzureConnectionCredentials, self.credentials)
+        """Create Azure client from connection string, account key, or workload-identity federation."""
+        creds = self.credentials
+        if isinstance(creds, AzureConnectionCredentials):
             return BlobServiceClient.from_connection_string(
-                connection_creds["connection_string"],
+                creds.connection_string,
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
-        else:
-            account_creds = cast(AzureAccountCredentials, self.credentials)
-            if account_url := account_creds.get("account_url"):
-                pass
-            else:
-                account_url = f"https://{account}.blob.core.windows.net/"
+        if isinstance(creds, AzureFederatedCredentials):
+            account_url = (
+                creds.account_url or f"https://{account}.blob.core.windows.net/"
+            )
             return BlobServiceClient(
                 account_url=account_url,
-                credential=account_creds["access_key"],
+                credential=WorkloadIdentityCredential(
+                    tenant_id=creds.tenant_id,
+                    client_id=creds.client_id,
+                ),
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
+        if isinstance(creds, AzureAccountCredentials):
+            account_url = (
+                creds.account_url or f"https://{account}.blob.core.windows.net/"
+            )
+            return BlobServiceClient(
+                account_url=account_url,
+                credential=creds.access_key,
+                connection_timeout=DEFAULT_CONNECT_TIMEOUT,
+                read_timeout=DEFAULT_READ_TIMEOUT,
+            )
+        raise TypeError(f"unsupported Azure credential type: {type(creds).__name__}")
 
     @create_retry_decorator("azure_storage")
     def store(self, uri: FileStorageURI, data: bytes) -> None:
