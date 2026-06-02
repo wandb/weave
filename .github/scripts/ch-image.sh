@@ -10,10 +10,11 @@ ghcr="ghcr.io/wandb/clickhouse-server:${tag}"
 hub="clickhouse/clickhouse-server:${tag}"
 
 if [ -n "${GITHUB_TOKEN:-}" ]; then
+  # best-effort: fork/dependabot PRs lack packages:write and fall back to the Hub path below.
   echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR:-wandb}" --password-stdin 1>&2 || true
 fi
 
-if docker pull "$ghcr" 1>&2 2>/dev/null; then
+if docker pull "$ghcr" 1>&2; then
   echo "$ghcr"
   exit 0
 fi
