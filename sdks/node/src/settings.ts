@@ -33,14 +33,7 @@ export class Settings {
   ) {}
 
   get shouldPrintCallLink(): boolean {
-    if (process.env.WEAVE_PRINT_CALL_LINK === 'true') {
-      return true;
-    }
-    if (process.env.WEAVE_PRINT_CALL_LINK === 'false') {
-      return false;
-    }
-
-    return this.printCallLink;
+    return parseEnvVar(process.env.WEAVE_PRINT_CALL_LINK) ?? this.printCallLink;
   }
 
   get attributes(): Record<string, any> {
@@ -57,4 +50,21 @@ export function makeSettings(settings?: SettingsInit): Settings {
     settings.globalAttributes ?? {},
     settings.genai ?? {}
   );
+}
+
+export function shouldUseOtelV2(): boolean {
+  return parseEnvVar(process.env.WEAVE_USE_OTEL_V2) ?? false;
+}
+
+function parseEnvVar(val: string | undefined): boolean | undefined {
+  switch (val) {
+    case 'true':
+      return true;
+
+    case 'false':
+      return false;
+
+    default:
+      return undefined;
+  }
 }
