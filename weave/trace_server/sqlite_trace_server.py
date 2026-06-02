@@ -2547,8 +2547,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         res = self.table_query_stats_batch(batch_req)
 
-        # A missing/deleted/mismatched digest returns no rows, so the batch
-        # result is empty. Treat that as a not-found (count=0) rather than erroring.
         if len(res.tables) != 1:
             logger.warning(
                 "Unexpected number of table_query_stats results: %d", len(res.tables)
