@@ -9,6 +9,7 @@ from tests.conftest import LATENCY_TOL
 from tests.trace.util import client_is_sqlite
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
+from weave.trace.serialization.custom_objs import UnsafeDeserializationError
 from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
@@ -28,6 +29,7 @@ from weave.trace_server.trace_server_interface import (
     EvaluationStatusNotFound,
     EvaluationStatusReq,
     EvaluationStatusRunning,
+    FileCreateReq,
     GenAISpanRef,
     ObjCreateReq,
     PredictionCreateReq,
@@ -404,6 +406,166 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
             "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
             "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
         }
+
+
+# The guard raises inside the lazy row-decode threadpool, which logs the failure
+# at ERROR before it propagates out of asyncio.run; that log is the expected path.
+@pytest.mark.disable_logging_error_check
+def test_evaluate_model_rejects_unsafe_dataset_row(client):
+    """An Op node in a dataset row must be refused at decode time, not loaded and
+    executed (WB-34909).
+
+    The evaluation and dataset objects carry no custom types themselves; the Op
+    CustomWeaveType lives in a table row that is only fetched and deserialized
+    lazily during evaluation. The worker disables unsafe custom-object decode, so
+    materializing that row raises instead of importing the code.
+    """
+    project_id = client.project_id
+    entity, project = from_project_id(project_id)
+    server = client.server
+
+    def _obj(object_id: str, val: dict, builtin: str | None = None) -> str:
+        obj = {"project_id": project_id, "object_id": object_id, "val": val}
+        if builtin is not None:
+            obj["builtin_object_class"] = builtin
+        res = server.obj_create(ObjCreateReq.model_validate({"obj": obj}))
+        return ObjectRef(
+            entity=entity, project=project, name=object_id, _digest=res.digest
+        ).uri
+
+    # A real file so the lazy file fetch succeeds; the decode guard, not a missing
+    # file, is what must stop the Op row from being reconstructed.
+    file_res = server.file_create(
+        FileCreateReq(project_id=project_id, name="obj.py", content=b"print('hi')")
+    )
+    table_res = server.table_create(
+        TableCreateReq.model_validate(
+            {
+                "table": {
+                    "project_id": project_id,
+                    "rows": [
+                        {"input": "ok"},
+                        {
+                            "input": {
+                                "_type": "CustomWeaveType",
+                                "weave_type": {"type": "Op"},
+                                "files": {"obj.py": file_res.digest},
+                                "load_op": None,
+                            }
+                        },
+                    ],
+                }
+            }
+        )
+    )
+    dataset_ref = _obj(
+        "dataset_with_custom_row",
+        {
+            "_type": "Dataset",
+            "_class_name": "Dataset",
+            "_bases": ["BaseModel", "Object", "Dataset"],
+            "rows": f"weave:///{project_id}/table/{table_res.digest}",
+        },
+    )
+    evaluation_ref = _obj(
+        "eval_with_custom_row",
+        {
+            "_type": "Evaluation",
+            "_class_name": "Evaluation",
+            "_bases": ["BaseModel", "Object", "Evaluation"],
+            "dataset": dataset_ref,
+            "scorers": None,
+        },
+    )
+    model_ref = _obj(
+        "valid_model",
+        {"llm_model_id": "gpt-4o-mini", "default_params": {}},
+        builtin="LLMStructuredCompletionModel",
+    )
+
+    with pytest.raises(UnsafeDeserializationError):
+        evaluate_model_worker.evaluate_model(
+            evaluate_model_worker.EvaluateModelArgs(
+                project_id=project_id,
+                evaluation_ref=evaluation_ref,
+                model_ref=model_ref,
+                wb_user_id=entity,
+                evaluation_call_id=generate_id(),
+            )
+        )
+
+
+@pytest.mark.parametrize("op_arg", ["evaluation_ref", "model_ref"])
+def test_evaluate_model_rejects_op_ref_as_eval_or_model_ref(client, op_arg):
+    """An op ref passed directly as the evaluation_ref/model_ref must be refused at
+    decode time (WB-34909). This pins the guarantee that replaced the deleted
+    `_assert_safe_ref` pre-check: `client.get` of an op ref reconstructs an `Op`
+    CustomWeaveType, which the secure worker client refuses instead of importing.
+    """
+    project_id = client.project_id
+    entity, project = from_project_id(project_id)
+    server = client.server
+
+    def _obj(object_id: str, val: dict, builtin: str | None = None) -> str:
+        obj = {"project_id": project_id, "object_id": object_id, "val": val}
+        if builtin is not None:
+            obj["builtin_object_class"] = builtin
+        res = server.obj_create(ObjCreateReq.model_validate({"obj": obj}))
+        return ObjectRef(
+            entity=entity, project=project, name=object_id, _digest=res.digest
+        ).uri
+
+    @weave.op
+    def sneaky(a: int) -> int:
+        return a + 1
+
+    op_ref = weave.publish(sneaky).uri()
+
+    table_res = server.table_create(
+        TableCreateReq.model_validate(
+            {"table": {"project_id": project_id, "rows": [{"input": "ok"}]}}
+        )
+    )
+    dataset_ref = _obj(
+        "valid_dataset",
+        {
+            "_type": "Dataset",
+            "_class_name": "Dataset",
+            "_bases": ["BaseModel", "Object", "Dataset"],
+            "rows": f"weave:///{project_id}/table/{table_res.digest}",
+        },
+    )
+    valid_evaluation_ref = _obj(
+        "valid_eval",
+        {
+            "_type": "Evaluation",
+            "_class_name": "Evaluation",
+            "_bases": ["BaseModel", "Object", "Evaluation"],
+            "dataset": dataset_ref,
+            "scorers": None,
+        },
+    )
+    valid_model_ref = _obj(
+        "valid_model",
+        {"llm_model_id": "gpt-4o-mini", "default_params": {}},
+        builtin="LLMStructuredCompletionModel",
+    )
+
+    refs = {
+        "evaluation_ref": valid_evaluation_ref,
+        "model_ref": valid_model_ref,
+        op_arg: op_ref,
+    }
+    with pytest.raises(UnsafeDeserializationError):
+        evaluate_model_worker.evaluate_model(
+            evaluate_model_worker.EvaluateModelArgs(
+                project_id=project_id,
+                evaluation_ref=refs["evaluation_ref"],
+                model_ref=refs["model_ref"],
+                wb_user_id=entity,
+                evaluation_call_id=generate_id(),
+            )
+        )
 
 
 def test_eval_results_query_basic(client):

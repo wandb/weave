@@ -1,78 +1,44 @@
 import pytest
 
-from weave.trace_server.validation import (
-    UnsafePayloadError,
-    assert_safe_payload,
+from weave.trace.serialization.custom_objs import (
+    KNOWN_TYPES,
+    OP_CUSTOM_WEAVE_TYPE,
+    SAFE_CUSTOM_WEAVE_TYPES,
+    is_safe_to_decode,
 )
 
 
-def test_assert_safe_payload():
-    # Safe payloads pass
-    assert_safe_payload({"name": "test", "value": 42})
-    assert_safe_payload({"nested": {"list": [1, "two", {"three": 3}]}})
-    assert_safe_payload("just a string ref")
-    assert_safe_payload(None)
-    assert_safe_payload([1, 2, 3])
-    assert_safe_payload({"_type": "ObjectRecord", "name": "test"})
+@pytest.mark.parametrize(
+    ("type_id", "allow_unsafe", "expected"),
+    [
+        # allow_unsafe (normal client) -> anything decodes.
+        ("Op", True, True),
+        ("TotallyMadeUp", True, True),
+        # Worker client (allow_unsafe=False): data-only types decode, code-loading
+        # ("Op") and unknown types are refused. The load_op fallback is gated separately
+        # (see test_unsafe_decode_disabled_refuses_code_bearing in test_custom_objs.py).
+        ("Op", False, False),
+        ("TotallyMadeUp", False, False),
+        ("PIL.Image.Image", False, True),
+        ("weave.type_wrappers.Content.content.Content", False, True),
+        ("weave.type_handlers.File.file.File", False, True),
+    ],
+    ids=[
+        "op-allowed-when-unsafe",
+        "unknown-allowed-when-unsafe",
+        "op-refused-when-secure",
+        "unknown-refused-when-secure",
+        "image-allowed-when-secure",
+        "content-allowed-when-secure",
+        "file-allowed-when-secure",
+    ],
+)
+def test_is_safe_to_decode(type_id, allow_unsafe, expected):
+    assert is_safe_to_decode(type_id, allow_unsafe=allow_unsafe) is expected
 
-    # ALL CustomWeaveType payloads rejected — Op, unknown, and safe subtypes alike
-    with pytest.raises(UnsafePayloadError):
-        assert_safe_payload(
-            {
-                "_type": "CustomWeaveType",
-                "weave_type": {"type": "Op"},
-                "files": {"obj.py": "abc123"},
-            }
-        )
 
-    with pytest.raises(UnsafePayloadError):
-        assert_safe_payload(
-            {
-                "_type": "CustomWeaveType",
-                "weave_type": {"type": "PIL.Image.Image"},
-                "files": {"image.png": "abc123"},
-            }
-        )
-
-    with pytest.raises(UnsafePayloadError):
-        assert_safe_payload(
-            {
-                "_type": "CustomWeaveType",
-                "weave_type": {"type": "TotallyMadeUpType"},
-                "load_op": "weave:///entity/project/object/evil:abc123",
-            }
-        )
-
-    # Nested in a list
-    with pytest.raises(UnsafePayloadError):
-        assert_safe_payload(
-            {
-                "scorers": [
-                    {
-                        "_type": "CustomWeaveType",
-                        "weave_type": {"type": "Op"},
-                    }
-                ],
-            }
-        )
-
-    # Deeply nested in dicts
-    with pytest.raises(UnsafePayloadError):
-        assert_safe_payload(
-            {
-                "a": {
-                    "b": {
-                        "c": {
-                            "_type": "CustomWeaveType",
-                            "weave_type": {"type": "Op"},
-                        }
-                    }
-                },
-            }
-        )
-
-    # Missing/malformed weave_type still rejected
-    with pytest.raises(UnsafePayloadError):
-        assert_safe_payload({"_type": "CustomWeaveType"})
-    with pytest.raises(UnsafePayloadError):
-        assert_safe_payload({"_type": "CustomWeaveType", "weave_type": "not a dict"})
+def test_safe_custom_weave_types_in_sync():
+    # Every known custom type must be classified: data-only serializers go in
+    # SAFE_CUSTOM_WEAVE_TYPES, and OP_CUSTOM_WEAVE_TYPE is the lone code-loading type.
+    # A newly added KNOWN_TYPE fails here until it is consciously placed on one side.
+    assert SAFE_CUSTOM_WEAVE_TYPES | {OP_CUSTOM_WEAVE_TYPE} == set(KNOWN_TYPES)
