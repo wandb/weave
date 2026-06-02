@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
+from tests.trace_server.eventually_consistent import EventuallyConsistentServer
 from weave.trace_server import trace_server_interface as tsi
 
 T = TypeVar("T")
@@ -11,14 +12,7 @@ T = TypeVar("T")
 TEST_ENTITY = "shawn"
 
 # Attribute names used by each middleware layer to reference the next server.
-# `_inner` (EventuallyConsistentServer) is checked first: its __getattr__ would
-# otherwise delegate `_internal_trace_server` to the layer below, skipping it.
-_NEXT_SERVER_ATTRS = (
-    "_inner",
-    "server",
-    "_next_trace_server",
-    "_internal_trace_server",
-)
+_NEXT_SERVER_ATTRS = ("server", "_next_trace_server", "_internal_trace_server")
 
 
 def find_server_layer(server: tsi.TraceServerInterface, layer_type: type[T]) -> T:
@@ -37,6 +31,12 @@ def find_server_layer(server: tsi.TraceServerInterface, layer_type: type[T]) -> 
         if obj_id in visited:
             break
         visited.add(obj_id)
+        # EventuallyConsistentServer is a transparent proxy: its __getattr__
+        # forwards `_internal_trace_server` to the layer below, which would skip
+        # that layer. Step into its real child explicitly instead.
+        if isinstance(current, EventuallyConsistentServer):
+            current = current._inner
+            continue
         next_layer = None
         for attr in _NEXT_SERVER_ATTRS:
             next_layer = getattr(current, attr, None)
