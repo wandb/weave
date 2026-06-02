@@ -4,7 +4,8 @@
 # the runnable image ref on stdout (everything else goes to stderr).
 set -uo pipefail
 
-tag="${1:?usage: ch-image.sh <tag>}"
+# Single source of truth for the ClickHouse image version used across CI.
+tag="${1:-25.11.2.24}"
 ghcr="ghcr.io/wandb/clickhouse-server:${tag}"
 hub="clickhouse/clickhouse-server:${tag}"
 

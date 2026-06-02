@@ -11,9 +11,6 @@ name: test
 on:
   push:
 
-env:
-  CLICKHOUSE_IMAGE_TAG: "25.11.2.24"
-
 jobs:
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml
@@ -206,7 +203,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          image=$(.github/scripts/ch-image.sh "$CLICKHOUSE_IMAGE_TAG")
+          image=$(.github/scripts/ch-image.sh)
           docker run --detach --rm --name weave_clickhouse \
             --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
             --env CLICKHOUSE_USER=default \
@@ -298,7 +295,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          image=$(.github/scripts/ch-image.sh "$CLICKHOUSE_IMAGE_TAG")
+          image=$(.github/scripts/ch-image.sh)
           docker run -d --rm \
             -e CLICKHOUSE_DB=default \
             -e CLICKHOUSE_USER=default \

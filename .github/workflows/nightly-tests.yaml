@@ -12,9 +12,6 @@ on:
         required: false
         default: ""
 
-env:
-  CLICKHOUSE_IMAGE_TAG: "25.11.2.24"
-
 jobs:
   nightly-tests:
     name: Nightly Tests
@@ -124,7 +121,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          image=$(.github/scripts/ch-image.sh "$CLICKHOUSE_IMAGE_TAG")
+          image=$(.github/scripts/ch-image.sh)
           docker run --detach --rm --name weave_clickhouse \
             --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
             --env CLICKHOUSE_USER=default \
