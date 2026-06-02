@@ -10,6 +10,7 @@ attributes when used as context managers.
 
 from __future__ import annotations
 
+import logging
 import types
 import uuid
 from contextvars import ContextVar, Token
@@ -42,6 +43,7 @@ from weave.session.types import (
     _parse_data_url,
 )
 from weave.trace.settings import should_disable_weave, should_redact_pii
+from weave.trace.util import Thread
 from weave.utils import pii_redaction
 from weave.utils.capture_info import get_capture_info
 
@@ -108,6 +110,8 @@ __all__ = [
 
 # OTel tracer name — identifies the Session SDK as the source of these spans.
 _TRACER_NAME = "weave.session"
+
+logger = logging.getLogger(__name__)
 
 
 def _capture_info_attrs() -> dict[str, str]:
@@ -218,7 +222,9 @@ def _publish_media_content(
         raise ValueError("_publish_media_content requires content or uri")
 
     ref = publish(content_obj)
-    return str(ref)
+    # Coerce to a plain ``str``: ``ref.uri`` may be a ``_CallableStr`` subclass
+    # that OTel attribute validation rejects.
+    return str(getattr(ref, "uri", ref))
 
 
 class Tool(_SpanBase):
@@ -339,6 +345,7 @@ class LLM(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[LLM | None] | None = PrivateAttr(default=None)
+    _upload_threads: list[Thread] = PrivateAttr(default_factory=list)
 
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
@@ -368,6 +375,15 @@ class LLM(_SpanBase):
         Creates a ``Content`` object from the provided data, publishes it
         to get a ``weave://`` ref, and stores only that ref.  Exactly one
         of ``content``, ``uri``, or ``file_id`` must be provided.
+
+        The publish (which uploads the media) runs on a dedicated
+        background thread so the call returns immediately without blocking
+        the caller; one thread is dispatched per attachment so multiple
+        uploads proceed in parallel. The placeholder ``MediaAttachment`` is
+        appended synchronously and its ``ref`` is filled in once the upload
+        completes. Refs are guaranteed populated before the span is emitted
+        (the build path waits on the in-flight uploads via
+        ``_await_uploads``).
         """
         sources = sum(bool(s) for s in (content, uri, file_id))
         if sources != 1:
@@ -378,17 +394,65 @@ class LLM(_SpanBase):
             if prefix in {"image", "audio", "video"}:
                 modality = prefix
 
-        ref_uri = _publish_media_content(
-            content=content, uri=uri, file_id=file_id, mime_type=mime_type
+        attachment = MediaAttachment(
+            ref="",
+            modality=modality or "unknown",
+            mime_type=mime_type,
         )
-        self.media_attachments.append(
-            MediaAttachment(
-                ref=ref_uri,
-                modality=modality or "unknown",
-                mime_type=mime_type,
-            )
+        self.media_attachments.append(attachment)
+        thread = Thread(
+            target=self._upload_media,
+            kwargs={
+                "attachment": attachment,
+                "content": content,
+                "uri": uri,
+                "file_id": file_id,
+                "mime_type": mime_type,
+            },
+            name="weave-session-media-upload",
+            daemon=True,
         )
+        thread.start()
+        self._upload_threads.append(thread)
         return self
+
+    def _upload_media(
+        self,
+        *,
+        attachment: MediaAttachment,
+        content: bytes | str,
+        uri: str,
+        file_id: str,
+        mime_type: str,
+    ) -> None:
+        """Publish one media attachment and record its ref.
+
+        Runs on a background thread dispatched by ``attach_media``. On
+        success the ``weave://`` ref is written back onto ``attachment``.
+        Failures are logged and leave the ref empty; ``_await_uploads``
+        drops empty-ref attachments so a failed upload never emits a
+        broken URI part.
+        """
+        try:
+            attachment.ref = _publish_media_content(
+                content=content, uri=uri, file_id=file_id, mime_type=mime_type
+            )
+        except Exception:
+            logger.exception("Failed to publish media attachment for chat span")
+
+    def _await_uploads(self) -> None:
+        """Block until all in-flight media uploads finish.
+
+        Called before building span attributes so every attachment has its
+        ``weave://`` ref populated. Attachments whose upload failed (empty
+        ref) are dropped so the emitted span never carries a broken URI.
+        """
+        if not self._upload_threads:
+            return
+        for thread in self._upload_threads:
+            thread.join()
+        self._upload_threads.clear()
+        self.media_attachments = [m for m in self.media_attachments if m.ref]
 
     def attach_media_url(self, url: str, *, modality: str = "") -> LLM:
         """Attach a media URL to this LLM call.
@@ -466,6 +530,10 @@ class LLM(_SpanBase):
         ``reasoning``, which previously bypassed the gate and leaked
         into ``gen_ai.output.messages``.
         """
+        # Block on any background media uploads so every attachment's
+        # weave:// ref is populated before it is serialized into attrs.
+        self._await_uploads()
+
         input_messages: list[Message] | None
         output_messages: list[Message] | None
         system_instructions: list[str] | None

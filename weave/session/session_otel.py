@@ -299,7 +299,9 @@ def llm_attributes(
         attrs["gen_ai.output.messages"] = serialized_out
 
     if media_attachments:
-        attrs["weave.content_refs"] = [m.ref for m in media_attachments]
+        # Coerce to plain ``str``: OTel attribute validation does an exact-type
+        # check and rejects ``str`` subclasses (e.g. ``_CallableStr`` refs).
+        attrs["weave.content_refs"] = [str(m.ref) for m in media_attachments]
 
     return attrs
 

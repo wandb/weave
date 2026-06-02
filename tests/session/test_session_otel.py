@@ -1766,6 +1766,7 @@ class TestAttachMediaUrl:
     ) -> None:
         llm = LLM()
         llm.attach_media_url(url, modality="image")
+        llm._await_uploads()
         (att,) = llm.media_attachments
         assert att.ref.startswith("weave:///")
         assert att.mime_type == expected_mime
@@ -1778,6 +1779,7 @@ class TestAttachMediaUrl:
         att = llm.media_attachments[0]
         assert att.modality == "image"
         assert att.mime_type == "image/jpeg"
+        llm._await_uploads()
 
     def test_empty_url_ignored(self) -> None:
         llm = LLM()
@@ -1789,6 +1791,7 @@ class TestAttachMediaUrl:
         llm = LLM()
         result = llm.attach_media_url("https://e.com/a.png", modality="image")
         assert result is llm
+        llm._await_uploads()
 
 
 class TestLLMRecord:
