@@ -77,7 +77,6 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
 
 
-@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_create(client):
     res = client.server.table_create(
         TableCreateReq(
@@ -1115,7 +1114,6 @@ def test_save_model(client):
 
 
 @pytest.mark.skip(reason="TODO: Skip flake")
-@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 async def test_saved_nested_modellike(client):
     class A(weave.Object):
@@ -1559,7 +1557,6 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
 
 
 @pytest.mark.timeout(60)
-@pytest.mark.flaky(reruns=3, reruns_delay=2)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     """This test is specifically testing the correctness

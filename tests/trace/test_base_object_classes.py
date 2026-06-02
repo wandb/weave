@@ -176,7 +176,6 @@ def test_pythonic_creation(client: WeaveClient):
     assert inherited_obj_result.val == expected_inherited_val
 
 
-@pytest.mark.flaky(reruns=3)
 def test_interface_creation(client):
     # Now we will do the equivant operation using low-level interface.
     nested_obj_id = "TestOnlyNestedBaseObject"

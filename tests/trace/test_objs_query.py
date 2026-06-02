@@ -1,8 +1,6 @@
 import base64
 import time
 
-import pytest
-
 import weave
 from tests.trace.server_utils import TEST_ENTITY
 from weave.trace.weave_client import WeaveClient
@@ -190,7 +188,6 @@ def test_objs_query_wb_user_id(client: WeaveClient):
     assert all(obj.wb_user_id == correct_id for obj in res)
 
 
-@pytest.mark.flaky(reruns=3)
 def test_objs_query_deleted_interaction(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -249,7 +246,6 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
     assert len(res.objs) == 0
 
 
-@pytest.mark.flaky(reruns=3)
 def test_objs_query_delete_and_recreate(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -306,7 +302,6 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
         assert res.objs[i].val["i"] == i + 1
 
 
-@pytest.mark.flaky(reruns=3)
 def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")

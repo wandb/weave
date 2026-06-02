@@ -97,7 +97,6 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 ## End hacky interface compatibility helpers
 
 
-@pytest.mark.flaky(reruns=2, reruns_delay=0.2)
 def test_simple_op(client):
     @weave.op
     def my_op(a: int) -> int:
@@ -903,9 +902,6 @@ def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
         assert len(inner_res.calls) == exp_count
 
 
-# Flaky against ClickHouse in CI: read-after-write visibility lag means a
-# calls_query right after flush can miss just-written rows. Rerun to absorb it.
-@pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
@@ -951,9 +947,6 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
         assert len(inner_res.calls) == exp_count
 
 
-# Flaky against ClickHouse in CI: read-after-write visibility lag means a
-# calls_query right after flush can miss just-written rows. Rerun to absorb it.
-@pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
     call_spec_1 = simple_line_call_bootstrap()
     client.flush()
@@ -1786,7 +1779,6 @@ def test_op_retrieval(weave_active):
     assert my_op2(1) == 2
 
 
-@pytest.mark.flaky(reruns=3)
 def test_bound_op_retrieval(weave_active):
     class CustomType(weave.Object):
         a: int
@@ -3256,7 +3248,6 @@ class BasicModel(weave.Model):
         return {"answer": "42"}
 
 
-@pytest.mark.flaky(reruns=3)
 def test_model_save(client):
     model = BasicModel()
     assert model.predict(1) == {"answer": "42"}
@@ -4751,7 +4742,6 @@ def test_get_object_from_uri(weave_active, obj):
     assert weave.get(uri) == obj
 
 
-@pytest.mark.flaky(reruns=3)
 def test_get_object_from_uri_non_registered_object(weave_active):
     class MyModel(weave.Model):
         a: int
