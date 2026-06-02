@@ -1,0 +1,92 @@
+name: genai flake forensics
+
+# Temporary: hunt the only-on-CI genai-agent-query flake by looping the real
+# trace_server suite on the exact CI ClickHouse image, dumping CH state on failure.
+# Delete this workflow once the flake is understood.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - chore/genai-flake-forensics
+
+jobs:
+  forensics:
+    name: forensics (3.${{ matrix.python-version-minor }})
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ["10", "11"]
+    services:
+      weave_clickhouse:
+        image: clickhouse/clickhouse-server:25.11.2.24
+        env:
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DB: default
+        ports:
+          - "8123:8123"
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install system deps
+        run: sudo apt update && sudo apt install -y libsqlite3-dev libmagic1
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install nox + uv
+        run: python -m pip install --upgrade pip nox uv
+      - name: Loop trace_server suite with forensics
+        env:
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WF_CLICKHOUSE_DATABASE: default_test
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
+          FLAKE_FORENSICS_DIR: ${{ github.workspace }}/forensics
+        run: |
+          set +e
+          SESSION="tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server')"
+          PLUGIN="-p tests.trace_server.flake_forensics_plugin"
+          GENAI="tests/trace_server/test_genai_agent_queries.py"
+          STATUS=0
+
+          echo "::group::warm install"
+          nox -e "$SESSION" -- $PLUGIN "$GENAI"
+          [ $? -ne 0 ] && STATUS=1
+          echo "::endgroup::"
+
+          for i in $(seq 1 25); do
+            echo "::group::genai-file iteration $i"
+            nox -R -e "$SESSION" -- $PLUGIN "$GENAI"
+            [ $? -ne 0 ] && STATUS=1
+            echo "::endgroup::"
+          done
+
+          for i in $(seq 1 6); do
+            echo "::group::full-suite iteration $i"
+            nox -R -e "$SESSION" -- -m "trace_server and not skip_clickhouse_client" $PLUGIN
+            [ $? -ne 0 ] && STATUS=1
+            echo "::endgroup::"
+          done
+
+          if [ -d "$FLAKE_FORENSICS_DIR" ] && [ -n "$(ls -A "$FLAKE_FORENSICS_DIR" 2>/dev/null)" ]; then
+            echo "FLAKE REPRODUCED: forensics captured in $FLAKE_FORENSICS_DIR"
+          else
+            echo "no flake reproduced this run (STATUS=$STATUS)"
+          fi
+      - name: Upload forensics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forensics-3.${{ matrix.python-version-minor }}
+          path: forensics/
+          if-no-files-found: ignore
