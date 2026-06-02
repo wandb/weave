@@ -1383,6 +1383,38 @@ def test_call_end_flushes_kafka_immediately(server_with_mock_kafka):
     assert mock_producer.produce_call_end.call_args[0][1] is True
 
 
+def test_call_end_payload_op_identity_per_path(server_with_mock_kafka):
+    """calls_complete enriches the Kafka payload with op_name/trace_id; v1 leaves them None."""
+    server, mock_producer = server_with_mock_kafka
+    project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+    now = dt.datetime.now(dt.timezone.utc)
+
+    server.call_end(_make_call_end_req())
+    v1_payload = mock_producer.produce_call_end.call_args[0][0]
+    assert v1_payload.op_name is None
+    assert v1_payload.trace_id is None
+
+    complete = tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=str(uuid.uuid4()),
+        trace_id=str(uuid.uuid4()),
+        op_name="weave-trace-internal:///int-id-1/op/my_op:abc",
+        started_at=now,
+        ended_at=now,
+        attributes={},
+        inputs={},
+        output={},
+        summary={},
+    )
+    with patch.object(chts, "get_project_retention_days", return_value=30):
+        server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[complete]))
+
+    complete_payload = mock_producer.produce_call_end.call_args[0][0]
+    assert complete_payload.op_name == complete.op_name
+    assert complete_payload.trace_id == complete.trace_id
+    assert complete_payload.id == complete.id
+
+
 def test_call_end_v2_flushes_kafka_immediately(server_with_mock_kafka):
     """Non-batch call_end_v2 should flush Kafka per-request."""
     server, mock_producer = server_with_mock_kafka

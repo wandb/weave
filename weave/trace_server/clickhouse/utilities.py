@@ -322,6 +322,8 @@ def maybe_enqueue_minimal_call_end(
     id: str,
     ended_at: datetime.datetime,
     flush_immediately: bool = False,
+    op_name: str | None = None,
+    trace_id: str | None = None,
 ) -> None:
     """Enqueue a minimal call end event to Kafka if online eval is enabled.
 
@@ -334,6 +336,8 @@ def maybe_enqueue_minimal_call_end(
         id: The call ID.
         ended_at: The call end timestamp.
         flush_immediately: Whether to flush the producer immediately.
+        op_name: Op identity, when available at produce time (calls_complete/OTel).
+        trace_id: Trace identity, when available at produce time.
     """
     if kafka_producer is None:
         return
@@ -345,6 +349,8 @@ def maybe_enqueue_minimal_call_end(
         output=None,
         summary={},
         exception=None,
+        op_name=op_name,
+        trace_id=trace_id,
     )
     kafka_producer.produce_call_end(minimal_end, flush_immediately)
 

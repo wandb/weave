@@ -244,6 +244,11 @@ class EndedCallSchemaForInsert(BaseModel):
     # WB Metadata
     wb_run_step_end: int | None = None
 
+    # Op identity. Populated only on the calls_complete and OTel produce paths
+    # so downstream scoring can filter without hydrating. None on the v1 path.
+    op_name: str | None = None
+    trace_id: str | None = None
+
     @field_serializer("summary")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)

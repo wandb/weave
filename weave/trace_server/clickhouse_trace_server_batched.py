@@ -693,8 +693,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 end_call.id,
                 end_call.ended_at,
                 False,
+                start_call.op_name,
+                start_call.trace_id,
             )
-            for _, end_call in calls
+            for start_call, end_call in calls
         ]
 
         # Convert and insert based on write target. All calls in the batch
@@ -1020,6 +1022,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     processed_complete_call.project_id,
                     processed_complete_call.id,
                     processed_complete_call.ended_at,
+                    op_name=processed_complete_call.op_name,
+                    trace_id=processed_complete_call.trace_id,
                 )
 
         return tsi.CallsUpsertCompleteRes()
