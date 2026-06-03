@@ -7025,6 +7025,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
             use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
+            # Mint the heartbeat's client like the primary so it inherits
+            # secure/pool/db settings (raw env would drop `secure=`).
+            heartbeat_client_factory=self._mint_client,
         )
         migrator.apply_migrations(self._database)
 

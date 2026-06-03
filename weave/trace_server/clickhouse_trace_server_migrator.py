@@ -88,6 +88,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from re import Pattern
+from typing import TypedDict
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
@@ -108,9 +109,10 @@ from weave.trace_server.database_engine import (
 )
 from weave.trace_server.environment import wf_clickhouse_calls_shard_key
 from weave.trace_server.migration_lock import (
+    LOCK_ROW_GC_SECONDS,
     LOCK_TABLE,
     LOCK_TABLE_COLUMNS,
-    LOCK_TTL_SECONDS,
+    add_heartbeat_column_sql,
     create_lock_table_sql,
     migration_lock,
 )
@@ -196,6 +198,13 @@ def _default_trace_server_costs_post_migration_hook(
         insert_costs(ctx.ch_client, ctx.target_db)
 
 
+class MigrationStatus(TypedDict):
+    """Current schema version of a database, read from the migrations table."""
+
+    curr_version: int
+    partially_applied_version: int | None
+
+
 class BaseClickHouseTraceServerMigrator(ABC):
     """Base class for ClickHouse trace server migration strategies.
 
@@ -216,12 +225,14 @@ class BaseClickHouseTraceServerMigrator(ABC):
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         super().__init__()
         self.ch_client = ch_client
         self.management_db = management_db
         self.migration_dir = self._resolve_migration_dir(migration_dir)
         self.post_migration_hook = post_migration_hook
+        self._heartbeat_client_factory = heartbeat_client_factory
         self._initialize_migration_db()
 
     def _uses_replicated_db_engine(self, db_name: str) -> bool:
@@ -290,8 +301,58 @@ class BaseClickHouseTraceServerMigrator(ABC):
             target_db: The database to migrate
             target_version: The target version to migrate to (None = latest)
         """
-        with migration_lock(self.ch_client, self.management_db):
+        # Lock-free pre-check: on a rolling deploy N replicas call this
+        # concurrently. If there is nothing to apply, skip the lock entirely so
+        # they do not serialize through it just to discover there is no work.
+        if not self._has_migrations_to_apply(target_db, target_version):
+            logger.info("No migrations to apply to `%s`; skipping lock", target_db)
+            return
+        with migration_lock(
+            self.ch_client,
+            self.management_db,
+            heartbeat_client_factory=self._heartbeat_client_factory,
+        ):
             self._apply_migrations_locked(target_db, target_version)
+
+    def _has_migrations_to_apply(
+        self, target_db: str, target_version: int | None = None
+    ) -> bool:
+        """Read-only check (no lock, no writes) for pending schema migrations.
+
+        Returns True when migrations are pending or a partial migration needs
+        attention, so the locked path can surface it as an error.
+        """
+        status = self._read_migration_status(target_db)
+        if status["partially_applied_version"] is not None:
+            return True
+        migration_map = self._get_migrations()
+        return (
+            len(
+                self._determine_migrations_to_apply(
+                    status["curr_version"], migration_map, target_version
+                )
+            )
+            > 0
+        )
+
+    def _read_migration_status(self, db_name: str) -> MigrationStatus:
+        """Read migration status without writing.
+
+        Unlike `_get_migration_status`, this never seeds a row, so it is safe to
+        call without the lock. Returns curr_version=0 when no row exists yet.
+        """
+        query = (
+            f"SELECT curr_version, partially_applied_version "
+            f"FROM {self.management_db}.migrations WHERE db_name = %(db_name)s"
+        )
+        res = self.ch_client.query(query, parameters={"db_name": db_name})
+        if not res.result_rows:
+            return {"curr_version": 0, "partially_applied_version": None}
+        curr_version, partially_applied_version = res.result_rows[0]
+        return {
+            "curr_version": curr_version,
+            "partially_applied_version": partially_applied_version,
+        }
 
     def _apply_migrations_locked(
         self, target_db: str, target_version: int | None = None
@@ -346,6 +407,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self._run_ddl_with_retry(create_table_sql)
         lock_table_sql = self._create_lock_table_sql()
         self._run_ddl_with_retry(lock_table_sql)
+        # Evolve lock tables created before `heartbeat_at` existed. Idempotent
+        # (ADD COLUMN IF NOT EXISTS), so it is a no-op on fresh tables.
+        self._run_ddl_with_retry(self._evolve_lock_table_sql())
 
     def _create_lock_table_sql(self) -> str:
         """Generate SQL for the migration lock table.
@@ -353,6 +417,13 @@ class BaseClickHouseTraceServerMigrator(ABC):
         Subclasses that need ON CLUSTER or Replicated engines override this.
         """
         return create_lock_table_sql(self.management_db)
+
+    def _evolve_lock_table_sql(self) -> str:
+        """Idempotent ALTER bringing an existing lock table to the current schema.
+
+        Subclasses that need ON CLUSTER or Replicated engines override this.
+        """
+        return add_heartbeat_column_sql(self.management_db)
 
     def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -592,6 +663,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         self.replicated_path = (
             DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
@@ -623,6 +695,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            heartbeat_client_factory=heartbeat_client_factory,
         )
 
     def _uses_replicated_db_engine(self, db_name: str) -> bool:
@@ -737,6 +810,11 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     def _create_lock_table_sql(self) -> str:
         """Generate SQL for the lock table, adapted for the management DB engine."""
         base_sql = create_lock_table_sql(self.management_db)
+        return self._prepare_ddl_for_database(base_sql, self.management_db)
+
+    def _evolve_lock_table_sql(self) -> str:
+        """ALTER the lock table, adapted for the management DB engine."""
+        base_sql = add_heartbeat_column_sql(self.management_db)
         return self._prepare_ddl_for_database(base_sql, self.management_db)
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
@@ -875,6 +953,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         logger.info(
             "%s DistributedClickHouseTraceServerMigrator initialized",
@@ -887,6 +966,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            heartbeat_client_factory=heartbeat_client_factory,
         )
 
     def _create_db_sql(self, db_name: str) -> str:
@@ -961,7 +1041,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             ({LOCK_TABLE_COLUMNS})
             ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/{LOCK_TABLE}', '{{shard}}-{{replica}}')
             ORDER BY lock_id
-            TTL toDateTime(acquired_at) + INTERVAL {LOCK_TTL_SECONDS} SECOND
+            TTL toDateTime(heartbeat_at) + INTERVAL {LOCK_ROW_GC_SECONDS} SECOND
         """
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
@@ -1406,6 +1486,7 @@ def get_clickhouse_trace_server_migrator(
     migration_dir: str | None = None,
     post_migration_hook: PostMigrationHook
     | None = _default_trace_server_costs_post_migration_hook,
+    heartbeat_client_factory: Callable[[], CHClient] | None = None,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
 
@@ -1466,6 +1547,7 @@ def get_clickhouse_trace_server_migrator(
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            heartbeat_client_factory=heartbeat_client_factory,
         )
     if replicated:
         return ReplicatedClickHouseTraceServerMigrator(
@@ -1475,6 +1557,7 @@ def get_clickhouse_trace_server_migrator(
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            heartbeat_client_factory=heartbeat_client_factory,
         )
 
     return CloudClickHouseTraceServerMigrator(
@@ -1482,6 +1565,7 @@ def get_clickhouse_trace_server_migrator(
         management_db,
         migration_dir=migration_dir,
         post_migration_hook=post_migration_hook,
+        heartbeat_client_factory=heartbeat_client_factory,
     )
 
 
