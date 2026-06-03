@@ -36,6 +36,12 @@ class EventuallyConsistentServer:
     def __getattr__(self, name: str) -> object:
         return getattr(self._inner, name)
 
+    # --- calls ---
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        return retry_read(
+            lambda: self._inner.calls_query(req), lambda res: not res.calls
+        )
+
     # --- objects / tables / files ---
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         return retry_read(lambda: self._inner.obj_read(req))
