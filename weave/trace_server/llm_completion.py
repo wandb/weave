@@ -241,6 +241,43 @@ def resolve_and_apply_prompt(
     return combined_messages, initial_messages
 
 
+def lite_llm_completion(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    provider: str | None = None,
+    base_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+    vertex_credentials: str | None = None,
+) -> tsi.CompletionsCreateRes:
+    kwargs = _build_litellm_kwargs(
+        api_key, inputs, provider, base_url, extra_headers, vertex_credentials
+    )
+    try:
+        res = litellm.completion(**kwargs)
+        return tsi.CompletionsCreateRes(response=res.model_dump())
+    except Exception as e:
+        return _litellm_error_response(e)
+
+
+async def lite_llm_acompletion(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    provider: str | None = None,
+    base_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+    vertex_credentials: str | None = None,
+) -> tsi.CompletionsCreateRes:
+    """Async twin of `lite_llm_completion`. No thread held during the LLM wait."""
+    kwargs = _build_litellm_kwargs(
+        api_key, inputs, provider, base_url, extra_headers, vertex_credentials
+    )
+    try:
+        res = await litellm.acompletion(**kwargs)
+        return tsi.CompletionsCreateRes(response=res.model_dump())
+    except Exception as e:
+        return _litellm_error_response(e)
+
+
 def _build_litellm_kwargs(
     api_key: str | None,
     inputs: tsi.CompletionsCreateRequestInputs,
@@ -310,43 +347,6 @@ def _build_litellm_kwargs(
 def _litellm_error_response(e: Exception) -> tsi.CompletionsCreateRes:
     error_message = str(e).replace("litellm.", "")
     return tsi.CompletionsCreateRes(response={"error": error_message})
-
-
-def lite_llm_completion(
-    api_key: str | None,
-    inputs: tsi.CompletionsCreateRequestInputs,
-    provider: str | None = None,
-    base_url: str | None = None,
-    extra_headers: dict[str, str] | None = None,
-    vertex_credentials: str | None = None,
-) -> tsi.CompletionsCreateRes:
-    kwargs = _build_litellm_kwargs(
-        api_key, inputs, provider, base_url, extra_headers, vertex_credentials
-    )
-    try:
-        res = litellm.completion(**kwargs)
-        return tsi.CompletionsCreateRes(response=res.model_dump())
-    except Exception as e:
-        return _litellm_error_response(e)
-
-
-async def lite_llm_acompletion(
-    api_key: str | None,
-    inputs: tsi.CompletionsCreateRequestInputs,
-    provider: str | None = None,
-    base_url: str | None = None,
-    extra_headers: dict[str, str] | None = None,
-    vertex_credentials: str | None = None,
-) -> tsi.CompletionsCreateRes:
-    """Async twin of `lite_llm_completion`. No thread held during the LLM wait."""
-    kwargs = _build_litellm_kwargs(
-        api_key, inputs, provider, base_url, extra_headers, vertex_credentials
-    )
-    try:
-        res = await litellm.acompletion(**kwargs)
-        return tsi.CompletionsCreateRes(response=res.model_dump())
-    except Exception as e:
-        return _litellm_error_response(e)
 
 
 def get_bedrock_credentials(

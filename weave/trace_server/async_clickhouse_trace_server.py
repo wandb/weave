@@ -16,8 +16,10 @@ from weave.trace_server.llm_completion import lite_llm_acompletion
 class AsyncClickHouseTraceServer(ClickHouseTraceServer):
     """`ClickHouseTraceServer` with async methods for I/O-bound work."""
 
-    def __init__(self, *, ch_executor: Executor | None = None, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(
+        self, *, host: str, ch_executor: Executor | None = None, **kwargs: Any
+    ) -> None:
+        super().__init__(host=host, **kwargs)
         self._ch_executor: Executor | None = ch_executor
 
     @tag_db_insert_path("completions_create")
@@ -40,6 +42,10 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             vertex_credentials=info.vertex_credentials,
         )
         end_time = datetime.datetime.now()
+
+        # Untracked calls do no CH work; skip the executor hop entirely.
+        if not req.track_llm_call:
+            return tsi.CompletionsCreateRes(response=res.response)
 
         return await self._run_ch_insert(
             self._log_completion_call, req, prep, res, start_time, end_time

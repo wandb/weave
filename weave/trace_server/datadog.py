@@ -67,10 +67,8 @@ def tag_db_insert_path(
     Convenience over `db_insert_path` for decorating public API methods
     whose entire body should be attributed to a single ingestion path.
 
-    Works on coroutine functions too: the contextvar is set across awaits.
-    For paths that hand off CH writes to a thread executor, the caller must
-    propagate the contextvar via `contextvars.copy_context().run` — the
-    contextvar set here does not cross `run_in_executor` automatically.
+    Coroutine-safe (tag spans awaits). `run_in_executor` does NOT carry the
+    contextvar, so a caller handing CH writes to an executor must `copy_context().run`.
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
