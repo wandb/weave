@@ -6036,7 +6036,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result_rows = list(query_result.result_rows)
 
         if len(result_rows) < n_chunks:
-            raise ValueError("Missing chunks")
+            # Treat as not-found so the tenacity retry in `_read_with_retry`
+            # picks it up. Replicated/distributed reads can transiently see
+            # fewer rows than `n_chunks` while replication catches up.
+            raise NotFoundError(
+                f"File with digest {req.digest} has {len(result_rows)}/{n_chunks} chunks visible"
+            )
         elif len(result_rows) > n_chunks:
             # The general case where this can occur is when there are multiple
             # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
