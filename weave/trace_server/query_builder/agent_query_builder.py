@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import datetime
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from typing import Any, NamedTuple, TypeAlias
 
@@ -1014,6 +1014,50 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         {having_sql}
         ORDER BY {order_by}
         LIMIT {limit_slot} OFFSET {offset_slot}
+    """
+
+
+def make_conversation_previews_query(
+    pb: ParamBuilder,
+    project_id: str,
+    conversation_ids: Collection[str],
+    *,
+    started_after: datetime.datetime | None = None,
+    started_before: datetime.datetime | None = None,
+) -> str:
+    """First/last message previews for an explicit set of conversations.
+
+    Deliberately scoped to ``conversation_id IN (...)`` — the page's already
+    computed conversation_ids — so the wide ``input_messages`` / ``output_messages``
+    columns are only read for the conversations actually shown, not for every
+    span matching the list filters. (A grouped ``argMin``/``argMax`` folded into
+    the main list query would read those columns for the entire filter match
+    before LIMIT.) The bloom-filter skip index on ``conversation_id`` plus the
+    optional time range bound the scan further.
+
+    ``argMinIf``/``argMaxIf`` pick the earliest input and latest output span that
+    actually carries messages; the handler turns the arrays into preview text.
+    """
+    pid_slot = pb.add(project_id, param_type="String")
+    ids_slot = pb.add(list(conversation_ids), param_type="Array(String)")
+    where_conditions = [
+        _project_filter_sql("s.project_id", pid_slot),
+        f"s.conversation_id IN {ids_slot}",
+    ]
+    add_time_filters(
+        where_conditions,
+        pb,
+        started_after=started_after,
+        started_before=started_before,
+    )
+    where = " AND ".join(where_conditions)
+    return f"""
+        SELECT s.conversation_id AS conversation_id,
+               argMinIf(s.input_messages, s.started_at, length(s.input_messages) > 0) AS first_input_messages,
+               argMaxIf(s.output_messages, s.ended_at, length(s.output_messages) > 0) AS last_output_messages
+        FROM spans s
+        WHERE {where}
+        GROUP BY conversation_id
     """
 
 

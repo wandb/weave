@@ -95,6 +95,10 @@ SPAN_GROUP_RESULT_COLS: frozenset[str] = SPAN_GROUP_AGGREGATE_COLS.union(
     )
 )
 
+# Max characters retained for a conversation message preview snippet. Keeps the
+# grouped list response lean — the table only renders a truncated line.
+CONVERSATION_PREVIEW_CHARS = 280
+
 # ---------------------------------------------------------------------------
 # Ingest
 # ---------------------------------------------------------------------------
