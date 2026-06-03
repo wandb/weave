@@ -22,7 +22,6 @@ from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
 from tests.trace.util import client_is_sqlite
 from weave.trace import weave_client
-from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 from weave.trace_server.opentelemetry.attributes import (
@@ -1411,14 +1410,6 @@ class TestSemanticConventionParsing:
         if client_is_sqlite(client):
             # SQLite does not support costs
             return
-
-        if wf_env.wf_clickhouse_use_distributed_tables():
-            pytest.skip(
-                "llm_token_prices is rand-sharded in distributed mode, so the "
-                "per-shard cost JOIN misses prices that hashed to a different "
-                "shard. Tracked as a follow-up: dimension tables need a broadcast "
-                "distribution before cost computation works on multi-shard clusters."
-            )
 
         project_id = client.project_id
 

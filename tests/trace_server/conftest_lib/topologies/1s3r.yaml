@@ -22,8 +22,8 @@
 # shards. ch-s1-r1 hosts the embedded Keeper alongside CH, so it gets
 # a larger cap (4 GB) than the keeper-less replicas (3 GB). Total
 # committed memory: 4 + 3 + 3 = 10 GB, well under the runner's 32 GB.
-# Caps were doubled (from 2/1.5) after an 8-worker xdist test hit the
-# 1.04 GiB / 1.80 GiB OvercommitTracker ceiling on a JOIN query.
+# Per-node cap is sized for 8-worker xdist JOINs, which hit the
+# OvercommitTracker ceiling at tighter limits.
 #
 # Usage (local):
 #   docker compose -f 1s3r.yaml up -d --wait
