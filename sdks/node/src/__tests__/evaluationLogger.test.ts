@@ -5,7 +5,7 @@
 import {EvaluationLogger} from '../evaluationLogger';
 import {WeaveObject} from '../weaveObject';
 import {initWithCustomTraceServer} from './clientMock';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 
 // Helper function to get calls from trace server
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {

@@ -3,6 +3,7 @@ import pytest
 import weave
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.builtin_object_classes.actions import (
     ActionSpec,
 )
@@ -83,6 +84,27 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     assert feedback.feedback_type == "wandb.runnable." + action_name
     assert feedback.runnable_ref == action_ref_uri
     assert feedback.payload == {"output": True}
+
+
+def test_actions_execute_batch_rejects_multiple_call_ids(client: WeaveClient):
+    """Submitting >1 call_id must raise InvalidRequest (HTTP 400), not
+    NotImplementedError (HTTP 500). Regression for WB-34836: batching is
+    unsupported but that's invalid input from the client's perspective, not
+    a server bug.
+    """
+    if client_is_sqlite(client):
+        return pytest.skip("skipping for sqlite")
+
+    with pytest.raises(InvalidRequest, match="Batching actions"):
+        client.server.actions_execute_batch(
+            ActionsExecuteBatchReq.model_validate(
+                {
+                    "project_id": client.project_id,
+                    "action_ref": "weave:///fake/fake/op/fake:v0",
+                    "call_ids": ["call_a", "call_b"],
+                }
+            )
+        )
 
 
 primitive_mock_response = {
