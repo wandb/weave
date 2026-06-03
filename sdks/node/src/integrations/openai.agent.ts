@@ -1,9 +1,6 @@
 /**
  * Weave integration for OpenAI Agents SDK
  *
- * This module provides tracing integration for the OpenAI Agents SDK using duck typing
- * to avoid direct dependencies on @openai/agents types.
- *
  * Usage:
  * ```typescript
  * import { addTraceProcessor } from '@openai/agents';
