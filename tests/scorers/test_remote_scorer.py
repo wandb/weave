@@ -10,6 +10,7 @@ from weave.scorers.remote_scorer import (
     StaticBearerAuthConfig,
     _validate_remote_scorer_endpoint_url,
 )
+from weave.trace.api import publish
 from weave.trace.object_record import pydantic_object_record
 
 pytestmark = pytest.mark.trace_server
@@ -382,3 +383,34 @@ def test_remote_scorer_score_raises_not_implemented() -> None:
         "RemoteScorer is run by the Weave scoring worker against your HTTPS "
         "endpoint; score() is not part of that path."
     )
+
+
+def test_remote_scorer_with_auth_config_round_trips_via_publish(client) -> None:
+    """Publishing a RemoteScorer with auth_config must reconstruct the typed
+    auth_config on read.
+
+    Regression: the base ``Scorer.from_obj`` leaves the nested ``auth_config`` as
+    a ``WeaveObject`` that the ``extra="forbid"`` union rejects, so ``ref.get()``
+    (and the scoring worker) raised a ``ValidationError``. ``RemoteScorer.from_obj``
+    unwraps it instead.
+    """
+    scorer = RemoteScorer(
+        name="rs_auth",
+        endpoint_url="http://127.0.0.1:8765/score",
+        auth_config=OAuthClientCredentialsConfig(
+            mode="oauth_client_credentials",
+            token_endpoint_url="http://127.0.0.1:8765/token",
+            client_id="cid",
+            client_secret_name="SEC",
+            scope="s",
+        ),
+    )
+    ref = publish(scorer, name="rs_auth")
+
+    gotten = ref.get()
+    assert isinstance(gotten, RemoteScorer)
+    assert isinstance(gotten.auth_config, OAuthClientCredentialsConfig)
+    assert gotten.auth_config.client_id == "cid"
+    assert gotten.auth_config.client_secret_name == "SEC"
+    # Secret values are never embedded — only the secret name.
+    assert gotten.endpoint_url == "http://127.0.0.1:8765/score"
