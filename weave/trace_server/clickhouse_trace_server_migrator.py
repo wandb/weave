@@ -47,20 +47,26 @@
   - Creates `view_name_local` ON CLUSTER with `TO target_table_local`
   - All `FROM` clauses and qualified column references renamed to `_local` suffix
 
-**CREATE VIEW and CREATE MATERIALIZED VIEW:**
-  - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
-  - Note: In distributed mode, materialized views from initial CREATE statements should reference
-    base tables (not _local), as the migrator doesn't transform initial CREATE statements
+**CREATE VIEW (non-materialized):**
+  - Only adds `ON CLUSTER` clause (regular views are metadata-only, no local/distributed split)
+
+**CREATE MATERIALIZED VIEW:**
+  - Rewrites to create only the local-targeted variant (`view_name_local`):
+    `FROM source` becomes `FROM source_local`, `TO target` becomes `TO target_local`.
+  - The original Distributed-source/target MV is NOT created. Otherwise inserts
+    into the Distributed source fire BOTH MVs (one on the initiator via the
+    Distributed source, one on the target shard via the local source) and produce
+    two derived rows per source row.
 
 **DROP TABLE:**
   - Drops both `table_name_local` AND `table_name`
   - Ensures complete cleanup of both local and distributed tables
 
 **DROP VIEW:**
-  - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
-  - Works identically to replicated mode
-  - Note: For materialized views that were modified via ALTER TABLE MODIFY QUERY,
-    you must drop the `_local` version explicitly (e.g., `DROP VIEW view_name_local`)
+  - Adds `ON CLUSTER` and ALSO drops the `_local` twin (`DROP VIEW IF EXISTS`).
+  - Plain views have no `_local` twin so the second statement is a no-op.
+  - Materialized views in distributed mode exist only as the `_local` variant,
+    so dropping the bare name is also a no-op but is kept for legacy DBs.
 
 **INSERT INTO:**
   - Skipped entirely (backfill not supported for distributed tables; handle per-shard)
@@ -158,8 +164,13 @@ _MIGRATIONS_TABLE_COLUMNS = """
 # Valid values: "trace_id" (default), "id", "project_id"
 ID_SHARDED_TABLES: dict[str, str] = {
     "calls_complete": wf_clickhouse_calls_shard_key(),
-    # Keep one trace/turn on one shard. This matches the default calls sharding
-    # key and keeps trace detail reads local.
+    # call_parts (call_start/call_end rows) must shard by `id`, not `trace_id`:
+    # call_end rows don't carry trace_id (only call_start does), so sharding by
+    # trace_id sends them via rand() and they land on a different shard than
+    # the matching call_start. Without co-location the partial states never
+    # merge, and queries that filter on aggregated columns (e.g. parent_id IS
+    # NULL for trace_roots_only) match the call_end row of every child call.
+    "call_parts": "id",
     "spans": "trace_id",
     "messages": "trace_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
@@ -1065,7 +1076,16 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 self._execute_distributed_rename(command)
                 return
 
-            # Handle CREATE/DROP VIEW (no local/distributed split, just add ON CLUSTER)
+            # Handle CREATE MATERIALIZED VIEW: rewrite to create only the
+            # local-source / local-target variant. See module docstring.
+            if SQLPatterns.CREATE_MATERIALIZED_VIEW_STMT.search(command_for_match):
+                if self._uses_replicated_db_engine(target_db):
+                    self._run_ddl_with_retry(command)
+                else:
+                    self._execute_materialized_view_create(command)
+                return
+
+            # Handle CREATE VIEW (non-materialized) / DROP VIEW: just add ON CLUSTER.
             if SQLPatterns.CREATE_VIEW_STMT.search(
                 command_for_match
             ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
@@ -1073,12 +1093,17 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 # and handles DDL replication — skip explicit engine conversion and ON CLUSTER.
                 if self._uses_replicated_db_engine(target_db):
                     formatted_command = command
-                else:
-                    formatted_command = self._format_replicated_sql(command)
-                    formatted_command = self._add_on_cluster_clause(
-                        formatted_command, target_db=target_db
-                    )
+                    self._run_ddl_with_retry(formatted_command)
+                    return
+                formatted_command = self._format_replicated_sql(command)
+                formatted_command = self._add_on_cluster_clause(
+                    formatted_command, target_db=target_db
+                )
                 self._run_ddl_with_retry(formatted_command)
+                # For DROP VIEW: also drop the `_local` twin in case this was a
+                # materialized view. IF EXISTS makes it a no-op for plain views.
+                if SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
+                    self._drop_local_view_twin(command_for_match, target_db)
                 return
 
             # Engine handling matrix for distributed local tables:
@@ -1202,6 +1227,49 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
 
         create_statement = f"CREATE MATERIALIZED VIEW {view_name_local}{on_cluster}\nTO {target_table}\nAS\n{select_query_local}"
         self._run_ddl_with_retry(create_statement)
+
+    def _execute_materialized_view_create(self, command: str) -> None:
+        """Handle CREATE MATERIALIZED VIEW in distributed mode.
+
+        Rewrites `view_name` → `view_name_local`, `TO target` → `TO target_local`,
+        and all `FROM source` references in the SELECT body to `FROM source_local`.
+        Skips creating the original Distributed-source/target MV.
+        """
+        match = SQLPatterns.CREATE_MATERIALIZED_VIEW_FULL.search(command)
+        if not match:
+            raise MigrationError(
+                f"Could not parse CREATE MATERIALIZED VIEW (expected `<view> TO <target> AS SELECT` form): {command}"
+            )
+        view_name = match.group(1)
+        target_table = match.group(2)
+        select_query = match.group(3).strip().rstrip(";").rstrip()
+
+        view_name_local = self._add_local_suffix(view_name)
+        target_table_local = self._add_local_suffix(target_table)
+        select_query_local = self._rename_from_tables_to_local(select_query)
+
+        on_cluster = self._get_on_cluster_clause(self.ch_client.database)
+        self._run_ddl_with_retry(f"DROP TABLE IF EXISTS {view_name_local}{on_cluster}")
+        self._run_ddl_with_retry(
+            f"CREATE MATERIALIZED VIEW {view_name_local}{on_cluster}\n"
+            f"TO {target_table_local}\n"
+            f"AS\n{select_query_local}"
+        )
+
+    def _drop_local_view_twin(self, command_for_match: str, target_db: str) -> None:
+        """After DROP VIEW <name>, also drop `<name>_local` if present.
+
+        Materialized views in distributed mode exist only as `<name>_local`, so
+        the bare-name DROP doesn't actually delete the MV unless we follow up
+        with the local twin. IF EXISTS makes this a no-op for plain views.
+        """
+        drop_match = SQLPatterns.DROP_TABLE_OR_VIEW.search(command_for_match)
+        if not drop_match:
+            return
+        object_name = drop_match.group(2)
+        local_name = self._add_local_suffix(object_name)
+        on_cluster = self._get_on_cluster_clause(target_db)
+        self._run_ddl_with_retry(f"DROP VIEW IF EXISTS {local_name}{on_cluster}")
 
     def _execute_local_table_operation(self, command: str) -> None:
         """Execute operations that only apply to local tables (indexes, mutations)."""
@@ -1533,6 +1601,14 @@ class SQLPatterns:
     RENAME_TABLE_STMT: Pattern = re.compile(r"\bRENAME\s+TABLE\b", re.IGNORECASE)
     CREATE_VIEW_STMT: Pattern = re.compile(
         r"\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\b", re.IGNORECASE
+    )
+    CREATE_MATERIALIZED_VIEW_STMT: Pattern = re.compile(
+        r"\bCREATE\s+MATERIALIZED\s+VIEW\b", re.IGNORECASE
+    )
+    CREATE_MATERIALIZED_VIEW_FULL: Pattern = re.compile(
+        r"CREATE\s+MATERIALIZED\s+VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+        r"([a-zA-Z0-9_.]+)\s+TO\s+([a-zA-Z0-9_.]+)\s+AS\s+(SELECT.+)",
+        re.IGNORECASE | re.DOTALL,
     )
     DROP_TABLE_OR_VIEW: Pattern = re.compile(
         r"\bDROP\s+(TABLE|VIEW)\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_.]+)", re.IGNORECASE

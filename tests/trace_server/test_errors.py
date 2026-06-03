@@ -3,6 +3,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseErro
 from gql.transport.exceptions import TransportServerError
 
 from weave.trace_server.errors import (
+    InvalidFieldError,
     InvalidRequest,
     handle_clickhouse_query_error,
     handle_server_exception,
@@ -42,3 +43,11 @@ def test_clickhouse_type_mismatch_returns_400() -> None:
 
     result = handle_server_exception(InvalidRequest(error_msg))
     assert result.status_code == 400
+
+
+def test_invalid_field_error_maps_to_422() -> None:
+    """Unsupported/unselectable fields are well-formed but unprocessable input -> 422,
+    not 403 (Forbidden, which implies an authz failure) or 500.
+    """
+    result = handle_server_exception(InvalidFieldError("Field 'foo' is not allowed"))
+    assert result.status_code == 422

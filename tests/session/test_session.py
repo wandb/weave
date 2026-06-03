@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import threading
+from unittest.mock import patch
+
 import pytest
 
 from weave.session.session import (
@@ -25,6 +28,25 @@ from weave.session.session import (
     start_tool,
     start_turn,
 )
+
+_fake_ref_counter = iter(range(1, 10_000))
+
+
+def _fake_publish_media_content(**kwargs: object) -> str:
+    return f"weave:///test/project/object/content:{next(_fake_ref_counter)}"
+
+
+@pytest.fixture(autouse=True)
+def _reset_contextvars():
+    """Reset contextvar state after each test to prevent leakage."""
+    yield
+    if (llm := get_current_llm()) is not None:
+        llm.end()
+    if (turn := get_current_turn()) is not None:
+        turn.end()
+    if (session := get_current_session()) is not None:
+        session.end()
+
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -134,8 +156,13 @@ class TestLLM:
         assert c.reasoning.content == "Let me consider..."
 
     def test_attach_media_returns_self(self) -> None:
-        c = LLM(model="gpt-4o")
-        assert c.attach_media(content=b"png_bytes", mime_type="image/png") is c
+        with patch(
+            "weave.session.session._publish_media_content",
+            side_effect=_fake_publish_media_content,
+        ):
+            c = LLM(model="gpt-4o")
+            assert c.attach_media(content=b"png_bytes", mime_type="image/png") is c
+            c._await_uploads()
 
     def test_context_manager_sets_timestamps(self) -> None:
         with LLM(model="gpt-4o") as c:
@@ -149,16 +176,24 @@ class TestLLM:
 
 
 class TestAttachMedia:
+    @pytest.fixture(autouse=True)
+    def _mock_publish(self) -> None:
+        with patch(
+            "weave.session.session._publish_media_content",
+            side_effect=_fake_publish_media_content,
+        ):
+            yield  # type: ignore[misc]
+
     def test_attach_inline_image(self) -> None:
         llm = LLM(model="gpt-4o")
         result = llm.attach_media(content=b"png_bytes", mime_type="image/png")
         assert result is llm
         assert len(llm.media_attachments) == 1
+        llm._await_uploads()
         att = llm.media_attachments[0]
-        assert att.kind == "blob"
+        assert att.ref.startswith("weave:///")
         assert att.modality == "image"
         assert att.mime_type == "image/png"
-        assert att.content == b"png_bytes"
 
     def test_attach_uri(self) -> None:
         llm = LLM(model="gpt-4o")
@@ -168,21 +203,21 @@ class TestAttachMedia:
             mime_type="image/jpeg",
         )
         assert len(llm.media_attachments) == 1
+        llm._await_uploads()
         att = llm.media_attachments[0]
-        assert att.kind == "uri"
+        assert att.ref.startswith("weave:///")
         assert att.modality == "image"
         assert att.mime_type == "image/jpeg"
-        assert att.uri == "https://example.com/photo.jpg"
 
     def test_attach_file_id(self) -> None:
         llm = LLM(model="gpt-4o")
         llm.attach_media(file_id="file-abc123", mime_type="audio/wav")
         assert len(llm.media_attachments) == 1
+        llm._await_uploads()
         att = llm.media_attachments[0]
-        assert att.kind == "file"
+        assert att.ref.startswith("weave:///")
         assert att.modality == "audio"
         assert att.mime_type == "audio/wav"
-        assert att.file_id == "file-abc123"
 
     def test_modality_inferred_from_mime_type(self) -> None:
         llm = LLM(model="gpt-4o")
@@ -190,6 +225,7 @@ class TestAttachMedia:
         assert llm.media_attachments[0].modality == "audio"
         llm.attach_media(content=b"data", mime_type="video/mp4")
         assert llm.media_attachments[1].modality == "video"
+        llm._await_uploads()
 
     def test_rejects_zero_sources(self) -> None:
         llm = LLM(model="gpt-4o")
@@ -200,6 +236,86 @@ class TestAttachMedia:
         llm = LLM(model="gpt-4o")
         with pytest.raises(ValueError, match="Exactly one of"):
             llm.attach_media(content=b"x", uri="http://x")
+
+
+class TestAttachMediaAsync:
+    """attach_media uploads off-thread, in parallel, joined before the span."""
+
+    def test_attach_media_does_not_block(self) -> None:
+        """The call returns before the (slow) upload finishes."""
+        release = threading.Event()
+
+        def slow_publish(**kwargs: object) -> str:
+            release.wait(timeout=5)
+            return "weave:///e/p/object/content:done"
+
+        with patch(
+            "weave.session.session._publish_media_content",
+            side_effect=slow_publish,
+        ):
+            llm = LLM(model="gpt-4o")
+            llm.attach_media(content=b"x", mime_type="image/png")
+            # Upload still in flight: the placeholder exists but its ref is
+            # not yet populated, even though the call already returned.
+            assert llm.media_attachments[0].ref == ""
+            release.set()
+            llm._await_uploads()
+            assert llm.media_attachments[0].ref == "weave:///e/p/object/content:done"
+
+    def test_uploads_run_in_parallel(self) -> None:
+        """Each attach_media gets its own thread; uploads overlap."""
+        n = 4
+        # A barrier of size n only releases once all n workers reach it, so
+        # it can never fill if uploads ran serially on one thread.
+        barrier = threading.Barrier(n, timeout=5)
+        worker_threads: list[int] = []
+
+        def publish(**kwargs: object) -> str:
+            worker_threads.append(threading.get_ident())
+            barrier.wait()
+            return "weave:///e/p/object/content:v1"
+
+        with patch(
+            "weave.session.session._publish_media_content",
+            side_effect=publish,
+        ):
+            llm = LLM(model="gpt-4o")
+            for _ in range(n):
+                llm.attach_media(content=b"x", mime_type="image/png")
+            llm._await_uploads()
+
+        assert len(llm.media_attachments) == n
+        main_ident = threading.get_ident()
+        assert all(ident != main_ident for ident in worker_threads)
+        assert len(set(worker_threads)) == n  # one distinct thread per upload
+
+    @pytest.mark.disable_logging_error_check
+    def test_failed_upload_is_dropped(self) -> None:
+        """An upload that raises is logged and its attachment removed."""
+
+        def boom(**kwargs: object) -> str:
+            raise RuntimeError("upload failed")
+
+        with patch(
+            "weave.session.session._publish_media_content",
+            side_effect=boom,
+        ):
+            llm = LLM(model="gpt-4o")
+            llm.attach_media(content=b"x", mime_type="image/png")
+            llm._await_uploads()
+
+        assert llm.media_attachments == []
+
+    def test_end_awaits_uploads(self) -> None:
+        """Refs are populated by the time the span is built at end()."""
+        with patch(
+            "weave.session.session._publish_media_content",
+            side_effect=_fake_publish_media_content,
+        ):
+            llm = LLM(model="gpt-4o")
+            llm.attach_media(content=b"x", mime_type="image/png")
+            llm.end()
+            assert llm.media_attachments[0].ref.startswith("weave:///")
 
 
 class TestSubAgent:
