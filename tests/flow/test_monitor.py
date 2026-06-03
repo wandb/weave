@@ -37,6 +37,7 @@ def test_out_of_range_sampling_rate():
 
 
 def test_publish(weave_active):
+    client = weave_active
     monitor = Monitor(
         name="test_monitor",
         sampling_rate=0.5,
@@ -58,7 +59,10 @@ def test_publish(weave_active):
 
     assert stored_monitor.active == False
     assert stored_monitor.sampling_rate == 0.5
-    assert stored_monitor.op_names == ["example_op_name"]
+    # WB-33908: a short op name is normalized to a full ref at construction (a
+    # client is active), so even publish-without-activate stores the full ref.
+    expected_op = f"weave:///{client.entity}/{client.project}/op/example_op_name:*"
+    assert stored_monitor.op_names == [expected_op]
     assert stored_monitor.query == Query(
         **{
             "$expr": {
@@ -87,8 +91,12 @@ def test_activate(weave_active):
     assert deactivated_ref.get().active == False
 
 
-def test_activate_normalizes_short_op_names(weave_active):
-    """WB-33908: a short op name must be stored as a full weave:// op ref."""
+def test_normalizes_short_op_names_at_construction(weave_active):
+    """WB-33908: a short op name is normalized to a full weave:// op ref.
+
+    Normalization happens at construction (a client is active), not in
+    ``activate()``; the read-back just confirms it round-trips through storage.
+    """
     client = weave_active
     monitor = Monitor(
         name="test_monitor",
@@ -96,15 +104,14 @@ def test_activate_normalizes_short_op_names(weave_active):
         op_names=["my_op"],
     )
 
-    stored = monitor.activate().get()
-
     expected = f"weave:///{client.entity}/{client.project}/op/my_op:*"
-    assert stored.op_names == [expected]
-    # The in-memory monitor is normalized too (activate mutates before publish).
     assert monitor.op_names == [expected]
 
+    stored = monitor.activate().get()
+    assert stored.op_names == [expected]
 
-def test_activate_preserves_full_refs_and_agent_spans(weave_active):
+
+def test_preserves_full_refs_and_agent_spans(weave_active):
     """Full weave:// refs and agent-span literals are left unchanged."""
     client = weave_active
     full_ref = f"weave:///{client.entity}/{client.project}/op/already:*"
@@ -114,18 +121,21 @@ def test_activate_preserves_full_refs_and_agent_spans(weave_active):
         op_names=[full_ref, "weave.genai.turn_ended"],
     )
 
-    stored = monitor.activate().get()
+    assert monitor.op_names == [full_ref, "weave.genai.turn_ended"]
 
+    stored = monitor.activate().get()
     assert stored.op_names == [full_ref, "weave.genai.turn_ended"]
 
 
-def test_activate_rejects_ambiguous_slashed_op_name(weave_active):
-    """A slashed value that isn't a weave:// ref is rejected, not mangled."""
-    monitor = Monitor(
-        name="test_monitor",
-        scorers=[],
-        op_names=["entity/project/op/foo"],
-    )
+def test_rejects_ambiguous_slashed_op_name(weave_active):
+    """A slashed value that isn't a weave:// ref is rejected, not mangled.
 
+    With a client active, normalization runs at construction, so the error
+    surfaces when the Monitor is built.
+    """
     with pytest.raises(ValueError, match="weave URI"):
-        monitor.activate()
+        Monitor(
+            name="test_monitor",
+            scorers=[],
+            op_names=["entity/project/op/foo"],
+        )

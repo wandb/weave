@@ -6,7 +6,10 @@ from typing_extensions import NotRequired, Self, TypedDict
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
 from weave.trace.api import ObjectRef, publish
-from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    require_weave_client,
+)
 from weave.trace.objectify import register_object
 from weave.trace.refs import Ref
 from weave.trace.vals import WeaveObject
@@ -105,6 +108,29 @@ class Monitor(Object):
         if isinstance(value, list):
             return [item.uri() if isinstance(item, Ref) else item for item in value]
         return value
+
+    def model_post_init(self, context: Any, /) -> None:
+        """Normalize ``op_names`` at construction when a client is available.
+
+        Publishing has no per-object hook, so to also cover a bare
+        ``weave.publish(monitor)`` (no ``activate()``), expand short names here:
+        anyone who will publish has typically called ``weave.init``, so the client
+        is set when the monitor is constructed.
+        
+        Several use cases perform construction without a client, such as unit tests,
+        inspection, deserializing a stored monitor in a worker. The guard on
+        ``get_weave_client()`` allows construction without a client. Normalization
+        won't occur in this case, but that should be ok because stored monitors already
+        hold full refs.
+        
+        There is an edge case where a monitor can be created using the SDK without
+        normalizing: if the user constructs the monitor, then calls weave.init,
+        and then publishes it. Calling ``activate()`` or ``deactivate()`` could be
+        a workaround for this use-case.
+        """
+        super().model_post_init(context)
+        if get_weave_client() is not None:
+            self.op_names = self._normalized_op_names()
 
     def activate(self) -> ObjectRef:
         """Activates the monitor.
