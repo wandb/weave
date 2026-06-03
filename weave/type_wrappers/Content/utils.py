@@ -82,6 +82,18 @@ def _get_resolver() -> Any:
     return None
 
 
+# libmagic reports WAV as audio/x-wav; normalize detected types to the canonical
+# audio/wav so buffer- and filename-based detection agree. Caller-supplied
+# mimetypes don't pass through here and are preserved as-is.
+_DETECTED_MIMETYPE_ALIASES = {
+    "audio/x-wav": "audio/wav",
+}
+
+
+def _normalize_detected_mimetype(mimetype: str | None) -> str | None:
+    return _DETECTED_MIMETYPE_ALIASES.get(mimetype, mimetype)
+
+
 def _detect_from_resolver(
     *, filename: str | None, buffer: bytes | None
 ) -> tuple[str | None, str | None]:
@@ -92,7 +104,8 @@ def _detect_from_resolver(
     """
     resolver = _get_resolver()
     if resolver is not None:
-        return resolver.detect(filename=filename, buffer=buffer)
+        mimetype, extension = resolver.detect(filename=filename, buffer=buffer)
+        return _normalize_detected_mimetype(mimetype), extension
 
     if buffer is not None:
         logger.warning(
@@ -183,7 +196,7 @@ def guess_from_buffer(buffer: bytes) -> str | None:
         return None
 
     mimetype, _ = resolver.detect(filename=None, buffer=buffer)
-    return mimetype
+    return _normalize_detected_mimetype(mimetype)
 
 
 def guess_from_filename(filename: str) -> str | None:
