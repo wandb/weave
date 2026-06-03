@@ -12,14 +12,22 @@ import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_TYPE,
   ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_RESPONSE_ID,
+  ATTR_GEN_AI_RESPONSE_MODEL,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
 } from '../../genai/semconv';
 import type {
   AgentSpanData,
   FunctionSpanData,
+  GenerationSpanData,
+  ResponseSpanData,
   Span,
   Trace,
   TracingProcessor,
@@ -28,6 +36,64 @@ import type {
 const TRACER_NAME = 'weave.openai_agents';
 const WEAVE_ATTR_PREFIX = 'weave.openai_agents';
 const PROVIDER_NAME = 'openai';
+const DEFAULT_CHAT_OUTPUT_TYPE = 'text';
+
+function hasModel(resp: Record<string, any>): resp is {model: string} {
+  return typeof resp.model === 'string';
+}
+
+function hasId(resp: Record<string, any>): resp is {id: string} {
+  return typeof resp.id === 'string';
+}
+
+function hasUsage(
+  resp: Record<string, any>
+): resp is {usage: ResponseSpanDataUsage} {
+  return (
+    typeof resp.usage !== 'undefined' &&
+    typeof resp.usage.input_tokens !== 'undefined'
+  );
+}
+
+/**
+ * Extract the model string from a ResponseSpanData. The Agents SDK exposes
+ * the raw openai response under `_response`.
+ */
+function modelFromResponseSpan(spanData: ResponseSpanData): string | undefined {
+  if (spanData._response && hasModel(spanData._response)) {
+    return spanData._response.model;
+  }
+}
+
+/**
+ * Extract the openai response id from a ResponseSpanData. Prefer the
+ * top-level `response_id` (which the Agents SDK populates directly) and
+ * fall back to `_response.id`.
+ */
+function responseIdFromResponseSpan(
+  spanData: ResponseSpanData
+): string | undefined {
+  if (spanData.response_id) {
+    return spanData.response_id;
+  }
+
+  if (spanData._response && hasId(spanData._response)) {
+    return spanData._response.id;
+  }
+}
+
+type ResponseSpanDataUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+};
+
+function usageFromResponseSpan(
+  spanData: ResponseSpanData
+): ResponseSpanDataUsage | undefined {
+  if (spanData._response && hasUsage(spanData._response)) {
+    return spanData._response.usage;
+  }
+}
 
 /**
  * Descriptive OTel span name. AgentSpan uses the conventional
@@ -42,6 +108,12 @@ function otelSpanName(span: Span): string {
 
     case 'function':
       return `execute_tool ${span.spanData.name}`;
+
+    case 'response':
+      return `chat ${modelFromResponseSpan(span.spanData) ?? ''}`.trimEnd();
+
+    case 'generation':
+      return `chat ${span.spanData.model ?? ''}`.trimEnd();
 
     default:
       const name = (span.spanData as {name?: string}).name ?? '';
@@ -79,6 +151,84 @@ function invokeAgentAttrs(
   return attrs;
 }
 
+function executeToolAttrs(
+  spanData: FunctionSpanData,
+  conversationId: string
+): Attributes {
+  const attrs: Attributes = {
+    [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
+    [ATTR_GEN_AI_TOOL_NAME]: spanData.name ?? '',
+  };
+  if (conversationId) {
+    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
+  }
+  if (spanData.input) {
+    attrs[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = spanData.input;
+  }
+  if (spanData.output) {
+    attrs[ATTR_GEN_AI_TOOL_CALL_RESULT] = spanData.output;
+  }
+  return attrs;
+}
+
+/**
+ * `chat` attrs for a ResponseSpan. Pulls data from Agents-SDK populated `_response`
+ * attribute when present. Input/output message serialization is not yet implemented.
+ */
+function responseChatAttrs(
+  spanData: ResponseSpanData,
+  conversationId: string
+): Attributes {
+  const model = modelFromResponseSpan(spanData);
+  const attrs: Attributes = {
+    [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+    [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
+    [ATTR_GEN_AI_OUTPUT_TYPE]: DEFAULT_CHAT_OUTPUT_TYPE,
+  };
+  if (conversationId) {
+    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
+  }
+  if (model) {
+    attrs[ATTR_GEN_AI_REQUEST_MODEL] = model;
+    attrs[ATTR_GEN_AI_RESPONSE_MODEL] = model;
+  }
+  const respId = responseIdFromResponseSpan(spanData);
+  if (respId) {
+    attrs[ATTR_GEN_AI_RESPONSE_ID] = respId;
+  }
+  const usage = usageFromResponseSpan(spanData);
+  if (usage) {
+    attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens;
+    attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens;
+  }
+  return attrs;
+}
+
+/**
+ * `chat` attrs for a GenerationSpan.
+ */
+function generationChatAttrs(
+  spanData: GenerationSpanData,
+  conversationId: string
+): Attributes {
+  const attrs: Attributes = {
+    [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+    [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
+    [ATTR_GEN_AI_OUTPUT_TYPE]: DEFAULT_CHAT_OUTPUT_TYPE,
+  };
+  if (conversationId) {
+    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
+  }
+  if (spanData.model) {
+    attrs[ATTR_GEN_AI_REQUEST_MODEL] = spanData.model;
+  }
+  if (spanData.usage) {
+    attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = spanData.usage.input_tokens;
+    attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = spanData.usage.output_tokens;
+  }
+  return attrs;
+}
+
 function attrsForSpan(span: Span, conversationId: string): Attributes {
   switch (span.spanData.type) {
     case 'agent':
@@ -87,31 +237,17 @@ function attrsForSpan(span: Span, conversationId: string): Attributes {
     case 'function':
       return executeToolAttrs(span.spanData, conversationId);
 
+    case 'response':
+      return responseChatAttrs(span.spanData, conversationId);
+
+    case 'generation':
+      return generationChatAttrs(span.spanData, conversationId);
+
     default:
       // Remaining span types still emit OTel spans with the openai
       // trace_id/span_id attributes set in onSpanStart, but no semconv
       // attributes yet — per-type mappings land in later increments.
       return {};
-  }
-
-  function executeToolAttrs(
-    spanData: FunctionSpanData,
-    conversationId: string
-  ): Attributes {
-    const attrs: Attributes = {
-      [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
-      [ATTR_GEN_AI_TOOL_NAME]: spanData.name ?? '',
-    };
-    if (conversationId) {
-      attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
-    }
-    if (spanData.input) {
-      attrs[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = spanData.input;
-    }
-    if (spanData.output) {
-      attrs[ATTR_GEN_AI_TOOL_CALL_RESULT] = spanData.output;
-    }
-    return attrs;
   }
 }
 
@@ -123,7 +259,7 @@ function attrsForSpan(span: Span, conversationId: string): Attributes {
  *
  * - `invoke_agent {gen_ai.agent.name}` (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/#invoke-agent-client-span)
  * - `execute_tool {gen_ai.tool.name}` (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/#execute-tool-span)
- * - (TODO) `chat {gen_ai.request.model}` (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/#inference)
+ * - `chat {gen_ai.request.model}` (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/#inference)
  *
  * Span types without a clean semantic mapping emit with a descriptive operation name
  * and `weave.openai_agents.*` attributes:

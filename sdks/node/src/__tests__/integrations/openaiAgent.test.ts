@@ -7,7 +7,9 @@ import {
   Usage,
   withAgentSpan,
   withFunctionSpan,
+  withGenerationSpan,
   withGuardrailSpan,
+  withResponseSpan,
   withTrace,
 } from '@openai/agents';
 import type {Model, ModelRequest, ModelResponse} from '@openai/agents';
@@ -244,7 +246,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(await inMemoryTraceServer.getCalls(testProjectName)).toHaveLength(0);
   });
 
-  test('emits `invoke_agent` and `execute_tool` spans', async () => {
+  test('emits `invoke_agent`, `execute_tool` and `chat` spans', async () => {
     await withTrace('Test', async () => {
       await withAgentSpan(async () => {}, {
         spanId: 'span-agent',
@@ -263,6 +265,19 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
           output: 'sunny, 22C',
         },
       });
+      await withResponseSpan(async span => {
+        span.spanData._response = {
+          id: 'resp-abc',
+          model: 'gpt-4o-mini',
+          usage: {input_tokens: 12, output_tokens: 7},
+        };
+      });
+      await withGenerationSpan(async () => {}, {
+        data: {
+          model: 'gpt-3.5-turbo',
+          usage: {input_tokens: 9, output_tokens: 4},
+        },
+      });
       await withGuardrailSpan(async () => {}, {
         spanId: 'span-guardrail',
         data: {name: 'test-guardrail', triggered: false},
@@ -270,7 +285,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     });
 
     const spans = await emittedSpans();
-    expect(spans).toHaveLength(3);
+    expect(spans).toHaveLength(5);
 
     const agent = spans.find(s => s.name === 'invoke_agent test-agent')!;
     expect(agent.attributes).toMatchObject({
@@ -293,6 +308,30 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'gen_ai.tool.call.result': 'sunny, 22C',
       'weave.openai_agents.span_id': 'span-function',
     });
+
+    const resp = spans.find(s => s.name === 'chat gpt-4o-mini')!;
+    expect(resp.attributes).toMatchObject({
+      'gen_ai.operation.name': 'chat',
+      'gen_ai.provider.name': 'openai',
+      'gen_ai.output.type': 'text',
+      'gen_ai.request.model': 'gpt-4o-mini',
+      'gen_ai.response.model': 'gpt-4o-mini',
+      'gen_ai.response.id': 'resp-abc',
+      'gen_ai.usage.input_tokens': 12,
+      'gen_ai.usage.output_tokens': 7,
+    });
+
+    const gen = spans.find(s => s.name === 'chat gpt-3.5-turbo')!;
+    expect(gen.attributes).toMatchObject({
+      'gen_ai.operation.name': 'chat',
+      'gen_ai.provider.name': 'openai',
+      'gen_ai.output.type': 'text',
+      'gen_ai.request.model': 'gpt-3.5-turbo',
+      'gen_ai.usage.input_tokens': 9,
+      'gen_ai.usage.output_tokens': 4,
+    });
+    // No response.id on the legacy generation span.
+    expect(gen.attributes['gen_ai.response.id']).toBeUndefined();
   });
 
   test('preserves parent-child relationship', async () => {
