@@ -6,6 +6,7 @@ from litellm.types.utils import ModelResponse
 from tests.trace.util import client_is_sqlite
 from weave.trace.settings import override_settings
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.types import AgentSpansQueryReq
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -92,9 +93,24 @@ def test_completions_create(client):
         )
 
     assert res.response == mock_response
-    calls = list(client.get_calls())
-    assert len(calls) == 1
-    assert calls[0].output == res.response
-    assert calls[0].summary["usage"][model_name] == res.response["usage"]
-    assert calls[0].inputs == inputs
-    assert calls[0].op_name == "weave.completions_create"
+    assert res.span_id is not None
+    assert res.trace_id is not None
+    assert res.conversation_id is not None
+
+    spans_res = client.server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=client.project_id,
+            include_details=True,
+        )
+    )
+    assert len(spans_res.spans) == 1
+    span = spans_res.spans[0]
+    assert span.span_id == res.span_id
+    assert span.trace_id == res.trace_id
+    assert span.conversation_id == res.conversation_id
+    assert span.request_model == model_name
+    assert span.response_model == "gpt-4o-2024-08-06"
+    assert span.input_tokens == 11
+    assert span.output_tokens == 9
+    assert span.agent_name == "playground"
+    assert span.status_code == "OK"
