@@ -23,6 +23,8 @@ from weave.trace_server.ttl_settings import compute_expire_at
 
 logger = logging.getLogger(__name__)
 
+PLAYGROUND_AGENT_NAME = "playground"
+
 
 def build_completion_span(
     *,
@@ -122,7 +124,8 @@ def build_completion_span(
         project_id=project_id,
         trace_id=trace_id,
         span_id=span_id,
-        span_name="chat",
+        agent_name=PLAYGROUND_AGENT_NAME,
+        span_name=PLAYGROUND_AGENT_NAME,
         span_kind="CLIENT",
         started_at=started_at,
         ended_at=ended_at,

@@ -161,7 +161,6 @@ from weave.trace_server.clickhouse_schema import (
 )
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.constants import (
-    COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
 from weave.trace_server.datadog import (
@@ -7472,7 +7471,7 @@ def _create_tracked_span_stream_wrapper(
         aggregated_metadata: dict[str, Any] = {}
         stream_error: str | None = None
 
-        try:
+        try:  # noqa: PLW0717
             for chunk in chunk_iter:
                 yield chunk
 
