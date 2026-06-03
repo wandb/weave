@@ -14,13 +14,6 @@
      Production runs hit many replicas for load spreading; tests don't
      need that and trade it for determinism.
 
-     distributed_product_mode=global: the app layer sets this for queries
-     that go through `_query`, but several direct `ch_client.query` call
-     sites bypass that and inherit the server default `deny`, which rejects
-     IN/JOIN subqueries against Distributed tables. Set it at the profile
-     so every connection picks it up. Production servers should mirror this
-     at the app client level — tracked as a follow-up.
-
      Production servers do NOT mount this file; deployments that want sync
      semantics set these themselves. -->
 <clickhouse>
@@ -28,7 +21,6 @@
         <default>
             <distributed_foreground_insert>1</distributed_foreground_insert>
             <load_balancing>in_order</load_balancing>
-            <distributed_product_mode>global</distributed_product_mode>
         </default>
     </profiles>
 </clickhouse>
