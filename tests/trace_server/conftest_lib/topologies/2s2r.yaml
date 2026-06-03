@@ -26,11 +26,14 @@
 #   behavior. Revisit only if an incident proves Keeper HA is in our
 #   bug surface.
 #
-# Resource limits target the GH Actions ubuntu-latest runner (7 GB RAM,
-# 2 vCPU). Each CH node caps at 1.5 GB; total committed memory across
-# 4 CH nodes is 6 GB — tighter than 1s3r's 4.5 GB, but observed actual
-# usage is ~800 MB per node (~3.2 GB total) so real headroom is
-# comfortable. If CI OOMs, first lever is lowering per-node cap to 1 GB.
+# Resource limits target the GH Actions ubuntu-latest-8-cores runner
+# (32 GB RAM, 8 vCPU) used by the `trace`/`trace_calls_complete_only`
+# shards. ch-s1-r1 hosts the embedded Keeper alongside CH, so it gets
+# a larger cap (4 GB) than the keeper-less replicas (3 GB). Total
+# committed memory: 4 + 3 * 3 = 13 GB, well under the runner's 32 GB.
+# Caps were doubled (from 2/1.5) after an 8-worker xdist test hit the
+# 1.04 GiB / 1.80 GiB OvercommitTracker ceiling on a JOIN query
+# (test_eval_results_query_multiple_scorers).
 #
 # Host port 8131 is used (1s3r uses 8130) to avoid collision when both
 # topologies are up simultaneously for local dev. CI runs them in
@@ -57,7 +60,7 @@ x-ch-node: &ch-node
   deploy:
     resources:
       limits:
-        memory: 1536M
+        memory: 3072M
   healthcheck:
     test: ["CMD-SHELL", "wget -q -O- http://localhost:8123/ping || exit 1"]
     interval: 3s
@@ -70,8 +73,14 @@ services:
     <<: *ch-node
     container_name: weave-ci-ch-2s2r-s1-r1
     hostname: ch-s1-r1
+    # Larger memory cap than the other nodes because this one also
+    # runs the embedded Keeper.
+    deploy:
+      resources:
+        limits:
+          memory: 4096M
     ports:
-      # Host port 8131 → container 8123. 1s3r uses 8130.
+      # Host port 8131 -> container 8123. 1s3r uses 8130.
       - "8131:8123"
       - "9001:9000"
     volumes:
