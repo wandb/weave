@@ -92,11 +92,13 @@ def patch_openai(settings: IntegrationSettings | None = None) -> None:
 def _dispatch_openai() -> None:
     """Implicit-patch entry for ``openai``.
 
-    Under ``WEAVE_USE_OTEL_V2``, openai itself is NOT patched. The Agents SDK
-    integration is the system under observation and already exposes the LLM
-    call data via ``ResponseSpanData`` / ``GenerationSpanData`` — instrumenting
-    openai separately would dual-log every call from inside an agent. Direct
-    (non-agent) calls to ``openai.*`` are temporarily untraced in OTel V2 mode.
+    Under ``WEAVE_USE_OTEL_V2`` (the default — see ``UserSettings.use_otel_v2``),
+    openai itself is NOT patched. The Agents SDK integration is the system under
+    observation and already exposes the LLM call data via ``ResponseSpanData`` /
+    ``GenerationSpanData`` — instrumenting openai separately would dual-log every
+    call from inside an agent. Direct (non-agent) calls to ``openai.*`` are
+    therefore untraced by default; call ``patch_openai()`` explicitly, or set
+    ``WEAVE_USE_OTEL_V2=false``, to trace them.
     """
     if should_use_otel_v2():
         return
