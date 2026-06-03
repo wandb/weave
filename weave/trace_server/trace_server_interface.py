@@ -1,7 +1,7 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypeAlias, get_args
 
 from pydantic import (
     BaseModel,
@@ -1458,6 +1458,152 @@ class FeedbackStatsRes(BaseModel):
             "(e.g. 'output_score'). Each value maps agg name to result."
         ),
     )
+
+
+# --- Feedback aggregate schema (for scores grouped by time bucket) ---
+
+FeedbackAggregateGroupByColumn: TypeAlias = Literal[
+    "runnable_ref", "span_agent_name", "span_agent_version", "span_status_code"
+]
+
+# Valid GROUP BY columns for aggregate feedback requests.
+FEEDBACK_AGGREGATE_GROUP_BY_COLUMNS: frozenset[FeedbackAggregateGroupByColumn] = (
+    frozenset(get_args(FeedbackAggregateGroupByColumn))
+)
+
+# Span types, matched on the feedback's weave_ref path segment
+FeedbackSpanType: TypeAlias = Literal["agent_turn", "agent_conversation"]
+
+# Limit aggregate feedback request time range and time bucket count
+MAX_FEEDBACK_AGG_TIME_RANGE_DAYS = 31
+MAX_FEEDBACK_AGG_TIME_BUCKETS = 256
+DAY_IN_MS = datetime.timedelta(days=1).total_seconds() * 1000
+
+
+class FeedbackAggregateReq(BaseModelStrict):
+    """Query for aggregate scores by time bucket and dimension."""
+
+    project_id: str = Field(examples=["entity/project"])
+    after_ms: int = Field(
+        description="Inclusive lower bound on created_at (milliseconds since epoch).",
+        ge=0,
+    )
+    before_ms: int = Field(
+        description="Exclusive upper bound on created_at (milliseconds since epoch).",
+        ge=0,
+    )
+    time_bucket_seconds: int | None = Field(
+        default=None,
+        description="Time bucket size in seconds, e.g. 3600 for 1h buckets",
+        gt=0,
+    )
+    feedback_types: list[str] = Field(
+        default_factory=list,
+        description="Filter on feedback_type by prefix",
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Filter to feedback that includes any of the given tags",
+    )
+    rating_min: float | None = Field(
+        default=None,
+        description="Include only rows with a rating >= this value",
+        ge=0.0,
+        le=1.0,
+    )
+    rating_max: float | None = Field(
+        default=None,
+        description="Include only rows with a rating <= this value",
+        ge=0.0,
+        le=1.0,
+    )
+    monitor_ids: list[str] = Field(
+        default_factory=list,
+        description="Filter by the monitor's objectID:digest by prefix",
+    )
+    scorer_ids: list[str] = Field(
+        default_factory=list,
+        description="Filter by the scorer's objectID:digest by prefix",
+    )
+    span_agent_names: list[str] = Field(
+        default_factory=list,
+        description="Filter to feedback whose span_agent_name matches any of these (exact).",
+    )
+    span_types: list[FeedbackSpanType] = Field(
+        default_factory=list,
+        description="Filter by span type (turn vs conversation), matched on weave_ref.",
+    )
+    group_by: list[FeedbackAggregateGroupByColumn] = Field(
+        default_factory=list,
+        description=(f"Allowed: {sorted(FEEDBACK_AGGREGATE_GROUP_BY_COLUMNS)}."),
+    )
+
+    @model_validator(mode="after")
+    def _validate(self) -> "FeedbackAggregateReq":
+        time_range_ms = self.before_ms - self.after_ms
+        if time_range_ms <= 0:
+            raise ValueError("before_ms must be greater than after_ms")
+        if time_range_ms > MAX_FEEDBACK_AGG_TIME_RANGE_DAYS * DAY_IN_MS:
+            raise ValueError(
+                f"Feedback request range cannot exceed {MAX_FEEDBACK_AGG_TIME_RANGE_DAYS} days"
+            )
+        # Only cap the bucket count when bucketing; None means a single rollup row.
+        if self.time_bucket_seconds is not None:
+            n_buckets = (time_range_ms / 1000) / self.time_bucket_seconds
+            if n_buckets > MAX_FEEDBACK_AGG_TIME_BUCKETS:
+                raise ValueError(
+                    f"Feedback request range cannot exceed {MAX_FEEDBACK_AGG_TIME_BUCKETS} buckets"
+                )
+        return self
+
+
+class FeedbackAggregateBucket(BaseModel):
+    """One (time bucket, group) row of aggregated scorer feedback."""
+
+    time_bucket_start_ms: int | None = Field(
+        default=None,
+        description="Time bucket start, unix epoch ms (UTC). None when unbucketed.",
+    )
+    group: dict[str, str] = Field(
+        default_factory=dict,
+        description="Group-by dimension values for this row (e.g. {'runnable_ref': '...'}).",
+    )
+    total_count: int = Field(
+        description="Number of feedback rows in this bucket/group."
+    )
+    scored_count: int = Field(
+        description=(
+            "Rows that emitted a score (at least one tag or rating). Excludes "
+            "agent-monitor rows that scored nothing — use this for score volume."
+        ),
+    )
+    tag_counts: dict[str, int] = Field(
+        default_factory=dict, description="Count of each scorer tag."
+    )
+    rating_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Number of rows carrying each rating key (e.g. '_rating_').",
+    )
+    rating_sums: dict[str, float] = Field(
+        default_factory=dict,
+        description="Sum of each rating key's values; client derives avg = sum/count.",
+    )
+
+
+class FeedbackAggregateRes(BaseModel):
+    """Sparse time-series of aggregated scorer feedback (empty buckets omitted)."""
+
+    time_bucket_seconds: int | None = Field(
+        default=None,
+        description="Time bucket size used (seconds). None when unbucketed.",
+    )
+    after_ms: int = Field(
+        description="Resolved inclusive lower bound, unix epoch ms (UTC)."
+    )
+    before_ms: int = Field(
+        description="Resolved exclusive upper bound, unix epoch ms (UTC)."
+    )
+    buckets: list[FeedbackAggregateBucket] = Field(default_factory=list)
 
 
 # --- Feedback payload schema (discovered paths for stats) ---
@@ -3164,6 +3310,7 @@ class TraceServerInterface(Protocol):
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
     def feedback_stats(self, req: FeedbackStatsReq) -> FeedbackStatsRes: ...
+    def feedback_aggregate(self, req: FeedbackAggregateReq) -> FeedbackAggregateRes: ...
     def feedback_payload_schema(
         self, req: FeedbackPayloadSchemaReq
     ) -> FeedbackPayloadSchemaRes: ...
