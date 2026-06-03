@@ -18,7 +18,12 @@ import type {
   Span as OpenAIAgentsSpan,
 } from '@openai/agents';
 
-export type {CustomSpanData, Trace, TracingProcessor} from '@openai/agents';
+export type {
+  AgentSpanData,
+  CustomSpanData,
+  Trace,
+  TracingProcessor,
+} from '@openai/agents';
 
 export type Span<TData extends SpanData = SpanData> = OpenAIAgentsSpan<TData>;
 

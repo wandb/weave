@@ -10,15 +10,16 @@ import {
   withGuardrailSpan,
   withTrace,
 } from '@openai/agents';
-import type {
-  Model,
-  ModelRequest,
-  ModelResponse,
-  Trace,
-  Span,
-} from '@openai/agents';
+import type {Model, ModelRequest, ModelResponse} from '@openai/agents';
+import {
+  InMemorySpanExporter,
+  type ReadableSpan,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-base';
 import {z} from 'zod';
 import * as weave from '../..';
+import {clearWeaveTracerProvider} from '../../genai/provider';
+import {Settings} from '../../settings';
 import {initWithCustomTraceServer} from '../clientMock';
 import {InMemoryTraceServer, Call} from '../helpers/inMemoryTraceServer';
 import {agentsInstrumentedHolder} from 'weave/integrations/openai.agent';
@@ -210,6 +211,157 @@ describe('OpenAI Agents Integration', () => {
   });
 });
 
+describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
+  withEnv({WEAVE_USE_OTEL_V2: true, WANDB_API_KEY: 'test-api-key'});
+  withOpenAITracingEnabled();
+
+  let inMemoryTraceServer: InMemoryTraceServer;
+  let exporter: InMemorySpanExporter;
+  const testProjectName = 'test-project-otel';
+
+  beforeEach(async () => {
+    inMemoryTraceServer = new InMemoryTraceServer();
+    exporter = new InMemorySpanExporter();
+
+    initWithCustomTraceServer(
+      testProjectName,
+      inMemoryTraceServer,
+      new Settings(true, {}, {spanProcessor: new SimpleSpanProcessor(exporter)})
+    );
+
+    clearWeaveTracerProvider();
+    setTraceProcessors([]);
+    agentsInstrumentedHolder.value = false;
+    await weave.instrumentOpenAIAgents();
+  });
+
+  test('empty trace emits no OTel spans', async () => {
+    await withTrace('Agent Workflow', async () => {}, {
+      traceId: 'test-trace-123',
+    });
+
+    expect(await emittedSpans()).toHaveLength(0);
+    expect(await inMemoryTraceServer.getCalls(testProjectName)).toHaveLength(0);
+  });
+
+  test('emits `invoke_agent` span', async () => {
+    await withTrace('Test', async () => {
+      await withAgentSpan(async () => {}, {
+        spanId: 'span-agent',
+        data: {
+          name: 'test-agent',
+          tools: ['t1'],
+          handoffs: ['h1'],
+          output_type: 'text',
+        },
+      });
+      await withFunctionSpan(async () => {}, {
+        spanId: 'span-function',
+        data: {name: 'test-function', input: '', output: ''},
+      });
+      await withGuardrailSpan(async () => {}, {
+        spanId: 'span-guardrail',
+        data: {name: 'test-guardrail', triggered: false},
+      });
+    });
+
+    const spans = await emittedSpans();
+    expect(spans).toHaveLength(3);
+
+    const agent = spans.find(s => s.name === 'invoke_agent test-agent')!;
+    expect(agent.attributes).toMatchObject({
+      'gen_ai.operation.name': 'invoke_agent',
+      'gen_ai.agent.name': 'test-agent',
+      'gen_ai.provider.name': 'openai',
+      'weave.openai_agents.agent.tools': ['t1'],
+      'weave.openai_agents.agent.handoffs': ['h1'],
+      'weave.openai_agents.agent.output_type': 'text',
+      'weave.openai_agents.span_id': 'span-agent',
+    });
+  });
+
+  test('preserves parent-child relationship', async () => {
+    await withTrace('Workflow', async () => {
+      await withAgentSpan(
+        async () => {
+          await withFunctionSpan(async () => {}, {
+            spanId: 'span-fn',
+            data: {name: 'inner', input: '', output: ''},
+          });
+        },
+        {
+          spanId: 'span-agent',
+          data: {
+            name: 'test-agent',
+            tools: [],
+            handoffs: [],
+            output_type: 'text',
+          },
+        }
+      );
+    });
+
+    const spans = await emittedSpans();
+    expect(spans).toHaveLength(2);
+
+    const agent = spans.find(s => s.name === 'invoke_agent test-agent')!;
+    const fn = findBySpanId(spans, 'span-fn')!;
+
+    // Child OTel span points back at the agent OTel span via parentSpanId,
+    // and they share the same traceId.
+    expect(fn.parentSpanId).toBe(agent.spanContext().spanId);
+    expect(fn.spanContext().traceId).toBe(agent.spanContext().traceId);
+    expect(agent.parentSpanId).toBeUndefined();
+  });
+
+  test('agent run with tool call emits expected OTel spans', async () => {
+    const getWeather = tool({
+      name: 'get_weather',
+      description: 'Get the current weather for a given city.',
+      parameters: z.object({city: z.string()}),
+      execute: ({city}) => `${city}: Sunny, 22°C`,
+    });
+
+    const agent = new Agent({
+      name: 'Assistant',
+      instructions: 'You are a helpful assistant.',
+      tools: [getWeather],
+      model: new MockAgent([
+        toolCall('get_weather', {city: 'Tokyo'}, 'call-tokyo'),
+        assistantMessage('Tokyo is sunny.', 'msg-final'),
+      ]),
+    });
+
+    const result = await run(agent, 'What is the weather in Tokyo?');
+    expect(result.finalOutput).toBe('Tokyo is sunny.');
+
+    const spans = await emittedSpans();
+
+    const agentSpan = spans.find(s => s.name === 'invoke_agent Assistant');
+    expect(agentSpan).toBeDefined();
+    expect(agentSpan!.attributes).toMatchObject({
+      'gen_ai.operation.name': 'invoke_agent',
+      'gen_ai.agent.name': 'Assistant',
+      'gen_ai.provider.name': 'openai',
+      'weave.openai_agents.agent.tools': ['get_weather'],
+    });
+  });
+
+  async function emittedSpans(): Promise<ReadableSpan[]> {
+    await weave.flushOTel();
+    return exporter.getFinishedSpans();
+  }
+
+  function findBySpanId(
+    spans: ReadableSpan[],
+    spanId: string
+  ): ReadableSpan | undefined {
+    return spans.find(
+      s => s.attributes['weave.openai_agents.span_id'] === spanId
+    );
+  }
+});
+
 /**
  * Returns canned responses in sequence.
  */
@@ -286,5 +438,24 @@ function withOpenAITracingEnabled() {
   });
   afterEach(() => {
     setTracingDisabled(true);
+  });
+}
+
+function withEnv(vars: Record<string, string | boolean | undefined>) {
+  const original: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const [key, value] of Object.entries(vars)) {
+      original[key] = process.env[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = String(value);
+    }
+  });
+
+  afterEach(() => {
+    for (const key of Object.keys(vars)) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
   });
 }
