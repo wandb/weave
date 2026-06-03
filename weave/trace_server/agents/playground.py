@@ -61,26 +61,21 @@ def build_completion_span(
     if response and "choices" in response:
         output_messages = _normalize_output_messages(response["choices"])
         finish_reasons = [
-            c.get("finish_reason", "") or ""
-            for c in response.get("choices", [])
+            c.get("finish_reason", "") or "" for c in response.get("choices", [])
         ]
 
     usage = (response or {}).get("usage", {})
     input_tokens = usage.get("prompt_tokens", 0) or 0
     output_tokens = usage.get("completion_tokens", 0) or 0
     reasoning_tokens = (
-        usage.get("reasoning_tokens", 0)
-        or usage.get("reasoning_output_tokens", 0)
-        or 0
+        usage.get("reasoning_tokens", 0) or usage.get("reasoning_output_tokens", 0) or 0
     )
     cache_creation_input_tokens = usage.get("cache_creation_input_tokens", 0) or 0
     cache_read_input_tokens = usage.get("cache_read_input_tokens", 0) or 0
 
     request_temperature = request_inputs.temperature or 0.0
     request_max_tokens = (
-        request_inputs.max_completion_tokens
-        or request_inputs.max_tokens
-        or 0
+        request_inputs.max_completion_tokens or request_inputs.max_tokens or 0
     )
     request_top_p = request_inputs.top_p or 0.0
     request_frequency_penalty = request_inputs.frequency_penalty or 0.0
@@ -113,7 +108,9 @@ def build_completion_span(
         expire_at = EXPIRE_AT_NEVER
 
     raw_dump: dict[str, Any] = {
-        "inputs": request_inputs.model_dump(exclude_none=True, exclude={"vertex_credentials"}),
+        "inputs": request_inputs.model_dump(
+            exclude_none=True, exclude={"vertex_credentials"}
+        ),
     }
     if response is not None:
         raw_dump["response"] = response
