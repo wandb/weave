@@ -9,19 +9,42 @@ import {
 
 import {getWeaveTracer} from '../../genai/provider';
 import {
+  serializeInputMessages,
+  serializeOutputMessages,
+  messagesFromChatCompletions,
+  outputFromResponseSpan,
+  inputFromResponseSpan,
+  hasChatCompletionInput,
+  hasChatCompletionOutput,
+  hasResponsesOutput,
+  hasResponsesInput,
+} from './messages';
+import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_OUTPUT_TYPE,
   ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_CHOICE_COUNT,
+  ATTR_GEN_AI_REQUEST_FREQUENCY_PENALTY,
+  ATTR_GEN_AI_REQUEST_MAX_TOKENS,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_REQUEST_PRESENCE_PENALTY,
+  ATTR_GEN_AI_REQUEST_SEED,
+  ATTR_GEN_AI_REQUEST_STOP_SEQUENCES,
+  ATTR_GEN_AI_REQUEST_TEMPERATURE,
+  ATTR_GEN_AI_REQUEST_TOP_P,
   ATTR_GEN_AI_RESPONSE_ID,
   ATTR_GEN_AI_RESPONSE_MODEL,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
 } from '../../genai/semconv';
 import type {
   AgentSpanData,
@@ -39,75 +62,14 @@ import type {
   TracingProcessor,
   TranscriptionSpanData,
 } from '../openai.agent.types';
+import type OpenAI from 'openai';
+import type {GenerationUsageData} from '@openai/agents';
 
 const TRACER_NAME = 'weave.openai_agents';
 const WEAVE_ATTR_PREFIX = 'weave.openai_agents';
 const PROVIDER_NAME = 'openai';
 const DEFAULT_CHAT_OUTPUT_TYPE = 'text';
 
-function hasModel(resp: Record<string, any>): resp is {model: string} {
-  return typeof resp.model === 'string';
-}
-
-function hasId(resp: Record<string, any>): resp is {id: string} {
-  return typeof resp.id === 'string';
-}
-
-function hasUsage(
-  resp: Record<string, any>
-): resp is {usage: ResponseSpanDataUsage} {
-  return (
-    typeof resp.usage !== 'undefined' &&
-    typeof resp.usage.input_tokens !== 'undefined'
-  );
-}
-
-/**
- * Extract the model string from a ResponseSpanData. The Agents SDK exposes
- * the raw openai response under `_response`.
- */
-function modelFromResponseSpan(spanData: ResponseSpanData): string | undefined {
-  if (spanData._response && hasModel(spanData._response)) {
-    return spanData._response.model;
-  }
-}
-
-/**
- * Extract the openai response id from a ResponseSpanData. Prefer the
- * top-level `response_id` (which the Agents SDK populates directly) and
- * fall back to `_response.id`.
- */
-function responseIdFromResponseSpan(
-  spanData: ResponseSpanData
-): string | undefined {
-  if (spanData.response_id) {
-    return spanData.response_id;
-  }
-
-  if (spanData._response && hasId(spanData._response)) {
-    return spanData._response.id;
-  }
-}
-
-type ResponseSpanDataUsage = {
-  input_tokens?: number;
-  output_tokens?: number;
-};
-
-function usageFromResponseSpan(
-  spanData: ResponseSpanData
-): ResponseSpanDataUsage | undefined {
-  if (spanData._response && hasUsage(spanData._response)) {
-    return spanData._response.usage;
-  }
-}
-
-/**
- * Descriptive OTel span name. AgentSpan uses the conventional
- * `invoke_agent <subject>` shape; other types fall back to a basic
- * `<kind> <subject>` for trace-viewer readability until later increments
- * add proper semconv mappings.
- */
 function otelSpanName(span: Span): string {
   switch (span.spanData.type) {
     case 'agent':
@@ -117,7 +79,9 @@ function otelSpanName(span: Span): string {
       return `execute_tool ${span.spanData.name}`;
 
     case 'response':
-      return `chat ${modelFromResponseSpan(span.spanData) ?? ''}`.trimEnd();
+      return hasResponsesOutput(span.spanData)
+        ? `chat ${span.spanData._response.model}`
+        : `chat`;
 
     case 'generation':
       return `chat ${span.spanData.model ?? ''}`.trimEnd();
@@ -204,35 +168,79 @@ function executeToolAttrs(
   return attrs;
 }
 
+function responseUsageAttrs(
+  usage: OpenAI.Responses.ResponseUsage | undefined
+): Attributes | undefined {
+  if (!usage) return;
+
+  return {
+    [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: usage.input_tokens,
+    [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output_tokens,
+    [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]:
+      usage.input_tokens_details?.cached_tokens,
+    [ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]:
+      usage.output_tokens_details?.reasoning_tokens,
+  };
+}
+
+function generationSpanUsageAttrs(
+  usage: GenerationUsageData | undefined
+): Attributes | undefined {
+  if (!usage) return;
+
+  return {
+    [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: usage.input_tokens,
+    [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output_tokens,
+    [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.details
+      ?.cached_tokens as number,
+    [ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]: usage.details
+      ?.reasoning_tokens as number,
+  };
+}
+
 /**
  * `chat` attrs for a ResponseSpan. Pulls data from Agents-SDK populated `_response`
- * attribute when present. Input/output message serialization is not yet implemented.
+ * attribute when present.
  */
 function responseChatAttrs(
   spanData: ResponseSpanData,
   conversationId: string
 ): Attributes {
-  const model = modelFromResponseSpan(spanData);
-  const attrs: Attributes = {
+  let attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+    [ATTR_GEN_AI_CONVERSATION_ID]: conversationId,
+    [ATTR_GEN_AI_RESPONSE_ID]: spanData.response_id,
     [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     [ATTR_GEN_AI_OUTPUT_TYPE]: DEFAULT_CHAT_OUTPUT_TYPE,
   };
-  if (conversationId) {
-    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
+
+  if (hasResponsesInput(spanData)) {
+    const {messages, attachments} = inputFromResponseSpan(spanData);
+
+    attrs = {
+      ...attrs,
+      [ATTR_GEN_AI_INPUT_MESSAGES]: serializeInputMessages(
+        messages,
+        attachments
+      ),
+    };
   }
-  if (model) {
-    attrs[ATTR_GEN_AI_REQUEST_MODEL] = model;
-    attrs[ATTR_GEN_AI_RESPONSE_MODEL] = model;
-  }
-  const respId = responseIdFromResponseSpan(spanData);
-  if (respId) {
-    attrs[ATTR_GEN_AI_RESPONSE_ID] = respId;
-  }
-  const usage = usageFromResponseSpan(spanData);
-  if (usage) {
-    attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens;
-    attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens;
+
+  if (hasResponsesOutput(spanData)) {
+    const {messages, reasoning} = outputFromResponseSpan(spanData);
+    const response = spanData._response;
+
+    attrs = {
+      ...attrs,
+      [ATTR_GEN_AI_REQUEST_MODEL]: response.model,
+      [ATTR_GEN_AI_RESPONSE_MODEL]: response.model,
+      [ATTR_GEN_AI_RESPONSE_ID]: attrs[ATTR_GEN_AI_RESPONSE_ID] ?? response.id,
+      [ATTR_GEN_AI_OUTPUT_MESSAGES]: serializeOutputMessages(
+        messages,
+        reasoning
+      ),
+      ...responseUsageAttrs(response.usage),
+    };
   }
 
   return attrs;
@@ -247,20 +255,81 @@ function generationChatAttrs(
 ): Attributes {
   const attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+    [ATTR_GEN_AI_CONVERSATION_ID]: conversationId,
     [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     [ATTR_GEN_AI_OUTPUT_TYPE]: DEFAULT_CHAT_OUTPUT_TYPE,
+    [ATTR_GEN_AI_REQUEST_MODEL]: spanData.model,
   };
-  if (conversationId) {
-    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
+
+  if (hasChatCompletionInput(spanData) && spanData.input.length > 0) {
+    const messages = messagesFromChatCompletions(spanData.input);
+    attrs[ATTR_GEN_AI_INPUT_MESSAGES] = serializeInputMessages(messages, []);
   }
-  if (spanData.model) {
-    attrs[ATTR_GEN_AI_REQUEST_MODEL] = spanData.model;
+
+  if (hasChatCompletionOutput(spanData) && spanData.output.length > 0) {
+    const messages = messagesFromChatCompletions(spanData.output);
+    attrs[ATTR_GEN_AI_OUTPUT_MESSAGES] = serializeOutputMessages(messages, '');
   }
-  if (spanData.usage) {
-    attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = spanData.usage.input_tokens;
-    attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = spanData.usage.output_tokens;
+
+  return {
+    ...attrs,
+    ...generationSpanUsageAttrs(spanData.usage),
+    ...modelConfigAttrs(spanData.model_config),
+  };
+}
+
+/**
+ * Allowlist of `GenerationSpanData.model_config` keys mapped to their
+ * GenAI semconv attribute names. Only these keys are forwarded; everything
+ * else on `model_config` is openai-specific and doesn't map cleanly to
+ * GenAI semconv.
+ */
+const MODEL_CONFIG_KEY_MAP = {
+  temperature: ATTR_GEN_AI_REQUEST_TEMPERATURE,
+  top_p: ATTR_GEN_AI_REQUEST_TOP_P,
+  frequency_penalty: ATTR_GEN_AI_REQUEST_FREQUENCY_PENALTY,
+  presence_penalty: ATTR_GEN_AI_REQUEST_PRESENCE_PENALTY,
+  max_tokens: ATTR_GEN_AI_REQUEST_MAX_TOKENS,
+  seed: ATTR_GEN_AI_REQUEST_SEED,
+  stop: ATTR_GEN_AI_REQUEST_STOP_SEQUENCES,
+  n: ATTR_GEN_AI_REQUEST_CHOICE_COUNT,
+};
+
+/**
+ * Extract `gen_ai.request.*` attrs from a GenerationSpanData.model_config.
+ *
+ * Keys not in the allowlist are dropped. Null/undefined values are dropped.
+ * `stop` is normalized to an array (openai accepts a single string OR a
+ * list); semconv requires `stop_sequences` to be a list of strings, so a
+ * bare string becomes a single-element array and anything that's neither
+ * string nor array is dropped.
+ */
+function modelConfigAttrs(
+  modelConfig: GenerationSpanData['model_config']
+): Attributes {
+  if (!modelConfig) {
+    return {};
   }
-  return attrs;
+
+  const out: Attributes = {};
+  for (const [key, attr] of Object.entries(MODEL_CONFIG_KEY_MAP)) {
+    const value = modelConfig[key];
+    if (value === null || value === undefined) {
+      continue;
+    }
+
+    if (attr === ATTR_GEN_AI_REQUEST_STOP_SEQUENCES) {
+      if (typeof value === 'string') {
+        out[attr] = [value];
+      } else if (Array.isArray(value)) {
+        out[attr] = value;
+      }
+      continue;
+    }
+
+    out[attr] = value;
+  }
+  return out;
 }
 
 function handoffAttrs(spanData: HandoffSpanData): Attributes {
