@@ -14,8 +14,12 @@ import type {
   GenerationSpanData,
   GuardrailSpanData,
   HandoffSpanData,
+  MCPListToolsSpanData,
   ResponseSpanData,
   Span as OpenAIAgentsSpan,
+  SpeechGroupSpanData,
+  SpeechSpanData,
+  TranscriptionSpanData,
 } from '@openai/agents';
 
 export type {
@@ -23,9 +27,15 @@ export type {
   CustomSpanData,
   FunctionSpanData,
   GenerationSpanData,
+  GuardrailSpanData,
+  HandoffSpanData,
+  MCPListToolsSpanData,
   ResponseSpanData,
+  SpeechGroupSpanData,
+  SpeechSpanData,
   Trace,
   TracingProcessor,
+  TranscriptionSpanData,
 } from '@openai/agents';
 
 export type Span<TData extends SpanData = SpanData> = OpenAIAgentsSpan<TData>;
@@ -40,4 +50,8 @@ export type SpanData =
   | ResponseSpanData
   | HandoffSpanData
   | CustomSpanData
-  | GuardrailSpanData;
+  | GuardrailSpanData
+  | TranscriptionSpanData
+  | SpeechSpanData
+  | SpeechGroupSpanData
+  | MCPListToolsSpanData;
