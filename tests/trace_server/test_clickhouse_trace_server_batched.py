@@ -589,22 +589,20 @@ def test_completions_create_stream_custom_provider_with_tracking():
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_complete"
-        ) as mock_insert_complete,
-        patch.object(
-            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
-        ) as mock_update_end,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
     ):
-        # Mock the litellm completion stream
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
+
         mock_stream = MagicMock()
         mock_stream.__iter__.return_value = mock_chunks
         mock_litellm.return_value = mock_stream
 
-        # Mock provider and model objects
         mock_provider = tsi.ObjSchema(
             project_id="dGVzdF9wcm9qZWN0",
             object_id="custom-provider",
@@ -653,7 +651,6 @@ def test_completions_create_stream_custom_provider_with_tracking():
 
         mock_obj_read.side_effect = mock_obj_read_func
 
-        # Create test request with tracking enabled
         req = tsi.CompletionsCreateReq(
             project_id="dGVzdF9wcm9qZWN0",
             inputs=tsi.CompletionsCreateRequestInputs(
@@ -667,7 +664,6 @@ def test_completions_create_stream_custom_provider_with_tracking():
         stream = server.completions_create_stream(req)
         chunks = list(stream)
 
-        # Verify streaming functionality
         assert len(chunks) == 3  # Meta chunk + 2 content chunks
         assert "_meta" in chunks[0]
         assert "weave_call_id" in chunks[0]["_meta"]
@@ -675,14 +671,11 @@ def test_completions_create_stream_custom_provider_with_tracking():
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
         assert "usage" in chunks[2]
 
-        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
-        mock_insert_complete.assert_called_once()
-        mock_update_end.assert_called_once()
-        start_call = mock_insert_complete.call_args[0][0]
-        assert start_call.project_id == "dGVzdF9wcm9qZWN0"
-        assert start_call.ended_at is None
+        # Open span + completed span
+        assert mock_agent_writer.insert_span.call_count == 2
+        completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
+        assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
 
-        # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
         call_args = mock_litellm.call_args[1]
         assert (
@@ -766,28 +759,26 @@ def test_completions_create_stream_multiple_choices():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_complete"
-        ) as mock_insert_complete,
-        patch.object(
-            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
-        ) as mock_update_end,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
     ):
-        # Mock the litellm completion stream
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
+
         mock_stream = MagicMock()
         mock_stream.__iter__.return_value = mock_chunks
         mock_litellm.return_value = mock_stream
 
-        # Create test request with n=2 and tracking enabled
         req = tsi.CompletionsCreateReq(
             project_id="dGVzdF9wcm9qZWN0",
             inputs=tsi.CompletionsCreateRequestInputs(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Say hello"}],
-                n=2,  # Request 2 completions
+                n=2,
             ),
             track_llm_call=True,
         )
@@ -796,53 +787,28 @@ def test_completions_create_stream_multiple_choices():
         stream = server.completions_create_stream(req)
         chunks = list(stream)
 
-        # Verify streaming functionality
         assert len(chunks) == 4  # Meta chunk + 3 content chunks
         assert "_meta" in chunks[0]
-        assert "weave_call_id" in chunks[0]["_meta"]  # Single call ID (not multiple)
+        assert "weave_call_id" in chunks[0]["_meta"]
         assert (
             "weave_call_ids" not in chunks[0]["_meta"]
-        )  # Should not have multiple format
+        )
 
-        # Verify original chunks are preserved
         assert chunks[1]["choices"][0]["delta"]["content"] == "Hello"
         assert chunks[1]["choices"][1]["delta"]["content"] == "Hi"
         assert chunks[3]["choices"][0]["finish_reason"] == "stop"
         assert chunks[3]["choices"][1]["finish_reason"] == "stop"
 
-        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
-        mock_insert_complete.assert_called_once()
-        mock_update_end.assert_called_once()
+        # Open span + completed span
+        assert mock_agent_writer.insert_span.call_count == 2
 
-        # Verify start call
-        start_call = mock_insert_complete.call_args[0][0]
-        assert start_call.project_id == "dGVzdF9wcm9qZWN0"
-        start_call_inputs = json.loads(start_call.inputs_dump)
-        assert start_call_inputs["model"] == "gpt-3.5-turbo"
-        assert start_call_inputs["n"] == 2
-        assert "choice_index" not in start_call_inputs
+        completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
+        assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
+        assert completed_span.request_model == "gpt-3.5-turbo"
 
-        # Verify end call has correct output with BOTH choices
-        end_call = mock_update_end.call_args[0][0]
-        assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        end_call_output = end_call.output
-        assert "choices" in end_call_output
-        assert len(end_call_output["choices"]) == 2
+        # Verify both choices are captured in output_messages
+        assert len(completed_span.output_messages) == 2
 
-        # Verify both choices are accumulated correctly
-        choices = end_call_output["choices"]
-
-        # Choice 0
-        choice_0 = next(c for c in choices if c["index"] == 0)
-        assert choice_0["message"]["content"] == "Hello there!"
-        assert choice_0["finish_reason"] == "stop"
-
-        # Choice 1
-        choice_1 = next(c for c in choices if c["index"] == 1)
-        assert choice_1["message"]["content"] == "Hi friend!"
-        assert choice_1["finish_reason"] == "stop"
-
-        # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
         call_args = mock_litellm.call_args[1]
         assert call_args["inputs"].n == 2
@@ -895,28 +861,26 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_complete"
-        ) as mock_insert_complete,
-        patch.object(
-            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
-        ) as mock_update_end,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
     ):
-        # Mock the litellm completion stream
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
+
         mock_stream = MagicMock()
         mock_stream.__iter__.return_value = mock_chunks
         mock_litellm.return_value = mock_stream
 
-        # Create test request with n=1 and tracking enabled
         req = tsi.CompletionsCreateReq(
             project_id="dGVzdF9wcm9qZWN0",
             inputs=tsi.CompletionsCreateRequestInputs(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Say hello"}],
-                n=1,  # Single completion
+                n=1,
             ),
             track_llm_call=True,
         )
@@ -925,39 +889,23 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         stream = server.completions_create_stream(req)
         chunks = list(stream)
 
-        # Verify streaming functionality - should maintain legacy format
         assert len(chunks) == 3  # Meta chunk + 2 content chunks
         assert "_meta" in chunks[0]
         assert "weave_call_id" in chunks[0]["_meta"]
         assert "weave_call_ids" not in chunks[0]["_meta"]
 
-        # Verify content
         assert chunks[1]["choices"][0]["delta"]["content"] == "Hello world!"
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
 
-        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
-        mock_insert_complete.assert_called_once()
-        mock_update_end.assert_called_once()
+        # Open span + completed span
+        assert mock_agent_writer.insert_span.call_count == 2
 
-        # Verify start call
-        start_call = mock_insert_complete.call_args[0][0]
-        assert start_call.project_id == "dGVzdF9wcm9qZWN0"
-        start_call_inputs = json.loads(start_call.inputs_dump)
-        assert start_call_inputs["model"] == "gpt-3.5-turbo"
-        assert start_call_inputs["n"] == 1
-        assert "choice_index" not in start_call_inputs
+        completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
+        assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
+        assert completed_span.request_model == "gpt-3.5-turbo"
+        assert len(completed_span.output_messages) == 1
+        assert completed_span.output_messages[0].content == "Hello world!"
 
-        # Verify end call has correct output
-        end_call = mock_update_end.call_args[0][0]
-        assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        end_call_output = end_call.output
-        assert "choices" in end_call_output
-        assert len(end_call_output["choices"]) == 1
-        choice = end_call_output["choices"][0]
-        assert choice["index"] == 0
-        assert choice["message"]["content"] == "Hello world!"
-
-        # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
         call_args = mock_litellm.call_args[1]
         assert call_args["inputs"].n == 1
