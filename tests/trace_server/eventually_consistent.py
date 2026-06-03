@@ -11,6 +11,8 @@ import time
 from collections.abc import Callable
 from typing import TypeVar
 
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents import types as agent_types
 from weave.trace_server.errors import NotFoundError
 
 RETRY_DELAY_SECONDS = 0.2
@@ -28,69 +30,83 @@ class EventuallyConsistentServer:
     `find_server_layer` (see its `_NEXT_SERVER_ATTRS`).
     """
 
-    def __init__(self, inner: object) -> None:
+    def __init__(self, inner: tsi.TraceServerInterface) -> None:
         self._inner = inner
 
     def __getattr__(self, name: str) -> object:
         return getattr(self._inner, name)
 
     # --- objects / tables / files ---
-    def obj_read(self, req: object) -> object:
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         return retry_read(lambda: self._inner.obj_read(req))
 
-    def objs_query(self, req: object) -> object:
+    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         return retry_read(lambda: self._inner.objs_query(req), lambda res: not res.objs)
 
-    def table_query(self, req: object) -> object:
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         return retry_read(
             lambda: self._inner.table_query(req), lambda res: not res.rows
         )
 
-    def refs_read_batch(self, req: object) -> object:
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         return retry_read(
             lambda: self._inner.refs_read_batch(req), lambda res: not res.vals
         )
 
-    def file_content_read(self, req: object) -> object:
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return retry_read(lambda: self._inner.file_content_read(req))
 
     # --- agents ---
-    def agent_spans_query(self, req: object) -> object:
+    def agent_spans_query(
+        self, req: agent_types.AgentSpansQueryReq
+    ) -> agent_types.AgentSpansQueryRes:
         return retry_read(
             lambda: self._inner.agent_spans_query(req),
             lambda res: res.total_count == 0,
         )
 
-    def agent_spans_stats(self, req: object) -> object:
+    def agent_spans_stats(
+        self, req: agent_types.AgentSpanStatsReq
+    ) -> agent_types.AgentSpanStatsRes:
         metric_keys = stats_metric_keys(req)
         return retry_read(
             lambda: self._inner.agent_spans_stats(req),
             lambda res: stats_result_is_empty(res, metric_keys),
         )
 
-    def agent_agents_query(self, req: object) -> object:
+    def agent_agents_query(
+        self, req: agent_types.AgentsQueryReq
+    ) -> agent_types.AgentsQueryRes:
         return retry_read(
             lambda: self._inner.agent_agents_query(req), lambda res: not res.agents
         )
 
-    def agent_versions_query(self, req: object) -> object:
+    def agent_versions_query(
+        self, req: agent_types.AgentVersionsQueryReq
+    ) -> agent_types.AgentVersionsQueryRes:
         return retry_read(
             lambda: self._inner.agent_versions_query(req),
-            lambda res: not res.agent_versions,
+            lambda res: not res.versions,
         )
 
-    def agent_search(self, req: object) -> object:
+    def agent_search(
+        self, req: agent_types.AgentSearchReq
+    ) -> agent_types.AgentSearchRes:
         return retry_read(
             lambda: self._inner.agent_search(req), lambda res: not res.results
         )
 
-    def agent_conversation_chat(self, req: object) -> object:
+    def agent_conversation_chat(
+        self, req: agent_types.AgentConversationChatReq
+    ) -> agent_types.AgentConversationChatRes:
         return retry_read(
             lambda: self._inner.agent_conversation_chat(req),
             lambda res: res.total_turns == 0,
         )
 
-    def agent_custom_attrs_schema(self, req: object) -> object:
+    def agent_custom_attrs_schema(
+        self, req: agent_types.AgentCustomAttrsSchemaReq
+    ) -> agent_types.AgentCustomAttrsSchemaRes:
         return retry_read(
             lambda: self._inner.agent_custom_attrs_schema(req),
             lambda res: not res.attributes,
@@ -114,7 +130,7 @@ def retry_read(call: Callable[[], T], is_empty: Callable[[T], bool] | None = Non
     return result
 
 
-def stats_metric_keys(req: object) -> list[str]:
+def stats_metric_keys(req: agent_types.AgentSpanStatsReq) -> list[str]:
     """Result-row keys the stats query produces for the requested metrics."""
     keys: list[str] = []
     for metric in req.metrics:
@@ -125,7 +141,9 @@ def stats_metric_keys(req: object) -> list[str]:
     return keys
 
 
-def stats_result_is_empty(res: object, metric_keys: list[str]) -> bool:
+def stats_result_is_empty(
+    res: agent_types.AgentSpanStatsRes, metric_keys: list[str]
+) -> bool:
     """Empty when no rows, or every judged column is zero/None in every row.
 
     Judged columns are the requested metric aliases, or the bucket `count` column
