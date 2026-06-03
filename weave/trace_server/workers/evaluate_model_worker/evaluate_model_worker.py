@@ -13,7 +13,6 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
     LLMStructuredCompletionModel,
 )
 from weave.trace_server.trace_server_interface import EvaluateModelArgs, EvalWorkerJob
-from weave.trace_server.validation import assert_safe_payload
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 

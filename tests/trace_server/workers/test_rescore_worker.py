@@ -146,7 +146,6 @@ async def test_rescore_predictions_score_create_called_per_prediction_per_scorer
     mock_server.prediction_list.return_value = iter(predictions)
     mock_server.score_create = MagicMock()
     mock_server.evaluation_run_finish = MagicMock()
-    mock_server.obj_read = MagicMock()  # for _assert_safe_ref
 
     mock_client = MagicMock()
     mock_client.server = mock_server
@@ -158,11 +157,8 @@ async def test_rescore_predictions_score_create_called_per_prediction_per_scorer
 
     with (
         patch(
-            "weave.trace_server.workers.evaluate_model_worker.rescore_worker.require_weave_client",
+            "weave.trace_server.workers.evaluate_model_worker.rescore_worker.require_secure_weave_client",
             return_value=mock_client,
-        ),
-        patch(
-            "weave.trace_server.workers.evaluate_model_worker.rescore_worker._assert_safe_ref"
         ),
         patch(
             "weave.trace_server.workers.evaluate_model_worker.rescore_worker._get_valid_scorer",
@@ -225,11 +221,8 @@ async def test_rescore_predictions_summary_keyed_by_scorer_name_not_ref():
 
     with (
         patch(
-            "weave.trace_server.workers.evaluate_model_worker.rescore_worker.require_weave_client",
+            "weave.trace_server.workers.evaluate_model_worker.rescore_worker.require_secure_weave_client",
             return_value=mock_client,
-        ),
-        patch(
-            "weave.trace_server.workers.evaluate_model_worker.rescore_worker._assert_safe_ref"
         ),
         patch(
             "weave.trace_server.workers.evaluate_model_worker.rescore_worker._get_valid_scorer",
@@ -265,7 +258,10 @@ async def test_rescore_predictions_summary_keyed_by_scorer_name_not_ref():
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_rescore_predictions_evaluation_run_finish_called_on_exception():
-    """evaluation_run_finish must be called even when an unexpected error occurs."""
+    """evaluation_run_finish must be called with an empty summary on unexpected error,
+    and the exception must be swallowed so Kafka does not redeliver and double-write
+    scores into the (already finished) new_evaluation_run_id.
+    """
     args = RescoringArgs(
         project_id="e/p",
         source_evaluation_run_id="src-run",
@@ -284,11 +280,8 @@ async def test_rescore_predictions_evaluation_run_finish_called_on_exception():
 
     with (
         patch(
-            "weave.trace_server.workers.evaluate_model_worker.rescore_worker.require_weave_client",
+            "weave.trace_server.workers.evaluate_model_worker.rescore_worker.require_secure_weave_client",
             return_value=mock_client,
-        ),
-        patch(
-            "weave.trace_server.workers.evaluate_model_worker.rescore_worker._assert_safe_ref"
         ),
         patch(
             "weave.trace_server.workers.evaluate_model_worker.rescore_worker._get_valid_scorer",
@@ -307,8 +300,8 @@ async def test_rescore_predictions_evaluation_run_finish_called_on_exception():
             rescore_predictions,
         )
 
-        with pytest.raises(RuntimeError, match="db error"):
-            await rescore_predictions(args)
+        # Exception must be swallowed — no pytest.raises here.
+        await rescore_predictions(args)
 
     # finish must still have been called (with empty summary)
     assert mock_server.evaluation_run_finish.call_count == 1
@@ -360,11 +353,8 @@ async def test_rescore_predictions_pagination_exhausts_all_pages():
 
     with (
         patch(
-            "weave.trace_server.workers.evaluate_model_worker.rescore_worker.require_weave_client",
+            "weave.trace_server.workers.evaluate_model_worker.rescore_worker.require_secure_weave_client",
             return_value=mock_client,
-        ),
-        patch(
-            "weave.trace_server.workers.evaluate_model_worker.rescore_worker._assert_safe_ref"
         ),
         patch(
             "weave.trace_server.workers.evaluate_model_worker.rescore_worker._get_valid_scorer",
