@@ -32,9 +32,9 @@ class Object(BaseModel):
     the Weave system.
 
     Attributes:
-        name (Optional[str]): A human-readable name for the object.
-        description (Optional[str]): A description of what the object represents.
-        ref (Optional[ObjectRef]): A reference to the object in the Weave system.
+        name (str | None): A human-readable name for the object.
+        description (str | None): A description of what the object represents.
+        ref (ObjectRef | None): A reference to the object in the Weave system.
 
     Examples:
         ```python

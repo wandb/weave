@@ -53,15 +53,15 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     process_query_for_object_refs,
 )
 from weave.trace_server.calls_query_builder.optimization_builder import (
+    DATETIME_BUFFER_TIME_SECONDS,
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
-    parse_string_to_utc_timestamp,
     safe_alias,
     safely_format_sql,
-    timestamp_to_datetime_str,
+    trace_id_index_expr,
 )
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
@@ -75,8 +75,10 @@ from weave.trace_server.orm import (
     ParamBuilder,
     clickhouse_cast,
     combine_conditions,
+    maybe_convert_datetime_operands,
     python_value_to_ch_type,
     split_escaped_field_path,
+    timestamp_to_datetime_str,
 )
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
@@ -86,6 +88,13 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
+
+# Deferred: server-side defense-in-depth cap for unfiltered calls_merged stats.
+# Wired up in `build_calls_stats_query` but currently commented out; callers
+# without a `limit` still get an exact count. Flip this on when we see real
+# >>1M-count requests in the wild.
+DEFAULT_STATS_MAX_LIMIT = 1_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,8 +249,9 @@ class CallsMergedDynamicField(CallsMergedAggField):
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         if self.extra_path:
-            raise NotImplementedError(
-                "Dynamic fields cannot be selected directly, yet - implement me!"
+            raise InvalidFieldError(
+                f"Field '{self.field}.{'.'.join(self.extra_path)}' cannot be selected directly; "
+                "select the parent column instead."
             )
         # Use the parent (CallsMergedAggField) as_sql to get the aggregate
         # expression without the JSON extraction that our own as_sql adds.
@@ -279,8 +289,8 @@ class CallsMergedSummaryField(CallsMergedField):
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
-            raise NotImplementedError(
-                f"Summary field '{self.summary_field}' not implemented. "
+            raise InvalidFieldError(
+                f"Summary field '{self.summary_field}' is not allowed. "
                 f"Supported fields are: {supported_fields}"
             )
 
@@ -410,8 +420,9 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
-        raise NotImplementedError(
-            "Feedback fields cannot be selected directly, yet - implement me!"
+        raise InvalidFieldError(
+            "Feedback fields cannot be selected directly. "
+            "Use the feedback endpoints to read feedback payloads."
         )
 
 
@@ -452,8 +463,9 @@ class CallsMergedQueueItemField(CallsMergedField):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
-        raise NotImplementedError(
-            "Queue item fields cannot be selected directly, yet - implement me!"
+        raise InvalidFieldError(
+            "Annotation queue item fields cannot be selected directly; "
+            "use the annotation queue endpoints instead."
         )
 
 
@@ -531,8 +543,9 @@ class QueryBuilderDynamicField(QueryBuilderField):
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         if self.extra_path:
-            raise NotImplementedError(
-                "Dynamic fields cannot be selected directly, yet - implement me!"
+            raise InvalidFieldError(
+                f"Field '{self.field}.{'.'.join(self.extra_path)}' cannot be selected directly; "
+                "select the parent column instead."
             )
         return super().as_select_sql(pb, table_alias, use_agg_fn=use_agg_fn)
 
@@ -1005,13 +1018,17 @@ class CallsQuery(BaseModel):
                     return queue_id
         return None
 
-    def _should_optimize(self) -> bool:
-        """Determines if query optimization should be performed.
+    def _should_use_filter_cte(self) -> bool:
+        """Whether to use the filter-then-load two-pass CTE pattern.
 
-        Returns True if the query has heavy fields and predicate pushdown is possible.
+        Returns True if the query has heavy fields AND predicate pushdown is possible.
         Heavy fields are expensive to load into memory (inputs, output, attributes, summary).
         Predicate pushdown is possible when there are light filters, light query conditions,
-        or light order filters that can be pushed down into a subquery.
+        or light order filters that can narrow rows before the heavy load.
+
+        Note: this is a narrow knob covering the two-pass CTE shape only. It does NOT
+        govern other always-on prunes (e.g. the trace_id bloom-filter candidate CTE),
+        which apply independently.
         """
         # First, check if the query has any heavy fields
         table_name = get_calls_table_name(self.read_table)
@@ -1127,7 +1144,7 @@ class CallsQuery(BaseModel):
         # Determine if we should use the two-step filtered_calls CTE pattern.
         # Only relevant for calls_merged (where GROUP BY makes the two-pass
         # approach worthwhile). For calls_complete, we always use single-pass.
-        should_optimize = self._should_optimize()
+        should_use_filter_cte = self._should_use_filter_cte()
 
         # Important: Always inject deleted_at into the query.
         # We use None as the literal for both table types. The sentinel handling
@@ -1139,9 +1156,12 @@ class CallsQuery(BaseModel):
             )
         )
 
-        # For calls_merged: filter out orphaned call ends (started_at IS NULL).
-        # This can occur with out-of-order call part insertion or early client
-        # termination.  Also REQUIRED for proper pre-GROUP BY (WHERE) optimizations.
+        # For calls_merged: filter out orphaned call ends (op_name IS NULL).
+        # op_name is start-only (CallEndCHInsertable has no op_name), so its
+        # NULL-ness is the reliable signal that a row group is "missing its
+        # start." `started_at` used to serve here but is now populated on
+        # call_end rows too (so the SDK-provided value can pin
+        # `sortable_datetime`), making it ambiguous as an orphan signal.
         # For calls_complete: every row has a non-nullable started_at, so this
         # condition is always true -- skip it to avoid dead SQL.
         if self.read_table == ReadTable.CALLS_MERGED:
@@ -1151,7 +1171,7 @@ class CallsQuery(BaseModel):
                         "$not": [
                             {
                                 "$eq": [
-                                    {"$getField": "started_at"},
+                                    {"$getField": "op_name"},
                                     {"$literal": None},
                                 ]
                             }
@@ -1169,19 +1189,52 @@ class CallsQuery(BaseModel):
             table_alias_resolved,
         )
 
-        if not should_optimize and not self.include_costs and not object_ref_conditions:
-            return self._as_sql_base_format(pb, table_alias_resolved)
+        # Build object-ref and candidate-id CTEs up front so all downstream
+        # code paths (early-return, single-pass, two-pass) can reference them.
+        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
+            pb, self.project_id, object_ref_conditions
+        )
+
+        # Pre-narrow rows via the `idx_trace_id_bloom` skip-index when the
+        # query has a hardcoded trace_ids filter on calls_merged. The CTE
+        # uses the strict (no OR-IS-NULL) form so the bloom filter can prune
+        # granules; the outer query keeps the OR-IS-NULL form for unmerged-
+        # call-part correctness and restricts to `id IN filter_candidate_ids`.
+        #
+        # Always-on: independent of `should_use_filter_cte`, because the bloom
+        # prune pays for itself even on the trivial single-pass path and the
+        # CTE itself is cheap (one extra SELECT, no replicated ordering).
+        # TODO(WB-34494): as_sql is getting long. Follow-up to hoist the
+        # early-return predicate into a named local and extract the
+        # single-pass / two-pass branches into helpers.
+        candidate_cte_name: str | None = None
+        candidate_cte_sql = self._build_filter_candidate_ids_cte_sql(
+            pb, table_alias_resolved
+        )
+        if candidate_cte_sql is not None:
+            ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
+            candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
+
+        if (
+            not should_use_filter_cte
+            and not self.include_costs
+            and not object_ref_conditions
+        ):
+            base_sql = self._as_sql_base_format(
+                pb,
+                table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
+            )
+            if ctes.has_ctes():
+                return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
+            return base_sql
 
         # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
         # where it reduces rows before expensive GROUP BY aggregation.
         # For calls_complete (one row per call, no GROUP BY), always use a
         # single-pass query — it's both simpler and significantly faster.
         use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
-            should_optimize or self.include_costs or bool(object_ref_conditions)
-        )
-
-        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
-            pb, self.project_id, object_ref_conditions
+            should_use_filter_cte or self.include_costs or bool(object_ref_conditions)
         )
 
         if use_filter_cte:
@@ -1221,6 +1274,7 @@ class CallsQuery(BaseModel):
             filtered_calls_sql = filter_query._as_sql_base_format(
                 pb,
                 table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
@@ -1303,14 +1357,15 @@ class CallsQuery(BaseModel):
             WhereFilters object containing all filter SQL strings
         """
         # The op_name, trace_id, trace_roots, wb_run_id conditions REQUIRE conditioning
-        # on the started_at field after grouping in the HAVING clause. These filters
+        # on the op_name field after grouping in the HAVING clause. These filters
         # remove call starts before grouping, creating orphan call ends. By conditioning
-        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
-        # all rows returned at least have a call start.
+        # on `NOT any(op_name) is NULL`, we filter out orphaned call ends, ensuring
+        # all rows returned at least have a call start. op_name is the orphan-end
+        # signal (start-only) because started_at now rides on call_end rows too.
 
         op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_id = process_trace_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, self.read_table
         )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
@@ -1720,6 +1775,39 @@ class CallsQuery(BaseModel):
         {order_result.offset_sql}"""
         return QueryBodyResult(sql=sql, needs_feedback_join=needs_feedback_join)
 
+    def _build_filter_candidate_ids_cte_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+    ) -> str | None:
+        """Build the `filter_candidate_ids` CTE body, or None if not applicable.
+
+        The CTE pre-narrows rows by trace_id using the strict
+        `ifNull(trace_id, '')` form so the `idx_trace_id_bloom` skip-index
+        from migration 031 can prune granules. The outer query then keeps the
+        OR-IS-NULL form for unmerged-call-part correctness and restricts to
+        `id IN filter_candidate_ids` to inherit the pruning.
+
+        Returns None when the optimization does not apply: non-calls_merged
+        read tables, or no hardcoded trace_ids filter to push down.
+        """
+        if self.read_table != ReadTable.CALLS_MERGED:
+            return None
+        if self.hardcoded_filter is None or not self.hardcoded_filter.filter.trace_ids:
+            return None
+
+        trace_id_strict = process_trace_id_filter_to_sql_strict(
+            self.hardcoded_filter, pb, table_alias
+        )
+        if not trace_id_strict:
+            return None
+
+        project_param = pb.add_param(self.project_id)
+        return f"""SELECT {table_alias}.id AS id
+        FROM {table_alias}
+        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
+        WHERE {trace_id_strict}"""
+
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,
@@ -2026,40 +2114,7 @@ def _maybe_convert_datetime_operands(
         >>> ops2[1].literal_
         '2024-03-01 00:00:00.000000'
     """
-    if len(operands) != 2:
-        return operands
-
-    field_idx = None
-    literal_idx = None
-    timestamp: float | None = None
-
-    for i, op in enumerate(operands):
-        if (
-            isinstance(op, tsi_query.GetFieldOperator)
-            and op.get_field_ in DATETIME_COLUMN_FIELDS
-        ):
-            field_idx = i
-        elif isinstance(op, tsi_query.LiteralOperation):
-            lit = op.literal_
-            if isinstance(lit, (int, float)):
-                literal_idx = i
-                timestamp = float(lit)
-            elif isinstance(lit, str):
-                parsed = parse_string_to_utc_timestamp(lit)
-                if parsed is not None:
-                    literal_idx = i
-                    timestamp = parsed
-
-    if field_idx is None or literal_idx is None or timestamp is None:
-        return operands
-
-    # Convert numeric timestamp to datetime string for proper DateTime64 comparison
-    assert isinstance(timestamp, float)
-    datetime_str = timestamp_to_datetime_str(timestamp)
-
-    new_operands = list(operands)
-    new_operands[literal_idx] = tsi_query.LiteralOperation(**{"$literal": datetime_str})
-    return new_operands
+    return maybe_convert_datetime_operands(operands, DATETIME_COLUMN_FIELDS)
 
 
 def _extract_field_name(operand: "tsi_query.Operand") -> str | None:
@@ -2367,18 +2422,33 @@ def process_op_name_filter_to_sql(
     return " AND " + combine_conditions(or_conditions, "OR")
 
 
+def _trace_id_match_sql(
+    trace_ids: list[str],
+    field_expr: str,
+    param_builder: ParamBuilder,
+) -> str:
+    """Build a `field_expr = ?` or `field_expr IN ?` clause for `trace_ids`.
+
+    Returns "" when `trace_ids` is empty. Single-element lists use equality
+    for performance; multi-element lists use `IN`.
+    """
+    if not trace_ids:
+        return ""
+    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+    if len(trace_ids) == 1:
+        return f"{field_expr} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
+    return f"{field_expr} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
+
+
 def process_trace_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable,
 ) -> str:
     """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
         return ""
-
-    trace_ids = hardcoded_filter.filter.trace_ids
-
-    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
 
     trace_id_field = get_field_by_name("trace_id")
     if not isinstance(trace_id_field, CallsMergedAggField):
@@ -2386,16 +2456,51 @@ def process_trace_id_filter_to_sql(
     trace_id_field_sql = trace_id_field.as_sql(
         param_builder, table_alias, use_agg_fn=False
     )
+    field_expr = trace_id_index_expr(trace_id_field_sql, read_table)
 
-    # If there's only one trace_id, use an equality condition for performance
-    if len(trace_ids) == 1:
-        trace_cond = f"{trace_id_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
-    elif len(trace_ids) > 1:
-        trace_cond = f"{trace_id_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
-    else:
+    trace_cond = _trace_id_match_sql(
+        hardcoded_filter.filter.trace_ids, field_expr, param_builder
+    )
+    if not trace_cond:
         return ""
 
-    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+    # `calls_complete.trace_id` is non-nullable `String`, so the OR-IS-NULL
+    # arm only applies to `calls_merged`, where unmerged call parts can have
+    # a NULL aggregated trace_id.
+    if read_table != ReadTable.CALLS_MERGED:
+        return f" AND ({trace_cond})"
+
+    trace_null = trace_id_field.null_check_sql(
+        param_builder, table_alias, read_table, use_agg_fn=False
+    )
+    return f" AND ({trace_cond} OR {trace_null})"
+
+
+def process_trace_id_filter_to_sql_strict(
+    hardcoded_filter: HardCodedFilter | None,
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Strict (no `OR IS NULL`) trace_id condition for the candidate-id CTE.
+
+    The OR-IS-NULL clause that the outer query keeps for unmerged-call-part
+    correctness defeats the bloom filter, so this strict form runs alone inside
+    `filter_candidate_ids` to maximize granule pruning. Returns "" when no
+    trace_ids are set. Only meaningful for calls_merged.
+    """
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
+        return ""
+
+    trace_id_field = get_field_by_name("trace_id")
+    if not isinstance(trace_id_field, CallsMergedAggField):
+        raise TypeError("trace_id is not an aggregate field")
+    trace_id_field_sql = trace_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+    field_expr = trace_id_index_expr(trace_id_field_sql, ReadTable.CALLS_MERGED)
+    return _trace_id_match_sql(
+        hardcoded_filter.filter.trace_ids, field_expr, param_builder
+    )
 
 
 def process_thread_id_filter_to_sql(
@@ -2582,8 +2687,11 @@ def process_object_refs_filter_to_opt_sql(
     # are filtering on.
     #
     # calls_merged has split start/end rows, so we must also include
-    # "naked call end" rows (started_at IS NULL) for input ref filters and
+    # "naked call end" rows (op_name IS NULL) for input ref filters and
     # "naked call start" rows (ended_at IS NULL) for output ref filters.
+    # op_name (not started_at) is the reliable end-row signal: started_at
+    # is now propagated onto call_end rows so it can pin sortable_datetime,
+    # but op_name remains start-only.
     #
     # calls_complete has one complete row per call -- started_at is always
     # set (non-nullable, no sentinel) and ended_at uses a sentinel for
@@ -2594,12 +2702,12 @@ def process_object_refs_filter_to_opt_sql(
         if read_table == ReadTable.CALLS_COMPLETE:
             refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0)"
         else:
-            started_at_field = get_field_by_name("started_at")
-            started_at_null = started_at_field.null_check_sql(
+            op_name_field = get_field_by_name("op_name")
+            op_name_null = op_name_field.null_check_sql(
                 param_builder, table_alias, read_table, use_agg_fn=False
             )
             refs_filter_opt_sql += (
-                f"AND (length({table_alias}.input_refs) > 0 OR {started_at_null})"
+                f"AND (length({table_alias}.input_refs) > 0 OR {op_name_null})"
             )
     if "output_dump" in object_ref_fields_consumed:
         ended_at_field = get_field_by_name("ended_at")
@@ -2753,11 +2861,10 @@ def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
-) -> tuple[str, KeysView[str]]:
+) -> tuple[str, KeysView[str], dict[str, int | str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
     This function handles both optimized special-case queries and the general case.
-    Returns a tuple of (query_sql, column_names).
 
     Args:
         req: The stats query request
@@ -2765,13 +2872,17 @@ def build_calls_stats_query(
         read_table: Which calls table to read from
 
     Returns:
-        Tuple of (SQL query string, column names in the result)
+        Tuple of (SQL query string, column names in the result, ClickHouse
+        query settings to apply at execution time).
     """
-    aggregated_columns = {"count": "count()"}
+    aggregated_columns: dict[str, str] = {
+        "count": "count()",
+        "has_more": "toUInt8(0)",
+    }
+    settings: dict[str, int | str] = {}
 
-    # Try optimized special case queries first
     if opt_query := _try_optimized_stats_query(req, param_builder, read_table):
-        return (opt_query, aggregated_columns.keys())
+        return (opt_query, aggregated_columns.keys(), settings)
 
     if req.include_total_storage_size:
         aggregated_columns["total_storage_size_bytes"] = (
@@ -2785,14 +2896,21 @@ def build_calls_stats_query(
         query = _build_calls_complete_stats_query(
             req, param_builder, aggregated_columns
         )
-        return (query, aggregated_columns.keys())
+        return (query, aggregated_columns.keys(), settings)
 
-    # For calls_merged, use subquery wrapping (GROUP BY requires materialization)
+    # Deferred (see DEFAULT_STATS_MAX_LIMIT): uncomment to apply the server-side
+    # cap when the caller didn't pass a limit.
+    # if req.limit is None and not req.include_total_storage_size:
+    #     req = req.model_copy(update={"limit": DEFAULT_STATS_MAX_LIMIT})
+    if req.limit is not None:
+        aggregated_columns["has_more"] = f"toUInt8(count() >= {req.limit})"
+        settings["optimize_aggregation_in_order"] = 1
+
     cq = _build_stats_calls_query(req, read_table)
     inner_query = cq.as_sql(param_builder)
-    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
+    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] + ' AS ' + k for k in aggregated_columns)} FROM ({inner_query})"
 
-    return (calls_query_sql, aggregated_columns.keys())
+    return (calls_query_sql, aggregated_columns.keys(), settings)
 
 
 def _build_stats_calls_query(
@@ -2921,6 +3039,38 @@ def _try_optimized_stats_query(
             req.project_id, param_builder, read_table
         )
 
+    # Pattern 3: Unfiltered distinct-call count on calls_merged.
+    #
+    # Replace the GROUP BY + argMax rollup with two parallel aggregators on one
+    # scan: uniqExact(id) - uniqExactIf(id, isNotNull(deleted_at)). Exact match
+    # to the GROUP BY path's deleted-call exclusion. calls_complete has its own
+    # flat path; limit=1 stays with Pattern 1.
+    if read_table == ReadTable.CALLS_MERGED and _is_unfiltered_stats_req(req):
+        return _optimized_unfiltered_calls_merged_count_query(
+            req.project_id, req.limit, param_builder
+        )
+
+    # Pattern 4: Time-windowed distinct-call count on calls_merged.
+    #
+    # Generalizes Pattern 3 to a count whose only narrowing is a started_at
+    # time bound: count windowed start rows with uniqExact (started_at lives
+    # only on the start row, so the per-row filter equals the GROUP BY path's
+    # `any(started_at) <op> T` HAVING), and exclude soft-deleted ids via an
+    # anti-set instead of a parallel aggregator (deleted_at lives on a separate
+    # delete row, so it cannot be correlated to started_at in one scan). A lower
+    # bound is required so the anti-set can be windowed too: a call's deleted_at
+    # is always >= its started_at, so deletes of in-window calls land in-window.
+    if (
+        read_table == ReadTable.CALLS_MERGED
+        and req.query is not None
+        and _is_time_filtered_stats_req(req)
+    ):
+        bounds = _extract_started_at_only_bounds(req.query.expr_)
+        if bounds is not None and any(op in {">", ">="} for op, _ in bounds):
+            return _optimized_time_filtered_calls_merged_count_query(
+                req.project_id, req.limit, bounds, param_builder
+            )
+
     return None
 
 
@@ -2975,6 +3125,226 @@ def _optimized_wb_run_id_not_null_query(
             LIMIT 1
         )
     """
+
+
+def _optimized_unfiltered_calls_merged_count_query(
+    project_id: str,
+    limit: int | None,
+    param_builder: ParamBuilder,
+) -> str:
+    """Flat distinct-id count for unfiltered calls_merged stats.
+
+    Counts distinct non-deleted started ids in one scan via inclusion-exclusion:
+    count(started not deleted) = count(started or deleted) - count(deleted).
+    op_name is start-only and deleted_at is delete-row-only (never on the same
+    row), so this matches the GROUP BY path's `op_name IS NOT NULL AND
+    deleted_at IS NULL` HAVING -- dropping orphaned call-ends -- without the
+    second scan an anti-set needs.
+    """
+    table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
+    project_id_slot = param_slot(param_builder.add_param(project_id), "String")
+    started = f"isNotNull({table_name}.op_name)"  # op_name is start-only
+    deleted = f"isNotNull({table_name}.deleted_at)"
+    raw_count_expr = (
+        f"uniqExactIf({table_name}.id, {started} OR {deleted}) "
+        f"- uniqExactIf({table_name}.id, {deleted})"
+    )
+    inner = (
+        f"SELECT {raw_count_expr} AS raw_count "
+        f"FROM {table_name} "
+        f"WHERE {table_name}.project_id = {project_id_slot}"
+    )
+    return _wrap_raw_count_with_limit(inner, limit)
+
+
+def _optimized_time_filtered_calls_merged_count_query(
+    project_id: str,
+    limit: int | None,
+    bounds: list[tuple[str, float]],
+    param_builder: ParamBuilder,
+) -> str:
+    """Distinct-call count for a calls_merged stats request filtered only by time.
+
+    Counts windowed start rows with uniqExact. started_at gates the window;
+    since #6933 call-end rows carry started_at too, we also require op_name
+    (start-only) to be non-null -- that selects the start row and reproduces the
+    GROUP BY path's orphaned-call-end exclusion. Soft-deleted ids are removed
+    with an anti-set rather than a parallel aggregator, because deleted_at lives
+    on a separate delete row and cannot be correlated to started_at in one scan.
+
+    The loose `sortable_datetime` prefilter is kept for granule pruning via the
+    migration-012 minmax index; the exact `started_at` predicate removes its
+    buffer slop. The anti-set is windowed by the lower bound only: a call's
+    deleted_at is always >= its started_at, so every delete of an in-window call
+    also lands in-window and none is missed.
+    """
+    table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
+    project_id_slot = param_slot(param_builder.add_param(project_id), "String")
+
+    # op_name is start-only, so its non-null-ness selects the start row and
+    # drops orphaned call-ends -- matching the GROUP BY path's HAVING. Required
+    # because since #6933 the end row carries started_at too.
+    started = f"isNotNull({table_name}.op_name)"
+
+    exact_conditions: list[str] = []
+    prefilter_conditions: list[str] = []
+    lower_prefilter_conditions: list[str] = []
+    for op_str, timestamp in bounds:
+        exact_slot = param_slot(
+            param_builder.add_param(timestamp_to_datetime_str(timestamp)), "String"
+        )
+        exact_conditions.append(f"{table_name}.started_at {op_str} {exact_slot}")
+
+        # Loosen toward the past for lower bounds (and toward the future for
+        # upper bounds) so the prefilter is a superset of the exact predicate.
+        is_lower = op_str in {">", ">="}
+        buffer = (
+            -DATETIME_BUFFER_TIME_SECONDS if is_lower else DATETIME_BUFFER_TIME_SECONDS
+        )
+        prefilter_slot = param_slot(
+            param_builder.add_param(timestamp_to_datetime_str(int(timestamp) + buffer)),
+            "String",
+        )
+        prefilter = f"{table_name}.sortable_datetime {op_str} {prefilter_slot}"
+        prefilter_conditions.append(prefilter)
+        if is_lower:
+            lower_prefilter_conditions.append(prefilter)
+
+    outer_prefilter = " AND ".join(prefilter_conditions)
+    lower_prefilter = " AND ".join(lower_prefilter_conditions)
+
+    deleted_ids = (
+        f"SELECT {table_name}.id FROM {table_name} "
+        f"PREWHERE {table_name}.project_id = {project_id_slot} "
+        f"WHERE {lower_prefilter} AND isNotNull({table_name}.deleted_at)"
+    )
+    inner = (
+        f"SELECT uniqExact({table_name}.id) AS raw_count "
+        f"FROM {table_name} "
+        f"PREWHERE {table_name}.project_id = {project_id_slot} "
+        f"WHERE {outer_prefilter} "
+        f"AND {' AND '.join(exact_conditions)} "
+        f"AND {started} "
+        f"AND {table_name}.id NOT IN ({deleted_ids})"
+    )
+    return _wrap_raw_count_with_limit(inner, limit)
+
+
+def _wrap_raw_count_with_limit(inner: str, limit: int | None) -> str:
+    """Wrap a `SELECT ... AS raw_count` inner query in the stats count/has_more shape."""
+    if limit is None:
+        return f"SELECT raw_count AS count, toUInt8(0) AS has_more FROM ({inner})"
+    return (
+        f"SELECT least(raw_count, {limit}) AS count, "
+        f"toUInt8(raw_count > {limit}) AS has_more "
+        f"FROM ({inner})"
+    )
+
+
+def _is_unfiltered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
+    """True iff the request is a pure project-scope count with no narrowing.
+
+    Gates Pattern 3 (flat distinct-id count). limit=1 stays with Pattern 1.
+    """
+    return (
+        (req.limit is None or req.limit > 1)
+        and req.query is None
+        and not req.include_total_storage_size
+        and not req.expand_columns
+        and _is_minimal_filter(req.filter)
+    )
+
+
+def _is_time_filtered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
+    """True iff the request is a project-scope count narrowed only by a query.
+
+    Gates Pattern 4. The query is further validated to be started_at-only by
+    `_extract_started_at_only_bounds`; here we require a present query, no
+    storage-size rollup, no column expansion, a minimal hardcoded filter, and a
+    non-existence-check limit (limit=1 stays with Patterns 1/2).
+    """
+    return (
+        (req.limit is None or req.limit > 1)
+        and req.query is not None
+        and not req.include_total_storage_size
+        and not req.expand_columns
+        and _is_minimal_filter(req.filter)
+    )
+
+
+_STARTED_AT_FIELD = "started_at"
+_STARTED_AT_BOUND_OPS: dict[type[tsi_query.Operation], str] = {
+    tsi_query.GtOperation: ">",
+    tsi_query.GteOperation: ">=",
+    tsi_query.LtOperation: "<",
+    tsi_query.LteOperation: "<=",
+}
+
+
+def _extract_started_at_only_bounds(
+    operand: tsi_query.Operand,
+) -> list[tuple[str, float]] | None:
+    """Return the started_at bounds iff `operand` filters on nothing else.
+
+    Accepts a single gt/gte/lt/lte comparison of `started_at` against a numeric
+    literal (field on the left), or an AND tree of such comparisons. Returns
+    None for any other shape (other fields, OR/NOT, non-numeric literal, field
+    on the right, ...) so the caller falls back to the GROUP BY path.
+    """
+    if isinstance(operand, tsi_query.AndOperation):
+        bounds: list[tuple[str, float]] = []
+        for sub in operand.and_:
+            sub_bounds = _extract_started_at_only_bounds(sub)
+            if sub_bounds is None:
+                return None
+            bounds.extend(sub_bounds)
+        return bounds or None
+
+    if not isinstance(
+        operand,
+        (
+            tsi_query.GtOperation,
+            tsi_query.GteOperation,
+            tsi_query.LtOperation,
+            tsi_query.LteOperation,
+        ),
+    ):
+        return None
+    bound = _started_at_bound_from_comparison(
+        operand, _STARTED_AT_BOUND_OPS[type(operand)]
+    )
+    return [bound] if bound is not None else None
+
+
+def _started_at_bound_from_comparison(
+    operand: tsi_query.GtOperation
+    | tsi_query.GteOperation
+    | tsi_query.LtOperation
+    | tsi_query.LteOperation,
+    op_str: str,
+) -> tuple[str, float] | None:
+    """Return (op_str, unix_seconds) iff `operand` is `started_at <op> <number>`."""
+    if isinstance(operand, tsi_query.GtOperation):
+        left, right = operand.gt_
+    elif isinstance(operand, tsi_query.GteOperation):
+        left, right = operand.gte_
+    elif isinstance(operand, tsi_query.LtOperation):
+        left, right = operand.lt_
+    else:
+        left, right = operand.lte_
+
+    if (
+        not isinstance(left, tsi_query.GetFieldOperator)
+        or left.get_field_ != _STARTED_AT_FIELD
+    ):
+        return None
+    if not isinstance(right, tsi_query.LiteralOperation):
+        return None
+    literal = right.literal_
+    # bool is a subclass of int -- exclude it explicitly.
+    if isinstance(literal, bool) or not isinstance(literal, (int, float)):
+        return None
+    return (op_str, float(literal))
 
 
 def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
@@ -3050,19 +3420,23 @@ def build_calls_complete_update_end_query(
         started_at and ended_at params are passed as Int64 microseconds since epoch
         because clickhouse-connect truncates datetime objects to whole seconds.
         We use fromUnixTimestamp64Micro() to convert back to DateTime64(6).
+
+        Uses `%(name)s` (client-side), not `{name:Type}` -- the latter puts
+        params in the URL and broken-pipes on multi-MB outputs. Injection safety
+        comes from clickhouse_connect's `escape_str`.
     """
     # Build WHERE clause - include started_at if provided for better primary key usage
-    where_clauses = [f"project_id = {{{project_id_param}:String}}"]
+    where_clauses = [f"project_id = %({project_id_param})s"]
     if started_at_param is not None:
         where_clauses.append(
-            f"started_at = fromUnixTimestamp64Micro({{{started_at_param}:Int64}}, 'UTC')"
+            f"started_at = fromUnixTimestamp64Micro(%({started_at_param})s, 'UTC')"
         )
     else:
         # TODO: try to optimistically parse uuidv7, grabbing timestamps from the ID
         # then use that to narrow the granules we need to search.
         pass
 
-    where_clauses.append(f"id = {{{id_param}:String}}")
+    where_clauses.append(f"id = %({id_param})s")
     where_clause = " AND ".join(where_clauses)
 
     # Format table name with ON CLUSTER if cluster_name is provided
@@ -3073,12 +3447,12 @@ def build_calls_complete_update_end_query(
     return f"""
         UPDATE {formatted_table}
         SET
-            ended_at = fromUnixTimestamp64Micro({{{ended_at_param}:Int64}}, 'UTC'),
-            exception = {{{exception_param}:String}},
-            output_dump = {{{output_dump_param}:String}},
-            summary_dump = {{{summary_dump_param}:String}},
-            output_refs = {{{output_refs_param}:Array(String)}},
-            wb_run_step_end = {{{wb_run_step_end_param}:UInt64}},
+            ended_at = fromUnixTimestamp64Micro(%({ended_at_param})s, 'UTC'),
+            exception = %({exception_param})s,
+            output_dump = %({output_dump_param})s,
+            summary_dump = %({summary_dump_param})s,
+            output_refs = %({output_refs_param})s,
+            wb_run_step_end = %({wb_run_step_end_param})s,
             updated_at = now64(3)
         WHERE {where_clause}
         """

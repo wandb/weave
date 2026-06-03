@@ -1716,7 +1716,7 @@ def test_attributes_on_ops(client):
     }
 
 
-def test_dataset_row_type(client):
+def test_dataset_row_type(weave_active):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     with pytest.raises(ValidationError):
         d = weave.Dataset(rows=[])
@@ -1775,7 +1775,7 @@ def test_dataclass_support(client):
     }
 
 
-def test_op_retrieval(client):
+def test_op_retrieval(weave_active):
     @weave.op
     def my_op(a: int) -> int:
         return a + 1
@@ -1787,7 +1787,7 @@ def test_op_retrieval(client):
 
 
 @pytest.mark.flaky(reruns=3)
-def test_bound_op_retrieval(client):
+def test_bound_op_retrieval(weave_active):
     class CustomType(weave.Object):
         a: int
 
@@ -1812,7 +1812,7 @@ def test_bound_op_retrieval(client):
 
 
 @pytest.mark.skip("Not implemented: general bound op designation")
-def test_bound_op_retrieval_no_self(client):
+def test_bound_op_retrieval_no_self(weave_active):
     class CustomTypeWithoutSelf(weave.Object):
         a: int
 
@@ -1830,7 +1830,7 @@ def test_bound_op_retrieval_no_self(client):
         my_op2 = my_op_ref.get()
 
 
-def test_dataset_row_ref(client):
+def test_dataset_row_ref(weave_active):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
     d2 = weave.ref(ref.uri).get()
@@ -2018,7 +2018,7 @@ def test_unknown_input_and_output_types(client):
     assert inner_res.calls[0].output == repr(res)
 
 
-def test_unknown_attribute(client):
+def test_unknown_attribute(weave_active):
     class MyUnknownClass:
         val: int
 
@@ -3133,7 +3133,7 @@ def test_in_operation(client):
         assert res[i].id == call_ids[i]
 
 
-def test_call_has_client_version(client):
+def test_call_has_client_version(weave_active):
     @weave.op
     def test():
         return 1
@@ -3143,7 +3143,7 @@ def test_call_has_client_version(client):
     assert "client_version" in c.attributes["weave"]
 
 
-def test_user_cannot_modify_call_weave_dict(client):
+def test_user_cannot_modify_call_weave_dict(weave_active):
     @weave.op
     def test():
         call = require_current_call()
@@ -3174,7 +3174,7 @@ def test_user_cannot_modify_call_weave_dict(client):
     # but at that point you're on your own :)
 
 
-def test_calls_iter_slice(client):
+def test_calls_iter_slice(weave_active):
     @weave.op
     def func(x):
         return x
@@ -3187,7 +3187,7 @@ def test_calls_iter_slice(client):
     assert len(calls_subset) == 3
 
 
-def test_calls_iter_cached(client):
+def test_calls_iter_cached(weave_active):
     @weave.op
     def func(x):
         return x
@@ -3214,7 +3214,7 @@ def test_calls_iter_cached(client):
         assert elapsed_times[0] > elapsed_times[2] * 3
 
 
-def test_calls_iter_different_value_same_page_cached(client):
+def test_calls_iter_different_value_same_page_cached(weave_active):
     @weave.op
     def func(x):
         return x
@@ -4140,7 +4140,7 @@ async def test_op_sampling_inheritance_async_generator(client):
     assert len(client.get_calls()) == 0
 
 
-def test_op_sampling_invalid_rates(client):
+def test_op_sampling_invalid_rates(weave_active):
     with pytest.raises(ValueError, match="tracing_sample_rate must be between 0 and 1"):
 
         @weave.op(tracing_sample_rate=-0.5)
@@ -4160,7 +4160,7 @@ def test_op_sampling_invalid_rates(client):
             pass
 
 
-def test_op_sampling_child_follows_parent(client):
+def test_op_sampling_child_follows_parent(weave_active):
     parent_calls = 0
     child_calls = 0
 
@@ -4747,7 +4747,7 @@ def test_call_query_stream_with_invalid_filter_field(client):
         weave.Evaluation(dataset=weave.Dataset(rows=[{"a": 1, "b": 2}])),
     ],
 )
-def test_get_object_from_uri(client, obj):
+def test_get_object_from_uri(weave_active, obj):
     ref = weave.publish(obj)
     uri = ref.uri
 
@@ -4755,7 +4755,7 @@ def test_get_object_from_uri(client, obj):
 
 
 @pytest.mark.flaky(reruns=3)
-def test_get_object_from_uri_non_registered_object(client):
+def test_get_object_from_uri_non_registered_object(weave_active):
     class MyModel(weave.Model):
         a: int
         b: float = 2.0
@@ -4900,6 +4900,74 @@ def test_calls_query_stats_with_limit(client):
     result = calls_stats(limit=1, include_total_storage_size=True)
     assert result.count == 1
     assert result.total_storage_size_bytes is not None
+
+
+def test_calls_query_stats_started_at_window_excludes_deletes(client):
+    """A started_at lower-bound count must match across backends and exclude
+    soft-deleted calls and orphaned call-ends. On ClickHouse this exercises the
+    windowed distinct-id fast path; on SQLite it exercises the reference
+    implementation, so equal results pin the optimization to the GROUP BY
+    semantics.
+    """
+
+    @weave.op
+    def stats_window_op() -> int:
+        return 1
+
+    for _ in range(3):
+        stats_window_op()
+
+    project_id = get_client_project_id(client)
+    all_calls = client.get_calls()
+    assert len(all_calls) == 3
+
+    def count(literal_seconds: int) -> int:
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$gt": [{"$getField": "started_at"}, {"$literal": literal_seconds}]
+                }
+            }
+        )
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id=project_id, query=query)
+        ).count
+
+    def unfiltered_count() -> int:
+        # No query -> exercises the flat distinct-id fast path (Pattern 3).
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id=project_id)
+        ).count
+
+    # Lower bound in the distant past counts every (non-deleted) call.
+    assert count(1) == 3
+    assert unfiltered_count() == 3
+    # Lower bound in the far future counts nothing.
+    assert count(99999999999) == 0
+
+    # Deleting a call removes it from both counts (delete exclusion).
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[all_calls[0].id])
+    )
+    assert count(1) == 2
+    assert unfiltered_count() == 2
+
+    # An orphaned call-end (end row, no start) carries started_at since #6933 but
+    # has no op_name; the op_name guard must keep it out of both fast-path counts.
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=generate_id(),
+                started_at=now,
+                ended_at=now,
+                summary={},
+            )
+        )
+    )
+    assert count(1) == 2
+    assert unfiltered_count() == 2
 
 
 @pytest.mark.parametrize(
@@ -5463,7 +5531,7 @@ def test_get_calls_filter_by_thread_ids_only(client):
     assert all(call.thread_id == f"thread_a_{unique}" for call in calls_thread_a)
 
 
-def test_thread_context_error_handling(client):
+def test_thread_context_error_handling(weave_active):
     """Test that ThreadContext is properly managed even when exceptions occur."""
     import weave
     from weave.trace.context import call_context

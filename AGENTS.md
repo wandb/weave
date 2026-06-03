@@ -81,6 +81,14 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 - Testing is managed by `nox` with multiple shards for different Python versions
 - Each shard represents specific package configurations
 
+### Server fixtures (do NOT hand-roll fake servers)
+
+- **Never create a `_FakeServer`, stub, or mock `TraceServerInterface`** to test
+  server-side logic. Use the existing `client` fixture (gives `client.server` +
+  `client.project_id`) or the `trace_server` fixture, which run against a real
+  SQLite/ClickHouse backend. Build inputs with the real APIs
+  (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
+
 ### Key Test Shards
 
 Focus on these primary test shards:

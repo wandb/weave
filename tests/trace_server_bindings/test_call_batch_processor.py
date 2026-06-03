@@ -216,14 +216,16 @@ def test_missing_trace_id_raises_value_error() -> None:
         processor.stop_accepting_new_work_and_flush_queue()
 
 
-def test_flush_drops_unpaired_items_and_clears_state() -> None:
-    """Flush drops unpaired items and clears caches."""
+def test_flush_eager_sends_unpaired_items_and_clears_state() -> None:
+    """Flush sends unpaired items via the eager v2 endpoints and clears caches."""
     complete_fn = MagicMock()
     eager_fn = MagicMock()
     processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
 
-    processor.enqueue([_make_start_item("call-1", "trace-1")])
-    processor.enqueue([_make_end_item("call-2")])
+    orphan_start = _make_start_item("call-1", "trace-1")
+    orphan_end = _make_end_item("call-2")
+    processor.enqueue([orphan_start])
+    processor.enqueue([orphan_end])
 
     with patch(
         "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS",
@@ -236,7 +238,11 @@ def test_flush_drops_unpaired_items_and_clears_state() -> None:
     assert processor._pending_ends == {}
     assert len(processor._eager_call_ids) == 0
     complete_fn.assert_not_called()
-    eager_fn.assert_not_called()
+    # Both orphans should have been handed to the eager processor (possibly
+    # across one or multiple batched invocations).
+    sent_items = [item for call in eager_fn.call_args_list for item in call.args[0]]
+    assert orphan_start in sent_items
+    assert orphan_end in sent_items
 
 
 def test_queue_full_writes_to_disk(tmp_path: pathlib.Path) -> None:

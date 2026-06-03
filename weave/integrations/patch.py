@@ -14,10 +14,24 @@ from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
 from weave.trace.autopatch import IntegrationSettings
+from weave.trace.settings import should_use_otel_v2
 
-# Global set to track which integrations have been patched
-# This prevents double-patching when libraries are imported multiple times
+# Integrations that have actually been patched. Prevents double-patching
+# when libraries are imported multiple times.
 _PATCHED_INTEGRATIONS: set[str] = set()
+
+# Integrations that another (higher-priority) integration has claimed and
+# that should therefore be skipped. Example: ``patch_google_adk`` adds
+# ``"google.genai"`` here because ADK's own OTel spans already cover
+# google-genai calls, and double-logging would mean two spans per
+# Gemini request.
+#
+# Membership semantics:
+# - in ``_PATCHED_INTEGRATIONS`` → the patcher ran
+# - in ``_SUPPRESSED_INTEGRATIONS`` → the patcher must not run
+# - in both → impossible by construction (suppression guards run before
+#   patcher attempts)
+_SUPPRESSED_INTEGRATIONS: set[str] = set()
 
 # Global reference to the import hook, so we can unregister it if needed
 _IMPORT_HOOK: WeaveImportHook | None = None
@@ -38,8 +52,12 @@ def _patch_integration(
         triggering_symbols: Symbols to add to _PATCHED_INTEGRATIONS on success (e.g. ["openai"])
         settings: Optional integration settings
     """
-    # If symbols are already patched, don't patch again
-    if any(name in _PATCHED_INTEGRATIONS for name in triggering_symbols):
+    # Skip if already patched, or if another integration has claimed this
+    # symbol (and ours should defer).
+    if any(
+        name in _PATCHED_INTEGRATIONS or name in _SUPPRESSED_INTEGRATIONS
+        for name in triggering_symbols
+    ):
         return
 
     if settings is None:
@@ -69,6 +87,20 @@ def patch_openai(settings: IntegrationSettings | None = None) -> None:
         triggering_symbols=["openai"],
         settings=settings,
     )
+
+
+def _dispatch_openai() -> None:
+    """Implicit-patch entry for ``openai``.
+
+    Under ``WEAVE_USE_OTEL_V2``, openai itself is NOT patched. The Agents SDK
+    integration is the system under observation and already exposes the LLM
+    call data via ``ResponseSpanData`` / ``GenerationSpanData`` — instrumenting
+    openai separately would dual-log every call from inside an agent. Direct
+    (non-agent) calls to ``openai.*`` are temporarily untraced in OTel V2 mode.
+    """
+    if should_use_otel_v2():
+        return
+    patch_openai()
 
 
 def patch_anthropic(settings: IntegrationSettings | None = None) -> None:
@@ -151,6 +183,38 @@ def patch_vertexai(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_google_adk(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for Google Agent Development Kit (ADK).
+
+    ADK uses ``google.genai`` internally, and ADK's own OTel spans
+    already cover the model calls Weave's ``google_genai`` integration
+    targets. When ADK is patched we therefore suppress
+    ``patch_google_genai`` to avoid double-logging the same Gemini
+    request/response on the new agents pipeline and the legacy
+    call-level integration.
+
+    Note: the import hook currently matches only root modules, so
+    ``import google.adk`` after ``weave.init()`` will *not* auto-trigger
+    this patch (the root module ``google`` is not in the mapping).
+    Either import ADK before calling ``weave.init()`` so
+    ``implicit_patch()`` catches it, or call ``patch_google_adk()``
+    explicitly after init. Follow-up work will extend the hook to match
+    dotted paths.
+    """
+    _patch_integration(
+        module_path="weave.integrations.google_adk.google_adk_sdk",
+        patcher_func_getter_name="get_google_adk_patcher",
+        triggering_symbols=["google.adk"],
+        settings=settings,
+    )
+    # Only suppress google-genai if ADK actually patched (i.e.
+    # ``settings.enabled`` wasn't False). Both wire names go in so
+    # explicit calls and ``implicit_patch`` both defer.
+    if "google.adk" in _PATCHED_INTEGRATIONS:
+        _SUPPRESSED_INTEGRATIONS.add("google.genai")
+        _SUPPRESSED_INTEGRATIONS.add("google.generativeai")
+
+
 def patch_huggingface(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Hugging Face."""
     _patch_integration(
@@ -211,14 +275,17 @@ def patch_notdiamond(settings: IntegrationSettings | None = None) -> None:
     )
 
 
-def patch_mcp(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for MCP (Model Context Protocol)."""
-    from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
+def patch_fastmcp(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for FastMCP (Model Context Protocol)."""
+    from weave.integrations.fastmcp import (
+        get_fastmcp_client_patcher,
+        get_fastmcp_server_patcher,
+    )
 
     if settings is None:
         settings = IntegrationSettings()
-    server_patched = get_mcp_server_patcher(settings).attempt_patch()
-    client_patched = get_mcp_client_patcher(settings).attempt_patch()
+    server_patched = get_fastmcp_server_patcher(settings).attempt_patch()
+    client_patched = get_fastmcp_client_patcher(settings).attempt_patch()
     if server_patched or client_patched:
         _PATCHED_INTEGRATIONS.add("mcp")
 
@@ -244,13 +311,35 @@ def patch_smolagents(settings: IntegrationSettings | None = None) -> None:
 
 
 def patch_openai_agents(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for OpenAI Agents."""
+    """Enable Weave tracing for OpenAI Agents (calls-based processor)."""
     _patch_integration(
-        module_path="weave.integrations.openai_agents.openai_agents",
+        module_path="weave.integrations.openai_agents.patcher",
         patcher_func_getter_name="get_openai_agents_patcher",
         triggering_symbols=["openai_agents"],
         settings=settings,
     )
+
+
+def patch_openai_agents_otel(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave OTel tracing for OpenAI Agents (Agents-tab destination)."""
+    _patch_integration(
+        module_path="weave.integrations.openai_agents.patcher",
+        patcher_func_getter_name="get_openai_agents_otel_patcher",
+        triggering_symbols=["openai_agents_otel"],
+        settings=settings,
+    )
+
+
+def _dispatch_openai_agents() -> None:
+    """Implicit-patch entry: route to OTel processor when WEAVE_USE_OTEL_V2 is set.
+
+    Explicit ``patch_openai_agents()`` / ``patch_openai_agents_otel()`` calls
+    are unaffected — they always do exactly what their name says.
+    """
+    if should_use_otel_v2():
+        patch_openai_agents_otel()
+        return
+    patch_openai_agents()
 
 
 def patch_verdict(settings: IntegrationSettings | None = None) -> None:
@@ -284,13 +373,35 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
 
 
 def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for Claude Agent SDK."""
+    """Enable Weave tracing for Claude Agent SDK (calls-based)."""
     _patch_integration(
         module_path="weave.integrations.claude_agent_sdk",
         patcher_func_getter_name="get_claude_agent_sdk_patcher",
         triggering_symbols=["claude_agent_sdk"],
         settings=settings,
     )
+
+
+def patch_claude_agent_sdk_otel(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave OTel tracing for Claude Agent SDK (Agents-tab destination)."""
+    _patch_integration(
+        module_path="weave.integrations.claude_agent_sdk.otel_integration",
+        patcher_func_getter_name="get_claude_agent_sdk_otel_patcher",
+        triggering_symbols=["claude_agent_sdk_otel"],
+        settings=settings,
+    )
+
+
+def _dispatch_claude_agent_sdk() -> None:
+    """Implicit-patch entry: route to OTel variant when WEAVE_USE_OTEL_V2 is set.
+
+    Explicit ``patch_claude_agent_sdk()`` / ``patch_claude_agent_sdk_otel()``
+    calls are unaffected — they always do exactly what their name says.
+    """
+    if should_use_otel_v2():
+        patch_claude_agent_sdk_otel()
+        return
+    patch_claude_agent_sdk()
 
 
 def patch_langchain() -> None:
@@ -324,13 +435,17 @@ def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
 # When a module is already imported, we'll automatically call its patch function
 
 INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
-    "openai": patch_openai,
+    "openai": _dispatch_openai,
     "anthropic": patch_anthropic,
     "mistralai": patch_mistral,
     "groq": patch_groq,
     "litellm": patch_litellm,
     "cerebras": patch_cerebras,
     "cohere": patch_cohere,
+    # ADK must come before ``google.genai`` / ``google.generativeai``:
+    # patching ADK suppresses google-genai (see ``patch_google_adk``), but
+    # the suppression only takes effect if ADK is patched first.
+    "google.adk": patch_google_adk,
     "google.generativeai": patch_google_genai,
     "google.genai": patch_google_genai,
     "vertexai": patch_vertexai,
@@ -341,11 +456,11 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "crewai": patch_crewai,
     "crewai_tools": patch_crewai,
     "notdiamond": patch_notdiamond,
-    "mcp": patch_mcp,
+    "mcp": patch_fastmcp,
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
-    "agents": patch_openai_agents,
-    "claude_agent_sdk": patch_claude_agent_sdk,
+    "agents": _dispatch_openai_agents,
+    "claude_agent_sdk": _dispatch_claude_agent_sdk,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,
     "autogen": patch_autogen,
@@ -444,8 +559,9 @@ class PatchingLoader:
 def _patch_if_needed(module_name: str) -> None:
     """Apply patching for a module if it hasn't been patched yet."""
     if (
-        module_name not in _PATCHED_INTEGRATIONS
-        and module_name in INTEGRATION_MODULE_MAPPING
+        module_name in INTEGRATION_MODULE_MAPPING
+        and module_name not in _PATCHED_INTEGRATIONS
+        and module_name not in _SUPPRESSED_INTEGRATIONS
     ):
         patch_func = INTEGRATION_MODULE_MAPPING[module_name]
         try:
@@ -474,8 +590,14 @@ def implicit_patch() -> None:
         return
 
     for module_name, patch_func in INTEGRATION_MODULE_MAPPING.items():
-        # Check if the module is already imported and not yet patched
-        if module_name in sys.modules and module_name not in _PATCHED_INTEGRATIONS:
+        # Check if the module is already imported, not yet patched, and
+        # not suppressed by a sibling integration (e.g. ADK suppresses
+        # google.genai).
+        if (
+            module_name in sys.modules
+            and module_name not in _PATCHED_INTEGRATIONS
+            and module_name not in _SUPPRESSED_INTEGRATIONS
+        ):
             try:
                 patch_func()
                 _PATCHED_INTEGRATIONS.add(module_name)
@@ -519,6 +641,7 @@ def unregister_import_hook() -> None:
 
 
 def reset_patched_integrations() -> None:
-    """Reset the set of patched integrations (useful for testing)."""
-    global _PATCHED_INTEGRATIONS  # noqa: PLW0603
+    """Reset the patched + suppressed integration sets (useful for testing)."""
+    global _PATCHED_INTEGRATIONS, _SUPPRESSED_INTEGRATIONS  # noqa: PLW0603
     _PATCHED_INTEGRATIONS = set()
+    _SUPPRESSED_INTEGRATIONS = set()

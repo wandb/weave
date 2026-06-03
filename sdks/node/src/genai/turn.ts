@@ -1,0 +1,177 @@
+import {
+  type AttributeValue,
+  type Attributes,
+  type Context,
+  ROOT_CONTEXT,
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+  type TimeInput,
+  trace,
+} from '@opentelemetry/api';
+
+import {_getGenaiState} from './context';
+import {LLM, type LLMInit} from './llm';
+import {getWeaveTracer} from './provider';
+import {
+  ATTR_GEN_AI_AGENT_NAME,
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  WEAVE_GENAI_TRACER_NAME,
+} from './semconv';
+import {SubAgent, type SubAgentInit} from './subagent';
+import {Tool, type ToolInit} from './tool';
+
+export interface TurnInit {
+  agentName?: string;
+  model?: string;
+}
+
+/**
+ * An agent invocation. Typically wraps the work to respond to a single
+ * user message. Emits an `invoke_agent` span and acts as the root of the
+ * trace for that turn: it is always started under `ROOT_CONTEXT` so it
+ * never accidentally inherits a parent from another OTel-instrumented
+ * library.
+ *
+ * Created by `weave.startTurn()` (or `session.startTurn()`) and
+ * terminated with `end()`. Only one Turn may be active in an async chain.
+ * Children (LLM, Tool, SubAgent) attach via the `startLLM`, `startTool`,
+ * `startSubagent` methods.
+ *
+ * @example
+ * const turn = weave.startTurn({agentName: 'research-bot', model: MODEL});
+ * try {
+ *   const llm = turn.startLLM({model: MODEL, providerName: 'openai'});
+ *   // ...
+ *   llm.end();
+ * } finally {
+ *   turn.end();
+ * }
+ */
+export class Turn {
+  private _ended = false;
+
+  private constructor(
+    private readonly span: Span,
+    private readonly context: Context,
+    private readonly conversationId: string,
+    public readonly agentName: string,
+    public readonly model: string
+  ) {}
+
+  static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
+    const state = _getGenaiState();
+    if (state.turn !== null) {
+      throw new Error(
+        'A Turn is already active in this async chain. End it before starting a new one.'
+      );
+    }
+    const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
+    const attributes: Record<string, string> = {
+      [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
+    };
+    if (opts.agentName) {
+      attributes[ATTR_GEN_AI_AGENT_NAME] = opts.agentName;
+    }
+    if (opts.model) {
+      attributes[ATTR_GEN_AI_REQUEST_MODEL] = opts.model;
+    }
+    if (opts.conversationId) {
+      attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
+    }
+    // Pass ROOT_CONTEXT explicitly so Turn is always a root span — never
+    // accidentally inherits a parent from some other OTel-instrumented
+    // library's active context.
+    const span = tracer.startSpan(
+      'invoke_agent',
+      {kind: SpanKind.CLIENT, attributes},
+      ROOT_CONTEXT
+    );
+    const turn = new Turn(
+      span,
+      trace.setSpan(ROOT_CONTEXT, span),
+      opts.conversationId ?? '',
+      opts.agentName ?? '',
+      opts.model ?? ''
+    );
+    state.turn = turn;
+    return turn;
+  }
+
+  /** Start a child LLM span under this Turn. */
+  startLLM(opts: LLMInit): LLM {
+    return LLM.create({
+      ...opts,
+      parentContext: this.context,
+      conversationId: this.conversationId,
+    });
+  }
+
+  /** Start a child Tool span under this Turn. */
+  startTool(opts: ToolInit): Tool {
+    return Tool.create({
+      ...opts,
+      parentContext: this.context,
+      conversationId: this.conversationId,
+    });
+  }
+
+  /** Start a child SubAgent span under this Turn. */
+  startSubagent(opts: SubAgentInit): SubAgent {
+    return SubAgent.create({
+      ...opts,
+      parentContext: this.context,
+      conversationId: this.conversationId,
+    });
+  }
+
+  /**
+   * Set a single attribute on the Turn span. Useful for stamping running
+   * totals (e.g. cumulative cost, token usage) or other metadata that becomes
+   * known mid-turn. No-op after `end()`. Mirrors OTel `Span.setAttribute`.
+   *
+   * @example
+   * turn.setAttribute('gen_ai.usage.input_tokens', totalInputTokens);
+   */
+  setAttribute(key: string, value: AttributeValue): this {
+    if (this._ended) return this;
+    this.span.setAttribute(key, value);
+    return this;
+  }
+
+  /**
+   * Add a named event to the Turn span. Useful for marking non-span moments
+   * such as context compaction, tool-loop detection, or guardrail trips.
+   * No-op after `end()`. Mirrors OTel `Span.addEvent`.
+   *
+   * @example
+   * turn.addEvent('context_compacted', {removedMessages: 12});
+   */
+  addEvent(name: string, attributes?: Attributes, startTime?: TimeInput): this {
+    if (this._ended) return this;
+    this.span.addEvent(name, attributes, startTime);
+    return this;
+  }
+
+  /** Close the Turn span. Idempotent. Pass `error` to mark it as failed. */
+  end(opts?: {error?: Error}): void {
+    if (this._ended) {
+      return;
+    }
+    this._ended = true;
+    if (opts?.error) {
+      this.span.recordException(opts.error);
+      this.span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: opts.error.message,
+      });
+    }
+    this.span.end();
+    const state = _getGenaiState();
+    if (state.turn === this) {
+      state.turn = null;
+    }
+  }
+}

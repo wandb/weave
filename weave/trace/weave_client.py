@@ -6,9 +6,7 @@ import datetime
 import json
 import logging
 import os
-import platform
 import re
-import sys
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
@@ -18,7 +16,6 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 import pydantic
 from httpx import HTTPStatusError as HTTPError
 
-from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
@@ -68,7 +65,12 @@ from weave.trace.op import (
 from weave.trace.op import op as op_deco
 from weave.trace.op_protocol import Op
 from weave.trace.project_id_resolver import ProjectIdResolver
-from weave.trace.ref_util import get_ref, remove_ref, set_ref
+from weave.trace.ref_util import (
+    clear_refs_on_failure,
+    get_ref,
+    remove_ref,
+    set_ref,
+)
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -89,8 +91,6 @@ from weave.trace.serialization.serialize import (
 from weave.trace.serialization.serializer import get_serializer_for_obj
 from weave.trace.settings import (
     client_parallelism,
-    should_capture_client_info,
-    should_capture_system_info,
     should_print_call_link,
     should_redact_pii,
     should_use_parallel_table_upload,
@@ -106,6 +106,7 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
+from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
 from weave.trace_server.ids import generate_id
@@ -117,6 +118,18 @@ from weave.trace_server.interface.feedback_types import (
 from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace_server.trace_server_interface import (
     AliasesListReq,
+    AnnotationQueueAddCallsReq,
+    AnnotationQueueAddCallsRes,
+    AnnotationQueueCreateReq,
+    AnnotationQueueDeleteReq,
+    AnnotationQueueItemSchema,
+    AnnotationQueueItemsQueryReq,
+    AnnotationQueueReadReq,
+    AnnotationQueueSchema,
+    AnnotationQueuesQueryReq,
+    AnnotationQueuesStatsReq,
+    AnnotationQueueStatsSchema,
+    AnnotationQueueUpdateReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
@@ -175,6 +188,7 @@ from weave.trace_server_bindings.link_asset_to_registry import (
 )
 from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
+from weave.utils.capture_info import get_capture_info
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
 from weave.utils.project_id import from_project_id, to_project_id
@@ -383,6 +397,14 @@ class WeaveClient:
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
+
+        # Whether this client may reconstruct code-bearing custom objects (ops, or any
+        # type that decodes by running a stored `.py`) on `client.get`. Defaults True:
+        # for normal users this only ever runs code from their own traces, so it is
+        # safe. Server-side workers flip it off via `require_secure_weave_client`, and
+        # anyone can disable it globally with `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false`
+        # (data-only objects like images/audio still decode). Enforced in custom_objs.py.
+        self._allow_unsafe_custom_obj_decode = True
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -733,6 +755,155 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @trace_sentry.global_trace_sentry.watch()
+    def create_annotation_queue(
+        self,
+        *,
+        name: str,
+        scorer_refs: list[str],
+        description: str = "",
+    ) -> str:
+        """Create an annotation queue for this project.
+
+        Args:
+            name: Display name for the queue.
+            scorer_refs: Weave refs for the scorers/annotation fields reviewers complete.
+            description: Optional reviewer guidelines or queue description.
+
+        Returns:
+            The ID of the created annotation queue.
+        """
+        res = self.server.annotation_queue_create(
+            AnnotationQueueCreateReq(
+                project_id=self.project_id,
+                name=name,
+                description=description,
+                scorer_refs=scorer_refs,
+            )
+        )
+        return res.id
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_annotation_queue(self, queue_id: str) -> AnnotationQueueSchema:
+        """Read a single annotation queue by ID."""
+        res = self.server.annotation_queue_read(
+            AnnotationQueueReadReq(project_id=self.project_id, queue_id=queue_id)
+        )
+        return res.queue
+
+    @trace_sentry.global_trace_sentry.watch()
+    def list_annotation_queues(
+        self,
+        *,
+        name: str | None = None,
+        sort_by: list[SortBy] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[AnnotationQueueSchema]:
+        """List annotation queues for this project."""
+        return list(
+            self.server.annotation_queues_query_stream(
+                AnnotationQueuesQueryReq(
+                    project_id=self.project_id,
+                    name=name,
+                    sort_by=sort_by,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def update_annotation_queue(
+        self,
+        queue_id: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        scorer_refs: list[str] | None = None,
+    ) -> AnnotationQueueSchema:
+        """Update annotation queue metadata."""
+        res = self.server.annotation_queue_update(
+            AnnotationQueueUpdateReq(
+                project_id=self.project_id,
+                queue_id=queue_id,
+                name=name,
+                description=description,
+                scorer_refs=scorer_refs,
+            )
+        )
+        return res.queue
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_annotation_queue(self, queue_id: str) -> AnnotationQueueSchema:
+        """Soft-delete an annotation queue."""
+        res = self.server.annotation_queue_delete(
+            AnnotationQueueDeleteReq(project_id=self.project_id, queue_id=queue_id)
+        )
+        return res.queue
+
+    @trace_sentry.global_trace_sentry.watch()
+    def add_calls_to_annotation_queue(
+        self,
+        queue_id: str,
+        *,
+        call_ids: list[str],
+        display_fields: list[str],
+    ) -> AnnotationQueueAddCallsRes:
+        """Add calls to an annotation queue.
+
+        Args:
+            queue_id: Annotation queue ID.
+            call_ids: Call IDs to add to the queue.
+            display_fields: JSON paths to show reviewers, such as
+                ``inputs.prompt`` or ``output.text``.
+        """
+        # Ensure newly created calls are persisted before queue membership is created.
+        self._flush()
+        return self.server.annotation_queue_add_calls(
+            AnnotationQueueAddCallsReq(
+                project_id=self.project_id,
+                queue_id=queue_id,
+                call_ids=call_ids,
+                display_fields=display_fields,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def list_annotation_queue_items(
+        self,
+        queue_id: str,
+        *,
+        filter: AnnotationQueueItemsFilter | None = None,
+        sort_by: list[SortBy] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        include_position: bool = False,
+    ) -> list[AnnotationQueueItemSchema]:
+        """List calls assigned to an annotation queue."""
+        res = self.server.annotation_queue_items_query(
+            AnnotationQueueItemsQueryReq(
+                project_id=self.project_id,
+                queue_id=queue_id,
+                filter=filter,
+                sort_by=sort_by,
+                limit=limit,
+                offset=offset,
+                include_position=include_position,
+            )
+        )
+        return res.items
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_annotation_queue_stats(
+        self, queue_ids: list[str]
+    ) -> list[AnnotationQueueStatsSchema]:
+        """Get item completion stats for annotation queues."""
+        res = self.server.annotation_queues_stats(
+            AnnotationQueuesStatsReq(project_id=self.project_id, queue_ids=queue_ids)
+        )
+        return res.stats
+
+    @trace_sentry.global_trace_sentry.watch()
     def create_call(
         self,
         op: str | Op,
@@ -792,7 +963,14 @@ class WeaveClient:
             trace_id = parent.trace_id
             parent_id = parent.id
         else:
-            trace_id = generate_id()
+            # Trace-root invariant: when a caller pre-allocates the call id
+            # via ``_call_id_override``, ``trace_id`` must match. The
+            # frontend's "show me everything in this trace" queries land on
+            # ``trace_id``, so trace roots with ``trace_id != id`` would
+            # leave the trace tree partially / wrongly populated. Without
+            # this, callers needing the invariant have to bypass
+            # ``create_call`` and emit ``call_start`` directly.
+            trace_id = _call_id_override or generate_id()
             parent_id = None
 
         if not attributes:
@@ -802,14 +980,8 @@ class WeaveClient:
         # per-call attributes. Per-call attributes take precedence over the client defaults.
         attributes_dict = AttributesDict(**zip_dicts(self.attributes, attributes))
 
-        if should_capture_client_info():
-            attributes_dict._set_weave_item("client_version", version.VERSION)
-            attributes_dict._set_weave_item("source", "python-sdk")
-            attributes_dict._set_weave_item("sys_version", sys.version)
-        if should_capture_system_info():
-            attributes_dict._set_weave_item("os_name", platform.system())
-            attributes_dict._set_weave_item("os_version", platform.version())
-            attributes_dict._set_weave_item("os_release", platform.release())
+        for k, v in get_capture_info().items():
+            attributes_dict._set_weave_item(k, v)
 
         # Skip the future allocation once the op's digest is resolved (any
         # call after the first). Reading `.uri` directly is a no-op string
@@ -1921,6 +2093,9 @@ class WeaveClient:
             # but that might have unintended consequences. As a result, we break the
             # typical pattern and explicitly set the ref here.
             set_ref(obj, ref)
+            # _save_object_basic cleaned up obj_rec; same ref now lives on obj.
+            if isinstance(ref._digest, Future):
+                clear_refs_on_failure(ref._digest, lambda: remove_ref(obj))
 
         # Case 2: Op:
         # Here we save the op itself.
@@ -2164,13 +2339,13 @@ class WeaveClient:
         else:
             ref = ObjectRef(self.entity, self.project, name, digest_future)
 
-        # Attach the ref to the object
         try:
             set_ref(orig_val, ref)
-        except Exception:
-            # Don't worry if we can't set the ref.
-            # This can happen for primitive types that don't have __dict__
+        except ValueError:
+            # Primitives without __dict__ can't hold a ref; that's fine.
             pass
+
+        clear_refs_on_failure(digest_future, lambda: remove_ref(orig_val))
 
         return ref
 
@@ -2271,6 +2446,13 @@ class WeaveClient:
 
         if isinstance(table, WeaveTable):
             table.table_ref = table_ref
+
+        def _clear_table_refs() -> None:
+            table.ref = None
+            if isinstance(table, WeaveTable):
+                table.table_ref = None
+
+        clear_refs_on_failure(digest_future, _clear_table_refs)
 
         return table_ref
 
@@ -2482,13 +2664,16 @@ class WeaveClient:
         # Removing call display name, use "" for db representation
         if display_name is None:
             display_name = ""
-        self.server.call_update(
-            CallUpdateReq(
-                project_id=self.project_id,
-                call_id=call.id,
-                display_name=elide_display_name(display_name),
-            )
+        req = CallUpdateReq(
+            project_id=self.project_id,
+            call_id=call.id,
+            display_name=elide_display_name(display_name),
         )
+
+        def send_call_update() -> None:
+            self.server.call_update(req)
+
+        self.future_executor.defer(send_call_update)
 
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
@@ -2533,6 +2718,12 @@ class WeaveClient:
             res = self.future_executor.defer(file_create_with_fallback)
 
         self.send_file_cache.put(req, res)
+
+        def _evict_on_failure(fut: Future[FileCreateRes]) -> None:
+            if fut.exception() is not None:
+                self.send_file_cache.delete_if(req, fut)
+
+        res.add_done_callback(_evict_on_failure)
         return res
 
     @cached_property

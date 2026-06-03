@@ -1,6 +1,11 @@
 import datetime
 import json
+import os
+import sqlite3
+import tempfile
 from unittest.mock import Mock, patch
+
+import pytest
 
 from weave.trace_server import sqlite_trace_server as slts
 from weave.trace_server import trace_server_interface as tsi
@@ -113,6 +118,60 @@ def _make_server_with_call(
         )
     )
     return server, call_id
+
+
+def test_sqlite_calls_query_stats_sets_has_more_when_limit_saturates():
+    """Backend-equivalence with the CH path: has_more must be True when
+    count==limit (caller's count is truncated) and False otherwise. Sqlite
+    previously returned the Pydantic default (False) regardless, which makes
+    a dev frontend hitting sqlite silently disagree with prod on the "X+" cap.
+    """
+    server = slts.SqliteTraceServer(":memory:")
+    server.drop_tables()
+    server.setup_tables()
+    try:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for i in range(3):
+            server.call_start(
+                tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id="test_project",
+                        id=f"call_{i}",
+                        trace_id=f"trace_{i}",
+                        op_name="op",
+                        started_at=now,
+                        attributes={},
+                        inputs={},
+                    )
+                )
+            )
+            server.call_end(
+                tsi.CallEndReq(
+                    end=tsi.EndedCallSchemaForInsert(
+                        project_id="test_project",
+                        id=f"call_{i}",
+                        ended_at=now,
+                        output=None,
+                        summary={},
+                    )
+                )
+            )
+
+        # 3 calls, limit=2 -> count==2, has_more=True (truncated).
+        truncated = server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id="test_project", limit=2)
+        )
+        assert truncated.count == 2
+        assert truncated.has_more is True
+
+        # 3 calls, limit=10 -> count==3, has_more=False (room to spare).
+        exact = server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id="test_project", limit=10)
+        )
+        assert exact.count == 3
+        assert exact.has_more is False
+    finally:
+        server.close()
 
 
 def test_sqlite_storage_size_bytes_populated_on_call_end():
@@ -404,3 +463,163 @@ def test_sqlite_calls_query_empty_thread_ids_against_real_db():
         assert len(result) == 0
     finally:
         server.close()
+
+
+# ── "latest" alias write semantics ────────────────────────────────────
+
+
+@pytest.fixture
+def sqlite_db_path():
+    """Yield a fresh on-disk SQLite path; cleanup the file and the cached conn."""
+    fd, path = tempfile.mkstemp(suffix=".sqlite")
+    os.close(fd)
+    try:
+        yield path
+    finally:
+        slts.close_conn_cursor(path)
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+
+
+def _make_obj_create_req(
+    project_id: str, object_id: str, val: dict
+) -> tsi.ObjCreateReq:
+    return tsi.ObjCreateReq(
+        obj=tsi.ObjSchemaForInsert(project_id=project_id, object_id=object_id, val=val)
+    )
+
+
+def test_obj_create_atomic_on_alias_failure(sqlite_db_path):
+    """obj_create's IMMEDIATE TRANSACTION must roll back the version row when
+    the alias INSERT fails — neither the new objects row nor the alias row lands.
+    """
+    server = slts.SqliteTraceServer(sqlite_db_path)
+    server.setup_tables()
+
+    project_id = "p"
+    object_id = "atomic_obj"
+
+    # Establish a prior version so we can verify "latest" is unchanged.
+    r1 = server.obj_create(_make_obj_create_req(project_id, object_id, {"v": 1}))
+
+    # Replace the cached cursor with a Mock that wraps the real cursor and
+    # raises on the alias INSERT. The version-row INSERT and the alias
+    # INSERT both run inside `BEGIN IMMEDIATE TRANSACTION`, so a failure
+    # before `conn.commit()` should roll back both.
+    real_conn, real_cursor = slts.get_conn_cursor(sqlite_db_path)
+
+    def _execute_or_fail(sql, *args, **kwargs):
+        if "INSERT OR REPLACE INTO aliases" in sql:
+            raise RuntimeError("simulated alias write failure")
+        return real_cursor.execute(sql, *args, **kwargs)
+
+    proxy = Mock(wraps=real_cursor)
+    proxy.execute = _execute_or_fail
+    conn_map = slts._get_conn_map()
+    saved = conn_map[sqlite_db_path]
+    conn_map[sqlite_db_path] = slts.ConnCursor(real_conn, proxy)
+    try:
+        with pytest.raises(RuntimeError, match="simulated alias write failure"):
+            server.obj_create(_make_obj_create_req(project_id, object_id, {"v": 2}))
+    finally:
+        conn_map[sqlite_db_path] = saved
+        # Defensive: clear any lingering open transaction from the failed call.
+        # sqlite raises OperationalError("cannot rollback - no transaction is
+        # active") if the prior BEGIN already auto-rolled back; treat that as
+        # the success case.
+        try:
+            real_conn.rollback()
+        except sqlite3.Error:
+            pass
+
+    # The version row for v=2 must NOT have landed (transaction rolled back).
+    real_cursor.execute(
+        "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?",
+        (project_id, object_id),
+    )
+    assert real_cursor.fetchone()[0] == 1
+
+    # And "latest" still resolves to the prior digest (only v=1 exists).
+    read_res = server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=object_id, digest="latest")
+    )
+    assert read_res.obj.digest == r1.digest
+
+
+def test_direct_delete_of_latest_alias_falls_back_to_is_latest_column(sqlite_db_path):
+    """Directly hard-delete the 'latest' alias row from `aliases` (bypassing
+    `obj_delete`'s cascade and `remove_aliases` — which the public validation
+    layer would reject for 'latest' anyway).
+
+    The hybrid `_IS_LATEST_FROM_ALIASES_SQL` expression must transparently
+    fall back to the column-based `objects.is_latest = 1` branch.  This
+    exercises that branch in isolation, without going through `obj_delete`
+    (which both re-points the column AND removes the alias row, so it
+    leaves both branches consistent and doesn't tell you which one
+    answered the query).
+
+    Catches: anyone removing the column fallback from
+    `_IS_LATEST_FROM_ALIASES_SQL`, or anyone removing `obj_create`'s
+    maintenance of `objects.is_latest` on insert.
+    """
+    server = slts.SqliteTraceServer(sqlite_db_path)
+    server.setup_tables()
+
+    project_id = "p"
+    object_id = "fallback_obj"
+
+    r0 = server.obj_create(_make_obj_create_req(project_id, object_id, {"v": 0}))
+    r1 = server.obj_create(_make_obj_create_req(project_id, object_id, {"v": 1}))
+
+    # Sanity: alias path wins normally.
+    read_pre = server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=object_id, digest="latest")
+    )
+    assert read_pre.obj.digest == r1.digest
+
+    # Hard-delete the alias row directly.  This is below the public API —
+    # `remove_aliases` would reject the reserved 'latest' name, and
+    # `obj_delete` would cascade other state we don't want to touch here.
+    conn, cursor = slts.get_conn_cursor(sqlite_db_path)
+    cursor.execute(
+        "DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ?",
+        (project_id, object_id, "latest"),
+    )
+    conn.commit()
+
+    # Now the alias-row branch of _IS_LATEST_FROM_ALIASES_SQL is empty;
+    # resolution must come from `objects.is_latest = 1` (column set by
+    # obj_create).  r1 was inserted second, so its column is 1; r0 was
+    # marked 0 by `_mark_existing_objects_as_not_latest`.
+    read_post = server.obj_read(
+        tsi.ObjReadReq(project_id=project_id, object_id=object_id, digest="latest")
+    )
+    assert read_post.obj.digest == r1.digest, (
+        f"after deleting the 'latest' alias row, obj_read('latest') resolved "
+        f"to {read_post.obj.digest!r}; expected {r1.digest!r} via the "
+        f"objects.is_latest column fallback.  Either obj_create stopped "
+        f"maintaining is_latest on insert, or `_IS_LATEST_FROM_ALIASES_SQL` "
+        f"no longer ORs in the column branch."
+    )
+
+    # Same answer through the latest_only query path.
+    latest_only = server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id], latest_only=True),
+        )
+    ).objs
+    assert [o.digest for o in latest_only] == [r1.digest]
+    # r0 must NOT also be is_latest=1 — exactly one row per object.
+    assert latest_only[0].is_latest == 1
+
+    # And through aliases=['latest'] — also routes through _IS_LATEST_FROM_ALIASES_SQL.
+    via_alias_filter = server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id], aliases=["latest"]),
+        )
+    ).objs
+    assert [o.digest for o in via_alias_filter] == [r1.digest]

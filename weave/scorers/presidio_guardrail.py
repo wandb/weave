@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, PrivateAttr
 
@@ -45,8 +45,8 @@ class PresidioScorer(weave.Scorer):
     )
 
     # Private attributes
-    _analyzer: Optional["AnalyzerEngine"] = PrivateAttr(default=None)
-    _anonymizer: Optional["AnonymizerEngine"] = PrivateAttr(default=None)
+    _analyzer: "AnalyzerEngine | None" = PrivateAttr(default=None)
+    _anonymizer: "AnonymizerEngine | None" = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
         from presidio_analyzer import AnalyzerEngine, RecognizerRegistry

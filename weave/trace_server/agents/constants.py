@@ -13,6 +13,9 @@ DEFAULT_AGENT_QUERY_LIMIT = 100
 MAX_AGENT_QUERY_LIMIT = 10_000
 DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT = 200
 MAX_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT = 2_000
+MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_SPECS = 20
+MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_BINS = 50
+MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_TOP_N = 20
 DEFAULT_SEARCH_LIMIT = 20
 MAX_SEARCH_LIMIT = 1000
 MAX_AGENT_STATS_RANGE_DAYS = 31
@@ -58,6 +61,43 @@ SEARCH_CONTENT_PREVIEW_CHARS = 500
 
 # Displayed conversation_id bucket for spans with no `gen_ai.conversation.id`.
 NO_CONVERSATION_LABEL = "__NO_CONVERSATION__"
+
+# ---------------------------------------------------------------------------
+# Grouped spans
+# ---------------------------------------------------------------------------
+
+# Aggregate aliases produced by grouped spans list queries.
+SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
+    {
+        "span_count",
+        "invocation_count",
+        "conversation_count",
+        "total_input_tokens",
+        "total_cache_creation_input_tokens",
+        "total_cache_read_input_tokens",
+        "total_output_tokens",
+        "total_reasoning_tokens",
+        "total_duration_ms",
+        "error_count",
+        "first_seen",
+        "last_seen",
+    }
+)
+SPAN_GROUP_RESULT_COLS: frozenset[str] = SPAN_GROUP_AGGREGATE_COLS.union(
+    frozenset(
+        {
+            "agent_names",
+            "agent_versions",
+            "provider_names",
+            "request_models",
+            "conversation_names",
+        }
+    )
+)
+
+# Max characters retained for a conversation message preview snippet. Keeps the
+# grouped list response lean — the table only renders a truncated line.
+CONVERSATION_PREVIEW_CHARS = 280
 
 # ---------------------------------------------------------------------------
 # Ingest

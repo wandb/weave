@@ -1,7 +1,7 @@
 import weave
 
 
-def test_call_to_dict(client):
+def test_call_to_dict(weave_active):
     @weave.op
     def greet(name: str, age: int) -> str:
         return f"Hello {name}, you are {age}!"

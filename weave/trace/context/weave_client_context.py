@@ -31,7 +31,7 @@ def set_weave_client_global(client: WeaveClient | None) -> None:
 
 
 # This is no longer a concept, but should be
-# def set_weave_client_context(client: Optional["WeaveClient"]) -> None:
+# def set_weave_client_context(client: "WeaveClient | None") -> None:
 #     context_state._graph_client.set(client)
 
 
@@ -44,6 +44,16 @@ def get_weave_client() -> WeaveClient | None:
 def require_weave_client() -> WeaveClient:
     if (client := get_weave_client()) is None:
         raise WeaveInitError("You must call `weave.init(<project_name>)` first")
+    return client
+
+
+def require_secure_weave_client() -> WeaveClient:
+    """Like `require_weave_client`, but locks the client into refusing to decode
+    code-bearing custom objects (`Op` / `load_op`). Server-side workers that
+    reconstruct user payloads must use this, never the raw client.
+    """
+    client = require_weave_client()
+    client._allow_unsafe_custom_obj_decode = False
     return client
 
 

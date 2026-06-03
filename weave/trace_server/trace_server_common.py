@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 from weave.shared import refs_internal as ri
+from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 
 CallStatus = Literal["running", "completed", "failed"]
@@ -23,6 +24,12 @@ FEEDBACK_QUERY_FIELDS = [
     "call_ref",
     "trigger_ref",
     "annotation_ref",
+    "scorer_tags",
+    "scorer_tag_reasons",
+    "scorer_tag_confidences",
+    "scorer_ratings",
+    "scorer_rating_reasons",
+    "scorer_rating_confidences",
 ]
 
 
@@ -157,6 +164,14 @@ def make_derived_summary_fields(
     used to store derived fields, adhering to the tsi.SummaryMap type.
     """
     weave_summary = summary.pop("weave", {})
+    # Server-derived fields are recomputed below — discard any stored values
+    # so historically-malformed rows (e.g. a list-shaped `trace_name` written
+    # by an earlier rescore-worker bug that copied `summary["weave"]` from a
+    # source call into a synthetic child, where `sum_dict_leaves` then bubbled
+    # the string up into the parent as a list) don't escape CallSchema
+    # validation. These keys are owned by this function alone.
+    for derived_key in ("status", "trace_name", "latency_ms", "display_name"):
+        weave_summary.pop(derived_key, None)
 
     status = tsi.TraceStatus.SUCCESS
     if exception:
@@ -347,6 +362,41 @@ def determine_call_status(call: tsi.CallSchema) -> CallStatus:
     return "failed"
 
 
+def _str_or_none(v: Any) -> str | None:
+    return v if isinstance(v, str) and v else None
+
+
+def eval_run_refs_from_call(
+    call: tsi.CallSchema, attributes: dict[str, Any]
+) -> tuple[str, str]:
+    """Return (evaluation_ref, model_ref) for an evaluation-run call.
+
+    Both refs are stored in two places: under
+    ``attributes.weave.{evaluation,model}`` (set by ``evaluation_run_create``,
+    used as a denormalization for filterable list queries) and on
+    ``call.inputs`` as ``self``/``model`` (the canonical inputs of every
+    ``Evaluation.evaluate`` call). Standard evaluations and imperative
+    evaluations (``weave.EvaluationLogger``) bypass ``evaluation_run_create``
+    and only populate ``call.inputs``, so we must fall back to inputs to
+    return a non-empty pair for those cases. Mirrors the pattern in
+    ``eval_results_helpers.py``: ``inputs.get("self") or inputs.get("this")``.
+    """
+    inputs = call.inputs if isinstance(call.inputs, dict) else {}
+
+    evaluation_ref = (
+        _str_or_none(attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY))
+        or _str_or_none(inputs.get("self"))
+        or _str_or_none(inputs.get("this"))
+        or ""
+    )
+    model_ref = (
+        _str_or_none(attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY))
+        or _str_or_none(inputs.get("model"))
+        or ""
+    )
+    return evaluation_ref, model_ref
+
+
 def op_name_matches(op_name: str | None, expected_name: str) -> bool:
     """Check if an op_name URI matches the expected op name.
 
@@ -405,3 +455,43 @@ def try_parse_json(val: Any, default: Any = None) -> Any:
         return json.loads(val)
     except (json.JSONDecodeError, TypeError):
         return default
+
+
+def apply_tags_and_synth_latest_in_place(
+    objs: list[tsi.ObjSchema],
+    tags_map: dict[tuple[str, str], list[str]],
+    aliases_map: dict[tuple[str, str], list[str]],
+) -> None:
+    """Apply tags + aliases onto each obj, synthesizing 'latest' when needed.
+
+    Synthesis covers the computed-fallback branch of the hybrid `is_latest`
+    projection: when obj_delete tombstones the explicit 'latest' alias row,
+    is_latest = 1 is then supplied by the window-function rank over the
+    surviving versions. Surface that virtual 'latest' on read so callers
+    see a view consistent with obj.is_latest.
+
+    Read-skew guard: the projection query and the aliases-map query are two
+    separate reads of the `aliases` table. If a concurrent write moves
+    'latest' to a different digest between them, we can see is_latest=1 on
+    the old digest while the aliases map already credits 'latest' to the
+    new digest. Skip synthesizing 'latest' on any digest whose object_id
+    already has an explicit 'latest' alias in the just-fetched map.
+
+    Shared between ClickHouse and SQLite trace servers, both of which
+    return identically-shaped tags_map / aliases_map keyed by
+    (object_id, digest).
+    """
+    object_ids_with_alias_latest = {
+        oid for (oid, _), aliases in aliases_map.items() if "latest" in aliases
+    }
+    for obj in objs:
+        key = (obj.object_id, obj.digest)
+        obj.tags = sorted(tags_map.get(key, []))
+        aliases = aliases_map.get(key, [])
+        if (
+            obj.is_latest == 1
+            and "latest" not in aliases
+            and obj.object_id not in object_ids_with_alias_latest
+        ):
+            aliases = ["latest", *aliases]
+        obj.aliases = aliases

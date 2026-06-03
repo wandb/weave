@@ -13,7 +13,7 @@ def test_weaveobject_properties():
     assert to.x == 1
 
 
-def test_weaveobject_access_after_init_termination(client):
+def test_weaveobject_access_after_init_termination(weave_active):
     my_obj = None
 
     class MyObj(weave.Object):

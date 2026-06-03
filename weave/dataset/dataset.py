@@ -1,7 +1,7 @@
 import warnings
 from collections.abc import Iterable, Iterator
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from pydantic import field_validator
 from typing_extensions import Self
@@ -69,7 +69,7 @@ class Dataset(Object):
         return cls(rows=rows)
 
     @classmethod
-    def from_hf(cls, hf_dataset: Union["HFDataset", "HFDatasetDict"]) -> Self:
+    def from_hf(cls, hf_dataset: "HFDataset | HFDatasetDict") -> Self:
         try:
             from datasets import Dataset as HFDataset
             from datasets import DatasetDict as HFDatasetDict

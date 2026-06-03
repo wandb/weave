@@ -1,9 +1,6 @@
 /**
  * Weave integration for OpenAI Agents SDK
  *
- * This module provides tracing integration for the OpenAI Agents SDK using duck typing
- * to avoid direct dependencies on @openai/agents types.
- *
  * Usage:
  * ```typescript
  * import { addTraceProcessor } from '@openai/agents';
@@ -24,11 +21,6 @@ import type {
   Span,
   Trace,
   TracingProcessor,
-  AgentSpanData,
-  FunctionSpanData,
-  ResponseSpanData,
-  HandoffSpanData,
-  GuardrailSpanData,
   CustomSpanData,
 } from './openai.agent.types';
 
@@ -97,67 +89,61 @@ function extractSpanData(span: Span): {
 
   switch (spanData.type) {
     case 'agent': {
-      const data = spanData as AgentSpanData;
       return {
         inputs: {},
         output: null,
         metadata: {
-          tools: data.tools,
-          handoffs: data.handoffs,
-          output_type: data.output_type,
+          tools: spanData.tools,
+          handoffs: spanData.handoffs,
+          output_type: spanData.output_type,
         },
         metrics: {},
       };
     }
 
     case 'function': {
-      const data = spanData as FunctionSpanData;
       return {
-        inputs: {input: data.input},
-        output: data.output,
+        inputs: {input: spanData.input},
+        output: spanData.output,
         metadata: {},
         metrics: {},
       };
     }
 
     case 'response': {
-      const data = spanData as ResponseSpanData;
       return {
-        inputs: data._input ? {input: data._input} : {},
-        output: data._response || null,
+        inputs: spanData._input ? {input: spanData._input} : {},
+        output: spanData._response || null,
         metadata: {},
         metrics: {},
       };
     }
 
     case 'handoff': {
-      const data = spanData as HandoffSpanData;
       return {
         inputs: {},
         output: null,
         metadata: {
-          from_agent: data.from_agent,
-          to_agent: data.to_agent,
+          from_agent: spanData.from_agent,
+          to_agent: spanData.to_agent,
         },
         metrics: {},
       };
     }
 
     case 'guardrail': {
-      const data = spanData as GuardrailSpanData;
       return {
         inputs: {},
         output: null,
         metadata: {
-          triggered: data.triggered,
+          triggered: spanData.triggered,
         },
         metrics: {},
       };
     }
 
     case 'custom': {
-      const data = spanData as CustomSpanData;
-      const customData = data.data;
+      const customData = spanData.data;
       return {
         inputs: customData.input ? {input: customData.input} : {},
         output: customData.output || null,
@@ -689,7 +675,7 @@ export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
  * and registers a TracingProcessor. If the package is not installed, it returns false without
  * throwing an error.
  *
- * @returns Promise<boolean> - true if registration succeeded, false if @openai/agents not available
+ * @returns `Promise<boolean>` - `true` if registration succeeded, `false` if `@openai/agents` not available
  *
  * @example
  * ```typescript

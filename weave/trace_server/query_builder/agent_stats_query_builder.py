@@ -27,6 +27,7 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
     AgentSpanStatsValueType,
+    group_by_ref_alias,
 )
 from weave.trace_server.calls_query_builder.stats_query_base import (
     auto_select_granularity_seconds,
@@ -38,7 +39,6 @@ from weave.trace_server.query_builder.agent_query_builder import (
     _project_filter_sql,
     add_time_filters,
     ensure_group_filters_match,
-    group_by_ref_alias,
     group_filters_having_sql,
     resolve_agent_span_field_column,
     resolve_group_by,

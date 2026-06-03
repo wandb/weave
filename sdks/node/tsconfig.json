@@ -16,14 +16,14 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "allowJs": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*", "types/**/*"],
   "exclude": [
     "examples",
     "dist",
     "node_modules",
-    "src/integrations/checkOpenai.ts",
     "src/__tests__/**/*"
   ]
 }

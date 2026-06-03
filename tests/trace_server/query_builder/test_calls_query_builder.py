@@ -11,11 +11,13 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     ParamBuilder,
+    QueryBuilderDynamicField,
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
+    build_calls_stats_query,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -48,7 +50,7 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
                 AND
                 ((
                    NOT ((
-                      any({expected_table}.started_at) IS NULL
+                  any({expected_table}.op_name) IS NULL
                    ))
                 ))
             )
@@ -91,7 +93,7 @@ def test_query_light_column() -> None:
             AND
             ((
                NOT ((
-                  any(calls_merged.started_at) IS NULL
+                  any(calls_merged.op_name) IS NULL
                ))
             ))
         )
@@ -120,7 +122,7 @@ def test_query_heavy_column() -> None:
             AND
             ((
                NOT ((
-                  any(calls_merged.started_at) IS NULL
+                  any(calls_merged.op_name) IS NULL
                ))
             ))
         )
@@ -153,7 +155,7 @@ def test_query_heavy_column_simple_filter() -> None:
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
         )
         SELECT
@@ -193,7 +195,7 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
             ORDER BY any(calls_merged.started_at) DESC
         )
@@ -237,7 +239,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
             AND
-                ((NOT ((any(calls_merged.started_at) IS NULL))))
+                ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
             ORDER BY any(calls_merged.started_at) DESC
             LIMIT 10
@@ -297,52 +299,57 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS (
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ifNull(calls_merged.trace_id, '') = {pb_0:String}),
+        filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_9:String}
-            WHERE ((calls_merged.op_name IN {pb_5:Array(String)})
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (calls_merged.id IN filter_candidate_ids)
+                AND ((calls_merged.op_name IN {pb_7:Array(String)})
                     OR (calls_merged.op_name IS NULL))
-                AND (calls_merged.trace_id = {pb_6:String}
+                AND (ifNull(calls_merged.trace_id, '') = {pb_0:String}
                     OR calls_merged.trace_id IS NULL)
-                AND ((calls_merged.inputs_dump LIKE {pb_7:String} OR calls_merged.inputs_dump IS NULL)
-                    AND (calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL))
+                AND ((calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL)
+                    AND (calls_merged.inputs_dump LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                                    ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+                                    ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
                     AND
-                    ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
+                    ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') = {pb_5:String}))
                 AND
-                ((any(calls_merged.wb_user_id) = {pb_4:String}))
+                ((any(calls_merged.wb_user_id) = {pb_6:String}))
                 AND
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND
-                ((NOT ((any(calls_merged.started_at) IS NULL))))
+                ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
             ORDER BY any(calls_merged.started_at) DESC
-            LIMIT 10
-        )
+            LIMIT 10)
         SELECT
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_9:String}
+        PREWHERE calls_merged.project_id = {pb_1:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
         {
-            "pb_0": '$."param"."val"',
-            "pb_1": "hello",
-            "pb_2": '$."param"."bool"',
-            "pb_3": "true",
-            "pb_4": "my_user_id",
-            "pb_5": ["a", "b"],
-            "pb_6": "111111111111",
-            "pb_7": '%"hello"%',
-            "pb_8": "%true%",
-            "pb_9": "project",
+            "pb_0": "111111111111",
+            "pb_1": "project",
+            "pb_2": '$."param"."val"',
+            "pb_3": "hello",
+            "pb_4": '$."param"."bool"',
+            "pb_5": "true",
+            "pb_6": "my_user_id",
+            "pb_7": ["a", "b"],
+            "pb_8": '%"hello"%',
+            "pb_9": "%true%",
         },
     )
 
@@ -372,7 +379,7 @@ def test_query_with_simple_feedback_sort() -> None:
                 calls_merged.id)
             HAVING
                 (((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
             ORDER BY
                 (NOT (JSONType(anyIf(feedback.payload_dump,
                 feedback.feedback_type = {pb_0:String}),
@@ -433,7 +440,7 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             calls_merged.id)
         HAVING
             (((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         ORDER BY
             (NOT (JSONType(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_1:String}),
@@ -537,7 +544,7 @@ def test_query_with_simple_feedback_filter() -> None:
             feedback.feedback_type = {pb_0:String}),
             {pb_2:String}), 'null'), '')))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": "wandb.runnable.my_op",
@@ -586,7 +593,7 @@ def test_query_with_wildcard_feedback_filter() -> None:
             {pb_0:String}), 'null'), ''), coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
             {pb_0:String}), 'null'), '') != '') = {pb_1:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": '$."output"."label"',
@@ -632,7 +639,7 @@ def test_query_with_wildcard_feedback_filter_no_extra_path() -> None:
         HAVING
             (((any(feedback.runnable_ref) = {pb_0:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": "some_value",
@@ -681,7 +688,7 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             feedback.feedback_type = {pb_0:String}),
             {pb_1:String}), 'null'), '') = {pb_2:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         ORDER BY
             (NOT (JSONType(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
@@ -791,7 +798,7 @@ def test_calls_query_multiple_select_columns() -> None:
             AND
             ((
                NOT ((
-                  any(calls_merged.started_at) IS NULL
+                  any(calls_merged.op_name) IS NULL
                ))
             ))
         )
@@ -835,7 +842,7 @@ def test_calls_query_with_predicate_filters() -> None:
                 ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND ((any(calls_merged.wb_user_id) = {pb_2:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
         )
         SELECT
@@ -882,7 +889,7 @@ def test_query_with_summary_weave_status_sort() -> None:
             AND
             ((
                NOT ((
-                  any(calls_merged.started_at) IS NULL
+                  any(calls_merged.op_name) IS NULL
                ))
             ))
         )
@@ -944,7 +951,7 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
                 ELSE {pb_3:String}
             END = {pb_3:String}))
         AND ((any(calls_merged.deleted_at) IS NULL))
-        AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         ORDER BY CASE
             WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
             WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
@@ -1009,7 +1016,7 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
                 AND
                 ((any(calls_merged.wb_user_id) = {pb_4:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
         )
         SELECT
@@ -1077,7 +1084,7 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
             OR
             (coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '') = {pb_3:String})))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": '$."param"."val"',
@@ -1163,7 +1170,7 @@ def test_calls_query_with_complex_heavy_filters() -> None:
                 AND
                 ((any(calls_merged.wb_user_id) = {pb_8:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
         )
         SELECT
@@ -1220,7 +1227,7 @@ def test_calls_query_with_like_optimization() -> None:
         HAVING (
             ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -1260,7 +1267,7 @@ def test_calls_query_with_like_optimization_contains() -> None:
         HAVING (
             (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -1300,7 +1307,7 @@ def test_query_with_json_value_in_condition() -> None:
         HAVING (
             ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -1503,7 +1510,7 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
                 AND
                 ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_4:String}), 'null'), '') IN ({pb_5:String},{pb_6:String})))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
         )
         SELECT
@@ -1561,7 +1568,7 @@ def test_calls_query_with_unoptimizable_or_condition() -> None:
             (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String})
             OR (toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '')) > {pb_3:Int64})))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -1620,7 +1627,7 @@ def test_dynamic_json_filters_infer_casts_from_literals() -> None:
             OR (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_10:String}), 'null'), '') = {pb_11:String})
         ))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -1675,7 +1682,7 @@ def test_literal_inferred_casts_cover_feedback_and_mixed_numeric_in() -> None:
             feedback.feedback_type = {pb_0:String}),
             {pb_1:String}), 'null'), '')) > {pb_2:Float64}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": "wandb.runnable.my_op",
@@ -1713,7 +1720,7 @@ def test_literal_inferred_casts_cover_feedback_and_mixed_numeric_in() -> None:
         HAVING (((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump),
             {pb_0:String}), 'null'), '')) IN ({pb_1:Int64},{pb_2:Float64})))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": '$."x"',
@@ -1758,7 +1765,7 @@ def test_whole_number_float_eq_emits_int_form_like_prefilter() -> None:
         HAVING (
             ((toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '')) = {pb_1:Float64}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -1801,7 +1808,7 @@ def test_bool_eq_emits_numeric_form_like_prefilter() -> None:
         HAVING (
             ((multiIf(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = 'true', 1, coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = 'false', 0, toUInt8OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''))) = {pb_1:Bool}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -1837,7 +1844,7 @@ def test_calls_query_filter_by_empty_string() -> None:
         HAVING (
             ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -1874,7 +1881,7 @@ def test_query_with_summary_weave_latency_ms_sort() -> None:
             AND
             ((
                NOT ((
-                  any(calls_merged.started_at) IS NULL
+                  any(calls_merged.op_name) IS NULL
                ))
             ))
         )
@@ -1917,7 +1924,7 @@ def test_query_with_summary_weave_latency_ms_filter() -> None:
               ELSE (toUnixTimestamp64Milli(any(calls_merged.ended_at)) - toUnixTimestamp64Milli(any(calls_merged.started_at)))
           END > {pb_0:Int64}))
         AND ((any(calls_merged.deleted_at) IS NULL))
-        AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {"pb_0": 1000, "pb_1": "project"},
     )
@@ -1974,7 +1981,7 @@ def test_summary_weave_field_select_backtick_quoting(
             HAVING (
                 ((any({expected_table}.deleted_at) IS NULL))
                 AND
-                ((NOT ((any({expected_table}.started_at) IS NULL))))
+                ((NOT ((any({expected_table}.op_name) IS NULL))))
             )
             """,
             {
@@ -2055,7 +2062,7 @@ def test_query_with_summary_weave_trace_name_sort() -> None:
             AND
             ((
                NOT ((
-                  any(calls_merged.started_at) IS NULL
+                  any(calls_merged.op_name) IS NULL
                ))
             ))
         )
@@ -2107,10 +2114,63 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
                 ELSE any(calls_merged.op_name)
             END = {pb_0:String}))
         AND ((any(calls_merged.deleted_at) IS NULL))
-        AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {"pb_0": "my_model", "pb_1": "project"},
     )
+
+
+def test_unsupported_summary_field_raises_invalid_field_error() -> None:
+    """Filtering by an unknown summary.weave.* field must surface as InvalidFieldError
+    (mapped to HTTP 403) rather than NotImplementedError (HTTP 500). Regression for
+    WB-34835: clients hitting /calls/query_stats with summary.weave.duration_ms were
+    getting 500s for what is actually invalid input.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "summary.weave.duration_ms"},
+                    {"$literal": 0},
+                ]
+            }
+        )
+    )
+    with pytest.raises(InvalidFieldError, match="duration_ms"):
+        cq.as_sql(ParamBuilder())
+
+
+def test_unselectable_columns_raise_invalid_field_error() -> None:
+    """Selecting columns that the SQL builder can't materialize as a select expression
+    must surface as InvalidFieldError (403), not NotImplementedError (500). Regression
+    for WB-34836: dynamic, feedback, and annotation-queue-item paths all hit the same
+    "implement me!" raise.
+    """
+    # Nested dynamic field (e.g. inputs.foo) - routed through CallsMergedDynamicField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("inputs.foo")
+    with pytest.raises(InvalidFieldError, match="cannot be selected directly"):
+        cq.as_sql(ParamBuilder())
+
+    # Feedback payload column - routed through CallsMergedFeedbackPayloadField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("feedback.[wandb.note].payload.note")
+    with pytest.raises(InvalidFieldError, match="Feedback fields"):
+        cq.as_sql(ParamBuilder())
+
+    # Annotation queue item column - routed through CallsMergedQueueItemField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("annotation_queue_items.queue_id")
+    with pytest.raises(InvalidFieldError, match="queue item fields"):
+        cq.as_sql(ParamBuilder())
+
+    # QueryBuilderDynamicField with extra_path (used by table_query, not CallsQuery,
+    # so we have to construct and select directly).
+    field = QueryBuilderDynamicField(field="val_dump", extra_path=["foo", "bar"])
+    with pytest.raises(InvalidFieldError, match="val_dump.foo.bar"):
+        field.as_select_sql(ParamBuilder(), "table")
 
 
 def test_build_calls_complete_update_end_query() -> None:
@@ -2131,16 +2191,16 @@ def test_build_calls_complete_update_end_query() -> None:
     expected = """
         UPDATE calls_complete
         SET
-            ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC'),
-            exception = {exception:String},
-            output_dump = {output_dump:String},
-            summary_dump = {summary_dump:String},
-            output_refs = {output_refs:Array(String)},
-            wb_run_step_end = {wb_run_step_end:UInt64},
+            ended_at = fromUnixTimestamp64Micro(%(ended_at)s, 'UTC'),
+            exception = %(exception)s,
+            output_dump = %(output_dump)s,
+            summary_dump = %(summary_dump)s,
+            output_refs = %(output_refs)s,
+            wb_run_step_end = %(wb_run_step_end)s,
             updated_at = now64(3)
-        WHERE project_id = {project_id:String}
-            AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')
-            AND id = {id:String}
+        WHERE project_id = %(project_id)s
+            AND started_at = fromUnixTimestamp64Micro(%(started_at)s, 'UTC')
+            AND id = %(id)s
     """
 
     exp_formatted = sqlparse.format(expected, reindent=True)
@@ -2173,7 +2233,7 @@ def test_storage_size_fields():
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {"pb_0": "test/project"},
     )
@@ -2212,7 +2272,7 @@ def test_total_storage_size(with_filter: bool):
                     OR (calls_merged.op_name IS NULL))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING (((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
             )
             SELECT
                 calls_merged.id AS id,
@@ -2266,7 +2326,7 @@ def test_total_storage_size(with_filter: bool):
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
             """,
             {"pb_0": "test/project"},
@@ -2315,7 +2375,7 @@ def test_datetime_optimization_simple() -> None:
         HAVING (
             ((any(calls_merged.started_at) > {pb_0:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -2353,7 +2413,7 @@ def test_datetime_optimization_lt_simple() -> None:
         HAVING (
             ((any(calls_merged.started_at) < {pb_0:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -2396,7 +2456,7 @@ def test_datetime_optimization_not_operation() -> None:
         HAVING ((
             (NOT ((any(calls_merged.started_at) >= {pb_0:String}))))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -2484,7 +2544,7 @@ def test_datetime_optimization_multiple_conditions() -> None:
                 OR ((any(calls_merged.ended_at) >= {pb_0:String})
                     AND (any(calls_merged.ended_at) > {pb_1:String}))))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
@@ -2536,7 +2596,7 @@ def test_datetime_optimization_invalid_field() -> None:
             ((any(calls_merged.wb_user_id) > {pb_0:Int64}))
             AND ((any(calls_merged.started_at) > {pb_1:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {"pb_0": 1709251200, "pb_1": "2025-03-01 00:00:00 UTC", "pb_2": "project"},
@@ -2716,7 +2776,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
                 AND ((any(calls_merged.started_at) > {pb_3:String}))
                 AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') = {pb_5:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))))
         SELECT calls_merged.id AS id
         FROM calls_merged
         PREWHERE calls_merged.project_id = {pb_8:String}
@@ -2747,17 +2807,27 @@ def test_trace_id_filter_in():
     assert_sql(
         cq,
         """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ifNull(calls_merged.trace_id, '') IN {pb_0:Array(String)})
         SELECT
             calls_merged.id AS id
         FROM calls_merged
         PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.trace_id IN {pb_0:Array(String)}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND (ifNull(calls_merged.trace_id, '') IN {pb_2:Array(String)}
                 OR calls_merged.trace_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
-        {"pb_0": ["111111111111", "222222222222"], "pb_1": "project"},
+        {
+            "pb_0": ["111111111111", "222222222222"],
+            "pb_1": "project",
+            "pb_2": ["111111111111", "222222222222"],
+        },
     )
 
 
@@ -2773,21 +2843,55 @@ def test_trace_id_filter_eq():
     assert_sql(
         cq,
         """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ifNull(calls_merged.trace_id, '') = {pb_0:String})
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND ((calls_merged.op_name IN {pb_2:Array(String)})
                 OR (calls_merged.op_name IS NULL))
-            AND (calls_merged.trace_id = {pb_1:String}
+            AND (ifNull(calls_merged.trace_id, '') = {pb_0:String}
                 OR calls_merged.trace_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
+            "pb_0": "111111111111",
+            "pb_1": "project",
+            "pb_2": ["weave-trace-internal:///%"],
+        },
+    )
+
+
+def test_trace_id_filter_calls_complete_no_candidate_cte() -> None:
+    """On calls_complete, trace_id is non-nullable String with a bloom filter
+    on the raw column. The query must keep raw `trace_id IN` (no `ifNull` wrap),
+    must NOT include `OR trace_id IS NULL` (the column is non-nullable), and
+    must NOT emit a `filter_candidate_ids` CTE - that CTE is only for pruning
+    the calls_merged Nullable trace_id index.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_ids": ["111111111111"]})
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE (calls_complete.trace_id = {pb_1:String})
+        AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+        """,
+        {
+            "pb_0": SENTINEL_EPOCH,
             "pb_1": "111111111111",
-            "pb_0": ["weave-trace-internal:///%"],
             "pb_2": "project",
         },
     )
@@ -2808,7 +2912,7 @@ def test_wb_run_id_filter_eq():
                 OR calls_merged.wb_run_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (any(calls_merged.wb_run_id) IN {pb_0:Array(String)}))
         """,
         {"pb_0": ["wb_run_123"], "pb_1": ["wb_run_123"], "pb_2": "project"},
@@ -2840,7 +2944,7 @@ def test_trace_roots_only_filter_with_condition():
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.wb_user_id) = {pb_0:Int64}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {"pb_0": 1, "pb_1": "project"},
     )
@@ -2863,7 +2967,7 @@ def test_parent_id_filter():
                 OR calls_merged.parent_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (any(calls_merged.parent_id) IN {pb_0:Array(String)}))
         """,
         {
@@ -2896,7 +3000,7 @@ def test_input_output_refs_filter():
                 OR length(calls_merged.output_refs) = 0)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
                 AND (hasAny(array_concat_agg(calls_merged.output_refs), {pb_1:Array(String)})))))
         """,
@@ -2945,7 +3049,7 @@ def test_input_output_refs_filter_with_wildcards():
                 OR length(calls_merged.output_refs) = 0)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (((((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
                     OR (arrayExists(x -> startsWith(x, {pb_1:String}), array_concat_agg(calls_merged.input_refs)))))
                 AND (((hasAny(array_concat_agg(calls_merged.output_refs), {pb_2:Array(String)}))
@@ -2983,50 +3087,57 @@ def test_all_optimization_filters():
     assert_sql(
         cq,
         """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ifNull(calls_merged.trace_id, '') IN {pb_0:Array(String)})
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_12:String}
-        WHERE (calls_merged.parent_id IN {pb_11:Array(String)}
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND (calls_merged.parent_id IN {pb_13:Array(String)}
                 OR calls_merged.parent_id IS NULL)
-            AND ((calls_merged.op_name IN {pb_5:Array(String)})
+            AND ((calls_merged.op_name IN {pb_7:Array(String)})
                 OR (calls_merged.op_name IS NULL))
-            AND (calls_merged.trace_id IN {pb_6:Array(String)}
+            AND (ifNull(calls_merged.trace_id, '') IN {pb_8:Array(String)}
                 OR calls_merged.trace_id IS NULL)
-            AND (calls_merged.thread_id IN {pb_7:Array(String)}
+            AND (calls_merged.thread_id IN {pb_9:Array(String)}
                 OR calls_merged.thread_id IS NULL)
-            AND (calls_merged.turn_id IN {pb_8:Array(String)}
+            AND (calls_merged.turn_id IN {pb_10:Array(String)}
                 OR calls_merged.turn_id IS NULL)
-            AND (((hasAny(calls_merged.input_refs, {pb_9:Array(String)})
+            AND (((hasAny(calls_merged.input_refs, {pb_11:Array(String)})
                 OR length(calls_merged.input_refs) = 0)
-                AND (hasAny(calls_merged.output_refs, {pb_10:Array(String)})
+                AND (hasAny(calls_merged.output_refs, {pb_12:Array(String)})
                     OR length(calls_merged.output_refs) = 0)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-            AND (((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
-                AND (hasAny(array_concat_agg(calls_merged.output_refs), {pb_1:Array(String)}))
-            AND (any(calls_merged.parent_id) IN {pb_2:Array(String)})
-              AND (any(calls_merged.thread_id) IN {pb_3:Array(String)})
-              AND (any(calls_merged.turn_id) IN {pb_4:Array(String)}))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            AND (((hasAny(array_concat_agg(calls_merged.input_refs), {pb_2:Array(String)}))
+                AND (hasAny(array_concat_agg(calls_merged.output_refs), {pb_3:Array(String)}))
+            AND (any(calls_merged.parent_id) IN {pb_4:Array(String)})
+              AND (any(calls_merged.thread_id) IN {pb_5:Array(String)})
+              AND (any(calls_merged.turn_id) IN {pb_6:Array(String)}))))
         """,
         {
-            "pb_0": ["weave-trace-internal:///222222222222%"],
-            "pb_1": ["weave-trace-internal:///111111111111%"],
-            "pb_2": ["111111111111", "222222222222"],
-            "pb_3": ["thread_333", "thread_444"],
-            "pb_4": ["turn_555", "turn_666"],
-            "pb_5": [
+            "pb_0": ["111111111111", "222222222222"],
+            "pb_1": "project",
+            "pb_2": ["weave-trace-internal:///222222222222%"],
+            "pb_3": ["weave-trace-internal:///111111111111%"],
+            "pb_4": ["111111111111", "222222222222"],
+            "pb_5": ["thread_333", "thread_444"],
+            "pb_6": ["turn_555", "turn_666"],
+            "pb_7": [
                 "weave-trace-internal:///222222222222",
                 "weave-trace-internal:///111111111111",
             ],
-            "pb_6": ["111111111111", "222222222222"],
-            "pb_7": ["thread_333", "thread_444"],
-            "pb_8": ["turn_555", "turn_666"],
-            "pb_9": ["weave-trace-internal:///222222222222%"],
-            "pb_10": ["weave-trace-internal:///111111111111%"],
-            "pb_11": ["111111111111", "222222222222"],
-            "pb_12": "project",
+            "pb_8": ["111111111111", "222222222222"],
+            "pb_9": ["thread_333", "thread_444"],
+            "pb_10": ["turn_555", "turn_666"],
+            "pb_11": ["weave-trace-internal:///222222222222%"],
+            "pb_12": ["weave-trace-internal:///111111111111%"],
+            "pb_13": ["111111111111", "222222222222"],
         },
     )
 
@@ -3204,7 +3315,7 @@ def test_thread_id_filter_eq():
                 OR calls_merged.thread_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
         """,
         {"pb_0": ["thread_123"], "pb_1": "thread_123", "pb_2": "project"},
@@ -3229,7 +3340,7 @@ def test_thread_id_filter_in():
                 OR calls_merged.thread_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
         """,
         {
@@ -3256,7 +3367,7 @@ def test_turn_id_filter_eq():
                 OR calls_merged.turn_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (any(calls_merged.turn_id) IN {pb_0:Array(String)}))
         """,
         {"pb_0": ["turn_123"], "pb_1": "turn_123", "pb_2": "project"},
@@ -3279,7 +3390,7 @@ def test_turn_id_filter_in():
                 OR calls_merged.turn_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (any(calls_merged.turn_id) IN {pb_0:Array(String)}))
         """,
         {
@@ -3313,7 +3424,7 @@ def test_thread_id_and_turn_id_filter_combined():
                 OR calls_merged.turn_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             AND (((any(calls_merged.thread_id) IN {pb_0:Array(String)})
               AND (any(calls_merged.turn_id) IN {pb_1:Array(String)}))))
         """,
@@ -3360,7 +3471,7 @@ def test_query_with_optimization_and_attributes_order() -> None:
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
             ORDER BY any(calls_merged.started_at) ASC
         )
@@ -3414,7 +3525,7 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
                 calls_merged.id)
         HAVING (((toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_0:String}), 'null'), '')) = {pb_1:Int64}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": '$."metrics.scorer.run"."value"',
@@ -3532,8 +3643,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         PREWHERE calls_complete.project_id = {pb_12:String}
         WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
                 OR (calls_complete.op_name IS NULL))
-            AND (calls_complete.trace_id = {pb_4:String}
-                OR calls_complete.trace_id IS NULL)
+            AND (calls_complete.trace_id = {pb_4:String})
         AND (
             ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')) > {pb_1:Int64}))
             AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
@@ -3921,7 +4031,7 @@ def test_query_with_queue_filter_calls_merged() -> None:
         HAVING (
             ((any(annotation_queue_items.queue_id) = {pb_0:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": "test_queue_id",
@@ -4063,7 +4173,7 @@ def test_stats_query_calls_complete_flat_count() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT count() AS count
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_1:String}
         WHERE 1
@@ -4086,7 +4196,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT count() AS count
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_2:String}
         WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
@@ -4112,6 +4222,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         req,
         """
         SELECT count() AS count,
+               toUInt8(0) AS has_more,
                sum(coalesce(CASE
                    WHEN calls_complete.parent_id = {pb_2:String}
                         THEN rolled_up_cms.total_storage_size_bytes
@@ -4163,7 +4274,7 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     assert_stats_sql(
         req,
         """
-        SELECT count(DISTINCT calls_complete.id) AS count
+        SELECT count(DISTINCT calls_complete.id) AS count, toUInt8(0) AS has_more
         FROM calls_complete
         LEFT JOIN (
             SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
@@ -4190,13 +4301,290 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     )
 
 
-def test_stats_query_calls_merged_uses_subquery() -> None:
-    """Stats query on calls_merged should use subquery wrapping (GROUP BY requires it)."""
-    req = tsi.CallsQueryStatsReq(project_id="project")
+def test_stats_query_calls_merged_unfiltered_limit_1_stays_with_pattern_1() -> None:
+    """limit=1 with no filter is the project-existence check (Pattern 1),
+    which uses `LIMIT 1` and is strictly cheaper than starting a uniqUpTo
+    aggregator. Pinning this boundary so Pattern 3 never intercepts.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project", limit=1)
     assert_stats_sql(
         req,
         """
-        SELECT count()
+        SELECT toUInt8(count()) AS has_any
+        FROM (
+            SELECT 1
+            FROM calls_merged
+            WHERE project_id = {pb_0:String}
+            LIMIT 1
+        )
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> None:
+    """Unfiltered calls_merged stats with no limit takes the flat distinct-id path.
+
+    Inclusion-exclusion on one scan: count(started or deleted) - count(deleted)
+    = distinct non-deleted started ids. op_name (start-only) drops orphaned
+    call-ends, matching the GROUP BY path's exclusion semantics exactly.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project")
+    pb = ParamBuilder("pb")
+    _query, _columns, settings = build_calls_stats_query(
+        req, pb, ReadTable.CALLS_MERGED
+    )
+    assert settings == {}
+    assert_stats_sql(
+        req,
+        """
+        SELECT raw_count AS count,
+               toUInt8(0) AS has_more
+        FROM (
+            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_0:String})
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -> None:
+    """Caller-supplied limit caps `count` via least() and flips `has_more`
+    when the raw distinct count exceeds the cap. Inner aggregator is unchanged.
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project", limit=5)
+    pb = ParamBuilder("pb")
+    _query, _columns, settings = build_calls_stats_query(
+        req, pb, ReadTable.CALLS_MERGED
+    )
+    assert settings == {}
+    assert_stats_sql(
+        req,
+        """
+        SELECT least(raw_count, 5) AS count,
+               toUInt8(raw_count > 5) AS has_more
+        FROM (
+            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_0:String})
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_filter_falls_back_to_group_by() -> None:
+    """Hardcoded filter forces the GROUP BY rollup -- filters need per-id state."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        filter=tsi.CallsFilter(op_names=["my_op"]),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                   OR (calls_merged.op_name IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND
+                ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+        )
+        """,
+        {"pb_0": ["my_op"], "pb_1": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_query_falls_back_to_group_by() -> None:
+    """A `query` argument forces the GROUP BY rollup -- predicates live in HAVING."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=tsi.Query.model_validate(
+            {"$expr": {"$eq": [{"$getField": "id"}, {"$literal": "x"}]}}
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((calls_merged.id = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+        )
+        """,
+        {"pb_0": "x", "pb_1": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def _started_at_query(expr: dict) -> tsi.Query:
+    return tsi.Query.model_validate({"$expr": expr})
+
+
+def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> None:
+    """A started_at-only window takes the distinct-id fast path (Pattern 4).
+
+    uniqExact counts start rows in the window -- the exact `started_at`
+    predicates match the GROUP BY path's `any(started_at) <op> T` HAVING (and
+    drop the prefilter buffer slop), and `op_name IS NOT NULL` reproduces its
+    orphaned-call-end exclusion (since #6933 end rows carry started_at too).
+    Soft-deleted ids are removed with an anti-set. Both bounds prefilter the
+    outer scan, but only the lower bound windows the anti-set: deletes can land
+    after the upper bound, never before the lower one. Limit capping reuses the
+    shared count/has_more wrapper.
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        limit=5,
+        query=_started_at_query(
+            {
+                "$and": [
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": 1709251200}]},
+                    {"$lt": [{"$getField": "started_at"}, {"$literal": 1709337600}]},
+                ]
+            }
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT least(raw_count, 5) AS count,
+               toUInt8(raw_count > 5) AS has_more
+        FROM (
+            SELECT uniqExact(calls_merged.id) AS raw_count
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_0:String}
+            WHERE calls_merged.sortable_datetime > {pb_2:String}
+              AND calls_merged.sortable_datetime < {pb_4:String}
+              AND calls_merged.started_at > {pb_1:String}
+              AND calls_merged.started_at < {pb_3:String}
+              AND isNotNull(calls_merged.op_name)
+              AND calls_merged.id NOT IN (
+                  SELECT calls_merged.id
+                  FROM calls_merged
+                  PREWHERE calls_merged.project_id = {pb_0:String}
+                  WHERE calls_merged.sortable_datetime > {pb_2:String}
+                    AND isNotNull(calls_merged.deleted_at)))
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": "2024-03-01 00:00:00.000000",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-02 00:00:00.000000",
+            "pb_4": "2024-03-02 00:05:00.000000",
+        },
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_started_at_fast_path_gates() -> None:
+    """The fast path fires only when a lower-bounded started_at is the sole
+    filter. An upper-bound-only window (cannot window the delete anti-set) and a
+    started_at bound mixed with any other predicate both fall back to GROUP BY.
+    """
+    # Upper bound only -> no lower bound to window the anti-set -> fall back.
+    assert_stats_sql(
+        tsi.CallsQueryStatsReq(
+            project_id="project",
+            query=_started_at_query(
+                {"$lt": [{"$getField": "started_at"}, {"$literal": 1709251200}]}
+            ),
+        ),
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.sortable_datetime < {pb_1:String})
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.started_at) < {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+        )
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-01 00:05:00.000000",
+            "pb_2": "project",
+        },
+        read_table=ReadTable.CALLS_MERGED,
+    )
+    # started_at lower bound + a non-time predicate -> not time-only -> fall back.
+    assert_stats_sql(
+        tsi.CallsQueryStatsReq(
+            project_id="project",
+            query=_started_at_query(
+                {
+                    "$and": [
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": 1709251200},
+                            ]
+                        },
+                        {"$eq": [{"$getField": "op_name"}, {"$literal": "x"}]},
+                    ]
+                }
+            ),
+        ),
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_3:String}
+            WHERE (calls_merged.sortable_datetime > {pb_2:String})
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.started_at) > {pb_0:String}))
+                AND ((any(calls_merged.op_name) = {pb_1:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+        )
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "x",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "project",
+        },
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_with_expand_columns_falls_back_to_group_by() -> None:
+    """expand_columns disables the flat path even when no filter/query references
+    the expansion -- treat any caller-supplied expansion as opting into rollup.
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        expand_columns=["inputs.model"],
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
         FROM (
             SELECT calls_merged.id AS id
             FROM calls_merged
@@ -4205,13 +4593,65 @@ def test_stats_query_calls_merged_uses_subquery() -> None:
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND
-                ((NOT ((any(calls_merged.started_at) IS NULL))))
+                ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
         )
         """,
         {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
     )
+
+
+def test_stats_query_calls_merged_caller_limit_keeps_setting() -> None:
+    """Caller-supplied limit also triggers the streaming-aggregate setting and
+    `has_more` reflects saturation against the caller's limit. A filter is
+    included so we exercise the GROUP BY path (Pattern 3 short-circuits
+    unfiltered requests).
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        limit=5,
+        filter=tsi.CallsFilter(op_names=["my_op"]),
+    )
+    pb = ParamBuilder("pb")
+    query, _columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    assert settings == {"optimize_aggregation_in_order": 1}
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(count() >= 5) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                   OR (calls_merged.op_name IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND
+                ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+            LIMIT 5
+        )
+        """,
+        {"pb_0": ["my_op"], "pb_1": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
+    """include_total_storage_size needs every row, so no cap and no setting."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        include_total_storage_size=True,
+    )
+    query, _columns, settings = build_calls_stats_query(
+        req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
+    )
+    assert settings == {}
+    assert "LIMIT" not in query
+    assert "toUInt8(0) AS has_more" in query
 
 
 # ---------------------------------------------------------------------------
@@ -4518,7 +4958,7 @@ def test_query_with_reaction_eq_filter_calls_merged() -> None:
             AND coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
             {pb_1:String}), 'null'), '') != ''), {pb_2:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": "wandb.reaction.1",
@@ -4571,7 +5011,7 @@ def test_query_with_note_contains_filter_calls_merged() -> None:
             AND coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
             {pb_1:String}), 'null'), '') != '')))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": "wandb.note.1",
@@ -4620,7 +5060,7 @@ def test_query_with_annotation_filter_still_uses_anyif() -> None:
             feedback.feedback_type = {pb_0:String}),
             {pb_1:String}), 'null'), '') = {pb_2:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": "wandb.annotation.rating",

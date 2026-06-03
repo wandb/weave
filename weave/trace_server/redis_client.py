@@ -42,13 +42,21 @@ def get_redis_client() -> redis.Redis | None:
 
     try:
         parsed = urlparse(url)
-        master = parse_qs(parsed.query).get("master", [None])[0]
+        query = parse_qs(parsed.query)
+        master = query.get("master", [None])[0]
         if not master:
+            # Strip Go-connector query params; redis-py forwards unknowns as kwargs.
+            tls = query.get("tls", [None])[0] == "true"
+            ca_cert_path = query.get("caCertPath", [None])[0]
+            if tls:
+                parsed = parsed._replace(scheme="rediss")
+            clean_url = parsed._replace(query="").geturl()
             return redis.from_url(
-                url,
+                clean_url,
                 decode_responses=True,
                 socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
                 socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
+                ssl_ca_certs=ca_cert_path if tls else None,
             )
 
         if not parsed.hostname:

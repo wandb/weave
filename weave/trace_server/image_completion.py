@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
@@ -5,7 +6,10 @@ from weave.trace_server.base64_content_conversion import store_content_object
 from weave.trace_server.errors import (
     InvalidRequest,
 )
+from weave.trace_server.helpers.url_safety import is_publicly_routable_url
 from weave.type_wrappers.Content.content import Content
+
+logger = logging.getLogger(__name__)
 
 
 def _process_image_data_item(
@@ -20,9 +24,9 @@ def _process_image_data_item(
     Args:
         data_item (dict): The image data item from the API response.
         index (int): The index of this item in the data array.
-        trace_server (Optional[Any]): The trace server instance for file storage.
-        project_id (Optional[str]): The project ID for file storage.
-        wb_user_id (Optional[str]): The user ID for object creation.
+        trace_server (Any | None): The trace server instance for file storage.
+        project_id (str | None): The project ID for file storage.
+        wb_user_id (str | None): The user ID for object creation.
 
     Returns:
         dict: The modified data item with Content object references instead of raw data.
@@ -46,6 +50,12 @@ def _process_image_data_item(
         # Handle URL-based images
         if "url" in data_item and data_item["url"] and trace_server and project_id:
             url = data_item["url"]
+            if not is_publicly_routable_url(url):
+                processed_item["error"] = (
+                    f"refusing to fetch image from disallowed URL at index {index}"
+                )
+                logger.warning("Blocked non-publicly routable url %s", url)
+                return processed_item
             # Use Content.from_url() to handle download and content creation
             content_obj = Content.from_url(
                 url, metadata={"source_index": index, "_original_schema": "url"}
@@ -90,14 +100,14 @@ def lite_llm_image_generation(
     """Generate images using LiteLLM image generation.
 
     Args:
-        api_key (Optional[str]): The API key for the LLM provider.
+        api_key (str | None): The API key for the LLM provider.
         inputs (dict[str, Any]): The input parameters for image generation.
-        provider (Optional[str]): The provider name.
-        base_url (Optional[str]): Custom base URL for the API.
-        extra_headers (Optional[dict[str, str]]): Additional headers.
-        trace_server (Optional[Any]): The trace server instance for file storage.
-        project_id (Optional[str]): The project ID for file storage.
-        wb_user_id (Optional[str]): The user ID for object creation.
+        provider (str | None): The provider name.
+        base_url (str | None): Custom base URL for the API.
+        extra_headers (dict[str, str] | None): Additional headers.
+        trace_server (Any | None): The trace server instance for file storage.
+        project_id (str | None): The project ID for file storage.
+        wb_user_id (str | None): The user ID for object creation.
 
     Returns:
         tsi.ImageGenerationCreateRes: The image generation response.

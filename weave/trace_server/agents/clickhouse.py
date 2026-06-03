@@ -11,34 +11,47 @@ import datetime
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
 from weave.shared import refs_internal as ri
-from weave.trace_server.agents.chat_view import build_trace_chat
+from weave.trace_server.agents.chat_view import (
+    build_trace_chat,
+    first_user_preview_text,
+    last_assistant_preview_text,
+)
 from weave.trace_server.agents.constants import (
+    CONVERSATION_PREVIEW_CHARS,
     MAX_INGEST_ERRORS_REPORTED,
     NO_CONVERSATION_LABEL,
 )
 from weave.trace_server.agents.helpers import (
     genai_span_to_row,
+    messages_from_ch_value,
     normalize_span_row,
     unpack_string_array,
 )
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
     AgentSpanCHInsertable,
+    NormalizedMessage,
 )
 from weave.trace_server.agents.types import (
+    AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
     AgentConversationChatReq,
     AgentConversationChatRes,
+    AgentConversationMessagePreview,
     AgentCustomAttrSchemaItem,
     AgentCustomAttrsSchemaReq,
     AgentCustomAttrsSchemaRes,
+    AgentGroupByRef,
     AgentSchema,
     AgentSearchConversationResult,
     AgentSearchMatchedMessage,
     AgentSearchReq,
     AgentSearchRes,
+    AgentSpanGroupDistributionBin,
+    AgentSpanGroupDistributionItem,
+    AgentSpanGroupDistributionValue,
     AgentSpanGroupRow,
     AgentSpanSchema,
     AgentSpansQueryReq,
@@ -55,26 +68,33 @@ from weave.trace_server.agents.types import (
     AgentVersionsQueryRes,
     GenAIOTelExportReq,
     GenAIOTelExportRes,
+    group_by_ref_alias,
 )
+from weave.trace_server.datadog import record_db_insert
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
-    group_by_ref_alias,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
     make_agents_list_query,
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
+    make_conversation_previews_query,
     make_custom_attrs_schema_query,
     make_message_search_query,
+    make_span_group_categorical_distributions_query,
+    make_span_group_distribution_counts_query,
+    make_span_group_numeric_distributions_query,
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
+    safe_float,
     safe_int,
     safe_str,
+    span_group_distribution_key,
 )
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
@@ -111,6 +131,13 @@ PaginatedReqT = TypeVar(
     AgentConversationChatReq,
 )
 PARAM_NAMESPACE = "genai"
+
+
+class _SpanGroupDistKey(NamedTuple):
+    """Lookup key for distribution items: one per (group row, dist alias)."""
+
+    group_key: str
+    alias: str
 
 
 @dataclass(frozen=True)
@@ -150,7 +177,55 @@ class AgentQueryHandler:
         aliases = [group_by_ref_alias(ref) for ref in req.group_by]
         measure_aliases = [measure.alias for measure in req.measures]
         groups = [_hydrate_group_row(r, aliases, measure_aliases) for r in rows]
+        if req.group_distributions:
+            self._hydrate_group_distributions(req, groups, aliases[0])
+        if _is_conversation_grouping(req.group_by):
+            self._hydrate_conversation_previews(req, groups, aliases[0])
         return AgentSpansQueryRes(groups=groups, total_count=total)
+
+    def _hydrate_conversation_previews(
+        self,
+        req: AgentSpansQueryReq,
+        groups: list[AgentSpanGroupRow],
+        group_alias: str,
+    ) -> None:
+        """Attach first/last message previews to conversation rows.
+
+        Runs a second, bounded query scoped to exactly the conversation_ids on
+        this page so the wide message columns are read only for the displayed
+        conversations — not for every span matching the list filters. Failures
+        are swallowed: previews are best-effort display data and must not fail
+        the list query.
+        """
+        conversation_ids: set[str] = set()
+        for g in groups:
+            cid = g.group_keys.get(group_alias)
+            if isinstance(cid, str) and cid:
+                conversation_ids.add(cid)
+        if not conversation_ids:
+            return
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_conversation_previews_query(
+            pb,
+            req.project_id,
+            conversation_ids,
+            started_after=req.started_after,
+            started_before=req.started_before,
+        )
+        try:
+            rows = _rows_as_dicts(self._query(sql, pb.get_params()))
+        except Exception:
+            logger.exception("failed to hydrate conversation message previews")
+            return
+        previews_by_conv = {
+            safe_str(row.get("conversation_id")): _conversation_preview(row)
+            for row in rows
+        }
+        for g in groups:
+            cid = g.group_keys.get(group_alias)
+            preview = previews_by_conv.get(cid) if isinstance(cid, str) else None
+            if preview is not None:
+                g.first_message, g.last_message = preview
 
     def spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
         """Return chart-ready aggregations over spans."""
@@ -189,6 +264,116 @@ class AgentQueryHandler:
             offset=req.offset,
             has_more=len(rows) > req.limit,
         )
+
+    def _hydrate_group_distributions(
+        self,
+        req: AgentSpansQueryReq,
+        groups: list[AgentSpanGroupRow],
+        group_alias: str,
+    ) -> None:
+        """Attach requested custom attribute distributions to returned groups."""
+        # TODO: Split item setup and row hydration into smaller testable helpers.
+        if not groups:
+            return
+
+        groups_by_key = {
+            span_group_distribution_key(group.group_keys.get(group_alias)): group
+            for group in groups
+        }
+        group_values = [group.group_keys.get(group_alias) for group in groups]
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        counts_sql = make_span_group_distribution_counts_query(pb, req, group_values)
+        total_counts = {
+            safe_str(row.get("group_key")): safe_int(row.get("total_count"))
+            for row in _rows_as_dicts(self._query(counts_sql, pb.get_params()))
+        }
+
+        items: dict[_SpanGroupDistKey, AgentSpanGroupDistributionItem] = {}
+        for group_key, group in groups_by_key.items():
+            for spec in req.group_distributions:
+                total_count = total_counts.get(group_key, 0)
+                source = spec.custom_attr_source()
+                item = AgentSpanGroupDistributionItem(
+                    alias=spec.alias,
+                    source=source,
+                    key=spec.value.key,
+                    value_type=AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES[source],
+                    total_count=total_count,
+                    # Start at total_count; distribution rows below subtract
+                    # present values for groups where the custom attr exists.
+                    missing_count=total_count,
+                )
+                items[_SpanGroupDistKey(group_key, spec.alias)] = item
+                group.distributions[spec.alias] = item
+
+        # TODO: Run the numeric and categorical distribution queries in parallel
+        # — they're independent and each is the slowest piece of this hydrate.
+        numeric_specs = [
+            spec
+            for spec in req.group_distributions
+            if spec.value.source in {"custom_attrs_int", "custom_attrs_float"}
+        ]
+        if numeric_specs:
+            pb = ParamBuilder(PARAM_NAMESPACE)
+            sql = make_span_group_numeric_distributions_query(
+                pb, req, group_values, numeric_specs
+            )
+            for row in _rows_as_dicts(self._query(sql, pb.get_params())):
+                key = _SpanGroupDistKey(
+                    safe_str(row.get("group_key")), safe_str(row.get("alias"))
+                )
+                distribution_item = items.get(key)
+                if distribution_item is None:
+                    continue
+                distribution_item.present_count = safe_int(row.get("present_count"))
+                distribution_item.missing_count = max(
+                    0,
+                    distribution_item.total_count - distribution_item.present_count,
+                )
+                distribution_item.bins.append(
+                    AgentSpanGroupDistributionBin(
+                        index=safe_int(row.get("bucket_index")),
+                        min=safe_float(row.get("bucket_min")),
+                        max=safe_float(row.get("bucket_max")),
+                        count=safe_int(row.get("count")),
+                    )
+                )
+
+        categorical_specs = [
+            spec
+            for spec in req.group_distributions
+            if spec.value.source in {"custom_attrs_string", "custom_attrs_bool"}
+        ]
+        if categorical_specs:
+            pb = ParamBuilder(PARAM_NAMESPACE)
+            sql = make_span_group_categorical_distributions_query(
+                pb, req, group_values, categorical_specs
+            )
+            for row in _rows_as_dicts(self._query(sql, pb.get_params())):
+                key = _SpanGroupDistKey(
+                    safe_str(row.get("group_key")), safe_str(row.get("alias"))
+                )
+                distribution_item = items.get(key)
+                if distribution_item is None:
+                    continue
+                distribution_item.present_count = safe_int(row.get("present_count"))
+                distribution_item.missing_count = max(
+                    0,
+                    distribution_item.total_count - distribution_item.present_count,
+                )
+                distribution_item.values.append(
+                    AgentSpanGroupDistributionValue(
+                        value=safe_str(row.get("value")),
+                        count=safe_int(row.get("count")),
+                    )
+                )
+
+        # Categorical queries return only the top-N values per group; anything
+        # beyond that lands in `other_count` so the UI can show a remainder slice.
+        for item in items.values():
+            if item.values:
+                top_count = sum(value.count for value in item.values)
+                item.other_count = max(0, item.present_count - top_count)
 
     # ------------------------------------------------------------------
     # AMT-backed agents queries
@@ -502,6 +687,7 @@ class AgentWriteHandler:
                 data=[genai_span_to_row(s) for s in span_rows],
                 column_names=ALL_SPAN_INSERT_COLUMNS,
             )
+            record_db_insert(table="spans", count=len(span_rows))
 
         if failure_counts:
             logger.warning(
@@ -635,7 +821,14 @@ def _hydrate_group_row(
         invocation_count=safe_int(row.get("invocation_count")),
         conversation_count=safe_int(row.get("conversation_count")),
         total_input_tokens=safe_int(row.get("total_input_tokens")),
+        total_cache_creation_input_tokens=safe_int(
+            row.get("total_cache_creation_input_tokens")
+        ),
+        total_cache_read_input_tokens=safe_int(
+            row.get("total_cache_read_input_tokens")
+        ),
         total_output_tokens=safe_int(row.get("total_output_tokens")),
+        total_reasoning_tokens=safe_int(row.get("total_reasoning_tokens")),
         total_duration_ms=safe_int(row.get("total_duration_ms")),
         error_count=safe_int(row.get("error_count")),
         agent_names=unpack_string_array(row.get("agent_names")),
@@ -645,8 +838,61 @@ def _hydrate_group_row(
         conversation_names=unpack_string_array(row.get("conversation_names")),
         first_seen=_datetime_or_none(row.get("first_seen")),
         last_seen=_datetime_or_none(row.get("last_seen")),
+        # first_message / last_message are hydrated separately for conversation
+        # groupings via _hydrate_conversation_previews; left None here.
         metrics=metrics,
     )
+
+
+def _is_conversation_grouping(group_by: list[AgentGroupByRef]) -> bool:
+    """Whether this is a single group-by on the conversation_id column.
+
+    Message previews are a per-conversation concept, so we only pay for the
+    second query when the page is grouped by conversation_id alone.
+    """
+    return (
+        len(group_by) == 1
+        and group_by[0].source == "column"
+        and group_by[0].key == "conversation_id"
+    )
+
+
+def _conversation_preview(
+    row: ClickHouseRow,
+) -> tuple[
+    AgentConversationMessagePreview | None, AgentConversationMessagePreview | None
+]:
+    """Return (first_message, last_message) previews from a preview-query row."""
+    return (
+        _message_preview(
+            row.get("first_input_messages"), "user_message", first_user_preview_text
+        ),
+        _message_preview(
+            row.get("last_output_messages"),
+            "assistant_message",
+            last_assistant_preview_text,
+        ),
+    )
+
+
+def _message_preview(
+    raw_messages: object,
+    role: str,
+    extract_text: Callable[[list[NormalizedMessage]], str],
+) -> AgentConversationMessagePreview | None:
+    """Build a truncated message preview from a raw ClickHouse message array.
+
+    `extract_text` applies the same role resolution as the full chat view so
+    previews match what the opened conversation shows. Returns None when no
+    renderable text is present so callers can fall back to the conversation id.
+    """
+    messages = messages_from_ch_value(raw_messages)
+    text = extract_text(messages).strip()
+    if not text:
+        return None
+    if len(text) > CONVERSATION_PREVIEW_CHARS:
+        text = text[:CONVERSATION_PREVIEW_CHARS].rstrip() + "…"
+    return AgentConversationMessagePreview(role=role, text=text)
 
 
 def _datetime_or_none(val: object) -> datetime.datetime | None:

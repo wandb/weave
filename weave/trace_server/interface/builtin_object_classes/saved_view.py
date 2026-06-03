@@ -91,6 +91,14 @@ class SavedViewDefinition(BaseModel):
     # Used by the frontend to persist user-defined column ordering.
     column_order: list[str] | None = Field(default=None)
 
+    # Paths to columns whose values are refs to other objects and that must be
+    # dereferenced for filtering / sorting / display to work. Mirrors the
+    # `expand_columns` field of `CallsQueryReq` — when a saved view filters on
+    # a sub-field of a referenced object (e.g. `inputs.self.base_model_name`),
+    # the parent ref path (`inputs.self`) must be in this list so the trace
+    # server joins through to the referenced object at query time.
+    expand_columns: list[str] | None = Field(default=None)
+
     header_depth: int | None = Field(default=None)
 
     pin: Pin | None = Field(default=None)
