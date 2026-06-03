@@ -162,13 +162,12 @@ class RemoteScorer(Scorer):
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
-        """Reconstruct from a stored object, unwrapping nested config models.
+        """Rebuild a RemoteScorer from its stored representation.
 
-        The base ``Scorer.from_obj`` rebuilds via per-field ``getattr``, which
-        leaves a nested ``auth_config`` as a ``WeaveObject`` that the
-        ``extra="forbid"`` auth-config union rejects. ``unwrap()`` recursively
-        flattens nested ``WeaveObject``s to plain dicts (as ``Monitor.from_obj``
-        does for its ``query``), so ``auth_config`` deserializes correctly.
+        ``unwrap()`` converts the stored object — including nested fields such
+        as ``auth_config`` — back into plain Python values before validation.
+        Without it, a nested ``auth_config`` arrives wrapped and fails to
+        validate.
         """
         return cls.model_validate(obj.unwrap())
 
