@@ -23,7 +23,7 @@ from weave.trace_server.ttl_settings import compute_expire_at
 
 logger = logging.getLogger(__name__)
 
-PLAYGROUND_AGENT_NAME = "playground"
+PLAYGROUND_AGENT_NAME = "Weave Chat Playground"
 
 
 def build_completion_span(
