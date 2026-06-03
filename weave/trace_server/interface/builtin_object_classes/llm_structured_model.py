@@ -188,6 +188,7 @@ class LLMStructuredCompletionModel(Model):
             IndexError,
             TypeError,
             AttributeError,
+            ValueError,
             json.JSONDecodeError,
         ) as e:
             raise RuntimeError(
@@ -266,17 +267,52 @@ class LLMStructuredCompletionModel(Model):
 def parse_response(
     response_payload: dict, response_format: ResponseFormat | None
 ) -> Message | str | dict[str, Any]:
+    """Extract the model output from an LLM completion response payload.
+
+    Raises:
+        RuntimeError: the provider returned a top-level `error` field.
+        ValueError: the payload is malformed (missing choices/message), the
+            content is None/empty, or json_object parsing failed.
+    """
     if response_payload.get("error"):
-        # Or handle more gracefully depending on desired behavior
         raise RuntimeError(f"LLM API returned an error: {response_payload['error']}")
 
-    # Assuming OpenAI-like structure: a list of choices, first choice has the message
-    output_message_dict = response_payload["choices"][0]["message"]
+    choices = response_payload.get("choices")
+    if not choices:
+        raise ValueError(
+            "LLM response is missing 'choices' -> the upstream call likely failed "
+            "(invalid API key, content filtering, or provider error). "
+            f"Response keys: {sorted(response_payload.keys())}"
+        )
+
+    message = choices[0].get("message") if isinstance(choices[0], dict) else None
+    if not isinstance(message, dict):
+        raise TypeError(
+            f"LLM response choice did not contain a message dict: {choices[0]!r}"
+        )
+    content = message.get("content")
 
     if response_format == "text":
-        return output_message_dict["content"]
+        if content is None:
+            raise ValueError(
+                "LLM response content is None -> the model returned no text. "
+                "Check your API key, model config, and content filtering settings."
+            )
+        return content
     elif response_format == "json_object":
-        return json.loads(output_message_dict["content"])
+        if content is None or (isinstance(content, str) and not content.strip()):
+            raise ValueError(
+                "LLM response content was empty when JSON output was requested. "
+                "Check your API key and that the model supports JSON mode."
+            )
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as e:
+            snippet = content if len(content) <= 200 else content[:200] + "..."
+            raise ValueError(
+                f"LLM response was not valid JSON (response_format=json_object). "
+                f"Content snippet: {snippet!r}"
+            ) from e
     else:
         raise ValueError(f"Invalid response_format: {response_format}")
 

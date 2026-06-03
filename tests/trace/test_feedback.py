@@ -362,6 +362,53 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "scorer_rating_confidences": {},
     }
 
+    # Runnable scorer feedback may also populate typed scorer columns while
+    # keeping the raw scorer output in payload for backwards compatibility.
+    typed_weave_ref = f"weave:///{project_id}/call/call_id_456"
+    typed_create_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=typed_weave_ref,
+            feedback_type=feedback_type,
+            payload={"output": {"passed": False}},
+            runnable_ref=runnable_ref,
+            call_ref=call_ref,
+            trigger_ref=trigger_ref,
+            scorer_tags=["unsafe"],
+            scorer_tag_reasons={"unsafe": "contains disallowed content"},
+            scorer_tag_confidences={"unsafe": 0.91},
+            scorer_ratings={"_rating_": 0.2},
+            scorer_rating_reasons={"_rating_": "low quality response"},
+            scorer_rating_confidences={"_rating_": 0.88},
+        )
+    )
+
+    typed_query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "id"},
+                            {"$literal": typed_create_res.id},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert len(typed_query_res.result) == 1
+    typed_row = typed_query_res.result[0]
+    assert typed_row["feedback_type"] == feedback_type
+    assert typed_row["payload"] == {"output": {"passed": False}}
+    assert typed_row["scorer_tags"] == ["unsafe"]
+    assert typed_row["scorer_tag_reasons"] == {"unsafe": "contains disallowed content"}
+    assert typed_row["scorer_tag_confidences"] == {"unsafe": 0.91}
+    assert typed_row["scorer_ratings"] == {"_rating_": 0.2}
+    assert typed_row["scorer_rating_reasons"] == {"_rating_": "low quality response"}
+    assert typed_row["scorer_rating_confidences"] == {"_rating_": 0.88}
+
 
 def test_agent_monitor_feedback(client: WeaveClient) -> None:
     """End-to-end create/query for wandb.agent_monitor feedback with typed scorer columns."""
@@ -411,8 +458,8 @@ def test_agent_monitor_feedback(client: WeaveClient) -> None:
             )
         )
 
-    # Case 4: scorer_* fields rejected on non-agent-monitor feedback types
-    # (non-empty value).
+    # Case 4: scorer_* fields rejected on feedback that is neither agent-monitor
+    # nor runnable (non-empty value).
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(

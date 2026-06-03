@@ -47,20 +47,26 @@
   - Creates `view_name_local` ON CLUSTER with `TO target_table_local`
   - All `FROM` clauses and qualified column references renamed to `_local` suffix
 
-**CREATE VIEW and CREATE MATERIALIZED VIEW:**
-  - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
-  - Note: In distributed mode, materialized views from initial CREATE statements should reference
-    base tables (not _local), as the migrator doesn't transform initial CREATE statements
+**CREATE VIEW (non-materialized):**
+  - Only adds `ON CLUSTER` clause (regular views are metadata-only, no local/distributed split)
+
+**CREATE MATERIALIZED VIEW:**
+  - Rewrites to create only the local-targeted variant (`view_name_local`):
+    `FROM source` becomes `FROM source_local`, `TO target` becomes `TO target_local`.
+  - The original Distributed-source/target MV is NOT created. Otherwise inserts
+    into the Distributed source fire BOTH MVs (one on the initiator via the
+    Distributed source, one on the target shard via the local source) and produce
+    two derived rows per source row.
 
 **DROP TABLE:**
   - Drops both `table_name_local` AND `table_name`
   - Ensures complete cleanup of both local and distributed tables
 
 **DROP VIEW:**
-  - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
-  - Works identically to replicated mode
-  - Note: For materialized views that were modified via ALTER TABLE MODIFY QUERY,
-    you must drop the `_local` version explicitly (e.g., `DROP VIEW view_name_local`)
+  - Adds `ON CLUSTER` and ALSO drops the `_local` twin (`DROP VIEW IF EXISTS`).
+  - Plain views have no `_local` twin so the second statement is a no-op.
+  - Materialized views in distributed mode exist only as the `_local` variant,
+    so dropping the bare name is also a no-op but is kept for legacy DBs.
 
 **INSERT INTO:**
   - Skipped entirely (backfill not supported for distributed tables; handle per-shard)
@@ -82,6 +88,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from re import Pattern
+from typing import TypedDict
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
@@ -102,9 +109,10 @@ from weave.trace_server.database_engine import (
 )
 from weave.trace_server.environment import wf_clickhouse_calls_shard_key
 from weave.trace_server.migration_lock import (
+    LOCK_ROW_GC_SECONDS,
     LOCK_TABLE,
     LOCK_TABLE_COLUMNS,
-    LOCK_TTL_SECONDS,
+    add_heartbeat_column_sql,
     create_lock_table_sql,
     migration_lock,
 )
@@ -156,14 +164,25 @@ _MIGRATIONS_TABLE_COLUMNS = """
 # Valid values: "trace_id" (default), "id", "project_id"
 ID_SHARDED_TABLES: dict[str, str] = {
     "calls_complete": wf_clickhouse_calls_shard_key(),
-    # Keep one trace/turn on one shard. This matches the default calls sharding
-    # key and keeps trace detail reads local.
+    # call_parts (call_start/call_end rows) must shard by `id`, not `trace_id`:
+    # call_end rows don't carry trace_id (only call_start does), so sharding by
+    # trace_id sends them via rand() and they land on a different shard than
+    # the matching call_start. Without co-location the partial states never
+    # merge, and queries that filter on aggregated columns (e.g. parent_id IS
+    # NULL for trace_roots_only) match the call_end row of every child call.
+    "call_parts": "id",
     "spans": "trace_id",
     "messages": "trace_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",
     "agent_versions": "project_id, agent_name",
+    # Files are chunked: `_file_content_read_once` selects all rows for a
+    # (project_id, digest) and checks the count against `n_chunks`. With
+    # rand() sharding chunks land on different shards, so any per-shard
+    # replication lag manifests as "Missing chunks". Co-locate chunks of
+    # one file on one shard so the read sees an atomic set.
+    "files": "project_id, digest",
 }
 
 
@@ -183,6 +202,13 @@ def _default_trace_server_costs_post_migration_hook(
 ) -> None:
     if should_insert_costs(ctx.current_version, ctx.target_version):
         insert_costs(ctx.ch_client, ctx.target_db)
+
+
+class MigrationStatus(TypedDict):
+    """Current schema version of a database, read from the migrations table."""
+
+    curr_version: int
+    partially_applied_version: int | None
 
 
 class BaseClickHouseTraceServerMigrator(ABC):
@@ -205,12 +231,14 @@ class BaseClickHouseTraceServerMigrator(ABC):
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         super().__init__()
         self.ch_client = ch_client
         self.management_db = management_db
         self.migration_dir = self._resolve_migration_dir(migration_dir)
         self.post_migration_hook = post_migration_hook
+        self._heartbeat_client_factory = heartbeat_client_factory
         self._initialize_migration_db()
 
     def _uses_replicated_db_engine(self, db_name: str) -> bool:
@@ -279,8 +307,58 @@ class BaseClickHouseTraceServerMigrator(ABC):
             target_db: The database to migrate
             target_version: The target version to migrate to (None = latest)
         """
-        with migration_lock(self.ch_client, self.management_db):
+        # Lock-free pre-check: on a rolling deploy N replicas call this
+        # concurrently. If there is nothing to apply, skip the lock entirely so
+        # they do not serialize through it just to discover there is no work.
+        if not self._has_migrations_to_apply(target_db, target_version):
+            logger.info("No migrations to apply to `%s`; skipping lock", target_db)
+            return
+        with migration_lock(
+            self.ch_client,
+            self.management_db,
+            heartbeat_client_factory=self._heartbeat_client_factory,
+        ):
             self._apply_migrations_locked(target_db, target_version)
+
+    def _has_migrations_to_apply(
+        self, target_db: str, target_version: int | None = None
+    ) -> bool:
+        """Read-only check (no lock, no writes) for pending schema migrations.
+
+        Returns True when migrations are pending or a partial migration needs
+        attention, so the locked path can surface it as an error.
+        """
+        status = self._read_migration_status(target_db)
+        if status["partially_applied_version"] is not None:
+            return True
+        migration_map = self._get_migrations()
+        return (
+            len(
+                self._determine_migrations_to_apply(
+                    status["curr_version"], migration_map, target_version
+                )
+            )
+            > 0
+        )
+
+    def _read_migration_status(self, db_name: str) -> MigrationStatus:
+        """Read migration status without writing.
+
+        Unlike `_get_migration_status`, this never seeds a row, so it is safe to
+        call without the lock. Returns curr_version=0 when no row exists yet.
+        """
+        query = (
+            f"SELECT curr_version, partially_applied_version "
+            f"FROM {self.management_db}.migrations WHERE db_name = %(db_name)s"
+        )
+        res = self.ch_client.query(query, parameters={"db_name": db_name})
+        if not res.result_rows:
+            return {"curr_version": 0, "partially_applied_version": None}
+        curr_version, partially_applied_version = res.result_rows[0]
+        return {
+            "curr_version": curr_version,
+            "partially_applied_version": partially_applied_version,
+        }
 
     def _apply_migrations_locked(
         self, target_db: str, target_version: int | None = None
@@ -335,6 +413,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self._run_ddl_with_retry(create_table_sql)
         lock_table_sql = self._create_lock_table_sql()
         self._run_ddl_with_retry(lock_table_sql)
+        # Evolve lock tables created before `heartbeat_at` existed. Idempotent
+        # (ADD COLUMN IF NOT EXISTS), so it is a no-op on fresh tables.
+        self._run_ddl_with_retry(self._evolve_lock_table_sql())
 
     def _create_lock_table_sql(self) -> str:
         """Generate SQL for the migration lock table.
@@ -342,6 +423,13 @@ class BaseClickHouseTraceServerMigrator(ABC):
         Subclasses that need ON CLUSTER or Replicated engines override this.
         """
         return create_lock_table_sql(self.management_db)
+
+    def _evolve_lock_table_sql(self) -> str:
+        """Idempotent ALTER bringing an existing lock table to the current schema.
+
+        Subclasses that need ON CLUSTER or Replicated engines override this.
+        """
+        return add_heartbeat_column_sql(self.management_db)
 
     def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -581,6 +669,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         self.replicated_path = (
             DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
@@ -612,6 +701,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            heartbeat_client_factory=heartbeat_client_factory,
         )
 
     def _uses_replicated_db_engine(self, db_name: str) -> bool:
@@ -726,6 +816,11 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     def _create_lock_table_sql(self) -> str:
         """Generate SQL for the lock table, adapted for the management DB engine."""
         base_sql = create_lock_table_sql(self.management_db)
+        return self._prepare_ddl_for_database(base_sql, self.management_db)
+
+    def _evolve_lock_table_sql(self) -> str:
+        """ALTER the lock table, adapted for the management DB engine."""
+        base_sql = add_heartbeat_column_sql(self.management_db)
         return self._prepare_ddl_for_database(base_sql, self.management_db)
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
@@ -864,6 +959,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         logger.info(
             "%s DistributedClickHouseTraceServerMigrator initialized",
@@ -876,6 +972,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            heartbeat_client_factory=heartbeat_client_factory,
         )
 
     def _create_db_sql(self, db_name: str) -> str:
@@ -950,7 +1047,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             ({LOCK_TABLE_COLUMNS})
             ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/{LOCK_TABLE}', '{{shard}}-{{replica}}')
             ORDER BY lock_id
-            TTL toDateTime(acquired_at) + INTERVAL {LOCK_TTL_SECONDS} SECOND
+            TTL toDateTime(heartbeat_at) + INTERVAL {LOCK_ROW_GC_SECONDS} SECOND
         """
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
@@ -985,7 +1082,16 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 self._execute_distributed_rename(command)
                 return
 
-            # Handle CREATE/DROP VIEW (no local/distributed split, just add ON CLUSTER)
+            # Handle CREATE MATERIALIZED VIEW: rewrite to create only the
+            # local-source / local-target variant. See module docstring.
+            if SQLPatterns.CREATE_MATERIALIZED_VIEW_STMT.search(command_for_match):
+                if self._uses_replicated_db_engine(target_db):
+                    self._run_ddl_with_retry(command)
+                else:
+                    self._execute_materialized_view_create(command)
+                return
+
+            # Handle CREATE VIEW (non-materialized) / DROP VIEW: just add ON CLUSTER.
             if SQLPatterns.CREATE_VIEW_STMT.search(
                 command_for_match
             ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
@@ -993,12 +1099,17 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 # and handles DDL replication — skip explicit engine conversion and ON CLUSTER.
                 if self._uses_replicated_db_engine(target_db):
                     formatted_command = command
-                else:
-                    formatted_command = self._format_replicated_sql(command)
-                    formatted_command = self._add_on_cluster_clause(
-                        formatted_command, target_db=target_db
-                    )
+                    self._run_ddl_with_retry(formatted_command)
+                    return
+                formatted_command = self._format_replicated_sql(command)
+                formatted_command = self._add_on_cluster_clause(
+                    formatted_command, target_db=target_db
+                )
                 self._run_ddl_with_retry(formatted_command)
+                # For DROP VIEW: also drop the `_local` twin in case this was a
+                # materialized view. IF EXISTS makes it a no-op for plain views.
+                if SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
+                    self._drop_local_view_twin(command_for_match, target_db)
                 return
 
             # Engine handling matrix for distributed local tables:
@@ -1122,6 +1233,49 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
 
         create_statement = f"CREATE MATERIALIZED VIEW {view_name_local}{on_cluster}\nTO {target_table}\nAS\n{select_query_local}"
         self._run_ddl_with_retry(create_statement)
+
+    def _execute_materialized_view_create(self, command: str) -> None:
+        """Handle CREATE MATERIALIZED VIEW in distributed mode.
+
+        Rewrites `view_name` → `view_name_local`, `TO target` → `TO target_local`,
+        and all `FROM source` references in the SELECT body to `FROM source_local`.
+        Skips creating the original Distributed-source/target MV.
+        """
+        match = SQLPatterns.CREATE_MATERIALIZED_VIEW_FULL.search(command)
+        if not match:
+            raise MigrationError(
+                f"Could not parse CREATE MATERIALIZED VIEW (expected `<view> TO <target> AS SELECT` form): {command}"
+            )
+        view_name = match.group(1)
+        target_table = match.group(2)
+        select_query = match.group(3).strip().rstrip(";").rstrip()
+
+        view_name_local = self._add_local_suffix(view_name)
+        target_table_local = self._add_local_suffix(target_table)
+        select_query_local = self._rename_from_tables_to_local(select_query)
+
+        on_cluster = self._get_on_cluster_clause(self.ch_client.database)
+        self._run_ddl_with_retry(f"DROP TABLE IF EXISTS {view_name_local}{on_cluster}")
+        self._run_ddl_with_retry(
+            f"CREATE MATERIALIZED VIEW {view_name_local}{on_cluster}\n"
+            f"TO {target_table_local}\n"
+            f"AS\n{select_query_local}"
+        )
+
+    def _drop_local_view_twin(self, command_for_match: str, target_db: str) -> None:
+        """After DROP VIEW <name>, also drop `<name>_local` if present.
+
+        Materialized views in distributed mode exist only as `<name>_local`, so
+        the bare-name DROP doesn't actually delete the MV unless we follow up
+        with the local twin. IF EXISTS makes this a no-op for plain views.
+        """
+        drop_match = SQLPatterns.DROP_TABLE_OR_VIEW.search(command_for_match)
+        if not drop_match:
+            return
+        object_name = drop_match.group(2)
+        local_name = self._add_local_suffix(object_name)
+        on_cluster = self._get_on_cluster_clause(target_db)
+        self._run_ddl_with_retry(f"DROP VIEW IF EXISTS {local_name}{on_cluster}")
 
     def _execute_local_table_operation(self, command: str) -> None:
         """Execute operations that only apply to local tables (indexes, mutations)."""
@@ -1338,6 +1492,7 @@ def get_clickhouse_trace_server_migrator(
     migration_dir: str | None = None,
     post_migration_hook: PostMigrationHook
     | None = _default_trace_server_costs_post_migration_hook,
+    heartbeat_client_factory: Callable[[], CHClient] | None = None,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
 
@@ -1398,6 +1553,7 @@ def get_clickhouse_trace_server_migrator(
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            heartbeat_client_factory=heartbeat_client_factory,
         )
     if replicated:
         return ReplicatedClickHouseTraceServerMigrator(
@@ -1407,6 +1563,7 @@ def get_clickhouse_trace_server_migrator(
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            heartbeat_client_factory=heartbeat_client_factory,
         )
 
     return CloudClickHouseTraceServerMigrator(
@@ -1414,6 +1571,7 @@ def get_clickhouse_trace_server_migrator(
         management_db,
         migration_dir=migration_dir,
         post_migration_hook=post_migration_hook,
+        heartbeat_client_factory=heartbeat_client_factory,
     )
 
 
@@ -1449,6 +1607,14 @@ class SQLPatterns:
     RENAME_TABLE_STMT: Pattern = re.compile(r"\bRENAME\s+TABLE\b", re.IGNORECASE)
     CREATE_VIEW_STMT: Pattern = re.compile(
         r"\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\b", re.IGNORECASE
+    )
+    CREATE_MATERIALIZED_VIEW_STMT: Pattern = re.compile(
+        r"\bCREATE\s+MATERIALIZED\s+VIEW\b", re.IGNORECASE
+    )
+    CREATE_MATERIALIZED_VIEW_FULL: Pattern = re.compile(
+        r"CREATE\s+MATERIALIZED\s+VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+        r"([a-zA-Z0-9_.]+)\s+TO\s+([a-zA-Z0-9_.]+)\s+AS\s+(SELECT.+)",
+        re.IGNORECASE | re.DOTALL,
     )
     DROP_TABLE_OR_VIEW: Pattern = re.compile(
         r"\bDROP\s+(TABLE|VIEW)\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_.]+)", re.IGNORECASE

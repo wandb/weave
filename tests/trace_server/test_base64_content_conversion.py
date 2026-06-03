@@ -347,10 +347,10 @@ class TestStandaloneBase64Detection:
         # Verify file_create was called twice (content + metadata)
         assert trace_server.file_create.call_count == 2
 
-        # Verify the content mimetype is audio/wav (not text/plain or application/octet-stream)
+        # Detected audio/x-wav is normalized to canonical audio/wav.
         metadata_call = trace_server.file_create.call_args_list[1][0][0]
         metadata = json.loads(metadata_call.content)
-        assert metadata["mimetype"] in {"audio/wav", "audio/x-wav", "audio/wave"}
+        assert metadata["mimetype"] == "audio/wav"
 
 
 class TestThresholdAndStructuralIdentity:

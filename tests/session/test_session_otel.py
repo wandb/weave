@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import base64
 import json
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from opentelemetry import trace as otel_trace
@@ -390,17 +390,13 @@ class TestLLMAttributes:
         assert "finish_reason" not in raw[0]
         assert raw[1]["finish_reason"] == "length"
 
-    def test_attach_media_blob_serialized_as_blob_part(self) -> None:
+    def test_attach_media_serialized_as_uri_part(self) -> None:
+        ref = "weave:///test/project/object/img:v1"
         attrs = llm_attributes(
             model="gpt-4o",
             input_messages=[Message(role="user", content="what is this?")],
             media_attachments=[
-                MediaAttachment(
-                    kind="blob",
-                    modality="image",
-                    mime_type="image/png",
-                    content=b"\x89PNG",
-                )
+                MediaAttachment(ref=ref, modality="image", mime_type="image/png")
             ],
         )
         raw = json.loads(attrs["gen_ai.input.messages"])
@@ -410,59 +406,29 @@ class TestLLMAttributes:
                 "parts": [
                     {"type": "text", "content": "what is this?"},
                     {
-                        "type": "blob",
+                        "type": "uri",
                         "mime_type": "image/png",
                         "modality": "image",
-                        "content": base64.b64encode(b"\x89PNG").decode("ascii"),
+                        "uri": ref,
                     },
                 ],
             }
         ]
 
-    def test_attach_media_uri_serialized_as_uri_part(self) -> None:
+    def test_content_refs_emitted(self) -> None:
+        ref = "weave:///test/project/object/img:v1"
         attrs = llm_attributes(
             model="gpt-4o",
             input_messages=[Message(role="user", content="describe")],
             media_attachments=[
-                MediaAttachment(
-                    kind="uri",
-                    modality="image",
-                    mime_type="image/jpeg",
-                    uri="https://example.com/photo.jpg",
-                )
+                MediaAttachment(ref=ref, modality="image", mime_type="image/jpeg")
             ],
         )
-        raw = json.loads(attrs["gen_ai.input.messages"])
-        assert raw[0]["parts"][1] == {
-            "type": "uri",
-            "mime_type": "image/jpeg",
-            "modality": "image",
-            "uri": "https://example.com/photo.jpg",
-        }
-
-    def test_attach_media_file_serialized_as_file_part(self) -> None:
-        attrs = llm_attributes(
-            model="gpt-4o",
-            input_messages=[Message(role="user", content="transcribe")],
-            media_attachments=[
-                MediaAttachment(
-                    kind="file",
-                    modality="audio",
-                    mime_type="audio/wav",
-                    file_id="file-abc",
-                )
-            ],
-        )
-        raw = json.loads(attrs["gen_ai.input.messages"])
-        assert raw[0]["parts"][1] == {
-            "type": "file",
-            "mime_type": "audio/wav",
-            "modality": "audio",
-            "file_id": "file-abc",
-        }
+        assert attrs["weave.content_refs"] == [ref]
 
     def test_media_attached_to_last_user_message(self) -> None:
         """When multiple user messages exist, media goes on the most recent one."""
+        ref = "weave:///test/project/object/img:v1"
         attrs = llm_attributes(
             model="gpt-4o",
             input_messages=[
@@ -471,9 +437,7 @@ class TestLLMAttributes:
                 Message(role="user", content="last"),
             ],
             media_attachments=[
-                MediaAttachment(
-                    kind="uri", modality="image", mime_type="image/png", uri="u"
-                )
+                MediaAttachment(ref=ref, modality="image", mime_type="image/png")
             ],
         )
         raw = json.loads(attrs["gen_ai.input.messages"])
@@ -491,33 +455,32 @@ class TestLLMAttributes:
         SDK's contract is that media decorates a user message, and a
         media-only LLM call is degenerate.
         """
+        ref = "weave:///test/project/object/img:v1"
         attrs = llm_attributes(
             model="gpt-4o",
             media_attachments=[
-                MediaAttachment(
-                    kind="uri", modality="image", mime_type="image/png", uri="u"
-                )
+                MediaAttachment(ref=ref, modality="image", mime_type="image/png")
             ],
         )
         assert "gen_ai.input.messages" not in attrs
+        assert attrs["weave.content_refs"] == [ref]
 
     def test_multiple_media_all_on_last_user_message(self) -> None:
+        ref1 = "weave:///test/project/object/img1:v1"
+        ref2 = "weave:///test/project/object/img2:v1"
         attrs = llm_attributes(
             model="gpt-4o",
             input_messages=[Message(role="user", content="hi")],
             media_attachments=[
-                MediaAttachment(
-                    kind="uri", modality="image", mime_type="image/png", uri="u1"
-                ),
-                MediaAttachment(
-                    kind="uri", modality="image", mime_type="image/png", uri="u2"
-                ),
+                MediaAttachment(ref=ref1, modality="image", mime_type="image/png"),
+                MediaAttachment(ref=ref2, modality="image", mime_type="image/png"),
             ],
         )
         raw = json.loads(attrs["gen_ai.input.messages"])
         assert len(raw[0]["parts"]) == 3  # text + 2 media
-        assert raw[0]["parts"][1]["uri"] == "u1"
-        assert raw[0]["parts"][2]["uri"] == "u2"
+        assert raw[0]["parts"][1]["uri"] == ref1
+        assert raw[0]["parts"][2]["uri"] == ref2
+        assert attrs["weave.content_refs"] == [ref1, ref2]
 
     def test_system_instructions_serialized_as_text_parts(self) -> None:
         attrs = llm_attributes(
@@ -843,15 +806,9 @@ class TestExplicitMessageParts:
 
     def test_media_attachments_appended_to_explicit_parts(self) -> None:
         """media_attachments still extend the last user message even with explicit parts."""
+        ref = "weave:///test/project/object/img:v1"
         msg = Message(role="user", parts=[TextPart(content="see this")])
-        media = [
-            MediaAttachment(
-                kind="uri",
-                modality="image",
-                mime_type="image/png",
-                uri="https://example.com/x.png",
-            )
-        ]
+        media = [MediaAttachment(ref=ref, modality="image", mime_type="image/png")]
         attrs = llm_attributes(
             model="gpt-4o", input_messages=[msg], media_attachments=media
         )
@@ -1784,47 +1741,36 @@ class TestMessageBuilders:
 class TestAttachMediaUrl:
     """LLM.attach_media_url handles data: and plain URLs uniformly."""
 
+    _FAKE_REF = "weave:///e/p/object/c:v1"
+
+    @pytest.fixture(autouse=True)
+    def _mock_publish(self) -> None:
+        with patch(
+            "weave.session.session._publish_media_content",
+            return_value=self._FAKE_REF,
+        ):
+            yield  # type: ignore[misc]
+
     @pytest.mark.parametrize(
-        (
-            "url",
-            "expected_kind",
-            "expected_mime",
-            "expected_payload_field",
-            "expected_payload",
-        ),
+        ("url", "expected_mime"),
         [
-            (
-                "data:image/png;base64,iVBORw0KGgo=",
-                "blob",
-                "image/png",
-                "content",
-                "iVBORw0KGgo=",
-            ),
-            (
-                "https://example.com/cat.png",
-                "uri",
-                "",
-                "uri",
-                "https://example.com/cat.png",
-            ),
+            ("data:image/png;base64,iVBORw0KGgo=", "image/png"),
+            ("https://example.com/cat.png", ""),
         ],
-        ids=["data_url_blob", "plain_url_uri"],
+        ids=["data_url", "plain_url"],
     )
-    def test_url_dispatches_to_blob_or_uri(
+    def test_url_produces_weave_ref(
         self,
         url: str,
-        expected_kind: str,
         expected_mime: str,
-        expected_payload_field: str,
-        expected_payload: str,
     ) -> None:
         llm = LLM()
         llm.attach_media_url(url, modality="image")
+        llm._await_uploads()
         (att,) = llm.media_attachments
-        assert att.kind == expected_kind
+        assert att.ref.startswith("weave:///")
         assert att.mime_type == expected_mime
         assert att.modality == "image"
-        assert getattr(att, expected_payload_field) == expected_payload
 
     def test_data_url_modality_inferred_from_mime(self) -> None:
         """Modality auto-fills from mime_type when not provided."""
@@ -1833,6 +1779,7 @@ class TestAttachMediaUrl:
         att = llm.media_attachments[0]
         assert att.modality == "image"
         assert att.mime_type == "image/jpeg"
+        llm._await_uploads()
 
     def test_empty_url_ignored(self) -> None:
         llm = LLM()
@@ -1844,6 +1791,7 @@ class TestAttachMediaUrl:
         llm = LLM()
         result = llm.attach_media_url("https://e.com/a.png", modality="image")
         assert result is llm
+        llm._await_uploads()
 
 
 class TestLLMRecord:
@@ -2133,64 +2081,53 @@ class TestMessageFromOpenAIResponsesInput:
         assert [m["role"] for m in out] == ["user"]
 
     @pytest.mark.parametrize(
-        ("block", "expected_part"),
+        "block",
         [
-            (
-                {
-                    "type": "input_image",
-                    "image_url": "data:image/png;base64,iVBORw0KGgo=",
-                },
-                {
-                    "type": "blob",
-                    "mime_type": "image/png",
-                    "modality": "image",
-                    "content": "iVBORw0KGgo=",
-                },
-            ),
-            (
-                {"type": "image_url", "image_url": {"url": "https://e.com/cat.png"}},
-                {
-                    "type": "uri",
-                    "mime_type": "",
-                    "modality": "image",
-                    "uri": "https://e.com/cat.png",
-                },
-            ),
+            {"type": "input_image", "image_url": "data:image/png;base64,iVBORw0KGgo="},
+            {"type": "image_url", "image_url": {"url": "https://e.com/cat.png"}},
         ],
-        ids=["data_url_blob", "plain_url_uri"],
+        ids=["data_url", "plain_url"],
     )
     def test_image_only_user_message_attaches_media(
         self,
         otel_spans: InMemorySpanExporter,
         block: dict,
-        expected_part: dict,
     ) -> None:
         """Image-only user messages must keep a Message slot so the
         attachment binds to the right user turn on the wire.
         """
-        out = self._input_messages_attr(
-            otel_spans, [{"role": "user", "content": [block]}]
-        )
+        with patch(
+            "weave.session.adapters.openai._publish_media_content",
+            return_value="weave:///e/p/object/img:v1",
+        ):
+            out = self._input_messages_attr(
+                otel_spans, [{"role": "user", "content": [block]}]
+            )
         assert len(out) == 1
         assert out[0]["role"] == "user"
-        # No text part (empty content), just the media part.
-        assert out[0]["parts"] == [expected_part]
+        part = out[0]["parts"][0]
+        assert part["type"] == "uri"
+        assert part["uri"].startswith("weave:///")
 
     def test_duplicate_image_urls_deduplicated(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
-        out = self._input_messages_attr(
-            otel_spans,
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_image", "image_url": "https://e.com/a.png"},
-                        {"type": "input_image", "image_url": "https://e.com/a.png"},
-                    ],
-                }
-            ],
-        )
+        with patch(
+            "weave.session.adapters.openai._publish_media_content",
+            return_value="weave:///e/p/object/img:v1",
+        ):
+            out = self._input_messages_attr(
+                otel_spans,
+                [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_image", "image_url": "https://e.com/a.png"},
+                            {"type": "input_image", "image_url": "https://e.com/a.png"},
+                        ],
+                    }
+                ],
+            )
         assert out == [
             {
                 "role": "user",
@@ -2199,7 +2136,7 @@ class TestMessageFromOpenAIResponsesInput:
                         "type": "uri",
                         "mime_type": "",
                         "modality": "image",
-                        "uri": "https://e.com/a.png",
+                        "uri": "weave:///e/p/object/img:v1",
                     }
                 ],
             }

@@ -11,12 +11,13 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from re import sub
-from typing import Any, TypeVar, cast
+from typing import Any, NamedTuple, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
 from cachetools import TTLCache
+from clickhouse_connect import common as ch_common
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
@@ -295,11 +296,16 @@ from weave.trace_server.trace_server_common import (
     LRUCache,
     apply_tags_and_synth_latest_in_place,
     determine_call_status,
+    eval_run_refs_from_call,
     get_nested_key,
     hydrate_calls_with_feedback,
     make_feedback_query_req,
     set_nested_key,
     try_parse_json,
+)
+from weave.trace_server.trace_server_interface import (
+    EvaluateModelArgs,
+    RescoringArgs,
 )
 from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
@@ -307,7 +313,6 @@ from weave.trace_server.ttl_settings import (
     invalidate_ttl_cache,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
-    EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
 
@@ -344,6 +349,10 @@ OBJ_READ_RETRY_ATTEMPTS = 3
 _CH_POOL_MANAGER = get_pool_manager(
     maxsize=CH_POOL_MAX_CONNECTIONS, num_pools=CH_POOL_COUNT
 )
+
+# Send query settings to the server instead of rejecting them against the client's
+# cached server_settings map, which is poisoned when minted during a CH degradation.
+ch_common.set_setting("invalid_setting_action", "send")
 
 
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
@@ -549,9 +558,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             str: Table name to use for UPDATE statements.
         """
+        return self._mutation_table_name("calls_complete")
+
+    def _mutation_table_name(self, table: str) -> str:
+        """Resolve the concrete mutation target for `table`.
+
+        Lightweight UPDATE/DELETE don't run on Distributed engines, so
+        distributed mode targets `{table}_local` and lets `ON CLUSTER`
+        fan the mutation across shards via Keeper.
+        """
         if self.use_distributed_mode:
-            return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
-        return "calls_complete"
+            return f"{table}{ch_settings.LOCAL_TABLE_SUFFIX}"
+        return table
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -2684,8 +2702,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         res = self.table_query_stats_batch(batch_req)
 
-        if len(res.tables) != 1:
-            logger.exception(RuntimeError("Unexpected number of results", res))
+        if len(res.tables) == 0:
+            logger.warning("No table_query_stats results for digest %s", req.digest)
+            return tsi.TableQueryStatsRes(count=0)
 
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)
@@ -3060,6 +3079,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
             cluster_name=self.clickhouse_cluster_name,
+            table_name=self._mutation_table_name("annotation_queues"),
             name=req.name,
             description=req.description,
             scorer_refs=req.scorer_refs,
@@ -3125,6 +3145,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
             cluster_name=self.clickhouse_cluster_name,
+            table_name=self._mutation_table_name("annotation_queues"),
         )
 
         self._command(
@@ -3468,6 +3489,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 annotation_state=req.annotation_state,
                 pb=update_pb,
                 cluster_name=self.clickhouse_cluster_name,
+                table_name=self._mutation_table_name("annotator_queue_items_progress"),
             )
             self._command(
                 update_query,
@@ -4233,7 +4255,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         file_content_res = self._file_content_read_with_retry(file_content_req)
         source_code = file_content_res.content.decode("utf-8")
 
-        # Extract additional attributes (exclude system fields)
         excluded_fields = {
             "_type",
             "_class_name",
@@ -4344,6 +4365,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             version=op_create_res.digest,
         )
 
+        # Build attributes — include source_evaluation_run_id if this is a rescore run
+        weave_attrs: dict = {
+            constants.EVALUATION_RUN_ATTR_KEY: "true",
+            constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
+            constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+        }
+        if req.source_evaluation_run_id:
+            weave_attrs[constants.EVALUATION_RUN_SOURCE_ATTR_KEY] = (
+                req.source_evaluation_run_id
+            )
+
         # Start a call to represent the evaluation run
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
@@ -4353,11 +4385,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 op_name=op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes={
-                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                        constants.EVALUATION_RUN_ATTR_KEY: "true",
-                        constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
-                        constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
-                    }
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: weave_attrs,
                 },
                 inputs={
                     "self": req.evaluation,
@@ -4382,16 +4410,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise NotFoundError(f"Evaluation run {req.evaluation_run_id} not found")
 
         attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+        evaluation_ref, model_ref = eval_run_refs_from_call(call, attributes)
         status = determine_call_status(call)
 
         return tsi.EvaluationRunReadRes(
             evaluation_run_id=call.id,
-            evaluation=attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""),
-            model=attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY, ""),
+            evaluation=evaluation_ref,
+            model=model_ref,
             status=status,
             started_at=call.started_at,
             finished_at=call.ended_at,
             summary=call.summary,
+            source_evaluation_run_id=attributes.get(
+                constants.EVALUATION_RUN_SOURCE_ATTR_KEY
+            ),
         )
 
     def evaluation_run_list(
@@ -6009,7 +6041,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result_rows = list(query_result.result_rows)
 
         if len(result_rows) < n_chunks:
-            raise ValueError("Missing chunks")
+            # Treat as not-found so the tenacity retry in `_read_with_retry`
+            # picks it up. Replicated/distributed reads can transiently see
+            # fewer rows than `n_chunks` while replication catches up.
+            raise NotFoundError(
+                f"File with digest {req.digest} has {len(result_rows)}/{n_chunks} chunks visible"
+            )
         elif len(result_rows) > n_chunks:
             # The general case where this can occur is when there are multiple
             # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
@@ -6297,7 +6334,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.ActionsExecuteBatchRes()
         if len(req.call_ids) > 1:
             # This is temporary until we setup our batching infrastructure
-            raise NotImplementedError("Batching actions is not yet supported")
+            raise InvalidRequest(
+                "Batching actions is not yet supported; submit one call_id at a time."
+            )
 
         # For now, we just execute in-process if it is a single action
         execute_batch(
@@ -6311,6 +6350,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        prep = self._prepare_completion_request(req)
+        if isinstance(prep, tsi.CompletionsCreateRes):
+            return prep
+
+        info = prep.completion_model_info
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(
+            api_key=info.api_key,
+            inputs=req.inputs,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            vertex_credentials=info.vertex_credentials,
+        )
+        end_time = datetime.datetime.now()
+
+        return self._log_completion_call(req, prep, res, start_time, end_time)
+
+    def _prepare_completion_request(
+        self, req: tsi.CompletionsCreateReq
+    ) -> "CompletionPrepResult | tsi.CompletionsCreateRes":
+        """Resolve prompt + model info, or return a short-circuit error response."""
         # --- Resolve prompt if provided and set messages
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
@@ -6345,24 +6406,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except Exception as e:
             return tsi.CompletionsCreateRes(response={"error": str(e)})
 
-        model_name = completion_model_info.model_name
+        return CompletionPrepResult(initial_messages, completion_model_info)
 
-        # Now that we have all the fields for both cases, we can make the API call
-        start_time = datetime.datetime.now()
-
-        # Make the API call
-        res = lite_llm_completion(
-            api_key=completion_model_info.api_key,
-            inputs=req.inputs,
-            provider=completion_model_info.provider,
-            base_url=completion_model_info.base_url,
-            extra_headers=completion_model_info.extra_headers,
-            return_type=completion_model_info.return_type,
-            vertex_credentials=completion_model_info.vertex_credentials,
-        )
-
-        end_time = datetime.datetime.now()
-
+    def _log_completion_call(
+        self,
+        req: tsi.CompletionsCreateReq,
+        prep: "CompletionPrepResult",
+        res: tsi.CompletionsCreateRes,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+    ) -> tsi.CompletionsCreateRes:
+        """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
@@ -6372,10 +6426,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
-        req.inputs.messages = initial_messages
+        req.inputs.messages = prep.initial_messages
         call_id = generate_id()
         trace_id = req.trace_id or generate_id()
         parent_id = req.parent_id
+        model_name = prep.completion_model_info.model_name
 
         # Build summary with usage info if available
         summary: tsi.SummaryInsertMap = {}
@@ -6728,6 +6783,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.EvaluateModelRes(call_id=call_id)
 
+    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
+        """Rescore an existing evaluation run with different scorer(s).
+
+        Allocates a new evaluation_run_id and dispatches the rescore worker;
+        the worker is the sole owner of the new call's lifecycle (emits
+        call_start at the top of the job and call_end at the bottom). We
+        deliberately do NOT pre-create the call here — call ownership must
+        live with the process that emits ``call_start``, otherwise the
+        worker's CallBatchProcessor sees an orphaned ``call_end`` (no
+        matching start in its in-memory pairing buffer) and drops it after
+        the flush timeout. See the invariant on ``CallBatchProcessor``.
+
+        Until the worker's first batch flush lands the call_start, the
+        ``/evaluations/status`` endpoint returns ``not_found`` for this id —
+        the rescore-results wrapper page already handles
+        ``not_found → running → complete`` as a normal progression.
+
+        The SDK path (``weave/evaluation/rescore.py``) keeps using
+        ``evaluation_run_create`` directly because in that path the SDK is
+        the owner: it emits start AND end from a single client.
+        """
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+
+        new_evaluation_run_id = generate_id()
+        self._evaluate_model_dispatcher.dispatch(
+            RescoringArgs(
+                project_id=req.project_id,
+                source_evaluation_run_id=req.source_evaluation_run_id,
+                scorer_refs=req.scorer_refs,
+                wb_user_id=req.wb_user_id,
+                new_evaluation_run_id=new_evaluation_run_id,
+            )
+        )
+        return tsi.RescoreRes(
+            call_id=new_evaluation_run_id,
+            evaluation_run_id=new_evaluation_run_id,
+        )
+
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
@@ -6939,6 +7035,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
             use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
+            # Mint the heartbeat's client like the primary so it inherits
+            # secure/pool/db settings (raw env would drop `secure=`).
+            heartbeat_client_factory=self._mint_client,
         )
         migrator.apply_migrations(self._database)
 
@@ -7508,6 +7607,16 @@ class CompletionModelInfo:
     extra_headers: dict[str, str]
     return_type: str | None
     vertex_credentials: str | None = None
+
+
+class CompletionPrepResult(NamedTuple):
+    """Output of `_prepare_completion_request` shared by sync + async paths.
+
+    Named so a future field reorder is a type error, not a silent positional bug.
+    """
+
+    initial_messages: list[dict[str, Any]]
+    completion_model_info: CompletionModelInfo
 
 
 def _setup_completion_model_info(

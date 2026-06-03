@@ -1,8 +1,8 @@
-"""Tests for weave.trace_server.calls_query_builder.utils."""
+"""Tests for the datetime parsing helpers in weave.trace_server.orm."""
 
 import pytest
 
-from weave.trace_server.calls_query_builder.utils import (
+from weave.trace_server.orm import (
     parse_string_to_utc_timestamp,
     timestamp_to_datetime_str,
 )
