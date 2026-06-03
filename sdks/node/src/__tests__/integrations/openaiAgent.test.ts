@@ -5,6 +5,10 @@ import {
   setTracingDisabled,
   tool,
   Usage,
+  withAgentSpan,
+  withFunctionSpan,
+  withGuardrailSpan,
+  withTrace,
 } from '@openai/agents';
 import type {
   Model,
@@ -35,17 +39,10 @@ describe('OpenAI Agents Integration', () => {
   });
 
   test('trace lifecycle creates and finishes call', async () => {
-    const processor = weave.createOpenAIAgentsTracingProcessor();
-    const trace = {
-      type: 'trace',
+    withTrace('Agent Workflow', async () => {}, {
       traceId: 'test-trace-123',
-      name: 'Agent Workflow',
-      groupId: null,
       metadata: {},
-    } as Trace;
-
-    await processor.onTraceStart(trace);
-    await processor.onTraceEnd(trace);
+    });
 
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
@@ -59,34 +56,34 @@ describe('OpenAI Agents Integration', () => {
   });
 
   test('maps span types to correct kinds', async () => {
-    const processor = weave.createOpenAIAgentsTracingProcessor();
-
-    await processor.onTraceStart({
-      type: 'trace',
-      traceId: 'test-trace',
-      name: 'Test',
-      groupId: null,
-    } as Trace);
-
     // Test key span types
     const spans = [
-      {id: 'span-agent', type: 'agent', expectedKind: 'agent'},
-      {id: 'span-function', type: 'function', expectedKind: 'tool'},
-      {id: 'span-guardrail', type: 'guardrail', expectedKind: 'guardrail'},
+      {id: 'span-agent', expectedKind: 'agent'},
+      {id: 'span-function', expectedKind: 'tool'},
+      {id: 'span-guardrail', expectedKind: 'guardrail'},
     ];
 
-    for (const {id, type} of spans) {
-      await processor.onSpanStart({
-        type: 'trace.span',
-        traceId: 'test-trace',
-        spanId: id,
-        parentId: null,
-        spanData: {type, name: `test-${type}`} as any,
-        startedAt: null,
-        endedAt: null,
-        error: null,
-      } as Span<any>);
-    }
+    await withTrace('Test', async () => {
+      await withAgentSpan(async () => {}, {
+        spanId: spans[0].id,
+        data: {
+          name: 'test-agent',
+          tools: [],
+          handoffs: [],
+          output_type: 'text',
+        },
+      });
+
+      await withFunctionSpan(async () => {}, {
+        spanId: spans[1].id,
+        data: {name: 'test-function', input: '', output: ''},
+      });
+
+      await withGuardrailSpan(async () => {}, {
+        spanId: spans[2].id,
+        data: {name: 'test-guardrail', triggered: false},
+      });
+    });
 
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
 
@@ -97,25 +94,9 @@ describe('OpenAI Agents Integration', () => {
   });
 
   test('creates parent-child hierarchy', async () => {
-    const processor = weave.createOpenAIAgentsTracingProcessor();
-
-    await processor.onTraceStart({
-      type: 'trace',
-      traceId: 'trace-123',
-      name: 'Workflow',
-      groupId: null,
-    } as Trace);
-
-    await processor.onSpanStart({
-      type: 'trace.span',
-      traceId: 'trace-123',
-      spanId: 'span-123',
-      parentId: null,
-      spanData: {type: 'agent', name: 'Agent'} as any,
-      startedAt: null,
-      endedAt: null,
-      error: null,
-    } as Span<any>);
+    await withTrace('Workflow', async () => {
+      await withAgentSpan(async () => {}, {spanId: 'span-123'});
+    });
 
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(2);
