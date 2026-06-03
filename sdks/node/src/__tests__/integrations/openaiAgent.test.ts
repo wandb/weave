@@ -244,7 +244,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(await inMemoryTraceServer.getCalls(testProjectName)).toHaveLength(0);
   });
 
-  test('emits `invoke_agent` span', async () => {
+  test('emits `invoke_agent` and `execute_tool` spans', async () => {
     await withTrace('Test', async () => {
       await withAgentSpan(async () => {}, {
         spanId: 'span-agent',
@@ -257,7 +257,11 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       });
       await withFunctionSpan(async () => {}, {
         spanId: 'span-function',
-        data: {name: 'test-function', input: '', output: ''},
+        data: {
+          name: 'test-function',
+          input: '{"city":"Tokyo"}',
+          output: 'sunny, 22C',
+        },
       });
       await withGuardrailSpan(async () => {}, {
         spanId: 'span-guardrail',
@@ -277,6 +281,17 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.openai_agents.agent.handoffs': ['h1'],
       'weave.openai_agents.agent.output_type': 'text',
       'weave.openai_agents.span_id': 'span-agent',
+    });
+
+    const executeToolSpan = spans.find(
+      s => s.name === 'execute_tool test-function'
+    )!;
+    expect(executeToolSpan.attributes).toMatchObject({
+      'gen_ai.operation.name': 'execute_tool',
+      'gen_ai.tool.name': 'test-function',
+      'gen_ai.tool.call.arguments': '{"city":"Tokyo"}',
+      'gen_ai.tool.call.result': 'sunny, 22C',
+      'weave.openai_agents.span_id': 'span-function',
     });
   });
 
@@ -345,6 +360,24 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'gen_ai.provider.name': 'openai',
       'weave.openai_agents.agent.tools': ['get_weather'],
     });
+
+    const executeToolSpan = spans.find(
+      s => s.name === 'execute_tool get_weather'
+    )!;
+    expect(executeToolSpan).toBeDefined();
+    expect(executeToolSpan.attributes).toMatchObject({
+      'gen_ai.operation.name': 'execute_tool',
+      'gen_ai.tool.name': 'get_weather',
+      // The Agents SDK serializes the tool's JSON args/result as strings
+      // on the FunctionSpanData, which we lift straight to semconv.
+      'gen_ai.tool.call.arguments': '{"city":"Tokyo"}',
+      'gen_ai.tool.call.result': 'Tokyo: Sunny, 22°C',
+    });
+    // Span is a child of the agent span.
+    expect(executeToolSpan.parentSpanId).toBe(agentSpan!.spanContext().spanId);
+    expect(executeToolSpan.spanContext().traceId).toBe(
+      agentSpan!.spanContext().traceId
+    );
   });
 
   async function emittedSpans(): Promise<ReadableSpan[]> {
