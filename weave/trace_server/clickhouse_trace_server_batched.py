@@ -5603,15 +5603,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         name="clickhouse_trace_server_batched._file_content_read_with_retry"
     )
     def _file_content_read_with_retry(
-        self, req: tsi.FileContentReadReq, max_attempts: int = 5
+        self, req: tsi.FileContentReadReq, max_attempts: int = 2
     ) -> tsi.FileContentReadRes:
-        """Read file content with retry for ClickHouse eventual consistency.
-
-        Higher attempt count than `_obj_read_with_retry` because chunked-file
-        reads need all chunks visible across all shards/replicas: in
-        replicated/distributed mode each missing chunk on any replica trips
-        the retry, and lag can briefly exceed the 50ms-1s window.
-        """
+        """Read file content with retry for ClickHouse eventual consistency."""
         return self._read_with_retry(
             lambda: self._file_content_read_once(req), max_attempts=max_attempts
         )
