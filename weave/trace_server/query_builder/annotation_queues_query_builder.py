@@ -236,8 +236,8 @@ def make_queue_delete_query(
     project_id: str,
     queue_id: str,
     pb: ParamBuilder,
+    table_name: str,
     cluster_name: str | None = None,
-    table_name: str = "annotation_queues",
 ) -> str:
     """Generate an UPDATE query to soft-delete an annotation queue.
 
@@ -247,10 +247,10 @@ def make_queue_delete_query(
         project_id: The project ID
         queue_id: The queue ID (UUID as string)
         pb: Parameter builder for safe SQL parameter injection
-        cluster_name: Optional ClickHouse cluster name for distributed mutations
         table_name: Concrete table to mutate. Callers in distributed mode pass
             `annotation_queues_local` because lightweight UPDATE/DELETE are
             unsupported on the Distributed engine.
+        cluster_name: Optional ClickHouse cluster name for distributed mutations
 
     Returns:
         SQL query string for soft-deleting a queue
@@ -276,8 +276,8 @@ def make_queue_update_query(
     project_id: str,
     queue_id: str,
     pb: ParamBuilder,
+    table_name: str,
     cluster_name: str | None = None,
-    table_name: str = "annotation_queues",
     *,
     name: str | None = None,
     description: str | None = None,
@@ -292,6 +292,9 @@ def make_queue_update_query(
         project_id: The project ID
         queue_id: The queue ID (UUID as string)
         pb: Parameter builder for safe SQL parameter injection
+        table_name: Concrete table to mutate. Callers in distributed mode pass
+            `annotation_queues_local` because lightweight UPDATE/DELETE are
+            unsupported on the Distributed engine.
         cluster_name: Optional ClickHouse cluster name for distributed mutations
         name: Optional new queue name
         description: Optional new queue description
@@ -654,8 +657,8 @@ def make_annotator_progress_update_query(
     annotator_id: str,
     annotation_state: str,
     pb: ParamBuilder,
+    table_name: str,
     cluster_name: str | None = None,
-    table_name: str = "annotator_queue_items_progress",
 ) -> str:
     """Generate an UPDATE query to update annotator progress for a queue item.
 
@@ -665,10 +668,10 @@ def make_annotator_progress_update_query(
         annotator_id: The annotator's wb_user_id
         annotation_state: The new annotation state
         pb: Parameter builder for safe SQL parameter injection
-        cluster_name: Optional ClickHouse cluster name for distributed mutations
         table_name: Concrete table to mutate. Callers in distributed mode pass
             `annotator_queue_items_progress_local` because lightweight UPDATE
             is unsupported on the Distributed engine.
+        cluster_name: Optional ClickHouse cluster name for distributed mutations
 
     Returns:
         SQL query string for updating annotator progress
