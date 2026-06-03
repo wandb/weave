@@ -1,4 +1,4 @@
-"""Async layer over `ClickHouseTraceServer`. See PR for design notes."""
+"""Async layer over `ClickHouseTraceServer` for I/O-bound completion calls."""
 
 import asyncio
 import contextvars
