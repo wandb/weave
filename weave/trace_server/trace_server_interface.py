@@ -1235,6 +1235,24 @@ class FeedbackCreateReq(BaseModelStrict):
         examples=[{"_rating_": 0.92}],
     )
 
+    # Denormalized columns from the `spans` table so we can filter without joining.
+    # Keeping these tables synced is best-effort: spans table remains the source of truth
+    span_agent_name: str = Field(
+        default="",
+        description="Display name of the scored agent (from spans.agent_name)",
+        examples=["midi-generator"],
+    )
+    span_agent_version: str = Field(
+        default="",
+        description="Version of the scored agent (from spans.agent_version)",
+        examples=["1.2.0"],
+    )
+    span_status_code: str = Field(
+        default="UNSET",
+        description="Status of the scored turn (from spans.status_code)",
+        examples=["SUCCESS"],
+    )
+
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 

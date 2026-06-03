@@ -203,6 +203,9 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "scorer_ratings": {},
         "scorer_rating_reasons": {},
         "scorer_rating_confidences": {},
+        "span_agent_name": "",
+        "span_agent_version": "",
+        "span_status_code": "UNSET",
     }
 
 
@@ -360,6 +363,9 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "scorer_ratings": {},
         "scorer_rating_reasons": {},
         "scorer_rating_confidences": {},
+        "span_agent_name": "",
+        "span_agent_version": "",
+        "span_status_code": "UNSET",
     }
 
     # Runnable scorer feedback may also populate typed scorer columns while
@@ -487,6 +493,9 @@ def test_agent_monitor_feedback(client: WeaveClient) -> None:
             scorer_ratings={"_rating_": 0.87},
             scorer_rating_reasons={"_rating_": "very confident response"},
             scorer_rating_confidences={"_rating_": 0.92},
+            span_agent_name="midi-generator",
+            span_agent_version="1.2.0",
+            span_status_code="OK",
         )
     )
     assert create_res.id is not None
@@ -504,6 +513,9 @@ def test_agent_monitor_feedback(client: WeaveClient) -> None:
     assert row["scorer_ratings"] == {"_rating_": 0.87}
     assert row["scorer_rating_reasons"] == {"_rating_": "very confident response"}
     assert row["scorer_rating_confidences"] == {"_rating_": 0.92}
+    assert row["span_agent_name"] == "midi-generator"
+    assert row["span_agent_version"] == "1.2.0"
+    assert row["span_status_code"] == "OK"
 
 
 def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
@@ -536,6 +548,9 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     assert query_res.result[0]["scorer_ratings"] == {}
     assert query_res.result[0]["scorer_rating_reasons"] == {}
     assert query_res.result[0]["scorer_rating_confidences"] == {}
+    assert query_res.result[0]["span_agent_name"] == ""
+    assert query_res.result[0]["span_agent_version"] == ""
+    assert query_res.result[0]["span_status_code"] == "UNSET"
 
 
 def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
