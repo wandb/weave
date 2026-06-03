@@ -82,13 +82,22 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
     # --- annotation queues ---
     pb = ParamBuilder()
     q_delete = make_queue_delete_query(
-        project_id="proj", queue_id="q", pb=pb, cluster_name=CLUSTER
+        project_id="proj",
+        queue_id="q",
+        pb=pb,
+        table_name="annotation_queues",
+        cluster_name=CLUSTER,
     )
     assert f"annotation_queues ON CLUSTER {CLUSTER}" in q_delete
 
     pb = ParamBuilder()
     q_update = make_queue_update_query(
-        project_id="proj", queue_id="q", pb=pb, cluster_name=CLUSTER, name="n"
+        project_id="proj",
+        queue_id="q",
+        pb=pb,
+        table_name="annotation_queues",
+        cluster_name=CLUSTER,
+        name="n",
     )
     assert f"annotation_queues ON CLUSTER {CLUSTER}" in q_update
 
@@ -99,9 +108,48 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
         annotator_id="a",
         annotation_state="done",
         pb=pb,
+        table_name="annotator_queue_items_progress",
         cluster_name=CLUSTER,
     )
     assert f"annotator_queue_items_progress ON CLUSTER {CLUSTER}" in progress
+
+
+def test_annotation_queue_mutations_use_caller_provided_local_name() -> None:
+    """In distributed mode the caller passes `<table>_local`; the builder must
+    use that name verbatim (lightweight UPDATE isn't supported on Distributed).
+    """
+    pb = ParamBuilder()
+    q_delete = make_queue_delete_query(
+        project_id="proj",
+        queue_id="q",
+        pb=pb,
+        cluster_name=CLUSTER,
+        table_name="annotation_queues_local",
+    )
+    assert f"annotation_queues_local ON CLUSTER {CLUSTER}" in q_delete
+
+    pb = ParamBuilder()
+    q_update = make_queue_update_query(
+        project_id="proj",
+        queue_id="q",
+        pb=pb,
+        cluster_name=CLUSTER,
+        table_name="annotation_queues_local",
+        name="n",
+    )
+    assert f"annotation_queues_local ON CLUSTER {CLUSTER}" in q_update
+
+    pb = ParamBuilder()
+    progress = make_annotator_progress_update_query(
+        project_id="proj",
+        queue_item_id="qi",
+        annotator_id="a",
+        annotation_state="done",
+        pb=pb,
+        cluster_name=CLUSTER,
+        table_name="annotator_queue_items_progress_local",
+    )
+    assert f"annotator_queue_items_progress_local ON CLUSTER {CLUSTER}" in progress
 
 
 @pytest.mark.parametrize(
