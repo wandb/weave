@@ -113,9 +113,7 @@ def test_table_update(client):
             )
         )
     )
-    table_query_res = client.server.table_query(
-        TableQueryReq(project_id=client.project_id, digest=table_create_res.digest)
-    )
+    table_query_res = _query_table_rows(client, table_create_res.digest, len(data))
     assert len(table_query_res.rows) == len(data)
     for i, row in enumerate(table_query_res.rows):
         assert row.val["val"] == data[i]["val"]
@@ -138,8 +136,8 @@ def test_table_update(client):
     final_data.pop(0)
     final_data.append({"val": 5})
 
-    table_query_2_res = client.server.table_query(
-        TableQueryReq(project_id=client.project_id, digest=table_create_res.digest)
+    table_query_2_res = _query_table_rows(
+        client, table_create_res.digest, len(final_data)
     )
 
     assert len(table_query_2_res.rows) == len(final_data)
@@ -156,6 +154,18 @@ def test_table_update(client):
         )
     )
     assert check_res.digest == table_create_res.digest
+
+
+def _query_table_rows(client, digest: str, expected: int) -> tsi.TableQueryRes:
+    """Read table rows, retrying past ClickHouse's async-insert flush window."""
+    for _ in range(20):
+        res = client.server.table_query(
+            TableQueryReq(project_id=client.project_id, digest=digest)
+        )
+        if len(res.rows) == expected:
+            return res
+        time.sleep(0.05)
+    return res
 
 
 @pytest.mark.skip
