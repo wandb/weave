@@ -7538,7 +7538,7 @@ def _create_tracked_span_stream_wrapper(
         aggregated_metadata: dict[str, Any] = {}
         stream_error: str | None = None
 
-        try:  # noqa: PLW0717
+        try:
             for chunk in chunk_iter:
                 yield chunk
 
