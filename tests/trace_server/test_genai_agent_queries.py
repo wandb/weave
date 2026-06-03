@@ -7,6 +7,9 @@ Migration 030 creates the genai tables automatically.
 import datetime
 import uuid
 
+import pytest
+
+from tests.trace_server.eventually_consistent import EventuallyConsistentServer
 from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
@@ -31,6 +34,17 @@ from weave.trace_server.agents.types import (
     AgentsQueryReq,
 )
 from weave.trace_server.interface.query import Query
+
+
+@pytest.fixture
+def ch_server(ch_server):
+    """Wrap the shared ch_server with one read-retry on empty/not-found.
+
+    These agent queries insert spans then immediately read them back; on CI
+    ClickHouse that read can miss the just-written row (read-your-write lag).
+    Scoped to this file so the shared fixture stays unwrapped (WB-35048).
+    """
+    return EventuallyConsistentServer(ch_server)
 
 
 def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
