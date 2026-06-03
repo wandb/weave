@@ -162,8 +162,13 @@ _MIGRATIONS_TABLE_COLUMNS = """
 # Valid values: "trace_id" (default), "id", "project_id"
 ID_SHARDED_TABLES: dict[str, str] = {
     "calls_complete": wf_clickhouse_calls_shard_key(),
-    # Keep one trace/turn on one shard. This matches the default calls sharding
-    # key and keeps trace detail reads local.
+    # call_parts (call_start/call_end rows) must shard by `id`, not `trace_id`:
+    # call_end rows don't carry trace_id (only call_start does), so sharding by
+    # trace_id sends them via rand() and they land on a different shard than
+    # the matching call_start. Without co-location the partial states never
+    # merge, and queries that filter on aggregated columns (e.g. parent_id IS
+    # NULL for trace_roots_only) match the call_end row of every child call.
+    "call_parts": "id",
     "spans": "trace_id",
     "messages": "trace_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
