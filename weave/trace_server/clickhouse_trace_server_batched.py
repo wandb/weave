@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import ddtrace
 from cachetools import TTLCache
+from clickhouse_connect import common as ch_common
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
@@ -348,6 +349,10 @@ OBJ_READ_RETRY_ATTEMPTS = 3
 _CH_POOL_MANAGER = get_pool_manager(
     maxsize=CH_POOL_MAX_CONNECTIONS, num_pools=CH_POOL_COUNT
 )
+
+# Send query settings to the server instead of rejecting them against the client's
+# cached server_settings map, which is poisoned when minted during a CH degradation.
+ch_common.set_setting("invalid_setting_action", "send")
 
 
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
