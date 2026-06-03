@@ -90,10 +90,6 @@ _DETECTED_MIMETYPE_ALIASES = {
 }
 
 
-def _normalize_detected_mimetype(mimetype: str | None) -> str | None:
-    return _DETECTED_MIMETYPE_ALIASES.get(mimetype, mimetype)
-
-
 def _detect_from_resolver(
     *, filename: str | None, buffer: bytes | None
 ) -> tuple[str | None, str | None]:
@@ -105,7 +101,9 @@ def _detect_from_resolver(
     resolver = _get_resolver()
     if resolver is not None:
         mimetype, extension = resolver.detect(filename=filename, buffer=buffer)
-        return _normalize_detected_mimetype(mimetype), extension
+        if mimetype is not None:
+            mimetype = _DETECTED_MIMETYPE_ALIASES.get(mimetype, mimetype)
+        return mimetype, extension
 
     if buffer is not None:
         logger.warning(
@@ -196,7 +194,9 @@ def guess_from_buffer(buffer: bytes) -> str | None:
         return None
 
     mimetype, _ = resolver.detect(filename=None, buffer=buffer)
-    return _normalize_detected_mimetype(mimetype)
+    if mimetype is not None:
+        mimetype = _DETECTED_MIMETYPE_ALIASES.get(mimetype, mimetype)
+    return mimetype
 
 
 def guess_from_filename(filename: str) -> str | None:
