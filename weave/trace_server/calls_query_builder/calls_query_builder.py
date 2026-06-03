@@ -78,6 +78,7 @@ from weave.trace_server.orm import (
     maybe_convert_datetime_operands,
     python_value_to_ch_type,
     split_escaped_field_path,
+    timestamp_to_datetime_str,
 )
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
