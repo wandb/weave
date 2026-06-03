@@ -134,18 +134,21 @@ class _FakeBYOBResolver(BYOBResolver):
 
 
 def test_byob_resolver_is_abstract() -> None:
-    """`BYOBResolver` cannot be instantiated directly; subclasses must
-    implement `resolve_write`, `resolve_read`, AND `resolve_export_target`.
+    """All three methods are abstract, and a subclass stays abstract until
+    every one is implemented (an empty `__abstractmethods__` is exactly what
+    lets Python instantiate it).
     """
-    with pytest.raises(TypeError):
-        BYOBResolver()  # type: ignore[abstract]
+    assert BYOBResolver.__abstractmethods__ == frozenset(
+        {"resolve_write", "resolve_read", "resolve_export_target"}
+    )
 
     class WriteOnly(BYOBResolver):
         def resolve_write(self, project_id, default_client):
             return default_client, ""
 
-    with pytest.raises(TypeError):
-        WriteOnly()  # type: ignore[abstract]
+    assert WriteOnly.__abstractmethods__ == frozenset(
+        {"resolve_read", "resolve_export_target"}
+    )
 
     class WriteAndRead(BYOBResolver):
         def resolve_write(self, project_id, default_client):
@@ -154,9 +157,7 @@ def test_byob_resolver_is_abstract() -> None:
         def resolve_read(self, project_id, stored_uri, default_client):
             return b""
 
-    # Still abstract: missing `resolve_export_target`.
-    with pytest.raises(TypeError):
-        WriteAndRead()  # type: ignore[abstract]
+    assert WriteAndRead.__abstractmethods__ == frozenset({"resolve_export_target"})
 
 
 def test_storage_resolution_error_is_distinct_exception() -> None:
@@ -345,7 +346,7 @@ def test_resolved_export_target_rejects_missing_required_fields() -> None:
     are all required; pydantic should refuse to construct without them.
     """
     with pytest.raises(ValidationError):
-        ResolvedExportTarget()  # type: ignore[call-arg]
+        ResolvedExportTarget.model_validate({})
 
 
 def test_resolve_export_target_returns_target_for_attached_project() -> None:
