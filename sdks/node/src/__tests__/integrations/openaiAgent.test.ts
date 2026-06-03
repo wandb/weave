@@ -1,4 +1,4 @@
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
+import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {createOpenAIAgentsTracingProcessor} from '../../integrations/openai.agent';
 import {initWithCustomTraceServer} from '../clientMock';
 

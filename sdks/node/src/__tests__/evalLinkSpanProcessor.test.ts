@@ -8,7 +8,7 @@ import {
   EvalLinkSpanProcessor,
   registerEvalLinkSpanProcessor,
 } from '../evalLinkSpanProcessor';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 import {op} from '../op';
 import {CallStack, type CallStackEntry} from '../weaveClient';
 import {initWithCustomTraceServer} from './clientMock';
