@@ -62,9 +62,8 @@ class ScenarioResult:
 
 
 def build_server() -> RemoteHTTPTraceServer:
-    url = os.environ["WF_TRACE_SERVER_URL"]
     api_key = os.environ["WANDB_API_KEY"]
-    server = RemoteHTTPTraceServer(url, should_batch=False)
+    server = RemoteHTTPTraceServer.from_env(should_batch=False)
     server.set_auth(("api", api_key))
     return server
 
@@ -121,6 +120,19 @@ def timed_create(
     return (time.perf_counter() - start) * 1000.0
 
 
+def make_create_worker(
+    server: RemoteHTTPTraceServer,
+    project_id: str,
+    object_id: str,
+    val: dict,
+    builtin_object_class: str | None = None,
+) -> Callable[[], float]:
+    """Bind one `timed_create` call into a zero-arg worker for `run_scenario`."""
+    return lambda: timed_create(
+        server, project_id, object_id, val, builtin_object_class
+    )
+
+
 def run_scenario(
     name: str,
     *,
@@ -173,13 +185,8 @@ def scenario_sequential_unique(
     server: RemoteHTTPTraceServer, project_id: str, run_id: str, n: int
 ) -> ScenarioResult:
     workers = [
-        (
-            lambda i=i: timed_create(
-                server,
-                project_id,
-                object_id=f"seq_{run_id}_{i}",
-                val=make_unique_val(f"seq_{i}"),
-            )
+        make_create_worker(
+            server, project_id, f"seq_{run_id}_{i}", make_unique_val(f"seq_{i}")
         )
         for i in range(n)
     ]
@@ -194,13 +201,8 @@ def scenario_concurrent_unique(
     threads: int,
 ) -> ScenarioResult:
     workers = [
-        (
-            lambda i=i: timed_create(
-                server,
-                project_id,
-                object_id=f"par_{run_id}_{i}",
-                val=make_unique_val(f"par_{i}"),
-            )
+        make_create_worker(
+            server, project_id, f"par_{run_id}_{i}", make_unique_val(f"par_{i}")
         )
         for i in range(n)
     ]
@@ -221,14 +223,7 @@ def scenario_concurrent_versions_one_name(
     """
     name = f"versioned_{run_id}"
     workers = [
-        (
-            lambda i=i: timed_create(
-                server,
-                project_id,
-                object_id=name,
-                val=make_unique_val(f"v{i}"),
-            )
-        )
+        make_create_worker(server, project_id, name, make_unique_val(f"v{i}"))
         for i in range(n)
     ]
     return run_scenario(
@@ -261,13 +256,11 @@ def scenario_concurrent_name_type_collision(
     class_a = "BenchClassA"
     class_b = "BenchClassB"
     workers = [
-        (
-            lambda i=i: timed_create(
-                server,
-                project_id,
-                object_id=name,
-                val=make_typed_val(class_a if i % 2 == 0 else class_b, f"v{i}"),
-            )
+        make_create_worker(
+            server,
+            project_id,
+            name,
+            make_typed_val(class_a if i % 2 == 0 else class_b, f"v{i}"),
         )
         for i in range(n)
     ]
@@ -291,7 +284,9 @@ def scenario_concurrent_name_type_collision(
             }
         )
     )
-    distinct_classes = sorted({o.base_object_class for o in objs_res.objs})
+    distinct_classes = sorted(
+        {o.base_object_class for o in objs_res.objs if o.base_object_class is not None}
+    )
     result.integrity_note = (
         f"distinct base_object_class for {name!r}: {distinct_classes} "
         f"(versions={len(objs_res.objs)}, expected: 1 distinct class)"
@@ -309,40 +304,25 @@ def scenario_eval_like(
     """Closest to a real evaluation: a few typed publishes + many unique
     untyped outputs, all racing through a thread pool.
     """
-    workers: list[Callable[[], float]] = []
-
     # A handful of typed singletons (dataset, model, scorer) up front.
-    workers.append(
-        lambda: timed_create(
-            server,
-            project_id,
-            object_id=f"eval_dataset_{run_id}",
-            val=make_unique_val("dataset"),
-        )
-    )
-    workers.append(
-        lambda: timed_create(
-            server,
-            project_id,
-            object_id=f"eval_model_{run_id}",
-            val=make_unique_val("model"),
-        )
-    )
-    workers.append(
-        lambda: timed_create(
-            server,
-            project_id,
-            object_id=f"eval_scorer_{run_id}",
-            val=make_unique_val("scorer"),
-        )
-    )
+    workers: list[Callable[[], float]] = [
+        make_create_worker(
+            server, project_id, f"eval_dataset_{run_id}", make_unique_val("dataset")
+        ),
+        make_create_worker(
+            server, project_id, f"eval_model_{run_id}", make_unique_val("model")
+        ),
+        make_create_worker(
+            server, project_id, f"eval_scorer_{run_id}", make_unique_val("scorer")
+        ),
+    ]
     for i in range(n_outputs):
         workers.append(
-            lambda i=i: timed_create(
+            make_create_worker(
                 server,
                 project_id,
-                object_id=f"eval_output_{run_id}_{i}",
-                val=make_unique_val(f"output_{i}"),
+                f"eval_output_{run_id}_{i}",
+                make_unique_val(f"output_{i}"),
             )
         )
     return run_scenario(f"eval-like x{threads}", workers=workers, threads=threads)
