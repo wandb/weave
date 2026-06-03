@@ -4,10 +4,12 @@ from typing import Annotated, Any, ClassVar, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing_extensions import Self
 
 from weave.flow.scorer import Scorer
 from weave.trace.objectify import register_object
 from weave.trace.op import op
+from weave.trace.vals import WeaveObject
 
 
 class StaticBearerAuthConfig(BaseModel):
@@ -157,6 +159,18 @@ class RemoteScorer(Scorer):
             "RemoteScorer is run by the Weave scoring worker against your HTTPS "
             "endpoint; score() is not part of that path."
         )
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        """Reconstruct from a stored object, unwrapping nested config models.
+
+        The base ``Scorer.from_obj`` rebuilds via per-field ``getattr``, which
+        leaves a nested ``auth_config`` as a ``WeaveObject`` that the
+        ``extra="forbid"`` auth-config union rejects. ``unwrap()`` recursively
+        flattens nested ``WeaveObject``s to plain dicts (as ``Monitor.from_obj``
+        does for its ``query``), so ``auth_config`` deserializes correctly.
+        """
+        return cls.model_validate(obj.unwrap())
 
 
 def _validate_remote_scorer_endpoint_url(v: str) -> str:
