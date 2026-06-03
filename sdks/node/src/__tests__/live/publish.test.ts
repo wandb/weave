@@ -1,9 +1,12 @@
 import {init, login} from '../../clientApi';
 import {Dataset, op, weaveAudio, weaveImage} from '../../index';
+import {getWandbConfigs} from '../../wandb/settings';
+import {vcrTest} from '../helpers/vcrTest';
 
-describe.skip('Publishing Various Data Types', () => {
+describe('Publishing Various Data Types', () => {
   beforeEach(async () => {
-    await login(process.env.WANDB_API_KEY ?? '');
+    const {apiKey} = getWandbConfigs();
+    await login(apiKey ?? '');
   });
 
   const primitiveOp = op(async function primitive(input: string) {
@@ -19,8 +22,9 @@ describe.skip('Publishing Various Data Types', () => {
     const height = 16;
     const buffer = Buffer.alloc(width * height * 4); // 4 bytes per pixel (RGBA)
 
+    // Deterministic pattern so VCR cassette replays match across runs.
     for (let i = 0; i < buffer.length; i++) {
-      buffer[i] = Math.floor(Math.random() * 256);
+      buffer[i] = i % 256;
     }
 
     return weaveImage({
@@ -30,15 +34,14 @@ describe.skip('Publishing Various Data Types', () => {
   });
 
   const audioOp = op(async function audio() {
-    // Create a small audio buffer with random samples
     const sampleRate = 44100; // Standard CD quality
     const duration = 0.1; // 100ms
     const numSamples = Math.floor(sampleRate * duration);
     const buffer = Buffer.alloc(numSamples * 2); // 2 bytes per sample for 16-bit audio
 
+    // Deterministic sawtooth so VCR cassette replays match across runs.
     for (let i = 0; i < buffer.length; i += 2) {
-      // Generate random 16-bit sample between -32768 and 32767
-      const sample = Math.floor(Math.random() * 65536 - 32768);
+      const sample = ((i / 2) % 65536) - 32768;
       buffer.writeInt16LE(sample, i);
     }
 
@@ -59,25 +62,29 @@ describe.skip('Publishing Various Data Types', () => {
     });
   });
 
-  test('publish various data types', async () => {
-    const client = await init('test-project');
+  vcrTest(
+    'publish various data types',
+    async () => {
+      const _client = await init('test-project');
 
-    const primitiveResult = await primitiveOp('world');
-    expect(primitiveResult).toBe('Hi world!');
+      const primitiveResult = await primitiveOp('world');
+      expect(primitiveResult).toBe('Hi world!');
 
-    const jsonResult = await jsonOp('Alice', 10);
-    expect(jsonResult).toEqual({name: 'Alice', age: 10});
+      const jsonResult = await jsonOp('Alice', 10);
+      expect(jsonResult).toEqual({name: 'Alice', age: 10});
 
-    const imageResult = await imageOp();
-    expect(imageResult).toHaveProperty('data');
-    expect(imageResult).toHaveProperty('imageType', 'png');
+      const imageResult = await imageOp();
+      expect(imageResult).toHaveProperty('data');
+      expect(imageResult).toHaveProperty('imageType', 'png');
 
-    const audioResult = await audioOp();
-    expect(audioResult).toHaveProperty('data');
-    expect(audioResult).toHaveProperty('audioType', 'wav');
+      const audioResult = await audioOp();
+      expect(audioResult).toHaveProperty('data');
+      expect(audioResult).toHaveProperty('audioType', 'wav');
 
-    const datasetResult = await datasetOp();
-    expect(datasetResult).toBeInstanceOf(Dataset);
-    expect(datasetResult.rows).toHaveLength(3);
-  }, 20000); // Adding explicit timeout here, though I'm not sure why it's needed
+      const datasetResult = await datasetOp();
+      expect(datasetResult).toBeInstanceOf(Dataset);
+      expect(datasetResult.rows).toHaveLength(3);
+    },
+    20000
+  ); // Adding explicit timeout here, though I'm not sure why it's needed
 });
