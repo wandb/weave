@@ -173,22 +173,31 @@ def _log_response(response: Response) -> None:
 
 
 @functools.cache
-def _get_client() -> httpx.Client:
-    """Return the shared httpx.Client, creating it lazily on first use.
+def _build_client(verify: bool, timeout: float) -> httpx.Client:
+    """Build an httpx.Client for a given (verify, timeout) pair.
 
-    Deferred so settings read at construction time (ssl_verify(), http_timeout())
-    reflect env vars set between `import weave` and the first request — most
-    notably WEAVE_INSECURE_DISABLE_SSL, which otherwise gets frozen to its
-    import-time value.
+    Cached so repeated requests with the same settings reuse one connection
+    pool. A change to WEAVE_INSECURE_DISABLE_SSL / WEAVE_HTTP_TIMEOUT picks
+    up a different cached client on the next request — no stale verify flag.
     """
     return httpx.Client(
         # Use HTTPX's default transport so env proxy handling (including
         # NO_PROXY) works natively.
         event_hooks={"request": [_log_request], "response": [_log_response]},
-        timeout=http_timeout(),
+        timeout=timeout,
         limits=CLIENT_LIMITS,
-        verify=ssl_verify(),
+        verify=verify,
     )
+
+
+def _get_client() -> httpx.Client:
+    """Return the httpx.Client matching the current env settings.
+
+    Reads ssl_verify() and http_timeout() per call so env-var changes after
+    `import weave` (or after the first request) are honored. The actual
+    Client objects are pooled by _build_client.
+    """
+    return _build_client(ssl_verify(), http_timeout())
 
 
 def __getattr__(name: str) -> Any:

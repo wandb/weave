@@ -70,6 +70,24 @@ class TestHttpxClientSslVerify:
         pool = transport._pool
         assert pool._ssl_context.verify_mode.name != "CERT_NONE"
 
+    def test_env_flip_swaps_cached_client(self, monkeypatch):
+        # _get_client() reads ssl_verify() per call and caches clients keyed
+        # on (verify, timeout). Flipping the env var post-import must surface
+        # a client with the new verify setting on the very next request.
+        monkeypatch.delenv(WEAVE_INSECURE_DISABLE_SSL, raising=False)
+        verifying = http_requests._get_client()
+        assert verifying._transport._pool._ssl_context.verify_mode.name != "CERT_NONE"
+
+        monkeypatch.setenv(WEAVE_INSECURE_DISABLE_SSL, "true")
+        insecure = http_requests._get_client()
+        assert insecure is not verifying
+        assert insecure._transport._pool._ssl_context.verify_mode.name == "CERT_NONE"
+
+        # Flipping back returns the original cached client (connection pool
+        # preserved across env-var toggles).
+        monkeypatch.delenv(WEAVE_INSECURE_DISABLE_SSL, raising=False)
+        assert http_requests._get_client() is verifying
+
 
 class TestInternalApiSslVerify:
     """The wandb thin API client passes ssl_verify() to gql transports."""
