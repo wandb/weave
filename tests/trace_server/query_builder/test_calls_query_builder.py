@@ -11,6 +11,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     ParamBuilder,
+    QueryBuilderDynamicField,
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
@@ -2199,6 +2200,59 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
         """,
         {"pb_0": "my_model", "pb_1": "project"},
     )
+
+
+def test_unsupported_summary_field_raises_invalid_field_error() -> None:
+    """Filtering by an unknown summary.weave.* field must surface as InvalidFieldError
+    (mapped to HTTP 403) rather than NotImplementedError (HTTP 500). Regression for
+    WB-34835: clients hitting /calls/query_stats with summary.weave.duration_ms were
+    getting 500s for what is actually invalid input.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "summary.weave.duration_ms"},
+                    {"$literal": 0},
+                ]
+            }
+        )
+    )
+    with pytest.raises(InvalidFieldError, match="duration_ms"):
+        cq.as_sql(ParamBuilder())
+
+
+def test_unselectable_columns_raise_invalid_field_error() -> None:
+    """Selecting columns that the SQL builder can't materialize as a select expression
+    must surface as InvalidFieldError (403), not NotImplementedError (500). Regression
+    for WB-34836: dynamic, feedback, and annotation-queue-item paths all hit the same
+    "implement me!" raise.
+    """
+    # Nested dynamic field (e.g. inputs.foo) - routed through CallsMergedDynamicField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("inputs.foo")
+    with pytest.raises(InvalidFieldError, match="cannot be selected directly"):
+        cq.as_sql(ParamBuilder())
+
+    # Feedback payload column - routed through CallsMergedFeedbackPayloadField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("feedback.[wandb.note].payload.note")
+    with pytest.raises(InvalidFieldError, match="Feedback fields"):
+        cq.as_sql(ParamBuilder())
+
+    # Annotation queue item column - routed through CallsMergedQueueItemField
+    cq = CallsQuery(project_id="project")
+    cq.add_field("annotation_queue_items.queue_id")
+    with pytest.raises(InvalidFieldError, match="queue item fields"):
+        cq.as_sql(ParamBuilder())
+
+    # QueryBuilderDynamicField with extra_path (used by table_query, not CallsQuery,
+    # so we have to construct and select directly).
+    field = QueryBuilderDynamicField(field="val_dump", extra_path=["foo", "bar"])
+    with pytest.raises(InvalidFieldError, match="val_dump.foo.bar"):
+        field.as_select_sql(ParamBuilder(), "table")
 
 
 def test_build_calls_complete_update_end_query() -> None:
@@ -4435,8 +4489,9 @@ def test_stats_query_calls_merged_unfiltered_limit_1_stays_with_pattern_1() -> N
 def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> None:
     """Unfiltered calls_merged stats with no limit takes the flat distinct-id path.
 
-    Two parallel aggregators on one scan dedupe ids and subtract those with any
-    soft-delete row. Matches the GROUP BY path's exclusion semantics exactly.
+    Inclusion-exclusion on one scan: count(started or deleted) - count(deleted)
+    = distinct non-deleted started ids. op_name (start-only) drops orphaned
+    call-ends, matching the GROUP BY path's exclusion semantics exactly.
     """
     req = tsi.CallsQueryStatsReq(project_id="project")
     pb = ParamBuilder("pb")
@@ -4450,7 +4505,7 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
         SELECT raw_count AS count,
                toUInt8(0) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4475,7 +4530,7 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4538,6 +4593,145 @@ def test_stats_query_calls_merged_with_query_falls_back_to_group_by() -> None:
         )
         """,
         {"pb_0": "x", "pb_1": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def _started_at_query(expr: dict) -> tsi.Query:
+    return tsi.Query.model_validate({"$expr": expr})
+
+
+def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> None:
+    """A started_at-only window takes the distinct-id fast path (Pattern 4).
+
+    uniqExact counts start rows in the window -- the exact `started_at`
+    predicates match the GROUP BY path's `any(started_at) <op> T` HAVING (and
+    drop the prefilter buffer slop), and `op_name IS NOT NULL` reproduces its
+    orphaned-call-end exclusion (since #6933 end rows carry started_at too).
+    Soft-deleted ids are removed with an anti-set. Both bounds prefilter the
+    outer scan, but only the lower bound windows the anti-set: deletes can land
+    after the upper bound, never before the lower one. Limit capping reuses the
+    shared count/has_more wrapper.
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        limit=5,
+        query=_started_at_query(
+            {
+                "$and": [
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": 1709251200}]},
+                    {"$lt": [{"$getField": "started_at"}, {"$literal": 1709337600}]},
+                ]
+            }
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT least(raw_count, 5) AS count,
+               toUInt8(raw_count > 5) AS has_more
+        FROM (
+            SELECT uniqExact(calls_merged.id) AS raw_count
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_0:String}
+            WHERE calls_merged.sortable_datetime > {pb_2:String}
+              AND calls_merged.sortable_datetime < {pb_4:String}
+              AND calls_merged.started_at > {pb_1:String}
+              AND calls_merged.started_at < {pb_3:String}
+              AND isNotNull(calls_merged.op_name)
+              AND calls_merged.id NOT IN (
+                  SELECT calls_merged.id
+                  FROM calls_merged
+                  PREWHERE calls_merged.project_id = {pb_0:String}
+                  WHERE calls_merged.sortable_datetime > {pb_2:String}
+                    AND isNotNull(calls_merged.deleted_at)))
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": "2024-03-01 00:00:00.000000",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-02 00:00:00.000000",
+            "pb_4": "2024-03-02 00:05:00.000000",
+        },
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_started_at_fast_path_gates() -> None:
+    """The fast path fires only when a lower-bounded started_at is the sole
+    filter. An upper-bound-only window (cannot window the delete anti-set) and a
+    started_at bound mixed with any other predicate both fall back to GROUP BY.
+    """
+    # Upper bound only -> no lower bound to window the anti-set -> fall back.
+    assert_stats_sql(
+        tsi.CallsQueryStatsReq(
+            project_id="project",
+            query=_started_at_query(
+                {"$lt": [{"$getField": "started_at"}, {"$literal": 1709251200}]}
+            ),
+        ),
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.sortable_datetime < {pb_1:String})
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.started_at) < {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+        )
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-01 00:05:00.000000",
+            "pb_2": "project",
+        },
+        read_table=ReadTable.CALLS_MERGED,
+    )
+    # started_at lower bound + a non-time predicate -> not time-only -> fall back.
+    assert_stats_sql(
+        tsi.CallsQueryStatsReq(
+            project_id="project",
+            query=_started_at_query(
+                {
+                    "$and": [
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": 1709251200},
+                            ]
+                        },
+                        {"$eq": [{"$getField": "op_name"}, {"$literal": "x"}]},
+                    ]
+                }
+            ),
+        ),
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_3:String}
+            WHERE (calls_merged.sortable_datetime > {pb_2:String})
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.started_at) > {pb_0:String}))
+                AND ((any(calls_merged.op_name) = {pb_1:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+        )
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "x",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "project",
+        },
         read_table=ReadTable.CALLS_MERGED,
     )
 

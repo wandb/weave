@@ -49,8 +49,8 @@ def _get_mimetypes_module() -> ModuleType:
     if _mimetypes_module is None:
         import mimetypes as _m
 
-        # Mimetypes is missing text/markdown, add it on first use.
         _m.add_type("text/markdown", ".md")
+        _m.add_type("audio/wav", ".wav")
         _mimetypes_module = _m
     return _mimetypes_module
 
@@ -82,6 +82,14 @@ def _get_resolver() -> Any:
     return None
 
 
+# libmagic reports WAV as audio/x-wav; normalize detected types to the canonical
+# audio/wav so buffer- and filename-based detection agree. Caller-supplied
+# mimetypes don't pass through here and are preserved as-is.
+_DETECTED_MIMETYPE_ALIASES = {
+    "audio/x-wav": "audio/wav",
+}
+
+
 def _detect_from_resolver(
     *, filename: str | None, buffer: bytes | None
 ) -> tuple[str | None, str | None]:
@@ -92,7 +100,10 @@ def _detect_from_resolver(
     """
     resolver = _get_resolver()
     if resolver is not None:
-        return resolver.detect(filename=filename, buffer=buffer)
+        mimetype, extension = resolver.detect(filename=filename, buffer=buffer)
+        if mimetype is not None:
+            mimetype = _DETECTED_MIMETYPE_ALIASES.get(mimetype, mimetype)
+        return mimetype, extension
 
     if buffer is not None:
         logger.warning(
@@ -183,6 +194,8 @@ def guess_from_buffer(buffer: bytes) -> str | None:
         return None
 
     mimetype, _ = resolver.detect(filename=None, buffer=buffer)
+    if mimetype is not None:
+        mimetype = _DETECTED_MIMETYPE_ALIASES.get(mimetype, mimetype)
     return mimetype
 
 

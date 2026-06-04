@@ -51,3 +51,70 @@ describe('Turn', () => {
     expect(span.events.some(e => e.name === 'exception')).toBe(true);
   });
 });
+
+describe('Turn.setAttribute', () => {
+  setupGenAITestEnvironment();
+  const getExporter = setupExporterPerTest();
+
+  it('writes an attribute to the underlying span', () => {
+    const turn = Turn.create({});
+    turn.setAttribute('weave.cost.usd', 0.42);
+    turn.end();
+    const spans = getExporter().getFinishedSpans();
+    expect(findSpan(spans, 'invoke_agent').attributes['weave.cost.usd']).toBe(
+      0.42
+    );
+  });
+
+  it('returns this for chaining', () => {
+    const turn = Turn.create({});
+    expect(turn.setAttribute('k', 'v')).toBe(turn);
+    turn.end();
+  });
+
+  it('is a no-op after end()', () => {
+    const turn = Turn.create({});
+    turn.end();
+    turn.setAttribute('after.end', 'x');
+    const spans = getExporter().getFinishedSpans();
+    expect(
+      findSpan(spans, 'invoke_agent').attributes['after.end']
+    ).toBeUndefined();
+  });
+});
+
+describe('Turn.addEvent', () => {
+  setupGenAITestEnvironment();
+  const getExporter = setupExporterPerTest();
+
+  it('writes a named event with attributes', () => {
+    const turn = Turn.create({});
+    turn.addEvent('context_compacted', {items_before: 50, items_after: 10});
+    turn.end();
+    const spans = getExporter().getFinishedSpans();
+    const ev = findSpan(spans, 'invoke_agent').events.find(
+      e => e.name === 'context_compacted'
+    );
+    expect(ev?.attributes).toMatchObject({items_before: 50, items_after: 10});
+  });
+
+  it('returns this for chaining', () => {
+    const turn = Turn.create({});
+    expect(turn.addEvent('e')).toBe(turn);
+    turn.end();
+    const spans = getExporter().getFinishedSpans();
+    expect(
+      findSpan(spans, 'invoke_agent').events.find(e => e.name === 'e')
+    ).toBeDefined();
+  });
+
+  it('is a no-op after end()', () => {
+    const turn = Turn.create({});
+    turn.end();
+    turn.addEvent('after.end');
+    const spans = getExporter().getFinishedSpans();
+    expect(
+      findSpan(spans, 'invoke_agent').events.find(e => e.name === 'after.end')
+    ).toBeUndefined();
+  });
+});

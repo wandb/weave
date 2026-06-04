@@ -41,6 +41,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_agents_list_query,
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
+    make_conversation_previews_query,
     make_custom_attrs_schema_query,
     make_message_search_query,
     make_span_group_categorical_distributions_query,
@@ -334,6 +335,38 @@ _GROUPED_AGG_TAIL = """count() AS span_count,
                groupUniqArray(s.conversation_name) AS conversation_names,
                min(s.started_at) AS first_seen,
                max(s.started_at) AS last_seen"""
+
+
+class TestMakeConversationPreviewsQuery:
+    def test_scoped_to_conversation_ids(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_conversation_previews_query(pb, "p1", ["conv-a", "conv-b"])
+        expected = """
+            SELECT s.conversation_id AS conversation_id,
+                   argMinIf(s.input_messages, s.started_at, length(s.input_messages) > 0) AS first_input_messages,
+                   argMaxIf(s.output_messages, s.ended_at, length(s.output_messages) > 0) AS last_output_messages
+            FROM spans s
+            WHERE s.project_id = {genai_0:String} AND s.conversation_id IN {genai_1:Array(String)}
+            GROUP BY conversation_id
+        """
+        assert_sql(
+            expected,
+            {"genai_0": "p1", "genai_1": ["conv-a", "conv-b"]},
+            query,
+            pb.get_params(),
+        )
+
+    def test_applies_time_range(self) -> None:
+        pb = ParamBuilder("genai")
+        start = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2024, 1, 2, tzinfo=datetime.timezone.utc)
+        query = make_conversation_previews_query(
+            pb, "p1", ["conv-a"], started_after=start, started_before=end
+        )
+        # Time bounds let ClickHouse prune partitions / primary-key ranges so the
+        # wide message columns are read for an even smaller slice.
+        assert "s.started_at >= {genai_2:DateTime64(6)}" in query
+        assert "s.started_at < {genai_3:DateTime64(6)}" in query
 
 
 class TestMakeGroupedSpansCountQuery:

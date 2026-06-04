@@ -759,6 +759,8 @@ def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
             max_retries=2,
             api_transport="rest",
             credentials=AnonymousCredentials(),
+            # pin project to match cassette; don't inherit GOOGLE_CLOUD_PROJECT from CI
+            project="wandb-qa",
         )
 
         messages = [

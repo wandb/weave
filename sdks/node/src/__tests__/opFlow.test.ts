@@ -1,4 +1,4 @@
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 import {wrapOpenAIChatCompletionsCreate} from '../integrations/openai';
 import {op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';

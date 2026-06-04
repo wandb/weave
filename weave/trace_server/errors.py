@@ -284,7 +284,6 @@ class ErrorRegistry:
         self.register(InvalidIdFormat, 400)
 
         # 403
-        self.register(InvalidFieldError, 403)
         self.register(QueryIllegalTypeofArgumentError, 403)
         self.register(BadQueryParameterError, 403)
 
@@ -297,6 +296,9 @@ class ErrorRegistry:
         # 413
         self.register(InsertTooLarge, 413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
+
+        # 422 - well-formed request, but the field/value it asks for is unsupported
+        self.register(InvalidFieldError, 422)
 
         # 501
         self.register(LightweightUpdateNotAllowedError, 501)

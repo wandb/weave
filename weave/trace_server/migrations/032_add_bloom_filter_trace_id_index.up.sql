@@ -13,9 +13,13 @@
 -- `ifNull(trace_id, '')` (and matching the predicate in the query layer
 -- character-for-character) makes the comparison non-nullable on both
 -- sides so the index actually fires.
+-- alter_sync = 1 forces the metadata change to land on the local replica
+-- before the next statement runs, so the MATERIALIZE below is guaranteed
+-- to see the new index (matches the convention in migrations 012 and 028).
 ALTER TABLE calls_merged
     ADD INDEX IF NOT EXISTS idx_trace_id_bloom
-        ifNull(trace_id, '') TYPE bloom_filter(0.01) GRANULARITY 1;
+        ifNull(trace_id, '') TYPE bloom_filter(0.01) GRANULARITY 1
+    SETTINGS alter_sync = 1;
 
 -- Kick off background materialization for existing parts. mutations_sync
 -- defaults to 0, so this returns immediately and ClickHouse runs the

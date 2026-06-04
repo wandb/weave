@@ -1,7 +1,7 @@
 import {withAttributes, op} from 'weave';
 
 import {initWithCustomTraceServer} from './clientMock';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 import {Settings} from '../settings';
 
 describe('attributes context', () => {
