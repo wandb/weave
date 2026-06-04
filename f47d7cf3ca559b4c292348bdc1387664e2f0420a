@@ -71,3 +71,18 @@ read op.* attributes directly; too invasive for one PR).
 - The 5 pre-existing test_evaluation_invalid_model_name failures look like a real
   ordering bug (validate model name before require_weave_client). Out of scope for
   this stack, but worth a separate fix.
+
+## Addendum: CallFinisher __slots__ (perf)
+User asked whether creating a CallFinisher per traced call adds significant
+overhead. Benchmarked (py3.12, 1M iters, min of 7) creation cost:
+- closure (pre-refactor): ~100 ns
+- CallFinisher without __slots__: +5.5 ns vs closure (dict-instance)
+- CallFinisher WITH __slots__: parity with closure (~0 ns delta)
+Memory: 72 bytes (slots) vs 160 bytes (obj+__dict__) per instance.
+Context: a real traced call costs micro-to-milliseconds (serialization,
+contextvars, server batching), so +5.5 ns was already ~0.001% — negligible.
+Added __slots__ anyway because it's free, deterministically halves per-instance
+memory, and removes the only measurable regression vs the old closure. No
+dynamic attributes are needed on CallFinisher. Inline comment in op_lifecycle.py
+documents the rationale. Benchmark script: .context/bench_callfinisher.py
+(gitignored). All 94 op tests still pass with slots.
