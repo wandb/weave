@@ -14,6 +14,7 @@ message wins and the parent invoke output is suppressed.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -388,6 +389,30 @@ def _select_root_span(spans: list[AgentSpanSchema]) -> AgentSpanSchema:
     return max(spans, key=_root_sort_key)
 
 
+def _display_text(content: str) -> str:
+    """Extract human-readable text from a message content field.
+
+    Content is either plain text (legacy) or a JSON-serialized parts array
+    (multimodal messages).  For parts arrays, concatenate text and reasoning
+    parts; for plain text, return as-is.
+    """
+    if not content or not content.startswith("["):
+        return content
+    try:
+        parts = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return content
+    if not isinstance(parts, list):
+        return content
+    texts: list[str] = []
+    for p in parts:
+        if isinstance(p, dict) and isinstance(p.get("content"), str):
+            texts.append(p["content"])
+        elif isinstance(p, str):
+            texts.append(p)
+    return "\n".join(texts)
+
+
 def _filter_message_texts(
     messages: list[NormalizedMessage],
     *,
@@ -398,14 +423,14 @@ def _filter_message_texts(
     texts: list[str] = []
     for message in messages:
         role = message.role
-        content = message.content
-        if not content:
+        text = _display_text(message.content)
+        if not text:
             continue
         if include_roles is not None and role not in include_roles:
             continue
         if exclude_roles is not None and role in exclude_roles:
             continue
-        texts.append(content)
+        texts.append(text)
     return texts
 
 

@@ -1,6 +1,8 @@
 import datetime
 import json
+import os
 from unittest import mock
+from unittest.mock import patch
 
 import pytest
 
@@ -333,11 +335,12 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
             "model_ref": model_ref_uri,
         }
     )
-    # Mock the LLM completions for all the calls during evaluation
-    # This is a simplified mock - in reality the evaluation would make multiple calls
-    with with_simple_mock_litellm_completion(
-        json.dumps({"score": 9})
-    ):  # Mock score response
+    # Mock the LLM completions for all the calls during evaluation.
+    # Also provide a fake OPENAI_API_KEY so the secret fetcher finds a key.
+    with (
+        with_simple_mock_litellm_completion(json.dumps({"score": 9})),
+        patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}),
+    ):
         eval_res = evaluate_model_fn(req)
 
     # Query for calls
@@ -349,14 +352,12 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         )
     )
 
-    # Here are the 9 calls that are expected:
+    # Expected calls on ClickHouse (completions write to spans table, not calls):
     # evaluate
     # predict_and_score
     #    predict
-    #       complete
     #    score
     #       predict
-    #          complete
     # summary
     #    scorer summary
     # Note: SQLite does not support calling the LLM, so it is not correct.
@@ -365,7 +366,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     if is_sqlite:
         assert len(calls_res.calls) == 5
     else:
-        assert len(calls_res.calls) == 9
+        assert len(calls_res.calls) == 7
 
     # Query for the specific evaluation call
     eval_calls_res = client.server.calls_query(
