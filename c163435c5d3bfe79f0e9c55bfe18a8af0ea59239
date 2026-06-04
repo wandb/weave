@@ -1,0 +1,58 @@
+## Conversation
+Phase-1 stack, branch 2/N. User corrected the migration model mid-stack:
+trace_server/ is intended to move to core WHOLESALE; anything OSS still needs
+must go to a shared dir (weave/shared/). So Phase 1 = lift shared code OUT of
+trace_server/ INTO weave/shared/, not split files in place. This branch is the
+first clean "lift to shared" — the granularity helpers, which are pure and have
+zero trace_server deps.
+
+## Actions
+- Created weave/shared/granularity.py with MAX_BUCKETS, BUCKET_THRESHOLD_*,
+  GRANULARITY_*, auto_select_granularity_seconds, ensure_max_buckets (copied
+  verbatim from stats_query_base.py).
+- Removed those defs from calls_query_builder/stats_query_base.py; added
+  `from weave.shared.granularity import auto_select_granularity_seconds,
+  ensure_max_buckets` (used by determine_bounds_and_bucket).
+- Repointed consumers to weave.shared.granularity: feedback_stats_query_builder
+  (split a mixed import block, keeping SqlQueryResult/StatsQueryBuildResult/
+  aggregation_selects_for_metric from stats_query_base), agent_stats_query_builder,
+  methods/sqlite_feedback_stats, methods/feedback_stats.
+- Left usage_query_builder + call_metrics_query_builder untouched (they import
+  non-granularity symbols from stats_query_base).
+- ruff --fix reordered imports in 2 files (I001).
+
+## Verification
+- ruff check: clean on all 6 touched files.
+- Real-order import smoke (sqlite_trace_server first): OK.
+- pytest (sqlite): test_call_stats + query_builder/test_feedback_stats +
+  query_builder/test_agent_stats_query_builder + tests/trace/test_feedback =
+  130 passed, 5 skipped.
+
+## Errors & Mistakes
+- My import smoke test initially imported methods.sqlite_feedback_stats DIRECTLY
+  and hit an ImportError: circular import sqlite_trace_server <-> sqlite_feedback_stats.
+  This is PRE-EXISTING (sqlite_feedback_stats line ~20 imports sqlite_trace_server;
+  sqlite_trace_server line 59 imports sqlite_feedback_stats). It only triggers when
+  sqlite_feedback_stats is imported FIRST; the real app always reaches it via
+  sqlite_trace_server, which resolves the cycle. My change did not create or worsen
+  it. Verified by importing in real order + running tests.
+
+## Hints for Future Agents
+- DO NOT import weave.trace_server.methods.sqlite_feedback_stats directly/first in
+  a smoke test — it falsely looks broken due to the pre-existing cycle. Import
+  sqlite_trace_server first.
+- Stack is rooted on origin/master; local master is stale + locked in another
+  worktree, so gt log shows phantom "ahead" counts. Cosmetic; PRs vs remote master
+  are correct. Run `gt sync` elsewhere to clean the view. Do NOT submit PRs without
+  user confirmation.
+
+## Codebase Discoveries
+- stats_query_base.py is a MIXED module: pure granularity helpers (now moved) +
+  ClickHouse SQL builders (determine_bounds_and_bucket, build_grouped_calls_subquery,
+  etc.) that stay. The pure half is what the SQLite/fake path needed.
+
+## Open Questions
+- The remaining shared business logic (cost defs, feedback schema discovery) and
+  the whole interface (tsi/orm/validation) depend on each other; cleanly moving
+  them to shared/ requires relocating the INTERFACE to shared first (the backbone,
+  ~55 client import sites). Pending user direction on that big move.
