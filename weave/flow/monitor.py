@@ -97,13 +97,14 @@ class Monitor(Object):
     @field_validator("op_names", mode="before")
     @classmethod
     def _coerce_op_name_refs_to_str(cls, value: Any) -> Any:
-        """Store op-name refs as their URI string.
+        """Access op-name refs as their URI string.
 
-        ``activate()`` persists ``op_names`` as full ``weave://`` op refs
-        (WB-33908). Weave's value layer turns those ref-shaped strings back into
-        ``Ref`` objects on read. We don't want that, so we coerce them back to strings
-        first, which allows us to satisfy ``list[AgentSpanOpName | str]`` when
-        objectifying a stored Monitor.
+        ``op_names`` is stored as full ``weave://`` op refs (WB-33908). When a
+        stored Monitor is loaded, Weave's value layer turns those ref-shaped
+        strings back into ``Ref`` objects, which the ``list[AgentSpanOpName |
+        str]`` field would reject. Pydantic runs this ``mode="before"`` validator
+        automatically on every load/construct; it maps any ``Ref`` back to its
+        URI string so the Monitor objectifies cleanly.
         """
         if isinstance(value, list):
             return [item.uri() if isinstance(item, Ref) else item for item in value]
