@@ -1,0 +1,57 @@
+## Conversation
+Phase-1 stack branch 3/N (corrected "lift shared code to weave/shared" model).
+User asked "what's wrong with TTL?" re: my earlier "Chesterton wrinkle" flag.
+Explained Chesterton's Fence + that the only concern was the vestigial SQLite
+invalidate_ttl_cache call. User said proceed (TTL included).
+
+## Actions
+- Created weave/shared/ttl.py with compute_expire_at + RETENTION_DAYS_NO_TTL
+  (copied verbatim).
+- ttl_settings.py: removed both defs + the now-unused `import datetime`; added
+  `from weave.shared.ttl import RETENTION_DAYS_NO_TTL` (used internally).
+- Repointed importers to weave.shared.ttl: clickhouse_trace_server_batched
+  (RETENTION_DAYS_NO_TTL), clickhouse/schema_converters (compute_expire_at),
+  sqlite_trace_server (both), tests/trace_server/test_ttl_settings
+  (compute_expire_at; kept the rest from ttl_settings).
+- Dropped the SQLite invalidate_ttl_cache import + the call at
+  project_ttl_settings_update.
+- ruff --fix corrected import order in 3 files (I001).
+
+## Chesterton check (why dropping the SQLite invalidate call is safe)
+- `git log -S invalidate_ttl_cache -- sqlite_trace_server.py` -> added in
+  14bc4a1a54 (#6181 "add TTL settings GET/POST API endpoints"), no git note.
+- get_project_retention_days (the ONLY populator of _project_ttl_cache) is called
+  only by clickhouse_trace_server_batched + TTL unit tests; SQLite uses its own
+  uncached _get_project_retention_days. So SQLite never populates/reads that cache;
+  invalidating it is a no-op in a SQLite deployment. Added for CH parity.
+- Cache test-isolation is handled by reset_ttl_cache() fixtures, not by this call.
+
+## Verification
+- ruff: clean on all 6 files.
+- import smoke (sqlite_trace_server first): OK; shared.ttl has both symbols;
+  ttl_settings.compute_expire_at gone; RETENTION_DAYS_NO_TTL re-imported.
+- grep: zero invalidate_ttl_cache refs left in sqlite_trace_server.py.
+- pytest (sqlite): test_ttl_settings (4) + test_ttl_insert_paths (13) +
+  test_call_stats (11) + tests/trace/test_feedback (21, 5 skipped) =
+  49 passed, 5 skipped.
+
+## Errors & Mistakes
+None. (schema_converters CH path not run live — no Docker; covered by import
+smoke + test_compute_expire_at unit test.)
+
+## Hints for Future Agents
+- weave/shared/ now holds granularity.py (branch 2) and ttl.py (branch 3).
+- The remaining Phase-1 items (cost defs, feedback schema discovery) depend on
+  the interface (tsi/orm/validation), which is still in trace_server. They CANNOT
+  move to shared/ without a shared->trace_server edge (wrong direction). The
+  interface relocation to weave/shared/ is the backbone and is large (~55 client
+  import sites). Pending user direction.
+
+## Codebase Discoveries
+- ttl_settings.py is mixed: pure helpers (moved) + a 2-layer (in-proc + redis)
+  retention cache reading from ClickHouse (stays, core-bound).
+
+## Open Questions
+- No sqlite-specific test exercises project_ttl_settings_update end-to-end
+  (coverage gap), but the change is a no-op removal verified by Chesterton +
+  import smoke + read-after-write reasoning.
