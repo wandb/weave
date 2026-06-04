@@ -1,0 +1,71 @@
+## Conversation
+Major plan pivot this session. User clarified the END GOAL: move the ENTIRE
+weave/trace_server/ dir into core. So the work is to break client<->server deps,
+with target structure:
+  weave/                         (client; gets its own trace_server_interface)
+  weave/trace_server/            (server; -> core)
+    interface/                   (the CONTRACT)
+    shared/                      (shared between the two impls)
+    sqlite_trace_server/
+    clickhouse_trace_server/
+User's ordered steps: 1) move server interface  2) make sqlite_/clickhouse_
+dirs + move impls  3) extract common bits -> shared  4) update the client.
+User defined "interface" precisely: "the contract that the trace server
+implementations define" -> ABCs + request/response models + signature types.
+NOT errors/ids/constants/trace_server_converter (those are shared utils -> step 3).
+
+This commit is STEP 1.
+
+## Actions
+- git mv trace_server_interface.py, common_interface.py, service_interface.py,
+  http_service_interface.py -> weave/trace_server/interface/ (query, feedback_types,
+  builtin_object_classes were already there).
+- Repointed cross-imports among the moved contract modules to the interface/
+  paths (service_interface->common_interface; tsi->his/common_interface/
+  service_interface; updated the back-compat comment).
+- Created thin re-export shims at the 4 old top-level paths:
+  `from weave.trace_server.interface.<mod> import *  # noqa: F403`.
+- Left errors/ids/constants/trace_server_converter/validation/agents in place
+  (not interface; agents.types stays, tsi still imports it; its TYPE_CHECKING
+  import of tsi resolves via the shim).
+
+## Verification
+- Import smoke: `import weave` (client) + both servers import OK.
+- Shim completeness: interface.trace_server_interface has 307 public names;
+  0 missing on the old-path shim. http_service_interface 11/11.
+- ruff: clean on all 8 files.
+- pytest (sqlite): tests/trace/test_weave_client (95) + test_client_trace (121)
+  + test_service_interface + test_trace_server_interface_util =
+  220 passed, 20 skipped.
+
+## Errors & Mistakes
+- Earlier in the session I built branches that moved granularity/ttl to the
+  CLIENT-level weave/shared/ (wrong: those are server-impl-shared -> they belong
+  in weave/trace_server/shared/, which moves to core). Those branches
+  (andrew/ts-split-feedback-cap, ts-shared-granularity, ts-shared-ttl) are
+  SUPERSEDED by this plan. The granularity/ttl extraction + feedback-cap cleanup
+  get re-applied in step 3 (-> trace_server/shared/). This branch was reset off
+  origin/master.
+
+## Hints for Future Agents
+- git did NOT record these as renames (old path persists as a shim), so the diff
+  shows modify-old + add-new. Use `git log --follow` if tracing history.
+- `import *` shims fully re-export (no __all__ in the source modules, so all
+  public names propagate). If a future module adds __all__, the shim would narrow.
+- Step 2 next: create weave/trace_server/{sqlite_trace_server,clickhouse_trace_server}/
+  and move the impls in (with shims). Step 3: extract shared utils (errors, ids,
+  constants, granularity, ttl, feedback fmt, orm, ...) -> trace_server/shared/.
+  Step 4: client gets its own trace_server_interface (thin wrapper now), repoint
+  the ~169 client imports, then the old top-level shims can go.
+- Stack rooted on origin/master; local master stale+locked in another worktree,
+  so gt shows phantom 'ahead' counts. Cosmetic. Do NOT submit PRs without user OK.
+
+## Codebase Discoveries
+- The contract surface is large: 307 public names in trace_server_interface.
+- tsi re-exports EnsureProjectExistsRes/ProjectsInfoReq/ProjectsInfoRes from
+  service_interface (noqa F401) for back-compat; preserved.
+
+## Open Questions
+- Whether errors/ids/constants ultimately live in trace_server/shared/ (server
+  side) or also need client-side copies (step 4) — TBD when wiring the client's
+  own interface.
