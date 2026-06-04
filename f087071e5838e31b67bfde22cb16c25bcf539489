@@ -1,0 +1,38 @@
+## Conversation
+Bottom of a 2-branch stack from the user's "use gt for this 1. delete cassettes
+2. delete gql" request (after an unused-file scan seeded by "I dont think the
+wb_schema is used anymore"). User follow-up: "where is the cassette removal
+branch? You need to add that too. Then rebase this whole thing off of origin
+master." -> I had made them SIBLING branches; from the workspace (on the gql
+branch) the cassette deletions weren't visible. Restructured into a stack
+(cassettes bottom -> gql top) and rebased onto the new origin/master.
+
+## What & Why
+git rm of 7 orphaned pytest-recording cassettes whose test function no longer
+exists (verified via .context/find_orphan_cassettes.py: 190 cassettes vs 3370
+defined test fns; exactly these 7 unmatched):
+- llamaindex test_llamaindex_quickstart{,_async} (test is now
+  test_llamaindex_quick_start, underscored)
+- openai test_openai_quickstart (split into async/stream/responses variants)
+- test_autopatch/{configuration_with_dicts,disabled_integration_doesnt_patch,
+  enabled_integration_patches,passthrough_op_kwargs} (tests gone; dir is a
+  leftover from when test_autopatch.py lived under openai/).
+
+## History / rebases
+- Originally committed as a1b7c0e5e5 on origin/master@120c265879.
+- origin/master then advanced to 0b3db35cf6; user asked to rebase off origin
+  master. `git rebase origin/master` -> new SHA f087071e58. Clean, no conflicts.
+- git notes do NOT follow rebase here, so this note was re-added to the new SHA.
+
+## gt mechanics / gotchas
+- gt trunk = LOCAL master, which is ~175 commits behind origin/master and is
+  checked out in the main worktree (/Users/andrew/conductor/weave) so it can't
+  be fast-forwarded from here. gt therefore reports '175 commits' for this
+  branch -- COSMETIC. The real base is origin/master: origin/master..HEAD == 1.
+  `gt restack` would rebase onto STALE local master, so I rebased onto
+  origin/master with plain git instead.
+- Bash `grep` is ripgrep: `\\|` is literal, `-E`/`--include` error. Verify with
+  the Grep tool. (This nearly produced false orphans earlier in the scan.)
+
+## Open Questions
+None. Not pushed/submitted yet.
