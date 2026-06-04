@@ -238,7 +238,6 @@ def make_queue_delete_query(
     pb: ParamBuilder,
     table_name: str,
     cluster_name: str | None = None,
-    table_name: str = "annotation_queues",
 ) -> str:
     """Generate an UPDATE query to soft-delete an annotation queue.
 
@@ -252,9 +251,6 @@ def make_queue_delete_query(
             `annotation_queues_local` because lightweight UPDATE/DELETE are
             unsupported on the Distributed engine.
         cluster_name: Optional ClickHouse cluster name for distributed mutations
-        table_name: Concrete table to mutate. Callers in distributed mode pass
-            `annotation_queues_local` because lightweight UPDATE/DELETE are
-            unsupported on the Distributed engine.
 
     Returns:
         SQL query string for soft-deleting a queue
@@ -282,7 +278,6 @@ def make_queue_update_query(
     pb: ParamBuilder,
     table_name: str,
     cluster_name: str | None = None,
-    table_name: str = "annotation_queues",
     *,
     name: str | None = None,
     description: str | None = None,
@@ -664,7 +659,6 @@ def make_annotator_progress_update_query(
     pb: ParamBuilder,
     table_name: str,
     cluster_name: str | None = None,
-    table_name: str = "annotator_queue_items_progress",
 ) -> str:
     """Generate an UPDATE query to update annotator progress for a queue item.
 
@@ -678,9 +672,6 @@ def make_annotator_progress_update_query(
             `annotator_queue_items_progress_local` because lightweight UPDATE
             is unsupported on the Distributed engine.
         cluster_name: Optional ClickHouse cluster name for distributed mutations
-        table_name: Concrete table to mutate. Callers in distributed mode pass
-            `annotator_queue_items_progress_local` because lightweight UPDATE
-            is unsupported on the Distributed engine.
 
     Returns:
         SQL query string for updating annotator progress
