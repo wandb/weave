@@ -516,6 +516,7 @@ jobs:
       - name: Set up uv (cached)
         uses: astral-sh/setup-uv@v7
         with:
+          version: "0.11.19"
           enable-cache: true
           cache-local-path: ${{ runner.temp }}\uv-cache
           cache-dependency-glob: "**/pyproject.toml"
@@ -603,6 +604,7 @@ jobs:
       - name: Set up uv (cached)
         uses: astral-sh/setup-uv@v7
         with:
+          version: "0.11.19"
           enable-cache: true
           cache-local-path: ${{ runner.temp }}\uv-cache
           cache-dependency-glob: "**/pyproject.toml"
