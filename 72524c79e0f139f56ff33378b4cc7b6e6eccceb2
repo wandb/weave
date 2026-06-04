@@ -1,0 +1,49 @@
+## Conversation
+Part of the "analyze import/init slowness" task. This is the demonstrated fix for
+the #1 hotspot found by profiling: jsonschema's eager format-checker imports.
+
+## Actions
+- Found via -X importtime: rfc3987_syntax.syntax_helpers = 0.45s self (~40% of
+  the whole `import weave`). Traced the chain: jsonschema -> jsonschema._format
+  -> (installed extras) -> rfc3987_syntax builds a Lark grammar.
+- Confirmed plain `import jsonschema` loads fqdn/isoduration/uri_template/
+  webcolors/rfc3986_validator/rfc3987_syntax via sys.modules diff.
+- grep showed only two top-level importers on the path:
+  weave/trace_server/interface/builtin_object_classes/{annotation_spec,actions}.py.
+- Both use jsonschema ONLY inside @field_validator / value_is_valid, never at
+  module scope, so deferring the import is safe.
+- Moved `import jsonschema` into the 3 functions with a comment explaining why.
+
+## Errors & Mistakes
+None for the edit itself. (See the profiler commit's note for the zsh
+word-splitting mishap while generating before/after artifacts.)
+
+## Dead Ends
+- Considered preventing jsonschema's _format auto-import instead, but that's
+  jsonschema-internal and depends on which extras are installed; the weave-side
+  lazy import is the clean, robust fix.
+
+## Hints for Future Agents
+- This deviates from the repo's "imports at top of file" rule. It is an
+  intentional, commented performance exception: the dep is heavy at import and
+  only needed at validation time. Keep the explanatory comment if you touch it.
+- The win only fully materializes when the jsonschema format extras (esp.
+  rfc3987-syntax + lark) are installed in the environment; it's still a strict
+  improvement otherwise (an unused-at-import dep is no longer imported eagerly).
+
+## Codebase Discoveries
+- weave never uses jsonschema format checking (calls validate() with no
+  format_checker), so none of the format-checker libs are needed at all on the
+  import path.
+
+## Verification
+- tests/trace/test_base_object_classes.py: 11 passed (sqlite).
+- Functional: valid schemas accepted; invalid -> SchemaError; value_is_valid
+  pass/fail correct; response_schema valid/invalid correct.
+- `import weave` no longer loads rfc3987_syntax/jsonschema (sys.modules check).
+- ruff clean.
+
+## Open Questions
+- Follow-up: defer httpx/gql/graphql (via trace_server.errors) and
+  sentry_sdk/urllib3 (via durability.wal -> telemetry.trace_sentry) to init for
+  ~0.25s more off cold import.
