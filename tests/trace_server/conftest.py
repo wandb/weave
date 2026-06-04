@@ -41,6 +41,24 @@ class ClickHouseSessionState:
     truncatable_tables: list[str]
 
 
+@pytest.fixture(autouse=True)
+def enable_calls_merged_heavy_indexes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default `WF_CALLS_MERGED_HEAVY_INDEXES=true` for every trace_server test.
+
+    The bloom-eligible candidate-CTE path (added in migration 031 + PR 6695)
+    is operator-gated by this env flag. Tests across `tests/trace_server/`
+    pin the post-flag SQL shape (the candidate CTE + `ifNull(<dump>, '')`
+    wrap) AND the post-flag runtime behavior (integration tests against
+    ClickHouse that assert the CTE narrows unmerged-parts correctly). All
+    of those tests assume the flag is on. Defaulting here keeps the
+    assumption explicit and uniform; individual tests that need the
+    off-path call
+    `monkeypatch.delenv("WF_CALLS_MERGED_HEAVY_INDEXES", raising=False)`
+    in their body.
+    """
+    monkeypatch.setenv("WF_CALLS_MERGED_HEAVY_INDEXES", "true")
+
+
 def pytest_addoption(parser):
     try:
         parser.addoption(

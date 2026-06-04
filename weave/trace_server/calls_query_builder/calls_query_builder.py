@@ -40,6 +40,7 @@ from weave.shared.trace_server_interface_util import (
     wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import ch_sentinel_values
+from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
@@ -1824,10 +1825,11 @@ class CallsQuery(BaseModel):
         can `id IN filter_candidate_ids` and inherit both prunes:
 
         1. trace_id (migration 032 / idx_trace_id_bloom on ifNull(trace_id, '')).
-           Pushed when hardcoded_filter has trace_ids.
+           Pushed when hardcoded_filter has trace_ids. Always-on.
         2. heavy-field LIKE (migration 033 / idx_<dump>_ngram on ifNull(<dump>, '')).
            Pushed when the strict heavy-LIKE form is non-empty AND ORDER BY
-           does not reference a heavy field or aggregate-state column.
+           does not reference a heavy field or aggregate-state column. Gated
+           on `WF_CALLS_MERGED_HEAVY_INDEXES` for operator-controlled rollout.
 
         The outer filter_query keeps the OR-IS-NULL form for unmerged-call-part
         correctness, which defeats both bloom indexes, so this CTE runs the
@@ -1844,6 +1846,10 @@ class CallsQuery(BaseModel):
             self.hardcoded_filter and self.hardcoded_filter.filter.trace_ids
         )
 
+        # Heavy-LIKE pushdown is operator-gated for rollout. The trace_id
+        # bloom (always-on) is unaffected.
+        heavy_path_enabled = wf_env.wf_calls_merged_heavy_indexes_enabled()
+
         # Heavy-LIKE strict has extra ORDER-BY gates because the heavy-LIKE
         # path mirrors the outer ORDER BY/LIMIT/OFFSET in this CTE. Aggregate-
         # state ORDER BY columns (argMaxMerge over AggregateFunction(...)
@@ -1851,7 +1857,9 @@ class CallsQuery(BaseModel):
         # display_name raw) raise ILLEGAL_TYPE_OF_ARGUMENT without a GROUP BY.
         # SimpleAggregateFunction columns (`any`, `array_concat_agg`) are
         # fine; their raw value IS the aggregated value.
-        heavy_eligible = not any(of.field.is_heavy() for of in self.order_fields)
+        heavy_eligible = heavy_path_enabled and not any(
+            of.field.is_heavy() for of in self.order_fields
+        )
         if heavy_eligible:
             for of in self.order_fields:
                 if isinstance(of.field, CallsMergedSummaryField):

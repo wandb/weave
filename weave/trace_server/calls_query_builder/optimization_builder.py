@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from weave.trace_server import environment as wf_env
 from weave.trace_server.calls_query_builder.utils import (
     NotContext,
     param_slot,
@@ -410,14 +411,16 @@ def process_query_to_optimization_sql(
     heavy_field_result = apply_processor(heavy_field_processor, and_operation)
     heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
 
-    # Also produce the strict (no OR-IS-NULL) variant for the index-friendly
-    # candidate-id CTE. For calls_complete this matches heavy_field_result_sql;
-    # ParamBuilder dedupes params by value so this doesn't bloat the parameters.
-    strict_processor = HeavyFieldOptimizationProcessor(
-        param_builder, table_alias, use_null_check=False
-    )
-    strict_result = apply_processor(strict_processor, and_operation)
-    strict_result_sql = strict_processor.finalize_sql(strict_result)
+    # Strict (no OR-IS-NULL) variant for the bloom-friendly candidate-CTE.
+    # Env-gated to match _build_filter_candidate_ids_cte_sql (builder returns None when off).
+    if wf_env.wf_calls_merged_heavy_indexes_enabled():
+        strict_processor = HeavyFieldOptimizationProcessor(
+            param_builder, table_alias, use_null_check=False
+        )
+        strict_result = apply_processor(strict_processor, and_operation)
+        strict_result_sql = strict_processor.finalize_sql(strict_result)
+    else:
+        strict_result_sql = None
 
     sortable_datetime_result_sql = None
     if config.use_aggregation:
@@ -473,12 +476,17 @@ def _create_like_condition(
 ) -> str:
     """Creates a LIKE condition for a JSON field.
 
-    The dump column is wrapped in `ifNull(..., '')` so that the expression
-    matches the `idx_inputs_dump_ngram` ngram bloom filter index on
-    calls_merged (see migration 033), and so that LIKE never returns NULL
-    over Nullable(String) columns.
+    When `WF_CALLS_MERGED_HEAVY_INDEXES` is enabled, the dump column is
+    wrapped in `ifNull(..., '')` so that the expression matches the
+    `idx_<dump>_ngram` ngram bloom filter index expression on calls_merged
+    (see migration 033), and so that LIKE never returns NULL over
+    Nullable(String) columns. When the flag is off, we emit the raw column
+    reference so the query path matches pre-bloom behavior exactly.
     """
-    field_name = f"ifNull({table_alias}.{field}, '')"
+    if wf_env.wf_calls_merged_heavy_indexes_enabled():
+        field_name = f"ifNull({table_alias}.{field}, '')"
+    else:
+        field_name = f"{table_alias}.{field}"
 
     if case_insensitive:
         param_name = pb.add_param(like_pattern.lower())
