@@ -1,25 +1,13 @@
 from __future__ import annotations
 
-import importlib
-from collections.abc import Callable
-from typing import TYPE_CHECKING
-
 from groq.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
 from groq.types.chat.chat_completion import Choice
 from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
 from groq.types.completion_usage import CompletionUsage
 
-import weave
-from weave.integrations.integration_utilities import should_use_accumulator
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import _add_accumulator
-
-if TYPE_CHECKING:
-    pass
-
-
-_groq_patcher: MultiPatcher | None = None
+from weave.integrations._llm_provider import Endpoint, LLMProviderPatcher
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher
+from weave.trace.autopatch import IntegrationSettings
 
 
 def groq_accumulator(
@@ -87,60 +75,27 @@ def groq_accumulator(
     return acc
 
 
-def groq_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
-    def wrapper(fn: Callable) -> Callable:
-        op_kwargs = settings.model_dump()
-        op = weave.op(fn, **op_kwargs)
-        return _add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: groq_accumulator,
-            should_accumulate=should_use_accumulator,
-        )
+# NOTE: groq's async endpoint historically did NOT use the async passthrough
+# wrapper (unlike cerebras), so async_passthrough is left at its default (False).
+_GROQ_ENDPOINTS = [
+    Endpoint(
+        module="groq.resources.chat.completions",
+        symbol="Completions.create",
+        op_name="groq.chat.completions.create",
+        accumulator=lambda inputs: groq_accumulator,
+    ),
+    Endpoint(
+        module="groq.resources.chat.completions",
+        symbol="AsyncCompletions.create",
+        op_name="groq.async.chat.completions.create",
+        accumulator=lambda inputs: groq_accumulator,
+    ),
+]
 
-    return wrapper
+_groq_provider = LLMProviderPatcher(_GROQ_ENDPOINTS)
 
 
 def get_groq_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
-    if settings is None:
-        settings = IntegrationSettings()
-
-    if not settings.enabled:
-        return NoOpPatcher()
-
-    global _groq_patcher  # noqa: PLW0603
-    if _groq_patcher is not None:
-        return _groq_patcher
-
-    base = settings.op_settings
-
-    chat_completions_settings = base.model_copy(
-        update={
-            "name": base.name or "groq.chat.completions.create",
-            "kind": base.kind or "llm",
-        }
-    )
-    async_chat_completions_settings = base.model_copy(
-        update={
-            "name": base.name or "groq.async.chat.completions.create",
-            "kind": base.kind or "llm",
-        }
-    )
-
-    _groq_patcher = MultiPatcher(
-        [
-            SymbolPatcher(
-                lambda: importlib.import_module("groq.resources.chat.completions"),
-                "Completions.create",
-                groq_wrapper(chat_completions_settings),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("groq.resources.chat.completions"),
-                "AsyncCompletions.create",
-                groq_wrapper(async_chat_completions_settings),
-            ),
-        ]
-    )
-
-    return _groq_patcher
+    return _groq_provider.get(settings)
