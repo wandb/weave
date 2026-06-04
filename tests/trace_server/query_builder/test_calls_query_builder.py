@@ -1302,7 +1302,14 @@ def test_calls_query_with_like_optimization_env_off(
 
 
 def test_calls_query_with_like_optimization_contains() -> None:
-    """Test that contains operations on JSON fields use LIKE optimization."""
+    """Case-insensitive contains emits NO candidate CTE.
+
+    `lower(ifNull(<dump>, '')) LIKE` cannot use the `idx_<dump>_ngram` index
+    (built on `ifNull(<dump>, '')`, not its lowercased form), so a strict
+    candidate over it prunes nothing. The strict pass drops case-insensitive
+    conditions; with only one CI condition here, no candidate CTE is emitted
+    and the outer query keeps the lower() LIKE pre-filter.
+    """
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_condition(
@@ -1320,29 +1327,23 @@ def test_calls_query_with_like_optimization_contains() -> None:
     assert_sql(
         cq,
         """
-        WITH filter_candidate_ids AS (
-            SELECT calls_merged.id AS id
-            FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_1:String}
-            WHERE (lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_0:String}))
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
-        WHERE (calls_merged.id IN filter_candidate_ids)
-            AND ((lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_0:String} OR calls_merged.inputs_dump IS NULL))
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE ((lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), ''), {pb_3:String}) > 0)
+            (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
         {
-            "pb_0": '%"%hello%"%',
-            "pb_1": "project",
-            "pb_2": '$."param"',
-            "pb_3": "hello",
+            "pb_0": '$."param"',
+            "pb_1": "hello",
+            "pb_2": '%"%hello%"%',
+            "pb_3": "project",
         },
     )
 
@@ -1572,7 +1573,6 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             PREWHERE calls_merged.project_id = {pb_5:String}
             WHERE ((calls_merged.op_name IN {pb_0:Array(String)}) OR (calls_merged.op_name IS NULL))
                 AND (ifNull(calls_merged.attributes_dump, '') LIKE {pb_1:String}
-                     AND lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_2:String}
                      AND (ifNull(calls_merged.attributes_dump, '') LIKE {pb_3:String}
                           OR ifNull(calls_merged.attributes_dump, '') LIKE {pb_4:String}))),
         filtered_calls AS (

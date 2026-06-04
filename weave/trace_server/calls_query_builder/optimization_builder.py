@@ -234,10 +234,15 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
     """
 
     def __init__(
-        self, pb: "ParamBuilder", table_alias: str, use_null_check: bool = True
+        self,
+        pb: "ParamBuilder",
+        table_alias: str,
+        use_null_check: bool = True,
+        skip_case_insensitive: bool = False,
     ) -> None:
         super().__init__(pb, table_alias)
         self.use_null_check = use_null_check
+        self.skip_case_insensitive = skip_case_insensitive
 
     def process_eq(self, operation: tsi_query.EqOperation) -> str | None:
         """Process equality operation on heavy fields.
@@ -254,7 +259,11 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
         Creates SQL condition using LIKE patterns for substrings in JSON fields.
         """
         return _create_like_optimized_contains_condition(
-            operation, self.pb, self.table_alias, self.use_null_check
+            operation,
+            self.pb,
+            self.table_alias,
+            self.use_null_check,
+            self.skip_case_insensitive,
         )
 
     def process_in(self, operation: tsi_query.InOperation) -> str | None:
@@ -422,7 +431,10 @@ def process_query_to_optimization_sql(
     # Env-gated to match _build_filter_candidate_ids_cte_sql (builder returns None when off).
     if wf_env.wf_calls_merged_heavy_indexes_enabled():
         strict_processor = HeavyFieldOptimizationProcessor(
-            param_builder, table_alias, use_null_check=False
+            param_builder,
+            table_alias,
+            use_null_check=False,
+            skip_case_insensitive=True,
         )
         strict_result = apply_processor(strict_processor, and_operation)
         strict_result_sql = strict_processor.finalize_sql(strict_result)
@@ -599,6 +611,7 @@ def _create_like_optimized_contains_condition(
     pb: "ParamBuilder",
     table_alias: str,
     use_null_check: bool = True,
+    skip_case_insensitive: bool = False,
 ) -> str | None:
     """Creates a LIKE-optimized condition for contains operations.
 
@@ -609,6 +622,12 @@ def _create_like_optimized_contains_condition(
         use_null_check: Whether to add OR IS NULL for start/end fields.
             True for calls_merged (unmerged parts may have NULL fields).
             False for calls_complete (every row is a complete call).
+        skip_case_insensitive: When True, return None for case-insensitive
+            contains. The strict candidate CTE sets this: `lower(<dump>) LIKE`
+            cannot use the `idx_<dump>_ngram` index (built on `ifNull(<dump>,
+            '')`, not its lowercased form), so a case-insensitive candidate
+            prunes nothing and is pure overhead. Dropping it keeps the CTE a
+            valid id superset; the outer query still applies the lower() LIKE.
     """
     # Check if the input is a GetField operation on a JSON field
     if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
@@ -633,6 +652,8 @@ def _create_like_optimized_contains_condition(
         return None
 
     case_insensitive = operation.contains_.case_insensitive or False
+    if skip_case_insensitive and case_insensitive:
+        return None
     like_pattern = f'%"%{substr_value}%"%'
 
     like_condition = _create_like_condition(
