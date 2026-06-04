@@ -1,0 +1,68 @@
+## Conversation
+Branch 2 of the stack requested by the user ("show what the integration refactor
+... would look like ... make a stacked PR"). Stacked on andrew/op-call-lifecycle
+(branch 1). Addresses audit findings F-D1 (every provider re-derives the same
+skeleton), F-D2 (verbatim async-passthrough duplication), F-D3 (name derivation
+drift), and F-D8 (accumulator/framework logic untested except via VCR).
+
+## Actions
+- Read the shared infra (integrations/patch.py, patcher.py,
+  integration_utilities.py) + 3 representatives (cerebras=no accumulator,
+  groq=accumulator, anthropic=complex) to extract the recurring shape.
+- Wrote weave/integrations/_llm_provider.py: Endpoint dataclass, make_async_
+  passthrough, derive_endpoint_settings, build_llm_provider_patcher,
+  LLMProviderPatcher.
+- Migrated cerebras_sdk.py (77->29) and groq_sdk.py (146->101, accumulator kept).
+- Added tests/integrations/test_llm_provider.py (8 tests, no SDK/cassette/client).
+- Installed groq + cerebras-cloud-sdk into the venv (uv pip install) to run the
+  real VCR suites; both pass (7/7).
+
+## Errors & Mistakes
+- First framework-test run: test_endpoint_op_name_is_used_when_settings_do_not_
+  override FAILED. My mistake: I tested op-name DERIVATION via
+  _build_endpoint_wrapper, but that function consumes ALREADY-RESOLVED settings
+  and just does op_settings.model_dump(); the op_name->name fallback happens in
+  build_llm_provider_patcher. Fix: extracted derive_endpoint_settings() as a named
+  pure function (also a clarity win) and pointed the derivation tests at it;
+  retargeted the wrapper test to assert the wrapper honors the resolved name.
+- cerebras/groq SDKs are NOT in the base `uv sync --group test` env (they're
+  per-shard in CI). Had to `uv pip install groq cerebras-cloud-sdk` to run their
+  VCR tests locally.
+- ruff format reflowed _llm_provider.py and the test file (not serialization-
+  sensitive, so safe); re-ran tests after.
+
+## Dead Ends
+- Initially considered testing op-name resolution by pulling the wrapper out of
+  the built patcher via patcher.patchers[0]._make_new_value(...) — rejected as
+  reaching into SymbolPatcher internals. derive_endpoint_settings is the clean
+  seam instead.
+
+## Hints for Future Agents
+- CRITICAL behavior nuance preserved: cerebras' async endpoint USES the async
+  passthrough (async_passthrough=True); groq's async endpoint does NOT (groq's
+  original groq_wrapper never wrapped async). Getting this wrong silently changes
+  which op execution path runs. The Endpoint.async_passthrough flag encodes this
+  per-endpoint difference — do not assume "async => passthrough".
+- get_<provider>_patcher MUST keep its name+signature: patch.py resolves it via
+  getattr(module, "get_<name>_patcher") and tests import it directly.
+- LLMProviderPatcher caching mirrors the originals exactly: disabled -> fresh
+  NoOpPatcher (NOT cached); enabled -> build once and reuse. reset() is new (the
+  old module globals had no reset affordance; see audit F-D10).
+- Migrating more providers: most are mechanical (endpoint list + keep the vendor
+  accumulator/on_finish). The ones with bespoke should_use_accumulator variants
+  (openai's Stainless raw-response guard, instructor's kwargs.stream) pass a
+  custom should_accumulate per endpoint rather than relying on the default.
+
+## Codebase Discoveries
+- integration_utilities.should_use_accumulator is the canonical streaming
+  predicate; the framework defaults Endpoint.should_accumulate to it when an
+  accumulator is present, matching groq/anthropic/litellm/langchain_nvidia.
+- OpSettings.model_dump() keys (name, call_display_name, postprocess_inputs,
+  postprocess_output, kind, color) are all valid weave.op() kwargs — that's why
+  weave.op(fn, **op_settings.model_dump()) works.
+
+## Open Questions
+- Full migration of the remaining ~24 providers is follow-up work; this PR
+  migrates 2 to prove the pattern and keep the diff reviewable. The OTel-style
+  integrations (langchain, llamaindex, openai_agents) are a different shape and
+  out of scope for this framework (they need the callback-adapter from F-D7).
