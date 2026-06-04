@@ -92,11 +92,7 @@ def test_activate(weave_active):
 
 
 def test_normalizes_short_op_names_at_construction(weave_active):
-    """WB-33908: a short op name is normalized to a full weave:// op ref.
-
-    Normalization happens at construction (a client is active), not in
-    ``activate()``; the read-back just confirms it round-trips through storage.
-    """
+    """WB-33908: a short op name is normalized to a full weave:// op ref."""
     client = weave_active
     monitor = Monitor(
         name="test_monitor",
