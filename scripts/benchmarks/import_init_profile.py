@@ -403,8 +403,10 @@ def print_importtime_section(modules: list[ModuleImport]) -> None:
     total_self_us = sum(m.self_us for m in modules)
     total_s = total_self_us / US_PER_S
     print("\n" + "=" * 72)
-    print(f"IMPORT BREAKDOWN  (total self-time {total_s:.3f}s across "
-          f"{len(modules)} modules)")
+    print(
+        f"IMPORT BREAKDOWN  (total self-time {total_s:.3f}s across "
+        f"{len(modules)} modules)"
+    )
     print("=" * 72)
 
     packages = aggregate_by_package(modules)
@@ -413,9 +415,7 @@ def print_importtime_section(modules: list[ModuleImport]) -> None:
     print("-" * 72)
     for name, self_us in packages[:IMPORTTIME_TOP_PACKAGES]:
         frac = self_us / total_self_us if total_self_us else 0.0
-        print(
-            f"{name:<28}{self_us / US_PER_S:>8.3f}s{frac * 100:>8.1f}%  {_bar(frac)}"
-        )
+        print(f"{name:<28}{self_us / US_PER_S:>8.3f}s{frac * 100:>8.1f}%  {_bar(frac)}")
 
     by_self = sorted(modules, key=lambda m: m.self_us, reverse=True)
     print(f"\nTop {IMPORTTIME_TOP_MODULES} individual modules by exclusive self-time:")
@@ -472,14 +472,23 @@ def generate_pyspy(out_dir: Path) -> Path | None:
 
     env = {**os.environ, **DISABLED_ENV}
     cmd = [
-        pyspy, "record",
-        "--rate", str(PYSPY_RATE_HZ),
-        "--output", str(svg_path),
-        "--", sys.executable, driver_path,
+        pyspy,
+        "record",
+        "--rate",
+        str(PYSPY_RATE_HZ),
+        "--output",
+        str(svg_path),
+        "--",
+        sys.executable,
+        driver_path,
     ]
     proc = subprocess.run(
-        cmd, capture_output=True, text=True,
-        timeout=SUBPROCESS_TIMEOUT_S, env=env, check=False,
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=SUBPROCESS_TIMEOUT_S,
+        env=env,
+        check=False,
     )
     Path(driver_path).unlink(missing_ok=True)
     if proc.returncode != 0:
@@ -496,15 +505,20 @@ def generate_pyspy(out_dir: Path) -> Path | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--iterations", type=int, default=DEFAULT_ITERATIONS,
+        "--iterations",
+        type=int,
+        default=DEFAULT_ITERATIONS,
         help=f"timing iterations per phase (default {DEFAULT_ITERATIONS})",
     )
     parser.add_argument(
-        "--out-dir", type=Path, default=DEFAULT_OUT_DIR,
+        "--out-dir",
+        type=Path,
+        default=DEFAULT_OUT_DIR,
         help="directory for flame graph + importtime artifacts",
     )
     parser.add_argument(
-        "--no-flame", action="store_true",
+        "--no-flame",
+        action="store_true",
         help="skip flame graph generation (timing + breakdown only)",
     )
     args = parser.parse_args()
