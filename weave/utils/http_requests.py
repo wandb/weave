@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import functools
 import json
 import os
 import threading
@@ -171,14 +172,31 @@ def _log_response(response: Response) -> None:
     pprint_response(response)
 
 
-client = httpx.Client(
-    # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
-    # works natively.
-    event_hooks={"request": [_log_request], "response": [_log_response]},
-    timeout=http_timeout(),
-    limits=CLIENT_LIMITS,
-    verify=ssl_verify(),
-)
+@functools.cache
+def _get_client() -> httpx.Client:
+    """Return the shared httpx.Client, creating it lazily on first use.
+
+    Deferred so settings read at construction time (ssl_verify(), http_timeout())
+    reflect env vars set between `import weave` and the first request — most
+    notably WEAVE_INSECURE_DISABLE_SSL, which otherwise gets frozen to its
+    import-time value.
+    """
+    return httpx.Client(
+        # Use HTTPX's default transport so env proxy handling (including
+        # NO_PROXY) works natively.
+        event_hooks={"request": [_log_request], "response": [_log_response]},
+        timeout=http_timeout(),
+        limits=CLIENT_LIMITS,
+        verify=ssl_verify(),
+    )
+
+
+def __getattr__(name: str) -> Any:
+    # Preserve `http_requests.client` as a public attribute while keeping
+    # construction lazy.
+    if name == "client":
+        return _get_client()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get(
@@ -189,6 +207,7 @@ def get(
     **kwargs: Any,
 ) -> Response:
     """Send a GET request with optional logging."""
+    client = _get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -206,6 +225,7 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
+    client = _get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -223,6 +243,7 @@ def put(
     **kwargs: Any,
 ) -> Response:
     """Send a PUT request with optional logging."""
+    client = _get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -239,6 +260,7 @@ def delete(
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
+    client = _get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)

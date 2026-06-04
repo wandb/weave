@@ -101,7 +101,9 @@ def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes | None
         return server.server_info()
     except Exception:
         logger.warning(
-            "Unexpected error when checking if Weave is available on the server.  Please contact support."
+            "Unexpected error when checking if Weave is available on the server. "
+            "Please contact support.",
+            exc_info=True,
         )
         return None
 
