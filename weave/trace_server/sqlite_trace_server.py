@@ -77,6 +77,7 @@ from weave.trace_server.trace_server_common import (
     digest_is_content_hash,
     digest_is_version_like,
     empty_str_to_none,
+    eval_run_refs_from_call,
     get_nested_key,
     get_prediction_inputs,
     hydrate_calls_with_feedback,
@@ -86,6 +87,10 @@ from weave.trace_server.trace_server_common import (
     scorer_read_res_from_obj,
     set_nested_key,
 )
+from weave.trace_server.trace_server_interface import (
+    EvaluateModelArgs,
+    RescoringArgs,
+)
 from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
     compute_expire_at,
@@ -93,7 +98,6 @@ from weave.trace_server.ttl_settings import (
 )
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
-    EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
 
@@ -2543,8 +2547,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         res = self.table_query_stats_batch(batch_req)
 
-        if len(res.tables) != 1:
-            raise RuntimeError("Unexpected number of results", res)
+        if len(res.tables) == 0:
+            logger.warning("No table_query_stats results for digest %s", req.digest)
+            return tsi.TableQueryStatsRes(count=0)
 
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)
@@ -3167,6 +3172,40 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
         )
         return tsi.EvaluateModelRes(call_id=call_id)
+
+    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
+        """Rescore an existing evaluation run with different scorer(s).
+
+        Allocates a new evaluation_run_id and dispatches the rescore worker;
+        the worker is the sole owner of the new call's lifecycle (emits
+        call_start at the top of the job and call_end at the bottom). See
+        the matching docstring on the ClickHouse implementation for the
+        ownership invariant — call_start and call_end must originate from
+        the same client/process so the CallBatchProcessor can pair them.
+
+        The SDK path (``weave/evaluation/rescore.py``) keeps using
+        ``evaluation_run_create`` directly because in that path the SDK is
+        the owner: it emits start AND end from a single client.
+        """
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+
+        new_evaluation_run_id = generate_id()
+        self._evaluate_model_dispatcher.dispatch(
+            RescoringArgs(
+                project_id=req.project_id,
+                source_evaluation_run_id=req.source_evaluation_run_id,
+                scorer_refs=req.scorer_refs,
+                wb_user_id=req.wb_user_id,
+                new_evaluation_run_id=new_evaluation_run_id,
+            )
+        )
+        return tsi.RescoreRes(
+            call_id=new_evaluation_run_id,
+            evaluation_run_id=new_evaluation_run_id,
+        )
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
@@ -3919,6 +3958,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Create an evaluation run as a call with special attributes."""
         evaluation_run_id = generate_id()
 
+        # Build attributes — include source_evaluation_run_id if this is a rescore run
+        weave_attrs: dict = {
+            constants.EVALUATION_RUN_ATTR_KEY: "true",
+            constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
+            constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+        }
+        if req.source_evaluation_run_id:
+            weave_attrs[constants.EVALUATION_RUN_SOURCE_ATTR_KEY] = (
+                req.source_evaluation_run_id
+            )
+
         # Start a call to represent the evaluation run
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
@@ -3928,11 +3978,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 op_name=constants.EVALUATION_RUN_OP_NAME,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes={
-                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                        constants.EVALUATION_RUN_ATTR_KEY: "true",
-                        constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
-                        constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
-                    }
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: weave_attrs,
                 },
                 inputs={
                     "self": req.evaluation,
@@ -3959,18 +4005,22 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         call = call_res.call
         attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+        evaluation_ref, model_ref = eval_run_refs_from_call(call, attributes)
 
         # Determine status
         status = determine_call_status(call)
 
         return tsi.EvaluationRunReadRes(
             evaluation_run_id=call.id,
-            evaluation=attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""),
-            model=attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY, ""),
+            evaluation=evaluation_ref,
+            model=model_ref,
             status=status,
             started_at=call.started_at,
             finished_at=call.ended_at,
             summary=call.summary,
+            source_evaluation_run_id=attributes.get(
+                constants.EVALUATION_RUN_SOURCE_ATTR_KEY
+            ),
         )
 
     def evaluation_run_list(

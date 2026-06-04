@@ -168,8 +168,16 @@ class RemoteScorer(Scorer):
         as ``auth_config`` — back into plain Python values before validation.
         Without it, a nested ``auth_config`` arrives wrapped and fails to
         validate.
+
+        Only known model fields are kept: stored objects can carry extra fields
+        the model doesn't declare (e.g. ``is_traced`` on UI-created scorers), and
+        ``Object`` is ``extra="forbid"``, so those must be dropped rather than
+        rejected.
         """
-        return cls.model_validate(obj.unwrap())
+        data = obj.unwrap()
+        return cls.model_validate(
+            {k: v for k, v in data.items() if k in cls.model_fields}
+        )
 
 
 def _validate_remote_scorer_endpoint_url(v: str) -> str:

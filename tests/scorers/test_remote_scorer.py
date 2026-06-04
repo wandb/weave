@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
+import weave
 from weave.flow.scorer import Scorer
 from weave.scorers.remote_scorer import (
     OAuthClientCredentialsConfig,
@@ -12,6 +13,7 @@ from weave.scorers.remote_scorer import (
 )
 from weave.trace.api import publish
 from weave.trace.object_record import pydantic_object_record
+from weave.trace_server import trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace_server
 
@@ -414,3 +416,46 @@ def test_remote_scorer_with_auth_config_round_trips_via_publish(client) -> None:
     assert gotten.auth_config.client_secret_name == "SEC"
     # Secret values are never embedded — only the secret name.
     assert gotten.endpoint_url == "http://127.0.0.1:8765/score"
+
+
+def test_remote_scorer_from_ui_shape_with_extra_fields_loads(client) -> None:
+    """A UI-created RemoteScorer carries extra fields and a plain auth_config dict.
+
+    The UI persists ``is_traced`` (not a RemoteScorer field) and ``auth_config``
+    as a plain dict. ``from_obj`` must drop unknown fields and type the
+    auth_config so the scoring worker can load it. Regression: ``model_validate``
+    on the raw unwrapped val rejected ``is_traced`` under ``extra="forbid"``.
+    """
+    object_id = "remote_ui_scorer"
+    val = {
+        "_type": "RemoteScorer",
+        "_class_name": "RemoteScorer",
+        "_bases": ["RemoteScorer", "Scorer", "Object", "BaseModel"],
+        "name": object_id,
+        "description": "created from the UI",
+        "column_map": None,
+        "endpoint_url": "http://127.0.0.1:8765/score",
+        "config": None,
+        "is_traced": True,  # extra field the model does not declare
+        "auth_config": {
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "http://127.0.0.1:8765/token",
+            "client_id": "cid",
+            "client_secret_name": "SEC",
+            "scope": "s",
+        },
+    }
+    res = client.server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=client.project_id, object_id=object_id, val=val
+            )
+        )
+    )
+    uri = f"weave:///{client.entity}/{client.project}/object/{object_id}:{res.digest}"
+
+    gotten = weave.ref(uri).get()
+    assert isinstance(gotten, RemoteScorer)
+    assert isinstance(gotten.auth_config, OAuthClientCredentialsConfig)
+    assert gotten.auth_config.client_id == "cid"
+    assert not hasattr(gotten, "is_traced")

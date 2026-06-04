@@ -590,6 +590,18 @@ class AgentSpanGroupDistributionItem(BaseModel):
     values: list[AgentSpanGroupDistributionValue] = Field(default_factory=list)
 
 
+class AgentConversationMessagePreview(BaseModel):
+    """A truncated first/last message snippet for a grouped conversation row.
+
+    `role` is the chat-timeline message type (e.g. "user_message",
+    "assistant_message") so clients can style it consistently with the full
+    chat view; `text` is the trimmed, length-capped preview content.
+    """
+
+    role: str = ""
+    text: str = ""
+
+
 class AgentSpanGroupRow(BaseModel):
     """A single row in a grouped spans query response.
 
@@ -615,6 +627,11 @@ class AgentSpanGroupRow(BaseModel):
     conversation_names: list[str] = Field(default_factory=list)
     first_seen: datetime.datetime | None = None
     last_seen: datetime.datetime | None = None
+    # First/last message previews, populated when grouping by conversation_id so
+    # the conversations table needs no per-row hydration. None when the earliest/
+    # latest span carried no renderable message text.
+    first_message: AgentConversationMessagePreview | None = None
+    last_message: AgentConversationMessagePreview | None = None
     metrics: dict[str, AgentSpanStatsCell] = Field(default_factory=dict)
     distributions: dict[str, AgentSpanGroupDistributionItem] = Field(
         default_factory=dict

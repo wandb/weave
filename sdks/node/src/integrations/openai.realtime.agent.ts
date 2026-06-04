@@ -30,7 +30,7 @@
 
 import {getGlobalClient} from '../clientApi';
 import {uuidv7} from 'uuidv7';
-import type {RealtimeSessionLike} from './openai.realtime.agent.types';
+import type {RealtimeSession} from '@openai/agents-realtime';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {globalSingleton} from '../utils/globalSingleton';
 
@@ -139,7 +139,7 @@ export class WeaveRealtimeTracingAdapter {
   // In-flight tool calls: toolCallId → Weave callId
   private toolCalls = new Map<string, string>();
 
-  constructor(private readonly session: RealtimeSessionLike) {
+  constructor(private readonly session: RealtimeSession) {
     this.attachListeners();
   }
 
@@ -741,7 +741,7 @@ function patchRealtimeSessionCommon(realtimeExports: any): void {
         construct(target: any, args: any[], newTarget: any) {
           const instance = Reflect.construct(target, args, newTarget) as any;
           instance[ADAPTER] = new WeaveRealtimeTracingAdapter(
-            instance as RealtimeSessionLike
+            instance as RealtimeSession
           );
           return instance;
         },
