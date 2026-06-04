@@ -102,6 +102,8 @@ def migrator():
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
     migrator._update_migration_status = Mock()
+    # Bypass the lock-free pre-check; these tests exercise the locked path.
+    migrator._has_migrations_to_apply = Mock(return_value=True)
     ch_client.command.reset_mock()
     return migrator
 
@@ -121,6 +123,8 @@ def replicated_migrator():
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
     migrator._update_migration_status = Mock()
+    # Bypass the lock-free pre-check; these tests exercise the locked path.
+    migrator._has_migrations_to_apply = Mock(return_value=True)
     ch_client.command.reset_mock()
     return migrator
 
@@ -141,6 +145,8 @@ def distributed_migrator():
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
     migrator._update_migration_status = Mock()
+    # Bypass the lock-free pre-check; these tests exercise the locked path.
+    migrator._has_migrations_to_apply = Mock(return_value=True)
     ch_client.command.reset_mock()
     return migrator
 
@@ -164,6 +170,8 @@ def test_apply_migrations_with_target_version(
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
     migrator._update_migration_status = Mock()
+    # Bypass the lock-free pre-check; these tests exercise the locked path.
+    migrator._has_migrations_to_apply = Mock(return_value=True)
     ch_client.command.reset_mock()
 
     # Setup
@@ -245,6 +253,7 @@ def test_apply_migrations_discovers_existing_target_database_engine(
             return_value=[(26, migration_file.name)]
         )
         migrator._update_migration_status = Mock()
+        migrator._has_migrations_to_apply = Mock(return_value=True)
         ch_client.command.reset_mock()
 
         migrator.apply_migrations(target_db, target_version=26)
@@ -310,6 +319,7 @@ def test_apply_migrations_raises_on_partially_applied(mock_migration_lock):
             "partially_applied_version": 2,
         }
     )
+    migrator._has_migrations_to_apply = Mock(return_value=True)
 
     with pytest.raises(MigrationError, match="partially applied migration version 2"):
         migrator.apply_migrations("test_db")
@@ -323,6 +333,7 @@ def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock
     migrator._get_migration_status = Mock()
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
 
     migrator._get_migration_status.return_value = {
         "curr_version": 0,
@@ -345,6 +356,97 @@ def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock
 
     mock_should_insert_costs.assert_not_called()
     mock_insert_costs.assert_not_called()
+
+
+def test_apply_migrations_skips_lock_when_nothing_pending():
+    """The lock-free pre-check short-circuits when no schema migration is due,
+    so rolling replicas don't serialize through the lock for a no-op.
+    """
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._has_migrations_to_apply = Mock(return_value=False)
+    migrator._apply_migrations_locked = Mock()
+
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_migrator.migration_lock"
+    ) as mock_lock:
+        migrator.apply_migrations("test_db")
+
+    mock_lock.assert_not_called()
+    migrator._apply_migrations_locked.assert_not_called()
+
+
+def test_has_migrations_to_apply_reads_status_without_writing(tmp_path):
+    """The pre-check is read-only and decides purely from version vs. disk."""
+    migration_dir = tmp_path / "migrations"
+    migration_dir.mkdir()
+    (migration_dir / "0001_a.up.sql").write_text("CREATE TABLE t1 (id Int32);")
+    (migration_dir / "0001_a.down.sql").write_text("DROP TABLE t1;")
+    (migration_dir / "0002_b.up.sql").write_text("CREATE TABLE t2 (id Int32);")
+    (migration_dir / "0002_b.down.sql").write_text("DROP TABLE t2;")
+
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, migration_dir=str(migration_dir), post_migration_hook=None
+    )
+
+    # Behind the latest on-disk version -> pending.
+    migrator._read_migration_status = Mock(
+        return_value={"curr_version": 1, "partially_applied_version": None}
+    )
+    assert migrator._has_migrations_to_apply("test_db") is True
+
+    # Caught up -> nothing pending, so the lock is skipped.
+    migrator._read_migration_status = Mock(
+        return_value={"curr_version": 2, "partially_applied_version": None}
+    )
+    assert migrator._has_migrations_to_apply("test_db") is False
+
+    # A partial migration must take the lock so the error surfaces.
+    migrator._read_migration_status = Mock(
+        return_value={"curr_version": 1, "partially_applied_version": 2}
+    )
+    assert migrator._has_migrations_to_apply("test_db") is True
+
+
+def test_read_migration_status_defaults_to_zero_without_row():
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+
+    empty = Mock()
+    empty.result_rows = []
+    ch_client.query = Mock(return_value=empty)
+    assert migrator._read_migration_status("test_db") == {
+        "curr_version": 0,
+        "partially_applied_version": None,
+    }
+    ch_client.insert.assert_not_called()
+
+    row = Mock()
+    row.result_rows = [(7, None)]
+    ch_client.query = Mock(return_value=row)
+    assert migrator._read_migration_status("test_db") == {
+        "curr_version": 7,
+        "partially_applied_version": None,
+    }
+
+
+def test_initialize_migration_db_adds_heartbeat_column():
+    """Existing lock tables get `heartbeat_at` added idempotently on init."""
+    ch_client = _make_ch_client()
+    trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+
+    executed = [c.args[0] for c in ch_client.command.call_args_list]
+    assert any(
+        "ADD COLUMN IF NOT EXISTS heartbeat_at" in sql and "migration_lock" in sql
+        for sql in executed
+    )
 
 
 def test_execute_migration_command(migrator):
@@ -1055,14 +1157,20 @@ def test_execute_views_in_replicated_and_distributed_modes(
         call_sql == "CREATE VIEW my_view ON CLUSTER test_cluster AS SELECT * FROM test"
     )
 
-    # Test in distributed mode (should be identical)
+    # Distributed mode also drops the `_local` twin so materialized views
+    # written via _execute_materialized_view_create are actually removed.
+    # Plain views have no `_local` twin, so the second DROP is a no-op via
+    # IF EXISTS but is still emitted.
     distributed_migrator.ch_client.command.reset_mock()
     distributed_migrator._execute_migration_command(
         "test_db", "DROP VIEW IF EXISTS my_view"
     )
-    assert distributed_migrator.ch_client.command.call_count == 1
-    call_sql = distributed_migrator.ch_client.command.call_args_list[0][0][0]
-    assert call_sql == "DROP VIEW IF EXISTS my_view ON CLUSTER test_cluster"
+    assert distributed_migrator.ch_client.command.call_count == 2
+    call_sqls = [
+        call.args[0] for call in distributed_migrator.ch_client.command.call_args_list
+    ]
+    assert call_sqls[0] == "DROP VIEW IF EXISTS my_view ON CLUSTER test_cluster"
+    assert call_sqls[1] == "DROP VIEW IF EXISTS my_view_local ON CLUSTER test_cluster"
 
     distributed_migrator.ch_client.command.reset_mock()
 

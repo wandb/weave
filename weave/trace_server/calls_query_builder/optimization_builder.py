@@ -21,10 +21,9 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server.calls_query_builder.utils import (
     NotContext,
     param_slot,
-    timestamp_to_datetime_str,
 )
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import clickhouse_cast
+from weave.trace_server.orm import clickhouse_cast, timestamp_to_datetime_str
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 if TYPE_CHECKING:

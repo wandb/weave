@@ -81,27 +81,35 @@ def test_transform_external_field_to_internal_field():
 
     # Transforming a column that doesn't exist should raise
     with pytest.raises(ValueError, match="Unknown field"):
-        _transform_external_field_to_internal_field("foo", all_columns, json_columns)
+        _transform_external_field_to_internal_field(
+            "foo", all_columns=all_columns, json_columns=json_columns
+        )
 
     result = _transform_external_field_to_internal_field(
-        "id", all_columns, json_columns
+        "id", all_columns=all_columns, json_columns=json_columns
     )
     assert result[0] == "id"
     assert result[2] == {"id"}
     result = _transform_external_field_to_internal_field(
-        "payload", all_columns, json_columns
+        "payload", all_columns=all_columns, json_columns=json_columns
     )
     assert result[0] == "payload_dump"
     assert result[2] == {"payload_dump"}
     pb = ParamBuilder(prefix="pb", database_type="sqlite")
     result = _transform_external_field_to_internal_field(
-        "payload.address", all_columns, json_columns, param_builder=pb
+        "payload.address",
+        all_columns=all_columns,
+        json_columns=json_columns,
+        param_builder=pb,
     )
     assert result[0] == "json_extract(payload_dump, :pb_0)"
     assert result[2] == {"payload_dump"}
     pb = ParamBuilder(prefix="pb", database_type="clickhouse")
     result = _transform_external_field_to_internal_field(
-        "payload.address", all_columns, json_columns, param_builder=pb
+        "payload.address",
+        all_columns=all_columns,
+        json_columns=json_columns,
+        param_builder=pb,
     )
     assert result[0] == "toString(JSON_VALUE(payload_dump, {pb_0:String}))"
     assert result[2] == {"payload_dump"}
@@ -132,6 +140,52 @@ def test_table_drop_sql():
         ],
     )
     assert table.drop_sql() == "DROP TABLE IF EXISTS users"
+
+
+def test_array_string_column_round_trip_clickhouse():
+    table = Table("t", [Column("id", "string"), Column("tags", "array_string")])
+    insert = table.insert({"id": "a", "tags": ["x", "y"]})
+    prepared = insert.prepare(database_type="clickhouse")
+    # ClickHouse driver accepts native list; ORM must not JSON-encode it.
+    assert prepared.data == [["a", ["x", "y"]]]
+    # Reading back a CH row returns a native list and ORM passes it through.
+    assert table.tuple_to_row(
+        ("a", ["x", "y"]), ["id", "tags"], database_type="clickhouse"
+    ) == {"id": "a", "tags": ["x", "y"]}
+
+
+def test_array_string_column_round_trip_sqlite():
+    table = Table("t", [Column("id", "string"), Column("tags", "array_string")])
+    insert = table.insert({"id": "a", "tags": ["x", "y"]})
+    prepared = insert.prepare(database_type="sqlite")
+    # SQLite has no Array type — ORM must JSON-encode the list to TEXT.
+    assert prepared.data == [["a", '["x", "y"]']]
+    # And decode on the way out.
+    assert table.tuple_to_row(
+        ("a", '["x", "y"]'), ["id", "tags"], database_type="sqlite"
+    ) == {"id": "a", "tags": ["x", "y"]}
+
+
+def test_map_string_float_column_round_trip():
+    table = Table(
+        "t",
+        [Column("id", "string"), Column("ratings", "map_string_float")],
+    )
+    payload = {"_rating_": 0.87}
+    ch_prepared = table.insert({"id": "a", "ratings": payload}).prepare(
+        database_type="clickhouse"
+    )
+    assert ch_prepared.data == [["a", payload]]
+    sqlite_prepared = table.insert({"id": "a", "ratings": payload}).prepare(
+        database_type="sqlite"
+    )
+    assert sqlite_prepared.data == [["a", '{"_rating_": 0.87}']]
+    assert table.tuple_to_row(
+        ("a", payload), ["id", "ratings"], database_type="clickhouse"
+    ) == {"id": "a", "ratings": payload}
+    assert table.tuple_to_row(
+        ("a", '{"_rating_": 0.87}'), ["id", "ratings"], database_type="sqlite"
+    ) == {"id": "a", "ratings": payload}
 
 
 def test_select_basic():
@@ -360,6 +414,8 @@ def _feedback_table() -> Table:
         "feedback",
         [
             Column("id", "string"),
+            Column("feedback_type", "string"),
+            Column("created_at", "datetime"),
             Column("payload", "json", db_name="payload_dump"),
         ],
     )
@@ -656,3 +712,47 @@ def test_feedback_query_in_mixed_literal_list_keeps_uncast_path() -> None:
         "WHERE (toString(JSON_VALUE(payload_dump, {pb_0:String})) "
         "IN ({pb_1:Int64},{pb_2:String}))"
     )
+
+
+@pytest.mark.parametrize(
+    ("field", "literal", "expected_param"),
+    [
+        # Regression for WB-34897: the exact ISO-8601 shape (T separator + Z
+        # suffix) ClickHouse rejected against a DateTime64 column.
+        ("created_at", "2026-05-27T17:49:15.491230Z", "2026-05-27 17:49:15.491230"),
+        ("created_at", "2026-05-27T17:49:15", "2026-05-27 17:49:15.000000"),
+        ("created_at", "2026-05-27", "2026-05-27 00:00:00.000000"),
+        # Numeric unix timestamps normalize to the same canonical form.
+        ("created_at", 1709251200, "2024-03-01 00:00:00.000000"),
+        # A non-DateTime column with an ISO-looking string is left untouched.
+        (
+            "feedback_type",
+            "2026-05-27T17:49:15.491230Z",
+            "2026-05-27T17:49:15.491230Z",
+        ),
+    ],
+)
+def test_feedback_query_normalizes_datetime_literal(
+    field, literal, expected_param
+) -> None:
+    """DateTime-column literals are rewritten to CH-native datetime strings.
+
+    ClickHouse cannot convert ISO-8601 `T`/`Z` strings to DateTime64, so a
+    literal compared against a DateTime column is normalized to the canonical
+    `YYYY-MM-DD HH:MM:SS.ffffff` form. Non-DateTime columns are unaffected.
+    """
+    select = (
+        _feedback_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{"$expr": {"$gte": [{"$getField": field}, {"$literal": literal}]}}
+            )
+        )
+    )
+    prepared = _prepare_clickhouse(select)
+    assert prepared.sql == (
+        f"SELECT id\nFROM feedback\nWHERE ({field} >= {{pb_0:String}})"
+    )
+    assert prepared.parameters == {"pb_0": expected_param}

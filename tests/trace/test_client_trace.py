@@ -4899,6 +4899,74 @@ def test_calls_query_stats_with_limit(client):
     assert result.total_storage_size_bytes is not None
 
 
+def test_calls_query_stats_started_at_window_excludes_deletes(client):
+    """A started_at lower-bound count must match across backends and exclude
+    soft-deleted calls and orphaned call-ends. On ClickHouse this exercises the
+    windowed distinct-id fast path; on SQLite it exercises the reference
+    implementation, so equal results pin the optimization to the GROUP BY
+    semantics.
+    """
+
+    @weave.op
+    def stats_window_op() -> int:
+        return 1
+
+    for _ in range(3):
+        stats_window_op()
+
+    project_id = get_client_project_id(client)
+    all_calls = client.get_calls()
+    assert len(all_calls) == 3
+
+    def count(literal_seconds: int) -> int:
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$gt": [{"$getField": "started_at"}, {"$literal": literal_seconds}]
+                }
+            }
+        )
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id=project_id, query=query)
+        ).count
+
+    def unfiltered_count() -> int:
+        # No query -> exercises the flat distinct-id fast path (Pattern 3).
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id=project_id)
+        ).count
+
+    # Lower bound in the distant past counts every (non-deleted) call.
+    assert count(1) == 3
+    assert unfiltered_count() == 3
+    # Lower bound in the far future counts nothing.
+    assert count(99999999999) == 0
+
+    # Deleting a call removes it from both counts (delete exclusion).
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[all_calls[0].id])
+    )
+    assert count(1) == 2
+    assert unfiltered_count() == 2
+
+    # An orphaned call-end (end row, no start) carries started_at since #6933 but
+    # has no op_name; the op_name guard must keep it out of both fast-path counts.
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=generate_id(),
+                started_at=now,
+                ended_at=now,
+                summary={},
+            )
+        )
+    )
+    assert count(1) == 2
+    assert unfiltered_count() == 2
+
+
 @pytest.mark.parametrize(
     "thread_ids",
     [

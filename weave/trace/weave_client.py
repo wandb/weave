@@ -6,9 +6,7 @@ import datetime
 import json
 import logging
 import os
-import platform
 import re
-import sys
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
@@ -18,7 +16,6 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 import pydantic
 from httpx import HTTPStatusError as HTTPError
 
-from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
@@ -94,8 +91,6 @@ from weave.trace.serialization.serialize import (
 from weave.trace.serialization.serializer import get_serializer_for_obj
 from weave.trace.settings import (
     client_parallelism,
-    should_capture_client_info,
-    should_capture_system_info,
     should_print_call_link,
     should_redact_pii,
     should_use_parallel_table_upload,
@@ -193,6 +188,7 @@ from weave.trace_server_bindings.link_asset_to_registry import (
 )
 from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
+from weave.utils.capture_info import get_capture_info
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
 from weave.utils.project_id import from_project_id, to_project_id
@@ -401,6 +397,14 @@ class WeaveClient:
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
+
+        # Whether this client may reconstruct code-bearing custom objects (ops, or any
+        # type that decodes by running a stored `.py`) on `client.get`. Defaults True:
+        # for normal users this only ever runs code from their own traces, so it is
+        # safe. Server-side workers flip it off via `require_secure_weave_client`, and
+        # anyone can disable it globally with `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false`
+        # (data-only objects like images/audio still decode). Enforced in custom_objs.py.
+        self._allow_unsafe_custom_obj_decode = True
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -976,14 +980,8 @@ class WeaveClient:
         # per-call attributes. Per-call attributes take precedence over the client defaults.
         attributes_dict = AttributesDict(**zip_dicts(self.attributes, attributes))
 
-        if should_capture_client_info():
-            attributes_dict._set_weave_item("client_version", version.VERSION)
-            attributes_dict._set_weave_item("source", "python-sdk")
-            attributes_dict._set_weave_item("sys_version", sys.version)
-        if should_capture_system_info():
-            attributes_dict._set_weave_item("os_name", platform.system())
-            attributes_dict._set_weave_item("os_version", platform.version())
-            attributes_dict._set_weave_item("os_release", platform.release())
+        for k, v in get_capture_info().items():
+            attributes_dict._set_weave_item(k, v)
 
         # Skip the future allocation once the op's digest is resolved (any
         # call after the first). Reading `.uri` directly is a no-op string

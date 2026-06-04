@@ -1,6 +1,5 @@
 import {uuidv7} from 'uuidv7';
 
-// This is mostly used for testing
 // TODO: Maybe move the interfaces to something like trace_server_interface.py
 
 interface Call {

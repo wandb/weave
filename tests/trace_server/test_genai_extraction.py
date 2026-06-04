@@ -8,6 +8,7 @@ test since that's a separate code path (Status object vs attributes).
 """
 
 import datetime
+import json
 from typing import Any
 
 from weave.trace_server.agents import semconv
@@ -142,8 +143,12 @@ def test_extract_genai_span_comprehensive() -> None:
     assert len(result.input_messages) == 2
     assert result.input_messages[0].role == "system"
     assert result.input_messages[1].role == "user"
-    # parts concatenate into content; finish_reason passes through
-    assert result.output_messages[0].content == "Let me think...\nDone."
+    # structured parts are JSON-serialized into content
+    parts = json.loads(result.output_messages[0].content)
+    assert parts == [
+        {"type": "reasoning", "content": "Let me think..."},
+        {"type": "text", "content": "Done."},
+    ]
     assert result.output_messages[0].finish_reason == "stop"
 
     # Reasoning content extracted from output message parts
