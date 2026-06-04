@@ -70,6 +70,7 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
     group_by_ref_alias,
 )
+from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
@@ -682,7 +683,8 @@ class AgentWriteHandler:
                     accepted += 1
 
         if span_rows:
-            self._ch_client.insert(
+            insert_with_empty_query_retry(
+                self._ch_client,
                 "spans",
                 data=[genai_span_to_row(s) for s in span_rows],
                 column_names=ALL_SPAN_INSERT_COLUMNS,
@@ -714,7 +716,8 @@ class AgentWriteHandler:
         GenAI extraction — the caller is responsible for constructing a
         fully populated ``AgentSpanCHInsertable``.
         """
-        self._ch_client.insert(
+        insert_with_empty_query_retry(
+            self._ch_client,
             "spans",
             data=[genai_span_to_row(span)],
             column_names=ALL_SPAN_INSERT_COLUMNS,
