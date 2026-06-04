@@ -60,6 +60,7 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
 from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
+from weave.trace_server.agents.playground import build_completion_span
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -107,6 +108,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
+from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_dict_to_call_schema_dict,
     ch_call_to_row,
@@ -160,7 +162,6 @@ from weave.trace_server.clickhouse_schema import (
 )
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.constants import (
-    COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
 from weave.trace_server.datadog import (
@@ -6420,89 +6421,42 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
-        write_target = self.table_routing_resolver.resolve_v2_write_target(
-            req.project_id,
-            self.ch_client,
-        )
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
         req.inputs.messages = prep.initial_messages
-        call_id = generate_id()
+        span_id = generate_id()
         trace_id = req.trace_id or generate_id()
-        parent_id = req.parent_id
+        conversation_id = req.conversation_id or generate_id()
+        conversation_name = req.conversation_name or ""
         model_name = prep.completion_model_info.model_name
 
-        # Build summary with usage info if available
-        summary: tsi.SummaryInsertMap = {}
-        if "usage" in res.response:
-            summary["usage"] = {model_name: res.response["usage"]}
+        error = res.response.get("error")
 
-        # Check for exception
-        exception = res.response.get("error")
+        span = build_completion_span(
+            project_id=req.project_id,
+            trace_id=trace_id,
+            span_id=span_id,
+            conversation_id=conversation_id,
+            conversation_name=conversation_name,
+            started_at=start_time,
+            ended_at=end_time,
+            provider_name=prep.completion_model_info.provider or "",
+            model_name=model_name,
+            request_inputs=req.inputs,
+            response=res.response,
+            wb_user_id=req.wb_user_id or "",
+            retention_days=retention_days,
+            error=error,
+        )
+        AgentWriteHandler(self.ch_client).insert_span(span)
 
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            # Write directly to calls_complete table
-            completed = tsi.CompletedCallSchemaForInsert(
-                project_id=req.project_id,
-                id=call_id,
-                trace_id=trace_id,
-                parent_id=parent_id,
-                op_name=COMPLETIONS_CREATE_OP_NAME,
-                started_at=start_time,
-                ended_at=end_time,
-                attributes={},
-                inputs={
-                    **req.inputs.model_dump(
-                        exclude_none=True, exclude={"vertex_credentials"}
-                    )
-                },
-                output=res.response,
-                summary=summary,
-                exception=exception,
-                wb_user_id=req.wb_user_id,
-            )
-            ch_call = complete_call_to_ch_insertable(completed, retention_days)
-            self._insert_call_complete(ch_call)
-        else:
-            # Write to call_parts/calls_merged via start/end pattern
-            start = tsi.StartedCallSchemaForInsert(
-                project_id=req.project_id,
-                id=call_id,
-                trace_id=trace_id,
-                parent_id=parent_id,
-                wb_user_id=req.wb_user_id,
-                op_name=COMPLETIONS_CREATE_OP_NAME,
-                started_at=start_time,
-                inputs={
-                    **req.inputs.model_dump(
-                        exclude_none=True, exclude={"vertex_credentials"}
-                    )
-                },
-                attributes={},
-            )
-            start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
-            end = tsi.EndedCallSchemaForInsert(
-                project_id=req.project_id,
-                id=start_call.id,
-                started_at=start_call.started_at,
-                ended_at=end_time,
-                output=res.response,
-                summary=summary,
-            )
-            if exception:
-                end.exception = exception
-            end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
-            calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
-                start_call,
-                end_call,
-            ]
-            batch_data = []
-            for call in calls:
-                batch_data.append(ch_call_to_row(call))
-
-            self._insert_call_batch(batch_data)
-
-        return tsi.CompletionsCreateRes(response=res.response, weave_call_id=call_id)
+        return tsi.CompletionsCreateRes(
+            response=res.response,
+            weave_call_id=span_id,
+            span_id=span_id,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+        )
 
     # -------------------------------------------------------------------
     # Streaming variant
@@ -6563,57 +6517,43 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return_type = completion_model_info.return_type
         vertex_credentials = completion_model_info.vertex_credentials
 
-        # Track start call if requested
-        start_call: CallStartCHInsertable | None = None
-        write_target: WriteTarget | None = None
+        span_id: str | None = None
+        trace_id: str | None = None
+        conversation_id: str | None = None
         retention_days: int | None = None
+        started_at: datetime.datetime | None = None
         if req.track_llm_call:
-            write_target = self.table_routing_resolver.resolve_v2_write_target(
-                req.project_id,
-                self.ch_client,
-            )
             retention_days = get_project_retention_days(req.project_id, self.ch_client)
-            # Prepare inputs for tracking: use original messages (with template syntax)
-            # and include prompt and template_vars
-            tracked_inputs = req.inputs.model_dump(
-                exclude_none=True, exclude={"vertex_credentials"}
-            )
-            tracked_inputs["model"] = model_name
-            tracked_inputs["messages"] = initial_messages
-            if prompt:
-                tracked_inputs["prompt"] = prompt
-            if template_vars:
-                tracked_inputs["template_vars"] = template_vars
+            span_id = generate_id()
+            trace_id = req.trace_id or generate_id()
+            conversation_id = req.conversation_id or generate_id()
+            started_at = datetime.datetime.now()
 
-            start = tsi.StartedCallSchemaForInsert(
+            req.inputs.messages = initial_messages
+            open_span = build_completion_span(
                 project_id=req.project_id,
-                trace_id=req.trace_id,
-                parent_id=req.parent_id,
-                wb_user_id=req.wb_user_id,
-                op_name=COMPLETIONS_CREATE_OP_NAME,
-                started_at=datetime.datetime.now(),
-                inputs=tracked_inputs,
-                attributes={},
+                trace_id=trace_id,
+                span_id=span_id,
+                conversation_id=conversation_id,
+                conversation_name=req.conversation_name or "",
+                started_at=started_at,
+                ended_at=SENTINEL_EPOCH,  # Open span sentinel
+                provider_name=provider or "",
+                model_name=model_name,
+                request_inputs=req.inputs,
+                response=None,
+                wb_user_id=req.wb_user_id or "",
+                retention_days=retention_days,
             )
-            start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
-            # Insert immediately so that callers can see the call in progress
-            if write_target == WriteTarget.CALLS_COMPLETE:
-                ch_complete_start = start_call_insertable_to_complete_start(start_call)
-                self._insert_call_complete(ch_complete_start)
-            else:
-                self._insert_call(start_call)
+            AgentWriteHandler(self.ch_client).insert_span(open_span)
 
-        # Set the combined messages (with template vars replaced) for LiteLLM
         req.inputs.messages = combined_messages
-
-        # Make a copy for the API call without prompt and template_vars
         api_inputs = req.inputs.model_copy()
         if hasattr(api_inputs, "prompt"):
             api_inputs.prompt = None
         if hasattr(api_inputs, "template_vars"):
             api_inputs.template_vars = None
 
-        # --- Build the underlying chunk iterator
         chunk_iter = lite_llm_completion_stream(
             api_key=api_key or "",
             inputs=api_inputs,
@@ -6624,26 +6564,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             vertex_credentials=vertex_credentials,
         )
 
-        # If tracking not requested just return chunks directly
-        if not req.track_llm_call or start_call is None:
+        if not req.track_llm_call or span_id is None:
             return chunk_iter
 
-        # Otherwise, wrap the iterator with tracking
-        end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            end_call_handler = lambda end: self._update_call_end_in_calls_complete(
-                end.model_copy(update={"started_at": start_call.started_at})
-            )
-
-        assert retention_days is not None  # narrowed by track_llm_call guard above
-        return _create_tracked_stream_wrapper(
-            self._insert_call,
-            chunk_iter,
-            start_call,
-            model_name,
-            req.project_id,
-            retention_days,
-            end_call_handler=end_call_handler,
+        assert retention_days is not None
+        assert trace_id is not None
+        assert conversation_id is not None
+        assert started_at is not None
+        req.inputs.messages = initial_messages
+        return _create_tracked_span_stream_wrapper(
+            ch_client=self.ch_client,
+            chunk_iter=chunk_iter,
+            project_id=req.project_id,
+            span_id=span_id,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+            conversation_name=req.conversation_name or "",
+            started_at=started_at,
+            provider_name=provider or "",
+            model_name=model_name,
+            request_inputs=req.inputs,
+            wb_user_id=req.wb_user_id or "",
+            retention_days=retention_days,
         )
 
     @tag_db_insert_path("image_create")
@@ -7495,7 +7437,6 @@ def _create_tracked_stream_wrapper(
         # (1) send meta chunk first so clients can associate stream
         yield {"_meta": {"weave_call_id": start_call.id}}
 
-        # Initialize accumulation variables for all choices
         aggregated_output: dict[str, Any] | None = None
         choice_contents: dict[int, list[str]] = {}  # Track content by choice index
         choice_tool_calls: dict[
@@ -7560,7 +7501,6 @@ def _create_tracked_stream_wrapper(
                                 )
 
         finally:
-            # Build final aggregated output with all choices
             if choice_contents or choice_tool_calls or choice_reasoning_content:
                 choices_array = _build_choices_array(
                     choice_contents,
@@ -7594,6 +7534,133 @@ def _create_tracked_stream_wrapper(
             else:
                 end_call_ch = end_call_for_insert_to_ch_insertable(end, retention_days)
                 insert_call(end_call_ch)
+
+    return _stream_wrapper()
+
+
+def _create_tracked_span_stream_wrapper(
+    *,
+    ch_client: Any,
+    chunk_iter: Iterator[dict[str, Any]],
+    project_id: str,
+    span_id: str,
+    trace_id: str,
+    conversation_id: str,
+    conversation_name: str,
+    started_at: datetime.datetime,
+    provider_name: str,
+    model_name: str,
+    request_inputs: tsi.CompletionsCreateRequestInputs,
+    wb_user_id: str,
+    retention_days: int,
+) -> Iterator[dict[str, Any]]:
+    """Wrap a streaming completion iterator with agent span tracking.
+
+    Yields chunks to the client. On stream completion (or error), inserts
+    a completed span row that replaces the initial "open" span via
+    ClickHouse's ReplacingMergeTree(created_at).
+    """
+
+    def _stream_wrapper() -> Iterator[dict[str, Any]]:
+        yield {
+            "_meta": {
+                "weave_call_id": span_id,  # backward compat
+                "span_id": span_id,
+                "trace_id": trace_id,
+                "conversation_id": conversation_id,
+            }
+        }
+
+        aggregated_output: dict[str, Any] | None = None
+        choice_contents: dict[int, list[str]] = {}
+        choice_tool_calls: dict[int, list[dict[str, Any]]] = {}
+        choice_reasoning_content: dict[int, list[str]] = {}
+        choice_finish_reasons: dict[int, str | None] = {}
+        aggregated_metadata: dict[str, Any] = {}
+        stream_error: str | None = None
+
+        try:
+            for chunk in chunk_iter:
+                yield chunk
+
+                if not isinstance(chunk, dict):
+                    continue
+
+                if "error" in chunk and not chunk.get("choices"):
+                    stream_error = str(chunk["error"])
+                    continue
+
+                _update_metadata_from_chunk(chunk, aggregated_metadata)
+
+                choices = chunk.get("choices")
+                if choices:
+                    for choice in choices:
+                        choice_index = choice.get("index", 0)
+
+                        if choice_index not in choice_contents:
+                            choice_contents[choice_index] = []
+                            choice_tool_calls[choice_index] = []
+                            choice_reasoning_content[choice_index] = []
+                            choice_finish_reasons[choice_index] = None
+
+                        if "finish_reason" in choice:
+                            choice_finish_reasons[choice_index] = choice[
+                                "finish_reason"
+                            ]
+
+                        delta = choice.get("delta")
+                        if delta and isinstance(delta, dict):
+                            content_piece = delta.get("content")
+                            if content_piece:
+                                choice_contents[choice_index].append(content_piece)
+
+                            tool_call_delta = delta.get("tool_calls")
+                            if tool_call_delta:
+                                _process_tool_call_delta(
+                                    tool_call_delta, choice_tool_calls[choice_index]
+                                )
+
+                            reasoning_content_delta = delta.get("reasoning_content")
+                            if reasoning_content_delta:
+                                choice_reasoning_content[choice_index].append(
+                                    reasoning_content_delta
+                                )
+
+        except Exception as exc:
+            stream_error = str(exc)
+        finally:
+            if choice_contents or choice_tool_calls or choice_reasoning_content:
+                choices_array = _build_choices_array(
+                    choice_contents,
+                    choice_tool_calls,
+                    choice_reasoning_content,
+                    choice_finish_reasons,
+                )
+                aggregated_output = _build_completion_response(
+                    aggregated_metadata,
+                    choices_array,
+                )
+
+            if aggregated_output is not None:
+                aggregated_output["model"] = model_name
+
+            completed_span = build_completion_span(
+                project_id=project_id,
+                trace_id=trace_id,
+                span_id=span_id,
+                conversation_id=conversation_id,
+                conversation_name=conversation_name,
+                started_at=started_at,
+                ended_at=datetime.datetime.now(),
+                provider_name=provider_name,
+                model_name=model_name,
+                request_inputs=request_inputs,
+                response=aggregated_output,
+                wb_user_id=wb_user_id,
+                retention_days=retention_days,
+                error=stream_error,
+            )
+            AgentWriteHandler(ch_client).insert_span(completed_span)
 
     return _stream_wrapper()
 
