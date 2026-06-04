@@ -53,6 +53,12 @@ from weave.trace.op_accumulator import (
 from weave.trace.op_accumulator import (
     _build_iterator_from_accumulator_for_op as _build_iterator_from_accumulator_for_op_impl,
 )
+from weave.trace.op_lifecycle import (
+    ASYNC_CALL_CREATE_MSG,
+    CALL_CREATE_MSG,
+    ON_OUTPUT_MSG,
+    CallFinisher,
+)
 from weave.trace.op_protocol import (
     CallDisplayNameFunc,
     FinishCallbackType,
@@ -81,9 +87,8 @@ R = TypeVar("R")
 logger = logging.getLogger(__name__)
 
 
-CALL_CREATE_MSG = "Error creating call:\n{}"
-ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
-ON_OUTPUT_MSG = "Error capturing call output:\n{}"
+# CALL_CREATE_MSG, ASYNC_CALL_CREATE_MSG, and ON_OUTPUT_MSG now live in
+# weave.trace.op_lifecycle (imported above) so CallFinisher can share them.
 UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log your traces to a project.\n"
 
 # Sentinel for the annotation cache. Decoration writes this when signature
@@ -451,6 +456,43 @@ def _set_python_function_type_on_weave_dict(
     weave_dict["type"] = type_str
 
 
+def _try_create_call(
+    op: Op,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    *,
+    weave_kwargs: WeaveKwargs | None,
+    use_stack: bool,
+    create_msg: str,
+) -> Call | None:
+    """Create a call, returning ``None`` when creation fails recoverably.
+
+    Snapshots the call stack, then attempts ``_create_call``:
+
+    - ``OpCallError`` always propagates — it signals a user-facing
+      argument-binding problem, not an internal tracing failure.
+    - Any other exception is treated as an internal tracing failure: the call
+      stack is restored to its pre-attempt snapshot and ``None`` is returned so
+      the caller can run the op untraced.
+
+    This is the shared body of the create-call-with-fallback block that each of
+    the four execution paths used to inline verbatim.
+    """
+    call_stack_snapshot = call_context.get_call_stack().copy()
+    try:
+        return _create_call(
+            op, *args, __weave=weave_kwargs, use_stack=use_stack, **kwargs
+        )
+    except OpCallError:
+        raise
+    except Exception:
+        _restore_call_stack(call_stack_snapshot)
+        if get_raise_on_captured_errors():
+            raise
+        log_once(logger.error, create_msg.format(traceback.format_exc()))
+        return None
+
+
 def _call_sync_func(
     op: Op,
     *args: Any,
@@ -483,56 +525,25 @@ def _call_sync_func(
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
     # If the parent was traced (sampled in), the child will be too.
-    call_stack_snapshot = call_context.get_call_stack().copy()
-    try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
-    except OpCallError as e:
-        raise
-    except Exception as e:
-        _restore_call_stack(call_stack_snapshot)
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
+    created_call = _try_create_call(
+        op,
+        args,
+        kwargs,
+        weave_kwargs=__weave,
+        use_stack=True,
+        create_msg=CALL_CREATE_MSG,
+    )
+    if created_call is None:
+        # Tracing failed during call creation; run the op untraced.
         res = func(*args, **kwargs)
         return res, call
+    call = created_call
 
     # Execute the op and process the result
     client = weave_client_context.require_weave_client()
-    has_finished = False
-
-    def finish(output: Any = None, exception: BaseException | None = None) -> None:
-        if __require_explicit_finish:
-            return
-
-        nonlocal has_finished
-        if has_finished:
-            return
-        has_finished = True
-
-        try:
-            # Apply any post-processing to the accumulated state if needed
-            try:
-                if processor := getattr(op, "_on_finish_post_processor", None):
-                    output = processor(output)
-            except Exception as e:
-                if get_raise_on_captured_errors():
-                    raise
-                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
-
-            client.finish_call(
-                call,
-                output,
-                exception,
-                op=op,
-            )
-        finally:
-            # Only pop the call context if we're the current call
-            current_call = call_context.get_current_call()
-            if current_call and current_call.id == call.id:
-                call_context.pop_call(call.id)
+    finish = CallFinisher(
+        op, call, client, require_explicit_finish=__require_explicit_finish
+    )
 
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
@@ -612,56 +623,25 @@ async def _call_async_func(
     _set_python_function_type_on_weave_dict(__weave, "async_function")
 
     # Proceed with tracing
-    call_stack_snapshot = call_context.get_call_stack().copy()
-    try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
-    except OpCallError as e:
-        raise
-    except Exception as e:
-        _restore_call_stack(call_stack_snapshot)
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
+    created_call = _try_create_call(
+        op,
+        args,
+        kwargs,
+        weave_kwargs=__weave,
+        use_stack=True,
+        create_msg=ASYNC_CALL_CREATE_MSG,
+    )
+    if created_call is None:
+        # Tracing failed during call creation; run the op untraced.
         res = await func(*args, **kwargs)
         return res, call
+    call = created_call
 
     # Execute the op and process the result
     client = weave_client_context.require_weave_client()
-    has_finished = False
-
-    def finish(output: Any = None, exception: BaseException | None = None) -> None:
-        if __require_explicit_finish:
-            return
-
-        nonlocal has_finished
-        if has_finished:
-            return
-        has_finished = True
-
-        try:
-            # Apply any post-processing to the accumulated state if needed
-            try:
-                if processor := getattr(op, "_on_finish_post_processor", None):
-                    output = processor(output)
-            except Exception as e:
-                if get_raise_on_captured_errors():
-                    raise
-                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
-
-            client.finish_call(
-                call,
-                output,
-                exception,
-                op=op,
-            )
-        finally:
-            # Only pop the call context if we're the current call
-            current_call = call_context.get_current_call()
-            if current_call and current_call.id == call.id:
-                call_context.pop_call(call.id)
+    finish = CallFinisher(
+        op, call, client, require_explicit_finish=__require_explicit_finish
+    )
 
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
@@ -746,66 +726,34 @@ def _call_sync_gen(
     _set_python_function_type_on_weave_dict(__weave, "generator")
 
     # Proceed with tracing
-    call_stack_snapshot = call_context.get_call_stack().copy()
-    try:
-        # For generators, use_stack=False because we push when iteration starts,
-        # not when the call is created. This avoids double-pushing.
-        call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
-    except OpCallError:
-        raise
-    except Exception:
-        _restore_call_stack(call_stack_snapshot)
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
+    # For generators, use_stack=False because we push when iteration starts,
+    # not when the call is created. This avoids double-pushing.
+    created_call = _try_create_call(
+        op,
+        args,
+        kwargs,
+        weave_kwargs=__weave,
+        use_stack=False,
+        create_msg=CALL_CREATE_MSG,
+    )
+    if created_call is None:
         gen = func(*args, **kwargs)
         return gen, call
+    call = created_call
 
     # Execute the op and get the generator
     client = weave_client_context.require_weave_client()
-    has_finished = False
+    finish = CallFinisher(
+        op, call, client, require_explicit_finish=__require_explicit_finish
+    )
     accumulated_state = None
     acc = op._accumulator
-
-    def finish(output: Any = None, exception: BaseException | None = None) -> None:
-        if __require_explicit_finish:
-            return
-
-        nonlocal has_finished
-        if has_finished:
-            return
-        has_finished = True
-
-        try:
-            # Apply any post-processing to the accumulated state if needed
-            try:
-                if processor := getattr(op, "_on_finish_post_processor", None):
-                    output = processor(output)
-            except Exception as e:
-                if get_raise_on_captured_errors():
-                    raise
-                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
-
-            client.finish_call(
-                call,
-                output,
-                exception,
-                op=op,
-            )
-        finally:
-            # Only pop the call context if we're the current call
-            current_call = call_context.get_current_call()
-            if current_call and current_call.id == call.id:
-                call_context.pop_call(call.id)
 
     # Create the generator wrapper
     try:
         # Define the wrapper generator that will handle the call context properly
         def wrapped_generator() -> Generator[Any]:
-            nonlocal accumulated_state, has_finished
+            nonlocal accumulated_state
 
             # Set the call context before creating the original generator
             # This ensures all calls made during generator initialization are properly nested
@@ -830,7 +778,7 @@ def _call_sync_gen(
                                     yield value
                             except Exception as e:
                                 # Make sure to mark the call as finished with the exception
-                                if not has_finished:
+                                if not finish.has_finished:
                                     finish(accumulated_state, e)
                                 # Re-raise the exception to preserve user code behavior
                                 raise
@@ -895,7 +843,7 @@ def _call_sync_gen(
                         call_context.push_call(call)
                 except Exception as e:
                     # Make sure to mark the call as finished with the exception
-                    if not has_finished:
+                    if not finish.has_finished:
                         finish(accumulated_state, e)
                     # Re-raise the exception to preserve user code behavior
                     raise
@@ -904,7 +852,7 @@ def _call_sync_gen(
                 finish(accumulated_state)
             except Exception as e:
                 # Handle exceptions from the generator
-                if not has_finished:
+                if not finish.has_finished:
                     finish(accumulated_state, e)
                 raise
 
@@ -924,7 +872,7 @@ def _call_sync_gen(
         def empty_sync_gen() -> Generator[Any]:
             # Re-raise the original exception if __should_raise is False
             # but we're evaluating the generator, to maintain expected behavior
-            if not has_finished:
+            if not finish.has_finished:
                 nonlocal e
                 raise e  # noqa: TRY201 - bare raise invalid outside exception handler
             # This will never actually yield anything but is needed for typing
@@ -968,66 +916,34 @@ def _call_async_gen(
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
 
     # Proceed with tracing
-    call_stack_snapshot = call_context.get_call_stack().copy()
-    try:
-        # For generators, use_stack=False because we push when iteration starts,
-        # not when the call is created. This avoids double-pushing.
-        call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
-    except OpCallError:
-        raise
-    except Exception:
-        _restore_call_stack(call_stack_snapshot)
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
+    # For generators, use_stack=False because we push when iteration starts,
+    # not when the call is created. This avoids double-pushing.
+    created_call = _try_create_call(
+        op,
+        args,
+        kwargs,
+        weave_kwargs=__weave,
+        use_stack=False,
+        create_msg=ASYNC_CALL_CREATE_MSG,
+    )
+    if created_call is None:
         gen = func(*args, **kwargs)
         return gen, call
+    call = created_call
 
     # Execute the op and get the generator
     client = weave_client_context.require_weave_client()
-    has_finished = False
+    finish = CallFinisher(
+        op, call, client, require_explicit_finish=__require_explicit_finish
+    )
     accumulated_state = None
     acc = op._accumulator
-
-    def finish(output: Any = None, exception: BaseException | None = None) -> None:
-        if __require_explicit_finish:
-            return
-
-        nonlocal has_finished
-        if has_finished:
-            return
-        has_finished = True
-
-        try:
-            # Apply any post-processing to the accumulated state if needed
-            try:
-                if processor := getattr(op, "_on_finish_post_processor", None):
-                    output = processor(output)
-            except Exception as e:
-                if get_raise_on_captured_errors():
-                    raise
-                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
-
-            client.finish_call(
-                call,
-                output,
-                exception,
-                op=op,
-            )
-        finally:
-            # Only pop the call context if we're the current call
-            current_call = call_context.get_current_call()
-            if current_call and current_call.id == call.id:
-                call_context.pop_call(call.id)
 
     # Create the generator wrapper
     try:
         # Define the wrapper generator that will handle the call context properly
         async def wrapped_generator() -> AsyncIterator:
-            nonlocal accumulated_state, has_finished
+            nonlocal accumulated_state
 
             # Set the call context before creating the original generator
             # This ensures all calls made during generator initialization are properly nested
@@ -1052,7 +968,7 @@ def _call_async_gen(
                                     yield value
                             except Exception as e:
                                 # Make sure to mark the call as finished with the exception
-                                if not has_finished:
+                                if not finish.has_finished:
                                     finish(accumulated_state, e)
                                 # Re-raise the exception to preserve user code behavior
                                 raise
@@ -1122,7 +1038,7 @@ def _call_async_gen(
                         call_context.push_call(call)
                 except Exception as e:
                     # Make sure to mark the call as finished with the exception
-                    if not has_finished:
+                    if not finish.has_finished:
                         finish(accumulated_state, e)
                     # Re-raise the exception to preserve user code behavior
                     raise
@@ -1131,7 +1047,7 @@ def _call_async_gen(
                 finish(accumulated_state)
             except Exception as e:
                 # Handle exceptions from the generator
-                if not has_finished:
+                if not finish.has_finished:
                     finish(accumulated_state, e)
                 raise
 
@@ -1151,7 +1067,7 @@ def _call_async_gen(
         async def empty_async_gen() -> AsyncIterator[Any]:  # noqa: RUF029 — must be async to produce AsyncIterator
             # Re-raise the original exception if __should_raise is False
             # but we're evaluating the generator, to maintain expected behavior
-            if not has_finished:
+            if not finish.has_finished:
                 nonlocal e
                 raise e  # noqa: TRY201 - bare raise invalid outside exception handler
             # This will never actually yield anything but is needed for typing
