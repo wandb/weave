@@ -9,6 +9,7 @@ from weave.trace_server.query_builder.objects_query_builder import (
     _make_object_id_conditions_part,
     _make_offset_part,
     _make_sort_part,
+    make_obj_name_type_collision_query,
     make_objects_val_query_and_parameters,
 )
 
@@ -331,4 +332,26 @@ def test_make_objects_val_query_and_parameters():
         "project_id": "test_project",
         "object_ids": ["object_1"],
         "digests": ["digestttttttttttttttt", "digestttttttttttttttt2"],
+    }
+
+
+def test_make_obj_name_type_collision_query():
+    query, parameters = make_obj_name_type_collision_query(
+        project_id="test_project", object_id="object_1", kind="object"
+    )
+
+    expected_query = """
+        SELECT DISTINCT base_object_class
+        FROM object_versions
+        WHERE project_id = {project_id: String}
+            AND object_id = {object_id: String}
+            AND kind = {kind: String}
+            AND deleted_at IS NULL
+    """
+
+    assert_sql(query, expected_query)
+    assert parameters == {
+        "project_id": "test_project",
+        "object_id": "object_1",
+        "kind": "object",
     }
