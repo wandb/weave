@@ -309,20 +309,14 @@ class UserSettings:
     """
     Routes OTel-capable integrations through their OTel variant.
 
-    When True (the default), integrations that ship a sibling OTel patcher
-    (e.g. ``openai_agents`` → ``openai_agents_otel``, ``claude_agent_sdk`` → its
-    OTel variant) dispatch to the OTel variant on implicit import-hook patching.
-    ``google_adk`` is OTel-only and emits OTel spans regardless of this flag.
-    Explicit ``patch_*`` calls are unaffected — they always do exactly what
-    their name says.
+    When True, integrations that ship a sibling OTel patcher (e.g. ``openai_agents``
+    → ``openai_agents_otel``) dispatch to the OTel variant on implicit
+    import-hook patching. Explicit ``patch_*`` calls are unaffected — they
+    always do exactly what their name says.
 
-    Consequence for plain ``openai``: it has no OTel variant, and the OTel
-    Agents processor already lifts in-agent LLM data from the Agents SDK's own
-    span data, so when this is True the implicit dispatcher does NOT patch
-    ``openai`` (this avoids double-logging calls made from inside an agent run).
-    Direct, non-agent ``openai.*`` calls are therefore untraced under implicit
-    patching; call ``weave.integrations.patch_openai()`` explicitly to trace
-    them, or set this to False.
+    NOTE: plain ``openai`` has no OTel variant, so it is no longer patched on
+    implicit import-hook patching. Call ``weave.integrations.patch_openai()``
+    explicitly (or set this to False) to trace direct ``openai.*`` calls.
 
     Can be overridden with the environment variable `WEAVE_USE_OTEL_V2`
     """

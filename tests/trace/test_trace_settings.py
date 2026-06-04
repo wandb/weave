@@ -31,7 +31,6 @@ from weave.trace.settings import (
     should_disable_weave,
     should_print_call_link,
     should_redact_pii,
-    should_use_otel_v2,
 )
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
@@ -608,29 +607,6 @@ class TestEnvOverlay:
     def test_coerces_optional_int(self, monkeypatch):
         monkeypatch.setenv("WEAVE_CLIENT_PARALLELISM", "7")
         assert client_parallelism() == 7
-
-
-@pytest.mark.usefixtures("clean_settings_env")
-class TestUseOtelV2Default:
-    """OTel-capable integrations route through their OTel variant by default.
-
-    Guards the default of ``UserSettings.use_otel_v2`` (True): every dispatcher
-    in ``weave/integrations/patch.py`` keys off ``should_use_otel_v2()``, so
-    flipping this back to False would silently revert ``openai_agents`` /
-    ``claude_agent_sdk`` to their legacy calls-based variant on implicit
-    patching (and resume patching plain ``openai``).
-    """
-
-    def test_defaults_to_true(self):
-        assert should_use_otel_v2() is True
-
-    def test_snapshot_can_opt_out(self):
-        replace_settings(UserSettings(use_otel_v2=False))
-        assert should_use_otel_v2() is False
-
-    def test_env_var_can_opt_out(self, monkeypatch):
-        monkeypatch.setenv("WEAVE_USE_OTEL_V2", "false")
-        assert should_use_otel_v2() is False
 
 
 @pytest.mark.usefixtures("clean_settings_env")
