@@ -91,7 +91,6 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 CTE_ALL_CALLS = "all_calls"
-CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 
 # Deferred: server-side defense-in-depth cap for unfiltered calls_merged stats.
 # Wired up in `build_calls_stats_query` but currently commented out; callers
@@ -1891,10 +1890,13 @@ class CallsQuery(BaseModel):
             if not trace_id_strict:
                 return None
             project_param = pb.add_param(self.project_id)
-            return f"""SELECT {table_alias}.id AS id
+            raw_sql = f"""
+        SELECT {table_alias}.id AS id
         FROM {table_alias}
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
-        WHERE {trace_id_strict}"""
+        WHERE {trace_id_strict}
+        """
+            return safely_format_sql(raw_sql, logger)
 
         # Heavy-LIKE eligible. Build the full WHERE via the optimization
         # pipeline (which also includes trace_id, op_name, etc. in OR-IS-NULL
