@@ -1,0 +1,61 @@
+## Conversation
+Step 3 (clean move, no shims). User chose option (a): put the CH-named-but-sqlite-reachable
+modules (clickhouse_schema, clickhouse_trace_server_settings) in shared/ FOR NOW; revisit at
+stack review. (Option b was: break the token_costs->clickhouse_schema and feedback->ch_settings
+couplings so they could live in clickhouse_trace_server/.)
+
+## Actions
+- Built import graph (.context/bucketize.py): BFS from sqlite_trace_server.py and
+  clickhouse_trace_server_batched.py. Rule: sqlite-reachable => shared (the reference impl must
+  not depend on the CH impl dir). Result: 27 files + 5 dirs (methods/ opentelemetry/
+  calls_query_builder/ project_version/ workers/) are shared.
+- Created weave/trace_server/shared/__init__.py (empty); git mv all 27 files + 5 dirs in.
+- Codemod .context/pr3_repoint_shared.py: per-unit dotted + space-form rules ->
+  weave.trace_server.shared.*. Idempotent; never touches client facade
+  (weave.trace_server_interface.*), contract (weave.trace_server.interface.*), or CH/sqlite
+  units that stay top-level. 163 files changed.
+- Residual client errors imports (weave_client/vals/refs/project_id_resolver/http_utils) now ->
+  weave.trace_server.shared.errors. Facade ids/constants/trace_server_converter re-export targets
+  -> shared.
+
+## Errors & Mistakes
+- BUG: codemod is line-by-line and only matched single-line `from weave.trace_server import X`.
+  Three files use MULTI-LINE `from weave.trace_server import (\n  X,\n ...)`. The continuation
+  bare-names weren't rewritten -> import smoke failed: clickhouse_trace_server_batched.py:46
+  `cannot import name ch_sentinel_values`. Fixed by hand-editing the 2 ALL-shared blocks
+  (clickhouse_trace_server_batched.py, tests/trace_server/conftest.py) opening line ->
+  `from weave.trace_server.shared import (`. The 3rd block (trace_server_external_adapter.py)
+  imports external_to_internal_trace_server_adapter = CH (stays) -> correctly left alone.
+- The straggler grep (all-lines, dotted form) was clean throughout because the broken imports
+  used the BARE-NAME multi-line space-form, not the dotted form. Lesson: also grep multi-line
+  `from weave.trace_server import ($` blocks when moving top-level modules.
+
+## Dead Ends
+- None.
+
+## Hints for Future Agents
+- CH-named modules clickhouse_schema (293L) + clickhouse_trace_server_settings (182L) are in
+  shared/ because: token_costs imports `clickhouse_schema.SelectableCHCallSchema`; feedback
+  imports the whole `clickhouse_trace_server_settings as ch_settings`. Both token_costs+feedback
+  are sqlite-reachable. Breaking these 2 couplings (memory: superseded ts-split-feedback-cap /
+  ts-shared-* branches did the feedback->ch_settings decoupling) would let them move to
+  clickhouse_trace_server/. DEFERRED per user (revisit at review).
+- redis_client in shared/ is fine (generic infra; ttl_settings.get_redis_client uses it).
+- After PR3, shared/ modules may still import top-level CH modules that haven't moved yet
+  (e.g., feedback was already importing ch_settings, now both in shared; but any shared->CH
+  edge for modules moving in PR4 will repoint to clickhouse_trace_server/ in PR4).
+- PENDING REVIEW COMMENT (user-forwarded): test/server `tsi` imports should read
+  `from weave.trace_server import interface as tsi` instead of
+  `from weave.trace_server.interface import trace_server_interface as tsi`. This needs
+  interface/__init__.py to re-export the protocol. Apply stack-wide as a final convention codemod
+  AFTER confirming exact form (incl. client-facade analog). Queued, not yet done.
+
+## Codebase Discoveries
+- Import-graph buckets (bucketize.py): query_builder/ is CH-only but calls_query_builder/ is
+  shared; methods/, opentelemetry/, project_version/, workers/ are shared.
+- git rename detection held 96-100% across all moved files despite import edits.
+
+## Open Questions
+- The 2 CH-named-in-shared placements (above) — resolve at stack review.
+- PR4 next: move CH impl (15 top-level files + clickhouse/ costs/ model_providers/ migrations/
+  helpers/ query_builder/ actions_worker/ agents/) into clickhouse_trace_server/.
