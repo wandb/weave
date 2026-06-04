@@ -398,6 +398,14 @@ class WeaveClient:
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
 
+        # Whether this client may reconstruct code-bearing custom objects (ops, or any
+        # type that decodes by running a stored `.py`) on `client.get`. Defaults True:
+        # for normal users this only ever runs code from their own traces, so it is
+        # safe. Server-side workers flip it off via `require_secure_weave_client`, and
+        # anyone can disable it globally with `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false`
+        # (data-only objects like images/audio still decode). Enforced in custom_objs.py.
+        self._allow_unsafe_custom_obj_decode = True
+
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
             # Set Client project name with updated project name

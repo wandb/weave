@@ -540,11 +540,22 @@ class CompletionsCreateReq(BaseModelStrict):
     parent_id: str | None = Field(
         None, description="Parent call ID to nest this LLM call under"
     )
+    conversation_id: str | None = Field(
+        None,
+        description="Conversation ID to group related completions into a multi-turn conversation",
+    )
+    conversation_name: str | None = Field(
+        None,
+        description="Human-readable conversation name",
+    )
 
 
 class CompletionsCreateRes(BaseModel):
     response: dict[str, Any]
-    weave_call_id: str | None = None
+    weave_call_id: str | None = None  # Deprecated: use span_id instead
+    span_id: str | None = None
+    trace_id: str | None = None
+    conversation_id: str | None = None
 
 
 class ImageGenerationRequestInputs(BaseModel):

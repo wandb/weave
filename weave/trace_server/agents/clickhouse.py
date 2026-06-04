@@ -14,27 +14,36 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
 from weave.shared import refs_internal as ri
-from weave.trace_server.agents.chat_view import build_trace_chat
+from weave.trace_server.agents.chat_view import (
+    build_trace_chat,
+    first_user_preview_text,
+    last_assistant_preview_text,
+)
 from weave.trace_server.agents.constants import (
+    CONVERSATION_PREVIEW_CHARS,
     MAX_INGEST_ERRORS_REPORTED,
     NO_CONVERSATION_LABEL,
 )
 from weave.trace_server.agents.helpers import (
     genai_span_to_row,
+    messages_from_ch_value,
     normalize_span_row,
     unpack_string_array,
 )
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
     AgentSpanCHInsertable,
+    NormalizedMessage,
 )
 from weave.trace_server.agents.types import (
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
     AgentConversationChatReq,
     AgentConversationChatRes,
+    AgentConversationMessagePreview,
     AgentCustomAttrSchemaItem,
     AgentCustomAttrsSchemaReq,
     AgentCustomAttrsSchemaRes,
+    AgentGroupByRef,
     AgentSchema,
     AgentSearchConversationResult,
     AgentSearchMatchedMessage,
@@ -73,6 +82,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_agents_list_query,
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
+    make_conversation_previews_query,
     make_custom_attrs_schema_query,
     make_message_search_query,
     make_span_group_categorical_distributions_query,
@@ -169,7 +179,53 @@ class AgentQueryHandler:
         groups = [_hydrate_group_row(r, aliases, measure_aliases) for r in rows]
         if req.group_distributions:
             self._hydrate_group_distributions(req, groups, aliases[0])
+        if _is_conversation_grouping(req.group_by):
+            self._hydrate_conversation_previews(req, groups, aliases[0])
         return AgentSpansQueryRes(groups=groups, total_count=total)
+
+    def _hydrate_conversation_previews(
+        self,
+        req: AgentSpansQueryReq,
+        groups: list[AgentSpanGroupRow],
+        group_alias: str,
+    ) -> None:
+        """Attach first/last message previews to conversation rows.
+
+        Runs a second, bounded query scoped to exactly the conversation_ids on
+        this page so the wide message columns are read only for the displayed
+        conversations — not for every span matching the list filters. Failures
+        are swallowed: previews are best-effort display data and must not fail
+        the list query.
+        """
+        conversation_ids: set[str] = set()
+        for g in groups:
+            cid = g.group_keys.get(group_alias)
+            if isinstance(cid, str) and cid:
+                conversation_ids.add(cid)
+        if not conversation_ids:
+            return
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_conversation_previews_query(
+            pb,
+            req.project_id,
+            conversation_ids,
+            started_after=req.started_after,
+            started_before=req.started_before,
+        )
+        try:
+            rows = _rows_as_dicts(self._query(sql, pb.get_params()))
+        except Exception:
+            logger.exception("failed to hydrate conversation message previews")
+            return
+        previews_by_conv = {
+            safe_str(row.get("conversation_id")): _conversation_preview(row)
+            for row in rows
+        }
+        for g in groups:
+            cid = g.group_keys.get(group_alias)
+            preview = previews_by_conv.get(cid) if isinstance(cid, str) else None
+            if preview is not None:
+                g.first_message, g.last_message = preview
 
     def spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
         """Return chart-ready aggregations over spans."""
@@ -651,6 +707,20 @@ class AgentWriteHandler:
         )
         return res, span_rows
 
+    def insert_span(self, span: AgentSpanCHInsertable) -> None:
+        """Insert a single pre-built span into the spans table.
+
+        Unlike ``insert_otel_spans`` this skips OTel protobuf parsing and
+        GenAI extraction — the caller is responsible for constructing a
+        fully populated ``AgentSpanCHInsertable``.
+        """
+        self._ch_client.insert(
+            "spans",
+            data=[genai_span_to_row(span)],
+            column_names=ALL_SPAN_INSERT_COLUMNS,
+        )
+        record_db_insert(table="spans", count=1)
+
 
 # ---------------------------------------------------------------------------
 # Private helpers
@@ -782,8 +852,61 @@ def _hydrate_group_row(
         conversation_names=unpack_string_array(row.get("conversation_names")),
         first_seen=_datetime_or_none(row.get("first_seen")),
         last_seen=_datetime_or_none(row.get("last_seen")),
+        # first_message / last_message are hydrated separately for conversation
+        # groupings via _hydrate_conversation_previews; left None here.
         metrics=metrics,
     )
+
+
+def _is_conversation_grouping(group_by: list[AgentGroupByRef]) -> bool:
+    """Whether this is a single group-by on the conversation_id column.
+
+    Message previews are a per-conversation concept, so we only pay for the
+    second query when the page is grouped by conversation_id alone.
+    """
+    return (
+        len(group_by) == 1
+        and group_by[0].source == "column"
+        and group_by[0].key == "conversation_id"
+    )
+
+
+def _conversation_preview(
+    row: ClickHouseRow,
+) -> tuple[
+    AgentConversationMessagePreview | None, AgentConversationMessagePreview | None
+]:
+    """Return (first_message, last_message) previews from a preview-query row."""
+    return (
+        _message_preview(
+            row.get("first_input_messages"), "user_message", first_user_preview_text
+        ),
+        _message_preview(
+            row.get("last_output_messages"),
+            "assistant_message",
+            last_assistant_preview_text,
+        ),
+    )
+
+
+def _message_preview(
+    raw_messages: object,
+    role: str,
+    extract_text: Callable[[list[NormalizedMessage]], str],
+) -> AgentConversationMessagePreview | None:
+    """Build a truncated message preview from a raw ClickHouse message array.
+
+    `extract_text` applies the same role resolution as the full chat view so
+    previews match what the opened conversation shows. Returns None when no
+    renderable text is present so callers can fall back to the conversation id.
+    """
+    messages = messages_from_ch_value(raw_messages)
+    text = extract_text(messages).strip()
+    if not text:
+        return None
+    if len(text) > CONVERSATION_PREVIEW_CHARS:
+        text = text[:CONVERSATION_PREVIEW_CHARS].rstrip() + "…"
+    return AgentConversationMessagePreview(role=role, text=text)
 
 
 def _datetime_or_none(val: object) -> datetime.datetime | None:

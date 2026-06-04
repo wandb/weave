@@ -108,6 +108,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      packages: write
     # TODO: refactor to use matrix.include for runner selection
     # Use 8-core runners for trace and trace_calls_complete_only shards (resource-intensive)
     runs-on: ${{ (matrix.nox-shard == 'trace' || matrix.nox-shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
@@ -166,17 +167,6 @@ jobs:
           - python-version-minor: "13"
             nox-shard: "verifiers_test"
       fail-fast: false
-    services:
-      weave_clickhouse:
-        image: clickhouse/clickhouse-server:25.11.2.24
-        env:
-          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-          CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ""
-          CLICKHOUSE_DB: default
-        ports:
-          - "8123:8123"
-        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -208,6 +198,28 @@ jobs:
           done
           docker logs wandbservice
           exit 1
+      - name: Start ClickHouse
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image=$(.github/scripts/ch-image.sh)
+          docker run --detach --rm --name weave_clickhouse \
+            --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+            --env CLICKHOUSE_USER=default \
+            --env CLICKHOUSE_PASSWORD= \
+            --env CLICKHOUSE_DB=default \
+            --publish 8123:8123 \
+            "$image"
+          for _i in {1..30}; do
+            if wget -q -O- 'http://localhost:8123/ping' >/dev/null; then
+              echo "clickhouse is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs weave_clickhouse
+          exit 1
       - name: Enable debug logging
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Install SQLite dev package
@@ -228,7 +240,7 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
           # Tests use VCR recordings so real keys aren't needed
@@ -267,6 +279,9 @@ jobs:
     name: Trace server migrator tests (1s1r)
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -276,7 +291,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Start ClickHouse with embedded Keeper
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          image=$(.github/scripts/ch-image.sh)
           docker run -d --rm \
             -e CLICKHOUSE_DB=default \
             -e CLICKHOUSE_USER=default \
@@ -286,7 +305,7 @@ jobs:
             -v ${{ github.workspace }}/tests/trace_server/conftest_lib/clickhouse_keeper_config.xml:/etc/clickhouse-server/config.d/keeper.xml \
             --name weave-test-keeper \
             --ulimit nofile=262144:262144 \
-            clickhouse/clickhouse-server:25.11.2.24
+            "$image"
           # Wait for server to be healthy
           for i in $(seq 1 30); do
             wget -q -O- 'http://localhost:8130/ping' && break || sleep 1
@@ -474,7 +493,7 @@ jobs:
   # ==== Windows Jobs ====
   windows_trace_no_server:
     name: Windows Trace non-trace server tests
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: windows-latest
     strategy:
       matrix:
@@ -494,10 +513,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Set up uv (cached)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-local-path: ${{ runner.temp }}\uv-cache
+          cache-dependency-glob: "**/pyproject.toml"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox
       - name: Run nox (Non Trace Server)
         env:
           DD_TRACE_ENABLED: "false"
@@ -514,7 +539,7 @@ jobs:
 
   windows_trace_tests:
     name: Windows Trace nox tests
-    timeout-minutes: 15
+    timeout-minutes: 25
     runs-on: windows-latest
     strategy:
       matrix:
@@ -575,10 +600,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Set up uv (cached)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-local-path: ${{ runner.temp }}\uv-cache
+          cache-dependency-glob: "**/pyproject.toml"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
