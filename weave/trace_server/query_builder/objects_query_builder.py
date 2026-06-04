@@ -474,8 +474,14 @@ def make_obj_name_type_collision_query(
     parallel load that extra work is enough to overload the ClickHouse
     coordinator. The raw table predicate is a perfect prefix match
     against the table's `ORDER BY (project_id, kind, object_id, digest)`,
-    so this is a primary-key-prefix scan. `DISTINCT` collapses any
-    pre-merge duplicates the ReplacingMergeTree hasn't reaped yet.
+    so this is a primary-key-prefix scan.
+
+    Reading the raw table (no FINAL) means a soft-deleted version's
+    pre-merge row can still satisfy `deleted_at IS NULL`, so a name
+    deleted and recreated with a new type may be rejected until the
+    ReplacingMergeTree merges. We accept over-rejecting here: this is a
+    write guard, and conservatively refusing a write is safer than
+    silently rebinding a name to a new type.
     """
     query = """
         SELECT DISTINCT base_object_class

@@ -1128,7 +1128,6 @@ def test_obj_create_rejects_name_type_collision(client: WeaveClient):
     assert "TestOnlyNestedBaseObject" in str(excinfo.value)
 
     # And the original type must still be the only one present for that name.
-    time.sleep(0.2)
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
