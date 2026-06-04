@@ -112,5 +112,5 @@ def test_completions_create(client):
     assert span.response_model == "gpt-4o-2024-08-06"
     assert span.input_tokens == 11
     assert span.output_tokens == 9
-    assert span.agent_name == "playground"
+    assert span.agent_name == "Weave Chat Playground"
     assert span.status_code == "OK"
