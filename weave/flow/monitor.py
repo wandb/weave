@@ -116,13 +116,13 @@ class Monitor(Object):
         ``weave.publish(monitor)`` (no ``activate()``), expand short names here:
         anyone who will publish has typically called ``weave.init``, so the client
         is set when the monitor is constructed.
-        
+
         Several use cases perform construction without a client, such as unit tests,
         inspection, deserializing a stored monitor in a worker. The guard on
         ``get_weave_client()`` allows construction without a client. Normalization
         won't occur in this case, but that should be ok because stored monitors already
         hold full refs.
-        
+
         There is an edge case where a monitor can be created using the SDK without
         normalizing: if the user constructs the monitor, then calls weave.init,
         and then publishes it. Calling ``activate()`` or ``deactivate()`` could be
