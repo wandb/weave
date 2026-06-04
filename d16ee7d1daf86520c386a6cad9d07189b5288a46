@@ -86,3 +86,14 @@ memory, and removes the only measurable regression vs the old closure. No
 dynamic attributes are needed on CallFinisher. Inline comment in op_lifecycle.py
 documents the rationale. Benchmark script: .context/bench_callfinisher.py
 (gitignored). All 94 op tests still pass with slots.
+
+## Addendum: review feedback
+Renamed _try_create_call -> _maybe_create_call (reviewer preference; the
+'maybe' prefix reads well for a Call | None return). Pushed back (kept as-is)
+on three other comments: CallFinisher.__call__ stays (it's a callback passed to
+accumulators/handlers); CallFinisher stays a plain slotted class rather than a
+dataclass (it's a stateful behavioral object, and its private _require_explicit_finish
+attr can't map cleanly to a dataclass field/init param); and _maybe_create_call's
+packed args/kwargs stay tuple[Any]/dict[str,Any] because ParamSpec P.args/P.kwargs
+can only annotate a function's literal *args/**kwargs, not packed regular params
+interleaved with weave's own control kwargs (same reason _create_call/_call_* use Any).
