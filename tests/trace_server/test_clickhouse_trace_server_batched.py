@@ -789,9 +789,7 @@ def test_completions_create_stream_multiple_choices():
         assert len(chunks) == 4  # Meta chunk + 3 content chunks
         assert "_meta" in chunks[0]
         assert "weave_call_id" in chunks[0]["_meta"]
-        assert (
-            "weave_call_ids" not in chunks[0]["_meta"]
-        )
+        assert "weave_call_ids" not in chunks[0]["_meta"]
 
         assert chunks[1]["choices"][0]["delta"]["content"] == "Hello"
         assert chunks[1]["choices"][1]["delta"]["content"] == "Hi"
