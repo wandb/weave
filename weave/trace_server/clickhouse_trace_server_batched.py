@@ -6423,12 +6423,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
-        req.inputs.messages = initial_messages
+        req.inputs.messages = prep.initial_messages
         span_id = generate_id()
         trace_id = req.trace_id or generate_id()
         conversation_id = req.conversation_id or generate_id()
         conversation_name = req.conversation_name or ""
-        parent_id = req.parent_id
         model_name = prep.completion_model_info.model_name
 
         error = res.response.get("error")
@@ -6441,7 +6440,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             conversation_name=conversation_name,
             started_at=start_time,
             ended_at=end_time,
-            provider_name=completion_model_info.provider or "",
+            provider_name=prep.completion_model_info.provider or "",
             model_name=model_name,
             request_inputs=req.inputs,
             response=res.response,
