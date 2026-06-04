@@ -1961,16 +1961,17 @@ def test_calls_query_stream_lazy_materialization_scoped_to_calls_complete(
     """
     captured: dict[str, Any] = {}
 
-    def _capture(query, parameters=None, settings=None, **kwargs):
+    def _capture(self, query, parameters=None, settings=None, **kwargs):
         captured["settings"] = dict(settings or {})
         return iter([])
 
+    # Patch on the classes, not the shared instances: instance-level setattr would
+    # leak `_query_stream` into the server's __dict__ (see test_reset_server_state).
+    resolver = clickhouse_trace_server.table_routing_resolver
     monkeypatch.setattr(
-        clickhouse_trace_server.table_routing_resolver,
-        "resolve_read_table",
-        lambda *args, **kwargs: read_table,
+        type(resolver), "resolve_read_table", lambda self, *args, **kwargs: read_table
     )
-    monkeypatch.setattr(clickhouse_trace_server, "_query_stream", _capture)
+    monkeypatch.setattr(type(clickhouse_trace_server), "_query_stream", _capture)
 
     list(
         clickhouse_trace_server.calls_query_stream(
