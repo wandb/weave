@@ -39,7 +39,7 @@ from weave.shared.trace_server_interface_util import (
     split_exact_and_wildcard_values,
     wildcard_version_value_to_ref_prefix,
 )
-from weave.trace_server import ch_sentinel_values
+from weave.trace_server import ch_sentinel_values, environment
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
@@ -64,7 +64,7 @@ from weave.trace_server.calls_query_builder.utils import (
     trace_id_index_expr,
 )
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import MULTI_VALUE_FEEDBACK_TYPES
 from weave.trace_server.interface.query import (
@@ -1066,6 +1066,30 @@ class CallsQuery(BaseModel):
         # No predicate pushdown possible
         return False
 
+    def _enforce_heavy_field_time_filter(self) -> None:
+        """Reject heavy-field filters that lack a `started_at` time bound.
+
+        A heavy-field filter (inputs, output, attributes) with no time bound
+        forces a full scan of the large dump columns; a `started_at` bound lets
+        the `sortable_datetime` minmax index prune parts. Gated by
+        `WEAVE_ENFORCE_HEAVY_FIELD_TIME_FILTER` (off by default).
+        """
+        if not environment.wf_enforce_heavy_field_time_filter():
+            return
+        table_name = get_calls_table_name(self.read_table)
+        consumed = [
+            field
+            for condition in self.query_conditions
+            for field in condition._get_consumed_fields(table_name)
+        ]
+        has_heavy = any(field.is_heavy() for field in consumed)
+        has_time = any(field.field == _STARTED_AT_FIELD for field in consumed)
+        if has_heavy and not has_time:
+            raise InvalidRequest(
+                "Querying heavy fields (inputs, output, attributes) requires a "
+                "started_at filter. Add a started_at bound to your query and retry."
+            )
+
     def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         """This is the main entry point for building the query.
 
@@ -1140,6 +1164,8 @@ class CallsQuery(BaseModel):
         """
         if not self.select_fields:
             raise ValueError("Missing select columns")
+
+        self._enforce_heavy_field_time_filter()
 
         # Determine if we should use the two-step filtered_calls CTE pattern.
         # Only relevant for calls_merged (where GROUP BY makes the two-pass

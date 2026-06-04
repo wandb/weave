@@ -66,6 +66,14 @@ def wf_enable_agent_scoring() -> bool:
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
 
 
+def wf_enforce_heavy_field_time_filter() -> bool:
+    """Whether to reject calls queries that filter on heavy fields without a started_at filter."""
+    return (
+        os.environ.get("WEAVE_ENFORCE_HEAVY_FIELD_TIME_FILTER", "false").lower()
+        == "true"
+    )
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(

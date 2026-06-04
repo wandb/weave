@@ -20,7 +20,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
@@ -5069,3 +5069,57 @@ def test_query_with_annotation_filter_still_uses_anyif() -> None:
             "pb_3": "project",
         },
     )
+
+
+def _heavy_contains_condition() -> "tsi_query.Operand":
+    return tsi_query.ContainsOperation.model_validate(
+        {
+            "$contains": {
+                "input": {"$getField": "inputs.message"},
+                "substr": {"$literal": "hello"},
+            }
+        }
+    )
+
+
+def _started_at_lower_bound() -> "tsi_query.Operand":
+    return tsi_query.GtOperation.model_validate(
+        {"$gt": [{"$getField": "started_at"}, {"$literal": 1700000000}]}
+    )
+
+
+@pytest.mark.parametrize(
+    ("enforce", "heavy", "time_filter", "should_raise"),
+    [
+        (True, True, False, True),  # heavy filter + no time -> rejected
+        (True, True, True, False),  # heavy filter + started_at bound -> allowed
+        (True, False, False, False),  # light-only filter -> allowed
+        (False, True, False, False),  # flag off -> allowed
+    ],
+)
+def test_heavy_field_requires_time_filter(
+    monkeypatch: pytest.MonkeyPatch,
+    enforce: bool,
+    heavy: bool,
+    time_filter: bool,
+    should_raise: bool,
+) -> None:
+    if enforce:
+        monkeypatch.setenv("WEAVE_ENFORCE_HEAVY_FIELD_TIME_FILTER", "true")
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        _heavy_contains_condition()
+        if heavy
+        else tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "wb_user_id"}, {"$literal": "u1"}]}
+        )
+    )
+    if time_filter:
+        cq.add_condition(_started_at_lower_bound())
+
+    if should_raise:
+        with pytest.raises(InvalidRequest, match="started_at"):
+            cq.as_sql(ParamBuilder())
+    else:
+        assert cq.as_sql(ParamBuilder()).strip()
