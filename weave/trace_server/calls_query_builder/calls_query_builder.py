@@ -55,6 +55,7 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
 )
 from weave.trace_server.calls_query_builder.optimization_builder import (
     DATETIME_BUFFER_TIME_SECONDS,
+    heavy_fields_span_start_and_end,
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
@@ -1136,10 +1137,7 @@ class CallsQuery(BaseModel):
             FROM calls_merged
             WHERE project_id = {PROJECT_ID}
             AND ifNull(<dump>, '') LIKE ...     -- strict, no OR IS NULL, hits the ngram index
-            AND <other light WHERE filters>
-            ORDER BY <raw cols>                 -- no any(), no GROUP BY
-            LIMIT {LIMIT}                       -- mirrored from outer
-            OFFSET {OFFSET}                     -- mirrored from outer
+            AND <other light WHERE filters>     -- WHERE-only id superset, no ORDER BY/LIMIT
         ),
         filtered_calls AS (
             SELECT id
@@ -1827,15 +1825,15 @@ class CallsQuery(BaseModel):
         1. trace_id (migration 032 / idx_trace_id_bloom on ifNull(trace_id, '')).
            Pushed when hardcoded_filter has trace_ids. Always-on.
         2. heavy-field LIKE (migration 033 / idx_<dump>_ngram on ifNull(<dump>, '')).
-           Pushed when the strict heavy-LIKE form is non-empty AND ORDER BY
-           does not reference a heavy field or aggregate-state column. Gated
-           on `WF_CALLS_MERGED_HEAVY_INDEXES` for operator-controlled rollout.
+           Pushed when the strict heavy-LIKE form is non-empty. Gated on
+           `WF_CALLS_MERGED_HEAVY_INDEXES` for operator-controlled rollout.
 
         The outer filter_query keeps the OR-IS-NULL form for unmerged-call-part
         correctness, which defeats both bloom indexes, so this CTE runs the
-        strict (no OR-IS-NULL) form alone. When only trace_id applies the CTE
-        is a minimal `WHERE trace_id = ?` SELECT (no ORDER BY/LIMIT). When
-        heavy LIKE applies the CTE mirrors the outer ORDER BY/LIMIT/OFFSET.
+        strict (no OR-IS-NULL) form alone. The CTE is a pure WHERE-only id
+        superset (no ORDER BY/LIMIT/OFFSET): the strict LIKE is approximate, so
+        truncating it would drop true matches that the outer HAVING keeps, and
+        the outer query owns the exact ORDER BY/LIMIT/OFFSET.
 
         Returns None when neither source applies.
         """
@@ -1850,35 +1848,8 @@ class CallsQuery(BaseModel):
         # bloom (always-on) is unaffected.
         heavy_path_enabled = wf_env.wf_calls_merged_heavy_indexes_enabled()
 
-        # Heavy-LIKE strict has extra ORDER-BY gates because the heavy-LIKE
-        # path mirrors the outer ORDER BY/LIMIT/OFFSET in this CTE. Aggregate-
-        # state ORDER BY columns (argMaxMerge over AggregateFunction(...)
-        # state, or CallsMergedSummaryField handlers that expand to
-        # display_name raw) raise ILLEGAL_TYPE_OF_ARGUMENT without a GROUP BY.
-        # SimpleAggregateFunction columns (`any`, `array_concat_agg`) are
-        # fine; their raw value IS the aggregated value.
-        heavy_eligible = heavy_path_enabled and not any(
-            of.field.is_heavy() for of in self.order_fields
-        )
-        if heavy_eligible:
-            for of in self.order_fields:
-                if isinstance(of.field, CallsMergedSummaryField):
-                    heavy_eligible = False
-                    break
-                if isinstance(
-                    of.field, CallsMergedAggField
-                ) and of.field.agg_fn.endswith("Merge"):
-                    heavy_eligible = False
-                    break
-
         heavy_has_strict_filter = False
-        if heavy_eligible:
-            # Peek on a throwaway ParamBuilder so queries without a heavy-LIKE
-            # optimization don't shift the public param numbering or pay for
-            # duplicate hardcoded-filter params (op_names lists, etc.).
-            # TODO(WB-33883): _build_where_clause_optimizations couples
-            # hardcoded-filter param allocation with optimization-SQL
-            # computation; splitting them removes the duplicate optimizer pass.
+        if heavy_path_enabled:
             non_object_ref_conditions = [
                 c
                 for c in self.query_conditions
@@ -1886,11 +1857,28 @@ class CallsQuery(BaseModel):
                     expand_columns and is_object_ref_operand(c.operand, expand_columns)
                 )
             ]
-            peek_pb = ParamBuilder()
-            peek = process_query_to_optimization_sql(
-                non_object_ref_conditions, peek_pb, table_alias, self.read_table
-            )
-            heavy_has_strict_filter = bool(peek.heavy_filter_opt_strict_sql)
+            # The strict candidate filters single un-merged rows; a conjunction
+            # across start-only (inputs/attributes) and end-only (output/summary)
+            # fields matches no single part, so skip the bloom candidate and let
+            # the OR-IS-NULL outer path handle it (correct, just unindexed).
+            heavy_fields = {
+                field.field
+                for c in non_object_ref_conditions
+                for field in c._get_consumed_fields(table_alias)
+                if field.is_heavy()
+            }
+            if not heavy_fields_span_start_and_end(heavy_fields):
+                # Peek on a throwaway ParamBuilder so queries without a heavy-LIKE
+                # optimization don't shift the public param numbering or pay for
+                # duplicate hardcoded-filter params (op_names lists, etc.).
+                # TODO(WB-33883): _build_where_clause_optimizations couples
+                # hardcoded-filter param allocation with optimization-SQL
+                # computation; splitting them removes the duplicate optimizer pass.
+                peek_pb = ParamBuilder()
+                peek = process_query_to_optimization_sql(
+                    non_object_ref_conditions, peek_pb, table_alias, self.read_table
+                )
+                heavy_has_strict_filter = bool(peek.heavy_filter_opt_strict_sql)
 
         if not has_trace_ids and not heavy_has_strict_filter:
             return None
@@ -1922,24 +1910,6 @@ class CallsQuery(BaseModel):
         if not where_filters.heavy_filter:
             return None
 
-        order_by_sql = ""
-        if self.order_fields:
-            order_by_sqls = [
-                of.as_sql(
-                    pb,
-                    table_alias,
-                    expand_columns=None,
-                    field_to_object_join_alias_map=None,
-                    use_agg_fn=False,
-                    read_table=self.read_table,
-                )
-                for of in self.order_fields
-            ]
-            order_by_sql = "ORDER BY " + ", ".join(order_by_sqls)
-
-        limit_sql = f"LIMIT {self.limit}" if self.limit is not None else ""
-        offset_sql = f"OFFSET {self.offset}" if self.offset is not None else ""
-
         project_param = pb.add_param(self.project_id)
         where_clause = where_filters.to_where_clause()
 
@@ -1948,9 +1918,6 @@ class CallsQuery(BaseModel):
         FROM {table_alias}
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         {where_clause}
-        {order_by_sql}
-        {limit_sql}
-        {offset_sql}
         """
         return safely_format_sql(raw_sql, logger)
 

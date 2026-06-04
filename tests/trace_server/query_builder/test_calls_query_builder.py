@@ -307,8 +307,6 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
                 AND (ifNull(calls_merged.trace_id, '') = {pb_1:String})
                 AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_2:String}
                      AND ifNull(calls_merged.inputs_dump, '') LIKE {pb_3:String})
-            ORDER BY calls_merged.started_at DESC
-            LIMIT 10
         ),
         filtered_calls AS (
             SELECT calls_merged.id AS id
@@ -1004,30 +1002,26 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
             }
         )
     )
+    # Heavy conditions spanning start-only (inputs) and end-only (output) fields
+    # cannot be ANDed in the strict candidate CTE (no single un-merged row has
+    # both), so no bloom candidate is emitted; the OR-IS-NULL outer path handles it.
     assert_sql(
         cq,
         """
-        WITH filter_candidate_ids AS (
-            SELECT calls_merged.id AS id
-            FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_2:String}
-            WHERE (ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String}
-                   AND ifNull(calls_merged.output_dump, '') LIKE {pb_1:String})),
-        filtered_calls AS (
+        WITH filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_2:String}
-            WHERE (calls_merged.id IN filter_candidate_ids)
-                AND ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String} OR calls_merged.inputs_dump IS NULL)
-                     AND (ifNull(calls_merged.output_dump, '') LIKE {pb_1:String} OR calls_merged.output_dump IS NULL))
+            PREWHERE calls_merged.project_id = {pb_7:String}
+            WHERE ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_5:String} OR calls_merged.inputs_dump IS NULL)
+                     AND (ifNull(calls_merged.output_dump, '') LIKE {pb_6:String} OR calls_merged.output_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), '') = {pb_4:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_5:String}), 'null'), '') = {pb_6:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
                 AND
-                ((any(calls_merged.wb_user_id) = {pb_7:String}))
+                ((any(calls_merged.wb_user_id) = {pb_4:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
@@ -1037,19 +1031,19 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
+        PREWHERE calls_merged.project_id = {pb_7:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
-            "pb_0": '%"hello"%',
-            "pb_1": '%"success"%',
-            "pb_2": "project",
-            "pb_3": '$."param"."val"',
-            "pb_4": "hello",
-            "pb_5": '$."result"',
-            "pb_6": "success",
-            "pb_7": "my_user_id",
+            "pb_0": '$."param"."val"',
+            "pb_1": "hello",
+            "pb_2": '$."result"',
+            "pb_3": "success",
+            "pb_4": "my_user_id",
+            "pb_5": '%"hello"%',
+            "pb_6": '%"success"%',
+            "pb_7": "project",
         },
     )
 
@@ -1080,40 +1074,36 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
             }
         )
     )
+    # Heavy conditions spanning start-only (inputs) and end-only (output) fields
+    # skip the bloom candidate CTE (the strict per-row form is unsafe across
+    # parts), falling back to the OR-IS-NULL outer path.
     assert_sql(
         cq,
         """
-        WITH filter_candidate_ids AS (
-            SELECT calls_merged.id AS id
-            FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_2:String}
-            WHERE ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String}
-                    OR ifNull(calls_merged.output_dump, '') LIKE {pb_1:String})))
         SELECT
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.id IN filter_candidate_ids)
-            AND (((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String} OR calls_merged.inputs_dump IS NULL)
-                  OR (ifNull(calls_merged.output_dump, '') LIKE {pb_1:String} OR calls_merged.output_dump IS NULL)))
+        PREWHERE calls_merged.project_id = {pb_6:String}
+        WHERE (((ifNull(calls_merged.inputs_dump, '') LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL)
+                OR (ifNull(calls_merged.output_dump, '') LIKE {pb_5:String} OR calls_merged.output_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
-            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), '') = {pb_4:String})
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String})
             OR
-            (coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_5:String}), 'null'), '') = {pb_6:String})))
+            (coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '') = {pb_3:String})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
-            "pb_0": '%"hello"%',
-            "pb_1": '%"success"%',
-            "pb_2": "project",
-            "pb_3": '$."param"."val"',
-            "pb_4": "hello",
-            "pb_5": '$."result"',
-            "pb_6": "success",
+            "pb_0": '$."param"."val"',
+            "pb_1": "hello",
+            "pb_2": '$."result"',
+            "pb_3": "success",
+            "pb_4": '%"hello"%',
+            "pb_5": '%"success"%',
+            "pb_6": "project",
         },
     )
 
@@ -1168,34 +1158,29 @@ def test_calls_query_with_complex_heavy_filters() -> None:
         )
     )
 
+    # The nested OR puts an end-only field (output) inside an AND with start-only
+    # fields (inputs), so no single un-merged row can satisfy the strict candidate;
+    # the bloom candidate is skipped in favor of the OR-IS-NULL outer path.
     assert_sql(
         cq,
         """
-        WITH filter_candidate_ids AS (
-            SELECT calls_merged.id AS id
-            FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_3:String}
-            WHERE (ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String}
-                   AND (ifNull(calls_merged.output_dump, '') LIKE {pb_1:String}
-                        OR lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_2:String}))),
-        filtered_calls AS (
+        WITH filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_3:String}
-            WHERE (calls_merged.id IN filter_candidate_ids)
-                AND ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String} OR calls_merged.inputs_dump IS NULL)
-                AND ((ifNull(calls_merged.output_dump, '') LIKE {pb_1:String} OR calls_merged.output_dump IS NULL)
-                    OR (lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL)))
+            PREWHERE calls_merged.project_id = {pb_12:String}
+            WHERE ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL)
+                AND ((ifNull(calls_merged.output_dump, '') LIKE {pb_10:String} OR calls_merged.output_dump IS NULL)
+                    OR (lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_11:String} OR calls_merged.inputs_dump IS NULL)))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') = {pb_5:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND
-                ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}), 'null'), '')) > {pb_7:Int64}))
-                AND (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_8:String}), 'null'), '') = {pb_9:String})
-                  OR positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_10:String}), 'null'), ''), {pb_11:String}) > 0))
+                ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '')) > {pb_3:Int64}))
+                AND (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_4:String}), 'null'), '') = {pb_5:String})
+                  OR positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}), 'null'), ''), {pb_7:String}) > 0))
                 AND
-                ((any(calls_merged.wb_user_id) = {pb_12:String}))
+                ((any(calls_merged.wb_user_id) = {pb_8:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.op_name) IS NULL))))
             )
@@ -1205,24 +1190,24 @@ def test_calls_query_with_complex_heavy_filters() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
+        PREWHERE calls_merged.project_id = {pb_12:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
-            "pb_0": '%"hello"%',
-            "pb_1": '%"success"%',
-            "pb_2": '%"%completed%"%',
-            "pb_3": "project",
-            "pb_4": '$."param"."val"',
-            "pb_5": "hello",
-            "pb_6": '$."param"."count"',
-            "pb_7": 5,
-            "pb_8": '$."result"."status"',
-            "pb_9": "success",
-            "pb_10": '$."param"."message"',
-            "pb_11": "completed",
-            "pb_12": "my_user_id",
+            "pb_0": '$."param"."val"',
+            "pb_1": "hello",
+            "pb_2": '$."param"."count"',
+            "pb_3": 5,
+            "pb_4": '$."result"."status"',
+            "pb_5": "success",
+            "pb_6": '$."param"."message"',
+            "pb_7": "completed",
+            "pb_8": "my_user_id",
+            "pb_9": '%"hello"%',
+            "pb_10": '%"success"%',
+            "pb_11": '%"%completed%"%',
+            "pb_12": "project",
         },
     )
 
@@ -3056,10 +3041,9 @@ def test_wb_run_id_filter_eq():
 def test_filter_candidate_ids_cte_matches_user_example() -> None:
     """A heavy LIKE filter on calls_merged emits a filter_candidate_ids CTE
     that uses the strict `ifNull(<dump>, '')` form (no OR-IS-NULL) so that
-    ClickHouse can use the ngram bloom filter index, with the outer ORDER BY
-    and LIMIT mirrored on raw columns. The outer filter_query keeps the
-    OR-IS-NULL form for unmerged-call-part correctness and adds
-    `id IN filter_candidate_ids`.
+    ClickHouse can use the ngram bloom filter index. The CTE is a WHERE-only
+    id superset (no ORDER BY/LIMIT); the outer filter_query keeps the
+    OR-IS-NULL form for unmerged-call-part correctness and owns ORDER BY/LIMIT.
     """
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -3086,8 +3070,6 @@ def test_filter_candidate_ids_cte_matches_user_example() -> None:
             PREWHERE calls_merged.project_id = {pb_1:String}
             WHERE (calls_merged.parent_id IS NULL)
                 AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String})
-            ORDER BY calls_merged.started_at DESC
-            LIMIT 50
         ),
         filtered_calls AS (
             SELECT calls_merged.id AS id

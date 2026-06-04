@@ -60,6 +60,13 @@ def _can_optimize_heavy_field(field: str) -> bool:
     return field in HEAVY_FIELDS_TO_OPTIMIZE
 
 
+def heavy_fields_span_start_and_end(fields: set[str]) -> bool:
+    """Whether the heavy fields straddle both the start-only and end-only groups."""
+    has_start = bool(fields & START_ONLY_CALL_FIELDS)
+    has_end = bool(fields & END_ONLY_CALL_FIELDS)
+    return has_start and has_end
+
+
 def _can_optimize_datetime_field(field: str) -> bool:
     """Returns whether a field can be optimized for datetime filtering.
 
