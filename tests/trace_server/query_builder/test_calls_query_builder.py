@@ -306,8 +306,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             WHERE ((calls_merged.op_name IN {pb_0:Array(String)}) OR (calls_merged.op_name IS NULL))
                 AND (ifNull(calls_merged.trace_id, '') = {pb_1:String})
                 AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_2:String}
-                     AND ifNull(calls_merged.inputs_dump, '') LIKE {pb_3:String})
-        ),
+                     AND ifNull(calls_merged.inputs_dump, '') LIKE {pb_3:String})),
         filtered_calls AS (
             SELECT calls_merged.id AS id
             FROM calls_merged
@@ -3069,8 +3068,7 @@ def test_filter_candidate_ids_cte_matches_user_example() -> None:
             FROM calls_merged
             PREWHERE calls_merged.project_id = {pb_1:String}
             WHERE (calls_merged.parent_id IS NULL)
-                AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String})
-        ),
+                AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String})),
         filtered_calls AS (
             SELECT calls_merged.id AS id
             FROM calls_merged
