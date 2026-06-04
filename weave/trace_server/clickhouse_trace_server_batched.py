@@ -1614,6 +1614,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ):
             settings = ch_settings.update_settings_for_aggregation_in_order(settings)
 
+        # calls_complete reads can hit lightweight-update patch parts that crash under
+        # CH lazy materialization (see CLICKHOUSE_CALLS_COMPLETE_READ_SETTINGS).
+        if read_table == ReadTable.CALLS_COMPLETE:
+            settings = ch_settings.update_settings_for_calls_complete_read(settings)
+
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
 
