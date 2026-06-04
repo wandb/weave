@@ -1,0 +1,50 @@
+## Conversation
+User asked to "scan the weave repo for unused files" (seeded with: "I dont think
+the wb_schema is used anymore"). After I produced a findings report, user said:
+"use gt for this 1. delete the orphaned cassettes 2. delete the gql stuff".
+This commit is item #1 (cassettes). The gql deletion is a separate sibling branch.
+
+## Actions
+- Built AST import-graph + reachability analyzers (saved in .context/, gitignored:
+  find_unused.py, find_unreachable.py, find_orphan_assets.py, find_orphan_cassettes.py).
+- find_orphan_cassettes.py: for each of 190 cassettes at
+  cassettes/<module>/<func>.yaml, checked whether `def <func>(` exists in any of
+  the 3370 test functions defined across tests/. Exactly 7 had no matching test.
+- git rm'd those 7, committed on a branch off origin/master tip (120c265879).
+
+## Why these 7 are dead (verified)
+- llamaindex: test renamed to test_llamaindex_quick_start (underscored). Old
+  recordings test_llamaindex_quickstart.yaml and _quickstart_async.yaml dangle.
+- openai: test_openai_quickstart split into async/stream/responses variants; bare
+  name gone.
+- test_autopatch/*: 4 tests (configuration_with_dicts, disabled_integration_
+  doesnt_patch, enabled_integration_patches, passthrough_op_kwargs) no longer
+  exist anywhere (grep: 'No files found'). The dir sits under openai/cassettes/
+  from when test_autopatch.py lived under openai/; it's now at
+  tests/integrations/test_autopatch.py. Deleting the 4 empties the dir entirely.
+
+## Errors & Mistakes
+- BIG GOTCHA: the Bash `grep` alias here is ripgrep. `grep \"a\\|b\"` searches the
+  LITERAL string a|b (escaped pipe = literal in RG), and `grep -E`/`--include`
+  ERROR OUT. My early \\|-alternation greps silently returned false 'no matches',
+  which nearly made me flag the llamaindex vector_index/*.json fixtures as orphans
+  — they are actually loaded by DIRECTORY path (StorageContext.from_defaults(
+  persist_dir=...)) in test_llamaindex_quick_start. Use the Grep tool or
+  /usr/bin/grep. Saved a memory about this.
+
+## gt / branch mechanics
+- Workspace branch andrew/find-unused-files == origin/master tip; local `master`
+  is 173 commits BEHIND origin/master and is checked out in the main worktree
+  (/Users/andrew/conductor/weave), so it can't be fast-forwarded from here.
+- gt trunk = local master. `gt create` refused (untracked current branch). So I
+  used git checkout -b off HEAD, committed, then `gt track --parent master`.
+- gt reports '174 commits' for this branch (173 stale-trunk + 1 real). This is
+  COSMETIC: origin/master..HEAD == 1. GitHub PR base=master will show only the
+  1 deletion commit. `gt sync`/refreshing local master clears the display.
+
+## Hints for Future Agents
+- Not pushed/submitted — user had only asked to delete. Offer `gt submit`.
+- Sibling branch andrew/rm-gql-schema holds item #2 (wb_schema.gql + .graphqlrc).
+
+## Open Questions
+None for this commit.
