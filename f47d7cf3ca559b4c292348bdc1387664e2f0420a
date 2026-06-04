@@ -1,0 +1,73 @@
+## Conversation
+User asked (in this session) to first audit the weave package (excl. trace_server)
+for separation-of-concerns/modularity/testability via a fan-out of subagents, then
+to "show what the integration refactor and op system refactors would look like" and
+"make a stacked PR for those 2 changes." This is branch 1 of the stack (op system);
+branch 2 (integrations) is stacked on top.
+
+The audit's finding F-B1 was: op.py has 4 near-identical execution paths whose
+finish() closure is copy-pasted verbatim 4x (lines 506-535, 635-664, 773-802,
+995-1024 on master), and the logic can't be unit-tested without a full op run.
+This commit addresses exactly that finding (the safest, highest-value slice). The
+larger F-B2 "OpState dataclass" consolidation was deliberately deferred (39+ files
+read op.* attributes directly; too invasive for one PR).
+
+## Actions
+- Read op.py in full (execution paths 454-1161, decorator 1230-1403, helpers).
+  Confirmed all four finish() closures are byte-identical and that the decorator
+  always initializes _on_finish_post_processor/_on_output_handler/_accumulator
+  (op.py:1340-1349).
+- Grepped: no code outside op.py references CALL_CREATE_MSG/ASYNC_CALL_CREATE_MSG/
+  ON_OUTPUT_MSG or _call_sync_func/_call_async_func/_call_sync_gen/_call_async_gen/
+  _restore_call_stack — safe to move constants / refactor internals.
+- Created weave/trace/op_lifecycle.py with CallFinisher + the 3 message constants.
+- Added _try_create_call() to op.py; rewrote all 4 paths to use it + CallFinisher.
+- Replaced the generators' `nonlocal ... has_finished` with `nonlocal
+  accumulated_state` and all `if not has_finished:` with `if not
+  finish.has_finished:` (replace_all; verified only those 8 sites remained).
+- Built a py3.12 test venv (uv venv --python 3.12 --clear && uv sync --group test)
+  because fresh Conductor workspaces ship no .venv.
+
+## Errors & Mistakes
+- First test run of tests/flow/test_evaluation_imperative.py + test_client_trace.py
+  showed "5 failed" plus a flood of "Error during cleanup of EvaluationLogger"
+  atexit tracebacks. The atexit noise is unrelated teardown logging. The 5
+  failures (test_evaluation_invalid_model_name_fixable/not_fixable) are
+  PRE-EXISTING ON MASTER: I git-stashed my changes (incl. untracked op_lifecycle.py
+  via `git stash push -u`) and confirmed the identical 5 failures on clean master.
+  Root cause: EvaluationLogger.__init__ calls require_weave_client() at
+  eval_imperative.py:792 BEFORE validating the model name, and those parametrized
+  tests run without an initialized client. Nothing to do with this refactor.
+- ruff format wanted to reflow op.py (my multi-line call args). op.py is NOT in the
+  serialization-sensitive ruff-format exclusion list (those are Content/Audio/
+  update_costs), so formatting was safe. Verified the diff only touched my edits.
+
+## Dead Ends
+- Considered collapsing the 4 paths into 2 (_run_func/_run_gen with is_async) but
+  the sync/async control flow (await points, StopIteration vs StopAsyncIteration,
+  sync vs async generator wrappers) genuinely differs; merging would be riskier
+  than the duplication it removes. Kept 4 entry points, shared only the lifecycle.
+- Considered tightening getattr(op, "_on_finish_post_processor", None) to direct
+  attribute access. Deferred to keep this a pure structural refactor (the OpState
+  PR is the right place). Preserved getattr semantics exactly.
+
+## Hints for Future Agents
+- CallFinisher.has_finished is PUBLIC on purpose: the generator paths read it to
+  decide whether to also finish on an error path (mirrors the old nonlocal flag).
+- _call_sync_gen's skip check is `should_skip_tracing_for_op(op)` ONLY, while
+  _call_sync_func also checks is_tracing_setting_disabled(). This asymmetry is
+  pre-existing and intentional-looking; it was NOT changed. Do not "fix" it here.
+- The empty_sync_gen/empty_async_gen fallbacks rely on finish.has_finished being
+  False when require_explicit_finish=True (CallFinisher returns before setting the
+  flag), so they re-raise. This matches the old closure behavior.
+
+## Codebase Discoveries
+- Test env: use `.venv/bin/python -m pytest <path> --trace-server=sqlite`. The
+  `grep` on PATH is aliased to ripgrep (rejects -E/--include). atexit cleanup of
+  EvaluationLogger spams stderr after the session; pipe 2>/dev/null to read the
+  pytest summary.
+
+## Open Questions
+- The 5 pre-existing test_evaluation_invalid_model_name failures look like a real
+  ordering bug (validate model name before require_weave_client). Out of scope for
+  this stack, but worth a separate fix.
