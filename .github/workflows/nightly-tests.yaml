@@ -220,10 +220,32 @@ jobs:
         run: |
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
 
+  nightly-tests-replicated-1s3r:
+    name: Nightly Tests (replicated 1s3r)
+    uses: ./.github/workflows/nightly-replicated-leg.yaml
+    with:
+      topology: "1s3r"
+      ch_port: "8130"
+      use_distributed: false
+      shards: ${{ github.event.inputs.shards }}
+    secrets: inherit
+
+  nightly-tests-replicated-2s2r:
+    name: Nightly Tests (replicated 2s2r)
+    uses: ./.github/workflows/nightly-replicated-leg.yaml
+    with:
+      topology: "2s2r"
+      ch_port: "8131"
+      use_distributed: true
+      shards: ${{ github.event.inputs.shards }}
+    secrets: inherit
+
   slack-notification:
     name: Slack Notification
     needs:
       - nightly-tests
+      - nightly-tests-replicated-1s3r
+      - nightly-tests-replicated-2s2r
 
     runs-on: ubuntu-latest
     if: always()
