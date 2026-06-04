@@ -200,14 +200,6 @@ def _get_client() -> httpx.Client:
     return _build_client(ssl_verify(), http_timeout())
 
 
-def __getattr__(name: str) -> Any:
-    # Preserve `http_requests.client` as a public attribute while keeping
-    # construction lazy.
-    if name == "client":
-        return _get_client()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
 def get(
     url: str,
     params: dict[str, str] | None = None,
