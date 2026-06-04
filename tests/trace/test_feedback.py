@@ -197,6 +197,12 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "call_ref": None,
         "trigger_ref": None,
         "queue_id": None,
+        "scorer_tags": [],
+        "scorer_tag_reasons": {},
+        "scorer_tag_confidences": {},
+        "scorer_ratings": {},
+        "scorer_rating_reasons": {},
+        "scorer_rating_confidences": {},
     }
 
 
@@ -348,7 +354,403 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "call_ref": call_ref,
         "trigger_ref": trigger_ref,
         "queue_id": None,
+        "scorer_tags": [],
+        "scorer_tag_reasons": {},
+        "scorer_tag_confidences": {},
+        "scorer_ratings": {},
+        "scorer_rating_reasons": {},
+        "scorer_rating_confidences": {},
     }
+
+    # Runnable scorer feedback may also populate typed scorer columns while
+    # keeping the raw scorer output in payload for backwards compatibility.
+    typed_weave_ref = f"weave:///{project_id}/call/call_id_456"
+    typed_create_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=typed_weave_ref,
+            feedback_type=feedback_type,
+            payload={"output": {"passed": False}},
+            runnable_ref=runnable_ref,
+            call_ref=call_ref,
+            trigger_ref=trigger_ref,
+            scorer_tags=["unsafe"],
+            scorer_tag_reasons={"unsafe": "contains disallowed content"},
+            scorer_tag_confidences={"unsafe": 0.91},
+            scorer_ratings={"_rating_": 0.2},
+            scorer_rating_reasons={"_rating_": "low quality response"},
+            scorer_rating_confidences={"_rating_": 0.88},
+        )
+    )
+
+    typed_query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "id"},
+                            {"$literal": typed_create_res.id},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert len(typed_query_res.result) == 1
+    typed_row = typed_query_res.result[0]
+    assert typed_row["feedback_type"] == feedback_type
+    assert typed_row["payload"] == {"output": {"passed": False}}
+    assert typed_row["scorer_tags"] == ["unsafe"]
+    assert typed_row["scorer_tag_reasons"] == {"unsafe": "contains disallowed content"}
+    assert typed_row["scorer_tag_confidences"] == {"unsafe": 0.91}
+    assert typed_row["scorer_ratings"] == {"_rating_": 0.2}
+    assert typed_row["scorer_rating_reasons"] == {"_rating_": "low quality response"}
+    assert typed_row["scorer_rating_confidences"] == {"_rating_": 0.88}
+
+
+def test_agent_monitor_feedback(client: WeaveClient) -> None:
+    """End-to-end create/query for wandb.agent_monitor feedback with typed scorer columns."""
+    project_id = client.project_id
+    feedback_type = "wandb.agent_monitor"
+    weave_ref = f"weave:///{project_id}/call/call_id_123"
+    runnable_name = "my_scorer"
+    runnable_ref = f"weave:///{project_id}/object/{runnable_name}:obj_id_123"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+    trigger_ref = f"weave:///{project_id}/object/{runnable_name}:trigger_id_123"
+    payload = {"value": ["nsfw"], "reason": ["explicit language"]}
+
+    # Case 1: runnable_ref is required.
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type=feedback_type,
+                payload=payload,
+                scorer_tags=["nsfw"],
+            )
+        )
+
+    # Case 2: call_ref is required.
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type=feedback_type,
+                payload=payload,
+                runnable_ref=runnable_ref,
+            )
+        )
+
+    # Case 3: trigger_ref is required.
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type=feedback_type,
+                payload=payload,
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+            )
+        )
+
+    # Case 4: scorer_* fields rejected on feedback that is neither agent-monitor
+    # nor runnable (non-empty value).
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="custom",
+                payload={},
+                scorer_tags=["nsfw"],
+            )
+        )
+
+    # Success: write tags, a rating, and reasons/confidences keyed by name.
+    create_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type=feedback_type,
+            payload=payload,
+            runnable_ref=runnable_ref,
+            call_ref=call_ref,
+            trigger_ref=trigger_ref,
+            scorer_tags=["nsfw", "high-quality"],
+            scorer_tag_reasons={"nsfw": "explicit language"},
+            scorer_tag_confidences={"nsfw": 0.95},
+            scorer_ratings={"_rating_": 0.87},
+            scorer_rating_reasons={"_rating_": "very confident response"},
+            scorer_rating_confidences={"_rating_": 0.92},
+        )
+    )
+    assert create_res.id is not None
+
+    query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(project_id=project_id)
+    )
+    assert len(query_res.result) == 1
+    row = query_res.result[0]
+    assert row["feedback_type"] == feedback_type
+    assert row["payload"] == payload
+    assert row["scorer_tags"] == ["nsfw", "high-quality"]
+    assert row["scorer_tag_reasons"] == {"nsfw": "explicit language"}
+    assert row["scorer_tag_confidences"] == {"nsfw": 0.95}
+    assert row["scorer_ratings"] == {"_rating_": 0.87}
+    assert row["scorer_rating_reasons"] == {"_rating_": "very confident response"}
+    assert row["scorer_rating_confidences"] == {"_rating_": 0.92}
+
+
+def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
+    """A minimal agent_monitor row (no typed scorer fields) round-trips with empty defaults."""
+    project_id = client.project_id
+    weave_ref = f"weave:///{project_id}/call/call_id_123"
+    runnable_ref = f"weave:///{project_id}/object/my_scorer:obj_id_123"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+    trigger_ref = f"weave:///{project_id}/object/my_scorer:trigger_id_123"
+
+    create_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type="wandb.agent_monitor",
+            payload={"value": None},
+            runnable_ref=runnable_ref,
+            call_ref=call_ref,
+            trigger_ref=trigger_ref,
+        )
+    )
+    assert create_res.id is not None
+
+    query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(project_id=project_id)
+    )
+    assert query_res.result[0]["scorer_tags"] == []
+    assert query_res.result[0]["scorer_tag_reasons"] == {}
+    assert query_res.result[0]["scorer_tag_confidences"] == {}
+    assert query_res.result[0]["scorer_ratings"] == {}
+    assert query_res.result[0]["scorer_rating_reasons"] == {}
+    assert query_res.result[0]["scorer_rating_confidences"] == {}
+
+
+def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
+    """Filter agent_monitor rows by typed scorer columns.
+
+    Covers each access pattern the proposal calls out:
+      - `$contains` on `scorer_tags` → array membership (`has` / `json_each`)
+      - dotted access on `scorer_ratings.<name>` → typed map value lookup
+      - dotted access on `scorer_tag_reasons.<name>` for reason equality
+    """
+    project_id = client.project_id
+    runnable_ref = f"weave:///{project_id}/object/my_scorer:obj_id_123"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+    trigger_ref = f"weave:///{project_id}/object/my_scorer:trigger_id_123"
+
+    def _create(weave_ref_suffix: str, **scorer_kwargs):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/{weave_ref_suffix}",
+                feedback_type="wandb.agent_monitor",
+                payload={"value": scorer_kwargs.get("scorer_tags", [])},
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger_ref,
+                **scorer_kwargs,
+            )
+        )
+
+    _create("a", scorer_tags=["nsfw"], scorer_ratings={"_rating_": 0.9})
+    _create(
+        "b",
+        scorer_tags=["high-quality"],
+        scorer_ratings={"_rating_": 0.4},
+        scorer_tag_reasons={"high-quality": "well formatted"},
+    )
+    _create("c")  # empty defaults
+
+    def _query(query_dict) -> list[dict]:
+        res = client.server.feedback_query(
+            tsi.FeedbackQueryReq(project_id=project_id, query=Query(**query_dict))
+        )
+        return res.result
+
+    # $contains on scorer_tags — must use array membership, not substring.
+    matches = _query(
+        {
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "scorer_tags"},
+                    "substr": {"$literal": "nsfw"},
+                }
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a"}
+
+    # Substring-style false positive should NOT match. "ns" appears inside
+    # "nsfw" but `has()` requires exact tag equality.
+    matches = _query(
+        {
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "scorer_tags"},
+                    "substr": {"$literal": "ns"},
+                }
+            }
+        }
+    )
+    assert matches == []
+
+    # case_insensitive $contains must still match. Without the case-insensitive
+    # branch the array path falls back to exact equality and misses tags that
+    # differ only in case.
+    _create("upper", scorer_tags=["NSFW"])
+    matches = _query(
+        {
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "scorer_tags"},
+                    "substr": {"$literal": "nsfw"},
+                    "case_insensitive": True,
+                }
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a", "upper"}
+
+    # Map value lookup with numeric comparison.
+    matches = _query(
+        {
+            "$expr": {
+                "$gt": [
+                    {"$getField": "scorer_ratings._rating_"},
+                    {"$literal": 0.5},
+                ]
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a"}
+
+    # Map value lookup on scorer_tag_reasons keyed by tag name.
+    matches = _query(
+        {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "scorer_tag_reasons.high-quality"},
+                    {"$literal": "well formatted"},
+                ]
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"b"}
+
+    # Regression: ClickHouse Map(*, Float64) returns 0 for missing keys,
+    # which would otherwise match `== 0` filters and surface every row
+    # without a rating as a "zero rating" row. Row 'c' has no rating and
+    # must not match an equality-against-zero filter.
+    matches = _query(
+        {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "scorer_ratings._rating_"},
+                    {"$literal": 0},
+                ]
+            }
+        }
+    )
+    assert matches == []
+
+    # Same regression for Map(*, String) — missing keys would otherwise
+    # read as "" and match an `== ""` filter.
+    matches = _query(
+        {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "scorer_tag_reasons.missing"},
+                    {"$literal": ""},
+                ]
+            }
+        }
+    )
+    assert matches == []
+
+
+def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
+    """Sorting by a map-column key (e.g. `scorer_ratings._rating_`) must work.
+
+    Regression: the ORDER BY path used to pass the field name into the
+    function's `cast` slot, which silently no-op'd for pre-existing column
+    types but raised on the new map_string_string branch. Locks in the
+    fix so future refactors don't reintroduce that mismatch.
+    """
+    project_id = client.project_id
+    runnable_ref = f"weave:///{project_id}/object/my_scorer:obj_id_123"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+    trigger_ref = f"weave:///{project_id}/object/my_scorer:trigger_id_123"
+
+    # Reasons in alphabetical order match the rating order so a single
+    # set of rows exercises both Map(*, Float64) and Map(*, String) sorts.
+    rows = [
+        ("low", 0.1, "alpha"),
+        ("mid", 0.5, "beta"),
+        ("high", 0.9, "gamma"),
+    ]
+    for suffix, rating, reason in rows:
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/{suffix}",
+                feedback_type="wandb.agent_monitor",
+                payload={"value": rating},
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger_ref,
+                scorer_ratings={"_rating_": rating},
+                scorer_rating_reasons={"_rating_": reason},
+            )
+        )
+
+    asc = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            sort_by=[SortBy(field="scorer_ratings._rating_", direction="asc")],
+        )
+    )
+    assert [r["weave_ref"].rsplit("/", 1)[-1] for r in asc.result] == [
+        "low",
+        "mid",
+        "high",
+    ]
+
+    desc = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            sort_by=[SortBy(field="scorer_ratings._rating_", direction="desc")],
+        )
+    )
+    assert [r["weave_ref"].rsplit("/", 1)[-1] for r in desc.result] == [
+        "high",
+        "mid",
+        "low",
+    ]
+
+    by_reason = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            sort_by=[SortBy(field="scorer_rating_reasons._rating_", direction="asc")],
+        )
+    )
+    assert [r["weave_ref"].rsplit("/", 1)[-1] for r in by_reason.result] == [
+        "low",
+        "mid",
+        "high",
+    ]
 
 
 async def populate_feedback(client: WeaveClient) -> None:
@@ -796,6 +1198,44 @@ def test_feedback_replace(client) -> None:
     new_feedback = next(f for f in feedbacks if f["id"] == replaced_feedback.id)
     assert new_feedback["feedback_type"] == "reaction"
     assert new_feedback["payload"] == {"emoji": "👍"}
+
+
+def test_feedback_replace_validates_before_purge(client) -> None:
+    """Replace must reject invalid payloads BEFORE deleting the existing row."""
+    project_id = client.project_id
+    weave_ref = f"weave:///{project_id}/obj/123:abc"
+
+    initial = client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type="reaction",
+            payload={"emoji": "👍"},
+            wb_user_id="test_user",
+        )
+    )
+
+    # The replace payload would fail validation (non-empty scorer_tags on a
+    # non-agent-monitor type). Without validate-before-purge, the purge would
+    # run first and destroy the original row.
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_replace(
+            FeedbackReplaceReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="reaction",
+                payload={"emoji": "👍"},
+                feedback_id=initial.id,
+                wb_user_id="test_user",
+                scorer_tags=["nsfw"],
+            )
+        )
+
+    # The original row must still be there.
+    query_res = client.server.feedback_query(
+        FeedbackQueryReq(project_id=project_id, fields=["id"])
+    )
+    assert [r["id"] for r in query_res.result] == [initial.id]
 
 
 def test_get_feedback_with_dict_query(client) -> None:
@@ -1416,3 +1856,30 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
 
     assert res.buckets == []
     assert res.granularity == 3600
+
+
+def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None:
+    """Ensure `feedback_query` returns tz-aware `created_at`."""
+    if client_is_sqlite(client):
+        pytest.skip("created_at is a string on sqlite; tz semantics only apply to CH")
+
+    project_id = client.project_id
+    client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref="weave:///entity/project/object/test:digest",
+            feedback_type="custom",
+            payload={"k": "v"},
+            wb_user_id="",
+        )
+    )
+    res = client.server.feedback_query(tsi.FeedbackQueryReq(project_id=project_id))
+    assert len(res.result) == 1
+    created_at = res.result[0]["created_at"]
+    assert isinstance(created_at, datetime.datetime)
+    assert created_at.tzinfo is not None, (
+        "feedback_query returned a naive datetime; browsers will misinterpret it"
+    )
+    assert created_at.utcoffset() == datetime.timedelta(0), (
+        "feedback created_at must be tz-aware UTC"
+    )

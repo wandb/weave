@@ -1,6 +1,6 @@
 import {EventEmitter} from 'events';
 import {WeaveRealtimeTracingAdapter} from '../../integrations/openai.realtime.agent';
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
+import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {initWithCustomTraceServer} from '../clientMock';
 
 function makeMockSession() {

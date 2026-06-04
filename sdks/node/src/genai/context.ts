@@ -77,10 +77,12 @@ export function _getGenaiState(): GenAIState {
  *
  * Use this to safely run parallel GenAI work:
  *
+ *   ```typescript
  *   await Promise.all([
  *     weave.runIsolated(async () => { ... }),
  *     weave.runIsolated(async () => { ... }),
  *   ]);
+ *  ```
  *
  * Sequential single-flight usage doesn't require this wrapper — the
  * process-wide default state handles it.

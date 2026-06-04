@@ -10,6 +10,7 @@ attributes when used as context managers.
 
 from __future__ import annotations
 
+import logging
 import types
 import uuid
 from contextvars import ContextVar, Token
@@ -41,6 +42,10 @@ from weave.session.types import (
     Usage,
     _parse_data_url,
 )
+from weave.trace.settings import should_disable_weave, should_redact_pii
+from weave.trace.util import Thread
+from weave.utils import pii_redaction
+from weave.utils.capture_info import get_capture_info
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -106,6 +111,17 @@ __all__ = [
 # OTel tracer name — identifies the Session SDK as the source of these spans.
 _TRACER_NAME = "weave.session"
 
+logger = logging.getLogger(__name__)
+
+
+def _capture_info_attrs() -> dict[str, str]:
+    """Build weave.* client / system info attrs, gated by settings.
+
+    Per-span (not OTel ``Resource``) so env-var toggles take effect on
+    every emit, matching ``@op`` semantics in ``weave_client.py``.
+    """
+    return {f"weave.{k}": v for k, v in get_capture_info().items()}
+
 
 class _SpanBase(BaseModel):
     """Shared config for span classes that use ``model`` as a field name."""
@@ -129,7 +145,7 @@ class _SpanBase(BaseModel):
         OTel span timestamp matches the user-visible start, not the moment
         ``__enter__`` happened to run.
         """
-        if not _OTEL_AVAILABLE:
+        if not _OTEL_AVAILABLE or should_disable_weave():
             return
         tracer = otel_trace.get_tracer(_TRACER_NAME)
         kwargs: dict[str, Any] = {}
@@ -172,6 +188,45 @@ class _SpanBase(BaseModel):
         self._otel_span.record_exception(exc_val)
 
 
+def _publish_media_content(
+    *,
+    content: bytes | str,
+    uri: str,
+    file_id: str,
+    mime_type: str,
+) -> str:
+    """Create a Content object from raw media data and publish it.
+
+    Returns the ``weave://`` ref URI string.
+    """
+    from weave.trace.api import publish
+    from weave.type_wrappers.Content.content import Content
+
+    content_obj: Content
+    if content:
+        if isinstance(content, str):
+            content_obj = Content.from_base64(content, mimetype=mime_type or None)
+        else:
+            content_obj = Content.from_bytes(content, mimetype=mime_type or None)
+    elif uri:
+        if uri.startswith("data:"):
+            content_obj = Content.from_data_url(uri)
+        else:
+            content_obj = Content.from_url(uri)
+    elif file_id:
+        raise ValueError(
+            f"Cannot publish file_id {file_id!r} as Content; "
+            "fetch the content from the provider first or use a URI"
+        )
+    else:
+        raise ValueError("_publish_media_content requires content or uri")
+
+    ref = publish(content_obj)
+    # Coerce to a plain ``str``: ``ref.uri`` may be a ``_CallableStr`` subclass
+    # that OTel attribute validation rejects.
+    return str(getattr(ref, "uri", ref))
+
+
 class Tool(_SpanBase):
     """One tool execution. Maps to an execute_tool OTel span.
 
@@ -196,6 +251,36 @@ class Tool(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
+    def _build_attrs(self, *, session_id: str, include_content: bool) -> dict[str, Any]:
+        """Build the full OTel attribute dict for this tool span.
+
+        Single chokepoint shared by streaming (``end``) and batch
+        (``_attrs_for_span``). Strips arguments/result when content is
+        gated off; otherwise routes them through ``redact_pii_string``
+        when redaction is enabled.
+        """
+        if include_content:
+            arguments = self.arguments
+            result = self.result
+            if should_redact_pii():
+                arguments = pii_redaction.redact_pii_string(arguments)
+                result = pii_redaction.redact_pii_string(result)
+        else:
+            arguments = ""
+            result = ""
+        attrs = execute_tool_attributes(
+            tool_name=self.name,
+            conversation_id=session_id,
+            tool_call_arguments=arguments,
+            tool_call_result=result,
+            tool_call_id=self.tool_call_id,
+            tool_type=self.tool_type,
+            tool_description=self.tool_description,
+            tool_definitions=self.tool_definitions,
+        )
+        attrs.update(_capture_info_attrs())
+        return attrs
+
     def end(self) -> None:
         if self._ended:
             return
@@ -206,17 +291,10 @@ class Tool(_SpanBase):
             elapsed = self.ended_at - self.started_at
             self.duration_ms = int(elapsed.total_seconds() * 1000)
 
-        session = _current_session.get()
-        include = session.include_content if session else True
-        attrs = execute_tool_attributes(
-            tool_name=self.name,
-            conversation_id=session.session_id if session else "",
-            tool_call_arguments=self.arguments if include else "",
-            tool_call_result=self.result if include else "",
-            tool_call_id=self.tool_call_id,
-            tool_type=self.tool_type,
-            tool_description=self.tool_description,
-            tool_definitions=self.tool_definitions,
+        session = get_current_session()
+        attrs = self._build_attrs(
+            session_id=session.session_id if session else "",
+            include_content=session.include_content if session else True,
         )
         self._end_otel_span(attrs)
 
@@ -267,6 +345,7 @@ class LLM(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[LLM | None] | None = PrivateAttr(default=None)
+    _upload_threads: list[Thread] = PrivateAttr(default_factory=list)
 
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
@@ -293,8 +372,18 @@ class LLM(_SpanBase):
     ) -> LLM:
         """Attach media to this LLM call.
 
-        Exactly one of content, uri, or file_id must be provided.
-        Modality is inferred from mime_type when not set explicitly.
+        Creates a ``Content`` object from the provided data, publishes it
+        to get a ``weave://`` ref, and stores only that ref.  Exactly one
+        of ``content``, ``uri``, or ``file_id`` must be provided.
+
+        The publish (which uploads the media) runs on a dedicated
+        background thread so the call returns immediately without blocking
+        the caller; one thread is dispatched per attachment so multiple
+        uploads proceed in parallel. The placeholder ``MediaAttachment`` is
+        appended synchronously and its ``ref`` is filled in once the upload
+        completes. Refs are guaranteed populated before the span is emitted
+        (the build path waits on the in-flight uploads via
+        ``_await_uploads``).
         """
         sources = sum(bool(s) for s in (content, uri, file_id))
         if sources != 1:
@@ -305,33 +394,73 @@ class LLM(_SpanBase):
             if prefix in {"image", "audio", "video"}:
                 modality = prefix
 
-        if content:
-            kind: Literal["blob", "uri", "file"] = "blob"
-        elif uri:
-            kind = "uri"
-        else:
-            kind = "file"
-
-        self.media_attachments.append(
-            MediaAttachment(
-                kind=kind,
-                modality=modality or "unknown",
-                mime_type=mime_type,
-                content=content,
-                uri=uri,
-                file_id=file_id,
-            )
+        attachment = MediaAttachment(
+            ref="",
+            modality=modality or "unknown",
+            mime_type=mime_type,
         )
+        self.media_attachments.append(attachment)
+        thread = Thread(
+            target=self._upload_media,
+            kwargs={
+                "attachment": attachment,
+                "content": content,
+                "uri": uri,
+                "file_id": file_id,
+                "mime_type": mime_type,
+            },
+            name="weave-session-media-upload",
+            daemon=True,
+        )
+        thread.start()
+        self._upload_threads.append(thread)
         return self
+
+    def _upload_media(
+        self,
+        *,
+        attachment: MediaAttachment,
+        content: bytes | str,
+        uri: str,
+        file_id: str,
+        mime_type: str,
+    ) -> None:
+        """Publish one media attachment and record its ref.
+
+        Runs on a background thread dispatched by ``attach_media``. On
+        success the ``weave://`` ref is written back onto ``attachment``.
+        Failures are logged and leave the ref empty; ``_await_uploads``
+        drops empty-ref attachments so a failed upload never emits a
+        broken URI part.
+        """
+        try:
+            attachment.ref = _publish_media_content(
+                content=content, uri=uri, file_id=file_id, mime_type=mime_type
+            )
+        except Exception:
+            logger.exception("Failed to publish media attachment for chat span")
+
+    def _await_uploads(self) -> None:
+        """Block until all in-flight media uploads finish.
+
+        Called before building span attributes so every attachment has its
+        ``weave://`` ref populated. Attachments whose upload failed (empty
+        ref) are dropped so the emitted span never carries a broken URI.
+        """
+        if not self._upload_threads:
+            return
+        for thread in self._upload_threads:
+            thread.join()
+        self._upload_threads.clear()
+        self.media_attachments = [m for m in self.media_attachments if m.ref]
 
     def attach_media_url(self, url: str, *, modality: str = "") -> LLM:
         """Attach a media URL to this LLM call.
 
         Convenience over ``attach_media`` for the common case where the
-        caller has a URL string from an upstream message and doesn't want
-        to inspect it. ``data:`` URLs are parsed into ``mime_type`` +
-        inline content (kind=blob); plain URIs become ``kind=uri``. Empty
-        URLs are ignored. Returns ``self`` for chaining.
+        caller has a URL string from an upstream message. ``data:`` URLs
+        are parsed into bytes and published; plain URIs are fetched and
+        published. Empty URLs are ignored. Returns ``self`` for chaining.
         """
         if not url:
             return self
@@ -392,24 +521,56 @@ class LLM(_SpanBase):
             self.output_type = output_type
         return self
 
-    def end(self) -> None:
-        if self._ended:
-            return
-        self._ended = True
-        self.ended_at = datetime.now(timezone.utc)
+    def _build_attrs(self, *, session_id: str, include_content: bool) -> dict[str, Any]:
+        """Build the full OTel attribute dict for this chat span.
 
-        session = _current_session.get()
-        include = session.include_content if session else True
+        Single chokepoint shared by streaming (``end``) and batch
+        (``_attrs_for_span``). All five content-bearing fields go
+        ``None`` when content is gated off — notably this includes
+        ``reasoning``, which previously bypassed the gate and leaked
+        into ``gen_ai.output.messages``.
+        """
+        # Block on any background media uploads so every attachment's
+        # weave:// ref is populated before it is serialized into attrs.
+        self._await_uploads()
+
+        input_messages: list[Message] | None
+        output_messages: list[Message] | None
+        system_instructions: list[str] | None
+        media_attachments: list[MediaAttachment] | None
+        reasoning: Reasoning | None
+        if include_content:
+            input_messages = self.input_messages
+            output_messages = self.output_messages
+            system_instructions = self.system_instructions
+            media_attachments = self.media_attachments
+            reasoning = self.reasoning
+            if should_redact_pii():
+                input_messages = pii_redaction.redact_messages(input_messages)
+                output_messages = pii_redaction.redact_messages(output_messages)
+                system_instructions = pii_redaction.redact_system_instructions(
+                    system_instructions
+                )
+                if reasoning.content:
+                    reasoning = Reasoning(
+                        content=pii_redaction.redact_pii_string(reasoning.content)
+                    )
+        else:
+            input_messages = None
+            output_messages = None
+            system_instructions = None
+            media_attachments = None
+            reasoning = None
         attrs = llm_attributes(
             model=self.model,
             provider_name=self.provider_name,
-            conversation_id=session.session_id if session else "",
-            input_messages=self.input_messages if include else None,
-            output_messages=self.output_messages if include else None,
-            media_attachments=self.media_attachments if include else None,
-            system_instructions=self.system_instructions if include else None,
+            conversation_id=session_id,
+            input_messages=input_messages,
+            output_messages=output_messages,
+            media_attachments=media_attachments,
+            system_instructions=system_instructions,
             usage=self.usage,
-            reasoning=self.reasoning,
+            reasoning=reasoning,
             finish_reasons=self.finish_reasons,
             response_id=self.response_id,
             response_model=self.response_model,
@@ -422,6 +583,20 @@ class LLM(_SpanBase):
             request_seed=self.request_seed,
             request_stop_sequences=self.request_stop_sequences,
             request_choice_count=self.request_choice_count,
+        )
+        attrs.update(_capture_info_attrs())
+        return attrs
+
+    def end(self) -> None:
+        if self._ended:
+            return
+        self._ended = True
+        self.ended_at = datetime.now(timezone.utc)
+
+        session = get_current_session()
+        attrs = self._build_attrs(
+            session_id=session.session_id if session else "",
+            include_content=session.include_content if session else True,
         )
 
         if self._token is not None:
@@ -493,21 +668,35 @@ class SubAgent(_SpanBase):
         """Start a tool execution within this sub-agent."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
+    def _build_attrs(self, *, session_id: str, session_name: str) -> dict[str, Any]:
+        """Build the full OTel attribute dict for this sub-agent span.
+
+        Sub-agents have no content fields — the dispatch only needs
+        identifiers and capture-info. Shared between streaming (``end``)
+        and batch (``_attrs_for_span``).
+        """
+        attrs = invoke_agent_attributes(
+            agent_name=self.name,
+            model=self.model,
+            conversation_id=session_id,
+            conversation_name=session_name,
+            agent_id=self.agent_id,
+            agent_description=self.agent_description,
+            agent_version=self.agent_version,
+        )
+        attrs.update(_capture_info_attrs())
+        return attrs
+
     def end(self) -> None:
         if self._ended:
             return
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
 
-        session = _current_session.get()
-        attrs = invoke_agent_attributes(
-            agent_name=self.name,
-            model=self.model,
-            conversation_id=session.session_id if session else "",
-            conversation_name=session.session_name if session else "",
-            agent_id=self.agent_id,
-            agent_description=self.agent_description,
-            agent_version=self.agent_version,
+        session = get_current_session()
+        attrs = self._build_attrs(
+            session_id=session.session_id if session else "",
+            session_name=session.session_name if session else "",
         )
         self._end_otel_span(attrs)
 
@@ -594,23 +783,46 @@ class Turn(_SpanBase):
         """Start a sub-agent invocation (nested invoke_agent span, same trace)."""
         return SubAgent(name=name, model=model or self.model)
 
+    def _build_attrs(
+        self, *, session_id: str, session_name: str, include_content: bool
+    ) -> dict[str, Any]:
+        """Build the full OTel attribute dict for this turn span.
+
+        Shared by streaming (``end``) and batch (``log_turn``). The Turn
+        carries user messages; ``include_content=False`` strips them at
+        source so Presidio is never called for already-dropped content.
+        """
+        messages: list[Message] | None
+        if include_content:
+            messages = self.messages
+            if should_redact_pii():
+                messages = pii_redaction.redact_messages(messages)
+        else:
+            messages = None
+        attrs = invoke_agent_attributes(
+            agent_name=self.agent_name,
+            conversation_id=session_id,
+            conversation_name=session_name,
+            model=self.model,
+            input_messages=messages,
+            agent_id=self.agent_id,
+            agent_description=self.agent_description,
+            agent_version=self.agent_version,
+        )
+        attrs.update(_capture_info_attrs())
+        return attrs
+
     def end(self) -> None:
         if self._ended:
             return
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
 
-        session = _current_session.get()
-        include = session.include_content if session else True
-        attrs = invoke_agent_attributes(
-            agent_name=self.agent_name,
-            conversation_id=session.session_id if session else "",
-            conversation_name=session.session_name if session else "",
-            model=self.model,
-            input_messages=self.messages if include else None,
-            agent_id=self.agent_id,
-            agent_description=self.agent_description,
-            agent_version=self.agent_version,
+        session = get_current_session()
+        attrs = self._build_attrs(
+            session_id=session.session_id if session else "",
+            session_name=session.session_name if session else "",
+            include_content=session.include_content if session else True,
         )
 
         if self._token is not None:
@@ -950,55 +1162,22 @@ def _attrs_for_span(
     session_name: str,
     include_content: bool,
 ) -> tuple[str, dict[str, Any]]:
-    """Build (otel_span_name, attribute_dict) for a child span."""
+    """Build (otel_span_name, attribute_dict) for a child span.
+
+    Delegates to each class's ``_build_attrs`` so streaming (``.end()``)
+    and batch (``log_turn``) produce byte-identical output.
+    """
     if isinstance(span, LLM):
-        attrs = llm_attributes(
-            model=span.model,
-            provider_name=span.provider_name,
-            conversation_id=session_id,
-            input_messages=span.input_messages if include_content else None,
-            output_messages=span.output_messages if include_content else None,
-            media_attachments=span.media_attachments if include_content else None,
-            system_instructions=span.system_instructions if include_content else None,
-            usage=span.usage,
-            reasoning=span.reasoning,
-            finish_reasons=span.finish_reasons,
-            response_id=span.response_id,
-            response_model=span.response_model,
-            output_type=span.output_type,
-            request_temperature=span.request_temperature,
-            request_max_tokens=span.request_max_tokens,
-            request_top_p=span.request_top_p,
-            request_frequency_penalty=span.request_frequency_penalty,
-            request_presence_penalty=span.request_presence_penalty,
-            request_seed=span.request_seed,
-            request_stop_sequences=span.request_stop_sequences,
-            request_choice_count=span.request_choice_count,
+        return f"chat {span.model}", span._build_attrs(
+            session_id=session_id, include_content=include_content
         )
-        return f"chat {span.model}", attrs
     if isinstance(span, Tool):
-        attrs = execute_tool_attributes(
-            tool_name=span.name,
-            conversation_id=session_id,
-            tool_call_arguments=span.arguments if include_content else "",
-            tool_call_result=span.result if include_content else "",
-            tool_call_id=span.tool_call_id,
-            tool_type=span.tool_type,
-            tool_description=span.tool_description,
-            tool_definitions=span.tool_definitions,
+        return f"execute_tool {span.name}", span._build_attrs(
+            session_id=session_id, include_content=include_content
         )
-        return f"execute_tool {span.name}", attrs
-    # SubAgent
-    attrs = invoke_agent_attributes(
-        agent_name=span.name,
-        model=span.model,
-        conversation_id=session_id,
-        conversation_name=session_name,
-        agent_id=span.agent_id,
-        agent_description=span.agent_description,
-        agent_version=span.agent_version,
+    return f"invoke_agent {span.name}", span._build_attrs(
+        session_id=session_id, session_name=session_name
     )
-    return f"invoke_agent {span.name}", attrs
 
 
 def log_turn(
@@ -1022,7 +1201,7 @@ def log_turn(
     Falls back to the earliest/latest child timestamp, then ``now()``, when
     the turn doesn't supply its own.
     """
-    if not _OTEL_AVAILABLE:
+    if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(session_id=session_id)
 
     resolved_spans = spans or []
@@ -1041,15 +1220,10 @@ def log_turn(
         continue_parent_trace=continue_parent_trace,
     )
 
-    turn_attrs = invoke_agent_attributes(
-        agent_name=turn.agent_name,
-        conversation_id=session_id,
-        conversation_name=session_name,
-        model=turn.model,
-        input_messages=turn.messages if include_content else None,
-        agent_id=turn.agent_id,
-        agent_description=turn.agent_description,
-        agent_version=turn.agent_version,
+    turn_attrs = turn._build_attrs(
+        session_id=session_id,
+        session_name=session_name,
+        include_content=include_content,
     )
 
     parent_ctx = Context() if not continue_parent_trace else None
@@ -1103,7 +1277,7 @@ def log_session(
     ``session_id`` if empty. By default each turn gets its own OTel trace.
     """
     sid = session_id or str(uuid.uuid4())
-    if not _OTEL_AVAILABLE:
+    if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(session_id=sid)
 
     trace_ids: list[str] = []

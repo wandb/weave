@@ -356,5 +356,38 @@ class TestRequestResponseTypes:
         assert res.weave_call_id == "call_123"
 
 
+class TestProcessImageDataItemRejectsUnsafeURLs:
+    """Non-publicly-routable URLs in the provider response must not be fetched.
+
+    URL classification itself is covered in tests/trace_server/test_url_safety.py;
+    this checks that `_process_image_data_item` is wired to that gate.
+    """
+
+    @pytest.mark.parametrize(
+        "unsafe_url",
+        [
+            "http://169.254.169.254/latest/meta-data/",
+            "http://127.0.0.1:6379/",
+            "http://localhost:8123/",
+            "file:///etc/passwd",
+        ],
+    )
+    def test_unsafe_url_skips_from_url(self, unsafe_url):
+        with (
+            patch(
+                "weave.trace_server.image_completion.Content.from_url"
+            ) as mock_from_url,
+            patch(
+                "weave.trace_server.image_completion.store_content_object"
+            ) as mock_store,
+        ):
+            result = _process_image_data_item(
+                {"url": unsafe_url}, 0, Mock(), "test-project", "user123"
+            )
+            mock_from_url.assert_not_called()
+            mock_store.assert_not_called()
+            assert "error" in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

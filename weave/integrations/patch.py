@@ -15,6 +15,7 @@ from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
 from weave.trace.autopatch import IntegrationSettings
+from weave.trace.settings import should_use_otel_v2
 
 # Integrations that have actually been patched. Prevents double-patching
 # when libraries are imported multiple times.
@@ -100,6 +101,20 @@ def patch_openai(settings: IntegrationSettings | None = None) -> None:
         triggering_symbols=["openai"],
         settings=settings,
     )
+
+
+def _dispatch_openai() -> None:
+    """Implicit-patch entry for ``openai``.
+
+    Under ``WEAVE_USE_OTEL_V2``, openai itself is NOT patched. The Agents SDK
+    integration is the system under observation and already exposes the LLM
+    call data via ``ResponseSpanData`` / ``GenerationSpanData`` — instrumenting
+    openai separately would dual-log every call from inside an agent. Direct
+    (non-agent) calls to ``openai.*`` are temporarily untraced in OTel V2 mode.
+    """
+    if should_use_otel_v2():
+        return
+    patch_openai()
 
 
 def patch_anthropic(settings: IntegrationSettings | None = None) -> None:
@@ -321,13 +336,35 @@ def patch_smolagents(settings: IntegrationSettings | None = None) -> None:
 
 
 def patch_openai_agents(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for OpenAI Agents."""
+    """Enable Weave tracing for OpenAI Agents (calls-based processor)."""
     _patch_integration(
-        module_path="weave.integrations.openai_agents.openai_agents",
+        module_path="weave.integrations.openai_agents.patcher",
         patcher_func_getter_name="get_openai_agents_patcher",
         triggering_symbols=["openai_agents"],
         settings=settings,
     )
+
+
+def patch_openai_agents_otel(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave OTel tracing for OpenAI Agents (Agents-tab destination)."""
+    _patch_integration(
+        module_path="weave.integrations.openai_agents.patcher",
+        patcher_func_getter_name="get_openai_agents_otel_patcher",
+        triggering_symbols=["openai_agents_otel"],
+        settings=settings,
+    )
+
+
+def _dispatch_openai_agents() -> None:
+    """Implicit-patch entry: route to OTel processor when WEAVE_USE_OTEL_V2 is set.
+
+    Explicit ``patch_openai_agents()`` / ``patch_openai_agents_otel()`` calls
+    are unaffected — they always do exactly what their name says.
+    """
+    if should_use_otel_v2():
+        patch_openai_agents_otel()
+        return
+    patch_openai_agents()
 
 
 def patch_verdict(settings: IntegrationSettings | None = None) -> None:
@@ -361,13 +398,35 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
 
 
 def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for Claude Agent SDK."""
+    """Enable Weave tracing for Claude Agent SDK (calls-based)."""
     _patch_integration(
         module_path="weave.integrations.claude_agent_sdk",
         patcher_func_getter_name="get_claude_agent_sdk_patcher",
         triggering_symbols=["claude_agent_sdk"],
         settings=settings,
     )
+
+
+def patch_claude_agent_sdk_otel(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave OTel tracing for Claude Agent SDK (Agents-tab destination)."""
+    _patch_integration(
+        module_path="weave.integrations.claude_agent_sdk.otel_integration",
+        patcher_func_getter_name="get_claude_agent_sdk_otel_patcher",
+        triggering_symbols=["claude_agent_sdk_otel"],
+        settings=settings,
+    )
+
+
+def _dispatch_claude_agent_sdk() -> None:
+    """Implicit-patch entry: route to OTel variant when WEAVE_USE_OTEL_V2 is set.
+
+    Explicit ``patch_claude_agent_sdk()`` / ``patch_claude_agent_sdk_otel()``
+    calls are unaffected — they always do exactly what their name says.
+    """
+    if should_use_otel_v2():
+        patch_claude_agent_sdk_otel()
+        return
+    patch_claude_agent_sdk()
 
 
 def patch_langchain() -> None:
@@ -417,7 +476,7 @@ def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
 # When a module is already imported, we'll automatically call its patch function
 
 INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
-    "openai": patch_openai,
+    "openai": _dispatch_openai,
     "anthropic": patch_anthropic,
     "mistralai": patch_mistral,
     "groq": patch_groq,
@@ -441,8 +500,8 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "mcp": patch_fastmcp,
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
-    "agents": patch_openai_agents,
-    "claude_agent_sdk": patch_claude_agent_sdk,
+    "agents": _dispatch_openai_agents,
+    "claude_agent_sdk": _dispatch_claude_agent_sdk,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,
     "autogen": patch_autogen,

@@ -1,7 +1,7 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol
 
 from pydantic import (
     BaseModel,
@@ -540,11 +540,22 @@ class CompletionsCreateReq(BaseModelStrict):
     parent_id: str | None = Field(
         None, description="Parent call ID to nest this LLM call under"
     )
+    conversation_id: str | None = Field(
+        None,
+        description="Conversation ID to group related completions into a multi-turn conversation",
+    )
+    conversation_name: str | None = Field(
+        None,
+        description="Human-readable conversation name",
+    )
 
 
 class CompletionsCreateRes(BaseModel):
     response: dict[str, Any]
-    weave_call_id: str | None = None
+    weave_call_id: str | None = None  # Deprecated: use span_id instead
+    span_id: str | None = None
+    trace_id: str | None = None
+    conversation_id: str | None = None
 
 
 class ImageGenerationRequestInputs(BaseModel):
@@ -1186,6 +1197,38 @@ class FeedbackCreateReq(BaseModelStrict):
         default=None,
         description="The annotation queue ID this feedback was created from. References annotation_queues.id. NULL when feedback is created outside of queues.",
         examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
+    )
+
+    # typed scorer outputs; populated by agent-monitor scorers
+    scorer_tags: list[str] = Field(
+        default_factory=list,
+        description="Tags applied to the ref by a scorer",
+        examples=[["nsfw", "high-quality"]],
+    )
+    scorer_tag_reasons: dict[str, str] = Field(
+        default_factory=dict,
+        description="reason text per tag, keyed by tag name",
+        examples=[{"nsfw": "Contains explicit language"}],
+    )
+    scorer_tag_confidences: dict[str, float] = Field(
+        default_factory=dict,
+        description="confidence (0-1) per tag, keyed by tag name",
+        examples=[{"nsfw": 0.92}],
+    )
+    scorer_ratings: dict[str, float] = Field(
+        default_factory=dict,
+        description="numeric ratings (0-1) keyed by rating name",
+        examples=[{"_rating_": 0.87}],
+    )
+    scorer_rating_reasons: dict[str, str] = Field(
+        default_factory=dict,
+        description="reason text per rating, keyed by rating name",
+        examples=[{"_rating_": "very confident response"}],
+    )
+    scorer_rating_confidences: dict[str, float] = Field(
+        default_factory=dict,
+        description="confidence (0-1) per rating, keyed by rating name",
+        examples=[{"_rating_": 0.92}],
     )
 
     # wb_user_id is automatically populated by the server
@@ -1926,6 +1969,90 @@ class EvaluateModelRes(BaseModel):
     call_id: str
 
 
+class EvaluateModelArgs(BaseModel):
+    """Arguments for a full evaluate-model job (loads model + runs predictions + scores).
+
+    Moved from workers/evaluate_model_worker/evaluate_model_worker.py so both job
+    types (EvaluateModelArgs and RescoringArgs) can be co-located in the same module
+    for the EvalWorkerJob discriminated union.
+    """
+
+    job_type: Literal["evaluate_model"] = "evaluate_model"
+    project_id: str
+    evaluation_ref: str
+    model_ref: str
+    wb_user_id: str
+    evaluation_call_id: str
+
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class RescoringArgs(BaseModel):
+    """Arguments for a rescore job dispatched to the evaluate-model worker.
+
+    Differs from EvaluateModelArgs: no model is loaded, no predictions are run.
+    Only scorer(s) are applied to existing predictions from source_evaluation_run_id.
+    """
+
+    job_type: Literal["rescore"] = "rescore"
+    project_id: str
+    source_evaluation_run_id: str = Field(
+        ..., description="The evaluation run whose predictions will be rescored"
+    )
+    scorer_refs: list[str] = Field(
+        ...,
+        min_length=1,
+        description="Scorer references (weave:// URIs) to apply; must be non-empty",
+    )
+    wb_user_id: str | None = Field(
+        None,
+        description="User ID — None on SDK path; always set on worker path",
+    )
+    new_evaluation_run_id: str = Field(
+        ..., description="Pre-created EvaluationRun ID to write new scores into"
+    )
+    model_config = ConfigDict(protected_namespaces=())
+
+
+# Discriminated union for the evaluate-model Kafka worker.
+# job_type field selects the concrete args type.
+# Old Kafka messages without job_type are patched by model_validator on EvaluateModelItem
+# in weave-trace's evaluate_model_dispatcher.py.
+EvalWorkerJob = Annotated[
+    EvaluateModelArgs | RescoringArgs,
+    Field(discriminator="job_type"),
+]
+
+
+class RescoreBody(BaseModel):
+    """Request body for rescoring via REST API (excludes server-set fields)."""
+
+    source_evaluation_run_id: str = Field(
+        ..., description="The evaluation run whose predictions will be rescored"
+    )
+    scorer_refs: list[str] = Field(
+        ...,
+        min_length=1,
+        description="Scorer references (weave:// URIs) to apply; must be non-empty",
+    )
+
+
+class RescoreReq(RescoreBody):
+    """Full rescore request including server-set fields."""
+
+    project_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class RescoreRes(BaseModel):
+    """Response for a rescore request."""
+
+    call_id: str = Field(..., description="Call ID for /evaluations/status polling")
+    evaluation_run_id: str = Field(
+        ..., description="The newly created EvaluationRun ID"
+    )
+
+
 class EvaluationStatusReq(BaseModelStrict):
     project_id: str
     call_id: str
@@ -2436,6 +2563,10 @@ class EvaluationRunCreateBody(BaseModel):
         ..., description="Reference to the evaluation (weave:// URI)"
     )
     model: str = Field(..., description="Reference to the model (weave:// URI)")
+    source_evaluation_run_id: str | None = Field(
+        None,
+        description="Source evaluation run ID if this run was created by rescoring — provenance link",
+    )
 
 
 class EvaluationRunCreateReq(EvaluationRunCreateBody):
@@ -2473,6 +2604,10 @@ class EvaluationRunReadRes(BaseModel):
     )
     summary: dict[str, Any] | None = Field(
         None, description="Summary data for the evaluation run"
+    )
+    source_evaluation_run_id: str | None = Field(
+        None,
+        description="Source evaluation run ID if this run was created by rescoring",
     )
 
 
@@ -2654,7 +2789,7 @@ class ScoreCreateBody(BaseModel):
 
     prediction_id: str = Field(..., description="The prediction ID")
     scorer: str = Field(..., description="The scorer reference (weave:// URI)")
-    value: float = Field(..., description="The value of the score")
+    value: Any = Field(..., description="The raw output of the scorer")
     evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to link this score as a child call",
@@ -2688,7 +2823,7 @@ class ScoreReadReq(BaseModel):
 class ScoreReadRes(BaseModel):
     score_id: str = Field(..., description="The score ID")
     scorer: str = Field(..., description="The scorer reference (weave:// URI)")
-    value: float = Field(..., description="The value of the score")
+    value: Any = Field(..., description="The raw output of the scorer")
     evaluation_run_id: str | None = Field(
         None, description="Evaluation run ID if this score is linked to one"
     )
@@ -3098,6 +3233,7 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+    def rescore(self, req: RescoreReq) -> RescoreRes: ...
 
     # Scoring API
     def calls_score(self, req: CallsScoreReq) -> CallsScoreRes: ...

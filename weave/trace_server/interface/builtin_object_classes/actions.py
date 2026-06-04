@@ -1,6 +1,5 @@
 from typing import Any, Literal
 
-import jsonschema
 from pydantic import BaseModel, Field, field_validator
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
@@ -17,6 +16,11 @@ class LlmJudgeActionConfig(BaseModel):
 
     @field_validator("response_schema")
     def validate_response_schema(cls, v: dict) -> dict:  # noqa: N805
+        # Imported lazily: `import jsonschema` eagerly loads every installed
+        # format-checker lib (rfc3987_syntax builds a Lark grammar, ~0.45s),
+        # so keeping it out of module scope avoids paying that on `import weave`.
+        import jsonschema
+
         try:
             jsonschema.validate(None, v)
         except jsonschema.exceptions.SchemaError:

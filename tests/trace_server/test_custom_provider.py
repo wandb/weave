@@ -358,31 +358,11 @@ def test_custom_provider_completions_create(client):
                 f"got {call_args['extra_headers']}"
             )
 
-            # Verify the call was properly logged
-            calls = list(client.get_calls())
-            assert len(calls) == 1, f"Expected 1 logged call, got {len(calls)}"
-            assert calls[0].output == res.response, (
-                f"Logged output mismatch. Expected {res.response}, "
-                f"got {calls[0].output}"
-            )
-            # The usage key in the summary uses the provider/model format, not the custom format
-            expected_usage_key = f"{provider_id}/{model_id}"
-            assert (
-                calls[0].summary["usage"][expected_usage_key] == res.response["usage"]
-            ), (
-                f"Usage summary mismatch. Expected {res.response['usage']}, "
-                f"got {calls[0].summary['usage'][expected_usage_key]}"
-            )
-            # The implementation modifies req.inputs.model before logging, so we expect the transformed model name
-            expected_logged_inputs = inputs.copy()
-            expected_logged_inputs["model"] = f"openai/{model_id}"
-            assert calls[0].inputs == expected_logged_inputs, (
-                f"Logged inputs mismatch. Expected {expected_logged_inputs}, got {calls[0].inputs}"
-            )
-            assert calls[0].op_name == "weave.completions_create", (
-                f"Operation name mismatch. Expected 'weave.completions_create', "
-                f"got {calls[0].op_name}"
-            )
+            # Completions now write to the spans table, not calls.
+            # Verify the span was created with correct identifiers.
+            assert res.weave_call_id is not None, "Expected a span_id in response"
+            assert res.span_id is not None, "Expected span_id in response"
+            assert res.trace_id is not None, "Expected trace_id in response"
         finally:
             _secret_fetcher_context.reset(token)
 
@@ -403,7 +383,7 @@ def test_custom_provider_ollama_model(client):
     provider_obj = create_provider_obj(
         project_id=client.project_id,
         provider_id=provider_id,
-        base_url="http://localhost:11434",
+        base_url="http://my-ollama-server.example.com:11434",
         api_key_name="OLLAMA_API_KEY",
         extra_headers={},
     )
@@ -462,7 +442,7 @@ def test_custom_provider_ollama_model(client):
             call_args = mock_completion.call_args[1]
             assert call_args["model"] == "ollama/llama2"  # Should add ollama/ prefix
             assert call_args["api_key"] == "DUMMY_SECRET_VALUE"
-            assert call_args["api_base"] == "http://localhost:11434"
+            assert call_args["api_base"] == "http://my-ollama-server.example.com:11434"
         finally:
             _secret_fetcher_context.reset(token)
 
@@ -490,7 +470,7 @@ def test_custom_provider_trailing_slash_normalization(client):
     provider_obj = create_provider_obj(
         project_id=client.project_id,
         provider_id=provider_id,
-        base_url="http://localhost:11434/",  # Note the trailing slash
+        base_url="http://my-ollama-server.example.com:11434/",  # Note the trailing slash
         api_key_name="TEST_API_KEY",
         extra_headers={},
     )
@@ -541,9 +521,9 @@ def test_custom_provider_trailing_slash_normalization(client):
             # Verify the trailing slash was stripped from api_base
             mock_completion.assert_called_once()
             call_args = mock_completion.call_args[1]
-            assert call_args["api_base"] == "http://localhost:11434", (
-                f"Expected trailing slash to be stripped. Got '{call_args['api_base']}'"
-            )
+            assert (
+                call_args["api_base"] == "http://my-ollama-server.example.com:11434"
+            ), f"Expected trailing slash to be stripped. Got '{call_args['api_base']}'"
         finally:
             _secret_fetcher_context.reset(token)
 

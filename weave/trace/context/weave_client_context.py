@@ -47,6 +47,16 @@ def require_weave_client() -> WeaveClient:
     return client
 
 
+def require_secure_weave_client() -> WeaveClient:
+    """Like `require_weave_client`, but locks the client into refusing to decode
+    code-bearing custom objects (`Op` / `load_op`). Server-side workers that
+    reconstruct user payloads must use this, never the raw client.
+    """
+    client = require_weave_client()
+    client._allow_unsafe_custom_obj_decode = False
+    return client
+
+
 @contextmanager
 def with_weave_client(
     entity: str | None, project: str | None, required: bool = True

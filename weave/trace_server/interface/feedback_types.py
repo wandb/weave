@@ -51,6 +51,10 @@ def feedback_type_is_runnable(feedback_type: str) -> bool:
     return feedback_type.startswith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
 
 
+def feedback_type_is_agent_monitor(feedback_type: str) -> bool:
+    return feedback_type == AGENT_MONITOR_FEEDBACK_TYPE
+
+
 def runnable_feedback_selector(name: str) -> str:
     return f"feedback.[{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{name}]"
 

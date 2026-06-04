@@ -1,4 +1,4 @@
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
+import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {commonPatchAnthropic} from '../../integrations/anthropic';
 import {initWithCustomTraceServer} from '../clientMock';
 

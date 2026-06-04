@@ -1,4 +1,4 @@
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
+import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {commonPatchGoogleGenAI} from '../../integrations/googleGenAI';
 import {initWithCustomTraceServer} from '../clientMock';
 
