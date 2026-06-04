@@ -11,12 +11,13 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from re import sub
-from typing import Any, TypeVar, cast
+from typing import Any, NamedTuple, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
 from cachetools import TTLCache
+from clickhouse_connect import common as ch_common
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
@@ -350,6 +351,10 @@ _CH_POOL_MANAGER = get_pool_manager(
     maxsize=CH_POOL_MAX_CONNECTIONS, num_pools=CH_POOL_COUNT
 )
 
+# Send query settings to the server instead of rejecting them against the client's
+# cached server_settings map, which is poisoned when minted during a CH degradation.
+ch_common.set_setting("invalid_setting_action", "send")
+
 
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
 # in ALL_CALL_COMPLETE_INSERT_COLUMNS.  Used by _insert_call_complete_batch to enforce
@@ -554,9 +559,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             str: Table name to use for UPDATE statements.
         """
+        return self._mutation_table_name("calls_complete")
+
+    def _mutation_table_name(self, table: str) -> str:
+        """Resolve the concrete mutation target for `table`.
+
+        Lightweight UPDATE/DELETE don't run on Distributed engines, so
+        distributed mode targets `{table}_local` and lets `ON CLUSTER`
+        fan the mutation across shards via Keeper.
+        """
         if self.use_distributed_mode:
-            return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
-        return "calls_complete"
+            return f"{table}{ch_settings.LOCAL_TABLE_SUFFIX}"
+        return table
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -3066,6 +3080,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
             cluster_name=self.clickhouse_cluster_name,
+            table_name=self._mutation_table_name("annotation_queues"),
             name=req.name,
             description=req.description,
             scorer_refs=req.scorer_refs,
@@ -3131,6 +3146,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
             cluster_name=self.clickhouse_cluster_name,
+            table_name=self._mutation_table_name("annotation_queues"),
         )
 
         self._command(
@@ -3474,6 +3490,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 annotation_state=req.annotation_state,
                 pb=update_pb,
                 cluster_name=self.clickhouse_cluster_name,
+                table_name=self._mutation_table_name("annotator_queue_items_progress"),
             )
             self._command(
                 update_query,
@@ -6025,7 +6042,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result_rows = list(query_result.result_rows)
 
         if len(result_rows) < n_chunks:
-            raise ValueError("Missing chunks")
+            # Treat as not-found so the tenacity retry in `_read_with_retry`
+            # picks it up. Replicated/distributed reads can transiently see
+            # fewer rows than `n_chunks` while replication catches up.
+            raise NotFoundError(
+                f"File with digest {req.digest} has {len(result_rows)}/{n_chunks} chunks visible"
+            )
         elif len(result_rows) > n_chunks:
             # The general case where this can occur is when there are multiple
             # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
@@ -6329,6 +6351,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        prep = self._prepare_completion_request(req)
+        if isinstance(prep, tsi.CompletionsCreateRes):
+            return prep
+
+        info = prep.completion_model_info
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(
+            api_key=info.api_key,
+            inputs=req.inputs,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            vertex_credentials=info.vertex_credentials,
+        )
+        end_time = datetime.datetime.now()
+
+        return self._log_completion_call(req, prep, res, start_time, end_time)
+
+    def _prepare_completion_request(
+        self, req: tsi.CompletionsCreateReq
+    ) -> "CompletionPrepResult | tsi.CompletionsCreateRes":
+        """Resolve prompt + model info, or return a short-circuit error response."""
         # --- Resolve prompt if provided and set messages
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
@@ -6363,24 +6407,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except Exception as e:
             return tsi.CompletionsCreateRes(response={"error": str(e)})
 
-        model_name = completion_model_info.model_name
+        return CompletionPrepResult(initial_messages, completion_model_info)
 
-        # Now that we have all the fields for both cases, we can make the API call
-        start_time = datetime.datetime.now()
-
-        # Make the API call
-        res = lite_llm_completion(
-            api_key=completion_model_info.api_key,
-            inputs=req.inputs,
-            provider=completion_model_info.provider,
-            base_url=completion_model_info.base_url,
-            extra_headers=completion_model_info.extra_headers,
-            return_type=completion_model_info.return_type,
-            vertex_credentials=completion_model_info.vertex_credentials,
-        )
-
-        end_time = datetime.datetime.now()
-
+    def _log_completion_call(
+        self,
+        req: tsi.CompletionsCreateReq,
+        prep: "CompletionPrepResult",
+        res: tsi.CompletionsCreateRes,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+    ) -> tsi.CompletionsCreateRes:
+        """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
@@ -6391,6 +6428,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         trace_id = req.trace_id or generate_id()
         conversation_id = req.conversation_id or generate_id()
         conversation_name = req.conversation_name or ""
+        parent_id = req.parent_id
+        model_name = prep.completion_model_info.model_name
 
         error = res.response.get("error")
 
@@ -6939,6 +6978,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
             use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
+            # Mint the heartbeat's client like the primary so it inherits
+            # secure/pool/db settings (raw env would drop `secure=`).
+            heartbeat_client_factory=self._mint_client,
         )
         migrator.apply_migrations(self._database)
 
@@ -7633,6 +7675,16 @@ class CompletionModelInfo:
     extra_headers: dict[str, str]
     return_type: str | None
     vertex_credentials: str | None = None
+
+
+class CompletionPrepResult(NamedTuple):
+    """Output of `_prepare_completion_request` shared by sync + async paths.
+
+    Named so a future field reorder is a type error, not a silent positional bug.
+    """
+
+    initial_messages: list[dict[str, Any]]
+    completion_model_info: CompletionModelInfo
 
 
 def _setup_completion_model_info(
