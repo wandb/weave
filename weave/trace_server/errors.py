@@ -47,6 +47,33 @@ class InvalidRequest(Error):
     pass
 
 
+class ObjectNameTypeCollision(InvalidRequest):
+    """Raised when obj_create targets an object_id already bound to a different base_object_class.
+
+    Object names are bound to one type per project (WB-30574). Weave refs do not
+    carry type, so allowing same-name different-type would make refs ambiguous.
+    """
+
+    def __init__(
+        self,
+        object_id: str,
+        kind: str,
+        new_base_object_class: str | None,
+        existing_base_object_classes: list[str | None],
+    ):
+        self.object_id = object_id
+        self.kind = kind
+        self.new_base_object_class = new_base_object_class
+        self.existing_base_object_classes = existing_base_object_classes
+        existing_str = ", ".join(repr(c) for c in existing_base_object_classes)
+        super().__init__(
+            f"Cannot create {kind} {object_id!r} with "
+            f"base_object_class={new_base_object_class!r}: a {kind} with this "
+            f"name already exists with base_object_class in [{existing_str}]. "
+            f"Object names are bound to one type per project."
+        )
+
+
 class CallsCompleteModeRequired(InvalidRequest):
     """Raised when project requires calls_complete mode but SDK is using legacy mode.
 
