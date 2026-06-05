@@ -264,16 +264,26 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
         return res
 
+    def _ext_to_int_run_ids(
+        self, run_ids: list[str], ext_entity_project_id: str
+    ) -> list[str]:
+        # A bare run id (no "/") is prefixed with the queried "entity/project"
+        # to form the "entity/project/run" that ext_to_int_run_id requires.
+        int_run_ids = []
+        for run_id in run_ids:
+            qualified = run_id if "/" in run_id else f"{ext_entity_project_id}/{run_id}"
+            int_run_ids.append(self._idc.ext_to_int_run_id(qualified))
+        return int_run_ids
+
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
-                req.filter.wb_run_ids = [
-                    self._idc.ext_to_int_run_id(run_id)
-                    for run_id in req.filter.wb_run_ids
-                ]
+                req.filter.wb_run_ids = self._ext_to_int_run_ids(
+                    req.filter.wb_run_ids, original_project_id
+                )
             # TODO: How do we correctly process run_id for the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
@@ -309,10 +319,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
-                req.filter.wb_run_ids = [
-                    self._idc.ext_to_int_run_id(run_id)
-                    for run_id in req.filter.wb_run_ids
-                ]
+                req.filter.wb_run_ids = self._ext_to_int_run_ids(
+                    req.filter.wb_run_ids, original_project_id
+                )
             # TODO: How do we correctly process the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
@@ -355,13 +364,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         req = req.model_copy(deep=True)
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
-                req.filter.wb_run_ids = [
-                    self._idc.ext_to_int_run_id(run_id)
-                    for run_id in req.filter.wb_run_ids
-                ]
+                req.filter.wb_run_ids = self._ext_to_int_run_ids(
+                    req.filter.wb_run_ids, original_project_id
+                )
             # TODO: How do we correctly process the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
