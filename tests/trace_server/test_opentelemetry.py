@@ -925,6 +925,28 @@ class TestAttributes:
             {"role": "assistant", "content": "hello", "extra": True}
         ]
 
+    def test_expand_attributes_nested_list_merge_preserves_dotted_only_elements(self):
+        """A nested-list element present only in dotted attrs must survive a later JSON blob.
+
+        Top-level completion lists are index-merged, but _deep_merge clobbers nested
+        lists (base[key] = value), so a second tool_call sent only via dotted keys is
+        silently dropped when the gen_ai.completion JSON blob is emitted after the
+        dotted attributes. Same data, different OTel emission order -> a tool call
+        vanishes from the stored call.
+        """
+        flat_attrs = [
+            ("gen_ai.completion.0.tool_calls.0.id", "call_0"),
+            ("gen_ai.completion.0.tool_calls.1.id", "call_1"),
+            ("gen_ai.completion.0.tool_calls.1.type", "function"),
+            (
+                "gen_ai.completion",
+                '[{"role": "assistant", "tool_calls": [{"id": "call_0", "type": "function"}]}]',
+            ),
+        ]
+        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
+        tool_calls = result["gen_ai"]["completion"][0]["tool_calls"]
+        assert [tc["id"] for tc in tool_calls] == ["call_0", "call_1"]
+
 
 def create_attributes(d: dict[str, Any]):
     return expand_attributes(d.items())
