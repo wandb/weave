@@ -1,0 +1,51 @@
+## Conversation
+User chose the reimagined LEAN 3-PR stack (eliminate intermediaries) over the built 5-PR stack,
+fresh off master. Then chose option B: narrow PR1 (clean moves), isolate the one real refactor
+(llm_structured_model schema/behavior) into PR2. "Implement all 3 at once, don't ask permission,
+don't push, use gt."
+
+## Actions (PR1 = foundation)
+- Branch andrew/ts-foundation off origin/master (gt-tracked parent master; gt shows phantom
+  "2 commits" = stale local master, cosmetic).
+- Computed the contract's transitive closure with .context/foundation_closure.py (after fixing
+  2 analyzer bugs: namespace-package resolve walked UP instead of base.name; multi-line
+  `from x import (` missed). Closure = 23 modules, exactly 1 escape:
+  weave.shared.object_class_util -> weave.trace.base_objects (deferred to PR2).
+- git mv 17 closure modules into weave/trace_server_interface/ (the real foundation):
+  trace_server_interface, common_interface, service_interface, http_service_interface,
+  ids, constants, trace_server_converter, validation, validation_util, ch_sentinel_values,
+  interface/query->query, interface/feedback_types->feedback_types, agents/{types,semconv,
+  constants,schema}->agents/, project_version/types->project_version/types.
+- Split errors.py (.context/split_errors.py): classes -> foundation/errors.py (only `import
+  datetime`); server errors.py = `from foundation.errors import *` + the HTTP registry/CH
+  translation. Per-file F405 ignore added for the re-export hub.
+- Codemod .context/pr1_foundation_repoint.py: pass1 repo-wide (17 modules, dotted+space-form,
+  per-submodule for the partial agents/interface/project_version packages); pass2 errors ->
+  foundation ONLY in client+foundation (NOT server dir, NOT registry-func files). 226 files.
+- weave/shared/ stays a peer (NOT moved); its 1 escape deferred to PR2.
+
+## Errors & Mistakes
+- Mixed single-line import `from weave.trace_server import constants, object_creation_utils,
+  usage_utils` (only constants moved) got its whole prefix rewritten -> import smoke failed.
+  Plus a multi-line `from weave.trace_server import (ch_sentinel_values, constants, ...)` in
+  clickhouse_trace_server_batched. Hand-split both (moved names -> foundation, stayed names ->
+  server). Lesson (again): multi-name/multi-line space-form imports mixing moved+stayed names
+  need splitting, not prefix-rewrite.
+- 30 ruff F405 in the split errors.py (registry references star-imported classes) -> justified
+  per-file ignore (it's a re-export hub).
+
+## Hints for Future Agents
+- FOUNDATION (verified imports neither client nor weave.trace_server): weave/trace_server_interface/
+  + weave/shared/. weave/trace_server/ now imports the foundation; the impl (clickhouse_*, sqlite,
+  orm, ttl, feedback, agents/clickhouse+kafka, project_version/project_version, builtin_object_classes)
+  stays.
+- agents/ and project_version/ are SPLIT: contract types in the foundation, impl in the server.
+- The ONE remaining foundation escape: weave.shared.object_class_util lazily imports
+  weave.trace.base_objects (client) for BUILTIN_OBJECT_REGISTRY. Sever in PR2 (point at the
+  foundation registry once builtin_object_classes moves there).
+
+## Open Questions
+- PR2 (next): llm_structured_model schema/behavior split (schema->foundation+registered,
+  weave.Model behavior->client); move builtin_object_classes + registry to foundation; sever
+  the object_class_util escape; eval_worker -> parallel weave/eval_worker/ + EvaluateModelDispatcher
+  Protocol; Content/prompt/monitor/scorer severs. PR3: packaging + test split.
