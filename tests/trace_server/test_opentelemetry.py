@@ -877,6 +877,76 @@ class TestAttributes:
             assert "gen_ai.prompt" in msg
             assert "Do not" in msg or "Invalid attribute structure" in msg
 
+    def test_expand_attributes_json_string_and_dotted_subkeys_coexist(self):
+        """JSON string + dotted subkeys for the same path should merge, not conflict."""
+        flat_attrs = [
+            ("gen_ai.completion", '[{"role": "assistant", "content": "hello"}]'),
+            ("gen_ai.completion.0.role", "assistant"),
+        ]
+        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
+        assert result["gen_ai"]["completion"] == [
+            {"role": "assistant", "content": "hello"}
+        ]
+
+    def test_expand_attributes_dotted_subkeys_then_json_string_coexist(self):
+        """Same merge but with reversed attribute ordering."""
+        flat_attrs = [
+            ("gen_ai.completion.0.role", "assistant"),
+            ("gen_ai.completion.0.content", "hello"),
+            ("gen_ai.completion", '[{"role": "assistant", "content": "hello"}]'),
+        ]
+        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
+        assert result["gen_ai"]["completion"] == [
+            {"role": "assistant", "content": "hello"}
+        ]
+
+    def test_expand_attributes_dotted_subkeys_override_json_string(self):
+        """Dotted subkeys arriving after JSON string should win at leaves."""
+        flat_attrs = [
+            ("gen_ai.completion", '[{"role": "assistant", "content": "original"}]'),
+            ("gen_ai.completion.0.content", "overridden"),
+        ]
+        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
+        assert result["gen_ai"]["completion"] == [
+            {"role": "assistant", "content": "overridden"}
+        ]
+
+    def test_expand_attributes_json_string_adds_fields_to_dotted(self):
+        """JSON string arriving after dotted subkeys should merge in extra fields."""
+        flat_attrs = [
+            ("gen_ai.completion.0.role", "assistant"),
+            (
+                "gen_ai.completion",
+                '[{"role": "assistant", "content": "hello", "extra": true}]',
+            ),
+        ]
+        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
+        assert result["gen_ai"]["completion"] == [
+            {"role": "assistant", "content": "hello", "extra": True}
+        ]
+
+    def test_expand_attributes_nested_list_merge_preserves_dotted_only_elements(self):
+        """A nested-list element present only in dotted attrs must survive a later JSON blob.
+
+        Top-level completion lists are index-merged, but _deep_merge clobbers nested
+        lists (base[key] = value), so a second tool_call sent only via dotted keys is
+        silently dropped when the gen_ai.completion JSON blob is emitted after the
+        dotted attributes. Same data, different OTel emission order -> a tool call
+        vanishes from the stored call.
+        """
+        flat_attrs = [
+            ("gen_ai.completion.0.tool_calls.0.id", "call_0"),
+            ("gen_ai.completion.0.tool_calls.1.id", "call_1"),
+            ("gen_ai.completion.0.tool_calls.1.type", "function"),
+            (
+                "gen_ai.completion",
+                '[{"role": "assistant", "tool_calls": [{"id": "call_0", "type": "function"}]}]',
+            ),
+        ]
+        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
+        tool_calls = result["gen_ai"]["completion"][0]["tool_calls"]
+        assert [tc["id"] for tc in tool_calls] == ["call_0", "call_1"]
+
 
 def create_attributes(d: dict[str, Any]):
     return expand_attributes(d.items())
@@ -1980,3 +2050,69 @@ def test_otel_span_wandb_attributes_and_data_routing(
     client.server.calls_delete(
         tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None)
     )
+
+
+def test_otel_export_json_string_and_dotted_completion_keys(
+    client: weave_client.WeaveClient,
+):
+    """Repro: gen_ai.completion as JSON string + gen_ai.completion.0.role silently drops span.
+
+    When an OTel exporter sends both:
+      - gen_ai.completion = '[{"role": "assistant", "content": "hello"}]' (JSON string)
+      - gen_ai.completion.0.role = "assistant" (dotted subkey)
+    the JSON string is auto-parsed into a list, then _validate_structure raises
+    AttributePathConflictError because list is not dict. The span is rejected —
+    otel_export returns 200 but no call appears in the database.
+    """
+    export_req = create_test_export_request()
+    project_id = client.project_id
+    export_req.project_id = project_id
+    export_req.wb_user_id = "abcd123"
+
+    processed_spans_list = export_req.processed_spans
+    span = processed_spans_list[0].resource_spans.scope_spans[0].spans[0]
+    del span.attributes[:]
+
+    kv_json = KeyValue()
+    kv_json.key = "gen_ai.completion"
+    kv_json.value.string_value = json.dumps(
+        [{"role": "assistant", "content": "Quantum computing uses qubits."}]
+    )
+    span.attributes.append(kv_json)
+
+    kv_role = KeyValue()
+    kv_role.key = "gen_ai.completion.0.role"
+    kv_role.value.string_value = "assistant"
+    span.attributes.append(kv_role)
+
+    kv_content = KeyValue()
+    kv_content.key = "gen_ai.completion.0.content"
+    kv_content.value.string_value = "Quantum computing uses qubits."
+    span.attributes.append(kv_content)
+
+    kv_model = KeyValue()
+    kv_model.key = "gen_ai.response.model"
+    kv_model.value.string_value = "gpt-4"
+    span.attributes.append(kv_model)
+
+    export_req.processed_spans = processed_spans_list
+
+    response = client.server.otel_export(export_req)
+    assert isinstance(response, tsi.OTelExportRes)
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=project_id))
+    # BUG: span is silently rejected — this assert fails (0 calls instead of 1)
+    assert len(res.calls) == 1, (
+        f"Expected 1 call but got {len(res.calls)}. "
+        "The span was silently rejected due to AttributePathConflictError "
+        "when gen_ai.completion (auto-parsed JSON list) conflicts with "
+        "gen_ai.completion.0.role dotted subkey."
+    )
+
+    call = res.calls[0]
+    assert call.output is not None
+    assert "gen_ai.completion" in call.output
+    completions = call.output["gen_ai.completion"]
+    assert isinstance(completions, list)
+    assert len(completions) == 1
+    assert completions[0]["role"] == "assistant"
