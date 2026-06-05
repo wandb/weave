@@ -4,6 +4,7 @@ import os
 from typing import Literal, TypedDict
 
 import httpx
+from typing_extensions import NotRequired
 
 model_providers_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 MODEL_PROVIDER_INFO_FILE = "model_providers.json"
@@ -83,7 +84,8 @@ class LLMModelDetails(TypedDict):
     idPlayground: str
     idHuggingFace: str
     label: str
-    labelOpenRouter: str | None
+    # The "name" of the model for OR, it is not necessary that the model exist in OR
+    labelOpenRouter: str
     status: str
     descriptionShort: str
     descriptionMedium: str
@@ -93,7 +95,7 @@ class LLMModelDetails(TypedDict):
     featureStructuredOutput: bool
     featureToolCalling: bool
     parameterCountTotal: int
-    parameterCountActive: int
+    parameterCountActive: NotRequired[int]
     contextWindow: int
     quantization: Quantization
     priceCentsPerBillionTokensInput: int
