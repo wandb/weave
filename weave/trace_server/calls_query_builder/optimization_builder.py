@@ -13,10 +13,12 @@ improving performance for complex conditions.
 """
 
 from abc import ABC, abstractmethod
+from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from weave.trace_server import environment as wf_env
 from weave.trace_server.calls_query_builder.utils import (
     NotContext,
     param_slot,
@@ -34,7 +36,29 @@ if TYPE_CHECKING:
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
 HEAVY_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
+# Heavy fields backed by an ngram bloom filter index on `ifNull(<dump>, '')`
+# (migration 033). Only these get the `ifNull()` wrap and the strict
+# candidate-CTE pushdown; other heavy fields keep the pre-index query shape.
+BLOOM_INDEXED_HEAVY_FIELDS = {"attributes_dump"}
+# Must stay start-only: the candidate CTE matches one un-merged row, so a
+# start+end conjunction would match nothing and silently drop ids (see
+# _build_filter_candidate_ids_cte_sql for the end-only path).
+assert BLOOM_INDEXED_HEAVY_FIELDS <= START_ONLY_CALL_FIELDS, (
+    "bloom-indexed heavy fields must be start-only for the candidate CTE to be correct"
+)
 DATETIME_FIELDS_TO_OPTIMIZE = {"started_at"}
+
+
+class BloomPath(Enum):
+    """How a heavy-field LIKE relates to the calls_merged ngram index."""
+
+    # raw column: calls_complete, or the flag off (pre-index shape).
+    OFF = auto()
+    # ifNull-wrapped on indexed fields, all heavy fields kept (outer query).
+    OUTER = auto()
+    # strict candidate CTE: ifNull wrap, bloom-indexed fields only, no lower().
+    CANDIDATE = auto()
+
 
 DATETIME_BUFFER_TIME_SECONDS = 60 * 5  # 5 minutes
 
@@ -52,6 +76,16 @@ def _field_requires_null_check(field: str) -> bool:
 def _can_optimize_heavy_field(field: str) -> bool:
     """Returns whether a field can be optimized for heavy field search."""
     return field in HEAVY_FIELDS_TO_OPTIMIZE
+
+
+def _excluded_from_bloom_candidate(field: str, bloom_path: BloomPath) -> bool:
+    """Whether to drop a heavy field from the strict bloom candidate CTE.
+
+    The candidate CTE only narrows by fields with a backing ngram index, so a
+    non-indexed heavy field would scan rather than prune. Dropping it keeps the
+    CTE a valid id superset; the outer query still applies the full filter.
+    """
+    return bloom_path == BloomPath.CANDIDATE and field not in BLOOM_INDEXED_HEAVY_FIELDS
 
 
 def _can_optimize_datetime_field(field: str) -> bool:
@@ -221,10 +255,15 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
     """
 
     def __init__(
-        self, pb: "ParamBuilder", table_alias: str, use_null_check: bool = True
+        self,
+        pb: "ParamBuilder",
+        table_alias: str,
+        use_null_check: bool = True,
+        bloom_path: BloomPath = BloomPath.OFF,
     ) -> None:
         super().__init__(pb, table_alias)
         self.use_null_check = use_null_check
+        self.bloom_path = bloom_path
 
     def process_eq(self, operation: tsi_query.EqOperation) -> str | None:
         """Process equality operation on heavy fields.
@@ -232,7 +271,11 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
         Creates SQL condition using LIKE patterns for values in JSON fields.
         """
         return _create_like_optimized_eq_condition(
-            operation, self.pb, self.table_alias, self.use_null_check
+            operation,
+            self.pb,
+            self.table_alias,
+            self.use_null_check,
+            self.bloom_path,
         )
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> str | None:
@@ -241,7 +284,11 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
         Creates SQL condition using LIKE patterns for substrings in JSON fields.
         """
         return _create_like_optimized_contains_condition(
-            operation, self.pb, self.table_alias, self.use_null_check
+            operation,
+            self.pb,
+            self.table_alias,
+            self.use_null_check,
+            self.bloom_path,
         )
 
     def process_in(self, operation: tsi_query.InOperation) -> str | None:
@@ -250,7 +297,11 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
         Creates SQL conditions using LIKE patterns for multiple values.
         """
         return _create_like_optimized_in_condition(
-            operation, self.pb, self.table_alias, self.use_null_check
+            operation,
+            self.pb,
+            self.table_alias,
+            self.use_null_check,
+            self.bloom_path,
         )
 
     def process_gt(self, operation: tsi_query.GtOperation) -> str | None:
@@ -358,6 +409,13 @@ def apply_processor(
 
 class OptimizationConditions(BaseModel):
     heavy_filter_opt_sql: str | None = None
+    # Strict variant of heavy_filter_opt_sql restricted to bloom-indexed heavy
+    # fields with no `OR <field> IS NULL` clauses. The OR-IS-NULL form is
+    # correct over unmerged calls_merged parts but defeats the ngram bloom
+    # filter index on `ifNull(attributes_dump, '')`. Use the strict form in a
+    # candidate-id CTE that pre-narrows rows via the index, then keep the
+    # OR-IS-NULL form in the outer query for correctness.
+    heavy_filter_opt_strict_sql: str | None = None
     sortable_datetime_filters_sql: str | None = None
 
 
@@ -393,11 +451,36 @@ def process_query_to_optimization_sql(
     # null checks are skipped since every row is a complete call.
     config = TableConfig.from_read_table(read_table)
     use_null_check = config.use_aggregation
+
+    # The ngram index lives only on calls_merged, so the bloom paths are gated
+    # on use_aggregation (calls_merged) as well as the env flag. calls_complete
+    # always keeps the raw pre-index query shape.
+    bloom_enabled = (
+        config.use_aggregation and wf_env.wf_calls_merged_heavy_indexes_enabled()
+    )
+    outer_bloom_path = BloomPath.OUTER if bloom_enabled else BloomPath.OFF
     heavy_field_processor = HeavyFieldOptimizationProcessor(
-        param_builder, table_alias, use_null_check=use_null_check
+        param_builder,
+        table_alias,
+        use_null_check=use_null_check,
+        bloom_path=outer_bloom_path,
     )
     heavy_field_result = apply_processor(heavy_field_processor, and_operation)
     heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
+
+    # Strict (no OR-IS-NULL), bloom-indexed-only variant for the candidate CTE.
+    # Matches _build_filter_candidate_ids_cte_sql, which returns None for the
+    # heavy path when bloom is disabled.
+    strict_result_sql = None
+    if bloom_enabled:
+        strict_processor = HeavyFieldOptimizationProcessor(
+            param_builder,
+            table_alias,
+            use_null_check=False,
+            bloom_path=BloomPath.CANDIDATE,
+        )
+        strict_result = apply_processor(strict_processor, and_operation)
+        strict_result_sql = strict_processor.finalize_sql(strict_result)
 
     sortable_datetime_result_sql = None
     if config.use_aggregation:
@@ -416,6 +499,7 @@ def process_query_to_optimization_sql(
 
     return OptimizationConditions(
         heavy_filter_opt_sql=heavy_field_result_sql,
+        heavy_filter_opt_strict_sql=strict_result_sql,
         sortable_datetime_filters_sql=sortable_datetime_result_sql,
     )
 
@@ -449,9 +533,21 @@ def _create_like_condition(
     pb: "ParamBuilder",
     table_alias: str,
     case_insensitive: bool = False,
+    bloom_path: BloomPath = BloomPath.OFF,
 ) -> str:
-    """Creates a LIKE condition for a JSON field."""
-    field_name = f"{table_alias}.{field}"
+    """Creates a LIKE condition for a JSON field.
+
+    On the bloom paths (calls_merged with the index enabled), a bloom-indexed
+    field (see `BLOOM_INDEXED_HEAVY_FIELDS`) is wrapped in `ifNull(..., '')` so
+    the expression matches the `idx_<dump>_ngram` index expression on
+    calls_merged (migration 033) and so LIKE never returns NULL over the
+    Nullable(String) column. Otherwise the raw column reference is emitted,
+    matching the pre-index query shape exactly.
+    """
+    if bloom_path != BloomPath.OFF and field in BLOOM_INDEXED_HEAVY_FIELDS:
+        field_name = f"ifNull({table_alias}.{field}, '')"
+    else:
+        field_name = f"{table_alias}.{field}"
 
     if case_insensitive:
         param_name = pb.add_param(like_pattern.lower())
@@ -507,6 +603,7 @@ def _create_like_optimized_eq_condition(
     pb: "ParamBuilder",
     table_alias: str,
     use_null_check: bool = True,
+    bloom_path: BloomPath = BloomPath.OFF,
 ) -> str | None:
     """Creates a LIKE-optimized condition for equality operations.
 
@@ -517,6 +614,7 @@ def _create_like_optimized_eq_condition(
         use_null_check: Whether to add OR IS NULL for start/end fields.
             True for calls_merged (unmerged parts may have NULL fields).
             False for calls_complete (every row is a complete call).
+        bloom_path: How this condition relates to the calls_merged ngram index.
     """
     field_operand, literal_operand = _extract_field_and_literal(operation)
     if field_operand is None or literal_operand is None:
@@ -536,13 +634,17 @@ def _create_like_optimized_eq_condition(
     if not _can_optimize_heavy_field(field):
         return None
 
+    if _excluded_from_bloom_candidate(field, bloom_path):
+        return None
+
     if literal_value is None or (isinstance(literal_value, str) and not literal_value):
         # Empty/None values are not valid for LIKE optimization
         return None
 
     like_patterns = _create_like_patterns_for_value(literal_value)
     per_pattern = [
-        _create_like_condition(field, p, pb, table_alias) for p in like_patterns
+        _create_like_condition(field, p, pb, table_alias, bloom_path=bloom_path)
+        for p in like_patterns
     ]
     like_condition = (
         per_pattern[0]
@@ -557,6 +659,7 @@ def _create_like_optimized_contains_condition(
     pb: "ParamBuilder",
     table_alias: str,
     use_null_check: bool = True,
+    bloom_path: BloomPath = BloomPath.OFF,
 ) -> str | None:
     """Creates a LIKE-optimized condition for contains operations.
 
@@ -567,6 +670,10 @@ def _create_like_optimized_contains_condition(
         use_null_check: Whether to add OR IS NULL for start/end fields.
             True for calls_merged (unmerged parts may have NULL fields).
             False for calls_complete (every row is a complete call).
+        bloom_path: How this condition relates to the calls_merged ngram index.
+            On the CANDIDATE path, case-insensitive contains is dropped:
+            `lower(<dump>)` cannot hit the index (built on `ifNull(<dump>, '')`),
+            so it prunes nothing; the outer query still applies the lower() LIKE.
     """
     # Check if the input is a GetField operation on a JSON field
     if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
@@ -590,11 +697,16 @@ def _create_like_optimized_contains_condition(
     if not _can_optimize_heavy_field(field):
         return None
 
+    if _excluded_from_bloom_candidate(field, bloom_path):
+        return None
+
     case_insensitive = operation.contains_.case_insensitive or False
+    if bloom_path == BloomPath.CANDIDATE and case_insensitive:
+        return None
     like_pattern = f'%"%{substr_value}%"%'
 
     like_condition = _create_like_condition(
-        field, like_pattern, pb, table_alias, case_insensitive
+        field, like_pattern, pb, table_alias, case_insensitive, bloom_path=bloom_path
     )
     return _maybe_use_null_check(like_condition, field, table_alias, use_null_check)
 
@@ -604,6 +716,7 @@ def _create_like_optimized_in_condition(
     pb: "ParamBuilder",
     table_alias: str,
     use_null_check: bool = True,
+    bloom_path: BloomPath = BloomPath.OFF,
 ) -> str | None:
     """Creates a LIKE-optimized condition for in operations.
 
@@ -614,6 +727,7 @@ def _create_like_optimized_in_condition(
         use_null_check: Whether to add OR IS NULL for start/end fields.
             True for calls_merged (unmerged parts may have NULL fields).
             False for calls_complete (every row is a complete call).
+        bloom_path: How this condition relates to the calls_merged ngram index.
     """
     # Check if the left side is a GetField operation on a JSON field
     if not isinstance(operation.in_[0], tsi_query.GetFieldOperator):
@@ -634,6 +748,9 @@ def _create_like_optimized_in_condition(
     if not _can_optimize_heavy_field(field):
         return None
 
+    if _excluded_from_bloom_candidate(field, bloom_path):
+        return None
+
     # Create OR conditions for each value
     like_conditions: list[str] = []
 
@@ -649,7 +766,7 @@ def _create_like_optimized_in_condition(
 
         for like_pattern in _create_like_patterns_for_value(value_operand.literal_):
             like_condition = _create_like_condition(
-                field, like_pattern, pb, table_alias
+                field, like_pattern, pb, table_alias, bloom_path=bloom_path
             )
             like_conditions.append(like_condition)
 

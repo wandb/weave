@@ -2897,6 +2897,168 @@ def test_trace_id_filter_calls_complete_no_candidate_cte() -> None:
     )
 
 
+def test_attributes_dump_ngram_index_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """On-path shape + scoping: attributes candidate CTE, trace_id unification,
+    inputs_dump untouched (not indexed), calls_complete untouched (merged-only).
+    The off-path is pinned by every other heavy-field test (flag unset default).
+    """
+    monkeypatch.setenv("WF_CALLS_MERGED_HEAVY_INDEXES", "true")
+
+    contains_cq = CallsQuery(project_id="project")
+    contains_cq.add_field("id")
+    contains_cq.add_field("attributes")
+    contains_cq.add_condition(
+        tsi_query.ContainsOperation.model_validate(
+            {
+                "$contains": {
+                    "input": {"$getField": "attributes.model"},
+                    "substr": {"$literal": "gpt-4"},
+                }
+            }
+        )
+    )
+    assert_sql(
+        contains_cq,
+        """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (ifNull(calls_merged.attributes_dump, '') LIKE {pb_0:String}))
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.attributes_dump) AS attributes_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND ((ifNull(calls_merged.attributes_dump, '') LIKE {pb_0:String}
+                OR calls_merged.attributes_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((position(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_2:String}), 'null'), ''), {pb_3:String}) > 0)
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": '%"%gpt-4%"%',
+            "pb_1": "project",
+            "pb_2": '$."model"',
+            "pb_3": "gpt-4",
+        },
+    )
+
+    # trace_id + attributes_dump: both bloom pushdowns share one candidate CTE.
+    unified_cq = CallsQuery(project_id="project")
+    unified_cq.add_field("id")
+    unified_cq.hardcoded_filter = HardCodedFilter(filter={"trace_ids": ["t1"]})
+    unified_cq.add_condition(
+        tsi_query.ContainsOperation.model_validate(
+            {
+                "$contains": {
+                    "input": {"$getField": "attributes.model"},
+                    "substr": {"$literal": "gpt-4"},
+                }
+            }
+        )
+    )
+    assert_sql(
+        unified_cq,
+        """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (ifNull(calls_merged.trace_id, '') = {pb_0:String})
+                AND (ifNull(calls_merged.attributes_dump, '') LIKE {pb_1:String})),
+        filtered_calls AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.id IN filter_candidate_ids)
+                AND (ifNull(calls_merged.trace_id, '') = {pb_0:String}
+                    OR calls_merged.trace_id IS NULL)
+                AND ((ifNull(calls_merged.attributes_dump, '') LIKE {pb_1:String}
+                    OR calls_merged.attributes_dump IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING ((position(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_3:String}), 'null'), ''), {pb_4:String}) > 0)
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))))
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": "t1",
+            "pb_1": '%"%gpt-4%"%',
+            "pb_2": "project",
+            "pb_3": '$."model"',
+            "pb_4": "gpt-4",
+        },
+    )
+
+    # inputs_dump (not indexed): no wrap, no candidate CTE even with the flag on.
+    inputs_cq = CallsQuery(project_id="project")
+    inputs_cq.add_field("id")
+    inputs_cq.add_condition(
+        tsi_query.ContainsOperation.model_validate(
+            {
+                "$contains": {
+                    "input": {"$getField": "inputs.x"},
+                    "substr": {"$literal": "yy"},
+                }
+            }
+        )
+    )
+    assert_sql(
+        inputs_cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE ((calls_merged.inputs_dump LIKE {pb_2:String}
+                OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((position(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {"pb_0": '$."x"', "pb_1": "yy", "pb_2": '%"%yy%"%', "pb_3": "project"},
+    )
+
+    # calls_complete: index is calls_merged-only, so no wrap and no candidate CTE.
+    complete_cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    complete_cq.add_field("id")
+    complete_cq.add_condition(
+        tsi_query.ContainsOperation.model_validate(
+            {
+                "$contains": {
+                    "input": {"$getField": "attributes.model"},
+                    "substr": {"$literal": "gpt-4"},
+                }
+            }
+        )
+    )
+    assert_sql(
+        complete_cq,
+        """
+        SELECT calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_4:String}
+        WHERE (calls_complete.attributes_dump LIKE {pb_3:String})
+            AND ((position(coalesce(nullIf(JSON_VALUE(calls_complete.attributes_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+                AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+        """,
+        {
+            "pb_0": '$."model"',
+            "pb_1": "gpt-4",
+            "pb_2": SENTINEL_EPOCH,
+            "pb_3": '%"%gpt-4%"%',
+            "pb_4": "project",
+        },
+    )
+
+
 def test_wb_run_id_filter_eq():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")

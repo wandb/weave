@@ -1601,6 +1601,70 @@ def test_trace_call_filter(client):
         )
 
 
+def test_attributes_dump_heavy_index_filter_parity(client, monkeypatch):
+    """Flag-on path returns the SAME calls as flag-off against real ClickHouse.
+
+    Proves the candidate-CTE + OR-IS-NULL arm is correct over real (unmerged)
+    rows, which the query-builder shape tests cannot. ClickHouse-only.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("heavy-field index path is ClickHouse-only")
+
+    @weave.op
+    def attr_op(x: int) -> int:
+        return x
+
+    for i, model in enumerate(["gpt-4o", "gpt-4o-mini", "claude-3-opus"]):
+        with weave.attributes({"model": model, "nested": {"k": model}}):
+            attr_op(i)
+
+    project_id = get_client_project_id(client)
+    server = get_client_trace_server(client)
+    queries = [
+        # contains "gpt-4" matches gpt-4o and gpt-4o-mini
+        (
+            2,
+            {
+                "$contains": {
+                    "input": {"$getField": "attributes.model"},
+                    "substr": {"$literal": "gpt-4"},
+                }
+            },
+        ),
+        # eq matches exactly one
+        (
+            1,
+            {"$eq": [{"$getField": "attributes.model"}, {"$literal": "gpt-4o"}]},
+        ),
+        # nested attributes field still routes through the dump index
+        (
+            1,
+            {
+                "$contains": {
+                    "input": {"$getField": "attributes.nested.k"},
+                    "substr": {"$literal": "claude"},
+                }
+            },
+        ),
+    ]
+
+    def ids_for(query: dict) -> list[str]:
+        res = server.calls_query(
+            tsi.CallsQueryReq.model_validate(
+                {"project_id": project_id, "query": {"$expr": query}}
+            )
+        )
+        return sorted(c.id for c in res.calls)
+
+    for expected, query in queries:
+        monkeypatch.delenv("WF_CALLS_MERGED_HEAVY_INDEXES", raising=False)
+        off_ids = ids_for(query)
+        monkeypatch.setenv("WF_CALLS_MERGED_HEAVY_INDEXES", "true")
+        on_ids = ids_for(query)
+        assert off_ids == on_ids, f"flag changed results for {query}"
+        assert len(on_ids) == expected, f"{query}: expected {expected}, got {on_ids}"
+
+
 def test_ops_with_default_params(client):
     @weave.op
     def op_with_default(a: int, b: int = 10) -> int:

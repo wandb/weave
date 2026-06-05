@@ -66,6 +66,15 @@ def wf_enable_agent_scoring() -> bool:
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
 
 
+def wf_calls_merged_heavy_indexes_enabled() -> bool:
+    """Gate the attributes_dump ngram-index candidate-CTE path on calls_merged.
+
+    Off by default and independent of migration 033; operators flip it per
+    cluster once the index has materialized on enough parts to be useful.
+    """
+    return os.environ.get("WF_CALLS_MERGED_HEAVY_INDEXES", "false").lower() == "true"
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(
