@@ -222,6 +222,11 @@ jobs:
 
   nightly-tests-replicated-1s3r:
     name: Nightly Tests (replicated 1s3r)
+    # id-token: write must be granted here too; a reusable workflow's
+    # effective permissions are the intersection of caller and callee.
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/nightly-replicated-leg.yaml
     with:
       topology: "1s3r"
@@ -232,6 +237,9 @@ jobs:
 
   nightly-tests-replicated-2s2r:
     name: Nightly Tests (replicated 2s2r)
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/nightly-replicated-leg.yaml
     with:
       topology: "2s2r"
