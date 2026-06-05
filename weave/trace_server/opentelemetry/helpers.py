@@ -151,10 +151,20 @@ def _list_to_numeric_dict(lst: list) -> dict[str, Any]:
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> None:
-    """Deep merge override into base in-place. Override values win at leaves."""
+    """Deep merge override into base in-place. Override values win at leaves.
+
+    When a key holds a structured value (dict or list) on both sides, merge it
+    recursively via _merge_structure so nested lists index-merge (preserving
+    elements present in only one encoding) instead of being clobbered. Otherwise
+    the override value wins.
+    """
     for key, value in override.items():
-        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-            _deep_merge(base[key], value)
+        if (
+            key in base
+            and isinstance(base[key], (dict, list))
+            and isinstance(value, (dict, list))
+        ):
+            _merge_structure(base, key, value)
         else:
             base[key] = value
 
