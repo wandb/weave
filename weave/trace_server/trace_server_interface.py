@@ -590,6 +590,7 @@ class CallsFilter(BaseModelStrict):
     turn_ids: list[str] | None = None
     trace_roots_only: bool | None = None
     wb_user_ids: list[str] | None = None
+    # "entity/project/run", or a bare run id (qualified to the queried project).
     wb_run_ids: list[str] | None = None
 
 
