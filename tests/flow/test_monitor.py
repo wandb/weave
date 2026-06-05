@@ -53,15 +53,18 @@ def test_publish(weave_active):
         },
     )
 
+    # WB-33908: a short op name is normalized to a full ref at construction,
+    # before any publish/activate.
+    expected_op = f"weave:///{client.entity}/{client.project}/op/example_op_name:*"
+    assert monitor.op_names == [expected_op]
+
     monitor_ref = publish(monitor)
 
     stored_monitor = monitor_ref.get()
 
     assert stored_monitor.active == False
     assert stored_monitor.sampling_rate == 0.5
-    # WB-33908: a short op name is normalized to a full ref at construction (a
-    # client is active), so even publish-without-activate stores the full ref.
-    expected_op = f"weave:///{client.entity}/{client.project}/op/example_op_name:*"
+    # The normalized op name is persisted (publish without activate still stores it).
     assert stored_monitor.op_names == [expected_op]
     assert stored_monitor.query == Query(
         **{
@@ -89,22 +92,6 @@ def test_activate(weave_active):
 
     deactivated_ref = monitor.deactivate()
     assert deactivated_ref.get().active == False
-
-
-def test_normalizes_short_op_names_at_construction(weave_active):
-    """WB-33908: a short op name is normalized to a full weave:// op ref."""
-    client = weave_active
-    monitor = Monitor(
-        name="test_monitor",
-        scorers=[],
-        op_names=["my_op"],
-    )
-
-    expected = f"weave:///{client.entity}/{client.project}/op/my_op:*"
-    assert monitor.op_names == [expected]
-
-    stored = monitor.activate().get()
-    assert stored.op_names == [expected]
 
 
 def test_preserves_full_refs_and_agent_spans(weave_active):
