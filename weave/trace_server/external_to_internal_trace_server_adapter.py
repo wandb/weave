@@ -264,12 +264,14 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
         return res
 
-    def _ext_to_int_run_ids(self, run_ids: list[str], ext_project_id: str) -> list[str]:
-        # Bare run ids (no "/") are qualified to the queried project, since the
-        # converter requires the full "entity/project/run" form.
+    def _ext_to_int_run_ids(
+        self, run_ids: list[str], ext_entity_project_id: str
+    ) -> list[str]:
+        # A bare run id (no "/") is prefixed with the queried "entity/project"
+        # to form the "entity/project/run" that ext_to_int_run_id requires.
         int_run_ids = []
         for run_id in run_ids:
-            qualified = run_id if "/" in run_id else f"{ext_project_id}/{run_id}"
+            qualified = run_id if "/" in run_id else f"{ext_entity_project_id}/{run_id}"
             int_run_ids.append(self._idc.ext_to_int_run_id(qualified))
         return int_run_ids
 
