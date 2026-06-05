@@ -11,7 +11,7 @@ from weave.trace.context.weave_client_context import (
     require_weave_client,
 )
 from weave.trace.objectify import register_object
-from weave.trace.refs import Ref
+from weave.trace.refs import OpRef, Ref
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
 
@@ -195,7 +195,9 @@ class Monitor(Object):
                     "op_names entries must be a weave URI starting with 'weave://', "
                     f"or a single op short name (no '/'); got {name!r}"
                 )
-            normalized.append(f"weave:///{entity}/{project}/op/{short}:*")
+            normalized.append(
+                OpRef(entity=entity, project=project, name=short, _digest="*").uri()
+            )
         return normalized
 
     @classmethod
