@@ -49,6 +49,11 @@ class ScorerDebounceConfig(TypedDict):
 class Monitor(Object):
     """Sets up a monitor to score incoming calls automatically.
 
+    Note that the op name will be converted to a weave ref using the entity and project
+    from the Weave client. If you're operating on multiple entities and projects
+    with the same client, you'll need to specify a fully-qualified weave ref.
+    See _normalized_op_names for more details.
+
     Examples:
     ```python
     import weave
