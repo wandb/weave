@@ -621,13 +621,21 @@ def test_filter_logic_operator_defaults_to_and() -> None:
         tsi.EvalResultsFilter(
             evaluation_call_id="eval-1",
             query=Query.model_validate(
-                {"$expr": {"$gte": [{"$getField": "scores.accuracy"}, {"$literal": 0.5}]}}
+                {
+                    "$expr": {
+                        "$gte": [{"$getField": "scores.accuracy"}, {"$literal": 0.5}]
+                    }
+                }
             ),
         ),
         tsi.EvalResultsFilter(
             evaluation_call_id="eval-2",
             query=Query.model_validate(
-                {"$expr": {"$lte": [{"$getField": "scores.accuracy"}, {"$literal": 0.9}]}}
+                {
+                    "$expr": {
+                        "$lte": [{"$getField": "scores.accuracy"}, {"$literal": 0.9}]
+                    }
+                }
             ),
         ),
     ]
@@ -678,13 +686,21 @@ def test_filter_logic_operator_or_produces_match_any() -> None:
         tsi.EvalResultsFilter(
             evaluation_call_id="eval-1",
             query=Query.model_validate(
-                {"$expr": {"$gte": [{"$getField": "scores.accuracy"}, {"$literal": 0.5}]}}
+                {
+                    "$expr": {
+                        "$gte": [{"$getField": "scores.accuracy"}, {"$literal": 0.5}]
+                    }
+                }
             ),
         ),
         tsi.EvalResultsFilter(
             evaluation_call_id="eval-2",
             query=Query.model_validate(
-                {"$expr": {"$lte": [{"$getField": "scores.accuracy"}, {"$literal": 0.9}]}}
+                {
+                    "$expr": {
+                        "$lte": [{"$getField": "scores.accuracy"}, {"$literal": 0.9}]
+                    }
+                }
             ),
         ),
     ]
@@ -798,13 +814,21 @@ def test_filter_logic_operator_or_same_eval_multiple_conditions() -> None:
         tsi.EvalResultsFilter(
             evaluation_call_id="eval-1",
             query=Query.model_validate(
-                {"$expr": {"$gte": [{"$getField": "scores.accuracy"}, {"$literal": 0.5}]}}
+                {
+                    "$expr": {
+                        "$gte": [{"$getField": "scores.accuracy"}, {"$literal": 0.5}]
+                    }
+                }
             ),
         ),
         tsi.EvalResultsFilter(
             evaluation_call_id="eval-1",
             query=Query.model_validate(
-                {"$expr": {"$lte": [{"$getField": "scores.accuracy"}, {"$literal": 0.9}]}}
+                {
+                    "$expr": {
+                        "$lte": [{"$getField": "scores.accuracy"}, {"$literal": 0.9}]
+                    }
+                }
             ),
         ),
     ]
@@ -824,7 +848,9 @@ def test_filter_logic_operator_or_same_eval_multiple_conditions() -> None:
     # The HAVING should contain: ((condition1 AND condition2)) - wrapped in parens
     assert " AND " in cte
     # With only one eval group, the OR doesn't appear
-    assert " OR " not in cte or "OR position" in cte  # "OR position" is from op_name matching
+    assert (
+        " OR " not in cte or "OR position" in cte
+    )  # "OR position" is from op_name matching
 
 
 def test_full_query_calls_complete() -> None:
