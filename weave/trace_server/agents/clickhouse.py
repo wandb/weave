@@ -707,6 +707,20 @@ class AgentWriteHandler:
         )
         return res, span_rows
 
+    def insert_span(self, span: AgentSpanCHInsertable) -> None:
+        """Insert a single pre-built span into the spans table.
+
+        Unlike ``insert_otel_spans`` this skips OTel protobuf parsing and
+        GenAI extraction — the caller is responsible for constructing a
+        fully populated ``AgentSpanCHInsertable``.
+        """
+        self._ch_client.insert(
+            "spans",
+            data=[genai_span_to_row(span)],
+            column_names=ALL_SPAN_INSERT_COLUMNS,
+        )
+        record_db_insert(table="spans", count=1)
+
 
 # ---------------------------------------------------------------------------
 # Private helpers

@@ -90,7 +90,13 @@ config_cases = [
             name="test_monitor",
             sampling_rate=0.5,
             scorers=[],
-            op_names=["example_op_name"],
+            # Agent-span literal: Monitor normalizes op_names to weave:// op refs
+            # on construction (WB-33908), and a real op ref would be resolved (and
+            # 404) by the reader flow since this op isn't created here. An
+            # agent-span literal is exempt from normalization and isn't a ref, so
+            # it round-trips deterministically. (Legacy cases below keep the bare
+            # "example_op_name" to test old stored data.)
+            op_names=["weave.genai.turn_ended"],
             query={
                 "$expr": {
                     "$gt": [
@@ -113,7 +119,7 @@ config_cases = [
             "description": None,
             "sampling_rate": 0.5,
             "scorers": [],
-            "op_names": ["example_op_name"],
+            "op_names": ["weave.genai.turn_ended"],
             "query": {
                 "_type": "Query",
                 "$expr": {
@@ -286,7 +292,7 @@ config_cases = [
             name="test_classifier_monitor",
             sampling_rate=0.75,
             scorers=[],
-            op_names=["classify_op"],
+            op_names=["weave.genai.turn_ended"],
             is_traced=False,
         ),
         inline_call_param=False,
@@ -297,7 +303,7 @@ config_cases = [
             "description": None,
             "sampling_rate": 0.75,
             "scorers": [],
-            "op_names": ["classify_op"],
+            "op_names": ["weave.genai.turn_ended"],
             "query": None,
             "is_traced": False,
             "active": False,

@@ -2031,3 +2031,48 @@ def test_feedback_filter_does_not_duplicate_calls_complete(
         f"Expected 1 call but got {len(results)} — feedback LEFT JOIN is duplicating rows"
     )
     assert results[0].id == call_id
+
+
+@pytest.mark.parametrize(
+    ("read_table", "expect_lazy_materialization_disabled"),
+    [
+        (ReadTable.CALLS_COMPLETE, True),
+        (ReadTable.CALLS_MERGED, False),
+    ],
+)
+def test_calls_query_stream_lazy_materialization_scoped_to_calls_complete(
+    monkeypatch,
+    clickhouse_trace_server,
+    read_table,
+    expect_lazy_materialization_disabled,
+):
+    """calls_complete reads inject query_plan_optimize_lazy_materialization=0 to dodge
+    the CH 25.11/25.12 patch-part `_block_number` crash; calls_merged reads do not.
+    """
+    captured: dict[str, Any] = {}
+
+    def _capture(self, query, parameters=None, settings=None, **kwargs):
+        captured["settings"] = dict(settings or {})
+        return iter([])
+
+    # Patch on the classes, not the shared instances: instance-level setattr would
+    # leak `_query_stream` into the server's __dict__ (see test_reset_server_state).
+    resolver = clickhouse_trace_server.table_routing_resolver
+    monkeypatch.setattr(
+        type(resolver), "resolve_read_table", lambda self, *args, **kwargs: read_table
+    )
+    monkeypatch.setattr(type(clickhouse_trace_server), "_query_stream", _capture)
+
+    list(
+        clickhouse_trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=f"{TEST_ENTITY}/lazy_mat", columns=["id"], limit=10
+            )
+        )
+    )
+
+    flag = "query_plan_optimize_lazy_materialization"
+    if expect_lazy_materialization_disabled:
+        assert captured["settings"][flag] == 0
+    else:
+        assert flag not in captured["settings"]
