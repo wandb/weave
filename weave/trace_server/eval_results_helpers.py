@@ -11,7 +11,7 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from pydantic import ValidationError
 
@@ -23,9 +23,9 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 
 try:
-    import ddtrace
+    from ddtrace.trace import tracer
 except ImportError:
-    ddtrace = None  # type: ignore[assignment]
+    tracer = None  # type: ignore[assignment]
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -41,11 +41,11 @@ def _trace_wrap(name: str) -> Callable[[F], F]:
     """No-op if ddtrace unavailable; otherwise wrap with ddtrace.tracer.wrap."""
 
     def decorator(fn: F) -> F:
-        if ddtrace is not None:
-            return ddtrace.tracer.wrap(name=name)(fn)  # type: ignore[return-value]
+        if tracer is not None:
+            return cast(F, tracer.wrap(name=name)(fn))
         return fn
 
-    return decorator  # type: ignore[return-value]
+    return decorator
 
 
 logger = logging.getLogger(__name__)
