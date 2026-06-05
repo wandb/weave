@@ -265,14 +265,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return res
 
     def _ext_to_int_run_ids(self, run_ids: list[str], ext_project_id: str) -> list[str]:
-        # Queries are already scoped to a project, so qualify bare run ids
-        # (no "/") to the "entity/project/run" the converter requires.
-        return [
-            self._idc.ext_to_int_run_id(
-                run_id if "/" in run_id else f"{ext_project_id}/{run_id}"
-            )
-            for run_id in run_ids
-        ]
+        # Bare run ids (no "/") are qualified to the queried project, since the
+        # converter requires the full "entity/project/run" form.
+        int_run_ids = []
+        for run_id in run_ids:
+            qualified = run_id if "/" in run_id else f"{ext_project_id}/{run_id}"
+            int_run_ids.append(self._idc.ext_to_int_run_id(qualified))
+        return int_run_ids
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         req = req.model_copy(deep=True)
