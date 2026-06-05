@@ -104,7 +104,7 @@ class Monitor(Object):
     def _coerce_op_name_refs_to_str(cls, value: Any) -> Any:
         """Access op-name refs as their URI string.
 
-        ``op_names`` is stored as full ``weave://`` op refs (WB-33908). When a
+        ``op_names`` is stored as full ``weave:///`` op refs (WB-33908). When a
         stored Monitor is loaded, Weave's value layer turns those ref-shaped
         strings back into ``Ref`` objects, which the ``list[AgentSpanOpName |
         str]`` field would reject. Pydantic runs this ``mode="before"`` validator
@@ -161,20 +161,20 @@ class Monitor(Object):
         return publish(self)
 
     def _normalized_op_names(self) -> list[str]:
-        """Expand bare op names to fully-qualified ``weave://`` op refs before saving.
+        """Expand bare op names to fully-qualified ``weave:///`` op refs before saving.
 
         Both the UI and the scoring worker require full refs. However, the public
         ``Monitor`` example tells users to pass a short name (``op_names=["my_op"]``).
         To satisfy both use-cases, we perform a conversion here using the
         active client's entity/project.
 
-        Entries that are already ``weave://`` refs, or agent-span literals
+        Entries that are already ``weave:///`` refs, or agent-span literals
         like ``"weave.genai.turn_ended"``, are returned unchanged.
         """
 
         def needs_expansion(name: str) -> bool:
             return name not in AGENT_SPAN_OP_NAMES and not name.strip().startswith(
-                "weave://"
+                "weave:///"
             )
 
         if not any(needs_expansion(name) for name in self.op_names):
@@ -192,7 +192,7 @@ class Monitor(Object):
                 raise ValueError(f"op_names entries must be non-empty; got {name!r}")
             if "/" in short:
                 raise ValueError(
-                    "op_names entries must be a weave URI starting with 'weave://', "
+                    "op_names entries must be a weave URI starting with 'weave:///', "
                     f"or a single op short name (no '/'); got {name!r}"
                 )
             normalized.append(
