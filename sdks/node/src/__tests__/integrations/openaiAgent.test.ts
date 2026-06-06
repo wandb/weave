@@ -209,6 +209,16 @@ describe('OpenAI Agents Integration', () => {
       }
     `);
 
+    // Integration-tracking metadata is stamped on calls this processor
+    // produces. The trace also contains nested OpenAI SDK calls with their
+    // own integration block, so match by name rather than by index.
+    const stamped = calls.map(c => c.attributes?.integration).filter(Boolean);
+    const mine = stamped.filter(i => i.name === 'openai_agents');
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.every(i => i.meta?.package_name === '@openai/agents')).toBe(
+      true
+    );
+
     // openai_agent_trace
     // ├── openai_agent_agent
     //     └── openai_agent_function

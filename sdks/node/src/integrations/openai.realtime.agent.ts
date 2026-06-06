@@ -33,6 +33,13 @@ import {uuidv7} from 'uuidv7';
 import type {RealtimeSession} from '@openai/agents-realtime';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import state from '../state';
+import {asAttributes, libraryIntegration} from './integrationMetadata';
+
+// Integration provenance stamped onto every call this integration produces.
+const OPENAI_REALTIME_AGENT_INTEGRATION = libraryIntegration(
+  'openai_agents_realtime',
+  {packageName: '@openai/agents-realtime'}
+);
 
 // ============================================================================
 // Helpers
@@ -404,7 +411,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: null,
       started_at: new Date().toISOString(),
       inputs: sessionData,
-      attributes: {kind: 'agent'},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.sessionCallId = callId;
@@ -445,7 +455,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: now,
       inputs: {text},
-      attributes: {kind: 'agent'},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     client.saveCallEnd({
@@ -473,7 +486,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: new Date().toISOString(),
       inputs: {},
-      attributes: {kind: 'agent'},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.voiceInputCalls.set(itemId, callId);
@@ -532,7 +548,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: now,
       inputs: sessionData,
-      attributes: {kind: 'agent'},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     client.saveCallEnd({
@@ -561,7 +580,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: new Date().toISOString(),
       inputs: {response_id: responseId},
-      attributes: {kind: 'llm'},
+      attributes: {
+        kind: 'llm',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.generationCalls.set(responseId, callId);
@@ -612,7 +634,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: parentCallId,
       started_at: new Date().toISOString(),
       inputs: {},
-      attributes: {kind: 'llm'},
+      attributes: {
+        kind: 'llm',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.audioCallId = callId;
@@ -674,7 +699,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: new Date().toISOString(),
       inputs,
-      attributes: {kind: 'tool'},
+      attributes: {
+        kind: 'tool',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.toolCalls.set(toolCallId, callId);

@@ -68,6 +68,12 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   opKind?: string;
   /** Custom color for the operation in the UI */
   opColor?: string;
+  /**
+   * Default attributes applied to every call this op creates. Integrations set
+   * this to stamp `attributes.integration` provenance. Merged beneath `kind`/
+   * `color`, which take precedence on key collision.
+   */
+  attributes?: Record<string, any>;
 }
 
 type AsyncResult<F extends (...args: any[]) => any> = Promise<

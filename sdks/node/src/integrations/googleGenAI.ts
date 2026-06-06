@@ -1,6 +1,12 @@
 import {op} from '../op';
 import {type OpOptions, type StreamReducer} from '../opType';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {asAttributes, libraryIntegration} from './integrationMetadata';
+
+// Integration provenance stamped onto every call this integration produces.
+const GOOGLE_GENAI_INTEGRATION = libraryIntegration('google_genai', {
+  packageName: '@google/genai',
+});
 
 const weaveGeminiModelHint = Symbol.for('_weave_gemini_model_hint');
 const weaveGeminiModelsWrapped = Symbol.for('_weave_gemini_models_wrapped');
@@ -143,6 +149,7 @@ function makeGenerateContentOp(originalGenerateContent: any) {
   const options: OpOptions<typeof wrapped> = {
     name: 'google.genai.models.generateContent',
     opKind: 'llm',
+    attributes: asAttributes(GOOGLE_GENAI_INTEGRATION),
     parameterNames: 'useParam0Object',
     summarize: geminiSummarizer,
     originalFunction: originalGenerateContent,
@@ -169,6 +176,7 @@ function makeGenerateContentStreamOp(originalGenerateContentStream: any) {
   const options: OpOptions<typeof wrapped> = {
     name: 'google.genai.models.generateContentStream',
     opKind: 'llm',
+    attributes: asAttributes(GOOGLE_GENAI_INTEGRATION),
     parameterNames: 'useParam0Object',
     summarize: geminiSummarizer,
     streamReducer: geminiStreamReducer,
