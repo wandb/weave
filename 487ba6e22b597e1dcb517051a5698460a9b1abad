@@ -1,0 +1,27 @@
+## Conversation
+User asked to review the ts-v2 decouple stack for over-promotion into weave/shared, then directed: create top-level weave/server_worker_shared/ (in-repo only, NO core moves), each move its own gt PR. This is PR6, stacked on andrew/ts-v2-eval-worker.
+
+## What & why
+EvaluateModelArgs/RescoringArgs/EvalWorkerJob/EvaluateModelDispatcher are shared between the trace server (dispatch) and the eval worker (consume), NOT client<->server. grimp confirmed zero client importers. They lived in weave/shared/trace_server_interface.py (the client<->server contract), so the client SDK carried a job contract it never uses. Moved to new leaf package weave/server_worker_shared/. EvaluateModelReq/Res stay in shared (client-facing trigger API the bindings implement).
+
+## Actions
+- New weave/server_worker_shared/__init__.py (documented bucket + the 4 types; only pydantic/abc/typing deps = clean leaf).
+- Removed the 4 types + the sole-user `from abc import ABC, abstractmethod` from weave/shared/trace_server_interface.py; ruff --fix then dropped the now-unused `Annotated`.
+- Repointed importers: weave/eval_worker/evaluate_model_worker.py (kept __all__ re-export for core back-compat), weave/trace_server/{sqlite,clickhouse}_trace_server*, tests/trace_server/workers/evaluate_model_test_worker.py, and (AMEND) tests/trace_server/test_rescore_evaluation.py.
+- pyproject.toml import-linter: renamed C1, removed weave.eval_worker from its source list (eval_worker is now a top-layer worker), added server_worker_shared to C1+C3 forbidden lists, added C4 'Server<->worker shared contract is a leaf'.
+
+## Errors & Mistakes
+- INITIAL COMMIT MISSED tests/trace_server/test_rescore_evaluation.py. My importer-grep filter ('import|tsi.|: Eval|: Rescoring') skipped the symbol line of a multi-line `from weave.shared.trace_server_interface import (... RescoringArgs ...)` because the `    RescoringArgs,` line alone matched none of those tokens. Collection error surfaced only when running pytest --collect-only across tests/trace_server. Fixed by amending this commit to repoint RescoringArgs -> weave.server_worker_shared. LESSON: when moving a symbol, grep the bare symbol name across the tree and check each hit's import source; do not pre-filter by 'import' (multi-line imports hide the symbol on a continuation line). test_trace_server_evaluation_apis.py was a false alarm -- it imports only the KEPT EvaluateModelReq/Res from shared.
+- ruff I001 on sqlite/clickhouse (server_worker_shared sorts before shared) -- auto-fixed.
+
+## Verification
+- lint-imports: 4 contracts kept, 0 broken (444 files).
+- ruff: clean. tests/trace_server/test_trace_server_evaluation_apis.py 18 passed/8 skipped; test_rescore_evaluation.py collects (6 tests).
+
+## Hints for Future Agents
+- weave.eval_worker is INTENTIONALLY not in C1 source_modules: it is the top of the graph (imports client+shared+server_worker_shared; nothing imports it but tests + core's Kafka consumer). Do not re-add.
+- server_worker_shared MUST stay a leaf (C4): imports only weave.shared + third-party.
+- CORE BREAKAGE (deferred, expected): core services/weave-trace imports these 4 from weave.shared.trace_server_interface -> breaks on next weave submodule bump; needs paired core PR repointing to weave.server_worker_shared. eval_worker's __all__ re-export still resolves the eval_worker import path.
+
+## Open Questions
+None. PR7 (next) moves the server-only agents/* subtree to weave/trace_server/agents/.
