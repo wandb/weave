@@ -15,6 +15,9 @@ T = TypeVar("T")
 R_co = TypeVar("R_co", covariant=True)
 
 DEFAULT_PAGE_SIZE = 1000
+# Max number of fetched pages retained per iterator. Bounds peak memory on
+# large iterations.
+DEFAULT_MAX_CACHED_PAGES = 128
 
 
 class FetchFunc(Protocol[T]):
@@ -46,15 +49,35 @@ class PaginatedIterator(Generic[T, R_co]):
         self.limit = limit
         self.offset = offset
         self._next_index = 0
+        self._fetch_page = self._make_page_fetcher(
+            fetch_func, page_size, DEFAULT_MAX_CACHED_PAGES
+        )
 
         if page_size <= 0:
             raise ValueError("page_size must be greater than 0")
         if limit is not None and limit <= 0:
             raise ValueError("limit must be greater than 0")
 
-    @lru_cache  # noqa: B019
-    def _fetch_page(self, index: int) -> list[T]:
-        return self.fetch_func(index * self.page_size, self.page_size)
+    @staticmethod
+    def _make_page_fetcher(
+        fetch_func: FetchFunc[T], page_size: int, max_cached_pages: int
+    ) -> Callable[[int], list[T]]:
+        """Build a bounded page cache for a single iterator.
+
+        The returned callable wraps a fresh ``functools.lru_cache`` that closes
+        over ``fetch_func`` and ``page_size`` only -- never the iterator. It is a
+        ``@staticmethod`` (no ``self``) precisely so the cache cannot capture the
+        instance; that is what lets the iterator and its cached pages be released
+        as soon as the caller drops it. A method-level ``@lru_cache`` would
+        instead key on ``self`` and live at class/function scope, pinning every
+        iterator for the life of the process (ruff B019).
+        """
+
+        @lru_cache(maxsize=max_cached_pages)
+        def fetch_page(index: int) -> list[T]:
+            return fetch_func(index * page_size, page_size)
+
+        return fetch_page
 
     @overload
     def _get_one(self: PaginatedIterator[T, T], index: int) -> T: ...
