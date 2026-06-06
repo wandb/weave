@@ -128,6 +128,12 @@ async def test_openai_async_quickstart(
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "openai"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "openai"
+
     output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"

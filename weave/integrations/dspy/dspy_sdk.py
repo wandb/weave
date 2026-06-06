@@ -10,6 +10,10 @@ from pydantic import BaseModel
 
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.integrations.dspy.dspy_utils import dictify, get_symbol_patcher
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import call_context
@@ -17,6 +21,7 @@ from weave.trace.context import call_context
 logger = logging.getLogger(__name__)
 
 _dspy_patcher: MultiPatcher | None = None
+DSPY_INTEGRATION = library_integration("dspy")
 _evaluate_patched = False
 
 
@@ -240,7 +245,7 @@ def get_dspy_patcher(
     if _dspy_patcher is not None:
         return _dspy_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, DSPY_INTEGRATION)
 
     _dspy_patcher = DSPyPatcher(
         [

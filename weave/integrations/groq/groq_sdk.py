@@ -10,6 +10,10 @@ from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
 from groq.types.completion_usage import CompletionUsage
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
@@ -20,6 +24,8 @@ if TYPE_CHECKING:
 
 
 _groq_patcher: MultiPatcher | None = None
+
+GROQ_INTEGRATION = library_integration("groq")
 
 
 def groq_accumulator(
@@ -113,7 +119,7 @@ def get_groq_patcher(
     if _groq_patcher is not None:
         return _groq_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, GROQ_INTEGRATION)
 
     chat_completions_settings = base.model_copy(
         update={

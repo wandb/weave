@@ -46,6 +46,11 @@ def test_anthropic(
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "anthropic"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "anthropic"
     output = call.output
     assert output.id == message.id
     assert output.model == message.model

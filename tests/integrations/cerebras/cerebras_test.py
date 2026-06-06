@@ -39,6 +39,11 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
 
     assert call.exception is None
     assert call.ended_at is not None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "cerebras"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "cerebras-cloud-sdk"
     output = call.output
     assert output.choices[0].message.content.strip() == exp
     assert output.choices[0].finish_reason == "stop"

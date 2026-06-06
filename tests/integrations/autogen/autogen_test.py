@@ -40,6 +40,15 @@ async def test_simple_client_create(
         [UserMessage(content="Hello, how are you?", source="user")]
     )
     calls = list(client.get_calls())
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    # AutoGen also drives openai sub-calls, which carry their own metadata, so
+    # filter to the autogen-stamped calls before asserting their shape.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    autogen_meta = [i for i in stamped if i["name"] == "autogen"]
+    assert autogen_meta, "expected >=1 call to carry autogen metadata"
+    assert all(i["meta"]["package_name"] == "autogen-agentchat" for i in autogen_meta)
     assert len(calls) == 2
     flattened = flatten_calls(calls)
     assert len(flattened) == 3

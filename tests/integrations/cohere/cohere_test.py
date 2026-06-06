@@ -46,6 +46,11 @@ def test_cohere(
     assert call.exception is None
     assert call.ended_at is not None
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "cohere"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "cohere"
     assert op_name_from_ref(call.op_name) == "cohere.Client.chat"
     output = call.output
     assert output.text == exp

@@ -13,6 +13,10 @@ from mistralai.models import (
 )
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
@@ -21,6 +25,8 @@ if TYPE_CHECKING:
     pass
 
 _mistral_patcher: MultiPatcher | None = None
+
+MISTRAL_INTEGRATION = library_integration("mistral", distribution_name="mistralai")
 
 
 def mistral_accumulator(
@@ -115,7 +121,7 @@ def get_mistral_patcher(
     if _mistral_patcher is not None:
         return _mistral_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, MISTRAL_INTEGRATION)
     chat_complete_settings = base.model_copy(
         update={
             "name": base.name or "mistralai.chat.complete",
