@@ -1,0 +1,51 @@
+## Conversation
+PR2 of the stack from "do that as a stack of PRs" (see PR1 note on
+andrew/paginated-iter-cache). Scope: "drop the broken offset path". This is
+the offset removal.
+
+## Actions
+- Chesterton's Fence check FIRST (mandated by user's CLAUDE.md before removing
+  code): traced offset to #3356 ("feature parity between callsStreamQuery and
+  get_calls") and the move #5125. Found get_calls(offset=) is a real, tested
+  public feature, BUT it is implemented by baking offset_override into
+  fetch_func (call.py:368-370) and constructing the iterator with offset=None
+  (call.py, "we handle it in fetch_func"). So the iterator's own offset param
+  is vestigial -- superseded by the fetch-func approach, never exercised.
+- Removed: the `offset` __init__ param + self.offset; the offset handling in
+  _get_one and _get_slice; and the `offset=None` kwarg at the call.py
+  construction site.
+- _get_one limit check went from `index >= self.limit + (self.offset or 0)`
+  to `index >= self.limit`.
+- Added test_paginated_iterator_limit_bounds_index_and_slice_consistently
+  (would have caught the latent bug; locks index==slice==iter at the limit).
+- Verified: ruff clean; 6 unit tests; get_calls offset/limit/page_size tests
+  (test_get_calls_len, test_get_calls_limit_offset,
+  test_get_calls_page_size_with_offset) all pass on sqlite -> public offset
+  behavior intact.
+
+## Errors & Mistakes
+- None this PR.
+
+## Dead Ends
+- Considered FIXING _get_one to match _get_slice instead of removing offset
+  (lower blast radius, keeps the param). Rejected: the param is dead +
+  untested, and the user's simplicity rules favor removing speculative/dead
+  code over maintaining a fixed-but-unused path. Removal also eliminates the
+  two-places-to-set-offset smell.
+
+## Hints for Future Agents
+- If you ever need iterator-level offset again, prefer the fetch_func approach
+  already used by make_calls_iterator -- do NOT reintroduce the param; the old
+  _get_one/_get_slice offset handling disagreed on the limit boundary.
+- Public offset coverage lives in tests/trace/test_weave_client.py
+  (test_get_calls_len ~L575, test_get_calls_limit_offset,
+  test_get_calls_page_size_with_offset). Run with -k offset / -k get_calls.
+
+## Codebase Discoveries
+- get_calls(offset=N) => offset_override baked into effective_offset in
+  fetch_func; the PaginatedIterator sees a stream already starting at N, so
+  calls[0] is logical row N. The iterator never needed its own offset.
+
+## Open Questions
+- ClickHouse run not done locally (sqlite only). The offset tests are
+  backend-agnostic logic, but a CI clickhouse pass is the final gate.
