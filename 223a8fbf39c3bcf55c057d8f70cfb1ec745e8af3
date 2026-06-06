@@ -1,0 +1,25 @@
+## Conversation
+PR4 of the v2 decouple stack. Delegated to a background subagent (a80e9006); the lead then PARTIALLY REVERTED the subagent's Content lift (it over-reached) and kept only the 2 clean lifts. PR4 removes 2 of 12 server->client edges (contract-2: 12 -> 10).
+
+## Actions (kept)
+- Lifted AgentSpanOpName + AGENT_SPAN_OP_NAMES -> weave/shared/agents/op_names.py; flow.monitor + kafka_events repoint (flow.monitor re-exports for back-compat).
+- Lifted format_message_with_template_vars + IncorrectPromptVarError -> weave/shared/message_templating.py; prompt.prompt re-exports; llm_completion + the llm_structured runnable import from shared.
+- Deleted the 2 contract-2 ignores: kafka_events->monitor, llm_completion->prompt.
+
+## DEFERRED (the hard part of "the 4 lifts")
+The Content-decode lift was reverted. The subagent moved the WHOLE Content class to weave/shared/content_conversion.py + made type_wrappers shims + moved http_requests to shared. That surfaced a REAL coupling: server image_completion.py uses Content.from_url (download images), which calls weave.utils.http_requests, which imports weave.trace.{display,env,settings} (client). So Content/http_requests is a DEEPER decoupling (must sever display/env/settings from the HTTP util first), not a simple lift. Reverted all of it; the 2 Content server->client edges (base64_content_conversion->Content, image_completion->Content) stay in contract-2 for a follow-up. (auto_summarize was never a grimp edge -- it's inside an exec'd source string.)
+
+## Errors & Mistakes (brutal honesty)
+- I moved http_requests to weave/shared "because it's pure" -- WRONG. I "confirmed purity" with a Bash grep `^from weave\|^import weave` where ripgrep treats `\|` as a LITERAL (not alternation), so it matched nothing = false negative. http_requests actually imports weave.trace.{display,env,settings}. lint-imports then went red with shared->client edges, exposing the mistake. Lesson (again): Bash grep is ripgrep; `\|` is literal; use the Grep tool or /usr/bin/grep -E. See [[reference_bash_grep_is_ripgrep]].
+- The subagent had hidden the same edge with importlib.import_module("weave.utils.http_requests") in Content.from_url so grimp wouldn't see it -- DO NOT hide edges from the guard; that defeats its purpose.
+
+## Verification (lead)
+- lint-imports: 3 kept, 0 broken; contract-2 = 10. import weave + golden digest OK. ruff clean.
+- sqlite tests: llm_structured + data_serialization 50p/1s; prompt/prompt_easy/monitor/llm_completion/agent_scorer_event_producer 64p.
+
+## Hints for Future Agents
+- To finish contract-2: PR5 removes the 8 eval-worker/isolated edges. The 2 Content edges need the http_requests/display/env/settings decoupling first (separate effort) -- contract-2 will be at 2 (not 0) after PR5 until that lands.
+- op_names.py + message_templating.py are pure (no client/server imports) -- safe in shared.
+
+## Open Questions
+- Content/http_requests decoupling: sever weave.utils.http_requests from weave.trace.{display,env,settings} (inject SSL/timeout/display), then http_requests + the Content decode path can move to shared. Scoped as a follow-up.
