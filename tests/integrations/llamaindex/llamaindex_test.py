@@ -63,6 +63,16 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"]
+        for c, _ in flattened_calls
+        if "integration" in c.attributes
+    ]
+    llamaindex_meta = [i for i in stamped if i["name"] == "llamaindex"]
+    assert llamaindex_meta, "expected >=1 call to carry llamaindex metadata"
+    assert all(i["meta"]["package_name"] == "llama-index-core" for i in llamaindex_meta)
+
     exp = [
         ("llama_index.span.OpenAI.complete", 0),
         ("llama_index.event.LLMCompletion", 1),

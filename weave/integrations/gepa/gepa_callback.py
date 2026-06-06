@@ -5,6 +5,7 @@ from typing import Any
 
 import weave
 from weave.evaluation.eval_imperative import EvaluationLogger
+from weave.integrations.integration_metadata import library_integration
 from weave.trace.call import Call
 from weave.trace.context import weave_client_context
 
@@ -14,6 +15,8 @@ logger = logging.getLogger(__name__)
 # object. Each iteration's accepted candidate becomes a new version of this
 # object so users can browse the full prompt history in the Weave UI.
 CANDIDATE_OBJECT_NAME = "gepa_candidate"
+
+GEPA_INTEGRATION = library_integration("gepa")
 
 
 def _safe(value: Any) -> Any:
@@ -28,7 +31,7 @@ def _safe(value: Any) -> Any:
 
 
 def _kind_attrs(kind: str) -> dict[str, Any]:
-    return {"weave": {"kind": kind}}
+    return {"weave": {"kind": kind}, **GEPA_INTEGRATION.as_attributes()}
 
 
 def _count_trajectory_failures(trajectories: list[Any] | None) -> int:
@@ -114,6 +117,7 @@ class WeaveGEPACallback:
         self._iteration_call = gc.create_call(
             "gepa.iteration",
             inputs={"iteration": iteration},
+            attributes=GEPA_INTEGRATION.as_attributes(),
             display_name=f"gepa.iteration.{iteration}",
         )
 
@@ -189,6 +193,7 @@ class WeaveGEPACallback:
                 "candidate_idx": event.get("candidate_idx"),
                 "components": _safe(components),
             },
+            attributes=GEPA_INTEGRATION.as_attributes(),
             display_name="gepa.reflective_dataset",
         )
         examples_per_component = {
@@ -219,6 +224,7 @@ class WeaveGEPACallback:
         self._proposal_call = gc.create_call(
             "gepa.propose",
             inputs=inputs,
+            attributes=GEPA_INTEGRATION.as_attributes(),
             display_name="gepa.propose",
         )
 
@@ -323,6 +329,7 @@ class WeaveGEPACallback:
         point = gc.create_call(
             "gepa.error",
             inputs=error_output,
+            attributes=GEPA_INTEGRATION.as_attributes(),
             display_name=f"gepa.error.{error_output['exception_type'] or 'Error'}",
         )
         gc.finish_call(point, None, exc_for_finish)

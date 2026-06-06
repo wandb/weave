@@ -31,9 +31,14 @@ except ImportError:  # pragma: no cover - older openai-agents SDKs lack these
     TaskSpanData = None
     TurnSpanData = None
 
+from weave.integrations.integration_metadata import library_integration
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import get_weave_client
+
+OPENAI_AGENTS_INTEGRATION = library_integration(
+    "openai_agents", distribution_name="openai-agents"
+)
 
 
 def _call_type(span: Span) -> str:
@@ -139,7 +144,11 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             op="openai_agent_trace",
             inputs={"name": trace.name},
             parent=call_context.get_current_call(),
-            attributes={"type": "task", "agent_trace_id": trace.trace_id},
+            attributes={
+                "type": "task",
+                "agent_trace_id": trace.trace_id,
+                **OPENAI_AGENTS_INTEGRATION.as_attributes(),
+            },
             display_name=trace.name,
         )
         self._trace_calls[trace.trace_id] = trace_call
@@ -525,6 +534,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
                 "agent_span_id": span.span_id,
                 "agent_trace_id": tid,
                 "parent_span_id": getattr(span, "parent_id", None),
+                **OPENAI_AGENTS_INTEGRATION.as_attributes(),
             },
             display_name=span_name,
         )

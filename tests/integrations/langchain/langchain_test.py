@@ -95,6 +95,14 @@ def test_simple_chain_invoke(
     calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_invoke(calls, exp_name)
 
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    langchain_meta = [i for i in stamped if i["name"] == "langchain"]
+    assert langchain_meta, "expected >=1 call to carry langchain metadata"
+    assert all(i["meta"]["package_name"] == "langchain-core" for i in langchain_meta)
+
     call = calls[0]
     # Assert that the call has usage metadata
     assert call.summary is not None

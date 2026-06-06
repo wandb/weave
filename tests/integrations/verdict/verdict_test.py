@@ -57,6 +57,16 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
     assert len(flattened) >= 1  # At least one call should be created
     assert_ends_and_errors(flattened)
 
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"]
+        for c, _ in flattened
+        if "integration" in c.attributes
+    ]
+    verdict_meta = [i for i in stamped if i["name"] == "verdict"]
+    assert verdict_meta, "expected >=1 call to carry verdict metadata"
+    assert all(i["meta"]["package_name"] == "verdict" for i in verdict_meta)
+
     # Check that we have the expected call names
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
