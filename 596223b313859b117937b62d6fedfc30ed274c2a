@@ -1,0 +1,29 @@
+## Conversation
+PR2 of the v2 decouple stack. User approved building PR1-5 autonomously. A subagent was launched to implement PR2 but was KILLED mid-investigation (clean tree, no edits). Given PR2 is the riskiest (digest correctness), implemented INLINE instead. Design Codex-validated in thread 019e9ae6 (continuation of the prior 019e982f).
+
+## Actions
+- Rewrote weave/trace_server/interface/builtin_object_classes/llm_structured_model.py into a PURE schema module (no client imports): kept Message, params, message casts, parse_response, _prepare_llm_messages, parse_params_to_litellm_params; added LLM_STRUCTURED_COMPLETION_CANONICAL_BASES + a BaseObject schema with __weave_canonical_bases__ ClassVar + ref/llm_model_id/default_params + extra=forbid + metadata strip (mirrors weave.Object).
+- New client module weave/flow/llm_structured_completion_model.py: the runnable LLMStructuredCompletionModel(Model) + @op predict + prepare_completion_request + cast_to_llm_structured_model_params (uses vals) + LLMStructuredModelParamsLike.
+- weave/shared/object_class_util.py dump_object: reads getattr(cls, '__weave_canonical_bases__', None) before falling back to MRO. getattr justified (serialization marker across arbitrary classes). No new shared->contract edge.
+- weave/trace/serialization/serialize.py: builtin deserialization resolves LLMStructuredCompletionModel to the client runnable by name (lazy import), else BUILTIN_OBJECT_REGISTRY. Robust to import order (Codex rec). Deliberately NOT reusing objectify._registry (would perturb Dataset/Evaluation/Prompt deserialization).
+- Repointed in-weave consumers (eval worker, llm_as_a_judge_scorer) + 5 test files to import the runnable from weave.flow.
+- pyproject ignores: removed 4 stale contract->client + 1 stale scorer->contract; added documented TRANSIENT edges (3 runnable->contract client->server removed in PR3; 1 eval_worker->runnable server->client removed in PR5).
+- Added 3 tests: canonical-bases parity (runnable MRO == constant), raw-dict digest stability (golden eCEXZKYo6MdXGYfTnXgFef5PzBZg2YX1cVYMVozYcmc), _bases-present passthrough.
+
+## Errors & Mistakes
+- ruff I001 (unsorted-imports) on the repointed consumer/test files -> ruff --fix.
+- STALE mock.patch targets: 7 occurrences of '...llm_structured_model.get_weave_client' (predict moved to the client) -> repointed to 'weave.flow.llm_structured_completion_model.get_weave_client'. Collection passed but tests would fail at runtime -- the exact string-ref hazard the migration memory warns about.
+- import-linter alerts on UNMATCHED (stale) ignores (exit 1) -- so stale ignore entries must be removed, not left.
+
+## Verification
+- lint-imports: 3 kept, 0 broken (441 files).
+- Server canonicalization: golden digest byte-identical (minimal + rich inputs).
+- Tests (sqlite): test_llm_structured_completion_model 20, scorer/eval_ref_get/base_object_classes/publish_round_trip 19, data_serialization 30+1skip, trace_server_evaluation_apis 18+8skip. ALL PASS.
+
+## Hints for Future Agents
+- DIGEST GATE: any change to the schema fields/serialization or the canonical-bases marker must keep compute_object_digest_result({'llm_model_id':'gpt-4'},'LLMStructuredCompletionModel').digest == 'eCEXZKYo6MdXGYfTnXgFef5PzBZg2YX1cVYMVozYcmc'. Object digests use sort_keys=True so field ORDER is irrelevant; only key set + values + _bases matter.
+- The schema and runnable SHARE _class_name 'LLMStructuredCompletionModel' on purpose (one wire identity, two registries: BUILTIN_OBJECT_REGISTRY=schema for server canonicalization; serialize.py resolver=runnable for client get()).
+- CORE STAGING REQUIRED (deferred to the end, lands at submodule bump): core workers import the RUNNABLE from the old contract path. patch_evaluation_class_with_datadog.py + agent_scoring_client.py must repoint to weave.flow.llm_structured_completion_model. scoring_worker.py imports Message/parse_response which STAY in the contract (no change). The frontend/wb_agent raw-dict path needs NO core change (digest preserved by the shim).
+
+## Open Questions
+- None blocking. Core import repoint tracked for the end-of-stack core PR.
