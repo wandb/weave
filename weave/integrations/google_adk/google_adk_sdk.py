@@ -57,6 +57,7 @@ from weave.integrations.google_adk.extractors import (
     set_llm_request_attributes,
     set_llm_response_attributes,
 )
+from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 
@@ -82,6 +83,19 @@ _SetCommonGenerateContentAttributes = Callable[
     [Span, LlmRequest, Mapping[str, AttributeValue]], None
 ]
 _TraceInferenceResult = Callable[[Span | GenerateContentSpan, LlmResponse], None]
+
+# Integration provenance, flattened once for OTel span attributes (scalars only).
+# ADK creates the spans; these wrappers enrich them, so we stamp the same
+# `integration.*` keys the other agent OTel integrations emit.
+_INTEGRATION_OTEL_ATTRS = library_integration(
+    "google_adk", distribution_name="google-adk"
+).as_otel_attributes()
+
+
+def _set_integration_attrs(span: Span) -> None:
+    """Stamp integration-tracking provenance onto an ADK OTel span."""
+    for key, value in _INTEGRATION_OTEL_ATTRS.items():
+        span.set_attribute(key, value)
 
 
 def _unwrap_inference_span(span: Span | GenerateContentSpan) -> Span:
@@ -119,6 +133,7 @@ def _wrap_trace_agent_invocation(
         # ADK already sets agent_name / agent_description / conversation_id;
         # layer in the Weave-superset fields it does not emit natively.
         span.set_attribute(GEN_AI_PROVIDER_NAME, _provider_name())
+        _set_integration_attrs(span)
         span.set_attribute(
             GEN_AI_OPERATION_NAME, GenAiOperationNameValues.INVOKE_AGENT.value
         )
@@ -146,6 +161,7 @@ def _wrap_trace_tool_call(original: _TraceToolCall) -> _TraceToolCall:
         original(tool, args, function_response_event, error, span)
         target = _resolve_optional_span(span)
         target.set_attribute(GEN_AI_PROVIDER_NAME, _provider_name())
+        _set_integration_attrs(target)
 
         # Tool args/result are message content; respect the ADK opt-out
         # so PHI/PII users get the same gate they get from ADK itself.
@@ -195,6 +211,7 @@ def _wrap_set_common_generate_content_attributes(
     ) -> None:
         original(span, llm_request, common_attributes)
         span.set_attribute(GEN_AI_PROVIDER_NAME, _provider_name())
+        _set_integration_attrs(span)
         set_llm_request_attributes(span, llm_request)
 
     return wrapper
@@ -218,6 +235,7 @@ def _wrap_trace_inference_result(
             return
         target = _unwrap_inference_span(span)
         target.set_attribute(GEN_AI_PROVIDER_NAME, _provider_name())
+        _set_integration_attrs(target)
         set_llm_response_attributes(target, llm_response)
 
     return wrapper

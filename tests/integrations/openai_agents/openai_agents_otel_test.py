@@ -140,6 +140,11 @@ def test_openai_agents_quickstart_otel(
     Runner.run_sync(agent, "Write a haiku about recursion in programming.")
 
     spans = otel_spans.get_finished_spans()
+    # Integration-tracking metadata is stamped (flattened) on every emitted span.
+    stamped = [_attrs(s) for s in spans if "integration.name" in _attrs(s)]
+    assert stamped, "expected >=1 span to carry integration metadata"
+    assert all(a["integration.name"] == "openai_agents" for a in stamped)
+    assert all(a["integration.meta.package_name"] == "openai-agents" for a in stamped)
     by_name = {s.name: s for s in spans}
 
     # No synthetic trace root: TaskSpan is the OTel root, named "workflow ..."
