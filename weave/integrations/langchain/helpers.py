@@ -31,7 +31,7 @@ def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
         usage_metadata: Raw usage metadata dictionary from provider
 
     Returns:
-        Tuple of (prompt_tokens, completion_tokens, total_tokens)
+        `TokenUsage` object with (prompt_tokens, completion_tokens, total_tokens)
 
     """
     if not usage_metadata:
@@ -101,8 +101,20 @@ def _find_full_model_name(output: Any, partial_model_name: str) -> str:
     return best_match
 
 
-def _extract_usage_data(call: Call, output: Any) -> None:
-    """Simplified usage extraction using consistent LangChain patterns."""
+def _extract_usage_data(call: Call, output: dict[str, Any]) -> None:
+    """
+    Usage extraction using LangChain metadata patterns.
+    Extracts usage data from the LangChain output and updates the Call object.
+    It looks for model name and type in the metadata, normalizes token usage,
+    and aggregates usage statistics for each model.
+
+    Args:
+        call: The Call object to update with usage data
+        output: The LangChain output dictionary containing model metadata and generations
+
+    Returns:
+        None: The Call object is updated in place with usage data
+    """
     if not output or "outputs" not in output:
         return
     # Extract model name and type from the langchain metadata directly
