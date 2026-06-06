@@ -1,0 +1,22 @@
+## Conversation
+PR5 (final weave PR) of the v2 decouple stack. Delegated to a background subagent (a8ca8dec) with a tight, deterministic spec; lead independently verified + committed. Completes the weave-side decoupling (modulo the 2 deferred Content edges).
+
+## Actions (subagent, verified by lead)
+- git mv weave/trace_server/workers/evaluate_model_worker/evaluate_model_worker.py -> weave/eval_worker/evaluate_model_worker.py; weave/trace_server/isolated_client_executor.py -> weave/eval_worker/isolated_client_executor.py. New weave/eval_worker/__init__.py. Removed the now-empty weave/trace_server/workers/ dir.
+- Lifted EvaluateModelDispatcher (1-method ABC) into weave/shared/trace_server_interface.py beside EvaluateModelArgs. The moved worker re-exports both from shared for back-compat.
+- Repointed server ctor-param imports (sqlite_trace_server.py, clickhouse_trace_server_batched.py) to import EvaluateModelDispatcher from weave.shared.trace_server_interface. Repointed tests (evaluate_model_test_worker, test_trace_server_evaluation_apis, isolated_client_executor tests + conftest).
+- pyproject: removed the 8 contract-2 edges (6 evaluate_model_worker + 2 isolated_client_executor); added "weave.eval_worker" to ALL 3 contracts (contract-1 source: eval_worker must not import trace_server; contract-2 forbidden: trace_server must not import eval_worker; contract-3 forbidden: shared must not import eval_worker) so eval_worker is guarded, not a blind spot.
+
+## Verification (lead, independent)
+- lint-imports EXIT 0, "3 kept, 0 broken" (443 files). Direct pyproject check: contract-1=0 (empty []), contract-2=2 (only the 2 Content edges), contract-3=0 (empty []). 2 empty ignore lists confirmed via grep.
+- golden digest eCEXZKYo6MdXGYfTnXgFef5PzBZg2YX1cVYMVozYcmc holds; import weave + eval_worker + ABC import OK.
+- workers/ dir removed; weave/eval_worker/ has __init__ + the 2 moved modules.
+- subagent tests (sqlite): test_trace_server_evaluation_apis 18p/8s, isolated_client_executor/ 15p, test_evaluate 20p, evaluate_model_worker 8p. ruff clean.
+
+## Hints for Future Agents
+- eval_worker is now a guarded CLIENT-side component. It imports client + shared, NOT the server impl (contract-1 source enforces this at 0 violations).
+- The ABC is a plain abc.ABC (the runtime boundary already existed: server DI's the dispatcher via ctor param, only calls .dispatch()). PLAN.md said "Protocol" loosely; ABC matches the existing code.
+- contract-2 will NOT reach 0 until the Content/http_requests decoupling lands (the 2 remaining edges). client->server and shared->* ARE at 0.
+
+## Open Questions
+- Core staging (.context/core-staging.md) for PR2/PR3/PR5 repoints is the next step (lands at submodule bump; can't be tested until then due to core's pinned weave submodule).
