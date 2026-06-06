@@ -1,0 +1,15 @@
+## Conversation
+PR0 (commit 1/2) of the v2 decouple-then-move stack. User wants weave/trace_server moved into the core repo over a stacked gt set of PRs, decouple-first. Plan locked via grill-me; see .context/PLAN.md (gitignored) in workspace tyler-v1.
+
+## Actions
+- Cherry-picked the namespace-__init__.py prep from the prior decouple stack's commit 86e3b856c3 (24 files, clean, 0 conflicts).
+- Re-scanned weave/ (os.walk + ancestor propagation) for dirs with .py in subtree but no __init__.py, to catch any added by the 18-commit master drift (0b3db35..5e34e2f). Result: NONE missing.
+
+## Errors & Mistakes
+None for this commit.
+
+## Hints for Future Agents
+- grimp (import-linter graph builder) SILENTLY skips PEP 420 namespace packages (dirs with .py but no __init__.py); the guard in commit 2 goes blind to such subtrees. NEVER delete these __init__.py. They are empty and do not affect submodule imports.
+
+## Codebase Discoveries
+- The 18 drift commits added no new namespace-package gaps; the 24 files cover current master.
