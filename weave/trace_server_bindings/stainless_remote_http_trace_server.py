@@ -1301,6 +1301,21 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         raise NotImplementedError("evaluation_status is not implemented")
 
+    @validate_call
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Score calls.
+
+        Args:
+            req: Calls score request.
+
+        Returns:
+            Calls score response.
+
+        Raises:
+            NotImplementedError: Not implemented.
+        """
+        raise NotImplementedError("calls_score is not implemented")
+
     # === Object APIs ===
 
     @validate_call
