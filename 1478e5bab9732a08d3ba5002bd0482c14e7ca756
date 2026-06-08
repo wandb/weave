@@ -62,3 +62,14 @@ the contract churn (add in client PR, remove here) is gone. Enforcement is the
 structural contracts from the guard PR (client !-> trace_server etc.); they
 cover the digest split once weave.shared.digest is removed here. lint-imports
 4/0.
+
+## Addendum (fix: dangling test importers)
+The original server-digest move repointed only weave/ importers and MISSED test
+importers of weave.shared.digest/object_class_util, breaking collection of:
+tests/trace/{test_client_side_digests,test_server_file_storage,test_llm_structured_completion_model}.py,
+tests/shared/test_digest.py, tests/trace_server/test_clickhouse_batching.py
+(+ a stale docstring line in tests/contract/test_conformance_server.py). Repointed:
+test_client_side_digests -> weave.trace.digest (client; uses only client-available
+symbols); the rest -> weave.trace_server.digest / .object_class_util (server;
+they use compute_object_digest_result / process_incoming_object_val, which are
+server-only). LESSON (third time): grep REPO-WIDE incl tests/ when moving a module.
