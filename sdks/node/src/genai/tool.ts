@@ -1,4 +1,11 @@
-import {type Span, SpanKind, SpanStatusCode} from '@opentelemetry/api';
+import {
+  type AttributeValue,
+  type Attributes,
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+  type TimeInput,
+} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
@@ -74,6 +81,20 @@ export class Tool {
       opts.parentContext
     );
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
+  }
+
+  /** Set a single attribute on the Tool span. No-op after `end()`. Mirrors OTel `Span.setAttribute`. */
+  setAttribute(key: string, value: AttributeValue): this {
+    if (this._ended) return this;
+    this.span.setAttribute(key, value);
+    return this;
+  }
+
+  /** Add a named event to the Tool span. No-op after `end()`. Mirrors OTel `Span.addEvent`. */
+  addEvent(name: string, attributes?: Attributes, startTime?: TimeInput): this {
+    if (this._ended) return this;
+    this.span.addEvent(name, attributes, startTime);
+    return this;
   }
 
   /**
