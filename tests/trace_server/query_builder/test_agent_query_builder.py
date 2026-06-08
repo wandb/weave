@@ -67,6 +67,20 @@ def assert_sql(
     )
 
 
+def _hidden_not_in(slot: str) -> str:
+    """The NOT IN subquery the agents queries use to exclude hidden agents.
+
+    ``slot`` is the param placeholder name carrying the project id, e.g.
+    ``"genai_1"``. Built by concatenation so the literal ``{slot:String}``
+    braces survive (str.format would read ``:String`` as a format spec).
+    """
+    return (
+        "agent_name NOT IN ("
+        "SELECT agent_name FROM hidden_agents WHERE project_id = {" + slot + ":String} "
+        "GROUP BY agent_name HAVING argMax(is_hidden, updated_at) = true)"
+    )
+
+
 # ============================================================================
 # make_spans_count_query (ungrouped)
 # ============================================================================
@@ -1060,6 +1074,26 @@ class TestMakeAgentsQueries:
         pb = ParamBuilder("genai")
         query = make_agents_count_query(pb, AgentsQueryReq(project_id="p1"))
 
+        exclusion = _hidden_not_in("genai_1")
+        expected = f"""
+            SELECT count() FROM (
+                SELECT agent_name FROM agents
+                WHERE project_id = {{genai_0:String}}
+                AND {exclusion}
+                GROUP BY agent_name
+            )
+        """
+        assert_sql(expected, {"genai_0": "p1", "genai_1": "p1"}, query, pb.get_params())
+
+    def test_count_include_hidden(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_agents_count_query(
+            pb,
+            AgentsQueryReq(
+                project_id="p1", filters=AgentsQueryFilters(include_hidden=True)
+            ),
+        )
+
         expected = """
             SELECT count() FROM (
                 SELECT agent_name FROM agents
@@ -1073,7 +1107,8 @@ class TestMakeAgentsQueries:
         pb = ParamBuilder("genai")
         query = make_agents_list_query(pb, AgentsQueryReq(project_id="p1"))
 
-        expected = """
+        exclusion = _hidden_not_in("genai_1")
+        expected = f"""
             SELECT agent_name,
                    sum(invocation_count) AS invocation_count,
                    sum(span_count) AS span_count,
@@ -1084,12 +1119,57 @@ class TestMakeAgentsQueries:
                    min(first_seen) AS first_seen,
                    max(last_seen) AS last_seen
             FROM agents
-            WHERE project_id = {genai_0:String}
+            WHERE project_id = {{genai_0:String}}
+            AND {exclusion}
             GROUP BY agent_name
             ORDER BY last_seen DESC, agent_name
-            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
+            LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
         """
-        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "p1",
+            "genai_2": 100,
+            "genai_3": 0,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_list_include_hidden_projects_flag(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_agents_list_query(
+            pb,
+            AgentsQueryReq(
+                project_id="p1", filters=AgentsQueryFilters(include_hidden=True)
+            ),
+        )
+
+        membership = (
+            "agent_name IN ("
+            "SELECT agent_name FROM hidden_agents WHERE project_id = {genai_1:String} "
+            "GROUP BY agent_name HAVING argMax(is_hidden, updated_at) = true)"
+        )
+        expected = f"""
+            SELECT agent_name,
+                   sum(invocation_count) AS invocation_count,
+                   sum(span_count) AS span_count,
+                   sum(total_input_tokens) AS total_input_tokens,
+                   sum(total_output_tokens) AS total_output_tokens,
+                   sum(total_duration_ms) AS total_duration_ms,
+                   sum(error_count) AS error_count,
+                   min(first_seen) AS first_seen,
+                   max(last_seen) AS last_seen,
+                   {membership} AS hidden
+            FROM agents
+            WHERE project_id = {{genai_0:String}}
+            GROUP BY agent_name
+            ORDER BY last_seen DESC, agent_name
+            LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "p1",
+            "genai_2": 100,
+            "genai_3": 0,
+        }
         assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_list_with_filter(self) -> None:
@@ -1102,7 +1182,8 @@ class TestMakeAgentsQueries:
             ),
         )
 
-        expected = """
+        exclusion = _hidden_not_in("genai_2")
+        expected = f"""
             SELECT agent_name,
                    sum(invocation_count) AS invocation_count,
                    sum(span_count) AS span_count,
@@ -1113,17 +1194,19 @@ class TestMakeAgentsQueries:
                    min(first_seen) AS first_seen,
                    max(last_seen) AS last_seen
             FROM agents
-            WHERE project_id = {genai_0:String}
-            AND agent_name = {genai_1:String}
+            WHERE project_id = {{genai_0:String}}
+            AND agent_name = {{genai_1:String}}
+            AND {exclusion}
             GROUP BY agent_name
             ORDER BY last_seen DESC, agent_name
-            LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
+            LIMIT {{genai_3:UInt64}} OFFSET {{genai_4:UInt64}}
         """
         expected_params = {
             "genai_0": "p1",
             "genai_1": "my-agent",
-            "genai_2": 100,
-            "genai_3": 0,
+            "genai_2": "p1",
+            "genai_3": 100,
+            "genai_4": 0,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
