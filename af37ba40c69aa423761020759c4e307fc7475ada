@@ -60,3 +60,6 @@ case lists in generate_fixtures.py and rerun.
 ## Open Questions
 None. Follow-up: tests/contract/test_conformance_client.py (publish via the weave
 client, assert ObjectRef.digest == corpus) on andrew/ts-v2-conformance-client.
+
+## Addendum (rename per user diff comment)
+User asked on test_conformance.py: 'is this testing the consumer or the server? I think it should be the server, right?' -- the generic name hid that this is the SHARED-layer test (calls weave.shared functions directly), distinct from the server boundary test (test_conformance_server.py). Renamed test_conformance.py -> test_conformance_shared.py + clarified the docstring so the trio reads shared/server/client by layer. The server IS tested (test_conformance_server.py); kept the shared test because it uniquely pins canonical_json bytes + covers message_template/validator/str/table (no object-write endpoint).
