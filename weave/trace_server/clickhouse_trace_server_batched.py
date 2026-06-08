@@ -19,7 +19,6 @@ import ddtrace
 from cachetools import TTLCache
 from clickhouse_connect import common as ch_common
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -131,12 +130,12 @@ from weave.trace_server.clickhouse.utilities import (
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
     find_call_descendants,
+    insert_with_empty_query_retry,
     log_and_raise_insert_error,
     maybe_enqueue_minimal_call_end,
     num_bytes,
     process_parameters,
     sanitize_invalid_utf8_surrogates,
-    should_retry_empty_query,
     string_to_int_in_range,
 )
 from weave.trace_server.clickhouse_schema import (
@@ -2911,7 +2910,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         stored_days = (
             RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
         )
-        self.ch_client.insert(
+        insert_with_empty_query_retry(
+            self.ch_client,
             "project_ttl_settings",
             data=[
                 [
@@ -7255,18 +7255,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         start = time.monotonic()
         sanitized_invalid_utf8 = False
-        for attempt in range(ch_settings.INSERT_MAX_RETRIES):
+        # At most two attempts: the original, plus one retry after sanitizing
+        # invalid client UTF-8. Empty-query retries are handled in the helper.
+        for _ in range(2):
             try:
-                result = self.ch_client.insert(
-                    table, data=data, column_names=column_names, settings=settings
+                result = insert_with_empty_query_retry(
+                    self.ch_client, table, data, column_names, settings
                 )
 
             # Invalid client Unicode: sanitize the batch and retry once.
             except UnicodeEncodeError as e:
-                if (
-                    sanitized_invalid_utf8
-                    or attempt == ch_settings.INSERT_MAX_RETRIES - 1
-                ):
+                if sanitized_invalid_utf8:
                     log_and_raise_insert_error(e, table, data)
                 sanitized_invalid_utf8 = True
                 data = sanitize_invalid_utf8_surrogates(data)
@@ -7277,14 +7276,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 converted = convert_to_insert_too_large(e)
                 log_and_raise_insert_error(converted, table, data)
 
-            # Empty query error: RETRY (generator was consumed during HTTP retry)
-            # We should retry with a fresh generator
-            except DatabaseError as e:
-                if should_retry_empty_query(e, table, attempt):
-                    continue
-                log_and_raise_insert_error(e, table, data)
-
-            # All other errors: raise immediately, no retry
+            # All other errors (including exhausted empty-query retries): no retry
             except Exception as e:
                 log_and_raise_insert_error(e, table, data)
 
