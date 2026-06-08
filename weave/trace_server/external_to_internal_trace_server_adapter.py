@@ -1333,6 +1333,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             agent.project_id = original_project_id
         return res
 
+    def agent_set_visibility(
+        self, req: tsi.agent_types.AgentVisibilityReq
+    ) -> tsi.agent_types.AgentVisibilityRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.agent_set_visibility(req)
+
     def agent_versions_query(
         self, req: tsi.agent_types.AgentVersionsQueryReq
     ) -> tsi.agent_types.AgentVersionsQueryRes:

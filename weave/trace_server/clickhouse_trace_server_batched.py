@@ -77,6 +77,8 @@ from weave.trace_server.agents.types import (
     AgentTraceChatRes,
     AgentVersionsQueryReq,
     AgentVersionsQueryRes,
+    AgentVisibilityReq,
+    AgentVisibilityRes,
     GenAIOTelExportReq,
     GenAIOTelExportRes,
 )
@@ -6844,6 +6846,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         return AgentQueryHandler(self._query, self.feedback_query).agents_query(req)
+
+    def agent_set_visibility(self, req: AgentVisibilityReq) -> AgentVisibilityRes:
+        AgentWriteHandler(self.ch_client).set_agent_visibility(req)
+        return AgentVisibilityRes(hidden=req.hidden)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
         return AgentQueryHandler(self._query, self.feedback_query).agent_versions_query(

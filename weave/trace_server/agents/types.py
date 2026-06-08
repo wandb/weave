@@ -1052,6 +1052,20 @@ class AgentsQueryRes(BaseModel):
     total_count: int = 0
 
 
+class AgentVisibilityReq(BaseModel):
+    """Hide or unhide an agent for an entire project."""
+
+    project_id: str
+    agent_name: str
+    hidden: bool
+
+
+class AgentVisibilityRes(BaseModel):
+    """Echoes the visibility state that was applied."""
+
+    hidden: bool
+
+
 # ---------------------------------------------------------------------------
 # Agent versions (from agent_versions MV)
 # ---------------------------------------------------------------------------
