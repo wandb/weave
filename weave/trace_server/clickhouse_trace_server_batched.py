@@ -1214,6 +1214,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         pb = ParamBuilder()
         query, columns, settings = build_calls_stats_query(req, pb, read_table)
+        settings = ch_settings.update_settings_for_stats_query_cache(settings)
         raw_res = self._query(query, pb.get_params(), settings=settings or None)
 
         res_dict = (
@@ -2821,7 +2822,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_files_storage_size=_default_true(req.include_file_storage_size),
             read_table=read_table,
         )
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        settings = ch_settings.update_settings_for_stats_query_cache()
+        query_result = self._query(query, pb.get_params(), settings=settings or None)
 
         if len(query_result.result_rows) != 1:
             raise RuntimeError("Unexpected number of results", query_result)

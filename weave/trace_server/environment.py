@@ -364,6 +364,25 @@ def wf_clickhouse_disable_lightweight_update() -> bool:
     )
 
 
+def wf_clickhouse_stats_query_cache_ttl() -> int:
+    """TTL in seconds for cached stats/count query results.
+
+    Doubles as the on/off switch for the stats query cache: 0 (the default when
+    unset) disables it, any positive value enables it with that TTL. The TTL bounds
+    staleness, since query cache entries are not invalidated on insert.
+    """
+    ttl = os.environ.get("WF_CLICKHOUSE_STATS_QUERY_CACHE_TTL")
+    if ttl is None:
+        return 0
+    try:
+        return int(ttl)
+    except ValueError:
+        logger.exception(
+            "WF_CLICKHOUSE_STATS_QUERY_CACHE_TTL value '%s' is not valid", ttl
+        )
+        return 0
+
+
 def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
     """The maximum async insert busy timeout in milliseconds for ClickHouse.
 

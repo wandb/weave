@@ -199,3 +199,41 @@ def update_settings_for_calls_complete_read(
     settings: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:
     return {**(settings or {}), **CLICKHOUSE_CALLS_COMPLETE_READ_SETTINGS}
+
+
+# Query cache for repeated stats/count reads. The ClickHouse query cache is a
+# read-side, in-memory result cache: no write/insert-time cost and a handful of
+# bytes per scalar count result. Opted into only for stats/count endpoints, never
+# for large result sets. Gated by WF_CLICKHOUSE_STATS_QUERY_CACHE_TTL: 0 (the
+# default) disables it, a positive value enables it with that TTL (seconds).
+# Overview: https://clickhouse.com/docs/operations/query-cache
+MIN_CACHED_QUERY_DURATION_MS = 200
+MIN_CACHED_QUERY_RUNS = 2
+_stats_query_cache_ttl = wf_env.wf_clickhouse_stats_query_cache_ttl()
+CLICKHOUSE_STATS_QUERY_CACHE_SETTINGS: dict[str, int | str] = (
+    {}
+    if _stats_query_cache_ttl <= 0
+    else {
+        # opt this query into reading/writing the cache
+        # https://clickhouse.com/docs/operations/settings/settings#use_query_cache
+        "use_query_cache": 1,
+        # entry lifetime; bounds staleness since the cache is not invalidated on insert
+        # https://clickhouse.com/docs/operations/settings/settings#query_cache_ttl
+        "query_cache_ttl": _stats_query_cache_ttl,
+        # only cache queries that actually took this long (skip the cheap fast-path counts)
+        # https://clickhouse.com/docs/operations/settings/settings#query_cache_min_query_duration
+        "query_cache_min_query_duration": MIN_CACHED_QUERY_DURATION_MS,
+        # only cache after the query has repeated, so one-off requests don't pollute it
+        # https://clickhouse.com/docs/operations/settings/settings#query_cache_min_query_runs
+        "query_cache_min_query_runs": MIN_CACHED_QUERY_RUNS,
+        # never share entries across users (project_id is in the query text already)
+        # https://clickhouse.com/docs/operations/settings/settings#query_cache_share_between_users
+        "query_cache_share_between_users": 0,
+    }
+)
+
+
+def update_settings_for_stats_query_cache(
+    settings: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
+    return {**(settings or {}), **CLICKHOUSE_STATS_QUERY_CACHE_SETTINGS}
