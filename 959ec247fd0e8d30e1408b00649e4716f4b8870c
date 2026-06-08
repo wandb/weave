@@ -53,3 +53,12 @@ message_templating, validation_util, helpers. No serialization IMPLEMENTATION le
 - pydantic_util + message_templating are still shared (used by BOTH sides); if 'each
   side owns everything' is the goal they'd be duplicated too (conformance already
   has message_template rows). Pending user direction.
+
+## Addendum (contract churn collapsed)
+This PR originally REMOVED the transitional 'Client must own its serialization'
+import-linter contract. After user feedback, that contract was dropped from the
+client PR entirely (never added), so this PR no longer touches pyproject.toml --
+the contract churn (add in client PR, remove here) is gone. Enforcement is the
+structural contracts from the guard PR (client !-> trace_server etc.); they
+cover the digest split once weave.shared.digest is removed here. lint-imports
+4/0.
