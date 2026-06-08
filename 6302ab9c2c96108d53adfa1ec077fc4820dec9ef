@@ -1,0 +1,53 @@
+## Conversation
+PR1 of the stack from "do that as a stack of PRs" (page-cache leak fix).
+Originally implemented as a per-instance OrderedDict LRU. The user then left a
+Conductor review comment on _fetch_page: "is this the best way? What if we
+instead implemented as a helper func that used lru_cache?" I evaluated, the
+user chose the helper, and this commit was amended (gt modify) to the
+helper+lru_cache form.
+
+## Actions
+- Built a runnable demo (.context/pagecache_demo.py, gitignored) comparing 4
+  strategies for leak/cycle behavior via weakref-after-del:
+    method lru_cache (OLD)   freed_on_refcount=False freed_after_gc=False  LEAK
+    helper lru_cache         freed_on_refcount=True  freed_after_gc=True   clean
+    bound-method lru_cache   freed_on_refcount=False freed_after_gc=True   cyclic
+    OrderedDict (PR1 v1)     freed_on_refcount=True  freed_after_gc=True   clean
+- Consulted Codex (threadId 019ea725-...): recommended KEEPING OrderedDict
+  because its leak-safety is structural, whereas the helper's safety depends on
+  the invariant 'fetch_func never closes over the iterator' and B019 won't
+  catch a regression. User chose the helper anyway (explicit override; prefers
+  stdlib cache machinery). Complied.
+- Implemented _make_page_fetcher(fetch_func, page_size, max_cached_pages): a
+  free function returning an lru_cache-wrapped closure. __init__ assigns
+  self._fetch_page = _make_page_fetcher(...). Removed the _fetch_page method
+  and the OrderedDict import; restored functools.lru_cache import.
+- ruff clean; 5 unit tests pass (incl. test_paginated_iterator_released_when_
+  unreferenced, the weakref leak regression -- passes because the closure does
+  not capture self).
+
+## Errors & Mistakes
+- None functionally. Note: amending with gt modify changed this commit's SHA
+  (9401d7a775 -> 6302ab9c2c) and restacked/changed PR2's SHA, orphaning both
+  prior git notes; re-added notes to the new SHAs.
+
+## Dead Ends
+- OrderedDict LRU (the first PR1 implementation) and the bound-method lru_cache
+  variant (works but creates a self<->cache cycle, needs gc.collect to free).
+  Both rejected in favor of the free-helper closure.
+
+## Hints for Future Agents
+- CRITICAL INVARIANT (documented in _make_page_fetcher docstring): the cache
+  closure must NOT capture the PaginatedIterator. It closes over fetch_func +
+  page_size only. If a future change makes fetch_func a bound method of the
+  iterator, or otherwise captures self, the leak/cycle returns AND ruff B019
+  will not flag it (the decorator is on a nested function, not a method).
+- The weakref release test is the guardrail; keep it.
+
+## Codebase Discoveries
+- fetch_func built by make_calls_iterator (call.py) closes over server/
+  project_id/filter -- never the iterator -- which is why the helper approach
+  is leak-free here.
+
+## Open Questions
+- None. Iteration-model duality (__next__ vs __iter__) still deferred.
