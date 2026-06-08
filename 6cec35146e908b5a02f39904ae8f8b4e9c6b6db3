@@ -67,3 +67,14 @@ Whether to also give the SERVER its own digest module (vs keeping
 weave.shared.digest as the server's), and whether to scope message_template /
 validator out of the corpus (they are behaviors, not ser/de). Both raised to the
 user, pending.
+
+## Addendum (user diff comment: contract placement)
+Removed the 'Client must own its serialization (not the shared digest impl)'
+import-linter contract that this PR originally added. User asked why it wasn't
+added earlier with the base contracts; the real issue is it was TRANSITIONAL --
+added here, then removed in the server-digest PR once weave.shared.digest was
+deleted (add-then-remove churn). It also couldn't go in the guard PR (the client
+still imported weave.shared.digest there). Resolution: rely on the structural
+contracts from the guard PR; the client/server digest split is enforced once the
+server PR deletes weave.shared.digest (client !-> trace_server covers the
+server's digest; shared !-> both covers shared). lint-imports stays 4/0 here.
