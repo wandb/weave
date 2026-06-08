@@ -3915,6 +3915,52 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert large_calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
 
+def test_many_medium_strings_offloaded_not_dropped(client, monkeypatch):
+    """A column of many medium strings (none over MAX_CHARS) must be offloaded,
+    not stripped wholesale. Without progressive offloading the first pass offloads
+    nothing and the entire column is replaced with ENTITY_TOO_LARGE_PAYLOAD.
+    """
+    if client_is_sqlite(client):
+        return
+
+    # Limit is 10KB; no single string exceeds MAX (50k), so the first pass
+    # offloads nothing. The MIN (1k) pass must offload the medium strings.
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_settings,
+        "PROACTIVE_OFFLOAD_BYTES_LIMIT",
+        10 * 1024,
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_settings,
+        "LARGE_STRING_OFFLOAD_MAX_CHARS",
+        50 * 1024,
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_settings,
+        "LARGE_STRING_OFFLOAD_MIN_CHARS",
+        1024,
+    )
+
+    medium = "m" * 2048
+    data = {f"field_{i}": medium for i in range(20)}  # ~40KB, no single huge leaf
+
+    @weave.op
+    def test_op_medium(input_data: dict):
+        return input_data
+
+    test_op_medium(data)
+
+    calls = list(test_op_medium.calls())
+    assert len(calls) == 1
+    # Every medium string is preserved as a Content object, not dropped.
+    assert calls[0].inputs["input_data"] != json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].output != json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    for i in range(20):
+        offloaded = calls[0].inputs["input_data"][f"field_{i}"]
+        assert isinstance(offloaded, Content)
+        assert offloaded.data == medium.encode("utf-8")
+
+
 def test_weave_finish_unsets_client(client, monkeypatch):
     @weave.op
     def foo():

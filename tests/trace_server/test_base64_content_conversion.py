@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.base64_content_conversion import (
     AUTO_CONVERSION_MIN_SIZE,
     is_base64,
@@ -18,6 +19,7 @@ from weave.trace_server.base64_content_conversion import (
     replace_large_strings_with_content_objects,
     store_content_object,
 )
+from weave.trace_server.clickhouse_trace_server_batched import _offload_oversized_row
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallStartReq,
@@ -259,6 +261,40 @@ def test_large_string_offloading():
         {"f": large}, "proj", broken_ts, max_chars=threshold
     )
     assert r["f"] == large  # original preserved
+
+
+def test_offload_oversized_row_progressive(monkeypatch):
+    """A column of many medium strings (none over MAX_CHARS) is offloaded via the
+    escalating MIN_CHARS pass instead of being stripped to ENTITY_TOO_LARGE_PAYLOAD,
+    while a column with no offloadable string leaves falls back to a full strip.
+    """
+    row_limit = 10 * 1024
+    monkeypatch.setattr(ch_settings, "LARGE_STRING_OFFLOAD_MAX_CHARS", 50 * 1024)
+    monkeypatch.setattr(ch_settings, "LARGE_STRING_OFFLOAD_MIN_CHARS", 1024)
+
+    # 20 medium strings, each under MAX (50k) but over MIN (1k); ~40 KiB total.
+    medium = {f"f{i}": "m" * 2048 for i in range(20)}
+    dump = json.dumps(medium)
+    ts = _mock_ts(num_files=40)  # 20 leaves * (content + metadata)
+    row, offloaded, stripped = _offload_oversized_row(
+        [dump, "proj"], [(0, len(dump.encode()))], len(dump.encode()), row_limit, 1, ts
+    )
+    parsed = json.loads(row[0])
+    assert offloaded == 1
+    assert stripped == 0
+    assert all(_is_content_ref(parsed[f"f{i}"]) for i in range(20))
+
+    # No offloadable string leaves (small ints) -> strip the whole column.
+    ints = {str(i): i for i in range(2000)}
+    dump = json.dumps(ints)
+    ts = _mock_ts(num_files=2)
+    row, offloaded, stripped = _offload_oversized_row(
+        [dump, "proj"], [(0, len(dump.encode()))], len(dump.encode()), row_limit, 1, ts
+    )
+    assert offloaded == 0
+    assert stripped == 1
+    assert row[0] == ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+    ts.file_create.assert_not_called()
 
 
 class TestStandaloneBase64Detection:

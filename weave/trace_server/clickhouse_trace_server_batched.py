@@ -174,6 +174,7 @@ from weave.trace_server.datadog import (
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
+    InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
     NotFoundError,
@@ -337,6 +338,11 @@ OP_REF_CACHE_TTL_SECONDS = 300
 
 # Max error messages to include in OTel export partial success responses
 MAX_OTEL_ERROR_MESSAGES = 20
+
+# UTF-8 encodes a character as at most 4 bytes, so `chars * 4` is a cheap upper
+# bound on a string's byte size. Used to skip the expensive byte-encode in the
+# offload gate for rows that are safely under the limit.
+MAX_UTF8_BYTES_PER_CHAR = 4
 
 # Cache size for ref expansion during call streaming
 REF_EXPANSION_CACHE_SIZE = 1000
@@ -718,11 +724,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
         rows = self._otel_build_rows(calls, retention_days, write_target)
         if write_target == WriteTarget.CALLS_COMPLETE:
-            rows = self._offload_large_values(rows, ALL_CALL_COMPLETE_INSERT_COLUMNS)
-            self._insert_call_complete_batch(rows)
+            self._offload_and_insert(
+                rows, ALL_CALL_COMPLETE_INSERT_COLUMNS, self._insert_call_complete_batch
+            )
         else:
-            rows = self._offload_large_values(rows, ALL_CALL_INSERT_COLUMNS)
-            self._insert_call_batch(rows)
+            self._offload_and_insert(
+                rows, ALL_CALL_INSERT_COLUMNS, self._insert_call_batch
+            )
 
         # Run callbacks and flush
         for cb in event_callbacks:
@@ -7251,10 +7259,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
-            batch = self._offload_large_values(
-                self._call_batch, ALL_CALL_INSERT_COLUMNS
+            self._offload_and_insert(
+                self._call_batch, ALL_CALL_INSERT_COLUMNS, self._insert_call_batch
             )
-            self._insert_call_batch(batch)
         finally:
             self._call_batch = []
 
@@ -7335,12 +7342,36 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not self._calls_complete_batch:
             return
         try:
-            batch = self._offload_large_values(
-                self._calls_complete_batch, ALL_CALL_COMPLETE_INSERT_COLUMNS
+            self._offload_and_insert(
+                self._calls_complete_batch,
+                ALL_CALL_COMPLETE_INSERT_COLUMNS,
+                self._insert_call_complete_batch,
             )
-            self._insert_call_complete_batch(batch)
         finally:
             self._calls_complete_batch = []
+
+    def _offload_and_insert(
+        self,
+        batch: list[list[Any]],
+        column_names: list[str],
+        insert_fn: Callable[[list[list[Any]]], None],
+    ) -> None:
+        """Offload oversized rows, then insert; fall back to one-by-one on overflow.
+
+        The proactive offload targets PROACTIVE_OFFLOAD_BYTES_LIMIT over the JSON
+        columns only, while ClickHouse's real ceiling covers the whole row. If a
+        row still trips InsertTooLarge we insert one at a time so a single
+        pathological row cannot fail the entire batch.
+        """
+        batch = self._offload_large_values(batch, column_names)
+        try:
+            insert_fn(batch)
+        except InsertTooLarge:
+            logger.warning(
+                "Row exceeded ClickHouse limit after offload; inserting one-by-one."
+            )
+            for row in batch:
+                insert_fn([row])
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._offload_large_values")
     def _offload_large_values(
@@ -7381,6 +7412,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         row_limit = ch_settings.PROACTIVE_OFFLOAD_BYTES_LIMIT
 
         for item in batch:
+            # Cheap upper bound first: `chars * 4` >= utf-8 byte size, so a row
+            # under the limit by that measure cannot exceed it. This skips the
+            # full byte-encode for the common small-row path (master did no
+            # measurement here at all). Columns may be None (nullable).
+            total_chars = sum(
+                len(item[i]) for i in json_column_indices if item[i] is not None
+            )
+            if total_chars * MAX_UTF8_BYTES_PER_CHAR <= row_limit:
+                final_batch.append(item)
+                continue
+
             json_idx_size_pairs = [(i, num_bytes(item[i])) for i in json_column_indices]
             total_json_bytes = sum(size for _, size in json_idx_size_pairs)
 
@@ -7441,6 +7483,16 @@ def _offload_oversized_row(
     stripped_count = 0
     entity_too_large_payload_byte_size = num_bytes(ch_settings.ENTITY_TOO_LARGE_PAYLOAD)
 
+    # Read live (not at import) so settings overrides apply; descending so we
+    # offload the largest leaves first and escalate to smaller ones.
+    offload_char_thresholds = sorted(
+        {
+            ch_settings.LARGE_STRING_OFFLOAD_MAX_CHARS,
+            ch_settings.LARGE_STRING_OFFLOAD_MIN_CHARS,
+        },
+        reverse=True,
+    )
+
     sorted_pairs = sorted(json_idx_size_pairs, key=lambda x: x[1], reverse=True)
 
     for col_idx, original_size in sorted_pairs:
@@ -7449,20 +7501,28 @@ def _offload_oversized_row(
 
         current_col_size = original_size
 
-        new_dump = _try_offload_json_column(
-            row[col_idx],
-            row[project_id_idx],
-            trace_server,
-            max_chars=ch_settings.LARGE_STRING_OFFLOAD_MAX_CHARS,
-        )
-        if new_dump is not None:
-            new_size = num_bytes(new_dump)
-            if new_size < current_col_size:
-                row[col_idx] = new_dump
-                total_json_bytes -= current_col_size - new_size
-                current_col_size = new_size
-                offloaded_count += 1
+        # Offload progressively smaller leaves until the column fits. A column
+        # made of many medium strings (none over MAX_CHARS) would otherwise
+        # offload nothing and get stripped wholesale, losing user data.
+        for max_chars in offload_char_thresholds:
+            if total_json_bytes <= row_limit:
+                break
+            new_dump = _try_offload_json_column(
+                row[col_idx],
+                row[project_id_idx],
+                trace_server,
+                max_chars=max_chars,
+            )
+            if new_dump is not None:
+                new_size = num_bytes(new_dump)
+                if new_size < current_col_size:
+                    row[col_idx] = new_dump
+                    total_json_bytes -= current_col_size - new_size
+                    current_col_size = new_size
+                    offloaded_count += 1
 
+        # Last resort: the column is still over budget (e.g. file storage is
+        # unavailable, or the bytes are not in offloadable string leaves).
         if total_json_bytes > row_limit:
             row[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
             total_json_bytes -= current_col_size - entity_too_large_payload_byte_size

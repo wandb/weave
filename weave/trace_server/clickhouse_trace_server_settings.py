@@ -31,11 +31,12 @@ ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 # ENTITY_TOO_LARGE_PAYLOAD so the row fits within ClickHouse limits.
 PROACTIVE_OFFLOAD_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
 
-# Minimum string length (in characters) to offload to Content storage when a row
-# exceeds the offload threshold. Strings shorter than this are left inline;
-# longer ones are stored as Content objects in file storage so the row can fit
-# within limits without data loss.
+# String-length thresholds (in characters) for offloading to Content storage when
+# a row exceeds the byte limit. We first offload only the largest strings (MAX),
+# and escalate to smaller strings (MIN) only if the column is still over budget,
+# so a column made of many medium strings is preserved rather than dropped.
 LARGE_STRING_OFFLOAD_MAX_CHARS = 100 * 1024  # 100k characters
+LARGE_STRING_OFFLOAD_MIN_CHARS = 8 * 1024  # 8k characters
 
 
 # Table naming conventions for distributed mode
