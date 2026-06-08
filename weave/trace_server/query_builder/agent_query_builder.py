@@ -839,11 +839,32 @@ def _spans_filter_sql(
     return _FilterSQL(where=" AND ".join(where_conditions))
 
 
+def _hidden_agents_subquery(pb: ParamBuilder, project_id: str) -> str:
+    """SQL selecting agent names currently hidden in a project.
+
+    Resolves current state from the `hidden_agents` ReplacingMergeTree without
+    FINAL: the latest toggle per agent wins via `argMax` on `updated_at`,
+    so a row with `is_hidden = true` only counts if it is the most recent write.
+    """
+    pid_slot = pb.add(project_id, param_type="String")
+    return (
+        f"SELECT agent_name FROM hidden_agents "
+        f"WHERE project_id = {pid_slot} "
+        f"GROUP BY agent_name HAVING argMax(is_hidden, updated_at) = true"
+    )
+
+
 def _agents_where(pb: ParamBuilder, req: AgentsQueryReq) -> str:
     conditions: list[str] = []
     if req.filters and req.filters.agent_name:
         aname_slot = pb.add(req.filters.agent_name, param_type="String")
         conditions.append(f"agent_name = {aname_slot}")
+    # Exclude hidden agents unless the caller explicitly opts in. When opted in,
+    # the list query instead projects a `hidden` flag (see make_agents_list_query).
+    if not (req.filters and req.filters.include_hidden):
+        conditions.append(
+            f"agent_name NOT IN ({_hidden_agents_subquery(pb, req.project_id)})"
+        )
     return " AND ".join(conditions)
 
 
@@ -1431,6 +1452,15 @@ def make_agents_list_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
     order_by = build_order_by(
         req.sort_by, AGENT_SORTABLE_COLS, "last_seen DESC, agent_name"
     )
+    # When hidden agents are included they are not excluded by _agents_where, so
+    # surface their state as a `hidden` flag. agent_name is the GROUP BY key, so
+    # membership in the (uncorrelated) hidden set is valid in the SELECT list.
+    hidden_select = ""
+    if req.filters and req.filters.include_hidden:
+        hidden_select = (
+            f",\n               agent_name IN "
+            f"({_hidden_agents_subquery(pb, req.project_id)}) AS hidden"
+        )
     limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
     return f"""
         SELECT agent_name,
@@ -1441,7 +1471,7 @@ def make_agents_list_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
                sum(total_duration_ms) AS total_duration_ms,
                sum(error_count) AS error_count,
                min(first_seen) AS first_seen,
-               max(last_seen) AS last_seen
+               max(last_seen) AS last_seen{hidden_select}
         FROM agents
         {where_sql}
         GROUP BY agent_name

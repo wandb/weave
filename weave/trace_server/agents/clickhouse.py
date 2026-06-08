@@ -390,6 +390,7 @@ class AgentQueryHandler:
             AgentSchema(
                 project_id=req.project_id,
                 agent_name=safe_str(r.get("agent_name")),
+                hidden=bool(r.get("hidden", False)),
                 **_agent_aggregate_fields(r),
             )
             for r in rows
