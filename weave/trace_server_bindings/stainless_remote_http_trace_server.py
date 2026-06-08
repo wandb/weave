@@ -1118,24 +1118,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.feedback.replace,
         )
 
-    @validate_call
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        """Execute actions in batch.
-
-        Args:
-            req: Actions execute batch request.
-
-        Returns:
-            Actions execute batch response.
-        """
-        return self._stainless_request(
-            req,
-            tsi.ActionsExecuteBatchRes,
-            self._stainless_client.services.actions_execute_batch,
-        )
-
     # Cost API
     @validate_call
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:

@@ -54,7 +54,6 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.actions_worker.dispatcher import execute_batch
 
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
@@ -6368,25 +6367,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=create_result.wb_user_id,
             payload=create_result.payload,
         )
-
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        if len(req.call_ids) == 0:
-            return tsi.ActionsExecuteBatchRes()
-        if len(req.call_ids) > 1:
-            # This is temporary until we setup our batching infrastructure
-            raise InvalidRequest(
-                "Batching actions is not yet supported; submit one call_id at a time."
-            )
-
-        # For now, we just execute in-process if it is a single action
-        execute_batch(
-            batch_req=req,
-            trace_server=self,
-        )
-
-        return tsi.ActionsExecuteBatchRes()
 
     @tag_db_insert_path("completions_create")
     def completions_create(

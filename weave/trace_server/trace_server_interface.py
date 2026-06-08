@@ -1593,17 +1593,6 @@ class CostPurgeRes(BaseModel):
     pass
 
 
-class ActionsExecuteBatchReq(BaseModelStrict):
-    project_id: str
-    action_ref: str
-    call_ids: list[str]
-    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
-
-
-class ActionsExecuteBatchRes(BaseModel):
-    pass
-
-
 class ProjectStatsReq(BaseModelStrict):
     project_id: str
     include_trace_storage_size: bool | None = True
@@ -3157,11 +3146,6 @@ class TraceServerInterface(Protocol):
     def feedback_payload_schema(
         self, req: FeedbackPayloadSchemaReq
     ) -> FeedbackPayloadSchemaRes: ...
-
-    # Action API
-    def actions_execute_batch(
-        self, req: ActionsExecuteBatchReq
-    ) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...

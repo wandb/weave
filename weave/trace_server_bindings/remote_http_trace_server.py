@@ -944,17 +944,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.FeedbackPayloadSchemaRes,
         )
 
-    @validate_call
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        return self._generic_request(
-            "/actions/execute_batch",
-            req,
-            tsi.ActionsExecuteBatchReq,
-            tsi.ActionsExecuteBatchRes,
-        )
-
     # Cost API
     @validate_call
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
