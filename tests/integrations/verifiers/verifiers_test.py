@@ -30,7 +30,10 @@ def patch_verifiers() -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
+    # `allowed_hosts` is a no-op for vcr; use vcr's real passthrough so the
+    # clickhouse/wandb HTTP calls bypass the cassette and only the LLM call replays.
+    ignore_localhost=True,
+    ignore_hosts=["api.wandb.ai"],
     allow_playback_repeats=True,
 )
 def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> None:
