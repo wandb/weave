@@ -93,6 +93,11 @@ def pytest_collection_modifyitems(config, items):
 
 
 def get_trace_server_flag(request):
+    # Tests marked `skip_clickhouse_client` run on sqlite: they patch HTTP via VCR,
+    # and a real clickhouse client would emit unmatched localhost traffic.
+    node = getattr(request, "node", None)
+    if node is not None and node.get_closest_marker("skip_clickhouse_client"):
+        return "sqlite"
     if request.config.getoption("--clickhouse"):
         return "clickhouse"
     if request.config.getoption("--sqlite"):
