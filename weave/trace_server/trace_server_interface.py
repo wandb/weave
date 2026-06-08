@@ -3136,10 +3136,11 @@ class EvalResultsQueryBody(BaseModelStrict):
         description="Filters applied to grouped rows. Multiple filters are AND'd together.",
     )
     filter_logic_operator: Literal["and", "or"] = Field(
-        default="and",
+        default="or",
         description=(
             "How to combine filters across evaluations: 'and' (Match All - row must "
-            "match in ALL evals) or 'or' (Match Any - row must match in ANY eval)."
+            "match in ALL evals) or 'or' (Match Any - row must match in ANY eval). "
+            "Defaults to 'or' (Match Any)."
         ),
     )
     limit: int | None = Field(

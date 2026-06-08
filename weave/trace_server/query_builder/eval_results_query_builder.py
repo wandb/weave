@@ -325,14 +325,14 @@ def _build_having_clause(
     filters: list[tsi.EvalResultsFilter] | None,
     require_intersection: bool,
     pb: ParamBuilder,
-    filter_logic_operator: str = "and",
+    filter_logic_operator: str = "or",
 ) -> str:
     """Build the HAVING clause for ranked_digests.
 
     Args:
-        filter_logic_operator: 'and' (Match All) or 'or' (Match Any).
-            - 'and': Row must match filters in ALL evals (default, backward compat)
-            - 'or': Row must match filters in ANY eval
+        filter_logic_operator: 'and' (Match All) or 'or' (Match Any, default).
+            - 'and': Row must match filters in ALL evals
+            - 'or': Row must match filters in ANY eval (default)
     """
     having_parts: list[str] = ["1=1"]
 
@@ -378,7 +378,7 @@ def build_ranked_digests_cte(
     limit: int | None,
     offset: int,
     pb: ParamBuilder,
-    filter_logic_operator: str = "and",
+    filter_logic_operator: str = "or",
 ) -> str:
     """Build ranked_digests, ranked_digest_count, and page_digests CTEs.
 
@@ -497,7 +497,7 @@ def build_eval_results_query(
     offset: int,
     pb: ParamBuilder,
     read_table: str,
-    filter_logic_operator: str = "and",
+    filter_logic_operator: str = "or",
 ) -> str:
     """Build the complete eval_results SQL query.
 
@@ -554,7 +554,7 @@ def build_eval_results_cte_chain(
     offset: int,
     pb: ParamBuilder,
     read_table: str,
-    filter_logic_operator: str = "and",
+    filter_logic_operator: str = "or",
 ) -> str:
     """Build the CTE chain body (without WITH keyword).
 
