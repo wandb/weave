@@ -293,8 +293,7 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 GROUP BY row_digest
                 HAVING 1=1
                     AND countDistinct(eval_call_id) >= {pb_7:UInt64}
-                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_6:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '')) ELSE NULL END)) >= {pb_8:Float64})
-                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_9:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '')) ELSE NULL END)) <= {pb_10:Float64})
+                    AND (((toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_6:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '')) ELSE NULL END)) >= {pb_8:Float64})) OR ((toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_9:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '')) ELSE NULL END)) <= {pb_10:Float64})))
             ),
 
             ranked_digest_count AS (
@@ -429,7 +428,7 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                 FROM predict_and_score_calls_resolved
                 GROUP BY row_digest
                 HAVING 1=1
-                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_5:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '')) ELSE NULL END)) >= {pb_6:Float64})
+                    AND (((toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_5:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '')) ELSE NULL END)) >= {pb_6:Float64})))
             ),
 
             ranked_digest_count AS (
@@ -609,11 +608,11 @@ def test_full_query_calls_merged() -> None:
     )
 
 
-def test_filter_logic_operator_defaults_to_and() -> None:
-    """Verify that omitting filter_logic_operator produces same SQL as explicit 'and'.
+def test_filter_logic_operator_defaults_to_or() -> None:
+    """Verify that omitting filter_logic_operator produces same SQL as explicit 'or'.
 
-    This ensures backward compatibility: frontends that don't send the new
-    parameter get Match All behavior.
+    The default is Match Any: frontends that don't send the new parameter get
+    'or' (a row matches if it satisfies the filters in ANY eval).
     """
     # Build with default (no filter_logic_operator specified)
     pb_default = ParamBuilder("pb")
@@ -649,10 +648,10 @@ def test_filter_logic_operator_defaults_to_and() -> None:
         offset=0,
         pb=pb_default,
         read_table="calls_complete",
-        # filter_logic_operator not specified - should default to "and"
+        # filter_logic_operator not specified - should default to "or"
     )
 
-    # Build with explicit "and"
+    # Build with explicit "or"
     pb_explicit = ParamBuilder("pb")
     cte_explicit = build_eval_results_cte_chain(
         project_id="proj-1",
@@ -664,7 +663,7 @@ def test_filter_logic_operator_defaults_to_and() -> None:
         offset=0,
         pb=pb_explicit,
         read_table="calls_complete",
-        filter_logic_operator="and",
+        filter_logic_operator="or",
     )
 
     # Both should produce identical SQL
@@ -752,6 +751,137 @@ def test_filter_logic_operator_or_produces_match_any() -> None:
                 HAVING 1=1
                     AND countDistinct(eval_call_id) >= {pb_5:UInt64}
                     AND (((toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_7:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '')) ELSE NULL END)) >= {pb_8:Float64})) OR ((toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_9:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '')) ELSE NULL END)) <= {pb_10:Float64})))
+            ),
+
+            ranked_digest_count AS (
+                SELECT count(*) AS total_rows FROM ranked_digests
+            ),
+
+            page_digests AS (
+                SELECT row_digest, row_order
+                FROM ranked_digests
+                ORDER BY row_order
+                LIMIT 10
+                OFFSET 0
+            ),
+
+            page_resolved_inputs AS (
+                SELECT digest, any(val_dump) AS val_dump
+                FROM table_rows
+                PREWHERE project_id = {pb_0:String}
+                WHERE digest IN (SELECT row_digest FROM page_digests)
+                GROUP BY digest
+            ),
+
+            page_rows AS (
+                SELECT predict_and_score_calls_resolved.call_id AS call_id,
+                    predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
+                    predict_and_score_calls_resolved.row_digest AS row_digest,
+                    page_digests.row_order AS row_order,
+                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                FROM predict_and_score_calls_resolved
+                INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
+                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
+            )
+            """,
+        pb.get_params(),
+        {
+            "pb_0": "proj-1",
+            "pb_1": ["eval-1", "eval-2"],
+            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+            "pb_4": SENTINEL_EPOCH,
+            "pb_5": 2,
+            "pb_6": '$."scores"."accuracy"',
+            "pb_7": "eval-1",
+            "pb_8": 0.5,
+            "pb_9": "eval-2",
+            "pb_10": 0.9,
+        },
+    )
+
+
+def test_filter_logic_operator_and_produces_match_all() -> None:
+    """Filter logic 'and' (Match All) flat-ANDs every per-eval condition.
+
+    With two filters scoped to different evals (eval-1: accuracy >= 0.5,
+    eval-2: accuracy <= 0.9), the HAVING clause should be:
+        (eval1_condition) AND (eval2_condition)
+    instead of the default Match Any:
+        ((eval1_condition)) OR ((eval2_condition))
+    """
+    pb = ParamBuilder("pb")
+    filters = [
+        tsi.EvalResultsFilter(
+            evaluation_call_id="eval-1",
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$gte": [{"$getField": "scores.accuracy"}, {"$literal": 0.5}]
+                    }
+                }
+            ),
+        ),
+        tsi.EvalResultsFilter(
+            evaluation_call_id="eval-2",
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$lte": [{"$getField": "scores.accuracy"}, {"$literal": 0.9}]
+                    }
+                }
+            ),
+        ),
+    ]
+    cte = build_eval_results_cte_chain(
+        project_id="proj-1",
+        eval_root_ids=["eval-1", "eval-2"],
+        sort_by=None,
+        filters=filters,
+        require_intersection=True,
+        limit=10,
+        offset=0,
+        pb=pb,
+        read_table="calls_complete",
+        filter_logic_operator="and",
+    )
+    # With AND logic, each per-eval condition is flat-AND'd in the HAVING clause
+    # (no OR grouping, no extra wrapping parens)
+    assert_raw_sql(
+        cte,
+        """
+            predict_and_score_calls AS (
+                SELECT calls_complete.id AS call_id,
+                    calls_complete.parent_id AS eval_call_id,
+                    calls_complete.inputs_dump,
+                    calls_complete.output_dump,
+                    CASE
+                        WHEN position(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/') > 0
+                            THEN regexpExtract(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/([^/]+)$', 1)
+                        ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
+                    END AS row_digest
+                FROM calls_complete
+                PREWHERE calls_complete.project_id = {pb_0:String}
+                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
+                    AND calls_complete.id NOT IN {pb_1:Array(String)}
+                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
+                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
+            ),
+
+            predict_and_score_calls_resolved AS (
+                SELECT * FROM predict_and_score_calls
+            ),
+
+            ranked_digests AS (
+                SELECT row_digest,
+                    ROW_NUMBER() OVER(ORDER BY row_digest ASC) AS row_order
+                FROM predict_and_score_calls_resolved
+                GROUP BY row_digest
+                HAVING 1=1
+                    AND countDistinct(eval_call_id) >= {pb_5:UInt64}
+                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_7:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '')) ELSE NULL END)) >= {pb_8:Float64})
+                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_9:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_6:String}), 'null'), '')) ELSE NULL END)) <= {pb_10:Float64})
             ),
 
             ranked_digest_count AS (
