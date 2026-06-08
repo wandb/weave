@@ -1,0 +1,55 @@
+## Conversation
+While reviewing the agent-span Graphite stack (api -> client -> skill), the
+user noticed binding-code changes appeared to live on the skill branch and
+asked why a "skill" touches server binding code. Root cause: earlier in the
+session (when HEAD was still andrew/agent-span-get-client) I implemented a
+review comment — "add ALL the tsi methods to RemoteHTTPTraceServer ... for
+completeness" — editing remote_http_trace_server.py + test_agent_spans_remote.py
+as UNCOMMITTED changes. The Conductor checkout later moved to the top of the
+stack (andrew/agent-span-tracing-skill, created by another workspace), and the
+uncommitted edits rode along, stranding binding work on the skill branch's
+working tree. User said "update the stack" -> relocate these changes to
+andrew/agent-span-get-api (where the bindings commit 98d1877 lives) and restack.
+
+## Actions
+- gt checkout andrew/agent-span-get-api (uncommitted edits carried over cleanly;
+  the 2 files are byte-identical across api/client/skill, so no conflict).
+- uvx ruff check -> clean.
+- Committed here as a NEW commit (did NOT amend 98d1877 to avoid rewriting its
+  SHA and orphaning its note).
+
+## What this commit does
+Binds the 9 previously-unbound TraceServerInterface methods. Key finding:
+RemoteHTTPTraceServer inherits the Protocol, so an unbound method silently
+returns None (Protocol `...` body) instead of raising — completeness is a
+correctness fix, not cosmetics. Verified all 115 Protocol methods are now
+genuinely defined (none inherited-stub-only).
+- 6 agent methods: genai_otel_export (NotImplementedError stub, protobuf
+  ingest, mirrors otel_export), agent_agents_query (/agents/query),
+  agent_versions_query (/agents/agent-versions/query), agent_search
+  (/agents/search), agent_traces_chat (/agents/traces/chat),
+  agent_conversation_chat (/agents/conversations/chat).
+- 3 non-agent: call_stats (/calls/stats), calls_score (/calls/score),
+  eval_results_query (/v2/{entity}/{project}/eval_results/query).
+
+## Hints for Future Agents
+- eval_results_query is the only non-trivial binding: its core route
+  (object_router) takes entity/project from the PATH and a project-LESS body
+  (EvalResultsQueryBody). Both EvalResultsQueryReq and ...Body are strict
+  (extra=forbid), so you MUST strip project_id: post
+  EvalResultsQueryBody(**req.model_dump(exclude={'project_id'})) — posting the
+  full Req 422s on the extra project_id field.
+- genai_otel_export is a deliberate NotImplementedError: the route
+  (/agents/otel/v1/traces) is protobuf and clients ingest server-side via the
+  OTel path, not through this binding (same stance as otel_export).
+- Tests mock the weave.utils.http_requests.post boundary and assert
+  route + parsed response; genai_otel_export test asserts NotImplementedError.
+- Live-verified the read path against megatruong/codex-test1 on
+  trace.wandb.ai before relocating: get_agent_spans + filter + to_pandas work.
+
+## Open Questions
+- Whether call_stats/calls_score/eval_results_query should stay on this
+  bindings PR or move to their own (they're unrelated to agents). Left here
+  per the "ALL tsi methods" instruction; trivial to split.
+- get_agent_spans return-shape ergonomics (dict vs typed AgentSpanSchema) is
+  still open on the get-client branch; not addressed here.
