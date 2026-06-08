@@ -1,0 +1,23 @@
+## Conversation
+Second burndown PR (validation_util) in the user's 'one shared file per PR,
+confirm it is gone' series.
+
+## What
+weave.shared.validation_util split: CHValidationError (referenced by the contract
+weave.shared.errors, registered -> 400, and by client tests) moved INTO
+weave.shared.errors; the validator functions (server-only) moved to
+weave/trace_server/validation_util.py (which imports CHValidationError from
+weave.shared.errors, so `validation_util.CHValidationError` still resolves and
+validation.py needs no body change). Repointed validation.py import, the
+generator (CHValidationError<-errors, require_*<-trace_server), and 2 tests.
+
+## Verification
+weave/shared/validation_util.py GONE. import-linter 4/0. import weave OK
+(CHValidationError identity asserted equal across errors + validation_util).
+generator output byte-identical. conformance 19 passed. ruff+ty clean.
+
+## Hint / cross-PR
+test_clickhouse_batching.py ALSO had a dangling `from weave.shared.digest import
+str_digest` (str_digest moved in the earlier server-digest PR, which missed test
+importers). That is fixed in the server-digest PR, not here. Full test validation
+of this PR completes after that fix restacks up.
