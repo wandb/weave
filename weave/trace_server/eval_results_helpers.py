@@ -11,7 +11,7 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import ValidationError
 
@@ -22,10 +22,14 @@ from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 
+if TYPE_CHECKING:
+    from ddtrace.trace import Tracer
+
+tracer: "Tracer | None"
 try:
     from ddtrace.trace import tracer
 except ImportError:
-    tracer = None  # type: ignore[assignment]
+    tracer = None
 
 F = TypeVar("F", bound=Callable[..., Any])
 
