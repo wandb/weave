@@ -276,6 +276,58 @@ describe('LLM (via Turn.startLLM)', () => {
       turn.end();
     });
 
+    it('LLMInit.startTime backdates the span start time', () => {
+      const turn = Turn.create({});
+      const startedAt = new Date('2026-01-01T00:00:00Z');
+      const endedAt = new Date('2026-01-01T00:00:05Z');
+      const llm = turn.startLLM({model: 'gpt-4o', startTime: startedAt});
+      llm.end({endTime: endedAt});
+      turn.end();
+
+      const spans = getExporter().getFinishedSpans();
+      const llmSpan = findSpan(spans, 'chat');
+      const MS_PER_SECOND = 1000;
+      expect(llmSpan.startTime[0]).toBe(
+        Math.floor(startedAt.getTime() / MS_PER_SECOND)
+      );
+      expect(llmSpan.endTime[0]).toBe(
+        Math.floor(endedAt.getTime() / MS_PER_SECOND)
+      );
+    });
+
+    it('setAttribute stamps arbitrary attribute on the chat span', () => {
+      const turn = Turn.create({});
+      const llm = turn.startLLM({model: 'gpt-4o'});
+      llm.setAttribute('gen_ai.response.id', 'resp-abc');
+      llm.setAttribute('gen_ai.response.finish_reasons', ['stop']);
+      llm.setAttribute('gen_ai.output.type', 'text');
+      llm.end();
+      turn.end();
+
+      const spans = getExporter().getFinishedSpans();
+      const llmSpan = findSpan(spans, 'chat');
+      expect(llmSpan.attributes['gen_ai.response.id']).toBe('resp-abc');
+      expect(llmSpan.attributes['gen_ai.response.finish_reasons']).toEqual([
+        'stop',
+      ]);
+      expect(llmSpan.attributes['gen_ai.output.type']).toBe('text');
+    });
+
+    it('setAttribute is a no-op after end() and warns', () => {
+      const turn = Turn.create({});
+      const llm = turn.startLLM({model: 'gpt-4o'});
+      llm.end();
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      llm.setAttribute('weave.too_late', 'x');
+      turn.end();
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
+
+      const spans = getExporter().getFinishedSpans();
+      const llmSpan = findSpan(spans, 'chat');
+      expect(llmSpan.attributes['weave.too_late']).toBeUndefined();
+    });
+
     it('accumulators called after end() warn and do not mutate state', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 

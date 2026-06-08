@@ -1,8 +1,10 @@
 import {
+  type AttributeValue,
   type Context,
   type Span,
   SpanKind,
   SpanStatusCode,
+  type TimeInput,
   trace,
 } from '@opentelemetry/api';
 
@@ -30,6 +32,8 @@ import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
 export interface LLMInit {
   model: string;
   providerName?: string;
+  /** Backdate the span's start time. Used when reconstructing chat spans from post-hoc data (e.g. transcript replay). */
+  startTime?: TimeInput;
 }
 
 /** Discriminated union for `LLM.attachMedia`: pick one of content / uri / fileId. */
@@ -119,7 +123,11 @@ export class LLM {
     }
     const span = tracer.startSpan(
       'chat',
-      {kind: SpanKind.CLIENT, attributes},
+      {
+        kind: SpanKind.CLIENT,
+        attributes,
+        ...(opts.startTime !== undefined ? {startTime: opts.startTime} : {}),
+      },
       opts.parentContext
     );
     const llm = new LLM(
@@ -213,6 +221,15 @@ export class LLM {
     return this;
   }
 
+  /** Set an attribute on the chat span. Useful for `gen_ai.response.{model,id,finish_reasons}` and `gen_ai.output.type`. No-op (with warning) after `end()`. */
+  setAttribute(key: string, value: AttributeValue): this {
+    if (this._warnIfEnded('setAttribute')) {
+      return this;
+    }
+    this.span.setAttribute(key, value);
+    return this;
+  }
+
   // ---------------------------------------------------------------------------
   // Child factories
   // ---------------------------------------------------------------------------
@@ -239,11 +256,8 @@ export class LLM {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
-  /**
-   * Flush accumulated state to the span and close it. Idempotent. Pass
-   * `error` to mark the span as failed.
-   */
-  end(opts?: {error?: Error}): void {
+  /** Flush accumulated state and close the span. Idempotent. Pass `error` to mark failed; pass `endTime` to backdate the close. */
+  end(opts?: {error?: Error; endTime?: TimeInput}): void {
     if (this._ended) {
       return;
     }
@@ -303,7 +317,7 @@ export class LLM {
         message: opts.error.message,
       });
     }
-    this.span.end();
+    this.span.end(opts?.endTime);
     const state = _getGenaiState();
     if (state.llm === this) {
       state.llm = null;
