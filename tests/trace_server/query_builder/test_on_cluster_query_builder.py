@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
+from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_delete_query,
@@ -186,8 +187,6 @@ def test_calls_complete_table_resolution_by_mode(
         env_vars["WF_CLICKHOUSE_REPLICATED_CLUSTER"] = cluster_name
 
     with patch.dict("os.environ", env_vars, clear=False):
-        from weave.trace_server import environment as wf_env
-
         table_name = (
             "calls_complete_local"
             if wf_env.wf_clickhouse_use_distributed_tables()
@@ -205,52 +204,78 @@ def test_calls_complete_table_resolution_by_mode(
 
 
 @pytest.mark.parametrize(
-    ("cluster_name", "on_cluster"),
-    [(None, ""), (CLUSTER, f" ON CLUSTER {CLUSTER}")],
-    ids=["cloud", "clustered"],
+    ("use_distributed", "cluster_name", "on_cluster"),
+    [
+        # Cloud mode: no cluster, plain table.
+        (False, None, ""),
+        # Replicated mode: cluster set, but NOT distributed -> no _local.
+        (False, CLUSTER, f" ON CLUSTER {CLUSTER}"),
+        # Distributed mode: DELETE must hit <table>_local on the cluster.
+        (True, CLUSTER, f" ON CLUSTER {CLUSTER}"),
+    ],
+    ids=["cloud", "replicated", "distributed"],
 )
 def test_purge_delete_honors_caller_table_and_cluster(
-    cluster_name: str | None, on_cluster: str
+    use_distributed: bool, cluster_name: str | None, on_cluster: str
 ) -> None:
-    """feedback/cost purge DELETE targets the caller's table_name + ON CLUSTER (WB-35378)."""
-    feedback = (
-        TABLE_FEEDBACK.purge()
-        .project_id("proj")
-        .where(
-            tsi.Query(**{"$expr": {"$eq": [{"$getField": "id"}, {"$literal": "abc"}]}})
-        )
-        .prepare(
-            database_type="clickhouse",
-            param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
-            table_name="feedback",
-            cluster_name=cluster_name,
-        )
-    )
-    assert feedback.sql == (
-        f"DELETE FROM feedback{on_cluster}\n"
-        "WHERE ((project_id = {project_id:String}) AND ((id = {p_1:String})))"
-    )
-    assert feedback.parameters == {"project_id": "proj", "p_1": "abc"}
+    """feedback/cost purge DELETE routes to the _local table + ON CLUSTER in distributed mode (WB-35378).
 
-    cost = (
-        LLM_TOKEN_PRICES_TABLE.purge()
-        .where(
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$eq": [{"$getField": "pricing_level_id"}, {"$literal": "proj"}]
-                    }
-                }
+    Drives table resolution through the same env wiring the batched server uses
+    (_mutation_table_name + clickhouse_cluster_name), so the distributed _local
+    routing -- the thing that was broken -- is asserted, not just the cloud path.
+    """
+    env_vars = {"WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES": str(use_distributed).lower()}
+    if cluster_name:
+        env_vars["WF_CLICKHOUSE_REPLICATED_CLUSTER"] = cluster_name
+
+    with patch.dict("os.environ", env_vars, clear=False):
+        suffix = "_local" if wf_env.wf_clickhouse_use_distributed_tables() else ""
+        resolved_cluster = wf_env.wf_clickhouse_replicated_cluster()
+
+        feedback = (
+            TABLE_FEEDBACK.purge()
+            .project_id("proj")
+            .where(
+                tsi.Query(
+                    **{"$expr": {"$eq": [{"$getField": "id"}, {"$literal": "abc"}]}}
+                )
+            )
+            .prepare(
+                database_type="clickhouse",
+                param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
+                table_name=f"feedback{suffix}",
+                cluster_name=resolved_cluster,
             )
         )
-        .prepare(
-            database_type="clickhouse",
-            param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
-            table_name="llm_token_prices",
-            cluster_name=cluster_name,
+        assert feedback.sql == (
+            f"DELETE FROM feedback{suffix}{on_cluster}\n"
+            "WHERE ((project_id = {project_id:String}) AND ((id = {p_1:String})))"
         )
-    )
-    assert cost.sql == (
-        f"DELETE FROM llm_token_prices{on_cluster}\nWHERE (pricing_level_id = {{p_0:String}})"
-    )
-    assert cost.parameters == {"p_0": "proj"}
+        assert feedback.parameters == {"project_id": "proj", "p_1": "abc"}
+
+        cost = (
+            LLM_TOKEN_PRICES_TABLE.purge()
+            .where(
+                tsi.Query(
+                    **{
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "pricing_level_id"},
+                                {"$literal": "proj"},
+                            ]
+                        }
+                    }
+                )
+            )
+            .prepare(
+                database_type="clickhouse",
+                param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
+                table_name=f"llm_token_prices{suffix}",
+                cluster_name=resolved_cluster,
+            )
+        )
+        assert cost.sql == (
+            f"DELETE FROM llm_token_prices{suffix}{on_cluster}\n"
+            "WHERE (pricing_level_id = {p_0:String})"
+        )
+        assert cost.parameters == {"p_0": "proj"}

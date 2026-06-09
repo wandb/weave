@@ -363,6 +363,7 @@ class Select:
         table_name: str | None = None,
         cluster_name: str | None = None,
     ) -> PreparedSelect:
+        """`table_name` overrides only the FROM (a same-schema physical variant like `<t>_local`), not joins."""
         param_builder = param_builder or ParamBuilder(None, database_type)
         assert database_type == param_builder.database_type
 
