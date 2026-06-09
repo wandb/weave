@@ -1,0 +1,26 @@
+<!-- Server-side defaults applied only to test CH clusters. Mounted into
+     /etc/clickhouse-server/users.d/ by the topology compose files so every
+     connection from every test thread inherits these as profile defaults.
+
+     distributed_foreground_insert=1: by default ClickHouse buffers a
+     Distributed INSERT locally and forwards async to the destination shard,
+     so an immediate SELECT against the Distributed wrapper can miss the
+     row. Tests rely on read-after-write semantics, so we force foreground
+     fan-out here.
+
+     load_balancing=in_order: Distributed reads always go to the first
+     healthy replica per shard, so they hit the same replica that received
+     the recent write (no replication-lag race for read-after-write).
+     Production runs hit many replicas for load spreading; tests don't
+     need that and trade it for determinism.
+
+     Production servers do NOT mount this file; deployments that want sync
+     semantics set these themselves. -->
+<clickhouse>
+    <profiles>
+        <default>
+            <distributed_foreground_insert>1</distributed_foreground_insert>
+            <load_balancing>in_order</load_balancing>
+        </default>
+    </profiles>
+</clickhouse>

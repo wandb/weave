@@ -40,6 +40,7 @@ from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
+    ObjectNameTypeCollision,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -1915,6 +1916,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # Validate
         object_id_validator(object_id)
 
+        kind = get_kind(processed_val)
         with self.lock:
             if self._obj_exists(cursor, project_id, object_id, digest):
                 # Even on dedup: move "latest" alias to this digest.
@@ -1924,6 +1926,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 )
                 conn.commit()
                 return tsi.ObjCreateRes(digest=digest, object_id=object_id)
+
+            self._reject_obj_name_type_collision(
+                cursor=cursor,
+                project_id=project_id,
+                object_id=object_id,
+                kind=kind,
+                new_base_object_class=digest_result.base_object_class,
+            )
 
             # Use IMMEDIATE transaction to acquire write lock immediately, preventing
             # race conditions where concurrent transactions read stale version_index values.
@@ -1964,7 +1974,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     project_id,
                     object_id,
                     datetime.datetime.now().isoformat(),
-                    get_kind(processed_val),
+                    kind,
                     digest_result.base_object_class,
                     digest_result.leaf_object_class,
                     json.dumps([]),
@@ -1995,6 +2005,40 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if return_row is None:
             return False
         return return_row[0] > 0
+
+    def _reject_obj_name_type_collision(
+        self,
+        cursor: sqlite3.Cursor,
+        project_id: str,
+        object_id: str,
+        kind: str,
+        new_base_object_class: str | None,
+    ) -> None:
+        """Reject obj_create when (project_id, object_id) already exists with a
+        different base_object_class. Names are bound to one type per project
+        (WB-30574). Weave refs do not carry type, so allowing same-name
+        different-type would make refs ambiguous.
+        """
+        cursor.execute(
+            """
+            SELECT DISTINCT base_object_class
+            FROM objects
+            WHERE project_id = ?
+                AND object_id = ?
+                AND kind = ?
+                AND deleted_at IS NULL
+            """,
+            (project_id, object_id, kind),
+        )
+        existing_classes = [row[0] for row in cursor.fetchall()]
+        mismatched = [c for c in existing_classes if c != new_base_object_class]
+        if mismatched:
+            raise ObjectNameTypeCollision(
+                object_id=object_id,
+                kind=kind,
+                new_base_object_class=new_base_object_class,
+                existing_base_object_classes=mismatched,
+            )
 
     def _mark_existing_objects_as_not_latest(
         self, cursor: sqlite3.Cursor, project_id: str, object_id: str
@@ -2757,13 +2801,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.FeedbackPayloadSchemaRes:
         """Discover feedback payload schema from SQLite samples."""
         return sqlite_feedback_payload_schema(self, req)
-
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        raise NotImplementedError(
-            "actions_execute_batch is not implemented for SQLite trace server"
-        )
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)

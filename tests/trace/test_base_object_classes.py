@@ -22,6 +22,7 @@ from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import ObjectNameTypeCollision
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyNestedBaseModel,
 )
@@ -1071,4 +1072,84 @@ def test_exclude_base_object_classes_with_inherited_objects(client: WeaveClient)
     assert all(
         obj.base_object_class != "TestOnlyNestedBaseObject"
         for obj in exclude_base_res.objs
+    )
+
+
+def test_obj_create_rejects_name_type_collision(client: WeaveClient):
+    """WB-30574: object_id is bound to one base_object_class per project.
+
+    Creating a new object with an existing object_id but a different
+    base_object_class must be rejected. Otherwise the apparent type of the
+    object changes and prior versions become invisible on the type-filtered
+    assets page.
+    """
+    shared_object_id = "shared_name"
+
+    # First create succeeds with base_object_class=TestOnlyNestedBaseObject.
+    nested_obj = base_objects.TestOnlyNestedBaseObject(b=1)
+    client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": shared_object_id,
+                    "val": nested_obj.model_dump(by_alias=True),
+                    "builtin_object_class": "TestOnlyNestedBaseObject",
+                }
+            }
+        )
+    )
+
+    # Second create with the same object_id but a different base_object_class
+    # must fail loudly. The error message must reference the existing type so
+    # the user understands why the create was rejected.
+    top_obj = base_objects.TestOnlyExample(
+        primitive=1,
+        nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
+        nested_base_object="weave:///fake/fake/object/fake:fake",
+    )
+    with pytest.raises(ObjectNameTypeCollision) as excinfo:
+        client.server.obj_create(
+            tsi.ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": client.project_id,
+                        "object_id": shared_object_id,
+                        "val": top_obj.model_dump(by_alias=True),
+                        "builtin_object_class": "TestOnlyExample",
+                    }
+                }
+            )
+        )
+    assert excinfo.value.object_id == shared_object_id
+    assert excinfo.value.kind == "object"
+    assert excinfo.value.new_base_object_class == "TestOnlyExample"
+    assert excinfo.value.existing_base_object_classes == ["TestOnlyNestedBaseObject"]
+    assert "TestOnlyNestedBaseObject" in str(excinfo.value)
+
+    # And the original type must still be the only one present for that name.
+    objs_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client.project_id,
+                "filter": {"object_ids": [shared_object_id]},
+            }
+        )
+    )
+    assert len(objs_res.objs) == 1
+    assert objs_res.objs[0].base_object_class == "TestOnlyNestedBaseObject"
+
+    # A new version with the SAME base_object_class is still allowed.
+    nested_obj_v2 = base_objects.TestOnlyNestedBaseObject(b=2)
+    client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": shared_object_id,
+                    "val": nested_obj_v2.model_dump(by_alias=True),
+                    "builtin_object_class": "TestOnlyNestedBaseObject",
+                }
+            }
+        )
     )

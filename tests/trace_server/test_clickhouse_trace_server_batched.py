@@ -13,12 +13,16 @@ from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 from tests.trace_server.test_project_version import make_project_id
 from weave.trace_server import ch_sentinel_values
 from weave.trace_server import clickhouse_trace_server_batched as chts
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.clickhouse import AgentWriteHandler
+from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_to_row,
     ch_complete_call_to_row,
 )
+from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
@@ -1089,6 +1093,55 @@ def test_insert_retries_empty_query_error():
         assert mock_ch_client.insert.call_count == 2  # Retried once
 
 
+def test_insert_with_empty_query_retry_contract():
+    """The shared direct-insert helper retries empty query, exhausts, and passes through."""
+    summary = MagicMock()
+
+    # Retry once then succeed.
+    client = MagicMock()
+    client.insert.side_effect = [DatabaseError("Empty query. (SYNTAX_ERROR)"), summary]
+    assert (
+        insert_with_empty_query_retry(client, "spans", data=[[1]], column_names=["a"])
+        is summary
+    )
+    assert client.insert.call_count == 2
+    # The retry must re-send the same rows (fresh generator over the same list).
+    assert client.insert.call_args.kwargs["data"] == [[1]]
+
+    # Empty query on every attempt: exhausts the retry budget then re-raises.
+    client = MagicMock()
+    client.insert.side_effect = DatabaseError("Empty query. (SYNTAX_ERROR)")
+    with pytest.raises(DatabaseError, match="Empty query"):
+        insert_with_empty_query_retry(client, "spans", data=[[1]], column_names=["a"])
+    assert client.insert.call_count == ch_settings.INSERT_MAX_RETRIES
+
+    # Any other database error raises immediately, no retry.
+    client = MagicMock()
+    client.insert.side_effect = DatabaseError("Table does not exist")
+    with pytest.raises(DatabaseError, match="Table does not exist"):
+        insert_with_empty_query_retry(client, "spans", data=[[1]], column_names=["a"])
+    assert client.insert.call_count == 1
+
+
+def test_agent_write_handler_retries_empty_query():
+    """Regression: the agent spans write path retries empty query (was bypassing _insert)."""
+    summary = MagicMock()
+    client = MagicMock()
+    client.insert.side_effect = [DatabaseError("Empty query. (SYNTAX_ERROR)"), summary]
+    span = AgentSpanCHInsertable(
+        project_id="entity/project",
+        trace_id="trace-1",
+        span_id="span-1",
+        span_name="chat",
+        started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+    AgentWriteHandler(client).insert_span(span)
+
+    assert client.insert.call_count == 2
+    assert client.insert.call_args.args[0] == "spans"
+
+
 def test_ensure_obj_version_exists_retries_eventual_consistency():
     """Object-version existence checks should tolerate transient read-after-write misses."""
     server = chts.ClickHouseTraceServer(host="test_host")
@@ -1286,10 +1339,17 @@ def server_with_mock_kafka():
     mock_ch_client.command.return_value = None
     mock_ch_client.insert.return_value = MagicMock()
 
-    # Mock query to return empty project (resolves to CALLS_MERGED write target)
-    mock_query_result = MagicMock()
-    mock_query_result.result_rows = [(None, None)]
-    mock_ch_client.query.return_value = mock_query_result
+    # Empty residence (resolves v2 writes to calls_complete); the calls_complete
+    # end path then reads the stored started_at, so return one for that query.
+    def _query_side_effect(query, *args, **kwargs):
+        result = MagicMock()
+        if "started_at" in query:
+            result.result_rows = [(dt.datetime.now(dt.timezone.utc),)]
+        else:
+            result.result_rows = [(None, None)]
+        return result
+
+    mock_ch_client.query.side_effect = _query_side_effect
 
     mock_producer = MagicMock()
 

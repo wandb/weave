@@ -594,6 +594,7 @@ class CallsFilter(BaseModelStrict):
     turn_ids: list[str] | None = None
     trace_roots_only: bool | None = None
     wb_user_ids: list[str] | None = None
+    # "entity/project/run", or a bare run id (qualified to the queried project).
     wb_run_ids: list[str] | None = None
 
 
@@ -1593,17 +1594,6 @@ class CostPurgeReq(BaseModelStrict):
 
 
 class CostPurgeRes(BaseModel):
-    pass
-
-
-class ActionsExecuteBatchReq(BaseModelStrict):
-    project_id: str
-    action_ref: str
-    call_ids: list[str]
-    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
-
-
-class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
@@ -3160,11 +3150,6 @@ class TraceServerInterface(Protocol):
     def feedback_payload_schema(
         self, req: FeedbackPayloadSchemaReq
     ) -> FeedbackPayloadSchemaRes: ...
-
-    # Action API
-    def actions_execute_batch(
-        self, req: ActionsExecuteBatchReq
-    ) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...

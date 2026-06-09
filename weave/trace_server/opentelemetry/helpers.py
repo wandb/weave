@@ -145,13 +145,39 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
     return current
 
 
+def _list_to_numeric_dict(lst: list) -> dict[str, Any]:
+    """Convert a list to a dict with numeric string keys (inverse of convert_numeric_keys_to_list)."""
+    return {str(i): v for i, v in enumerate(lst)}
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> None:
+    """Deep merge override into base in-place. Override values win at leaves.
+
+    When a key holds a structured value (dict or list) on both sides, merge it
+    recursively via _merge_structure so nested lists index-merge (preserving
+    elements present in only one encoding) instead of being clobbered. Otherwise
+    the override value wins.
+    """
+    for key, value in override.items():
+        if (
+            key in base
+            and isinstance(base[key], (dict, list))
+            and isinstance(value, (dict, list))
+        ):
+            _merge_structure(base, key, value)
+        else:
+            base[key] = value
+
+
 def _validate_structure(d: dict[str, Any], key: str, value: Any) -> None:
     """Ensure setting `value` at dot-path `key` won't corrupt structure.
 
     Validation rules:
     - Disallow placing a primitive at a path that already contains a mapping
       (dict or list).
-    - Disallow descending into a non-dict value for any parent segment.
+    - Disallow descending into a non-dict value for any parent segment
+      (unless the value is a list and the next path segment is a numeric index,
+      which represents redundant OTel attribute encoding).
     - Disallow overwriting an existing mapping at the leaf with a primitive
       when subkeys already exist for that path.
     """
@@ -185,6 +211,9 @@ def _validate_structure(d: dict[str, Any], key: str, value: Any) -> None:
         # we detect that we must descend into a non-dict (primitive) value.
         parent_path = ".".join(parts[: i + 1])
         if part in current and not isinstance(current[part], dict):
+            if isinstance(current[part], list) and parts[i + 1].isdigit():
+                current = _list_to_numeric_dict(current[part])
+                continue
             # We must descend, but parent is a primitive -> conflict
             raise AttributePathConflictError(
                 parent_key=parent_path,
@@ -218,18 +247,46 @@ def _validate_structure(d: dict[str, Any], key: str, value: Any) -> None:
             )
 
 
+def _merge_structure(current: dict, key: str, value: Any) -> None:
+    """Merge a structured value (dict/list) into an existing structured value at key."""
+    existing = current[key]
+    base = _list_to_numeric_dict(existing) if isinstance(existing, list) else existing
+    override = _list_to_numeric_dict(value) if isinstance(value, list) else value
+    _deep_merge(base, override)
+    current[key] = base
+
+
 def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
     """Set a value in a nested dictionary using a dot-separated key."""
     _validate_structure(d, key, value)
     if "." not in key:
+        if (
+            key in d
+            and isinstance(d[key], (dict, list))
+            and isinstance(value, (dict, list))
+        ):
+            _merge_structure(d, key, value)
+            return
         d[key] = value
         return
 
     parts = key.split(".")
     current = d
     for part in parts[:-1]:
+        existing = current.get(part)
+        if isinstance(existing, list):
+            current[part] = _list_to_numeric_dict(existing)
         current = current.setdefault(part, {})
-    current[parts[-1]] = value
+
+    last = parts[-1]
+    if (
+        last in current
+        and isinstance(current[last], (dict, list))
+        and isinstance(value, (dict, list))
+    ):
+        _merge_structure(current, last, value)
+        return
+    current[last] = value
 
 
 def convert_numeric_keys_to_list(

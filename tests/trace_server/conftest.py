@@ -21,6 +21,7 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import (
     clickhouse_trace_server_settings as ch_settings,
 )
+from weave.trace_server import environment as wf_env
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
@@ -142,12 +143,20 @@ def _get_worker_db_suffix(request, default: str = "_test") -> str:
 SEED_DATA_TABLES = frozenset({"llm_token_prices"})
 
 
+def _on_cluster_clause() -> str:
+    """`ON CLUSTER <name>` suffix when replicated, else empty."""
+    if not wf_env.wf_clickhouse_replicated():
+        return ""
+    cluster = wf_env.wf_clickhouse_replicated_cluster()
+    return f" ON CLUSTER {cluster}" if cluster else ""
+
+
 def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
-    """Query system.tables to find non-view tables that can be truncated."""
+    """Non-view, non-Distributed tables eligible for per-test truncate."""
     result = ch_client.query(
         "SELECT name FROM system.tables "
         f"WHERE database = '{database}' "
-        "AND engine NOT IN ('View', 'MaterializedView') "
+        "AND engine NOT IN ('View', 'MaterializedView', 'Distributed') "
         "ORDER BY name"
     )
     return [row[0] for row in result.result_rows if row[0] not in SEED_DATA_TABLES]
@@ -155,8 +164,9 @@ def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
 
 def _truncate_all_tables(ch_client, database: str, tables: list[str]) -> None:
     """Truncate all data tables in the database for test isolation."""
+    on_cluster = _on_cluster_clause()
     for table in tables:
-        ch_client.command(f"TRUNCATE TABLE {database}.{table} SYNC")
+        ch_client.command(f"TRUNCATE TABLE {database}.{table}{on_cluster} SYNC")
 
 
 def _reset_server_state(server: ClickHouseTraceServer) -> None:
@@ -222,13 +232,21 @@ def _ch_session_server(
     )
 
     # Drop and recreate from scratch once
-    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
-    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
+    on_cluster = _on_cluster_clause()
+    ch_server.ch_client.command(
+        f"DROP DATABASE IF EXISTS {management_db}{on_cluster} SYNC"
+    )
+    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}{on_cluster} SYNC")
     ch_server._database_ensured = False
 
     def patched_run_migrations():
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            ch_server._mint_client(), management_db=management_db
+            ch_server._mint_client(),
+            management_db=management_db,
+            replicated=wf_env.wf_clickhouse_replicated(),
+            replicated_path=wf_env.wf_clickhouse_replicated_path(),
+            replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
+            use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
         )
         migrator.apply_migrations(ch_server._database)
 
@@ -251,12 +269,17 @@ def _ch_session_server(
         os.environ["WF_CLICKHOUSE_DATABASE"] = original_db
 
     # Session cleanup: drop databases
+    teardown_on_cluster = _on_cluster_clause()
     try:
-        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
+        ch_server.ch_client.command(
+            f"DROP DATABASE IF EXISTS {management_db}{teardown_on_cluster} SYNC"
+        )
     except Exception:
         pass
     try:
-        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
+        ch_server.ch_client.command(
+            f"DROP DATABASE IF EXISTS {unique_db}{teardown_on_cluster} SYNC"
+        )
     except Exception:
         pass
     try:

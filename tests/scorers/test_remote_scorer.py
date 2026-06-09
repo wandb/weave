@@ -3,12 +3,17 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
+import weave
+from weave.flow.scorer import Scorer
 from weave.scorers.remote_scorer import (
     OAuthClientCredentialsConfig,
     RemoteScorer,
     StaticBearerAuthConfig,
     _validate_remote_scorer_endpoint_url,
 )
+from weave.trace.api import publish
+from weave.trace.object_record import pydantic_object_record
+from weave.trace_server import trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace_server
 
@@ -22,6 +27,29 @@ def test_remote_scorer_fields() -> None:
     assert rs.endpoint_url == "https://scoring.example.com/v1/score"
     assert rs.config == {"threshold": 0.9}
     assert rs.auth_config is None
+
+
+def test_remote_scorer_record_excludes_op_methods() -> None:
+    """WB-33909: RemoteScorer must not serialize score/summarize as op refs.
+
+    Publishing those embeds CustomWeaveType(Op) payloads that the scoring worker
+    rejects (``_assert_safe_scorer_payload``). RemoteScorer opts out via
+    ``_weave_exclude_ops_from_record``; a normal Scorer subclass still records
+    its ops.
+    """
+    rs = RemoteScorer(name="remote", endpoint_url="https://x.example.com/score")
+    record = pydantic_object_record(rs)
+    assert "score" not in record.__dict__
+    assert "summarize" not in record.__dict__
+    assert record.endpoint_url == "https://x.example.com/score"
+    assert record._class_name == "RemoteScorer"
+
+    class _PlainScorer(Scorer):
+        pass
+
+    plain_record = pydantic_object_record(_PlainScorer(name="plain"))
+    assert "score" in plain_record.__dict__
+    assert "summarize" in plain_record.__dict__
 
 
 def test_remote_scorer_oauth_auth_config_serializes_and_deserializes() -> None:
@@ -357,3 +385,77 @@ def test_remote_scorer_score_raises_not_implemented() -> None:
         "RemoteScorer is run by the Weave scoring worker against your HTTPS "
         "endpoint; score() is not part of that path."
     )
+
+
+def test_remote_scorer_with_auth_config_round_trips_via_publish(client) -> None:
+    """Publishing a RemoteScorer with auth_config must reconstruct the typed
+    auth_config on read.
+
+    Regression: the base ``Scorer.from_obj`` leaves the nested ``auth_config`` as
+    a ``WeaveObject`` that the ``extra="forbid"`` union rejects, so ``ref.get()``
+    (and the scoring worker) raised a ``ValidationError``. ``RemoteScorer.from_obj``
+    unwraps it instead.
+    """
+    scorer = RemoteScorer(
+        name="rs_auth",
+        endpoint_url="http://127.0.0.1:8765/score",
+        auth_config=OAuthClientCredentialsConfig(
+            mode="oauth_client_credentials",
+            token_endpoint_url="http://127.0.0.1:8765/token",
+            client_id="cid",
+            client_secret_name="SEC",
+            scope="s",
+        ),
+    )
+    ref = publish(scorer, name="rs_auth")
+
+    gotten = ref.get()
+    assert isinstance(gotten, RemoteScorer)
+    assert isinstance(gotten.auth_config, OAuthClientCredentialsConfig)
+    assert gotten.auth_config.client_id == "cid"
+    assert gotten.auth_config.client_secret_name == "SEC"
+    # Secret values are never embedded — only the secret name.
+    assert gotten.endpoint_url == "http://127.0.0.1:8765/score"
+
+
+def test_remote_scorer_from_ui_shape_with_extra_fields_loads(client) -> None:
+    """A UI-created RemoteScorer carries extra fields and a plain auth_config dict.
+
+    The UI persists ``is_traced`` (not a RemoteScorer field) and ``auth_config``
+    as a plain dict. ``from_obj`` must drop unknown fields and type the
+    auth_config so the scoring worker can load it. Regression: ``model_validate``
+    on the raw unwrapped val rejected ``is_traced`` under ``extra="forbid"``.
+    """
+    object_id = "remote_ui_scorer"
+    val = {
+        "_type": "RemoteScorer",
+        "_class_name": "RemoteScorer",
+        "_bases": ["RemoteScorer", "Scorer", "Object", "BaseModel"],
+        "name": object_id,
+        "description": "created from the UI",
+        "column_map": None,
+        "endpoint_url": "http://127.0.0.1:8765/score",
+        "config": None,
+        "is_traced": True,  # extra field the model does not declare
+        "auth_config": {
+            "mode": "oauth_client_credentials",
+            "token_endpoint_url": "http://127.0.0.1:8765/token",
+            "client_id": "cid",
+            "client_secret_name": "SEC",
+            "scope": "s",
+        },
+    }
+    res = client.server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=client.project_id, object_id=object_id, val=val
+            )
+        )
+    )
+    uri = f"weave:///{client.entity}/{client.project}/object/{object_id}:{res.digest}"
+
+    gotten = weave.ref(uri).get()
+    assert isinstance(gotten, RemoteScorer)
+    assert isinstance(gotten.auth_config, OAuthClientCredentialsConfig)
+    assert gotten.auth_config.client_id == "cid"
+    assert not hasattr(gotten, "is_traced")

@@ -5,6 +5,7 @@ from gql.transport.exceptions import TransportServerError
 from weave.trace_server.errors import (
     InvalidFieldError,
     InvalidRequest,
+    ObjectNameTypeCollision,
     handle_clickhouse_query_error,
     handle_server_exception,
 )
@@ -51,3 +52,25 @@ def test_invalid_field_error_maps_to_422() -> None:
     """
     result = handle_server_exception(InvalidFieldError("Field 'foo' is not allowed"))
     assert result.status_code == 422
+
+
+def test_object_name_type_collision_maps_to_400() -> None:
+    """Name+type collision is a fixable user error -> 400 with an actionable reason,
+    not 500. The registry matches by exact type, so the InvalidRequest subclass must
+    be registered explicitly.
+    """
+    exc = ObjectNameTypeCollision(
+        object_id="my-object",
+        kind="object",
+        new_base_object_class="Prompt",
+        existing_base_object_classes=[None],
+    )
+    result = handle_server_exception(exc)
+    assert result.status_code == 400
+    assert result.message == {
+        "reason": (
+            "Cannot publish 'my-object' as a Prompt: that name is already used "
+            "by a generic (untyped) object in this project. Object versions "
+            "cannot share types, publish this object under a different name."
+        )
+    }

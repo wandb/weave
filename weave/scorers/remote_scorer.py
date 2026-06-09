@@ -1,13 +1,15 @@
 """Customer-hosted remote HTTP scorer configuration."""
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing_extensions import Self
 
 from weave.flow.scorer import Scorer
 from weave.trace.objectify import register_object
 from weave.trace.op import op
+from weave.trace.vals import WeaveObject
 
 
 class StaticBearerAuthConfig(BaseModel):
@@ -111,6 +113,11 @@ class RemoteScorer(Scorer):
         'https://scoring.example.com/v1/score'
     """
 
+    # score()/summarize() are never executed in user code (the scoring worker
+    # POSTs to endpoint_url), so don't serialize them as op refs on publish.
+    # See pydantic_object_record / WB-33909.
+    _weave_exclude_ops_from_record: ClassVar[bool] = True
+
     @field_validator("endpoint_url", mode="before")
     @classmethod
     def strip_endpoint_url_whitespace(cls, v: Any) -> Any:
@@ -151,6 +158,25 @@ class RemoteScorer(Scorer):
         raise NotImplementedError(
             "RemoteScorer is run by the Weave scoring worker against your HTTPS "
             "endpoint; score() is not part of that path."
+        )
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        """Rebuild a RemoteScorer from its stored representation.
+
+        ``unwrap()`` converts the stored object — including nested fields such
+        as ``auth_config`` — back into plain Python values before validation.
+        Without it, a nested ``auth_config`` arrives wrapped and fails to
+        validate.
+
+        Only known model fields are kept: stored objects can carry extra fields
+        the model doesn't declare (e.g. ``is_traced`` on UI-created scorers), and
+        ``Object`` is ``extra="forbid"``, so those must be dropped rather than
+        rejected.
+        """
+        data = obj.unwrap()
+        return cls.model_validate(
+            {k: v for k, v in data.items() if k in cls.model_fields}
         )
 
 

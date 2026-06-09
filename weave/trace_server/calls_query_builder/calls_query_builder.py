@@ -3473,6 +3473,26 @@ def build_calls_complete_delete_query(
     return safely_format_sql(raw_sql, logger)
 
 
+def build_calls_complete_started_at_select_query(
+    table_name: str,
+    project_id_param: str,
+    id_param: str,
+    started_at_param: str | None = None,
+) -> str:
+    """Build a query that reads a call's stored started_at.
+
+    When started_at_param is given, the WHERE clause uses the full primary key
+    (project_id, started_at, id) for a point lookup. Otherwise it falls back to
+    (project_id, id), which scans the project's granules.
+    """
+    where = f"project_id = {{{project_id_param}:String}}"
+    if started_at_param is not None:
+        where += f" AND started_at = fromUnixTimestamp64Micro({{{started_at_param}:Int64}}, 'UTC')"
+    where += f" AND id = {{{id_param}:String}}"
+    raw_sql = f"SELECT started_at FROM {table_name} WHERE {where} LIMIT 1"
+    return safely_format_sql(raw_sql, logger)
+
+
 def build_calls_complete_update_query(
     table_name: str,
     project_id_param: str,

@@ -24,7 +24,6 @@ def patch_groq() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_quickstart(
     client: weave.trace.weave_client.WeaveClient,
@@ -73,7 +72,6 @@ def test_groq_quickstart(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_groq_async_chat_completion(
@@ -135,7 +133,6 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_streaming_chat_completion(
     client: weave.trace.weave_client.WeaveClient,
@@ -214,7 +211,6 @@ In summary, fast language models have revolutionized the field of NLP, enabling 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_groq_async_streaming_chat_completion(
@@ -285,7 +281,6 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_tool_call(
     client: weave.trace.weave_client.WeaveClient,

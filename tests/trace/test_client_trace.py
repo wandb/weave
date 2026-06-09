@@ -950,6 +950,26 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
 
         assert len(inner_res.calls) == exp_count
 
+    # Bare run ids are qualified to the query's entity/project, so they resolve
+    # to the same calls as their fully-qualified form (and can be mixed).
+    for wb_run_ids, exp_count in [
+        (["test-run-1"], call_spec_1.total_calls),
+        ([full_wb_run_id_1], call_spec_1.total_calls),
+        (
+            ["test-run-1", full_wb_run_id_2],
+            call_spec_1.total_calls + call_spec_2.total_calls,
+        ),
+    ]:
+        got = list(client.get_calls(filter=tsi.CallsFilter(wb_run_ids=wb_run_ids)))
+        assert len(got) == exp_count
+        stats = get_client_trace_server(client).calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.CallsFilter(wb_run_ids=wb_run_ids),
+            )
+        )
+        assert stats.count == exp_count
+
 
 # Flaky against ClickHouse in CI: read-after-write visibility lag means a
 # calls_query right after flush can miss just-written rows. Rerun to absorb it.
@@ -1042,29 +1062,34 @@ def test_trace_call_query_timings(client, no_autoflush):
     even_later = later + datetime.timedelta(seconds=1)
 
     num_calls = 100
-
-    # Create calls with controlled timing - mock only datetime.datetime.now()
     call_index = 0
 
-    def mock_now(*args, **kwargs):
-        nonlocal call_index
-        # Each create_call increments the index once at the start
-        # Return the appropriate time based on which call we're processing
+    def pick_now() -> datetime.datetime:
         if call_index <= num_calls - 3:  # calls 0-97 get 'now'
             return now
         elif call_index == num_calls - 2:  # call 98 gets 'later'
             return later
-        else:  # call 99 gets 'even_later'
-            return even_later
+        return even_later  # call 99 gets 'even_later'
 
-    with mock.patch(
-        "weave.trace.weave_client.datetime.datetime"
-    ) as mock_datetime_class:
-        # Mock only the .now() method, keep everything else as-is
-        mock_datetime_class.now = mock.Mock(side_effect=mock_now)
-        # Preserve other datetime functionality
-        mock_datetime_class.side_effect = datetime.datetime
+    # Subclass real datetime rather than a MagicMock so concurrent batch-processor
+    # threads running `isinstance(x, datetime.datetime)` during this window don't
+    # hit "arg 2 must be a type".
+    class MockDatetime(datetime.datetime):
+        @classmethod
+        def now(cls, tz: datetime.tzinfo | None = None) -> "MockDatetime":
+            t = pick_now()
+            return cls(
+                t.year,
+                t.month,
+                t.day,
+                t.hour,
+                t.minute,
+                t.second,
+                t.microsecond,
+                tzinfo=t.tzinfo,
+            )
 
+    with mock.patch("weave.trace.weave_client.datetime.datetime", MockDatetime):
         for i in range(num_calls):
             call_index = i
             client.create_call("y", {"a": i})
@@ -3451,11 +3476,14 @@ def test_object_with_char_limit(client):
     # we sanitize the name
     assert obj.ref.name == name
 
+    # Use a distinct name for the raw obj_create path: re-using `name` would
+    # collide with the SDK publish above (Custom-typed -> untyped), which the
+    # server now rejects (WB-30574).
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
                 "project_id": client.project_id,
-                "object_id": name,
+                "object_id": "r" * CHAR_LIMIT,
                 "val": {"1": 1},
             }
         }
@@ -3476,7 +3504,7 @@ def test_object_with_char_over_limit(client):
         {
             "obj": {
                 "project_id": client.project_id,
-                "object_id": name,
+                "object_id": "r" * (CHAR_LIMIT + 1),
                 "val": {"1": 1},
             }
         }

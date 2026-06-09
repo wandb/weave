@@ -19,7 +19,6 @@ import ddtrace
 from cachetools import TTLCache
 from clickhouse_connect import common as ch_common
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -55,7 +54,6 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.actions_worker.dispatcher import execute_batch
 
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
@@ -100,6 +98,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderDynamicField,
     QueryBuilderField,
     build_calls_complete_delete_query,
+    build_calls_complete_started_at_select_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
@@ -130,12 +129,12 @@ from weave.trace_server.clickhouse.utilities import (
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
     find_call_descendants,
+    insert_with_empty_query_retry,
     log_and_raise_insert_error,
     maybe_enqueue_minimal_call_end,
     num_bytes,
     process_parameters,
     sanitize_invalid_utf8_surrogates,
-    should_retry_empty_query,
     string_to_int_in_range,
 )
 from weave.trace_server.clickhouse_schema import (
@@ -179,6 +178,7 @@ from weave.trace_server.errors import (
     MissingLLMApiKeyError,
     NotFoundError,
     ObjectDeletedError,
+    ObjectNameTypeCollision,
     RequestTooLarge,
     handle_clickhouse_query_error,
 )
@@ -267,6 +267,7 @@ from weave.trace_server.query_builder.obj_tags_query_builder import (
 from weave.trace_server.query_builder.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     format_metadata_objects_from_query_result,
+    make_obj_name_type_collision_query,
     make_objects_val_query_and_parameters,
 )
 from weave.trace_server.query_builder.project_query_builder import (
@@ -1121,11 +1122,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         and the end arrives separately via call_end_v2.
 
         Args:
-            end_call: The end call data to update. If started_at is provided,
-                it enables more efficient queries by utilizing the ClickHouse
-                primary key (project_id, started_at, id).
+            end_call: The end call data to update. The UPDATE is keyed on the
+                full primary key (project_id, started_at, id).
+
+        Raises:
+            NotFoundError: If no start row exists for (project_id, id).
         """
         table_name = self._get_calls_complete_table_name()
+
+        # Confirm the row exists before the UPDATE (full PK fast path, then a
+        # (project_id, id) fallback) so a wrong started_at can't silently no-op.
+        started_at = end_call.started_at
+        if started_at is None or not self._calls_complete_call_exists(
+            table_name, end_call.project_id, end_call.id, started_at
+        ):
+            started_at = self._read_calls_complete_started_at(
+                table_name, end_call.project_id, end_call.id
+            )
+            if started_at is None:
+                raise NotFoundError(
+                    f"Cannot end call {end_call.id}: no start found in project "
+                    f"{end_call.project_id}"
+                )
 
         output = end_call.output
         output_refs = extract_refs_from_values(output)
@@ -1137,6 +1155,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # but DateTime64(6) requires microsecond precision for exact matching. This is a
         # hack, not sure why inserting a json dump and passing an explicit param differ
         ended_at_us = datetime_to_microseconds(end_call.ended_at)
+        started_at_us = datetime_to_microseconds(started_at)
 
         pb = ParamBuilder()
         project_id_param = pb.add_param(end_call.project_id)
@@ -1151,12 +1170,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         wb_run_step_end_param = pb.add_param(
             ch_sentinel_values.to_ch_value("wb_run_step_end", end_call.wb_run_step_end)
         )
-
-        # Add started_at param if provided for more efficient primary key usage
-        started_at_param: str | None = None
-        if end_call.started_at is not None:
-            started_at_us = datetime_to_microseconds(end_call.started_at)
-            started_at_param = pb.add_param(started_at_us)
+        started_at_param = pb.add_param(started_at_us)
 
         query = build_calls_complete_update_end_query(
             table_name=table_name,
@@ -1177,6 +1191,44 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters=pb.get_params(),
             settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
         )
+
+    def _calls_complete_call_exists(
+        self,
+        table_name: str,
+        project_id: str,
+        call_id: str,
+        started_at: datetime.datetime,
+    ) -> bool:
+        """Point-lookup a call on the full primary key (project_id, started_at, id)."""
+        pb = ParamBuilder()
+        project_id_param = pb.add_param(project_id)
+        id_param = pb.add_param(call_id)
+        started_at_param = pb.add_param(datetime_to_microseconds(started_at))
+        query = build_calls_complete_started_at_select_query(
+            table_name=table_name,
+            project_id_param=project_id_param,
+            id_param=id_param,
+            started_at_param=started_at_param,
+        )
+        res = self._query(query, parameters=pb.get_params())
+        return bool(res.result_rows)
+
+    def _read_calls_complete_started_at(
+        self, table_name: str, project_id: str, call_id: str
+    ) -> datetime.datetime | None:
+        """Read a call's stored started_at by (project_id, id), or None if absent."""
+        pb = ParamBuilder()
+        project_id_param = pb.add_param(project_id)
+        id_param = pb.add_param(call_id)
+        query = build_calls_complete_started_at_select_query(
+            table_name=table_name,
+            project_id_param=project_id_param,
+            id_param=id_param,
+        )
+        res = self._query(query, parameters=pb.get_params())
+        if not res.result_rows:
+            return None
+        return res.result_rows[0][0]
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -1614,6 +1666,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ):
             settings = ch_settings.update_settings_for_aggregation_in_order(settings)
 
+        # calls_complete reads can hit lightweight-update patch parts that crash under
+        # CH lazy materialization (see CLICKHOUSE_CALLS_COMPLETE_READ_SETTINGS).
+        if read_table == ReadTable.CALLS_COMPLETE:
+            settings = ch_settings.update_settings_for_calls_complete_read(settings)
+
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
 
@@ -1923,11 +1980,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             label=f"obj {req.obj.object_id!r}",
         )
 
+        kind = get_kind(processed_val)
+        self._reject_obj_name_type_collision(
+            project_id=req.obj.project_id,
+            object_id=req.obj.object_id,
+            kind=kind,
+            new_base_object_class=digest_result.base_object_class,
+        )
+
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
             wb_user_id=req.obj.wb_user_id,
-            kind=get_kind(processed_val),
+            kind=kind,
             base_object_class=digest_result.base_object_class,
             leaf_object_class=digest_result.leaf_object_class,
             refs=extract_refs_from_values(processed_val),
@@ -1954,6 +2019,32 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=digest,
             object_id=req.obj.object_id,
         )
+
+    def _reject_obj_name_type_collision(
+        self,
+        project_id: str,
+        object_id: str,
+        kind: str,
+        new_base_object_class: str | None,
+    ) -> None:
+        """Reject obj_create when (project_id, object_id) already exists with a
+        different base_object_class. Names are bound to one type per project
+        (WB-30574). Weave refs do not carry type, so allowing same-name
+        different-type would make refs ambiguous.
+        """
+        query, parameters = make_obj_name_type_collision_query(
+            project_id=project_id, object_id=object_id, kind=kind
+        )
+        result = self._query(query, parameters)
+        existing_classes = [row[0] for row in result.result_rows]
+        mismatched = [c for c in existing_classes if c != new_base_object_class]
+        if mismatched:
+            raise ObjectNameTypeCollision(
+                object_id=object_id,
+                kind=kind,
+                new_base_object_class=new_base_object_class,
+                existing_base_object_classes=mismatched,
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
     @tag_db_insert_path("obj_create_batch")
@@ -2818,7 +2909,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         stored_days = (
             RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
         )
-        self.ch_client.insert(
+        insert_with_empty_query_retry(
+            self.ch_client,
             "project_ttl_settings",
             data=[
                 [
@@ -6328,25 +6420,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             payload=create_result.payload,
         )
 
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        if len(req.call_ids) == 0:
-            return tsi.ActionsExecuteBatchRes()
-        if len(req.call_ids) > 1:
-            # This is temporary until we setup our batching infrastructure
-            raise InvalidRequest(
-                "Batching actions is not yet supported; submit one call_id at a time."
-            )
-
-        # For now, we just execute in-process if it is a single action
-        execute_batch(
-            batch_req=req,
-            trace_server=self,
-        )
-
-        return tsi.ActionsExecuteBatchRes()
-
     @tag_db_insert_path("completions_create")
     def completions_create(
         self, req: tsi.CompletionsCreateReq
@@ -7165,18 +7238,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         start = time.monotonic()
         sanitized_invalid_utf8 = False
-        for attempt in range(ch_settings.INSERT_MAX_RETRIES):
+        # At most two attempts: the original, plus one retry after sanitizing
+        # invalid client UTF-8. Empty-query retries are handled in the helper.
+        for _ in range(2):
             try:
-                result = self.ch_client.insert(
-                    table, data=data, column_names=column_names, settings=settings
+                result = insert_with_empty_query_retry(
+                    self.ch_client, table, data, column_names, settings
                 )
 
             # Invalid client Unicode: sanitize the batch and retry once.
             except UnicodeEncodeError as e:
-                if (
-                    sanitized_invalid_utf8
-                    or attempt == ch_settings.INSERT_MAX_RETRIES - 1
-                ):
+                if sanitized_invalid_utf8:
                     log_and_raise_insert_error(e, table, data)
                 sanitized_invalid_utf8 = True
                 data = sanitize_invalid_utf8_surrogates(data)
@@ -7187,14 +7259,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 converted = convert_to_insert_too_large(e)
                 log_and_raise_insert_error(converted, table, data)
 
-            # Empty query error: RETRY (generator was consumed during HTTP retry)
-            # We should retry with a fresh generator
-            except DatabaseError as e:
-                if should_retry_empty_query(e, table, attempt):
-                    continue
-                log_and_raise_insert_error(e, table, data)
-
-            # All other errors: raise immediately, no retry
+            # All other errors (including exhausted empty-query retries): no retry
             except Exception as e:
                 log_and_raise_insert_error(e, table, data)
 

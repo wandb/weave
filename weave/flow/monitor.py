@@ -1,12 +1,17 @@
-from typing import Literal, TypeAlias, get_args
+from typing import Any, Literal, TypeAlias, get_args
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing_extensions import NotRequired, Self, TypedDict
 
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
 from weave.trace.api import ObjectRef, publish
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    require_weave_client,
+)
 from weave.trace.objectify import register_object
+from weave.trace.refs import OpRef, Ref
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
 
@@ -43,6 +48,11 @@ class ScorerDebounceConfig(TypedDict):
 @register_object
 class Monitor(Object):
     """Sets up a monitor to score incoming calls automatically.
+
+    Note that the op name will be converted to a weave ref using the entity and project
+    from the Weave client. If you're operating on multiple entities and projects
+    with the same client, you'll need to specify a fully-qualified weave ref.
+    See _normalized_op_names for more details.
 
     Examples:
     ```python
@@ -89,6 +99,45 @@ class Monitor(Object):
     # Debounced scoring is enabled when this is present, and disabled when it is not.
     scorer_debounce_config: ScorerDebounceConfig | None = None
 
+    @field_validator("op_names", mode="before")
+    @classmethod
+    def _coerce_op_name_refs_to_str(cls, value: Any) -> Any:
+        """Access op-name refs as their URI string.
+
+        ``op_names`` is stored as full ``weave:///`` op refs (WB-33908). When a
+        stored Monitor is loaded, Weave's value layer turns those ref-shaped
+        strings back into ``Ref`` objects, which the ``list[AgentSpanOpName |
+        str]`` field would reject. Pydantic runs this ``mode="before"`` validator
+        automatically on every load/construct; it maps any ``Ref`` back to its
+        URI string so the Monitor objectifies cleanly.
+        """
+        if isinstance(value, list):
+            return [item.uri() if isinstance(item, Ref) else item for item in value]
+        return value
+
+    def model_post_init(self, context: Any, /) -> None:
+        """Normalize ``op_names`` at construction when a client is available.
+
+        Publishing has no per-object hook, so to also cover a bare
+        ``weave.publish(monitor)`` (no ``activate()``), expand short names here:
+        anyone who will publish has typically called ``weave.init``, so the client
+        is set when the monitor is constructed.
+
+        Several use cases perform construction without a client, such as unit tests,
+        inspection, deserializing a stored monitor in a worker. The guard on
+        ``get_weave_client()`` allows construction without a client. Normalization
+        won't occur in this case, but that should be ok because stored monitors already
+        hold full refs.
+
+        There is an edge case where a monitor can be created using the SDK without
+        normalizing: if the user constructs the monitor, then calls weave.init,
+        and then publishes it. Calling ``activate()`` or ``deactivate()`` could be
+        a workaround for this use-case.
+        """
+        super().model_post_init(context)
+        if get_weave_client() is not None:
+            self.op_names = self._normalized_op_names()
+
     def activate(self) -> ObjectRef:
         """Activates the monitor.
 
@@ -97,6 +146,7 @@ class Monitor(Object):
         """
         self.active = True
         self.ref = None
+        self.op_names = self._normalized_op_names()
         return publish(self)
 
     def deactivate(self) -> ObjectRef:
@@ -107,7 +157,48 @@ class Monitor(Object):
         """
         self.active = False
         self.ref = None
+        self.op_names = self._normalized_op_names()
         return publish(self)
+
+    def _normalized_op_names(self) -> list[str]:
+        """Expand bare op names to fully-qualified ``weave:///`` op refs before saving.
+
+        Both the UI and the scoring worker require full refs. However, the public
+        ``Monitor`` example tells users to pass a short name (``op_names=["my_op"]``).
+        To satisfy both use-cases, we perform a conversion here using the
+        active client's entity/project.
+
+        Entries that are already ``weave:///`` refs, or agent-span literals
+        like ``"weave.genai.turn_ended"``, are returned unchanged.
+        """
+
+        def needs_expansion(name: str) -> bool:
+            return name not in AGENT_SPAN_OP_NAMES and not name.strip().startswith(
+                "weave:///"
+            )
+
+        if not any(needs_expansion(name) for name in self.op_names):
+            return list(self.op_names)
+
+        client = require_weave_client()
+        entity, project = client.entity, client.project
+        normalized: list[str] = []
+        for name in self.op_names:
+            if not needs_expansion(name):
+                normalized.append(name)
+                continue
+            short = name.strip().strip("/")
+            if not short:
+                raise ValueError(f"op_names entries must be non-empty; got {name!r}")
+            if "/" in short:
+                raise ValueError(
+                    "op_names entries must be a weave URI starting with 'weave:///', "
+                    f"or a single op short name (no '/'); got {name!r}"
+                )
+            normalized.append(
+                OpRef(entity=entity, project=project, name=short, _digest="*").uri()
+            )
+        return normalized
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:

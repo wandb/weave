@@ -1,6 +1,5 @@
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
-    ActionSpec,
     AlertSpec,
     AnnotationSpec,
     BaseObject,
@@ -19,7 +18,6 @@ from weave.trace_server.interface.builtin_object_classes.builtin_object_registry
 
 __all__ = [
     "BUILTIN_OBJECT_REGISTRY",
-    "ActionSpec",
     "AlertSpec",
     "AnnotationSpec",
     "BaseObject",

@@ -17,10 +17,13 @@
 #   bugs we're trying to catch. Revisit only if an incident proves
 #   Keeper HA is part of our bug surface.
 #
-# Resource limits target the GH Actions ubuntu-latest runner (7 GB RAM,
-# 2 vCPU). Each CH node caps at 1.5 GB; total committed memory across
-# 3 CH nodes is 4.5 GB, leaving ~2.5 GB headroom for the test runner
-# and OS. Do not raise without verifying CI runner capacity.
+# Resource limits target the GH Actions ubuntu-latest-8-cores runner
+# (32 GB RAM, 8 vCPU) used by the `trace`/`trace_calls_complete_only`
+# shards. ch-s1-r1 hosts the embedded Keeper alongside CH, so it gets
+# a larger cap (4 GB) than the keeper-less replicas (3 GB). Total
+# committed memory: 4 + 3 + 3 = 10 GB, well under the runner's 32 GB.
+# Per-node cap is sized for 8-worker xdist JOINs, which hit the
+# OvercommitTracker ceiling at tighter limits.
 #
 # Usage (local):
 #   docker compose -f 1s3r.yaml up -d --wait
@@ -42,7 +45,7 @@ x-ch-node: &ch-node
   deploy:
     resources:
       limits:
-        memory: 1536M
+        memory: 3072M
   healthcheck:
     test: ["CMD-SHELL", "wget -q -O- http://localhost:8123/ping || exit 1"]
     interval: 3s
@@ -55,6 +58,12 @@ services:
     <<: *ch-node
     container_name: weave-ci-ch-s1-r1
     hostname: ch-s1-r1
+    # Larger memory cap than the other replicas because this node also
+    # runs the embedded Keeper.
+    deploy:
+      resources:
+        limits:
+          memory: 4096M
     ports:
       # Host-side port 8130 matches the default expected by
       # tests/trace_server_migrator/conftest.py::_DEFAULT_PORT,
