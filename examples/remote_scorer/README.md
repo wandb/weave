@@ -14,7 +14,7 @@ tunnels are local-development conveniences only.
   `POST /score`.
 - `scoring_logic.py`: framework-independent scoring logic that can be copied
   into another web framework or language.
-- `auth.py`: bearer-token extraction and a dev-only validator stub.
+- `auth.py`: dev-only bearer-token validator stub.
 - `register_remote_scorer.py`: publishes a `RemoteScorer` and activates a
   `Monitor`.
 - `trigger_test_trace.py`: sends a small traced call that can trigger the

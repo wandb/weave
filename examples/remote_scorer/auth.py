@@ -1,4 +1,4 @@
-"""Bearer-token helpers for the remote scorer sample.
+"""Bearer-token validation for the remote scorer sample.
 
 This file intentionally contains only a dev validator. Production deployments
 should validate tokens with your normal identity provider.
@@ -11,19 +11,6 @@ import logging
 import os
 
 logger = logging.getLogger(__name__)
-
-
-def extract_bearer_token(authorization_header: str | None) -> str | None:
-    """Return the bearer token from an Authorization header, or None."""
-    if authorization_header is None:
-        return None
-
-    scheme, separator, token = authorization_header.strip().partition(" ")
-    if separator != " " or scheme.lower() != "bearer":
-        return None
-
-    token = token.strip()
-    return token or None
 
 
 def validate_bearer_token(token: str) -> bool:

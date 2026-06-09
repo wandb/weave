@@ -7,15 +7,16 @@ import os
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-
-from auth import extract_bearer_token, validate_bearer_token
+from auth import validate_bearer_token
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from scoring_logic import REMOTE_SCORER_SCHEMA_VERSION, score_remote_call
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Weave remote scorer sample", version="1.0.0")
+security = HTTPBearer(auto_error=False)
 
 
 @app.get("/health")
@@ -24,13 +25,15 @@ def health() -> dict[str, str]:
 
 
 @app.post("/score")
-async def score(request: Request) -> dict[str, Any]:
+async def score(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),  # noqa: B008
+) -> dict[str, Any]:
     correlation_id = request.headers.get("X-Correlation-ID")
     idempotency_key = request.headers.get("Idempotency-Key")
     schema_version = request.headers.get("X-Weave-Schema-Version")
 
-    token = extract_bearer_token(request.headers.get("Authorization"))
-    if token is None or not validate_bearer_token(token):
+    if credentials is None or not validate_bearer_token(credentials.credentials):
         logger.warning(
             "unauthorized remote scorer request correlation_id=%s",
             correlation_id,
