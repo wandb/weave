@@ -6306,8 +6306,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         query = LLM_TOKEN_PRICES_TABLE.purge()
         query = query.where(query_with_pricing_level)
-        prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
+        prepared = query.prepare(
+            database_type="clickhouse",
+            table_name=self._mutation_table_name(LLM_TOKEN_PRICES_TABLE.name),
+            cluster_name=self.clickhouse_cluster_name,
+        )
+        self._command(
+            prepared.sql,
+            parameters=prepared.parameters,
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
         return tsi.CostPurgeRes()
 
     @tag_db_insert_path("feedback_create")
@@ -6385,8 +6393,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = TABLE_FEEDBACK.purge()
         query = query.project_id(req.project_id)
         query = query.where(req.query)
-        prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
+        prepared = query.prepare(
+            database_type="clickhouse",
+            table_name=self._mutation_table_name(TABLE_FEEDBACK.name),
+            cluster_name=self.clickhouse_cluster_name,
+        )
+        self._command(
+            prepared.sql,
+            parameters=prepared.parameters,
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
         return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:

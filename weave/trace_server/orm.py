@@ -360,6 +360,8 @@ class Select:
         self,
         database_type: DatabaseType,
         param_builder: ParamBuilder | None = None,
+        table_name: str | None = None,
+        cluster_name: str | None = None,
     ) -> PreparedSelect:
         param_builder = param_builder or ParamBuilder(None, database_type)
         assert database_type == param_builder.database_type
@@ -387,7 +389,9 @@ class Select:
             fieldnames = []
             sql = "DELETE "
 
-        sql += f"FROM {self.table.name}"
+        sql += (
+            f"FROM {_format_delete_target(table_name or self.table.name, cluster_name)}"
+        )
 
         # Handle joins
         # Returns {join type} JOIN {table name} ON {join condition}
@@ -495,6 +499,17 @@ class Select:
 
         parameters = param_builder.get_params()
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
+
+
+def _format_delete_target(table_name: str, cluster_name: str | None) -> str:
+    """Append `ON CLUSTER` to a DELETE target so it fans out across shards.
+
+    Callers pass the resolved table (e.g. `<table>_local` in distributed mode);
+    this only appends the cluster clause.
+    """
+    if cluster_name:
+        return f"{table_name} ON CLUSTER {cluster_name}"
+    return table_name
 
 
 @dataclass(slots=True)
