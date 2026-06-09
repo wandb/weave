@@ -1,0 +1,39 @@
+## Conversation
+Third burndown (message_templating) in the user's 'one shared file per PR,
+confirm gone' series. The involved one: a BEHAVIOR used by both client + server.
+
+## What
+weave.shared.message_templating (IncorrectPromptVarError + format_message_with_template_vars,
+pure) split per side:
+- git mv -> weave/trace_server/message_templating.py (server; llm_completion +
+  generator repointed; docstring updated to 'server's own, kept in sync by conformance').
+- NEW weave/trace/message_templating.py (client copy, identical body; prompt.py +
+  flow/llm_structured_completion_model.py repointed; prompt.py re-export + its
+  stale comment updated).
+Added message_template conformance CONSUMERS to both sides:
+- test_conformance_client.py::test_client_message_template -> weave.trace.message_templating
+- test_conformance_server.py::test_server_message_template -> weave.trace_server.message_templating
+Both call the pure function directly (no obj-write boundary) over the corpus
+message_template rows. This is NOT the circular shared-impl test the user
+rejected: the two copies are INDEPENDENT impls validated against frozen rows that
+were generated from the server copy.
+
+## Verification
+weave/shared/message_templating.py GONE. import-linter 4/0. import weave OK
+(client copy is not server copy). generator output byte-identical (msg_template
+fixtures unchanged). conformance 31 passed (client 12 + server 19). regression:
+test_llm_completion + test_llm_structured + test_prompt 58 passed. ruff+ty clean.
+No test importers existed (scoped repo-wide first -- avoided the digest miss).
+
+## Hint
+This PR modifies test_conformance_client/server.py (which live in lower PRs) to
+add the consumers -- correct: the consumers exist BECAUSE of this split.
+
+## State of weave.shared after this series
+The serialization IMPLEMENTATION + behaviors are fully out (digest,
+object_class_util, validation_util functions, trace_server_interface_util,
+message_templating). What remains is the wire CONTRACT + foundation
+(trace_server_interface, interface/, agents/, errors, ids, constants,
+refs_internal, common/service/http_service_interface, pydantic_util, helpers,
+trace_server_converter) -- the protocol both sides speak, which should stay shared
+(duplicating it = Tier-2 codegen decision, not a burndown).
