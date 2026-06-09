@@ -6,11 +6,17 @@ import {
   tool,
   Usage,
   withAgentSpan,
+  withCustomSpan,
   withFunctionSpan,
   withGenerationSpan,
   withGuardrailSpan,
+  withHandoffSpan,
+  withMCPListToolsSpan,
   withResponseSpan,
+  withSpeechGroupSpan,
+  withSpeechSpan,
   withTrace,
+  withTranscriptionSpan,
 } from '@openai/agents';
 import type {Model, ModelRequest, ModelResponse} from '@openai/agents';
 import {
@@ -246,7 +252,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(await inMemoryTraceServer.getCalls(testProjectName)).toHaveLength(0);
   });
 
-  test('emits `invoke_agent`, `execute_tool` and `chat` spans', async () => {
+  test('emits `invoke_agent`, `execute_tool`, `chat`, `handoff`, `guardrail`, `transcription`, `speech`, `speech_group`, `mcp_list_tools` and custom spans', async () => {
     await withTrace('Test', async () => {
       await withAgentSpan(async () => {}, {
         spanId: 'span-agent',
@@ -282,10 +288,47 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
         spanId: 'span-guardrail',
         data: {name: 'test-guardrail', triggered: false},
       });
+      await withHandoffSpan(async () => {}, {
+        spanId: 'span-handoff',
+        data: {from_agent: 'Triage', to_agent: 'Specialist'},
+      });
+      await withTranscriptionSpan(async () => {}, {
+        spanId: 'span-transcription',
+        data: {
+          input: {data: 'base64audio', format: 'pcm'},
+          output: 'hello world',
+          model: 'whisper-1',
+        },
+      });
+      await withSpeechSpan(async () => {}, {
+        spanId: 'span-speech',
+        data: {
+          input: 'say hello',
+          output: {data: 'base64audio', format: 'pcm'},
+          model: 'tts-1',
+        },
+      });
+      await withSpeechGroupSpan(async () => {}, {
+        spanId: 'span-speech-group',
+        data: {input: 'narration script'},
+      });
+      await withMCPListToolsSpan(async () => {}, {
+        spanId: 'span-mcp',
+        data: {server: 'http://localhost:9000', result: ['search', 'fetch']},
+      });
+      await withCustomSpan(async () => {}, {
+        spanId: 'span-custom',
+        data: {
+          name: 'my_step',
+          // Each non-null key in `data` becomes its own
+          // weave.openai_agents.custom.<key> attribute; null is dropped.
+          data: {kind: 'cache_lookup', hits: 3, miss: null},
+        },
+      });
     });
 
     const spans = await emittedSpans();
-    expect(spans).toHaveLength(5);
+    expect(spans).toHaveLength(11);
 
     const agent = spans.find(s => s.name === 'invoke_agent test-agent')!;
     expect(agent.attributes).toMatchObject({
@@ -332,6 +375,70 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     });
     // No response.id on the legacy generation span.
     expect(gen.attributes['gen_ai.response.id']).toBeUndefined();
+
+    const handoff = spans.find(s => s.name === 'handoff Triage -> Specialist')!;
+    expect(handoff.attributes).toMatchObject({
+      'weave.openai_agents.handoff.from_agent': 'Triage',
+      'weave.openai_agents.handoff.to_agent': 'Specialist',
+      'weave.openai_agents.span_id': 'span-handoff',
+    });
+    expect(handoff.attributes['gen_ai.operation.name']).toBeUndefined();
+
+    const guard = spans.find(s => s.name === 'guardrail test-guardrail')!;
+    expect(guard.attributes).toMatchObject({
+      'weave.openai_agents.guardrail.name': 'test-guardrail',
+      'weave.openai_agents.guardrail.triggered': false,
+      'weave.openai_agents.span_id': 'span-guardrail',
+    });
+    expect(guard.attributes['gen_ai.operation.name']).toBeUndefined();
+
+    const transcription = spans.find(s => s.name === 'transcription')!;
+    expect(transcription.attributes).toMatchObject({
+      'weave.openai_agents.transcription.model': 'whisper-1',
+      'weave.openai_agents.transcription.input': 'base64audio',
+      'weave.openai_agents.transcription.input_format': 'pcm',
+      'weave.openai_agents.transcription.output': 'hello world',
+      'weave.openai_agents.span_id': 'span-transcription',
+    });
+    expect(transcription.attributes['gen_ai.operation.name']).toBeUndefined();
+
+    const speech = spans.find(s => s.name === 'speech')!;
+    expect(speech.attributes).toMatchObject({
+      'weave.openai_agents.speech.model': 'tts-1',
+      'weave.openai_agents.speech.input': 'say hello',
+      'weave.openai_agents.speech.output': 'base64audio',
+      'weave.openai_agents.speech.output_format': 'pcm',
+      'weave.openai_agents.span_id': 'span-speech',
+    });
+    expect(speech.attributes['gen_ai.operation.name']).toBeUndefined();
+
+    const speechGroup = spans.find(s => s.name === 'speech_group')!;
+    expect(speechGroup.attributes).toMatchObject({
+      'weave.openai_agents.speech_group.input': 'narration script',
+      'weave.openai_agents.span_id': 'span-speech-group',
+    });
+    expect(speechGroup.attributes['gen_ai.operation.name']).toBeUndefined();
+
+    const mcp = spans.find(s => s.name === 'mcp_list_tools')!;
+    expect(mcp.attributes).toMatchObject({
+      'weave.openai_agents.mcp.server': 'http://localhost:9000',
+      'weave.openai_agents.mcp.result': ['search', 'fetch'],
+      'weave.openai_agents.span_id': 'span-mcp',
+    });
+    expect(mcp.attributes['gen_ai.operation.name']).toBeUndefined();
+
+    // CustomSpan uses the user-supplied name with no prefix.
+    const custom = spans.find(s => s.name === 'my_step')!;
+    expect(custom.attributes).toMatchObject({
+      'weave.openai_agents.custom.kind': 'cache_lookup',
+      'weave.openai_agents.custom.hits': 3,
+      'weave.openai_agents.span_id': 'span-custom',
+    });
+    // Null values dropped — `miss: null` doesn't produce an attribute.
+    expect(
+      custom.attributes['weave.openai_agents.custom.miss']
+    ).toBeUndefined();
+    expect(custom.attributes['gen_ai.operation.name']).toBeUndefined();
   });
 
   test('preserves parent-child relationship', async () => {

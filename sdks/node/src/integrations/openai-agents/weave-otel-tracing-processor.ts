@@ -25,12 +25,19 @@ import {
 } from '../../genai/semconv';
 import type {
   AgentSpanData,
+  CustomSpanData,
   FunctionSpanData,
   GenerationSpanData,
+  GuardrailSpanData,
+  HandoffSpanData,
+  MCPListToolsSpanData,
   ResponseSpanData,
   Span,
+  SpeechGroupSpanData,
+  SpeechSpanData,
   Trace,
   TracingProcessor,
+  TranscriptionSpanData,
 } from '../openai.agent.types';
 
 const TRACER_NAME = 'weave.openai_agents';
@@ -115,9 +122,35 @@ function otelSpanName(span: Span): string {
     case 'generation':
       return `chat ${span.spanData.model ?? ''}`.trimEnd();
 
+    case 'handoff':
+      const from = span.spanData.from_agent || '?';
+      const to = span.spanData.to_agent || '?';
+      return `handoff ${from} -> ${to}`;
+
+    case 'guardrail':
+      return `guardrail ${span.spanData.name}`.trimEnd();
+
+    case 'transcription':
+      return 'transcription';
+
+    case 'speech':
+      return 'speech';
+
+    case 'speech_group':
+      return 'speech_group';
+
+    case 'mcp_tools':
+      return 'mcp_list_tools';
+
+    case 'custom':
+      const name = span.spanData.name ?? '';
+      return name || 'custom';
+
     default:
-      const name = (span.spanData as {name?: string}).name ?? '';
-      return name ? `${span.spanData.type} ${name}` : span.spanData.type;
+      const spanData = span.spanData as {type: string; name?: string};
+      return spanData.name
+        ? `${spanData.type} ${spanData.name}`
+        : spanData.type;
   }
 }
 
@@ -201,6 +234,7 @@ function responseChatAttrs(
     attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens;
     attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens;
   }
+
   return attrs;
 }
 
@@ -229,6 +263,68 @@ function generationChatAttrs(
   return attrs;
 }
 
+function handoffAttrs(spanData: HandoffSpanData): Attributes {
+  return {
+    [`${WEAVE_ATTR_PREFIX}.handoff.from_agent`]: spanData.from_agent ?? '',
+    [`${WEAVE_ATTR_PREFIX}.handoff.to_agent`]: spanData.to_agent ?? '',
+  };
+}
+
+function transcriptionAttrs(spanData: TranscriptionSpanData): Attributes {
+  return {
+    [`${WEAVE_ATTR_PREFIX}.transcription.model`]: spanData.model ?? '',
+    [`${WEAVE_ATTR_PREFIX}.transcription.input`]: spanData.input?.data ?? '',
+    [`${WEAVE_ATTR_PREFIX}.transcription.input_format`]:
+      spanData.input?.format ?? '',
+    [`${WEAVE_ATTR_PREFIX}.transcription.output`]: spanData.output ?? '',
+  };
+}
+
+function guardrailAttrs(spanData: GuardrailSpanData): Attributes {
+  return {
+    [`${WEAVE_ATTR_PREFIX}.guardrail.name`]: spanData.name ?? '',
+    [`${WEAVE_ATTR_PREFIX}.guardrail.triggered`]: Boolean(spanData.triggered),
+  };
+}
+
+function speechAttrs(spanData: SpeechSpanData): Attributes {
+  return {
+    [`${WEAVE_ATTR_PREFIX}.speech.model`]: spanData.model ?? '',
+    [`${WEAVE_ATTR_PREFIX}.speech.input`]: spanData.input ?? '',
+    [`${WEAVE_ATTR_PREFIX}.speech.output`]: spanData.output?.data ?? '',
+    [`${WEAVE_ATTR_PREFIX}.speech.output_format`]:
+      spanData.output?.format ?? '',
+  };
+}
+
+function speechGroupAttrs(spanData: SpeechGroupSpanData): Attributes {
+  return {
+    [`${WEAVE_ATTR_PREFIX}.speech_group.input`]: spanData.input ?? '',
+  };
+}
+
+function mcpListToolsAttrs(spanData: MCPListToolsSpanData): Attributes {
+  return {
+    [`${WEAVE_ATTR_PREFIX}.mcp.server`]: spanData.server ?? '',
+    [`${WEAVE_ATTR_PREFIX}.mcp.result`]: spanData.result ?? [],
+  };
+}
+
+/**
+ * Surface CustomSpan data under `weave.openai_agents.custom.*`. Each
+ * non-null key in `spanData.data` becomes its own attribute so users can
+ * filter / aggregate on individual fields. Null/undefined values are
+ * dropped to keep the wire format clean.
+ */
+function customAttrs(spanData: CustomSpanData): Attributes {
+  const out: Attributes = {};
+  for (const [key, value] of Object.entries(spanData.data ?? {})) {
+    if (value === null || value === undefined) continue;
+    out[`${WEAVE_ATTR_PREFIX}.custom.${key}`] = value;
+  }
+  return out;
+}
+
 function attrsForSpan(span: Span, conversationId: string): Attributes {
   switch (span.spanData.type) {
     case 'agent':
@@ -243,10 +339,32 @@ function attrsForSpan(span: Span, conversationId: string): Attributes {
     case 'generation':
       return generationChatAttrs(span.spanData, conversationId);
 
+    case 'handoff':
+      return handoffAttrs(span.spanData);
+
+    case 'guardrail':
+      return guardrailAttrs(span.spanData);
+
+    case 'transcription':
+      return transcriptionAttrs(span.spanData);
+
+    case 'speech':
+      return speechAttrs(span.spanData);
+
+    case 'speech_group':
+      return speechGroupAttrs(span.spanData);
+
+    case 'mcp_tools':
+      return mcpListToolsAttrs(span.spanData);
+
+    case 'custom':
+      return customAttrs(span.spanData);
+
     default:
-      // Remaining span types still emit OTel spans with the openai
-      // trace_id/span_id attributes set in onSpanStart, but no semconv
-      // attributes yet — per-type mappings land in later increments.
+      // Unknown span type — still emits an OTel span with the openai
+      // trace_id/span_id attrs from onSpanStart, but no per-type semconv.
+      // Most likely cause: a new SpanData subtype was added to the SDK that
+      // this processor doesn't yet handle.
       return {};
   }
 }
@@ -264,13 +382,13 @@ function attrsForSpan(span: Span, conversationId: string): Attributes {
  * Span types without a clean semantic mapping emit with a descriptive operation name
  * and `weave.openai_agents.*` attributes:
  *
- * - (TODO) `handoff {from} -> {to}`
- * - (TODO) `guardrail {name}`
- * - (TODO) `transcription`
- * - (TODO) `speech`
- * - (TODO) `speech_group`
- * - (TODO) `mcp_list_tools`
- * - (TODO) `{custom}`
+ * - `handoff {from} -> {to}`
+ * - `guardrail {name}`
+ * - `transcription`
+ * - `speech`
+ * - `speech_group`
+ * - `mcp_list_tools`
+ * - `{custom}`
  */
 export class WeaveOtelTracingProcessor implements TracingProcessor {
   private spansById = new Map<string, OtelSpan>();
