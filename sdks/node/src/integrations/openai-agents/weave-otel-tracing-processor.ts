@@ -61,7 +61,7 @@ import type {
   Trace,
   TracingProcessor,
   TranscriptionSpanData,
-} from '../openai.agent.types';
+} from '@openai/agents';
 import type OpenAI from 'openai';
 import type {GenerationUsageData} from '@openai/agents';
 
@@ -70,7 +70,7 @@ const WEAVE_ATTR_PREFIX = 'weave.openai_agents';
 const PROVIDER_NAME = 'openai';
 const DEFAULT_CHAT_OUTPUT_TYPE = 'text';
 
-function otelSpanName(span: Span): string {
+function otelSpanName(span: Span<any>): string {
   switch (span.spanData.type) {
     case 'agent':
       return `invoke_agent ${span.spanData.name}`;
@@ -394,7 +394,7 @@ function customAttrs(spanData: CustomSpanData): Attributes {
   return out;
 }
 
-function attrsForSpan(span: Span, conversationId: string): Attributes {
+function attrsForSpan(span: Span<any>, conversationId: string): Attributes {
   switch (span.spanData.type) {
     case 'agent':
       return invokeAgentAttrs(span.spanData, conversationId);
@@ -475,7 +475,7 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
    * when no parent OTel span exists — the new span then becomes the OTel
    * root for the trace.
    */
-  private parentContext(span: Span): OtelContext | undefined {
+  private parentContext(span: Span<any>): OtelContext | undefined {
     if (!span.parentId) return undefined;
     const parent = this.spansById.get(span.parentId);
     if (!parent) return undefined;
@@ -508,7 +508,7 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
     this.conversationIdsByTraceId.delete(trace.traceId);
   }
 
-  async onSpanStart(span: Span): Promise<void> {
+  async onSpanStart(span: Span<any>): Promise<void> {
     const parentCtx = this.parentContext(span);
     const otelSpan = this.tracer().startSpan(
       otelSpanName(span),
@@ -527,7 +527,7 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
     }
   }
 
-  async onSpanEnd(span: Span): Promise<void> {
+  async onSpanEnd(span: Span<any>): Promise<void> {
     const otelSpan = this.spansById.get(span.spanId);
     this.spansById.delete(span.spanId);
     if (!otelSpan) return;

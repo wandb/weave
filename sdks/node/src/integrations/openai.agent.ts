@@ -14,7 +14,7 @@
 import type OpenAIAgents from '@openai/agents';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {globalSingleton} from '../utils/globalSingleton';
-import type {TracingProcessor} from './openai.agent.types';
+import type { TracingProcessor } from '@openai/agents';
 import {shouldUseOtelV2} from '../settings';
 import {WeaveOtelTracingProcessor} from './openai-agents/weave-otel-tracing-processor';
 import {WeaveTracingProcessor} from './openai-agents/weave-tracing-processor';
