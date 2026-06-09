@@ -86,7 +86,7 @@ function deriveOpName<T extends (...args: any[]) => any>(
   context?: MethodDecoratorContext
 ): string {
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
-  let calculatedName = 'anonymous';
+  let calculatedName: string;
 
   if (options?.name) {
     calculatedName = options.name;
@@ -305,7 +305,7 @@ function handleLegacyDecorator<T extends (...args: any[]) => any>(
   }
 
   // Derive default legacy name
-  let className = 'anonymous';
+  let className: string;
   if (target.constructor === Function) {
     // Static method
     className = (target as Function).name || 'anonymous';
