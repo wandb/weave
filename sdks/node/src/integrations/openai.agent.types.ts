@@ -21,6 +21,7 @@ import type {
 export type {
   AgentSpanData,
   CustomSpanData,
+  FunctionSpanData,
   Trace,
   TracingProcessor,
 } from '@openai/agents';

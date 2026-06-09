@@ -13,9 +13,13 @@ import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
+  ATTR_GEN_AI_TOOL_NAME,
 } from '../../genai/semconv';
 import type {
   AgentSpanData,
+  FunctionSpanData,
   Span,
   Trace,
   TracingProcessor,
@@ -36,10 +40,12 @@ function otelSpanName(span: Span): string {
     case 'agent':
       return `invoke_agent ${span.spanData.name}`;
 
-    default: {
+    case 'function':
+      return `execute_tool ${span.spanData.name}`;
+
+    default:
       const name = (span.spanData as {name?: string}).name ?? '';
       return name ? `${span.spanData.type} ${name}` : span.spanData.type;
-    }
   }
 }
 
@@ -78,11 +84,34 @@ function attrsForSpan(span: Span, conversationId: string): Attributes {
     case 'agent':
       return invokeAgentAttrs(span.spanData, conversationId);
 
+    case 'function':
+      return executeToolAttrs(span.spanData, conversationId);
+
     default:
       // Remaining span types still emit OTel spans with the openai
       // trace_id/span_id attributes set in onSpanStart, but no semconv
       // attributes yet — per-type mappings land in later increments.
       return {};
+  }
+
+  function executeToolAttrs(
+    spanData: FunctionSpanData,
+    conversationId: string
+  ): Attributes {
+    const attrs: Attributes = {
+      [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
+      [ATTR_GEN_AI_TOOL_NAME]: spanData.name ?? '',
+    };
+    if (conversationId) {
+      attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
+    }
+    if (spanData.input) {
+      attrs[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = spanData.input;
+    }
+    if (spanData.output) {
+      attrs[ATTR_GEN_AI_TOOL_CALL_RESULT] = spanData.output;
+    }
+    return attrs;
   }
 }
 
@@ -93,7 +122,7 @@ function attrsForSpan(span: Span, conversationId: string): Attributes {
  * conventions where they apply:
  *
  * - `invoke_agent {gen_ai.agent.name}` (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/#invoke-agent-client-span)
- * - (TODO) `execute_tool {gen_ai.tool.name}` (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/#execute-tool-span)
+ * - `execute_tool {gen_ai.tool.name}` (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/#execute-tool-span)
  * - (TODO) `chat {gen_ai.request.model}` (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/#inference)
  *
  * Span types without a clean semantic mapping emit with a descriptive operation name
