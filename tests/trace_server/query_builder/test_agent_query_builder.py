@@ -25,6 +25,7 @@ from weave.trace_server.agents.types import (
     AgentSpanValueRef,
     AgentsQueryFilters,
     AgentsQueryReq,
+    AgentStatsReq,
     AgentVersionsQueryReq,
 )
 from weave.trace_server.interface import query as tsi_query
@@ -35,6 +36,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     SPAN_SORTABLE_COLS,
     SPANS_LIST_COLS,
     build_order_by,
+    make_agent_stats_query,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -65,6 +67,51 @@ def assert_sql(
     assert expected_params == params, (
         f"\nExpected params: {expected_params}\n\nGot params: {params}"
     )
+
+
+class TestMakeAgentStatsQuery:
+    def test_basic(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_agent_stats_query(pb, AgentStatsReq(project_id="p1"))
+
+        expected = """
+            SELECT count() AS span_count,
+                   uniq(s.conversation_id) AS conversation_count,
+                   uniq(s.agent_name) AS agent_count
+            FROM spans s WHERE s.project_id = {genai_0:String}
+        """
+        assert_sql(expected, {"genai_0": "p1"}, query, pb.get_params())
+
+    def test_with_time_window(self) -> None:
+        pb = ParamBuilder("genai")
+        start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2026, 2, 1, tzinfo=datetime.timezone.utc)
+        query = make_agent_stats_query(
+            pb,
+            AgentStatsReq(
+                project_id="p1",
+                started_after=start,
+                started_before=end,
+            ),
+        )
+
+        expected = """
+            SELECT count() AS span_count,
+                   uniq(s.conversation_id) AS conversation_count,
+                   uniq(s.agent_name) AS agent_count
+            FROM spans s
+            WHERE s.project_id = {genai_0:String}
+              AND s.started_at >= {genai_1:DateTime64(6)}
+              AND s.started_at < {genai_2:DateTime64(6)}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": start, "genai_2": end}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_rejects_inverted_window(self) -> None:
+        start = datetime.datetime(2026, 2, 1, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        with pytest.raises(ValidationError, match="started_before must be after"):
+            AgentStatsReq(project_id="p1", started_after=start, started_before=end)
 
 
 # ============================================================================

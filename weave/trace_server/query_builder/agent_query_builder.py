@@ -42,6 +42,7 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsValueType,
     AgentSpanValueRef,
     AgentsQueryReq,
+    AgentStatsReq,
     AgentVersionsQueryReq,
     group_by_ref_alias,
 )
@@ -923,6 +924,30 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
                groupUniqArray(s.conversation_name) AS conversation_names,
                min(s.started_at) AS first_seen,
                max(s.started_at) AS last_seen"""
+
+
+def make_agent_stats_query(pb: ParamBuilder, req: AgentStatsReq) -> str:
+    """Build a fast, approximate project-level agent activity rollup.
+
+    A single pass over `spans` returning the total span count plus
+    approximate distinct agent and conversation counts, optionally scoped to
+    a time window. Distinct counts trade exactness for latency by design.
+    """
+    pid_slot = pb.add(req.project_id, param_type="String")
+    where_conditions = [_project_filter_sql("s.project_id", pid_slot)]
+    add_time_filters(
+        where_conditions,
+        pb,
+        started_after=req.started_after,
+        started_before=req.started_before,
+    )
+    where = " AND ".join(where_conditions)
+    return (
+        "SELECT count() AS span_count, "
+        "uniq(s.conversation_id) AS conversation_count, "
+        "uniq(s.agent_name) AS agent_count "
+        f"FROM spans s WHERE {where}"
+    )
 
 
 def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:

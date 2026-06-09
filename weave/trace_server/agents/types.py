@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -1051,6 +1051,41 @@ class AgentsQueryRes(BaseModel):
 
     agents: list[AgentSchema]
     total_count: int = 0
+
+
+class AgentStatsReq(BaseModel):
+    """Request a fast, approximate rollup of agent activity for a project.
+
+    Returns a total span count plus approximate distinct agent and
+    conversation counts, optionally scoped to a time window. When both
+    bounds are omitted the rollup is unbounded.
+    """
+
+    project_id: str
+    started_after: AwareDatetime | None = None
+    started_before: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def validate_stats_request(self) -> AgentStatsReq:
+        if self.started_after is not None:
+            self.started_after = _as_utc(self.started_after)
+        if self.started_before is not None:
+            self.started_before = _as_utc(self.started_before)
+        if (
+            self.started_after is not None
+            and self.started_before is not None
+            and self.started_before < self.started_after
+        ):
+            raise ValueError("AgentStatsReq started_before must be after started_after")
+        return self
+
+
+class AgentStatsRes(BaseModel):
+    """Approximate project-level rollup of agent activity."""
+
+    agent_count: int = 0
+    conversation_count: int = 0
+    span_count: int = 0
 
 
 # ---------------------------------------------------------------------------
