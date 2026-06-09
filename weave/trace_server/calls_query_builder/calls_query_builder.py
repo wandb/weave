@@ -2308,7 +2308,7 @@ def process_query_to_conditions(
     def process_operand(operand: "tsi_query.Operand") -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
             return param_slot(
-                param_builder.add_param(operand.literal_),  # type: ignore
+                param_builder.add_param(operand.literal_),
                 python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):

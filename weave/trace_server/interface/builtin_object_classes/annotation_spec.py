@@ -83,7 +83,7 @@ class AnnotationSpec(base_object_def.BaseObject):
 
         # Handle Pydantic model
         if isinstance(field_schema, type) and issubclass(field_schema, BaseModel):
-            data["field_schema"] = field_schema.model_json_schema()  # type: ignore
+            data["field_schema"] = field_schema.model_json_schema()
             return data
 
         return data

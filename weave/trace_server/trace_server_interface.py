@@ -9,6 +9,7 @@ from pydantic import (
     Field,
     field_serializer,
     model_validator,
+    with_config,
 )
 from typing_extensions import TypedDict
 
@@ -42,12 +43,10 @@ DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
 MAX_FEEDBACK_SAMPLE_LIMIT = 5000
 
 
+# https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
+@with_config(ConfigDict(extra="allow"))
 class ExtraKeysTypedDict(TypedDict):
     pass
-
-
-# https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
-ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
 
 class LLMUsageSchema(TypedDict, total=False):
