@@ -83,7 +83,9 @@ class AnnotationSpec(base_object_def.BaseObject):
 
         # Handle Pydantic model
         if isinstance(field_schema, type) and issubclass(field_schema, BaseModel):
-            data["field_schema"] = field_schema.model_json_schema()  # type: ignore
+            # Read back through `data` (typed `Any`): pydantic is invisible to
+            # the type-check env, so `issubclass` cannot narrow off bare `type`.
+            data["field_schema"] = data["field_schema"].model_json_schema()
             return data
 
         return data
