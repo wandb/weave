@@ -12,14 +12,21 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
+from weave.trace.util import log_once
 from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
+)
+from weave.type_wrappers.Content.utils import (
+    MIME_DETECTION_BUFFER_SIZE,
+    get_mime_and_extension,
 )
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
+
+logger = logging.getLogger(__name__)
 
 
 def is_pydantic_model_class(obj: Any) -> bool:
@@ -278,9 +285,28 @@ def _build_result_from_encoded(
 
 MAX_STR_LEN = 1000
 
+# Stable, parseable prefix for the placeholder substituted for oversized raw bytes.
+# Kept stable so exports/parsers can recognize these values.
+TRUNCATED_BYTES_PREFIX = "<weave-truncated-bytes:"
+
+_DEFAULT_MIMETYPE = "application/octet-stream"
+
+_RAW_BYTES_TRUNCATION_MSG = (
+    "weave does not store raw bytes inline, so a large bytes value was replaced "
+    "with a placeholder and is not recoverable. Wrap it in weave.Content "
+    "(e.g. weave.Content.from_bytes(value)) to store and export it losslessly."
+)
+
 
 def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
     """This is a fallback for objects that we don't have a better way to serialize."""
+    if isinstance(obj, (bytes, bytearray)):
+        # repr(bytes) is at least len(obj) + 3 chars, so oversized buffers are
+        # rejected without materializing the (potentially huge) repr.
+        if len(obj) + 3 > limit:
+            return _truncated_bytes_marker(obj)
+        encoded = repr(obj)
+        return encoded if len(encoded) <= limit else _truncated_bytes_marker(obj)
     rep = None
     try:
         rep = repr(obj)
@@ -292,6 +318,28 @@ def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
     if isinstance(rep, str) and len(rep) > limit:
         rep = rep[: limit - 3] + "..."
     return rep
+
+
+def _truncated_bytes_marker(obj: bytes | bytearray) -> str:
+    """Visible placeholder for raw bytes too large to store inline."""
+    log_once(logger.warning, _RAW_BYTES_TRUNCATION_MSG)
+    mimetype = _sniff_mimetype(bytes(obj[:MIME_DETECTION_BUFFER_SIZE]))
+    return (
+        f"{TRUNCATED_BYTES_PREFIX} {len(obj)} bytes, {mimetype}; "
+        "wrap in weave.Content to store losslessly>"
+    )
+
+
+def _sniff_mimetype(buffer: bytes) -> str:
+    """Best-effort content-type sniff; never raises (magic backend is optional)."""
+    try:
+        mimetype, _ = get_mime_and_extension(
+            mimetype=None, extension=None, filename=None, buffer=buffer
+        )
+    except Exception:
+        # Detection must never fail the user's op; fall back to the generic type.
+        return _DEFAULT_MIMETYPE
+    return mimetype
 
 
 def is_primitive(obj: Any) -> bool:

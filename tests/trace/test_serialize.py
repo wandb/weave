@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -6,6 +7,7 @@ import weave
 from weave.trace.object_record import pydantic_object_record
 from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
+    TRUNCATED_BYTES_PREFIX,
     dictify,
     is_pydantic_model_class,
     stringify,
@@ -152,6 +154,44 @@ def test_stringify_returns_repr() -> None:
 
     pt = Point(1, 2)
     assert stringify(pt) == repr(pt)
+
+
+def test_stringify_bytes_truncation() -> None:
+    """Large/binary bytes become a visible marker; small bytes keep their repr."""
+    # Below the limit: behavior unchanged (regression guard).
+    assert stringify(b"hello") == "b'hello'"
+    assert stringify(bytearray(b"hi")) == repr(bytearray(b"hi"))
+
+    big = os.urandom(4096)
+    marker = stringify(big)
+    assert marker.startswith(TRUNCATED_BYTES_PREFIX)
+    assert "4096 bytes" in marker
+
+    # Short buffer whose repr expands past the limit still gets the marker.
+    assert stringify(b"\xff" * 400).startswith(TRUNCATED_BYTES_PREFIX)
+
+    # Reached via dictify's maxdepth path, not only the top-level to_json ladder.
+    assert dictify({"a": big}, maxdepth=1)["a"].startswith(TRUNCATED_BYTES_PREFIX)
+
+
+def test_op_raw_bytes_truncation_marker(client) -> None:
+    """Raw bytes logged through an op surface as a marker on read-back, not silent truncation."""
+    payload = os.urandom(4096)
+
+    @weave.op
+    def echo(b: bytes) -> bytes:
+        return b
+
+    echo(payload)
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    stored_input = calls[0].inputs["b"]
+    stored_output = calls[0].output
+    assert isinstance(stored_input, str)
+    assert stored_input.startswith(TRUNCATED_BYTES_PREFIX)
+    assert "4096 bytes" in stored_input
+    assert stored_output.startswith(TRUNCATED_BYTES_PREFIX)
 
 
 def test_dictify_sanitizes() -> None:
