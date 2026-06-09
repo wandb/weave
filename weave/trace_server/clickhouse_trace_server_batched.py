@@ -57,8 +57,8 @@ from weave.trace_server import trace_server_interface as tsi
 
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
+from weave.trace_server.agents.completion_spans import build_completion_span
 from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
-from weave.trace_server.agents.playground import build_completion_span
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -6520,6 +6520,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=req.wb_user_id or "",
             retention_days=retention_days,
             error=error,
+            source=req.source,
         )
         AgentWriteHandler(self.ch_client).insert_span(span)
 
@@ -6617,6 +6618,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 response=None,
                 wb_user_id=req.wb_user_id or "",
                 retention_days=retention_days,
+                source=req.source,
             )
             AgentWriteHandler(self.ch_client).insert_span(open_span)
 
@@ -6659,6 +6661,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             request_inputs=req.inputs,
             wb_user_id=req.wb_user_id or "",
             retention_days=retention_days,
+            source=req.source,
         )
 
     @tag_db_insert_path("image_create")
@@ -7618,6 +7621,7 @@ def _create_tracked_span_stream_wrapper(
     request_inputs: tsi.CompletionsCreateRequestInputs,
     wb_user_id: str,
     retention_days: int,
+    source: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Wrap a streaming completion iterator with agent span tracking.
 
@@ -7724,6 +7728,7 @@ def _create_tracked_span_stream_wrapper(
                 wb_user_id=wb_user_id,
                 retention_days=retention_days,
                 error=stream_error,
+                source=source,
             )
             AgentWriteHandler(ch_client).insert_span(completed_span)
 

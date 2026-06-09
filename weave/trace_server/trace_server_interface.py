@@ -548,6 +548,10 @@ class CompletionsCreateReq(BaseModelStrict):
         None,
         description="Human-readable conversation name",
     )
+    source: str | None = Field(
+        None,
+        description="Source of the completion request (e.g. 'playground', 'signals')",
+    )
 
 
 class CompletionsCreateRes(BaseModel):
