@@ -86,7 +86,9 @@ def _text_part(text: str) -> dict:
     return {"type": "text", "content": text}
 
 
-def _uri_part(uri: str, *, mime_type: str = "audio/wav", modality: str = "audio") -> dict:
+def _uri_part(
+    uri: str, *, mime_type: str = "audio/wav", modality: str = "audio"
+) -> dict:
     return {"type": "uri", "mime_type": mime_type, "modality": modality, "uri": uri}
 
 
@@ -581,7 +583,8 @@ def test_input_media_attaches_to_user_message_not_assistant() -> None:
 
 def test_output_media_attaches_to_assistant_message() -> None:
     """Model-generated media is a part on the output message and renders on
-    the assistant bubble (mirror image of the input case)."""
+    the assistant bubble (mirror image of the input case).
+    """
     image_internal = "weave-trace-internal:///PID/object/Content:GENIMG"
     image_external = "weave:///e/p/object/Content:GENIMG"
     spans = [
@@ -627,7 +630,8 @@ def test_content_ref_without_inline_part_is_not_attached() -> None:
     """A `content_refs` entry with no matching inline message part has no
     direction signal, so it attaches to neither bubble — only refs anchored to
     an input/output part are surfaced (documents the deliberate pre-GA break
-    away from the undirected flat list)."""
+    away from the undirected flat list).
+    """
     spans = [
         _span(
             span_id="agent",
