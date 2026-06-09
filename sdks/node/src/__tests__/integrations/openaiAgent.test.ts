@@ -29,7 +29,7 @@ import * as weave from '../..';
 import {clearWeaveTracerProvider} from '../../genai/provider';
 import {Settings} from '../../settings';
 import {initWithCustomTraceServer} from '../clientMock';
-import {InMemoryTraceServer, Call} from '../helpers/inMemoryTraceServer';
+import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
 import {agentsInstrumentedHolder} from 'weave/integrations/openai.agent';
 import {wrapOpenAIChatCompletionsCreate} from '../../integrations/openai';
 import {makeAPIPromiseShim} from '../openaiMock';

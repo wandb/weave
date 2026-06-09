@@ -1,9 +1,14 @@
 import {requireGlobalClient} from './clientApi';
 import {Table} from './table';
-import {ObjectRef, WeaveObject, WeaveObjectParameters} from './weaveObject';
+import {
+  type ObjectRef,
+  WeaveObject,
+  type WeaveObjectParameters,
+} from './weaveObject';
 
-interface DatasetParameters<R extends DatasetRow>
-  extends WeaveObjectParameters {
+interface DatasetParameters<
+  R extends DatasetRow,
+> extends WeaveObjectParameters {
   rows: R[];
 }
 

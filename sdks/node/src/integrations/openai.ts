@@ -1,10 +1,10 @@
 import {weaveImage} from '../media';
 import {op} from '../op';
-import {OpOptions} from '../opType';
+import {type OpOptions} from '../opType';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {getGlobalClient} from '../clientApi';
 import {InternalCall} from '../call';
-import {WeaveClient} from '../weaveClient';
+import {type WeaveClient} from '../weaveClient';
 import {warnOnce} from '../utils/warnOnce';
 import {
   getCallStackFromOpenAIAgents,
@@ -197,7 +197,7 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
   };
 }
 
-import {StreamReducer} from '../opType';
+import {type StreamReducer} from '../opType';
 
 export type Response = {
   id: string;
