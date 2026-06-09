@@ -1025,12 +1025,21 @@ class AgentSchema(BaseModel):
     error_count: int
     first_seen: datetime.datetime | None
     last_seen: datetime.datetime | None
+    hidden: bool = False
 
 
 class AgentsQueryFilters(BaseModel):
     """Optional filters for querying agents."""
 
     agent_name: str | None = None
+    include_hidden: bool = Field(
+        default=False,
+        description=(
+            "When False (default), agents hidden via `hidden_agents` are "
+            "excluded. When True, hidden agents are returned with `hidden=True` "
+            "on the schema."
+        ),
+    )
 
 
 class AgentsQueryReq(BaseModel):
