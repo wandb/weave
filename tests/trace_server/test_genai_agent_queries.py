@@ -31,6 +31,7 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsReq,
     AgentSpanValueRef,
     AgentsQueryReq,
+    AgentStatsReq,
 )
 from weave.trace_server.interface.query import Query
 
@@ -1712,3 +1713,53 @@ def test_query_dsl_typed_custom_attr_comparison(ch_server):
     )
     assert res.total_count == 1
     assert len(res.spans) == 1
+
+
+def test_agent_stats(ch_server):
+    """Rollup returns span count plus distinct agent/conversation counts."""
+    project_id = _make_project_id("agent-stats")
+
+    spans = [
+        _make_span(project_id, agent_name="agent-A", conversation_id="conv-1"),
+        _make_span(project_id, agent_name="agent-A", conversation_id="conv-1"),
+        _make_span(project_id, agent_name="agent-B", conversation_id="conv-2"),
+        _make_span(project_id, agent_name="agent-A", conversation_id="conv-3"),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_stats(AgentStatsReq(project_id=project_id))
+    assert res.span_count == 4
+    assert res.agent_count == 2  # agent-A, agent-B
+    assert res.conversation_count == 3  # conv-1, conv-2, conv-3
+
+
+def test_agent_stats_time_window(ch_server):
+    """started_after scopes the rollup to spans within the window."""
+    project_id = _make_project_id("agent-stats-window")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    old = now - datetime.timedelta(days=90)
+
+    spans = [
+        _make_span(project_id, agent_name="recent", started_at=now),
+        _make_span(project_id, agent_name="stale", started_at=old),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_stats(
+        AgentStatsReq(
+            project_id=project_id,
+            started_after=now - datetime.timedelta(days=1),
+        )
+    )
+    assert res.span_count == 1
+    assert res.agent_count == 1
+
+
+def test_agent_stats_empty_project(ch_server):
+    """A project with no agent spans rolls up to all zeros."""
+    project_id = _make_project_id("agent-stats-empty")
+
+    res = ch_server.agent_stats(AgentStatsReq(project_id=project_id))
+    assert res.span_count == 0
+    assert res.agent_count == 0
+    assert res.conversation_count == 0

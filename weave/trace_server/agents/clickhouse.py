@@ -61,6 +61,8 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsRes,
     AgentsQueryReq,
     AgentsQueryRes,
+    AgentStatsReq,
+    AgentStatsRes,
     AgentTraceChatReq,
     AgentTraceChatRes,
     AgentVersionSchema,
@@ -77,6 +79,7 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
+    make_agent_stats_query,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -379,6 +382,22 @@ class AgentQueryHandler:
     # ------------------------------------------------------------------
     # AMT-backed agents queries
     # ------------------------------------------------------------------
+
+    def stats(self, req: AgentStatsReq) -> AgentStatsRes:
+        """Fast, approximate project-level rollup of agent activity.
+
+        Single pass over `spans` returning total span count plus approximate
+        distinct agent and conversation counts.
+        """
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_agent_stats_query(pb, req)
+        rows = _rows_as_dicts(self._query(sql, pb.get_params()))
+        row = rows[0] if rows else {}
+        return AgentStatsRes(
+            agent_count=safe_int(row.get("agent_count")),
+            conversation_count=safe_int(row.get("conversation_count")),
+            span_count=safe_int(row.get("span_count")),
+        )
 
     def agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         """Query agents AMT for agent list page."""

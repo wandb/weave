@@ -1319,6 +1319,14 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             agent.project_id = original_project_id
         return res
 
+    def agent_stats(
+        self, req: tsi.agent_types.AgentStatsReq
+    ) -> tsi.agent_types.AgentStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_stats, req, req.project_id
+        )
+
     def agent_versions_query(
         self, req: tsi.agent_types.AgentVersionsQueryReq
     ) -> tsi.agent_types.AgentVersionsQueryRes:
