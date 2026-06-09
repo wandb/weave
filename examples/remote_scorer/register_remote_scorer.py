@@ -121,7 +121,7 @@ def _parse_config(raw_config: str | None) -> dict[str, Any] | None:
         return None
     parsed = json.loads(raw_config)
     if not isinstance(parsed, dict):
-        raise ValueError("--config-json must be a JSON object")
+        raise TypeError("--config-json must be a JSON object")
     return parsed
 
 

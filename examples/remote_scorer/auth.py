@@ -28,9 +28,7 @@ def validate_bearer_token(token: str) -> bool:
     """
     expected = os.environ.get("REMOTE_SCORER_DEV_BEARER_TOKEN")
     if not expected:
-        logger.warning(
-            "REMOTE_SCORER_DEV_BEARER_TOKEN is not set; rejecting request"
-        )
+        logger.warning("REMOTE_SCORER_DEV_BEARER_TOKEN is not set; rejecting request")
         return False
 
     return hmac.compare_digest(token, expected)

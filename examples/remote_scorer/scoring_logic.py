@@ -19,7 +19,7 @@ def score_remote_call(request_body: dict[str, Any]) -> dict[str, Any]:
 
     original_call = request_body.get("original_call")
     if not isinstance(original_call, dict):
-        raise ValueError("request missing original_call object")
+        raise TypeError("request missing original_call object")
 
     inputs = original_call.get("inputs", {})
     message = inputs.get("message", "") if isinstance(inputs, dict) else ""
