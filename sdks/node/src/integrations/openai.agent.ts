@@ -167,7 +167,7 @@ export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
 export async function instrumentOpenAIAgents(): Promise<boolean> {
   try {
     // Use dynamic import() which works in both CommonJS and ESM
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
     // @ts-ignore - Dynamic import of optional peer dependency
     const agents = await import('@openai/agents');
     return await instrumentOpenAIAgentsCommon(agents);
