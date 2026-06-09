@@ -1,5 +1,7 @@
 # **Weave by Weights & Biases**
 
+<!-- Verify declarative environment setup -->
+
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](http://wandb.me/weave_colab)
 [![Stable Version](https://img.shields.io/pypi/v/weave?color=green)](https://pypi.org/project/weave)
 [![Download Stats](https://img.shields.io/pypi/dm/weave)](https://pypistats.org/packages/weave)
