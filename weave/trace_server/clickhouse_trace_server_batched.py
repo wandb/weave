@@ -3383,7 +3383,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_position=req.include_position,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
 
         items = []
         for row in result.named_results():
@@ -3428,7 +3428,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
 
         stats = []
         for row in result.result_rows:
@@ -3459,7 +3459,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             offset=None,
             include_position=False,
         )
-        fetch_result = self.ch_client.query(fetch_query, parameters=pb.get_params())
+        fetch_result = self._query(fetch_query, pb.get_params())
 
         for row in fetch_result.named_results():
             item = tsi.AnnotationQueueItemSchema(
