@@ -23,6 +23,8 @@ import type {
   TracingProcessor,
   CustomSpanData,
 } from './openai.agent.types';
+import {shouldUseOtelV2} from '../settings';
+import {WeaveOtelTracingProcessor} from './openai-agents/weave-otel-tracing-processor';
 
 // ============================================================================
 // Helper Functions
@@ -660,6 +662,10 @@ export class WeaveTracingProcessor implements TracingProcessor {
  * ```
  */
 export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
+  if (shouldUseOtelV2()) {
+    return new WeaveOtelTracingProcessor();
+  }
+
   return new WeaveTracingProcessor();
 }
 
@@ -747,7 +753,7 @@ const _agentsInstrumentedHolder = globalSingleton<{value: boolean}>(
   () => ({value: false})
 );
 
-export function instrumentOpenAIAgentsCommon(exports: any): boolean {
+function instrumentOpenAIAgentsCommon(exports: any): boolean {
   // Always capture context functions when available — even if already instrumented,
   // because a later module load may provide fresh references after a processor reset.
   registerAgentContextProvider(exports);
