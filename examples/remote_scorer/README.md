@@ -99,7 +99,7 @@ repo checkout, also install Weave in editable mode with the scorer extras:
 python -m pip install -e "../..[scorers]"
 ```
 
-The editable install is needed because these scripts depend on Weave `0.52.43`,
+The editable install is needed because these scripts depend on Weave `>=0.52.43`,
 which has not been released yet. The scorer extras are needed by the current
 Weave package import path used by the registration script.
 
@@ -107,7 +107,7 @@ Run the reference endpoint locally:
 
 ```bash
 export REMOTE_SCORER_DEV_BEARER_TOKEN="dev-token"
-uvicorn remote_scorer_app:app --host 0.0.0.0 --port 8000
+uvicorn remote_scorer_app:app --host 127.0.0.1 --port 8000
 ```
 
 Exercise the local contract without Weave:

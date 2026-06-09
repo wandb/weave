@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 
 import weave
 
@@ -31,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def make_sample_op(op_name: str):
+def make_sample_op(op_name: str) -> Callable[[str], dict[str, str]]:
     @weave.op(name=op_name)
     def sample_remote_scorer_target(message: str) -> dict[str, str]:
         return {
