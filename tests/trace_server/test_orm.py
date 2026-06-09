@@ -345,6 +345,53 @@ inner JOIN roles ON (table1.id = table2.id)"""
     )
 
 
+def test_join_global():
+    table1 = Table(
+        "users",
+        [
+            Column("id", "string"),
+            Column("creator", "string", nullable=True),
+            Column("payload", "json", db_name="payload_dump"),
+        ],
+    )
+    table2 = Table(
+        "roles",
+        [
+            Column("id", "string"),
+            Column("name", "string"),
+        ],
+    )
+
+    select = (
+        table1.select()
+        .fields(["id", "name"])
+        .join(
+            table2,
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "table1.id"},
+                            {"$getField": "table2.id"},
+                        ]
+                    }
+                }
+            ),
+            "LEFT",
+            global_=True,
+        )
+    )
+
+    prepared = select.prepare(database_type="clickhouse")
+
+    assert (
+        prepared.sql
+        == """SELECT id, name
+FROM users
+GLOBAL LEFT JOIN roles ON (table1.id = table2.id)"""
+    )
+
+
 def test_group_by():
     table = Table(
         "users",

@@ -258,6 +258,7 @@ class Join:
     table: Table
     query: tsi.Query
     join_type: str | None
+    global_: bool = False
 
 
 class Select:
@@ -297,9 +298,13 @@ class Select:
         self._group_by = None
 
     def join(
-        self, table: Table, query: tsi.Query, join_type: str | None = None
+        self,
+        table: Table,
+        query: tsi.Query,
+        join_type: str | None = None,
+        global_: bool = False,
     ) -> "Select":
-        self.joins.append(Join(table, query, join_type))
+        self.joins.append(Join(table, query, join_type, global_))
         for col in table.cols:
             self.all_columns.append(col.dbname())
         self.datetime_columns.extend(table.datetime_cols)
@@ -403,7 +408,9 @@ class Select:
                 datetime_columns=self.datetime_columns,
             )
             joined = combine_conditions(query_conds, "AND")
-            sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
+            global_prefix = "GLOBAL " if j.global_ else ""
+            join_kind = f"{j.join_type} " if j.join_type else ""
+            sql += f"\n{global_prefix}{join_kind}JOIN {j.table.name} ON {joined}"
 
         conditions = []
         if self._project_id:

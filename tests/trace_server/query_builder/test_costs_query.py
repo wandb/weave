@@ -100,7 +100,7 @@ def test_query_light_column_with_costs() -> None:
                             llm_token_prices.effective_date DESC
                     ) AS rank
                 FROM llm_usage
-                LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id) AND ((llm_token_prices.pricing_level_id = {pb_2:String})
+                GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id) AND ((llm_token_prices.pricing_level_id = {pb_2:String})
                     OR (llm_token_prices.pricing_level_id = {pb_3:String})
                     OR (llm_token_prices.pricing_level_id = {pb_4:String}))) )
             -- Final Select, which just selects the correct fields, and adds a costs object
@@ -264,7 +264,7 @@ def test_query_with_costs_and_attributes_order() -> None:
                                              ELSE 4
                                          END, llm_token_prices.effective_date DESC) AS rank
    FROM llm_usage
-   LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+   GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                   AND ((llm_token_prices.pricing_level_id = {pb_6:String})
                                        OR (llm_token_prices.pricing_level_id = {pb_7:String})
                                        OR (llm_token_prices.pricing_level_id = {pb_8:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -389,7 +389,7 @@ def test_query_with_costs_and_dynamic_summary_order() -> None:
                                              ELSE 4
                                          END, llm_token_prices.effective_date DESC) AS rank
    FROM llm_usage
-   LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+   GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                   AND ((llm_token_prices.pricing_level_id = {pb_3:String})
                                        OR (llm_token_prices.pricing_level_id = {pb_4:String})
                                        OR (llm_token_prices.pricing_level_id = {pb_5:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -510,7 +510,7 @@ def test_query_with_costs_and_feedback_order() -> None:
                                                          ELSE 4
                                                      END, llm_token_prices.effective_date DESC) AS rank
              FROM llm_usage
-             LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+             GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                             AND ((llm_token_prices.pricing_level_id = {pb_5:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_6:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_7:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -635,7 +635,7 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
                                                          ELSE 4
                                                      END, llm_token_prices.effective_date DESC) AS rank
              FROM llm_usage
-             LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+             GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                             AND ((llm_token_prices.pricing_level_id = {pb_3:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_4:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_5:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -748,7 +748,7 @@ def test_query_calls_complete_with_costs_light_fields() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_3:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_4:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_5:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -854,7 +854,7 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_4:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_5:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_6:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -976,7 +976,7 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_6:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_7:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_8:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -1093,7 +1093,7 @@ def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_1:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_2:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_3:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -1208,7 +1208,7 @@ def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_4:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_5:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_6:String})))) -- Final Select, which just selects the correct fields, and adds a costs object

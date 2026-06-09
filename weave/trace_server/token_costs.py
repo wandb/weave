@@ -357,6 +357,9 @@ def get_ranked_prices(
                 }
             ),
             "LEFT",
+            # CH 24.3+ analyzer ignores distributed_product_mode, so GLOBAL must
+            # be explicit to avoid Code 288 double-distributed JOIN on clusters.
+            global_=True,
         )
     )
 
