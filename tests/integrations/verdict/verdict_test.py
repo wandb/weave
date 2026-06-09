@@ -20,7 +20,6 @@ def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_simple_verdict_pipeline(client: WeaveClient) -> None:
@@ -69,7 +68,6 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_layer_tracing(client: WeaveClient) -> None:
@@ -119,7 +117,6 @@ def test_verdict_layer_tracing(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_custom_unit_tracing(client: WeaveClient) -> None:
@@ -170,7 +167,6 @@ def test_verdict_custom_unit_tracing(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_block_tracing(client: WeaveClient) -> None:
@@ -220,7 +216,6 @@ def test_verdict_block_tracing(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
@@ -269,7 +264,6 @@ def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_layer_configurations_tracing(client: WeaveClient) -> None:
@@ -317,7 +311,6 @@ def test_verdict_layer_configurations_tracing(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
@@ -370,7 +363,6 @@ def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
@@ -424,7 +416,6 @@ def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_tracer_inheritance(client: WeaveClient) -> None:

@@ -52,7 +52,6 @@ def patch_llamaindex() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
@@ -121,7 +120,6 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
@@ -186,7 +184,6 @@ async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
@@ -265,7 +262,6 @@ def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
@@ -338,7 +334,6 @@ async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
@@ -421,7 +416,6 @@ def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
@@ -505,7 +499,6 @@ async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
@@ -614,7 +607,6 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
@@ -725,7 +717,6 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
@@ -797,7 +788,6 @@ def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
@@ -843,7 +833,6 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     # before_record_request=filter_body,
 )
 @pytest.mark.asyncio

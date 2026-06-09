@@ -132,7 +132,6 @@ def get_flow_with_router_or():
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_crewai_simple_crew(client: WeaveClient) -> None:
     crew = get_crew()
@@ -265,7 +264,6 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
     crew = get_crew()
@@ -309,7 +307,6 @@ def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 async def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
     crew = get_crew()
@@ -342,7 +339,6 @@ async def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) -> None:
     crew = get_crew()
@@ -390,10 +386,6 @@ async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) ->
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=[
-        "api.wandb.ai",
-        "localhost",
-    ],
 )
 def test_simple_flow(client: WeaveClient) -> None:
     flow = get_flow_with_router_or()
