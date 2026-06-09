@@ -389,9 +389,7 @@ class Select:
             fieldnames = []
             sql = "DELETE "
 
-        sql += (
-            f"FROM {_format_delete_target(table_name or self.table.name, cluster_name)}"
-        )
+        sql += f"FROM {_format_table_name_with_cluster(table_name or self.table.name, cluster_name)}"
 
         # Handle joins
         # Returns {join type} JOIN {table name} ON {join condition}
@@ -501,11 +499,11 @@ class Select:
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
 
 
-def _format_delete_target(table_name: str, cluster_name: str | None) -> str:
-    """Append `ON CLUSTER` to a DELETE target so it fans out across shards.
+def _format_table_name_with_cluster(table_name: str, cluster_name: str | None) -> str:
+    """Append `ON CLUSTER {cluster_name}` to a table reference when clustered.
 
-    Callers pass the resolved table (e.g. `<table>_local` in distributed mode);
-    this only appends the cluster clause.
+    Callers pass the already-resolved table name (e.g. `<table>_local` in
+    distributed mode); this only appends the cluster clause.
     """
     if cluster_name:
         return f"{table_name} ON CLUSTER {cluster_name}"

@@ -73,6 +73,7 @@ from weave.trace_server.interface.query import (
 )
 from weave.trace_server.orm import (
     ParamBuilder,
+    _format_table_name_with_cluster,
     clickhouse_cast,
     combine_conditions,
     maybe_convert_datetime_operands,
@@ -3364,21 +3365,6 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.thread_ids is None
         and filter.turn_ids is None
     )
-
-
-def _format_table_name_with_cluster(
-    table_name: str,
-    cluster_name: str | None,
-) -> str:
-    """Format a table name with ON CLUSTER clause if cluster_name is provided.
-
-    Callers are responsible for passing the correct table name (e.g.
-    calls_complete_local in distributed mode). This function only appends the
-    ON CLUSTER clause.
-    """
-    if cluster_name:
-        return f"{table_name} ON CLUSTER {cluster_name}"
-    return table_name
 
 
 def build_calls_complete_update_end_query(

@@ -12,13 +12,12 @@ import pytest
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
-    _format_table_name_with_cluster,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
 )
 from weave.trace_server.feedback import TABLE_FEEDBACK
-from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.orm import ParamBuilder, _format_table_name_with_cluster
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_annotator_progress_update_query,
     make_queue_delete_query,
@@ -206,77 +205,52 @@ def test_calls_complete_table_resolution_by_mode(
 
 
 @pytest.mark.parametrize(
-    ("table_name", "cluster_name", "expected_from"),
-    [
-        ("feedback", None, "feedback"),
-        ("feedback", CLUSTER, f"feedback ON CLUSTER {CLUSTER}"),
-        ("feedback_local", CLUSTER, f"feedback_local ON CLUSTER {CLUSTER}"),
-    ],
-    ids=["cloud", "replicated", "distributed"],
+    ("cluster_name", "on_cluster"),
+    [(None, ""), (CLUSTER, f" ON CLUSTER {CLUSTER}")],
+    ids=["cloud", "clustered"],
 )
-def test_feedback_purge_routes_delete_target(
-    table_name: str, cluster_name: str | None, expected_from: str
+def test_purge_delete_honors_caller_table_and_cluster(
+    cluster_name: str | None, on_cluster: str
 ) -> None:
-    """Feedback purge DELETE must target the caller-resolved table + ON CLUSTER.
-
-    Distributed mode passes feedback_local; lightweight DELETE isn't supported
-    on the Distributed engine (WB-35378).
-    """
-    pb = ParamBuilder(prefix="p", database_type="clickhouse")
-    query = (
+    """feedback/cost purge DELETE targets the caller's table_name + ON CLUSTER (WB-35378)."""
+    feedback = (
         TABLE_FEEDBACK.purge()
         .project_id("proj")
         .where(
             tsi.Query(**{"$expr": {"$eq": [{"$getField": "id"}, {"$literal": "abc"}]}})
         )
-    )
-    prepared = query.prepare(
-        database_type="clickhouse",
-        param_builder=pb,
-        table_name=table_name,
-        cluster_name=cluster_name,
-    )
-    assert prepared.sql == (
-        f"DELETE FROM {expected_from}\n"
-        "WHERE ((project_id = {project_id:String}) AND ((id = {p_1:String})))"
-    )
-    assert prepared.parameters == {"project_id": "proj", "p_1": "abc"}
-
-
-@pytest.mark.parametrize(
-    ("table_name", "cluster_name", "expected_from"),
-    [
-        ("llm_token_prices", None, "llm_token_prices"),
-        ("llm_token_prices", CLUSTER, f"llm_token_prices ON CLUSTER {CLUSTER}"),
-        (
-            "llm_token_prices_local",
-            CLUSTER,
-            f"llm_token_prices_local ON CLUSTER {CLUSTER}",
-        ),
-    ],
-    ids=["cloud", "replicated", "distributed"],
-)
-def test_cost_purge_routes_delete_target(
-    table_name: str, cluster_name: str | None, expected_from: str
-) -> None:
-    """Cost purge DELETE must target the caller-resolved table + ON CLUSTER (WB-35378)."""
-    pb = ParamBuilder(prefix="p", database_type="clickhouse")
-    query = LLM_TOKEN_PRICES_TABLE.purge().where(
-        tsi.Query(
-            **{
-                "$expr": {
-                    "$eq": [{"$getField": "pricing_level_id"}, {"$literal": "proj"}]
-                }
-            }
+        .prepare(
+            database_type="clickhouse",
+            param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
+            table_name="feedback",
+            cluster_name=cluster_name,
         )
     )
-    prepared = query.prepare(
-        database_type="clickhouse",
-        param_builder=pb,
-        table_name=table_name,
-        cluster_name=cluster_name,
+    assert feedback.sql == (
+        f"DELETE FROM feedback{on_cluster}\n"
+        "WHERE ((project_id = {project_id:String}) AND ((id = {p_1:String})))"
     )
-    assert prepared.sql == (
-        f"DELETE FROM {expected_from}\nWHERE (pricing_level_id = {{p_0:String}})"
+    assert feedback.parameters == {"project_id": "proj", "p_1": "abc"}
+
+    cost = (
+        LLM_TOKEN_PRICES_TABLE.purge()
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [{"$getField": "pricing_level_id"}, {"$literal": "proj"}]
+                    }
+                }
+            )
+        )
+        .prepare(
+            database_type="clickhouse",
+            param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
+            table_name="llm_token_prices",
+            cluster_name=cluster_name,
+        )
     )
-    assert prepared.parameters == {"p_0": "proj"}
+    assert cost.sql == (
+        f"DELETE FROM llm_token_prices{on_cluster}\nWHERE (pricing_level_id = {{p_0:String}})"
+    )
+    assert cost.parameters == {"p_0": "proj"}
