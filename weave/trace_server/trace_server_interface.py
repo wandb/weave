@@ -3076,6 +3076,9 @@ class TraceServerInterface(Protocol):
     def agent_agents_query(
         self, req: agent_types.AgentsQueryReq
     ) -> agent_types.AgentsQueryRes: ...
+    def agent_set_visibility(
+        self, req: agent_types.AgentVisibilityReq
+    ) -> agent_types.AgentVisibilityRes: ...
     def agent_versions_query(
         self, req: agent_types.AgentVersionsQueryReq
     ) -> agent_types.AgentVersionsQueryRes: ...

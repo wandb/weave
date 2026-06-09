@@ -66,6 +66,7 @@ from weave.trace_server.agents.types import (
     AgentVersionSchema,
     AgentVersionsQueryReq,
     AgentVersionsQueryRes,
+    AgentVisibilityReq,
     GenAIOTelExportReq,
     GenAIOTelExportRes,
     group_by_ref_alias,
@@ -723,6 +724,33 @@ class AgentWriteHandler:
             column_names=ALL_SPAN_INSERT_COLUMNS,
         )
         record_db_insert(table="spans", count=1)
+
+    def set_agent_visibility(self, req: AgentVisibilityReq) -> None:
+        """Hide or unhide an agent project-wide.
+
+        Writes a single row into the `hidden_agents` ReplacingMergeTree
+        (migration 033). The latest row by `updated_at` wins, so the same path
+        toggles both directions. Counts on the agents AMT are untouched.
+        """
+        insert_with_empty_query_retry(
+            self._ch_client,
+            "hidden_agents",
+            data=[
+                [
+                    req.project_id,
+                    req.agent_name,
+                    req.hidden,
+                    datetime.datetime.now(datetime.timezone.utc),
+                ]
+            ],
+            column_names=[
+                "project_id",
+                "agent_name",
+                "is_hidden",
+                "updated_at",
+            ],
+        )
+        record_db_insert(table="hidden_agents", count=1)
 
 
 # ---------------------------------------------------------------------------
