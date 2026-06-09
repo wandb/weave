@@ -9,11 +9,8 @@ import {WeaveObject, WeaveObjectParameters} from './weaveObject';
 const PROGRESS_BAR = false;
 
 // Column mapping takes a dataset row of type R and maps it to a scorer's dataset row of type E
-interface EvaluationParameters<
-  R extends DatasetRow,
-  E extends DatasetRow,
-  M,
-> extends WeaveObjectParameters {
+interface EvaluationParameters<R extends DatasetRow, E extends DatasetRow, M>
+  extends WeaveObjectParameters {
   dataset: Dataset<R>;
   scorers: WeaveCallable<(...args: [{datasetRow: E; modelOutput: M}]) => any>[];
   maxConcurrency?: number;
