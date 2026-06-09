@@ -539,7 +539,7 @@ export class WeaveClient {
 
     this.isBatchProcessing = true;
 
-    let batchToProcess = [];
+    const batchToProcess = [];
     let currentBatchSize = 0;
 
     while (
@@ -774,7 +774,7 @@ export class WeaveClient {
 
       const {content, description, name} = val;
 
-      let obj = new StringPrompt({
+      const obj = new StringPrompt({
         name,
         description,
         content,
@@ -790,7 +790,7 @@ export class WeaveClient {
 
       const {description, messages, name} = val;
 
-      let obj = new MessagesPrompt({
+      const obj = new MessagesPrompt({
         name,
         description,
         messages,
@@ -807,7 +807,7 @@ export class WeaveClient {
 
       const {description, rows, name} = val;
 
-      let obj = new Dataset({
+      const obj = new Dataset({
         name: name || dataObj.id,
         description,
         rows,
@@ -821,7 +821,7 @@ export class WeaveClient {
       return obj;
     } else if (t == 'Table') {
       const {rows} = val;
-      let obj = new Table(rows);
+      const obj = new Table(rows);
       obj.__savedRef = ref;
 
       // Load table rows if they are a ref
@@ -831,7 +831,7 @@ export class WeaveClient {
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;
       if (typeName == 'PIL.Image.Image') {
-        let loadedFiles: {[key: string]: Buffer} = {};
+        const loadedFiles: {[key: string]: Buffer} = {};
         for (const [name, digest] of Object.entries(val.files)) {
           try {
             const fileContent =
@@ -847,7 +847,7 @@ export class WeaveClient {
         // TODO: Implement getting img back as buffer
         return 'Coming soon!';
       } else if (typeName == 'wave.Wave_read') {
-        let loadedFiles: {[key: string]: Buffer} = {};
+        const loadedFiles: {[key: string]: Buffer} = {};
         for (const [name, digest] of Object.entries(val.files)) {
           try {
             const fileContent =
@@ -1539,7 +1539,7 @@ function processSummary(
   currentCall: CallStackEntry,
   parentCall: CallStackEntry | undefined
 ) {
-  let ownSummary = summarize && result != null ? summarize(result) : {};
+  const ownSummary = summarize && result != null ? summarize(result) : {};
 
   if (ownSummary.usage) {
     for (const model in ownSummary.usage) {
