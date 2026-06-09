@@ -95,7 +95,6 @@ def accuracy_metric(answer, model_output, trace=None):
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_dspy_language_models(client: WeaveClient) -> None:
     lm = dspy.LM("openai/gpt-4o-mini", cache=False)
@@ -139,7 +138,6 @@ def test_dspy_language_models(client: WeaveClient) -> None:
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_dspy_predict_module(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
@@ -188,7 +186,6 @@ def test_dspy_predict_module(client: WeaveClient) -> None:
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_dspy_cot(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
@@ -245,7 +242,6 @@ def test_dspy_cot(client: WeaveClient) -> None:
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_dspy_custom_module(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
@@ -307,7 +303,6 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skipif(
     sys.platform == "win32",
@@ -378,7 +373,6 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skipif(
     sys.platform == "win32",
@@ -438,7 +432,6 @@ def test_dspy_evaluate_with_pydantic_prediction(client: WeaveClient) -> None:
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skipif(
     sys.platform == "win32",
@@ -477,7 +470,6 @@ def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skipif(
     sys.platform == "win32",
@@ -516,7 +508,6 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
         "x-request-id",
         "x-rate-limit",
     ],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skipif(
     sys.platform == "win32",

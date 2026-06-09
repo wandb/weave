@@ -180,3 +180,22 @@ def update_settings_for_aggregation_in_order(
     settings: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:
     return {**(settings or {}), **CLICKHOUSE_AGGREGATION_IN_ORDER_SETTINGS}
+
+
+# `calls_complete` is the only calls table with `enable_block_number_column=1`, so its
+# lightweight-update patch parts carry a `_block_number` virtual column. Since CH 25.11
+# allowed `optimize_read_in_order` + lazy materialization together, reads that hit Join-mode
+# patch parts under the InOrder pool feed an empty `read_sample_block` to the patch reader and
+# raise "Not found column `_block_number` in block" (NOT_FOUND_COLUMN_IN_BLOCK). Disabling lazy
+# materialization on this read path sidesteps it at no measurable cost (identical bytes_read,
+# equal-or-better latency in prod benchmarks). Fixed upstream by ClickHouse PR #99023, first
+# released in 26.3 and NOT backported to any 25.12.x. Remove once CH is >= 26.3.
+CLICKHOUSE_CALLS_COMPLETE_READ_SETTINGS: dict[str, int | str] = {
+    "query_plan_optimize_lazy_materialization": 0,
+}
+
+
+def update_settings_for_calls_complete_read(
+    settings: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
+    return {**(settings or {}), **CLICKHOUSE_CALLS_COMPLETE_READ_SETTINGS}

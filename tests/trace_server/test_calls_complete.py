@@ -12,7 +12,11 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.calls_query_builder.utils import param_slot
-from weave.trace_server.errors import CallsCompleteModeRequired, RequestTooLarge
+from weave.trace_server.errors import (
+    CallsCompleteModeRequired,
+    NotFoundError,
+    RequestTooLarge,
+)
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import (
     reset_project_residence_cache,
@@ -956,6 +960,77 @@ def test_call_end_v2_without_started_at(trace_server, clickhouse_trace_server):
     calls = _fetch_calls_stream(trace_server, project_id)
     assert len(calls) == 1
     assert calls[0].ended_at is not None
+
+
+def test_call_end_v2_mismatched_started_at_still_finishes(
+    trace_server, clickhouse_trace_server
+):
+    """call_end_v2 finishes on a mismatched started_at and errors on an unknown id."""
+    project_id = f"{TEST_ENTITY}/calls_complete_v2_mismatched_started_at"
+    internal_project_id = b64(project_id)
+
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    trace_server.call_start_v2(
+        tsi.CallStartV2Req(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=trace_id,
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    # End with a started_at that does NOT match the stored start.
+    ended_at = started_at + datetime.timedelta(seconds=5)
+    mismatched_started_at = started_at + datetime.timedelta(hours=1)
+    trace_server.call_end_v2(
+        tsi.CallEndV2Req(
+            end=tsi.EndedCallSchemaForInsertWithStartedAt(
+                project_id=project_id,
+                id=call_id,
+                started_at=mismatched_started_at,
+                ended_at=ended_at,
+                summary={"usage": {}, "status_counts": {}},
+            )
+        )
+    )
+
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 1
+    )
+    updated_ended_at = _fetch_call_ended_at(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
+    )
+    assert updated_ended_at == ended_at.replace(tzinfo=None)
+
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    assert calls[0].ended_at == ended_at
+
+    # Ending an unknown id has no start row to find, so it must signal not-found.
+    with pytest.raises(NotFoundError):
+        trace_server.call_end_v2(
+            tsi.CallEndV2Req(
+                end=tsi.EndedCallSchemaForInsertWithStartedAt(
+                    project_id=project_id,
+                    id=str(uuid.uuid4()),
+                    ended_at=ended_at,
+                    summary={"usage": {}, "status_counts": {}},
+                )
+            )
+        )
 
 
 def test_call_start_and_end_require_calls_complete_mode(
@@ -1941,3 +2016,48 @@ def test_feedback_filter_does_not_duplicate_calls_complete(
         f"Expected 1 call but got {len(results)} — feedback LEFT JOIN is duplicating rows"
     )
     assert results[0].id == call_id
+
+
+@pytest.mark.parametrize(
+    ("read_table", "expect_lazy_materialization_disabled"),
+    [
+        (ReadTable.CALLS_COMPLETE, True),
+        (ReadTable.CALLS_MERGED, False),
+    ],
+)
+def test_calls_query_stream_lazy_materialization_scoped_to_calls_complete(
+    monkeypatch,
+    clickhouse_trace_server,
+    read_table,
+    expect_lazy_materialization_disabled,
+):
+    """calls_complete reads inject query_plan_optimize_lazy_materialization=0 to dodge
+    the CH 25.11/25.12 patch-part `_block_number` crash; calls_merged reads do not.
+    """
+    captured: dict[str, Any] = {}
+
+    def _capture(self, query, parameters=None, settings=None, **kwargs):
+        captured["settings"] = dict(settings or {})
+        return iter([])
+
+    # Patch on the classes, not the shared instances: instance-level setattr would
+    # leak `_query_stream` into the server's __dict__ (see test_reset_server_state).
+    resolver = clickhouse_trace_server.table_routing_resolver
+    monkeypatch.setattr(
+        type(resolver), "resolve_read_table", lambda self, *args, **kwargs: read_table
+    )
+    monkeypatch.setattr(type(clickhouse_trace_server), "_query_stream", _capture)
+
+    list(
+        clickhouse_trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=f"{TEST_ENTITY}/lazy_mat", columns=["id"], limit=10
+            )
+        )
+    )
+
+    flag = "query_plan_optimize_lazy_materialization"
+    if expect_lazy_materialization_disabled:
+        assert captured["settings"][flag] == 0
+    else:
+        assert flag not in captured["settings"]

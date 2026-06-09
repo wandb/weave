@@ -39,7 +39,6 @@ def setup_tests():
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     agent = Agent(name="Assistant", instructions="You are a helpful assistant")
@@ -103,7 +102,6 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_openai_agents_quickstart_homework(

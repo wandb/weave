@@ -950,6 +950,26 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
 
         assert len(inner_res.calls) == exp_count
 
+    # Bare run ids are qualified to the query's entity/project, so they resolve
+    # to the same calls as their fully-qualified form (and can be mixed).
+    for wb_run_ids, exp_count in [
+        (["test-run-1"], call_spec_1.total_calls),
+        ([full_wb_run_id_1], call_spec_1.total_calls),
+        (
+            ["test-run-1", full_wb_run_id_2],
+            call_spec_1.total_calls + call_spec_2.total_calls,
+        ),
+    ]:
+        got = list(client.get_calls(filter=tsi.CallsFilter(wb_run_ids=wb_run_ids)))
+        assert len(got) == exp_count
+        stats = get_client_trace_server(client).calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.CallsFilter(wb_run_ids=wb_run_ids),
+            )
+        )
+        assert stats.count == exp_count
+
 
 # Flaky against ClickHouse in CI: read-after-write visibility lag means a
 # calls_query right after flush can miss just-written rows. Rerun to absorb it.

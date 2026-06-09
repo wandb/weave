@@ -65,12 +65,14 @@ class ObjectNameTypeCollision(InvalidRequest):
         self.kind = kind
         self.new_base_object_class = new_base_object_class
         self.existing_base_object_classes = existing_base_object_classes
-        existing_str = ", ".join(repr(c) for c in existing_base_object_classes)
+        existing_labels = [
+            _describe_object_class(c) for c in existing_base_object_classes
+        ]
+        existing_desc = " or ".join(dict.fromkeys(existing_labels))
         super().__init__(
-            f"Cannot create {kind} {object_id!r} with "
-            f"base_object_class={new_base_object_class!r}: a {kind} with this "
-            f"name already exists with base_object_class in [{existing_str}]. "
-            f"Object names are bound to one type per project."
+            f"Cannot publish {object_id!r} as {_describe_object_class(new_base_object_class)}: "
+            f"that name is already used by {existing_desc} in this project. "
+            f"Object versions cannot share types, publish this object under a different name."
         )
 
 
@@ -304,6 +306,7 @@ class ErrorRegistry:
         # 400
         self.register(InvalidRequest, 400)
         self.register(CallsCompleteModeRequired, 400)
+        self.register(ObjectNameTypeCollision, 400)
         self.register(InvalidExternalRef, 400)
         self.register(DigestMismatchError, 409)
         self.register(QueryNoCommonTypeError, 400)
@@ -466,6 +469,13 @@ def handle_clickhouse_query_error(e: Exception) -> None:
 
     # Re-raise the original exception if no known pattern matches
     raise e
+
+
+def _describe_object_class(base_object_class: str | None) -> str:
+    """Human-readable label for a base_object_class (None = an untyped object)."""
+    if base_object_class is None:
+        return "a generic (untyped) object"
+    return f"a {base_object_class}"
 
 
 def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:

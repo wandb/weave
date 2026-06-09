@@ -44,7 +44,6 @@ def patch_smolagents() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path", "query"],
 )
 def test_hf_api_model(client):
@@ -81,7 +80,6 @@ def test_hf_api_model(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_openai_server_model(client):
@@ -114,7 +112,6 @@ def test_openai_server_model(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_tool_calling_agent_search(client):
@@ -143,7 +140,6 @@ def test_tool_calling_agent_search(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_tool_calling_agent_weather(client):
@@ -181,7 +177,6 @@ def test_tool_calling_agent_weather(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_code_agent_search(client):
@@ -211,7 +206,6 @@ def test_code_agent_search(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_code_agent_weather(client):
