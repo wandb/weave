@@ -59,8 +59,8 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
-from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.completion_spans import build_completion_span
+from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
