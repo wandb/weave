@@ -4,6 +4,7 @@ from typing import Any
 
 import litellm
 from cachetools import TTLCache
+from litellm import CustomStreamWrapper
 from pydantic import BaseModel
 
 from weave.prompt.prompt import format_message_with_template_vars
@@ -664,12 +665,12 @@ def lite_llm_completion_stream(
                     stream_kwargs["vertex_credentials"] = vertex_credentials
                 stream = litellm.completion(**stream_kwargs)
 
+            # `stream=True` always yields a CustomStreamWrapper of pydantic
+            # chunks; downstream consumers and json serialization need dicts.
+            if not isinstance(stream, CustomStreamWrapper):
+                raise InvalidRequest("Expected a streaming response from litellm")
             for chunk in stream:
-                # ``chunk`` is a BaseModel (ChatCompletionChunk). Convert to dict.
-                if hasattr(chunk, "model_dump"):
-                    yield chunk.model_dump()
-                else:
-                    yield chunk  # type: ignore[return-value]
+                yield chunk.model_dump()
         except Exception as e:
             error_message = str(e).replace("litellm.", "")
             yield {"error": error_message}
