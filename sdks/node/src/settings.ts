@@ -57,7 +57,7 @@ export function shouldUseOtelV2(): boolean {
 }
 
 function parseEnvVar(val: string | undefined): boolean | undefined {
-  switch (val) {
+  switch (val?.toLowerCase()) {
     case 'true':
       return true;
 
