@@ -38,7 +38,7 @@ function isModernDecorator(
  */
 function isLegacyDecorator(
   args: any[]
-): args is [Object, string | symbol, TypedPropertyDescriptor<any>] {
+): args is [object, string | symbol, TypedPropertyDescriptor<any>] {
   return (
     args.length === 3 &&
     (typeof args[0] === 'object' || typeof args[0] === 'function') &&
@@ -294,7 +294,7 @@ function handleModernDecorator<T extends (...args: any[]) => any>(
 }
 
 function handleLegacyDecorator<T extends (...args: any[]) => any>(
-  target: Object,
+  target: object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<T>,
   factoryOptions?: Partial<OpOptions<T>>
@@ -343,7 +343,7 @@ function handleDecoratorFactory<T extends (...args: any[]) => any>(
     // Legacy Factory Usage
     if (isLegacyDecorator(decoratorArgs)) {
       const [target, propertyKey, descriptor] = decoratorArgs as [
-        Object,
+        object,
         string | symbol,
         TypedPropertyDescriptor<(...args: any[]) => any>,
       ];
@@ -389,7 +389,7 @@ export function op<T extends (...args: any[]) => any>(
 ): Op<T>;
 // Legacy decorator usage (experimentalDecorators in tsconfig.json): @weave.op
 export function op(
-  target: Object,
+  target: object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<any>
 ): TypedPropertyDescriptor<any>;
