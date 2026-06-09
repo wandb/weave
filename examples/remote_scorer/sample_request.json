@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "original_call": {
+    "project_id": "entity/project",
+    "call_id": "018f8d6c-8d5f-7000-8000-000000000001",
+    "trace_id": "018f8d6c-8d5f-7000-8000-000000000002",
+    "op_name": "weave:///entity/project/op/sample_remote_scorer_target:*",
+    "inputs": {
+      "message": "test message for scoring"
+    },
+    "started_at": "2026-06-08T12:00:00+00:00",
+    "ended_at": "2026-06-08T12:00:01+00:00",
+    "output": {
+      "reply": "received: test message for scoring",
+      "status": "ok"
+    }
+  },
+  "scoring_call_id": "018f8d6c-8d5f-7000-8000-000000000003",
+  "scoring_trace_id": "018f8d6c-8d5f-7000-8000-000000000004",
+  "monitor": {
+    "name": "example_remote_scorer_monitor",
+    "version_digest": "monitor-version-digest"
+  },
+  "scorer": {
+    "name": "example_remote_scorer",
+    "ref": "weave:///entity/project/object/example_remote_scorer:scorer-version-digest",
+    "config": {
+      "example_threshold": 0.8
+    }
+  },
+  "triggered_at": "2026-06-08T12:00:02+00:00"
+}
