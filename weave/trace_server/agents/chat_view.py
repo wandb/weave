@@ -534,7 +534,7 @@ def _ref_digest(ref: str) -> str:
     ``weave-trace-internal:///...`` form. Both end in ``...:<digest>``, so the
     digest is the stable key for matching one to the other.
     """
-    return ref.rsplit(":", 1)[-1] if ":" in ref else ref
+    return ref.rsplit(":", 1)[-1]
 
 
 def _media_part_digests(messages: list[NormalizedMessage]) -> set[str]:
