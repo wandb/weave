@@ -195,20 +195,25 @@ class _SpanBase(BaseModel):
         """
         if not _OTEL_AVAILABLE or should_disable_weave():
             return False
+        key_repr = (
+            "{" + ", ".join(map(repr, key)) + "}"
+            if isinstance(key, list)
+            else repr(key)
+        )
         if self._otel_span is None:
             logger.warning(
-                "%s(%r) ignored: span not started. Use `with` for live "
+                "%s(%s) ignored: span not started. Use `with` for live "
                 "tracing, or log_turn() for batch ingest.",
                 operation,
-                key,
+                key_repr,
             )
             return False
         if not self._otel_span.is_recording():
             logger.warning(
-                "%s(%r) ignored: span already ended. Set attributes before "
+                "%s(%s) ignored: span already ended. Set attributes before "
                 "exiting `with` or calling .end().",
                 operation,
-                key,
+                key_repr,
             )
             return False
         return True
