@@ -19,7 +19,9 @@ from weave.trace_server.feedback_agg_query_builder import (
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.trace_server_interface import (
+    FeedbackAggregateBucket,
     FeedbackAggregateReq,
+    FeedbackAggregateRes,
     FeedbackCreateReq,
     FeedbackQueryReq,
     FeedbackReplaceReq,
@@ -702,6 +704,278 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
         }
     )
     assert matches == []
+
+
+def test_feedback_aggregate(client: WeaveClient) -> None:
+    """Aggregate scorer feedback, asserting the entire FeedbackAggregateRes shape.
+
+    ClickHouse-only (uses sumMap / toStartOfInterval); SQLite raises. Ratings are
+    exact binary fractions (0.75, 0.5) so the summed Float64 (1.25) compares
+    exactly without approx. Covers both a time-bucketed query and several
+    unbucketed (whole-range rollup) queries.
+    """
+    project_id = client.project_id
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+    after_ms = now_ms - 3_600_000
+    before_ms = now_ms + 3_600_000
+
+    if client_is_sqlite(client):
+        with pytest.raises(NotImplementedError):
+            client.server.feedback_aggregate(
+                FeedbackAggregateReq(
+                    project_id=project_id,
+                    after_ms=after_ms,
+                    before_ms=before_ms,
+                    time_bucket_seconds=3600,
+                )
+            )
+        return
+
+    scorer_a = f"weave:///{project_id}/object/scorer_a:obj_id_a"
+    scorer_b = f"weave:///{project_id}/object/scorer_b:obj_id_b"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+    trigger_ref = f"weave:///{project_id}/object/my_scorer:trigger_id_123"
+
+    def _create(suffix: str, runnable_ref: str, **scorer_kwargs):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/{suffix}",
+                feedback_type="wandb.agent_monitor",
+                payload={"value": scorer_kwargs.get("scorer_tags", [])},
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger_ref,
+                **scorer_kwargs,
+            )
+        )
+
+    # Scorer A: two rated rows (one also tagged) + one row that scored nothing
+    # (so total_count > scored_count). Scorer B: one tagged row, no rating.
+    _create(
+        "a1",
+        scorer_a,
+        scorer_ratings={"_rating_": 0.75},
+        scorer_tags=["good"],
+        span_status_code="OK",
+    )
+    _create("a2", scorer_a, scorer_ratings={"_rating_": 0.5}, span_status_code="OK")
+    _create("a3", scorer_a)  # no tags, no rating; span_status_code defaults to UNSET
+    _create("b1", scorer_b, scorer_tags=["nsfw", "slow"], span_status_code="ERROR")
+    # A non-agent-monitor row that must be excluded by the feedback_type filter.
+    client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=f"weave:///{project_id}/call/note",
+            feedback_type="wandb.note.1",
+            payload={"note": "ignore me"},
+        )
+    )
+
+    # Per-scorer rollups, reused as the expected buckets across the cases below.
+    scorer_a_bucket = FeedbackAggregateBucket(
+        time_bucket_start_ms=None,
+        group={"runnable_ref": scorer_a},
+        total_count=3,  # a1, a2, a3
+        scored_count=2,  # a3 emitted no tag/rating
+        tag_counts={"good": 1},
+        rating_counts={"_rating_": 2},
+        rating_sums={"_rating_": 1.25},  # 0.75 + 0.5
+    )
+    scorer_b_bucket = FeedbackAggregateBucket(
+        time_bucket_start_ms=None,
+        group={"runnable_ref": scorer_b},
+        total_count=1,
+        scored_count=1,
+        tag_counts={"nsfw": 1, "slow": 1},
+        rating_counts={},
+        rating_sums={},
+    )
+
+    # --- Time-bucketed, grouped by scorer ---
+    # All rows are written ~now, so they share one epoch-aligned 1h bucket.
+    bucket_ms = 3600 * 1000
+    expected_bucket_start = (now_ms // bucket_ms) * bucket_ms
+    bucketed = client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            time_bucket_seconds=3600,
+            feedback_types=["wandb.agent_monitor"],
+            group_by=["runnable_ref"],
+        )
+    )
+    # ORDER BY bucket leaves rows in the same bucket unordered; sort by scorer for
+    # a stable shape. (A rare run straddling the hour boundary fails loudly here.)
+    bucketed.buckets.sort(key=lambda b: b.group["runnable_ref"])
+    assert bucketed == FeedbackAggregateRes(
+        time_bucket_seconds=3600,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            scorer_a_bucket.model_copy(
+                update={"time_bucket_start_ms": expected_bucket_start}
+            ),
+            scorer_b_bucket.model_copy(
+                update={"time_bucket_start_ms": expected_bucket_start}
+            ),
+        ],
+    )
+
+    # --- Unbucketed, grouped by scorer (ORDER BY runnable_ref is deterministic) ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+            group_by=["runnable_ref"],
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[scorer_a_bucket, scorer_b_bucket],
+    )
+
+    # --- Unbucketed, grouped by the span_status_code Enum8 column ---
+    # Enum8 ORDER BY is by numeric value, not name, so sort by status for a
+    # stable shape. UNSET (a3) scored nothing -> scored_count 0.
+    by_status = client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+            group_by=["span_status_code"],
+        )
+    )
+    by_status.buckets.sort(key=lambda b: b.group["span_status_code"])
+    assert by_status == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={"span_status_code": "ERROR"},
+                total_count=1,
+                scored_count=1,
+                tag_counts={"nsfw": 1, "slow": 1},
+                rating_counts={},
+                rating_sums={},
+            ),
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={"span_status_code": "OK"},
+                total_count=2,
+                scored_count=2,
+                tag_counts={"good": 1},
+                rating_counts={"_rating_": 2},
+                rating_sums={"_rating_": 1.25},
+            ),
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={"span_status_code": "UNSET"},
+                total_count=1,
+                scored_count=0,
+                tag_counts={},
+                rating_counts={},
+                rating_sums={},
+            ),
+        ],
+    )
+
+    # --- Unbucketed, no group_by: one global rollup row over all matched rows ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={},
+                total_count=4,  # a1, a2, a3, b1
+                scored_count=3,  # a3 emitted nothing
+                tag_counts={"good": 1, "nsfw": 1, "slow": 1},
+                rating_counts={"_rating_": 2},
+                rating_sums={"_rating_": 1.25},
+            ),
+        ],
+    )
+
+    # --- Filter: scorer_ids prefix-match the runnable_ref's objectID:digest (its
+    # last path segment), so "scorer_a" selects only scorer A. A trailing "*" is
+    # decoration and stripped, so it must yield the same result.
+    for scorer_id in ("scorer_a", "scorer_a*"):
+        assert client.server.feedback_aggregate(
+            FeedbackAggregateReq(
+                project_id=project_id,
+                after_ms=after_ms,
+                before_ms=before_ms,
+                feedback_types=["wandb.agent_monitor"],
+                scorer_ids=[scorer_id],
+                group_by=["runnable_ref"],
+            )
+        ) == FeedbackAggregateRes(
+            time_bucket_seconds=None,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            buckets=[scorer_a_bucket],
+        ), scorer_id
+
+    # --- Filter: tags keeps rows whose scorer_tags include "nsfw" (just b1); the
+    # rollup still counts all of that row's tags. ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+            tags=["nsfw"],
+            group_by=["runnable_ref"],
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[scorer_b_bucket],
+    )
+
+    # --- Filter: rating_min keeps rows whose _rating_ >= 0.7 (just a1 at 0.75);
+    # a2 (0.5) and the rating-less rows drop out. ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+            rating_min=0.7,
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={},
+                total_count=1,
+                scored_count=1,
+                tag_counts={"good": 1},
+                rating_counts={"_rating_": 1},
+                rating_sums={"_rating_": 0.75},
+            ),
+        ],
+    )
 
 
 def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
