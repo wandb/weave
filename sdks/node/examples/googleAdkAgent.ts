@@ -1,0 +1,87 @@
+/**
+ * Example: Google ADK (Agent Development Kit) Integration with Weave
+ *
+ * Demonstrates a tool-using Gemini agent built with @google/adk, traced by
+ * Weave. The integration is automatic: importing weave installs module hooks
+ * that register a Weave plugin on every ADK Runner. For environments where
+ * the hooks cannot run (e.g. some bundlers), pass the plugin explicitly:
+ *
+ * ```typescript
+ * import {WeaveAdkPlugin} from 'weave';
+ * new InMemoryRunner({agent, appName, plugins: [new WeaveAdkPlugin()]});
+ * ```
+ *
+ * Requires GOOGLE_API_KEY (or Vertex AI env config) for the Gemini call.
+ */
+
+import * as weave from 'weave';
+import {FunctionTool, InMemoryRunner, LlmAgent} from '@google/adk';
+import {z} from 'zod';
+
+// Set your own entity/project name here
+const WANDB_PROJECT = process.env.WANDB_PROJECT || 'examples';
+
+const APP_NAME = 'weave-adk-example';
+const USER_ID = 'example-user';
+const MODEL = 'gemini-2.5-flash';
+
+// --- Tools ---
+
+const getWeatherTool = new FunctionTool({
+  name: 'get_weather',
+  description: 'Get the current weather for a given city.',
+  parameters: z.object({
+    city: z.string().describe('The name of the city'),
+  }),
+  execute: async ({city}) => {
+    // Simulated weather data
+    const weather: Record<string, {temp: number; condition: string}> = {
+      'San Francisco': {temp: 18, condition: 'Foggy'},
+      'New York': {temp: 22, condition: 'Sunny'},
+      London: {temp: 12, condition: 'Cloudy'},
+      Tokyo: {temp: 28, condition: 'Humid'},
+    };
+    const data = weather[city] ?? {temp: 20, condition: 'Clear'};
+    return {city, condition: data.condition, temperature_c: data.temp};
+  },
+});
+
+// --- Agent ---
+
+async function main() {
+  await weave.init(WANDB_PROJECT);
+
+  const agent = new LlmAgent({
+    name: 'weather_agent',
+    description: 'Answers questions about the weather.',
+    instruction:
+      'You answer weather questions. Always use the get_weather tool.',
+    model: MODEL,
+    tools: [getWeatherTool],
+  });
+
+  const runner = new InMemoryRunner({agent, appName: APP_NAME});
+  const session = await runner.sessionService.createSession({
+    appName: APP_NAME,
+    userId: USER_ID,
+  });
+
+  for await (const event of runner.runAsync({
+    userId: USER_ID,
+    sessionId: session.id,
+    newMessage: {
+      role: 'user',
+      parts: [{text: "What's the weather in Tokyo and London?"}],
+    },
+  })) {
+    const text = event.content?.parts
+      ?.map(part => part.text)
+      .filter(Boolean)
+      .join('');
+    if (text) {
+      console.log(`[${event.author}] ${text}`);
+    }
+  }
+}
+
+main().catch(console.error);

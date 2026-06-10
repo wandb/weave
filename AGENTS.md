@@ -206,6 +206,32 @@ npm i
 npm run test
 ```
 
+### TypeScript SDK integration patterns (sdks/node)
+
+- Integrations live in `sdks/node/src/integrations/`. Auto-instrumentation is
+  registered in `integrations/hooks.ts` via `addCJSInstrumentation` (keyed on
+  `<package>@<resolved subpath>`, e.g. `@google/adk@dist/cjs/index.js`) and
+  `addESMInstrumentation` (keyed on the bare module name, applied by the
+  `--import=weave/instrument` loader).
+- Agent-framework integrations write calls directly with
+  `client.saveCallStart` / `saveCallEnd` (see `openai-agents/weave-tracing-processor.ts`
+  and `googleAdk.ts`) rather than wrapping functions in `op()`.
+- Framework types are duck-typed locally (e.g. `googleAdk.types.ts`) so the
+  SDK has no runtime dependency on the framework package. Keep these types
+  free of index signatures or the real framework types stop being assignable.
+- Jest replaces Node's module system, so the CJS require hook never fires
+  inside jest tests — call the patch hook (e.g. `commonPatchGoogleADK`)
+  directly, and use the `hostApps` jest project for real loader testing.
+- `@google/adk`'s CJS dist `require()`s the ESM-only `lodash-es` (legal under
+  Node >= 22 `require(esm)`, fatal under jest); the default jest project maps
+  `^lodash-es$` → `lodash`.
+- Google ADK gotchas: ADK 1.2.0 never dispatches plugin agent callbacks
+  (`runBefore/AfterAgentCallback` have no call sites), so `WeaveAdkPlugin`
+  synthesizes agent calls from `agentName` + the agent tree. ADK-internal
+  `GoogleGenAI` clients are detected by the `google-adk/` marker in their
+  `x-goog-api-client` header and excluded from the genai wrapper to avoid
+  double-counted usage.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
