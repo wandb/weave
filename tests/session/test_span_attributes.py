@@ -14,90 +14,103 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from weave.session.session import LLM, Session, SubAgent, Tool, Turn
 
-# (label, factory, otel span name) — name is full not prefix so SubAgent and
-# Turn (both "invoke_agent") don't collide.
+# (class_label, factory, otel_span_name) — span_name is the full emitted name
+# (not a prefix) so SubAgent and Turn (both "invoke_agent") don't collide.
 CASES = [
-    ("Tool", lambda: Tool(name="f"), "execute_tool f"),
+    ("Tool", lambda: Tool(name="test-tool"), "execute_tool test-tool"),
     ("LLM", lambda: LLM(model="gpt-4o"), "chat gpt-4o"),
-    ("SubAgent", lambda: SubAgent(name="sa"), "invoke_agent sa"),
-    ("Turn", lambda: Turn(agent_name="t"), "invoke_agent t"),
+    ("SubAgent", lambda: SubAgent(name="researcher"), "invoke_agent researcher"),
+    ("Turn", lambda: Turn(agent_name="weather-bot"), "invoke_agent weather-bot"),
 ]
-IDS = [c[0] for c in CASES]
+CLASS_LABELS = [case[0] for case in CASES]
 
 
-def _only(spans: list, name: str):
-    matches = [sp for sp in spans if sp.name == name]
-    assert len(matches) == 1, [s.name for s in matches]
+def _only_span(spans: list, span_name: str):
+    matches = [span for span in spans if span.name == span_name]
+    assert len(matches) == 1, [span.name for span in matches]
     return matches[0]
 
 
-@pytest.mark.parametrize(("_label", "factory", "span_name"), CASES, ids=IDS)
+@pytest.mark.parametrize(
+    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
+)
 def test_set_attribute_lands_on_span(
-    otel_spans: InMemorySpanExporter, _label, factory, span_name
+    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
 ) -> None:
-    with Session(session_id="s"), factory() as x:
-        x.set_attribute("weave.tag", "v")
-    assert (
-        _only(otel_spans.get_finished_spans(), span_name).attributes["weave.tag"] == "v"
-    )
+    with Session(session_id="test-session"), factory() as span_obj:
+        span_obj.set_attribute("weave.tag", "value")
+    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
+    assert finished_span.attributes["weave.tag"] == "value"
 
 
-@pytest.mark.parametrize(("_label", "factory", "span_name"), CASES, ids=IDS)
+@pytest.mark.parametrize(
+    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
+)
 def test_set_attribute_no_op_after_end(
-    otel_spans: InMemorySpanExporter, _label, factory, span_name
+    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
 ) -> None:
-    with Session(session_id="s"):
-        x = factory()
-        with x:
+    with Session(session_id="test-session"):
+        span_obj = factory()
+        with span_obj:
             pass
-        x.set_attribute("weave.late", "x")
-    assert "weave.late" not in (
-        _only(otel_spans.get_finished_spans(), span_name).attributes or {}
-    )
+        span_obj.set_attribute("weave.late", "value")
+    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
+    assert "weave.late" not in (finished_span.attributes or {})
 
 
-@pytest.mark.parametrize(("_label", "factory", "span_name"), CASES, ids=IDS)
+@pytest.mark.parametrize(
+    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
+)
 def test_add_event_records_on_span(
-    otel_spans: InMemorySpanExporter, _label, factory, span_name
+    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
 ) -> None:
-    ts = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    with Session(session_id="s"), factory() as x:
-        x.add_event("weave.evt", {"k": "v"}, timestamp=ts)
-    span = _only(otel_spans.get_finished_spans(), span_name)
-    assert len(span.events) == 1
-    assert (span.events[0].name, span.events[0].attributes["k"]) == ("weave.evt", "v")
-    assert span.events[0].timestamp == int(ts.timestamp() * 1_000_000_000)
+    timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    with Session(session_id="test-session"), factory() as span_obj:
+        span_obj.add_event(
+            "weave.evt", {"event_key": "event_value"}, timestamp=timestamp
+        )
+    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
+    assert len(finished_span.events) == 1
+    event = finished_span.events[0]
+    assert event.name == "weave.evt"
+    assert event.attributes["event_key"] == "event_value"
+    assert event.timestamp == int(timestamp.timestamp() * 1_000_000_000)
 
 
-@pytest.mark.parametrize(("_label", "factory", "span_name"), CASES, ids=IDS)
+@pytest.mark.parametrize(
+    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
+)
 def test_add_event_no_op_after_end(
-    otel_spans: InMemorySpanExporter, _label, factory, span_name
+    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
 ) -> None:
-    with Session(session_id="s"):
-        x = factory()
-        with x:
+    with Session(session_id="test-session"):
+        span_obj = factory()
+        with span_obj:
             pass
-        x.add_event("weave.late")
-    assert len(_only(otel_spans.get_finished_spans(), span_name).events) == 0
+        span_obj.add_event("weave.late")
+    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
+    assert len(finished_span.events) == 0
 
 
 def test_returns_self_for_chaining() -> None:
     """Both methods return ``self`` — checked on Tool (mixin, same on all)."""
-    t = Tool(name="f")
-    assert t.set_attribute("k", "v") is t
-    assert t.add_event("e") is t
+    tool = Tool(name="test-tool")
+    assert tool.set_attribute("key", "value") is tool
+    assert tool.add_event("event-name") is tool
 
 
-def test_set_attribute_accepts_sequence_value(otel_spans: InMemorySpanExporter) -> None:
+def test_set_attribute_accepts_sequence_value(
+    otel_spans: InMemorySpanExporter,
+) -> None:
     """OTel accepts ``Sequence[str]`` — used for e.g. ``gen_ai.response.finish_reasons``."""
-    with Session(session_id="s"), LLM(model="gpt-4o") as c:
-        c.set_attribute("gen_ai.response.finish_reasons", ["stop"])
-    span = _only(otel_spans.get_finished_spans(), "chat gpt-4o")
-    assert tuple(span.attributes["gen_ai.response.finish_reasons"]) == ("stop",)
+    with Session(session_id="test-session"), LLM(model="gpt-4o") as llm:
+        llm.set_attribute("gen_ai.response.finish_reasons", ["stop"])
+    chat_span = _only_span(otel_spans.get_finished_spans(), "chat gpt-4o")
+    assert tuple(chat_span.attributes["gen_ai.response.finish_reasons"]) == ("stop",)
 
 
 def test_no_op_on_unentered_span() -> None:
     """No OTel span ever created (caller never entered the context manager)."""
-    t = Tool(name="f")
-    assert t.set_attribute("k", "v") is t
-    assert t.add_event("e") is t
+    tool = Tool(name="test-tool")
+    assert tool.set_attribute("key", "value") is tool
+    assert tool.add_event("event-name") is tool

@@ -201,8 +201,12 @@ class _SpanBase(BaseModel):
     ) -> Self:
         """Record an OTel span event. No-op after ``end()``."""
         if self._otel_span is not None and self._otel_span.is_recording():
-            ts_ns = int(timestamp.timestamp() * 1_000_000_000) if timestamp else None
-            self._otel_span.add_event(name, attributes=attributes, timestamp=ts_ns)
+            timestamp_ns = (
+                int(timestamp.timestamp() * 1_000_000_000) if timestamp else None
+            )
+            self._otel_span.add_event(
+                name, attributes=attributes, timestamp=timestamp_ns
+            )
         return self
 
 
