@@ -108,7 +108,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      packages: write
     # TODO: refactor to use matrix.include for runner selection
     # Use 8-core runners for trace and trace_calls_complete_only shards (resource-intensive)
     runs-on: ${{ (matrix.nox-shard == 'trace' || matrix.nox-shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
@@ -198,29 +197,6 @@ jobs:
           done
           docker logs wandbservice
           exit 1
-      - name: Start ClickHouse
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          image=$(.github/scripts/ch-image.sh)
-          docker run --detach --rm --name weave_clickhouse \
-            --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
-            --env CLICKHOUSE_USER=default \
-            --env CLICKHOUSE_PASSWORD= \
-            --env CLICKHOUSE_DB=default \
-            --publish 8123:8123 \
-            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro \
-            "$image"
-          for _i in {1..30}; do
-            if wget -q -O- 'http://localhost:8123/ping' >/dev/null; then
-              echo "clickhouse is healthy"
-              exit 0
-            fi
-            sleep 1
-          done
-          docker logs weave_clickhouse
-          exit 1
       - name: Enable debug logging
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Install SQLite dev package
@@ -243,7 +219,6 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
           # Tests use VCR recordings so real keys aren't needed
@@ -258,18 +233,6 @@ jobs:
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server" \
             --trace-server=sqlite
-      - name: Run nox (Clickhouse Trace Server)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
       - name: Run nox (ClickHouse Local Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci

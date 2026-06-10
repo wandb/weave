@@ -19,7 +19,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      packages: write
     runs-on: ubuntu-latest
     env:
       MAX_ATTEMPTS: 3
@@ -115,30 +114,6 @@ jobs:
           done
           docker logs wandbservice
           exit 1
-      - name: Start ClickHouse
-        if: steps.filter_shards.outputs.skip != 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          image=$(.github/scripts/ch-image.sh)
-          docker run --detach --rm --name weave_clickhouse \
-            --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
-            --env CLICKHOUSE_USER=default \
-            --env CLICKHOUSE_PASSWORD= \
-            --env CLICKHOUSE_DB=default \
-            --publish 8123:8123 \
-            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro \
-            "$image"
-          for _i in {1..30}; do
-            if wget -q -O- 'http://localhost:8123/ping' >/dev/null; then
-              echo "clickhouse is healthy"
-              exit 0
-            fi
-            sleep 1
-          done
-          docker logs weave_clickhouse
-          exit 1
       - name: Enable debug logging
         if: steps.filter_shards.outputs.skip != 'true'
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
@@ -178,7 +153,6 @@ jobs:
           CI: 1
           WEAVE_USE_MEMRAY: 1
           WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
@@ -191,20 +165,6 @@ jobs:
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server" \
             --trace-server=sqlite
-      - name: Run nox (Clickhouse Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
-        run: |
-          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
       - name: Run nox (ClickHouse Local Trace Server)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
         env:
@@ -226,7 +186,6 @@ jobs:
           CI: 1
           WEAVE_USE_MEMRAY: 1
           WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
@@ -236,7 +195,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
-          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+          # These shards run without a marker filter, so their trace_server
+          # tests hit the (default) ClickHouse backend — serve it locally.
+          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            --trace-server=clickhouse-local
 
   nightly-tests-replicated-1s3r:
     name: Nightly Tests (replicated 1s3r)
