@@ -1,0 +1,45 @@
+## Conversation
+Round 3 ts-split PR 6: the small lifts, redesigned per rules 2/5. Round 2 put
+message_templating + op_names into the byte-identical mirror (impl in
+interface, rule 5) and made flow/monitor.py re-export the mirror constants
+(adding to flow, rule 2 borderline). Round 3: the server gets its OWN copies;
+the client is 100% untouched.
+
+## Actions
+- weave/trace_server/message_templating.py: tip twin content, docstring
+  rewritten for per-side + corpus framing. llm_completion repoints.
+- weave/trace_server/interface/agents/op_names.py: tip content (pure
+  Literal/frozenset = contract), docstring rewritten -- the client's monitor
+  keeps its own literal; corpus pins the set. kafka_events repoints. NO client
+  mirror copy (subset rule: no client consumer).
+- Corpus: message_template.jsonl regenerated from the NEW server module --
+  byte-identical to v2's frozen rows (copy faithfulness proof);
+  agent_span_op_names.jsonl new. Runners added to test_corpus_library.py:
+  templating runs against client=weave.prompt.prompt and
+  server=weave.trace_server.message_templating; op-name set equality against
+  client=weave.flow.monitor and server=interface op_names.
+- Burned: C2 llm_completion->prompt.prompt; SERVER_TO_FLOW_BASELINE -> empty.
+- Verified: lint-imports 3 kept; 37 meta+gate; 42 prompt/llm_completion/
+  agent_scorer tests; 167 conformance; ruff.
+
+## Errors & Mistakes
+None.
+
+## Dead Ends
+- Considered putting op_names in BOTH mirror trees (round-2 design) with
+  flow/monitor re-exporting. Rejected: adds an import to flow (frozen) and a
+  dead client mirror file no client code imports.
+
+## Hints for Future Agents
+- If a new agent-span op name is added: update BOTH flow/monitor.py's Literal
+  and interface/agents/op_names.py, then append a corpus row. The set-equality
+  conformance test fails loudly on one-sided edits.
+- IncorrectPromptVarError exists per side (prompt.py and the server module);
+  the corpus pins the CLASS NAME on rejection rows.
+
+## Codebase Discoveries
+- llm_completion only ever imported the templating function, not the error
+  class; the server-side error surfaces through the generic error registry.
+
+## Open Questions
+None.
