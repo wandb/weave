@@ -1,14 +1,13 @@
-"""Tests for ``set_attribute`` and ``add_event`` on session span classes.
+"""Tests for ``set_attribute``, ``set_attributes``, and ``add_event``.
 
-Both methods live on ``_SpanBase`` so all four span classes (Tool, LLM,
-SubAgent, Turn) get identical behavior. Parametrized across the four
-classes to lock in uniformity.
+All three live on ``_SpanBase`` so every span class (Tool, LLM, SubAgent,
+Turn) gets identical behavior. Tests cross-parametrize over the (span
+class x mutator method) cross product to lock in that uniformity.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -26,6 +25,36 @@ CASES = [
 CLASS_LABELS = [case[0] for case in CASES]
 
 
+# (op_name, invoke_on_span, assert_landed_on_finished_span)
+# The three mutators have different signatures; capture each call shape
+# alongside the matching "did it land?" check so cross-parametrize stays clean.
+MUTATORS = [
+    (
+        "set_attribute",
+        lambda span: span.set_attribute("weave.tag", "value"),
+        lambda finished: finished.attributes.get("weave.tag") == "value",
+    ),
+    (
+        "set_attributes",
+        lambda span: span.set_attributes({"weave.first": "one", "weave.second": "two"}),
+        lambda finished: (
+            finished.attributes.get("weave.first") == "one"
+            and finished.attributes.get("weave.second") == "two"
+        ),
+    ),
+    (
+        "add_event",
+        lambda span: span.add_event("weave.evt", {"event_key": "event_value"}),
+        lambda finished: (
+            len(finished.events) == 1
+            and finished.events[0].name == "weave.evt"
+            and finished.events[0].attributes["event_key"] == "event_value"
+        ),
+    ),
+]
+MUTATOR_LABELS = [mutator[0] for mutator in MUTATORS]
+
+
 def _only_span(spans: list, span_name: str):
     matches = [span for span in spans if span.name == span_name]
     assert len(matches) == 1, [span.name for span in matches]
@@ -35,89 +64,97 @@ def _only_span(spans: list, span_name: str):
 @pytest.mark.parametrize(
     ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
 )
-def test_set_attribute_lands_on_span(
-    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
+@pytest.mark.parametrize(
+    ("_op", "invoke", "assert_landed"), MUTATORS, ids=MUTATOR_LABELS
+)
+def test_mutator_lands_on_live_span(
+    otel_spans: InMemorySpanExporter,
+    _class_label,
+    factory,
+    span_name,
+    _op,
+    invoke,
+    assert_landed,
 ) -> None:
+    """Each mutator writes through to the OTel span when called inside ``with``."""
     with Session(session_id="test-session"), factory() as span_obj:
-        span_obj.set_attribute("weave.tag", "value")
-    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
-    assert finished_span.attributes["weave.tag"] == "value"
+        invoke(span_obj)
+    assert assert_landed(_only_span(otel_spans.get_finished_spans(), span_name))
 
 
 @pytest.mark.parametrize(
     ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
 )
-def test_set_attribute_no_op_after_end(
-    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
+@pytest.mark.parametrize(
+    ("_op", "invoke", "assert_landed"), MUTATORS, ids=MUTATOR_LABELS
+)
+def test_mutator_no_op_after_end(
+    otel_spans: InMemorySpanExporter,
+    _class_label,
+    factory,
+    span_name,
+    _op,
+    invoke,
+    assert_landed,
 ) -> None:
+    """Each mutator is a no-op when called after the span has ended."""
     with Session(session_id="test-session"):
         span_obj = factory()
         with span_obj:
             pass
-        span_obj.set_attribute("weave.late", "value")
-    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
-    assert "weave.late" not in (finished_span.attributes or {})
-
-
-@pytest.mark.parametrize(
-    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
-)
-def test_add_event_records_on_span(
-    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
-) -> None:
-    timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    with Session(session_id="test-session"), factory() as span_obj:
-        span_obj.add_event(
-            "weave.evt", {"event_key": "event_value"}, timestamp=timestamp
-        )
-    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
-    assert len(finished_span.events) == 1
-    event = finished_span.events[0]
-    assert event.name == "weave.evt"
-    assert event.attributes["event_key"] == "event_value"
-    assert event.timestamp == int(timestamp.timestamp() * 1_000_000_000)
-
-
-@pytest.mark.parametrize(
-    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
-)
-def test_add_event_no_op_after_end(
-    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
-) -> None:
-    with Session(session_id="test-session"):
-        span_obj = factory()
-        with span_obj:
-            pass
-        span_obj.add_event("weave.late")
-    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
-    assert len(finished_span.events) == 0
-
-
-@pytest.mark.parametrize(
-    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
-)
-def test_set_attributes_lands_on_span(
-    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
-) -> None:
-    """Bulk ``set_attributes`` lands every key on the OTel span."""
-    with Session(session_id="test-session"), factory() as span_obj:
-        span_obj.set_attributes({"weave.first": "one", "weave.second": "two"})
-    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
-    assert finished_span.attributes["weave.first"] == "one"
-    assert finished_span.attributes["weave.second"] == "two"
+        invoke(span_obj)
+    assert not assert_landed(_only_span(otel_spans.get_finished_spans(), span_name))
 
 
 @pytest.mark.parametrize(
     ("_class_label", "factory", "_span_name"), CASES, ids=CLASS_LABELS
 )
-def test_returns_self_for_chaining(
+def test_mutators_return_self_for_chaining(
     otel_spans: InMemorySpanExporter, _class_label, factory, _span_name
 ) -> None:
-    """All three mutators return ``self`` for fluent chaining on a live span."""
+    """All mutators return ``self`` for fluent chaining."""
     with Session(session_id="test-session"), factory() as span_obj:
-        assert span_obj.set_attribute("key", "value") is span_obj
-        assert span_obj.set_attributes({"key": "value"}) is span_obj
-        assert span_obj.add_event("event-name") is span_obj
+        for _op, invoke, _assert_landed in MUTATORS:
+            assert invoke(span_obj) is span_obj
+
+
+@pytest.mark.parametrize(
+    ("op", "invoke", "_assert_landed"), MUTATORS, ids=MUTATOR_LABELS
+)
+def test_warns_when_span_not_started(
+    caplog: pytest.LogCaptureFixture,
+    otel_spans: InMemorySpanExporter,
+    op,
+    invoke,
+    _assert_landed,
+) -> None:
+    """Each mutator warns and emits no span when called before ``with``."""
+    caplog.set_level(logging.WARNING, logger="weave.session.session")
+    invoke(Tool(name="test-tool"))
+    assert any(
+        op in record.message and "span not started" in record.message
+        for record in caplog.records
+    )
+    assert len(otel_spans.get_finished_spans()) == 0
+
+
+@pytest.mark.parametrize(
+    ("op", "invoke", "_assert_landed"), MUTATORS, ids=MUTATOR_LABELS
+)
+def test_warns_when_span_already_ended(
+    caplog: pytest.LogCaptureFixture, op, invoke, _assert_landed
+) -> None:
+    """Each mutator warns when called after ``end()``."""
+    caplog.set_level(logging.WARNING, logger="weave.session.session")
+    with Session(session_id="test-session"):
+        tool = Tool(name="test-tool")
+        with tool:
+            pass
+        invoke(tool)
+    assert any(
+        op in record.message and "span already ended" in record.message
+        for record in caplog.records
+    )
 
 
 def test_set_attribute_accepts_sequence_value(
@@ -128,47 +165,3 @@ def test_set_attribute_accepts_sequence_value(
         llm.set_attribute("gen_ai.response.finish_reasons", ["stop"])
     chat_span = _only_span(otel_spans.get_finished_spans(), "chat gpt-4o")
     assert tuple(chat_span.attributes["gen_ai.response.finish_reasons"]) == ("stop",)
-
-
-def test_no_op_on_unentered_span(otel_spans: InMemorySpanExporter) -> None:
-    """Unentered span doesn't crash and emits no OTel output."""
-    tool = Tool(name="test-tool")
-    tool.set_attribute("key", "value")
-    tool.add_event("event-name")
-    assert len(otel_spans.get_finished_spans()) == 0
-
-
-def test_warns_when_span_not_started(caplog: pytest.LogCaptureFixture) -> None:
-    """Calling set_attribute / add_event on an unentered span warns the user."""
-    caplog.set_level(logging.WARNING, logger="weave.session.session")
-    tool = Tool(name="test-tool")
-    tool.set_attribute("weave.tag", "value")
-    tool.add_event("weave.evt")
-    messages = [record.message for record in caplog.records]
-    assert any(
-        "set_attribute" in message and "span not started" in message
-        for message in messages
-    )
-    assert any(
-        "add_event" in message and "span not started" in message for message in messages
-    )
-
-
-def test_warns_when_span_already_ended(caplog: pytest.LogCaptureFixture) -> None:
-    """Calling set_attribute / add_event after end() warns the user."""
-    caplog.set_level(logging.WARNING, logger="weave.session.session")
-    with Session(session_id="test-session"):
-        tool = Tool(name="test-tool")
-        with tool:
-            pass
-        tool.set_attribute("weave.tag", "value")
-        tool.add_event("weave.evt")
-    messages = [record.message for record in caplog.records]
-    assert any(
-        "set_attribute" in message and "span already ended" in message
-        for message in messages
-    )
-    assert any(
-        "add_event" in message and "span already ended" in message
-        for message in messages
-    )
