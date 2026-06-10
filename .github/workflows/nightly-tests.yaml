@@ -157,6 +157,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox uv
+      - name: Install ClickHouse binary
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: echo "WEAVE_CLICKHOUSE_BINARY=$(bin/get_clickhouse.sh)" >> "$GITHUB_ENV"
       - name: Check if shard needs trace_server markers
         id: check_trace_markers
         if: steps.filter_shards.outputs.skip != 'true'
@@ -202,6 +205,20 @@ jobs:
         run: |
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
+      - name: Run nox (ClickHouse Local Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_USE_MEMRAY: 1
+          WB_SERVER_HOST: http://localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
+        run: |
+          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "trace_server and not skip_clickhouse_client" \
+            --trace-server=clickhouse-local
       - name: Run nox (No marker filters for integration-only shards)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
         env:
