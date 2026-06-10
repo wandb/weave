@@ -1,0 +1,27 @@
+## Conversation
+PR 3 of the rebuilt (round 2) ts-split stack. User feedback drove the rebuild: no shared zone anywhere; client weave/interface/** must MIRROR server weave/trace_server/interface/** (layout chosen via AskUserQuestion). This PR creates the server half of that mirror by consolidating the scattered contract into trace_server/interface/.
+
+## Actions
+- Prep (same as round-1 PR3): inlined validate_tag_name/validate_alias_name into tsi + trimmed validation.py (block ran to EOF -- first trim anchor missed); inverted sentinel deps (agents/schema defines SENTINEL_EPOCH/EXPIRE_AT_NEVER; ch_sentinel_values re-exports).
+- git mv 9 flat contract modules + helpers/url_safety + agents/{types,constants,schema,semconv} into interface/ (agents impl files stay at trace_server/agents/). helpers/ removed.
+- Repo-wide codemod (weave+tests+scripts, 207 files + stragglers): dotted-path swaps, bare-form `from weave.trace_server import X` swaps, parenthesized multi-line blocks, mixed-name line SPLITS.
+- pyproject baselines: remapped both TARGET paths (C1 entries) and IMPORTER paths (C2 entries) to interface/. Count unchanged.
+- AST closure check: interface/** imports only itself + weave.shared (the shared imports dissolve in PR 5).
+
+## Errors & Mistakes
+- Substring BARE_FORMS replacement mangled multi-name imports: `from weave.trace_server import constants, object_creation_utils, usage_utils` became an interface import of all three. Fixed with a splitter that separates moved/unmoved names; ALSO needed a parenthesized-block variant (clickhouse, two test conftests). Lesson: never substring-replace `from X import name` -- always parse the name list.
+- Missed bare forms surfaced one-by-one via ImportError at import time (http_service_interface, agents types/semconv); each fixed with a generic name-list rewriter.
+
+## Dead Ends
+- Considered shims at the old paths for core's benefit (the old andrew/ts-server-interface branch used move+shims). Rejected: two import paths for the same modules confuses the mirror story; core repoints at submodule bump anyway (cutover checklist).
+
+## Hints for Future Agents
+- The interface/ subtree must stay closure-clean: imports only within interface/ (+ weave.shared until PR 5). The AST check in this PR's construction is reproducible in a few lines; PR 4's conformance gate enforces it structurally thereafter.
+- agents/ is now SPLIT: contract in interface/agents/, impl (kafka_events, clickhouse, chat_view, helpers, playground...) stays at trace_server/agents/. kafka_events imports schema via interface/agents now.
+- Core imports the OLD paths (weave.trace_server.trace_server_interface etc. ~33 sites) -- they break at submodule bump and repoint then; documented in the doc's cutover section.
+
+## Codebase Discoveries
+- sqlite_trace_server had the only mixed single-line bare import; clickhouse + 2 test conftests had mixed parenthesized blocks.
+
+## Open Questions
+None.
