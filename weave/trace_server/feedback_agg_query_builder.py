@@ -61,8 +61,15 @@ def build_feedback_aggregate_query(
         bucket_expr = f"toStartOfInterval(created_at, toIntervalSecond({param_slot(bin_param, 'Int64')}), 'UTC')"
         dimension_parts.append(f"{bucket_expr} AS bucket")
         group_keys.append("bucket")
-    dimension_parts.extend(req.group_by)
-    group_keys.extend(req.group_by)
+
+    # Each dimension keys its result column on the client-facing name; `scorer_id`
+    # is derived from runnable_ref (so the response exposes an id, never a ref).
+    for dimension in req.group_by:
+        expr = _group_by_sql(dimension)
+        dimension_parts.append(
+            dimension if expr == dimension else f"{expr} AS {dimension}"
+        )
+        group_keys.append(dimension)
 
     select_parts = [
         *dimension_parts,
@@ -107,6 +114,18 @@ def _ref_object_id_sql(column: str) -> str:
     """
     last_segment = f"splitByChar('/', ifNull({column}, ''))[-1]"
     return f"splitByChar(':', {last_segment})[1]"
+
+
+def _group_by_sql(dimension: str) -> str:
+    """SQL expression for a client-facing group_by dimension.
+
+    `scorer_id` is derived from runnable_ref (its object id) so a grouped response
+    returns scorer ids, never refs. Every other dimension is a stored column used
+    as-is.
+    """
+    if dimension == "scorer_id":
+        return _ref_object_id_sql("runnable_ref")
+    return dimension
 
 
 def _any_prefix_clause(column_expr: str, values: list[str], pb: ParamBuilder) -> str:

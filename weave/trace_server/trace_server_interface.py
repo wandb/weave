@@ -1463,7 +1463,7 @@ class FeedbackStatsRes(BaseModel):
 # --- Feedback aggregate schema (for scores grouped by time bucket) ---
 
 FeedbackAggregateGroupByColumn: TypeAlias = Literal[
-    "runnable_ref", "span_agent_name", "span_agent_version", "span_status_code"
+    "scorer_id", "span_agent_name", "span_agent_version", "span_status_code"
 ]
 
 # Valid GROUP BY columns for aggregate feedback requests.
@@ -1519,11 +1519,11 @@ class FeedbackAggregateReq(BaseModelStrict):
     )
     monitor_ids: list[str] = Field(
         default_factory=list,
-        description="Filter by the monitor's objectID:digest by prefix",
+        description="Filter to these monitor ids (exact match; suffix with '*' for prefix match).",
     )
     scorer_ids: list[str] = Field(
         default_factory=list,
-        description="Filter by the scorer's objectID:digest by prefix",
+        description="Filter to these scorer ids (exact match; suffix with '*' for prefix match).",
     )
     span_agent_names: list[str] = Field(
         default_factory=list,
@@ -1531,7 +1531,7 @@ class FeedbackAggregateReq(BaseModelStrict):
     )
     span_types: list[FeedbackSpanType] = Field(
         default_factory=list,
-        description="Filter by span type (turn vs conversation), matched on weave_ref.",
+        description="Filter by span type (turn vs conversation).",
     )
     group_by: list[FeedbackAggregateGroupByColumn] = Field(
         default_factory=list,
@@ -1579,7 +1579,7 @@ class FeedbackAggregateBucket(BaseModel):
     )
     group: dict[str, str] = Field(
         default_factory=dict,
-        description="Group-by dimension values for this row (e.g. {'runnable_ref': '...'}).",
+        description="Group-by dimension values for this row (e.g. {'scorer_id': '...'}).",
     )
     total_count: int = Field(
         description="Number of feedback rows in this bucket/group."

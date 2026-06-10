@@ -773,9 +773,10 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     )
 
     # Per-scorer rollups, reused as the expected buckets across the cases below.
+    # Grouping by scorer_id returns the scorer's object id (the name), not a ref.
     scorer_a_bucket = FeedbackAggregateBucket(
         time_bucket_start_ms=None,
-        group={"runnable_ref": scorer_a},
+        group={"scorer_id": "scorer_a"},
         total_count=3,  # a1, a2, a3
         scored_count=2,  # a3 emitted no tag/rating
         tag_counts={"good": 1},
@@ -784,7 +785,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     )
     scorer_b_bucket = FeedbackAggregateBucket(
         time_bucket_start_ms=None,
-        group={"runnable_ref": scorer_b},
+        group={"scorer_id": "scorer_b"},
         total_count=1,
         scored_count=1,
         tag_counts={"nsfw": 1, "slow": 1},
@@ -803,12 +804,12 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
             before_ms=before_ms,
             time_bucket_seconds=3600,
             feedback_types=["wandb.agent_monitor"],
-            group_by=["runnable_ref"],
+            group_by=["scorer_id"],
         )
     )
     # ORDER BY bucket leaves rows in the same bucket unordered; sort by scorer for
     # a stable shape. (A rare run straddling the hour boundary fails loudly here.)
-    bucketed.buckets.sort(key=lambda b: b.group["runnable_ref"])
+    bucketed.buckets.sort(key=lambda b: b.group["scorer_id"])
     assert bucketed == FeedbackAggregateRes(
         time_bucket_seconds=3600,
         after_ms=after_ms,
@@ -823,14 +824,14 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
         ],
     )
 
-    # --- Unbucketed, grouped by scorer (ORDER BY runnable_ref is deterministic) ---
+    # --- Unbucketed, grouped by scorer (ORDER BY scorer_id is deterministic) ---
     assert client.server.feedback_aggregate(
         FeedbackAggregateReq(
             project_id=project_id,
             after_ms=after_ms,
             before_ms=before_ms,
             feedback_types=["wandb.agent_monitor"],
-            group_by=["runnable_ref"],
+            group_by=["scorer_id"],
         )
     ) == FeedbackAggregateRes(
         time_bucket_seconds=None,
@@ -967,25 +968,25 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
         ],
     )
 
-    # --- Filter: scorer_ids prefix-match the runnable_ref's objectID:digest (its
-    # last path segment), so "scorer_a" selects only scorer A. A trailing "*" is
-    # decoration and stripped, so it must yield the same result.
-    for scorer_id in ("scorer_a", "scorer_a*"):
+    # --- Filter: scorer_ids match the scorer's id exactly, so "scorer_a" selects
+    # only scorer A. A trailing "*" opts into prefix matching, which here yields
+    # the same single scorer.
+    for scorer_filter in ("scorer_a", "scorer_a*"):
         assert client.server.feedback_aggregate(
             FeedbackAggregateReq(
                 project_id=project_id,
                 after_ms=after_ms,
                 before_ms=before_ms,
                 feedback_types=["wandb.agent_monitor"],
-                scorer_ids=[scorer_id],
-                group_by=["runnable_ref"],
+                scorer_ids=[scorer_filter],
+                group_by=["scorer_id"],
             )
         ) == FeedbackAggregateRes(
             time_bucket_seconds=None,
             after_ms=after_ms,
             before_ms=before_ms,
             buckets=[scorer_a_bucket],
-        ), scorer_id
+        ), scorer_filter
 
     # --- Filter: tags keeps rows whose scorer_tags include "nsfw" (just b1); the
     # rollup still counts all of that row's tags. ---
@@ -996,7 +997,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
             before_ms=before_ms,
             feedback_types=["wandb.agent_monitor"],
             tags=["nsfw"],
-            group_by=["runnable_ref"],
+            group_by=["scorer_id"],
         )
     ) == FeedbackAggregateRes(
         time_bucket_seconds=None,

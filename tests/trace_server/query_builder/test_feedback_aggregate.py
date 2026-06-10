@@ -55,12 +55,13 @@ def test_build_feedback_aggregate_query():
     """
     pb = _make_pb()
     result = build_feedback_aggregate_query(
-        _make_req(group_by=["runnable_ref"], tags=["nsfw"]), pb
+        _make_req(group_by=["scorer_id"], tags=["nsfw"]), pb
     )
+    # scorer_id is derived from runnable_ref's object id (no ref exposed).
     assert _normalize_sql(result.sql) == _normalize_sql(
         """
         SELECT toStartOfInterval(created_at, toIntervalSecond({pb_3:Int64}), 'UTC') AS bucket,
-               runnable_ref,
+               splitByChar(':', splitByChar('/', ifNull(runnable_ref, ''))[-1])[1] AS scorer_id,
                sumMap(scorer_tags, arrayMap(x -> toUInt64(1), scorer_tags)) AS tag_counts,
                sumMap(mapKeys(scorer_ratings), mapValues(scorer_ratings)) AS rating_sums,
                sumMap(mapKeys(scorer_ratings), arrayMap(x -> toUInt64(1), mapValues(scorer_ratings))) AS rating_counts,
@@ -73,7 +74,7 @@ def test_build_feedback_aggregate_query():
           AND created_at < fromUnixTimestamp64Milli({pb_2:Int64})
           AND hasAny(scorer_tags, {pb_4:Array(String)})
         GROUP BY bucket,
-                 runnable_ref
+                 scorer_id
         ORDER BY bucket
         """
     )
@@ -115,12 +116,18 @@ def test_build_feedback_aggregate_query():
     ]
 
     # Edge: every allowlisted dimension lands in the SELECT, GROUP BY, and columns
-    # in the same shape — only the dimension name changes.
+    # in the same shape. Stored columns select as-is; scorer_id is derived from
+    # runnable_ref's object id and aliased back to the dimension name.
     for col in sorted(FEEDBACK_AGGREGATE_GROUP_BY_COLUMNS):
         grouped = build_feedback_aggregate_query(_make_req(group_by=[col]), _make_pb())
+        dim_select = (
+            "splitByChar(':', splitByChar('/', ifNull(runnable_ref, ''))[-1])[1] AS scorer_id"
+            if col == "scorer_id"
+            else col
+        )
         assert _normalize_sql(grouped.sql) == _normalize_sql(
             "SELECT toStartOfInterval(created_at, toIntervalSecond({pb_3:Int64}), 'UTC') AS bucket,\n"
-            f"       {col},\n"
+            f"       {dim_select},\n"
             "       sumMap(scorer_tags, arrayMap(x -> toUInt64(1), scorer_tags)) AS tag_counts,\n"
             "       sumMap(mapKeys(scorer_ratings), mapValues(scorer_ratings)) AS rating_sums,\n"
             "       sumMap(mapKeys(scorer_ratings), arrayMap(x -> toUInt64(1), mapValues(scorer_ratings))) AS rating_counts,\n"
@@ -148,11 +155,11 @@ def test_build_feedback_aggregate_query():
     # Edge: time_bucket_seconds=None drops the bucket entirely; group/order by the
     # dimensions instead.
     unbucketed = build_feedback_aggregate_query(
-        _make_req(time_bucket_seconds=None, group_by=["runnable_ref"]), _make_pb()
+        _make_req(time_bucket_seconds=None, group_by=["scorer_id"]), _make_pb()
     )
     assert _normalize_sql(unbucketed.sql) == _normalize_sql(
         """
-        SELECT runnable_ref,
+        SELECT splitByChar(':', splitByChar('/', ifNull(runnable_ref, ''))[-1])[1] AS scorer_id,
                sumMap(scorer_tags, arrayMap(x -> toUInt64(1), scorer_tags)) AS tag_counts,
                sumMap(mapKeys(scorer_ratings), mapValues(scorer_ratings)) AS rating_sums,
                sumMap(mapKeys(scorer_ratings), arrayMap(x -> toUInt64(1), mapValues(scorer_ratings))) AS rating_counts,
@@ -163,12 +170,12 @@ def test_build_feedback_aggregate_query():
         WHERE project_id = {pb_0:String}
           AND created_at >= fromUnixTimestamp64Milli({pb_1:Int64})
           AND created_at < fromUnixTimestamp64Milli({pb_2:Int64})
-        GROUP BY runnable_ref
-        ORDER BY runnable_ref
+        GROUP BY scorer_id
+        ORDER BY scorer_id
         """
     )
     assert unbucketed.columns == [
-        "runnable_ref",
+        "scorer_id",
         "tag_counts",
         "rating_sums",
         "rating_counts",
@@ -347,7 +354,7 @@ def test_feedback_aggregate_req_validation():
     # rejected if it adds a group_by, a time bucket, or any filter.
     over_cap = {"after_ms": 0, "before_ms": DAY_IN_MS * 365}
     for disqualifier in (
-        {"time_bucket_seconds": None, "group_by": ["runnable_ref"]},
+        {"time_bucket_seconds": None, "group_by": ["scorer_id"]},
         {"time_bucket_seconds": 3600},
         {"time_bucket_seconds": None, "feedback_types": ["wandb.agent_monitor"]},
         {"time_bucket_seconds": None, "tags": ["nsfw"]},
