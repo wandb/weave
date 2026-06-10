@@ -30,7 +30,7 @@ import {clearWeaveTracerProvider} from '../../genai/provider';
 import {Settings} from '../../settings';
 import {initWithCustomTraceServer} from '../clientMock';
 import {InMemoryTraceServer, Call} from '../helpers/inMemoryTraceServer';
-import {agentsInstrumentedHolder} from 'weave/integrations/openai.agent';
+import state from 'weave/state';
 
 describe('OpenAI Agents Integration', () => {
   withOpenAITracingEnabled();
@@ -43,7 +43,7 @@ describe('OpenAI Agents Integration', () => {
     initWithCustomTraceServer(testProjectName, inMemoryTraceServer);
 
     setTraceProcessors([]);
-    agentsInstrumentedHolder.value = false;
+    state.integrations.openaiAgents.instrumented = false;
     await weave.instrumentOpenAIAgents();
   });
 
@@ -239,7 +239,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     clearWeaveTracerProvider();
     setTraceProcessors([]);
-    agentsInstrumentedHolder.value = false;
+    state.integrations.openaiAgents.instrumented = false;
     await weave.instrumentOpenAIAgents();
   });
 
