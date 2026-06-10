@@ -1,0 +1,26 @@
+## Conversation
+PR 4 of the rebuilt (round 2) ts-split stack: the client interface mirror. Round-1 equivalent put the client copy in weave/shared; user feedback redirected to the weave/interface <-> weave/trace_server/interface mirror, which this PR implements.
+
+## Actions
+- copytree server interface -> weave/interface; single-prefix rewrite inside copies; 106 client-side files rewired (weave/ minus trace_server, tests/ minus tests/trace_server, scripts/).
+- Conformance gate rewritten for the mirror: ONE subtree pair, ONE path rule, file-set equality both directions. (Round 1 needed per-group pair lists and ordered multi-rule rewrites; the mirror collapses all of it.)
+- Twin machinery ported from the round-1 tip via git diff + path adaptation (git apply --3way; one conflict hunk at the tsi import, resolved by hand). Includes all round-1 fixes: call.__name__ for cache-key namespacing, exception __dict__ transplant, lazy stream translation, revalidation inside the error-translation block, generic path-map-based error-module resolver.
+- Ported the five test-file fixes (NotFoundError/InvalidRequest client-copy imports, OTelExportRes twin-tuples, DigestMismatchError/InvalidRequest twin-tuple aliases, GenAISpanRef dump-compare) with weave.interface paths.
+- New "Interface layer must not import client or server" contract; C1 burned to []; C3's PR2-transient registry entry burned (the lazy import now resolves to weave.interface).
+- Mirror __init__ docstrings (path-invariant text); generator dual-emits.
+
+## Errors & Mistakes
+- None new this round; the round-1 lessons (twin docstrings must be path-invariant; proxy __name__; by_alias dumps) are baked into the ported artifacts.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- The whole twin mechanism now hangs off ONE rule: ("weave.trace_server.interface", "weave.interface"). It appears in exactly two places -- the conformance test and the conftest error-module resolver. If the mirror ever moves, change both.
+- weave/interface must stay a LEAF (its own import-linter contract). The two transitional weave.shared.refs_internal baseline entries are burned by the next PR (shared dissolution).
+
+## Codebase Discoveries
+- The mirror layout eliminates the round-1 isort asymmetry entirely -- no per-file I001 exemption needed for trace_server_converter.
+
+## Open Questions
+None.
