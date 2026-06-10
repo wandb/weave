@@ -3663,7 +3663,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns the actual source code of the op.
         """
 
-        def _query_op() -> list[Any]:
+        def _query_op() -> list[SelectableCHObjSchema]:
             object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
             object_query_builder.add_is_op_condition(True)
             object_query_builder.add_object_ids_condition([req.object_id])
