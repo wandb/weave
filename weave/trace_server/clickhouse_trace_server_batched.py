@@ -54,12 +54,11 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.actions_worker.dispatcher import execute_batch
 
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
+from weave.trace_server.agents.completion_spans import build_completion_span
 from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
-from weave.trace_server.agents.playground import build_completion_span
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -99,6 +98,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderDynamicField,
     QueryBuilderField,
     build_calls_complete_delete_query,
+    build_calls_complete_started_at_select_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
@@ -1122,11 +1122,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         and the end arrives separately via call_end_v2.
 
         Args:
-            end_call: The end call data to update. If started_at is provided,
-                it enables more efficient queries by utilizing the ClickHouse
-                primary key (project_id, started_at, id).
+            end_call: The end call data to update. The UPDATE is keyed on the
+                full primary key (project_id, started_at, id).
+
+        Raises:
+            NotFoundError: If no start row exists for (project_id, id).
         """
         table_name = self._get_calls_complete_table_name()
+
+        # Confirm the row exists before the UPDATE (full PK fast path, then a
+        # (project_id, id) fallback) so a wrong started_at can't silently no-op.
+        started_at = end_call.started_at
+        if started_at is None or not self._calls_complete_call_exists(
+            table_name, end_call.project_id, end_call.id, started_at
+        ):
+            started_at = self._read_calls_complete_started_at(
+                table_name, end_call.project_id, end_call.id
+            )
+            if started_at is None:
+                raise NotFoundError(
+                    f"Cannot end call {end_call.id}: no start found in project "
+                    f"{end_call.project_id}"
+                )
 
         output = end_call.output
         output_refs = extract_refs_from_values(output)
@@ -1138,6 +1155,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # but DateTime64(6) requires microsecond precision for exact matching. This is a
         # hack, not sure why inserting a json dump and passing an explicit param differ
         ended_at_us = datetime_to_microseconds(end_call.ended_at)
+        started_at_us = datetime_to_microseconds(started_at)
 
         pb = ParamBuilder()
         project_id_param = pb.add_param(end_call.project_id)
@@ -1152,12 +1170,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         wb_run_step_end_param = pb.add_param(
             ch_sentinel_values.to_ch_value("wb_run_step_end", end_call.wb_run_step_end)
         )
-
-        # Add started_at param if provided for more efficient primary key usage
-        started_at_param: str | None = None
-        if end_call.started_at is not None:
-            started_at_us = datetime_to_microseconds(end_call.started_at)
-            started_at_param = pb.add_param(started_at_us)
+        started_at_param = pb.add_param(started_at_us)
 
         query = build_calls_complete_update_end_query(
             table_name=table_name,
@@ -1178,6 +1191,44 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters=pb.get_params(),
             settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
         )
+
+    def _calls_complete_call_exists(
+        self,
+        table_name: str,
+        project_id: str,
+        call_id: str,
+        started_at: datetime.datetime,
+    ) -> bool:
+        """Point-lookup a call on the full primary key (project_id, started_at, id)."""
+        pb = ParamBuilder()
+        project_id_param = pb.add_param(project_id)
+        id_param = pb.add_param(call_id)
+        started_at_param = pb.add_param(datetime_to_microseconds(started_at))
+        query = build_calls_complete_started_at_select_query(
+            table_name=table_name,
+            project_id_param=project_id_param,
+            id_param=id_param,
+            started_at_param=started_at_param,
+        )
+        res = self._query(query, parameters=pb.get_params())
+        return bool(res.result_rows)
+
+    def _read_calls_complete_started_at(
+        self, table_name: str, project_id: str, call_id: str
+    ) -> datetime.datetime | None:
+        """Read a call's stored started_at by (project_id, id), or None if absent."""
+        pb = ParamBuilder()
+        project_id_param = pb.add_param(project_id)
+        id_param = pb.add_param(call_id)
+        query = build_calls_complete_started_at_select_query(
+            table_name=table_name,
+            project_id_param=project_id_param,
+            id_param=id_param,
+        )
+        res = self._query(query, parameters=pb.get_params())
+        if not res.result_rows:
+            return None
+        return res.result_rows[0][0]
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -3332,7 +3383,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_position=req.include_position,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
 
         items = []
         for row in result.named_results():
@@ -3377,7 +3428,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
 
         stats = []
         for row in result.result_rows:
@@ -3408,7 +3459,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             offset=None,
             include_position=False,
         )
-        fetch_result = self.ch_client.query(fetch_query, parameters=pb.get_params())
+        fetch_result = self._query(fetch_query, pb.get_params())
 
         for row in fetch_result.named_results():
             item = tsi.AnnotationQueueItemSchema(
@@ -3612,7 +3663,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns the actual source code of the op.
         """
 
-        def _query_op() -> list[Any]:
+        def _query_op() -> list[SelectableCHObjSchema]:
             object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
             object_query_builder.add_is_op_condition(True)
             object_query_builder.add_object_ids_condition([req.object_id])
@@ -6369,25 +6420,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             payload=create_result.payload,
         )
 
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        if len(req.call_ids) == 0:
-            return tsi.ActionsExecuteBatchRes()
-        if len(req.call_ids) > 1:
-            # This is temporary until we setup our batching infrastructure
-            raise InvalidRequest(
-                "Batching actions is not yet supported; submit one call_id at a time."
-            )
-
-        # For now, we just execute in-process if it is a single action
-        execute_batch(
-            batch_req=req,
-            trace_server=self,
-        )
-
-        return tsi.ActionsExecuteBatchRes()
-
     @tag_db_insert_path("completions_create")
     def completions_create(
         self, req: tsi.CompletionsCreateReq
@@ -6488,6 +6520,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=req.wb_user_id or "",
             retention_days=retention_days,
             error=error,
+            source=req.source,
         )
         AgentWriteHandler(self.ch_client).insert_span(span)
 
@@ -6585,6 +6618,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 response=None,
                 wb_user_id=req.wb_user_id or "",
                 retention_days=retention_days,
+                source=req.source,
             )
             AgentWriteHandler(self.ch_client).insert_span(open_span)
 
@@ -6627,6 +6661,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             request_inputs=req.inputs,
             wb_user_id=req.wb_user_id or "",
             retention_days=retention_days,
+            source=req.source,
         )
 
     @tag_db_insert_path("image_create")
@@ -7586,6 +7621,7 @@ def _create_tracked_span_stream_wrapper(
     request_inputs: tsi.CompletionsCreateRequestInputs,
     wb_user_id: str,
     retention_days: int,
+    source: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Wrap a streaming completion iterator with agent span tracking.
 
@@ -7692,6 +7728,7 @@ def _create_tracked_span_stream_wrapper(
                 wb_user_id=wb_user_id,
                 retention_days=retention_days,
                 error=stream_error,
+                source=source,
             )
             AgentWriteHandler(ch_client).insert_span(completed_span)
 

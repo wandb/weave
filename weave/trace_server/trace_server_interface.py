@@ -9,6 +9,7 @@ from pydantic import (
     Field,
     field_serializer,
     model_validator,
+    with_config,
 )
 from typing_extensions import TypedDict
 
@@ -42,12 +43,10 @@ DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
 MAX_FEEDBACK_SAMPLE_LIMIT = 5000
 
 
+# https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
+@with_config(ConfigDict(extra="allow"))
 class ExtraKeysTypedDict(TypedDict):
     pass
-
-
-# https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
-ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
 
 class LLMUsageSchema(TypedDict, total=False):
@@ -547,6 +546,10 @@ class CompletionsCreateReq(BaseModelStrict):
     conversation_name: str | None = Field(
         None,
         description="Human-readable conversation name",
+    )
+    source: str | None = Field(
+        None,
+        description="Source of the completion request (e.g. 'playground', 'signals')",
     )
 
 
@@ -1590,17 +1593,6 @@ class CostPurgeReq(BaseModelStrict):
 
 
 class CostPurgeRes(BaseModel):
-    pass
-
-
-class ActionsExecuteBatchReq(BaseModelStrict):
-    project_id: str
-    action_ref: str
-    call_ids: list[str]
-    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
-
-
-class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
@@ -3157,11 +3149,6 @@ class TraceServerInterface(Protocol):
     def feedback_payload_schema(
         self, req: FeedbackPayloadSchemaReq
     ) -> FeedbackPayloadSchemaRes: ...
-
-    # Action API
-    def actions_execute_batch(
-        self, req: ActionsExecuteBatchReq
-    ) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...

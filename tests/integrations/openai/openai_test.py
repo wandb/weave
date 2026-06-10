@@ -101,9 +101,7 @@ def test_maybe_unwrap_api_response_returns_value_when_parse_fails(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_async_quickstart(
     client: weave.trace.weave_client.WeaveClient,
@@ -149,9 +147,7 @@ async def test_openai_async_quickstart(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -204,9 +200,7 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_async_stream_quickstart(
     client: weave.trace.weave_client.WeaveClient,
@@ -258,9 +252,7 @@ async def test_openai_async_stream_quickstart(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_stream_usage_quickstart(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
@@ -298,9 +290,7 @@ def test_openai_stream_usage_quickstart(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -382,9 +372,7 @@ def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> N
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_function_call_async(
     client: weave.trace.weave_client.WeaveClient,
@@ -468,9 +456,7 @@ async def test_openai_function_call_async(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_function_call_async_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -558,9 +544,7 @@ async def test_openai_function_call_async_stream(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -644,9 +628,7 @@ def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_tool_call_async(
     client: weave.trace.weave_client.WeaveClient,
@@ -731,9 +713,7 @@ async def test_openai_tool_call_async(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_tool_call_async_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -834,9 +814,7 @@ async def test_openai_tool_call_async_stream(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_as_context_manager(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
@@ -886,9 +864,7 @@ def test_openai_as_context_manager(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_as_context_manager_async(
     client: weave.trace.weave_client.WeaveClient,
@@ -943,7 +919,6 @@ async def test_openai_as_context_manager_async(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_moderation_patching(
     client: weave.trace.weave_client.WeaveClient,
@@ -977,9 +952,7 @@ def test_openai_moderation_patching(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_async_moderation_patching(
     client: weave.trace.weave_client.WeaveClient,
@@ -1015,7 +988,6 @@ async def test_openai_async_moderation_patching(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_embeddings_patching(
     client: weave.trace.weave_client.WeaveClient,
@@ -1049,9 +1021,7 @@ def test_openai_embeddings_patching(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_async_embeddings_patching(
     client: weave.trace.weave_client.WeaveClient,
@@ -1090,7 +1060,6 @@ async def test_openai_async_embeddings_patching(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_responses_quickstart(client: WeaveClient) -> None:
     oai = OpenAI()
@@ -1133,7 +1102,6 @@ def test_openai_responses_quickstart(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_responses_quickstart_stream(client: WeaveClient) -> None:
     oai = OpenAI()
@@ -1178,7 +1146,6 @@ def test_openai_responses_quickstart_stream(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_openai_responses_quickstart_async(client: WeaveClient) -> None:
@@ -1222,7 +1189,6 @@ async def test_openai_responses_quickstart_async(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_openai_responses_quickstart_async_stream(client: WeaveClient) -> None:
@@ -1269,7 +1235,6 @@ async def test_openai_responses_quickstart_async_stream(client: WeaveClient) -> 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_responses_tool_calling(client: WeaveClient) -> None:
     oai = OpenAI()
@@ -1324,7 +1289,6 @@ def test_openai_responses_tool_calling(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_responses_tool_calling_stream(client: WeaveClient) -> None:
     oai = OpenAI()
@@ -1381,7 +1345,6 @@ def test_openai_responses_tool_calling_stream(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_openai_responses_tool_calling_async(client: WeaveClient) -> None:
@@ -1438,7 +1401,6 @@ async def test_openai_responses_tool_calling_async(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_openai_responses_tool_calling_async_stream(client: WeaveClient) -> None:

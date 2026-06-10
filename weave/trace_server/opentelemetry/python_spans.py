@@ -48,6 +48,10 @@ from weave.trace_server.opentelemetry.helpers import (
     unflatten_key_values,
 )
 
+# OpenTelemetry's all-zero span id is the "invalid id" sentinel. Some exporters
+# serialize a root span's parent as this instead of omitting it, meaning no parent.
+OTEL_INVALID_SPAN_ID = b"\x00" * 8
+
 
 class SpanKind(Enum):
     """Enum representing the span's kind."""
@@ -235,7 +239,10 @@ class Span:
     def from_proto(cls, proto_span: PbSpan, resource: Resource | None = None) -> Self:
         """Create a Span from a protobuf Span."""
         parent_id = None
-        if proto_span.parent_span_id:
+        if (
+            proto_span.parent_span_id
+            and proto_span.parent_span_id != OTEL_INVALID_SPAN_ID
+        ):
             parent_id = hexlify(proto_span.parent_span_id).decode("ascii")
 
         return cls(

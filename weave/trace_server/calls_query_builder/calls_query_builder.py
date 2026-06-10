@@ -2308,7 +2308,7 @@ def process_query_to_conditions(
     def process_operand(operand: "tsi_query.Operand") -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
             return param_slot(
-                param_builder.add_param(operand.literal_),  # type: ignore
+                param_builder.add_param(operand.literal_),
                 python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
@@ -3470,6 +3470,26 @@ def build_calls_complete_delete_query(
         DELETE FROM {formatted_table}
         WHERE project_id = {{{project_id_param}:String}} AND id IN {{{call_ids_param}:Array(String)}}
         """
+    return safely_format_sql(raw_sql, logger)
+
+
+def build_calls_complete_started_at_select_query(
+    table_name: str,
+    project_id_param: str,
+    id_param: str,
+    started_at_param: str | None = None,
+) -> str:
+    """Build a query that reads a call's stored started_at.
+
+    When started_at_param is given, the WHERE clause uses the full primary key
+    (project_id, started_at, id) for a point lookup. Otherwise it falls back to
+    (project_id, id), which scans the project's granules.
+    """
+    where = f"project_id = {{{project_id_param}:String}}"
+    if started_at_param is not None:
+        where += f" AND started_at = fromUnixTimestamp64Micro({{{started_at_param}:Int64}}, 'UTC')"
+    where += f" AND id = {{{id_param}:String}}"
+    raw_sql = f"SELECT started_at FROM {table_name} WHERE {where} LIMIT 1"
     return safely_format_sql(raw_sql, logger)
 
 

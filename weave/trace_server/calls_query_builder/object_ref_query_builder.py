@@ -21,7 +21,7 @@ by the caller, in the expand_columns parameter.
 2. Process the leaf object reference condition, which filters on the value, or in the case
 of ordering extracts and returns the value, into a CTE. In this way we are starting from the
 bottom of the tree, working our way up to the root.
-3. Then we processe the intermediate object reference conditions, which find all objects
+3. Then we process the intermediate object reference conditions, which find all objects
 with a json path value that matches the intermediate object reference condition, into a CTE.
 4. Finally, the main query filters or orders on the result of the last CTE.
 
@@ -254,7 +254,7 @@ class ObjectRefCondition(BaseModel):
         Examples:
             >>> condition = ObjectRefFilterCondition(...)
             >>> condition.as_sql_condition(pb, "calls_merged", {"field_eq_value": "obj_filter_0"})
-            'JSON_VALUE(any(calls_merged.inputs_dump), $.model) IN (SELECT ref FROM obj_filter_0)'
+            'JSON_VALUE(any(calls_merged.inputs_dump), $.model) GLOBAL IN (SELECT ref FROM obj_filter_0)'
         """
         if self.unique_key not in field_to_object_join_alias_map:
             raise ValueError(
@@ -286,7 +286,9 @@ class ObjectRefCondition(BaseModel):
         # Table row refs have the format: weave-trace-internal:///<project_id>/object/<object_id>:<digest>/attr/rows/id/<row_digest>
         # We need to extract the row digest part for table_rows matching
         row_digest_extract = f"regexpExtract({json_extract_sql}, '/([^/]+)$', 1)"
-        return f"({json_extract_sql} IN (SELECT ref FROM {cte_alias}) OR {row_digest_extract} IN (SELECT ref FROM {cte_alias}))"
+        # GLOBAL IN: the referenced CTE reads Distributed object_versions and
+        # table_rows (UNION ALL), which the analyzer won't globalize via the setting.
+        return f"({json_extract_sql} GLOBAL IN (SELECT ref FROM {cte_alias}) OR {row_digest_extract} GLOBAL IN (SELECT ref FROM {cte_alias}))"
 
 
 class ObjectRefFilterCondition(ObjectRefCondition):
@@ -852,7 +854,7 @@ def _build_intermediate_cte_sql(
         {join_clause_for_ordering}
         WHERE ov.project_id = {param_slot(project_param, "String")}
             AND length(refs) > 0
-            AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, "String")}) IN (
+            AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, "String")}) GLOBAL IN (
                 SELECT ref FROM {current_cte_name}
             )
         GROUP BY ov.project_id, ov.object_id, ov.digest

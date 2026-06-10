@@ -1118,24 +1118,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.feedback.replace,
         )
 
-    @validate_call
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        """Execute actions in batch.
-
-        Args:
-            req: Actions execute batch request.
-
-        Returns:
-            Actions execute batch response.
-        """
-        return self._stainless_request(
-            req,
-            tsi.ActionsExecuteBatchRes,
-            self._stainless_client.services.actions_execute_batch,
-        )
-
     # Cost API
     @validate_call
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
@@ -1318,6 +1300,21 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             NotImplementedError: Not implemented.
         """
         raise NotImplementedError("evaluation_status is not implemented")
+
+    @validate_call
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Score calls.
+
+        Args:
+            req: Calls score request.
+
+        Returns:
+            Calls score response.
+
+        Raises:
+            NotImplementedError: Not implemented.
+        """
+        raise NotImplementedError("calls_score is not implemented")
 
     # === Object APIs ===
 

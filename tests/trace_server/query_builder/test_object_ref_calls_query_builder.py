@@ -53,10 +53,10 @@ def test_object_ref_filter_simple() -> None:
                   OR calls_merged.ended_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_0)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_0)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -124,10 +124,10 @@ def test_object_ref_filter_lt() -> None:
                   OR calls_merged.ended_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_0)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_0)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -198,7 +198,7 @@ def test_object_ref_filter_nested() -> None:
            FROM object_versions ov
            WHERE ov.project_id = {pb_0:String}
              AND length(refs) > 0
-             AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
+             AND JSON_VALUE(ov.val_dump, {pb_3:String}) GLOBAL IN (SELECT ref FROM obj_filter_0)
            GROUP BY ov.project_id,
                     ov.object_id,
                     ov.digest),
@@ -208,7 +208,7 @@ def test_object_ref_filter_nested() -> None:
            FROM object_versions ov
            WHERE ov.project_id = {pb_0:String}
              AND length(refs) > 0
-             AND JSON_VALUE(ov.val_dump, {pb_4:String}) IN (SELECT ref FROM obj_filter_1)
+             AND JSON_VALUE(ov.val_dump, {pb_4:String}) GLOBAL IN (SELECT ref FROM obj_filter_1)
            GROUP BY ov.project_id,
                     ov.object_id,
                     ov.digest),
@@ -221,10 +221,10 @@ def test_object_ref_filter_nested() -> None:
                   OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), '') IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), '') GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_2)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_2)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -338,16 +338,16 @@ def test_multiple_object_ref_filters() -> None:
                   OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_0)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_0)))
-                   AND ((NOT ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
+                   AND ((NOT ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') GLOBAL IN
                                (SELECT ref
                                 FROM obj_filter_1)
-                             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                                (SELECT ref
                                 FROM obj_filter_1)))))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -518,34 +518,34 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
               (SELECT ref
                FROM obj_filter_0)
-             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
               (SELECT ref
                FROM obj_filter_0)))
-           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
                (SELECT ref
                 FROM obj_filter_0)
-             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                (SELECT ref
                 FROM obj_filter_0)))
-           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
                (SELECT ref
                 FROM obj_filter_1)
-             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                (SELECT ref
                 FROM obj_filter_1)))
-           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
                  (SELECT ref
                   FROM obj_filter_2)
-               OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+               OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                  (SELECT ref
                   FROM obj_filter_2)))
-           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
                (SELECT ref
                 FROM obj_filter_3)
-             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                (SELECT ref
                 FROM obj_filter_3)))
            AND (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), {pb_9:String}) > 0)
@@ -697,23 +697,23 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                OR calls_merged.op_name IS NULL)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        HAVING (((((((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+        HAVING (((((((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
                        (SELECT ref
                         FROM obj_filter_0)
-                     OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                     OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                        (SELECT ref
                         FROM obj_filter_0)))
-                    AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+                    AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
                            (SELECT ref
                             FROM obj_filter_1)
-                         OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                         OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                            (SELECT ref
                             FROM obj_filter_1)))))
                   OR ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), '') = {pb_9:String}))
-                  OR ((NOT ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+                  OR ((NOT ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
                              (SELECT ref
                               FROM obj_filter_2)
-                           OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                           OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                              (SELECT ref
                               FROM obj_filter_2)))))))
                 AND ((any(calls_merged.deleted_at) IS NULL))
@@ -846,7 +846,7 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
            FROM object_versions ov
            WHERE ov.project_id = {pb_0:String}
              AND length(refs) > 0
-             AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
+             AND JSON_VALUE(ov.val_dump, {pb_3:String}) GLOBAL IN (SELECT ref FROM obj_filter_0)
            GROUP BY ov.project_id,
                     ov.object_id,
                     ov.digest),
@@ -858,10 +858,10 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
                   OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_1)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_1)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -930,7 +930,7 @@ def test_object_ref_filter_complex_nested_path() -> None:
            FROM object_versions ov
            WHERE ov.project_id = {pb_0:String}
              AND length(refs) > 0
-             AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
+             AND JSON_VALUE(ov.val_dump, {pb_3:String}) GLOBAL IN (SELECT ref FROM obj_filter_0)
            GROUP BY ov.project_id,
                     ov.object_id,
                     ov.digest),
@@ -943,10 +943,10 @@ def test_object_ref_filter_complex_nested_path() -> None:
                   OR calls_merged.op_name IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_1)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_1)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -1018,10 +1018,10 @@ def test_object_ref_filter_calls_complete() -> None:
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
         WHERE (length(calls_complete.output_refs) > 0
                OR calls_complete.ended_at = {pb_5:DateTime64(6)})
-        AND (((coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), '') IN
+        AND (((coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), '') GLOBAL IN
                    (SELECT ref
                     FROM obj_filter_0)
-                OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                    (SELECT ref
                     FROM obj_filter_0)))
                 AND ((calls_complete.deleted_at = {pb_4:DateTime64(3)})))
@@ -1101,10 +1101,10 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
         WHERE (calls_complete.parent_id = {pb_7:String})
           AND (length(calls_complete.input_refs) > 0)
-          AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') IN
+          AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') GLOBAL IN
                      (SELECT ref
                       FROM obj_filter_0)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                      (SELECT ref
                       FROM obj_filter_0)))
                 OR ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String}))))

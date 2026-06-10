@@ -25,7 +25,7 @@ def clear_http_env(monkeypatch):
 
 
 def test_client_uses_default_httpx_transport():
-    assert isinstance(http_requests.client._transport, httpx.HTTPTransport)
+    assert isinstance(http_requests._get_client()._transport, httpx.HTTPTransport)
 
 
 def test_request_hook_logs_when_enabled(monkeypatch):

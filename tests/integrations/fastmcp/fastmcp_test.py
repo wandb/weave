@@ -119,7 +119,6 @@ def main():
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_fastmcp_client(client: WeaveClient) -> None:
     main()
@@ -169,7 +168,6 @@ def test_fastmcp_client(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skipif(
     sys.platform == "win32",

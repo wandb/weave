@@ -68,6 +68,10 @@ export function getWeaveTracerProvider(): BasicTracerProvider | null {
   return _providerHolder.provider;
 }
 
+export function clearWeaveTracerProvider() {
+  _providerHolder.provider = null;
+}
+
 function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
   if (_providerHolder.provider) {
     return _providerHolder.provider;

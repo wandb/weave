@@ -31,6 +31,7 @@ export const ATTR_GEN_AI_PROVIDER_NAME = 'gen_ai.provider.name';
 export const ATTR_GEN_AI_REQUEST_MODEL = 'gen_ai.request.model';
 export const ATTR_GEN_AI_RESPONSE_FINISH_REASONS =
   'gen_ai.response.finish_reasons';
+export const ATTR_GEN_AI_RESPONSE_ID = 'gen_ai.response.id';
 export const ATTR_GEN_AI_RESPONSE_MODEL = 'gen_ai.response.model';
 export const ATTR_GEN_AI_SYSTEM_INSTRUCTIONS = 'gen_ai.system_instructions';
 export const ATTR_GEN_AI_TOOL_CALL_ARGUMENTS = 'gen_ai.tool.call.arguments';

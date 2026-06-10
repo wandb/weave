@@ -9,7 +9,6 @@ from weave.integrations.integration_utilities import op_name_from_ref
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_chat_completion(client):
     from huggingface_hub import InferenceClient
@@ -47,7 +46,6 @@ def test_huggingface_chat_completion(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_chat_completion_stream(client):
     from huggingface_hub import InferenceClient
@@ -86,7 +84,6 @@ def test_huggingface_chat_completion_stream(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_chat_completion_async(client):
@@ -124,7 +121,6 @@ async def test_huggingface_chat_completion_async(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_document_question_answering(client):
     from huggingface_hub import InferenceClient
@@ -155,7 +151,6 @@ def test_huggingface_document_question_answering(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_document_question_answering_async(client):
@@ -187,7 +182,6 @@ async def test_huggingface_document_question_answering_async(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_fill_mask(client):
     from huggingface_hub import InferenceClient
@@ -211,7 +205,6 @@ def test_huggingface_fill_mask(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_fill_mask_async(client):
@@ -239,7 +232,6 @@ async def test_huggingface_fill_mask_async(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_question_answering(client):
     from huggingface_hub import InferenceClient
@@ -267,7 +259,6 @@ def test_huggingface_question_answering(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_question_answering_async(client):
@@ -297,7 +288,6 @@ async def test_huggingface_question_answering_async(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_table_question_answering(client):
     from huggingface_hub import InferenceClient
@@ -328,7 +318,6 @@ def test_huggingface_table_question_answering(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_table_question_answering_async(client):
@@ -360,7 +349,6 @@ async def test_huggingface_table_question_answering_async(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_text_classification(client):
     from huggingface_hub import InferenceClient
@@ -387,7 +375,6 @@ def test_huggingface_text_classification(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_text_classification_async(client):
@@ -415,7 +402,6 @@ async def test_huggingface_text_classification_async(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_token_classification(client):
     from huggingface_hub import InferenceClient
@@ -444,7 +430,6 @@ def test_huggingface_token_classification(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_token_classification_async(client):
@@ -474,7 +459,6 @@ async def test_huggingface_token_classification_async(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_translation(client):
     from huggingface_hub import InferenceClient
@@ -501,7 +485,6 @@ def test_huggingface_translation(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_translation_async(client):
@@ -531,7 +514,6 @@ async def test_huggingface_translation_async(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_huggingface_text_to_image(client):
     from huggingface_hub import InferenceClient
@@ -561,7 +543,6 @@ def test_huggingface_text_to_image(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_huggingface_text_to_image_async(client):

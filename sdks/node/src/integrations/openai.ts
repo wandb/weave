@@ -6,7 +6,7 @@ import {getGlobalClient} from '../clientApi';
 import {InternalCall} from '../call';
 import {WeaveClient} from '../weaveClient';
 import {warnOnce} from '../utils/warnOnce';
-import {getCallStackFromOpenAIAgents} from './openai.agent';
+import {getCallStackFromOpenAIAgents} from './openai-agents/weave-tracing-processor';
 
 /**
  * Wraps a function to run with OpenAI Agents call stack if available.

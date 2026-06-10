@@ -30,7 +30,6 @@ def patch_verifiers() -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
     allow_playback_repeats=True,
 )
 def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> None:
