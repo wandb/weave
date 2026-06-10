@@ -233,10 +233,10 @@ class _SpanBase(BaseModel):
     def set_attributes(self, attributes: dict[str, Any]) -> Self:
         """Bulk-stamp OTel attributes. Mirrors OTel's ``Span.set_attributes``.
 
-        Convenience over repeated :meth:`set_attribute` when the caller has
-        a pre-built dict (e.g. forwarding attributes from an upstream span
+        Convenience over repeated ``set_attribute`` when the caller has a
+        pre-built dict (e.g. forwarding attributes from an upstream span
         or a transcript replay). Same no-op + warning semantics as
-        :meth:`set_attribute`.
+        ``set_attribute``.
         """
         if self._check_recording("set_attributes", list(attributes)):
             self._otel_span.set_attributes(attributes)
@@ -250,14 +250,12 @@ class _SpanBase(BaseModel):
     ) -> Self:
         """Record an OTel span event at a point in time within this span.
 
-        Examples:
-            - ``weave.permission_request`` — record that a permission
-              prompt was shown; attributes carry the suggested options
-            - Lifecycle markers — ``spawned`` / ``streaming`` / ``finished``
-              to time sub-operations inside the span
-            - Custom milestones — anything that happens at a point in time
-              within the span's lifetime (vs an attribute, which is a
-              property of the span as a whole)
+        Use for marker / lifecycle data — permission prompts (e.g.
+        ``weave.permission_request``), lifecycle transitions (e.g.
+        ``spawned`` / ``streaming`` / ``finished``), or any custom
+        milestone that happens at a point in time within the span's
+        lifetime (vs an attribute, which is a property of the span as a
+        whole).
 
         Must be called between span start and span end (inside ``with``).
         Outside that window the call is a no-op and logs a warning.
