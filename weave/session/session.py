@@ -188,15 +188,8 @@ class _SpanBase(BaseModel):
         self._otel_span.record_exception(exc_val)
 
     def set_attribute(self, key: str, value: Any) -> Self:
-        """Set an arbitrary attribute on this span's OTel span.
-
-        Escape hatch for values not covered by the declared GenAI semconv
-        fields (e.g. ``weave.display_name`` for Claude Code, enterprise tags).
-        No-op after :meth:`end`.
-        """
-        if not _OTEL_AVAILABLE or self._otel_span is None:
-            return self
-        if self._otel_span.is_recording():
+        """Stamp an arbitrary OTel attribute. No-op after ``end()``."""
+        if self._otel_span is not None and self._otel_span.is_recording():
             self._otel_span.set_attribute(key, value)
         return self
 
@@ -206,20 +199,9 @@ class _SpanBase(BaseModel):
         attributes: dict[str, Any] | None = None,
         timestamp: datetime | None = None,
     ) -> Self:
-        """Add an OTel span event with optional attributes and timestamp.
-
-        Used for marker events (e.g. ``weave.permission_request``,
-        lifecycle transitions). ``timestamp`` is a ``datetime``; if omitted,
-        OTel stamps the event with the current time. No-op after :meth:`end`.
-        """
-        if not _OTEL_AVAILABLE or self._otel_span is None:
-            return self
-        if self._otel_span.is_recording():
-            ts_ns = (
-                int(timestamp.timestamp() * 1_000_000_000)
-                if timestamp is not None
-                else None
-            )
+        """Record an OTel span event. No-op after ``end()``."""
+        if self._otel_span is not None and self._otel_span.is_recording():
+            ts_ns = int(timestamp.timestamp() * 1_000_000_000) if timestamp else None
             self._otel_span.add_event(name, attributes=attributes, timestamp=ts_ns)
         return self
 
