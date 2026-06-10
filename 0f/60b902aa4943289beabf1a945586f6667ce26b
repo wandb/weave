@@ -1,0 +1,96 @@
+## Conversation
+User asked for a "clickhouse-local" test backend so the suite stops needing both
+sqlite AND dockerized clickhouse runs, as a 3-PR graphite stack. Success criteria:
+(1) selectable via --clickhouse-local, (2) all clickhouse tests pass unchanged,
+(3) GHA step added and green, (4) local step faster than both sqlite and docker
+clickhouse steps, (5) the dockerized suite can then be deleted. Mid-task the user
+sent "Keep going, test this impl" — emphasis on validation breadth.
+
+## Actions
+- Mapped provisioning: everything funnels through ensure_clickhouse_db
+  (tests/trace_server/conftest_lib/clickhouse_server.py) yielding (host, port);
+  CI=1 short-circuits to env; session-scoped _ch_session_server migrates once,
+  per-test TRUNCATE isolation; xdist via per-worker DB suffixes.
+- Consulted Codex (threadId 019eb392-1f76-7003-82bc-857c210e7049): pushed me to
+  normalize the flag at configure time (config.option.trace_server = "clickhouse")
+  instead of relying on every reader using get_trace_server_flag; guard
+  --collect-only; conservative dirty-table detection; startup assertion that
+  users.d merged; exact version pinning.
+- Implemented plugin tests/trace_server/conftest_lib/clickhouse_local.py:
+  controller-owned server, pytest_configure_node(optionalhook) → workerinput,
+  env WF_CLICKHOUSE_HOST/PORT set in-process, stash keys for address/server.
+- bin/get_clickhouse.sh: linux pinned 26.4.4.38 from
+  packages.clickhouse.com/tgz/stable (verified both amd64/arm64 URLs 200);
+  darwin floats (no official versioned mac tarballs exist).
+- Validated on macOS (brew cask binary 26.5.2.39): trace_server shard 856
+  passed/2 skipped; trace shard -n10 943/946 (see Errors); flow +
+  trace_server_bindings shards green; edge cases: conflict flags error,
+  --collect-only starts no server, bad WEAVE_CLICKHOUSE_BINARY errors cleanly,
+  shorthand flag works, meta-test proves flag normalization.
+
+## Errors & Mistakes
+- First full-file run: test_delete_current_latest_promotes_prior_surviving_version
+  failed with "DB::Exception: Could not find symbol _memcmpSmallCharsAllowOverflow15
+  (CANNOT_COMPILE_CODE) (version 26.5.2.39 (official build))". macOS official
+  builds cannot resolve JIT symbols (Mach-O underscore prefix). Disabling
+  compile_expressions + compile_aggregate_expressions did NOT fix it — the
+  third JIT path, compile_sort_description (default 1, kicks in after 3 sorts,
+  hence order-dependent), was the actual trigger. All three are now 0 in the
+  local users.xml profile.
+- `import resource` at module top would have broken Windows CI at plugin import
+  time (module is imported unconditionally via pytest_plugins). Wrapped in
+  try/except ImportError.
+- Every run emitted PytestAssertRewriteWarning "module already imported" because
+  clickhouse_server.py imports clickhouse_local before pytest registers it as a
+  plugin. Fixed with PYTEST_DONT_REWRITE in the module docstring.
+- zsh footguns: `echo ===X===` triggers zsh =cmd expansion; `VAR=1 time cmd`
+  is a parse error (time is a keyword); rg -r is --replace, not recursive.
+- Benchmark accounting trap: `time` on the pytest pipeline includes the REAPED
+  local server's CPU (it's a pytest child), docker's server CPU is invisible.
+  The scary "150s system time" was mostly this artifact. Compare wall only.
+
+## Dead Ends
+- chdb/embedded clickhouse: rejected — would need a clickhouse_connect Client
+  adapter; large parity risk vs "tests pass unchanged" and version skew vs 26.4.
+- Hoped dirty-table truncate skip would cut the mac gap: no measurable change
+  (167→171s, noise). Kept anyway — strictly fewer round trips, and CI hardware
+  may benefit where the mac bottleneck (APFS) dominates locally. The REAL mac
+  finding: single-row INSERT is 6.3ms native-on-APFS vs 3.9ms docker-linux-VM;
+  SELECT identical (~1.3ms). On linux the data dir is /dev/shm, so this inverts.
+- 26.5s "teardown" of the alphabetically-last test = session DROP DATABASE SYNC
+  ceremony; now skipped for clickhouse-local (server+data destroyed moments later).
+
+## Hints for Future Agents
+- The launcher asserts async_insert=0 at startup; if users.d merging ever breaks
+  (CH config refactor), that assertion is the canary, not a test failure.
+- Mac timings DO NOT transfer to CI. Docker baseline on mac: 112s for
+  trace_server shard vs 166-171s local — that's APFS metadata tax, not a code
+  problem. CI comparisons must come from the PR2 run's side-by-side steps.
+- A leftover weave-python-test-clickhouse-server container (another session) was
+  bound to 8123; baselines used host port 8124. Don't kill that container — the
+  shared-container path is exactly what local devs use.
+- tests/trace/test_weave_client_threaded.py::test_flask_server fails on this mac
+  on SQLITE too (flask thread dies, port free) — environment, not backend.
+- test_sync_eval_parallelism + test_flask_server failed under -n10 on a loaded
+  machine, pass in isolation; they are timing-sensitive.
+- Conductor worktree gotcha: local `master` lives in ~/conductor/weave and was 4
+  commits stale; gt track said "includes 5 commits". Fixed by ff-merging master
+  in the main worktree. Without this, restacks would rewrite onto pre-26.4 CI.
+
+## Codebase Discoveries
+- ClickHouse JIT has THREE independent settings; compile_sort_description is the
+  one everyone forgets.
+- With an explicit --config-file, system.*_log tables are simply absent unless
+  configured (verified: groupArray(name) = []). The docker image's default
+  config enables them.
+- users.d merging follows the users.xml location (user_directories/users_xml),
+  verified empirically.
+- clickhouse server forks a clickhouse-watchdog parent; process-group SIGKILL
+  handles both.
+- system.tables total_rows over-counts under lightweight-delete masks and patch
+  parts — safe direction for dirty-table detection (never skips a dirty table).
+
+## Open Questions
+- No official pinned macOS binaries; mac devs float (brew or installer script).
+- Whether CI's local step beats the sqlite step on the trace shard is proven by
+  the PR2 CI run, not locally (mac APFS masks it).
