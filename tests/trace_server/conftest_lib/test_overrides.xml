@@ -1,6 +1,19 @@
 <!-- Server-side defaults applied only to test CH clusters. Mounted into
-     /etc/clickhouse-server/users.d/ by the topology compose files so every
-     connection from every test thread inherits these as profile defaults.
+     /etc/clickhouse-server/users.d/ by the topology compose files and the
+     single-node CI docker runs, so every connection from every test thread
+     inherits these as profile defaults.
+
+     async_insert=0: synchronous inserts in CI for read-after-write consistency.
+
+     use_query_condition_cache=0: CH 26.2-26.5 return wrong results when a query
+     combines PREWHERE on a pk-prefix column with WHERE non-pk IN/= on a
+     skip-indexed column (our calls_merged trace_id bloom-filter CTE): the query
+     condition cache is poisoned and later reads under-count / drop rows. See
+     https://github.com/ClickHouse/ClickHouse/issues/104781 (fixed by PR #105686,
+     backported to 26.3/26.4/26.5 but not yet in the pinned image). conftest
+     disables it per-query, but only on trace-server reads; setting it
+     server-side also covers the direct clickhouse-connect queries
+     (truncate/migrate/etc.) that would otherwise poison the shared cache.
 
      distributed_foreground_insert=1: by default ClickHouse buffers a
      Distributed INSERT locally and forwards async to the destination shard,
@@ -19,6 +32,8 @@
 <clickhouse>
     <profiles>
         <default>
+            <async_insert>0</async_insert>
+            <use_query_condition_cache>0</use_query_condition_cache>
             <distributed_foreground_insert>1</distributed_foreground_insert>
             <load_balancing>in_order</load_balancing>
         </default>

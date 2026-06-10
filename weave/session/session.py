@@ -296,7 +296,7 @@ class Tool(_SpanBase):
             session_id=session.session_id if session else "",
             include_content=session.include_content if session else True,
         )
-        self._end_otel_span(attrs)
+        self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
         if self.started_at is None:
@@ -591,7 +591,8 @@ class LLM(_SpanBase):
         if self._ended:
             return
         self._ended = True
-        self.ended_at = datetime.now(timezone.utc)
+        if self.ended_at is None:
+            self.ended_at = datetime.now(timezone.utc)
 
         session = get_current_session()
         attrs = self._build_attrs(
@@ -603,7 +604,7 @@ class LLM(_SpanBase):
             _current_llm.reset(self._token)
             self._token = None
 
-        self._end_otel_span(attrs)
+        self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
         if self._token is None:
@@ -691,18 +692,21 @@ class SubAgent(_SpanBase):
         if self._ended:
             return
         self._ended = True
-        self.ended_at = datetime.now(timezone.utc)
+        if self.ended_at is None:
+            self.ended_at = datetime.now(timezone.utc)
 
         session = get_current_session()
         attrs = self._build_attrs(
             session_id=session.session_id if session else "",
             session_name=session.session_name if session else "",
         )
-        self._end_otel_span(attrs)
+        self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
-        self.started_at = datetime.now(timezone.utc)
-        self._start_otel_span(f"invoke_agent {self.name}")
+        if self.started_at is None:
+            self.started_at = datetime.now(timezone.utc)
+        start_ns = int(self.started_at.timestamp() * 1_000_000_000)
+        self._start_otel_span(f"invoke_agent {self.name}", start_time_ns=start_ns)
         return self
 
     def __exit__(
@@ -816,7 +820,8 @@ class Turn(_SpanBase):
         if self._ended:
             return
         self._ended = True
-        self.ended_at = datetime.now(timezone.utc)
+        if self.ended_at is None:
+            self.ended_at = datetime.now(timezone.utc)
 
         session = get_current_session()
         attrs = self._build_attrs(
@@ -829,7 +834,7 @@ class Turn(_SpanBase):
             _current_turn.reset(self._token)
             self._token = None
 
-        self._end_otel_span(attrs)
+        self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
         if self._token is None:

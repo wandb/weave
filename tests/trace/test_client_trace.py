@@ -32,7 +32,7 @@ from tests.trace.util import (
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
-from tests.trace_server.helpers import force_optimize_table
+from tests.trace_server.helpers import force_optimize
 from weave import Thread, ThreadPoolExecutor
 from weave.shared.refs_internal import extra_value_quoter
 from weave.shared.trace_server_interface_util import (
@@ -4463,9 +4463,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with storage size
     calls = list(
@@ -4504,9 +4502,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4559,9 +4555,7 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4707,12 +4701,8 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
     if not client_is_sqlite(client):
-        clickhouse_client.command(
-            "OPTIMIZE TABLE calls_merged FINAL",
-        )
-        clickhouse_client.command(
-            "OPTIMIZE TABLE calls_merged_stats FINAL",
-        )
+        force_optimize(clickhouse_client, "calls_merged")
+        force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
@@ -4957,7 +4947,7 @@ def test_calls_query_stats_unfiltered_storage_counts_deleted_bytes(
             "calls_complete",
             "calls_complete_stats",
         ):
-            force_optimize_table(clickhouse_client, table)
+            force_optimize(clickhouse_client, table)
 
     optimize()
 
@@ -5177,9 +5167,7 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     result = client.server.calls_query_stats(

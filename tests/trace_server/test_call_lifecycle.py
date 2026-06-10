@@ -4,7 +4,7 @@ import uuid
 import pytest
 
 from tests.trace.util import client_is_sqlite
-from tests.trace_server.helpers import force_optimize_table
+from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
@@ -136,7 +136,7 @@ def test_call_end_started_at_anchors_sortable_datetime(
     # sortable_datetime = started_at and rescues the WHERE on its own, hiding
     # the bug. The bug only surfaces once the merge collapses the two parts
     # into a single row whose `any(sortable_datetime)` could be ended_at.
-    force_optimize_table(ch_client)
+    force_optimize_calls_merged(ch_client)
 
     threshold = started_at + datetime.timedelta(seconds=60)
     res = client.server.calls_query(
