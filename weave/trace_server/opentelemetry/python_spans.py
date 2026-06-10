@@ -235,7 +235,8 @@ class Span:
     def from_proto(cls, proto_span: PbSpan, resource: Resource | None = None) -> Self:
         """Create a Span from a protobuf Span."""
         parent_id = None
-        if proto_span.parent_span_id:
+        # An all-zero parent_span_id is the OTel invalid-id sentinel for a root span.
+        if any(proto_span.parent_span_id):
             parent_id = hexlify(proto_span.parent_span_id).decode("ascii")
 
         return cls(
