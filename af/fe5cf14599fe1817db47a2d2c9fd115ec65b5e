@@ -1,0 +1,30 @@
+## Conversation
+PR 5 of the rebuilt (round 2) ts-split stack: the dissolution the user's review feedback demanded -- "nothing in shared and equivalent implementations on both sides with tests. i.e. forbidden modules should include shared!". Round 1 had kept weave/shared as the client-side home; round 2 deletes the zone entirely.
+
+## Actions
+- git mv the 5 modules to weave/interface/ + path-fixed copies into weave/trace_server/interface/ (conformance subtree covers them with zero gate changes).
+- Rewired 37 importer files side-appropriately + the 4 interface twins themselves (converter/validation_util x2 -- my sweep had excluded the mirror trees, caught by residue check).
+- Deleted weave/shared; tests/shared -> tests/interface (+ noxfile trace_server-shard path list updated); the one init-name importer (test_digest) repointed to weave.interface.digest -- the mirror __init__ is docstring-only, no re-exports.
+- pyproject: C2 shared baselines burned; the shared-foundation contract block REMOVED (its source module is gone; import-linter errors on missing SOURCE modules); weave.shared left/added in C1 + interface-contract forbidden lists -- EMPIRICALLY VERIFIED import-linter tolerates nonexistent FORBIDDEN modules, so the tombstone stays per the user's explicit ask.
+- Meta-test test_no_shared_zone added.
+
+## Errors & Mistakes
+- ls weave/shared showed agents/helpers/interface subdirs AFTER the git rm -- stale UNTRACKED __pycache__ leftovers from round-1 branch checkouts (git ls-files confirmed empty). rm -rf'd. When switching between stacks that restructure packages, expect __pycache__ ghosts.
+- The interface twins were excluded from the importer sweep by design and needed their own pass; the residue check caught it immediately.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- Forbidden-module TOMBSTONES work (nonexistent forbidden modules are tolerated; nonexistent SOURCE modules are not). Use them to lock out resurrected packages; pair with a filesystem meta-test for belt-and-braces.
+- weave.interface/__init__ and its server twin deliberately re-export NOTHING -- import the submodule you need. The old weave/shared __init__ digest re-exports are gone.
+- tests/interface/ rides the trace_server shard (noxfile sharded_sections).
+
+## Codebase Discoveries
+- Only ONE consumer used the shared __init__ name re-exports (tests/shared/test_digest.py); everything else imported submodules directly.
+
+## Open Questions
+None.
+
+## Addendum
+Hardened test_no_shared_zone against stale __pycache__ ghosts: checking out pre-dissolution commits regenerates weave/shared/__pycache__, and switching forward leaves it as an untracked leftover. The assert now flags only real (non-pycache) files. Found during per-level stack verification.
