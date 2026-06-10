@@ -32,10 +32,6 @@ weave_prefix = ri.WEAVE_SCHEME + ":///"
 weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
 
 
-class InvalidInternalRef(ValueError):
-    pass
-
-
 def replace_external_weave_ref(
     ref_str: str,
     convert_ext_to_int_project_id: Callable[[str], str],
@@ -154,7 +150,7 @@ def universal_int_to_ext_ref_converter(
         rest = ref_str[len(weave_internal_prefix) :]
         parts = rest.split("/", 1)
         if len(parts) != 2:
-            raise InvalidInternalRef(f"Invalid URI: {ref_str}")
+            raise ri.InvalidInternalRef(f"Invalid URI: {ref_str}")
         project_id, tail = parts
         if project_id not in int_to_ext_project_cache:
             int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
@@ -176,7 +172,7 @@ def universal_int_to_ext_ref_converter(
                 # future that a programming error leads to this situation, in
                 # which case reading this object would consistently fail. We
                 # might want to instead return a private ref in this case.
-                raise InvalidInternalRef("Encountered unexpected ref format.")
+                raise ri.InvalidInternalRef("Encountered unexpected ref format.")
         return obj
 
     return _map_values(obj, mapper)

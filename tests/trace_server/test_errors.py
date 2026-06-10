@@ -4,6 +4,7 @@ from gql.transport.exceptions import TransportServerError
 
 from weave.trace_server.errors import (
     InvalidFieldError,
+    InvalidInternalRef,
     InvalidRequest,
     ObjectNameTypeCollision,
     handle_clickhouse_query_error,
@@ -52,6 +53,14 @@ def test_invalid_field_error_maps_to_422() -> None:
     """
     result = handle_server_exception(InvalidFieldError("Field 'foo' is not allowed"))
     assert result.status_code == 422
+
+
+def test_invalid_internal_ref_maps_to_400() -> None:
+    """InvalidInternalRef (a ValueError subclass) is registered explicitly so it maps to 400, not 500."""
+    result = handle_server_exception(
+        InvalidInternalRef("Encountered unexpected ref format.")
+    )
+    assert result.status_code == 400
 
 
 def test_object_name_type_collision_maps_to_400() -> None:

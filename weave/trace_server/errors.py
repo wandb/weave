@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
+from weave.shared.refs_internal import InvalidInternalRef
 from weave.trace_server.validation_util import CHValidationError
 
 # =============================================================================
@@ -308,6 +309,7 @@ class ErrorRegistry:
         self.register(CallsCompleteModeRequired, 400)
         self.register(ObjectNameTypeCollision, 400)
         self.register(InvalidExternalRef, 400)
+        self.register(InvalidInternalRef, 400)
         self.register(DigestMismatchError, 409)
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
