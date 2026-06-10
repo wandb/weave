@@ -40,14 +40,12 @@ class PaginatedIterator(Generic[T, R_co]):
         transform_func: TransformFunc[T, R_co] | None = None,
         size_func: SizeFunc | None = None,
         limit: int | None = None,
-        offset: int | None = None,
     ) -> None:
         self.fetch_func = fetch_func
         self.page_size = page_size
         self.transform_func = transform_func
         self.size_func = size_func
         self.limit = limit
-        self.offset = offset
         self._next_index = 0
         self._fetch_page = self._make_page_fetcher(
             fetch_func, page_size, DEFAULT_MAX_CACHED_PAGES
@@ -87,11 +85,8 @@ class PaginatedIterator(Generic[T, R_co]):
         if index < 0:
             raise IndexError("Negative indexing not supported")
 
-        if self.limit is not None and index >= self.limit + (self.offset or 0):
+        if self.limit is not None and index >= self.limit:
             raise IndexError(f"Index {index} out of range")
-
-        if self.offset is not None:
-            index += self.offset
 
         page_index = index // self.page_size
         page_offset = index % self.page_size
@@ -120,12 +115,6 @@ class PaginatedIterator(Generic[T, R_co]):
         # Apply limit if provided
         if self.limit is not None and (stop is None or stop > self.limit):
             stop = self.limit
-
-        # Apply offset if provided
-        if self.offset is not None:
-            start += self.offset
-            if stop is not None:
-                stop += self.offset
 
         i = start
         while stop is None or i < stop:

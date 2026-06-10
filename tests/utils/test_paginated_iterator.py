@@ -40,6 +40,19 @@ def test_paginated_iterator_iter_remains_restartable() -> None:
     assert list(paginated) == [0, 1, 2, 3, 4]
 
 
+def test_paginated_iterator_limit_bounds_index_and_slice_consistently() -> None:
+    paginated = PaginatedIterator(_fetch_numbers, page_size=2, limit=3)
+
+    assert paginated[2] == 2
+    with pytest.raises(IndexError):
+        paginated[3]
+
+    # Indexing, slicing, and iteration all agree on the limit boundary.
+    assert paginated[0:10] == [0, 1, 2]
+    assert paginated[:] == [0, 1, 2]
+    assert list(paginated) == [0, 1, 2]
+
+
 def test_paginated_iterator_reuses_fetched_pages_within_instance() -> None:
     fetch_offsets: list[int] = []
 
