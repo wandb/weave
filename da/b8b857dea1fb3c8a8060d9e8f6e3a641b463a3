@@ -1,0 +1,73 @@
+## Conversation
+Round 3 ts-split PR 3: the client interface mirror, rebuilt under the user's 5
+rules (.context/ts-split-round3-design.md). Key deltas vs round 2 (f750cd4ad7):
+(a) SUBSET mirror -- the client copies only contract it consumes; (b) the
+mirror carries NO impl (rule 5): no digest/refs_internal/converter/
+validation_util/ids twins; (c) ZERO transitional entries (rule 3) -- round 2
+added 2 weave.shared.refs_internal leaf-contract entries + an I001 exemption
+here; round 3's mirror is leaf-clean from birth because the impl never enters.
+
+## Actions
+- cherry-pick --no-commit f750cd4ad7. 19 conflicts, resolved by category:
+  - kept MINE (no runnable at this level): library_cases, test_evaluation_ref_get,
+    test_llm_as_a_judge_scorer, test_llm_structured_completion_model,
+    shared/object_class_util (lazy registry import stays weave.trace.base_objects).
+  - git rm weave/flow/llm_structured_completion_model.py (DU; rule 2).
+  - took THEIRS + scripted un-rewrite for the rest (14 files).
+- serialize.py: reverted round-2's runnable-resolution block in from_json to
+  master's registry-only form (registry stays at the server path until PR 5).
+- REGENERATED weave/interface from MY server tree. Exclusions:
+  llm_structured_model + builtin_object_registry ONLY. First attempt also
+  excluded agents/schema + agents/semconv -- WRONG: agents/types (in tsi's
+  closure) imports BOTH. Import-smoke of every mirror module caught it.
+- Conformance gate rewritten for SUBSET semantics (orphan client files fail;
+  REQUIRED_CLIENT_MODULES guards against an empty mirror).
+- pyproject: C1 burned to 9 remaining entries; weave.interface leaf contract
+  added with ignore_imports = [].
+- tests/trace/test_base_object_classes.py: test_only_example import repointed
+  BACK to the server path -- at this level weave.trace.base_objects re-exports
+  SERVER classes (registry not mirrored) and pydantic rejects cross-tree class
+  identity (model_type ValidationError). 9 tests failed until repointed.
+- FLOW_TO_SERVER_BASELINE burned to empty (flow repoints rode the pick).
+- AMENDED post-commit: tests/trace/test_weave_client.py line 14 carried
+  round-2's `from weave.flow.llm_structured_completion_model import ...`
+  (a phantom at this level -- module never exists in round 3). Caught while
+  building PR 4; fixed to the server schema path here so THIS PR is
+  independently green. Lesson: after adopting picked test files, run
+  COLLECTION (`pytest --co`) on the full tests/trace tree, not just targeted
+  suites.
+
+## Errors & Mistakes
+- The agents/schema+semconv exclusion broke 5 mirror modules at import time.
+- The phantom flow import above survived my first verification batch because
+  I never collected test_weave_client.py at this level.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- weave/interface is regenerated-not-edited: change the SERVER copy and re-run
+  the copy+rewrite (or edit both; the gate enforces).
+- The 9 remaining C1 entries: 5x ids + converter burn in PR 4; scorer +
+  registry x2 burn in PR 5.
+- test_base_object_classes' server-path import flips to the mirror in PR 5.
+
+## Codebase Discoveries
+- agents/types.py is in tsi's closure and pulls agents/{constants,schema,
+  semconv} -- the whole agents contract rides the mirror even though no client
+  code imports it directly.
+
+## Open Questions
+None.
+## Addendum (round-3 fix-forward)
+Amended twice during stack verification:
+1. tests/trace/test_weave_client.py phantom flow import (see earlier section).
+2. tests/trace/test_client_trace.py twin-class fixes found by the ClickHouse
+   battery at the stack tip: (a) CHValidationError must be caught as the
+   CLIENT copy (the fixture translates contract errors at the boundary);
+   (b) test_large_keys_are_stripped_call's monkeypatched _insert_call_batch
+   raises INSIDE server internals and must raise the SERVER's InsertTooLarge
+   (imported as ServerInsertTooLarge) or _flush_calls' except clause cannot
+   catch it and the error escapes to the client futures. Round 2 never hit
+   either: both tests skip on sqlite and round 2 never ran ClickHouse
+   locally.
