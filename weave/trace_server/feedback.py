@@ -55,6 +55,9 @@ TABLE_FEEDBACK = Table(
         Column("scorer_ratings", "map_string_float"),
         Column("scorer_rating_reasons", "map_string_string"),
         Column("scorer_rating_confidences", "map_string_float"),
+        Column("span_agent_name", "string"),
+        Column("span_agent_version", "string"),
+        Column("span_status_code", "string"),
     ],
 )
 
@@ -301,6 +304,9 @@ def format_feedback_to_row(
         "scorer_ratings": feedback_req.scorer_ratings,
         "scorer_rating_reasons": feedback_req.scorer_rating_reasons,
         "scorer_rating_confidences": feedback_req.scorer_rating_confidences,
+        "span_agent_name": feedback_req.span_agent_name,
+        "span_agent_version": feedback_req.span_agent_version,
+        "span_status_code": feedback_req.span_status_code,
     }
 
 

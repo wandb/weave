@@ -2798,6 +2798,15 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Compute feedback stats using SQLite + Python aggregation."""
         return sqlite_feedback_stats(self, req)
 
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        # Relies on ClickHouse-only aggregates (sumMap over Array/Map columns,
+        # toStartOfInterval bucketing). Not ported to SQLite.
+        raise NotImplementedError(
+            "feedback_aggregate is not implemented for SQLite trace server"
+        )
+
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
     ) -> tsi.FeedbackPayloadSchemaRes:
