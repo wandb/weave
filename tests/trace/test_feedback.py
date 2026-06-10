@@ -5,13 +5,21 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
 from tests.trace.util import client_is_sqlite
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    DummyIdConverter,
+)
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.feedback_agg_query_builder import (
+    build_feedback_aggregate_query,
+)
 from weave.trace_server.interface.query import Query
+from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.trace_server_interface import (
+    FeedbackAggregateReq,
     FeedbackCreateReq,
     FeedbackQueryReq,
     FeedbackReplaceReq,
@@ -991,6 +999,79 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
             f"Filtering by {model_output_field} $contains '{substr}' failed, "
             f"expected {expected_ids}, got {found_ids}"
         )
+
+
+def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> None:
+    """Functional checks (ClickHouse-only) that the WHERE filters match precisely.
+
+    The aggregate endpoint lands separately, so this executes the built query
+    directly. Guards against over-broad matching that string assertions miss:
+    object-id filters match the id exactly (a trailing '*' opts into prefix), and
+    span_types matches the ref's span-type segment, not an arbitrary substring.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("feedback_aggregate query is ClickHouse-only (sumMap/splitByChar)")
+
+    project_id = client.project_id
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+    after_ms = now_ms - 3_600_000
+    before_ms = now_ms + 3_600_000
+
+    def _monitor(suffix: str, monitor_id: str, weave_ref: str) -> None:
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="wandb.agent_monitor",
+                payload={"value": []},
+                runnable_ref=f"weave:///{project_id}/object/scorer_{suffix}:obj_{suffix}",
+                call_ref=f"weave:///{project_id}/call/{suffix}",
+                trigger_ref=f"weave:///{project_id}/object/{monitor_id}:trig_{suffix}",
+            )
+        )
+
+    # Two monitors whose ids share a prefix ("mon" vs "monday"), one scoring an
+    # agent_turn ref and one an agent_conversation ref.
+    _monitor("t1", "mon", f"weave:///{project_id}/agent_turn/trace_t1")
+    _monitor("c1", "monday", f"weave:///{project_id}/agent_conversation/conv_c1")
+
+    # feedback_create (via the external adapter) stores the internal project_id and
+    # internalized refs; query against that internal id, not the external one.
+    internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
+
+    def _total(**filters) -> int:
+        """Run the aggregate (global rollup) and return the total matched rows."""
+        pb = ParamBuilder()
+        built = build_feedback_aggregate_query(
+            FeedbackAggregateReq(
+                project_id=internal_project_id,
+                after_ms=after_ms,
+                before_ms=before_ms,
+                feedback_types=["wandb.agent_monitor"],
+                **filters,
+            ),
+            pb,
+        )
+        result = client.server._query(built.sql, built.parameters)
+        rows = [
+            dict(zip(built.columns, row, strict=True)) for row in result.result_rows
+        ]
+        return sum(int(r["total_count"]) for r in rows)
+
+    # Sanity: both rows are present absent any id/type filter.
+    assert _total() == 2
+
+    # monitor_ids: exact by default, so "mon" must NOT match "monday".
+    assert _total(monitor_ids=["mon"]) == 1
+    assert _total(monitor_ids=["monday"]) == 1
+    assert _total(monitor_ids=["mond"]) == 0  # no partial match without '*'
+    # A trailing '*' opts into prefix matching -> matches both ids.
+    assert _total(monitor_ids=["mon*"]) == 2
+
+    # span_types: matches the exact span-type segment of the ref, not a substring.
+    assert _total(span_types=["agent_turn"]) == 1
+    assert _total(span_types=["agent_conversation"]) == 1
+    assert _total(span_types=["agent_turn", "agent_conversation"]) == 2
 
 
 class MatchAnyDatetime:  # noqa: PLW1641
