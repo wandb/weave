@@ -1,0 +1,70 @@
+## Conversation
+Round 3 ts-split PR 3: the client interface mirror, rebuilt under the user's 5
+rules (.context/ts-split-round3-design.md). Key deltas vs round 2 (f750cd4ad7):
+(a) SUBSET mirror -- the client copies only contract it consumes; (b) the
+mirror carries NO impl (rule 5): no digest/refs_internal/converter/
+validation_util/ids twins; (c) ZERO transitional entries (rule 3) -- round 2
+added 2 weave.shared.refs_internal leaf-contract entries + an I001 exemption
+here; round 3's mirror is leaf-clean from birth because the impl never enters.
+
+## Actions
+- cherry-pick --no-commit f750cd4ad7. 19 conflicts, resolved by category:
+  - kept MINE (no runnable at this level): library_cases, test_evaluation_ref_get,
+    test_llm_as_a_judge_scorer, test_llm_structured_completion_model,
+    shared/object_class_util (lazy registry import stays weave.trace.base_objects).
+  - git rm weave/flow/llm_structured_completion_model.py (DU; rule 2).
+  - took THEIRS + scripted un-rewrite for the rest: weave.interface.{ids,
+    trace_server_converter,validation_util,digest,refs_internal,pydantic_util,
+    object_class_util,builtin_object_classes.{registry,llm_structured_model},
+    agents.{schema,semconv}} -> their round-3 homes (trace_server/* or
+    weave.shared/*). 14 files.
+- serialize.py: reverted round-2's runnable-resolution block in from_json to
+  master's registry-only form (registry stays at the server path until PR 5).
+- REGENERATED weave/interface from MY server tree (round-2's copies mismatch:
+  errors.py CHValidationError inversion etc.). Exclusions: llm_structured_model
+  + builtin_object_registry ONLY. First attempt also excluded agents/schema +
+  agents/semconv -- WRONG: agents/types (in tsi's closure) imports BOTH.
+  Import-smoke of every mirror module caught it.
+- Conformance gate rewritten for SUBSET semantics: client files must each have
+  a byte-identical server twin; orphans fail; REQUIRED_CLIENT_MODULES guards
+  against degrading to an empty mirror. Server-only contract (kafka schema
+  etc.) simply has no client copy.
+- pyproject: C1 burned to 9 remaining entries (scorer->llm schema,
+  base_objects/serialize->registry, weave_client->converter, 5x ->ids);
+  leaf contract for weave.interface added with ignore_imports = [].
+- conftest twin-error resolver: comment updated for subset; importlib hoisted
+  to top-level imports.
+- tests/trace/test_base_object_classes.py: repointed its test_only_example
+  import BACK to the server path -- at this level weave.trace.base_objects
+  re-exports SERVER classes (registry not mirrored), and pydantic rejects
+  cross-tree class identity (model_type ValidationError). 9 tests failed until
+  repointed; PR 5 flips it to the mirror path when the registry joins.
+- FLOW_TO_SERVER_BASELINE burned to empty (flow repoints rode the pick).
+- Verified: lint-imports 4 kept; 34 meta+gate tests; 12 base_object tests;
+  87 twin-boundary tests (vals/annotation_feedback/llm x2/bindings); ruff.
+
+## Errors & Mistakes
+- The agents/schema+semconv exclusion broke 5 mirror modules at import time
+  (closure miscount). Lesson: compute mirror exclusions from the IMPORT
+  CLOSURE, not from "who imports this module from outside".
+- Cross-tree pydantic class identity is a real hazard anywhere the registry
+  (server classes) meets direct mirror-class construction. The fixture
+  translation handles ERRORS; nested-model fields it cannot.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- weave/interface is regenerated-not-edited: to change a contract file, edit
+  the SERVER copy and re-run the copy script (or edit both; gate enforces).
+- The 9 remaining C1 entries map: 5x ids + converter burn in PR 4; scorer/
+  registry x2 + llm schema burn in PR 5.
+- test_base_object_classes' server-path import flips to the mirror in PR 5.
+
+## Codebase Discoveries
+- agents/types.py is in tsi's closure and pulls agents/{constants,schema,
+  semconv} -- the whole agents contract rides the mirror even though no
+  client code imports it directly.
+
+## Open Questions
+None.
