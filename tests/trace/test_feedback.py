@@ -912,6 +912,34 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
         ],
     )
 
+    # --- Time-bucketed, no group_by: the same global rollup, but one row per time
+    # bucket carrying its timestamp (group stays empty). All rows share one 1h
+    # bucket, so a single row comes back. ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            time_bucket_seconds=3600,
+            feedback_types=["wandb.agent_monitor"],
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=3600,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=expected_bucket_start,
+                group={},
+                total_count=4,
+                scored_count=3,
+                tag_counts={"good": 1, "nsfw": 1, "slow": 1},
+                rating_counts={"_rating_": 2},
+                rating_sums={"_rating_": 1.25},
+            ),
+        ],
+    )
+
     # --- Filter: scorer_ids prefix-match the runnable_ref's objectID:digest (its
     # last path segment), so "scorer_a" selects only scorer A. A trailing "*" is
     # decoration and stripped, so it must yield the same result.
