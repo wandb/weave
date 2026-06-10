@@ -1,0 +1,38 @@
+## Conversation
+Stack PR 3/3: criterion 5 — remove the dockerized suite, run everything
+clickhouse on the local backend.
+
+## Actions
+- Removed "Start ClickHouse" + "Run nox (Clickhouse Trace Server)" from
+  test.yaml trace-tests and nightly-tests.
+- nightly integration-only step now passes --trace-server=clickhouse-local:
+  those shards run with NO marker filter, so their trace_server-marked tests
+  hit the default clickhouse backend — previously served by the docker
+  container at WF_CLICKHOUSE_HOST=localhost.
+- Dropped dead WF_CLICKHOUSE_HOST envs and packages:write (existed solely for
+  ch-image.sh GHCR mirroring) from these two jobs.
+
+## Errors & Mistakes
+- None in this commit's scope.
+
+## Dead Ends
+- Considered also converting trace-server-migrator-1s1r (single node + embedded
+  keeper) to the local backend — deferred; keeper config mounting works but the
+  job is cheap and topology jobs keep ch-image.sh exercised.
+
+## Hints for Future Agents
+- KEEP: sqlite steps (sqlite backend ships in the product), migrator topology
+  jobs (1s3r/2s2r genuinely need clusters; 1s1r uses keeper config),
+  ch-image.sh (migrator jobs), and the docker fallback in
+  ensure_clickhouse_db_container_running (local devs without a binary).
+- The wandb local-testcontainer docker pull (~50s/job) remains — it was out of
+  scope but is now the dominant fixed cost of every trace-tests job.
+- If a test starts depending on system.query_log or JIT behavior, the local
+  backend's config (no log tables, JIT off) is where to look first.
+
+## Codebase Discoveries
+- packages:write on these jobs had a single consumer (ch-image.sh mirroring).
+
+## Open Questions
+- After this lands, is the dockerized container path in conftest_lib worth
+  keeping long-term, or should local devs be pushed to clickhouse-local?
