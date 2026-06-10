@@ -1,0 +1,79 @@
+## Conversation
+Round 3 ts-split PR 4: dissolve weave/shared into PER-SIDE implementations +
+the frozen JSONL conformance corpus. This is the heart of the user's rule 1
+("no shared dir; duplicate per side with conformance tests stored in JSONL,
+future home core repo") and replaces round 2's approach of moving shared into
+the byte-identical mirror (which violated rule 5: impl in interface).
+
+## Actions
+- Per-side copies created from the master shared content:
+  - server: weave/trace_server/{digest,object_class_util,pydantic_util,
+    refs_internal,trace_server_interface_util}.py. object_class_util's lazy
+    registry import -> the SERVER contract registry.
+  - client: weave/trace/{digest,object_class_util,pydantic_util,
+    refs_internal}.py + weave/trace/ref_converters.py (full copy of the
+    converter; client imports weave.interface.errors + weave.trace.refs_internal)
+    + weave/utils/ids.py. Client object_class_util keeps master's lazy import
+    of weave.trace.base_objects -- per-side copies make the round-2 "registry
+    repoint" commit UNNECESSARY (each side resolves its own registry), which
+    is also what burns the old C3 contract without any repoint.
+- Scripted rewires (42 files): server files weave.shared.X ->
+  weave.trace_server.X; client files -> weave.trace.X (+ ids -> weave.utils.ids,
+  converter -> weave.trace.ref_converters); tests/trace_server -> server paths;
+  tests/trace -> client paths EXCEPT trace_server_interface_util (server-only,
+  no client copy -- tests import the server module).
+- weave/shared DELETED. tests/shared/test_refs_internal.py -> tests/trace/
+  (it tests the client ref stack: refs.ObjectRef, sanitize_object_name).
+  test_digest/test_pydantic_util superseded by side-parametrized
+  tests/conformance/test_per_side_units.py (+ uuidv7 format/sortability).
+- Conformance corpus: conformance/{README.md,generate_fixtures.py,fixtures/
+  {digest,validator,refs,ref_conversion}.jsonl}. digest+validator rows adopted
+  VERBATIM from the v2 stack (andrew/ts-v2-* prior art) -- regenerating at
+  this level produced BYTE-IDENTICAL files, proving pre-split behavior matches
+  v2's post-split pinning (incl. the llm_structured_completion_model golden
+  row, which is the cross-PR digest-stability canary for PR 5's marker).
+  refs.jsonl (parse/round-trip/quoting) and ref_conversion.jsonl (ext<->int
+  over payloads) are NEW in round 3.
+- Runners: tests/conformance/test_corpus_library.py (every row x BOTH sides;
+  require_* validators server-only, validate_* against both tsi twins),
+  test_corpus_server.py (obj/table/file create through the client fixture),
+  test_corpus_client.py (weave.publish digests).
+- noxfile: trace_server shard tests/shared -> tests/conformance.
+- pyproject: 21 C2-shared entries burned; the shared-foundation contract
+  REMOVED (import-linter errors on missing SOURCE modules); weave.shared
+  tombstoned in C1 (added) + C2 + leaf forbidden lists; C1 ids x5 + converter
+  burned (C1 down to 3 entries).
+- Meta-test: test_no_shared_zone (pycache-ghost hardened).
+
+## Errors & Mistakes
+- test_generate_id_is_time_sortable first asserted whole-id sortedness --
+  WRONG: UUIDv7's random tail is not monotonic within one millisecond (this
+  home-rolled impl has no counter). Assert the 48-bit timestamp prefix only.
+- Discovered PR 3's phantom flow import via this PR's test run; fixed by
+  amending PR 3 (stash -> amend -> pop; the stash carried PR 4's WIP cleanly).
+- PT011/PT017 dance in the corpus validator runner: corpus pins the exact
+  class NAME from data, so `pytest.raises(Exception) as exc_info` + post-block
+  type-name assert with a spot `# noqa: PT011`.
+
+## Dead Ends
+- Considered a client-side subset copy of the converter (only
+  universal_ext_to_int_ref_converter). Full copy instead: the module is
+  cohesive, the corpus covers both directions, and a subset would drift.
+
+## Hints for Future Agents
+- Corpus rows are FROZEN (append-only). Changing an `expected` is a
+  backwards-incompatible wire change -- see conformance/README.md.
+- The llm golden digest row must stay green through PR 5's split (the
+  __weave_canonical_bases__ marker exists precisely for that).
+- Tests may import either side (outside lint scope); weave/ code must import
+  its OWN side -- the import-linter contracts enforce it.
+- generate_fixtures.py imports the SERVER reference impl; run it from the
+  project venv.
+
+## Codebase Discoveries
+- Regenerated digest.jsonl is byte-identical pre-split vs v2's post-split
+  freeze -- the canonical-bases marker design holds end to end.
+- Only tests/shared/test_digest.py ever used the shared __init__ re-exports.
+
+## Open Questions
+None.
