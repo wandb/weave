@@ -295,10 +295,7 @@ interface ResultState {
   _outputStaging?: Array<string>;
 }
 
-const openAIStreamAPIstreamReducer: StreamReducer<
-  StreamChunk,
-  ResultState
-> = {
+const openAIStreamAPIstreamReducer: StreamReducer<StreamChunk, ResultState> = {
   initialStateFn: () => ({
     responses: [],
     _outputStaging: [],
