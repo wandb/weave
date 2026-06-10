@@ -12,6 +12,7 @@ const parse: (filePath: string) => {
   name: string;
   basedir: string;
   path: string;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
 } = require('module-details-from-path');
 
 export let reset = () => {};
@@ -23,6 +24,7 @@ const passThroughModules = new Set<string>();
 
 if (typeof module !== 'undefined' && module.exports) {
   // CommonJS environment
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Module = require('module');
   const originalRequire = Module.prototype.require;
 
