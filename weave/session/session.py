@@ -261,11 +261,8 @@ class _SpanBase(BaseModel):
         Outside that window the call is a no-op and logs a warning.
         """
         if self._check_recording("add_event", name):
-            timestamp_ns = (
-                int(timestamp.timestamp() * 1_000_000_000) if timestamp else None
-            )
             self._otel_span.add_event(
-                name, attributes=attributes, timestamp=timestamp_ns
+                name, attributes=attributes, timestamp=_to_ns(timestamp)
             )
         return self
 
