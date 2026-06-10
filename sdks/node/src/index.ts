@@ -99,6 +99,7 @@ export {MessagesPrompt, StringPrompt} from './prompt';
 // is emitted, the `require()` call here is dead code, and the typeof
 // check prevents the missing module from ever being requested.
 if (typeof require === 'function' && typeof module === 'object') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('./utils/commonJSLoader');
 }
 
