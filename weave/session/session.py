@@ -197,9 +197,8 @@ class _SpanBase(BaseModel):
             return False
         if self._otel_span is None:
             logger.warning(
-                "%s(%r) ignored: span not started. Use `with` to start a "
-                "streaming span, or pass the populated object to log_turn() "
-                "for batch ingest.",
+                "%s(%r) ignored: span not started. Use `with` for live "
+                "tracing, or log_turn() for batch ingest.",
                 operation,
                 key,
             )
