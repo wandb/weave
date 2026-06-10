@@ -34,3 +34,20 @@ None beyond the pre-existing failures noted above.
   Rerun: cd /tmp/weave-adk-e2e && USE_REAL_GEMINI=true
   GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT=wandb-qa
   GOOGLE_CLOUD_LOCATION=us-central1 node main.js
+
+## Amendment (post-rebase, kelowna workspace)
+User asked to test the integration; a scratch demo (examples/googleAdkDemo.ts,
+untracked) was created in the kelowna workspace, which then appeared in every
+stack branch's working tree and looked like it was being added by multiple PRs.
+User directive: keep the demo in examples/, added once in the relevant PR.
+Resolution: deleted the scratch file and folded its deltas into this commit's
+canonical examples/googleAdkAgent.ts:
+- Env var doc fix: header said GOOGLE_API_KEY, but @google/adk 1.2.0 reads only
+  GOOGLE_GENAI_API_KEY || GEMINI_API_KEY (dist/cjs/models/google_llm.js:282 in
+  1.2.0; error message at google_llm.js:69 confirms). GOOGLE_API_KEY is never
+  consulted.
+- Added run command and expected-trace shape (invocation -> invoke_agent ->
+  call_llm/execute_tool) to the header so testers know what to verify.
+Offline smoke test (no keys) confirmed the CJS require hook patches Runner and
+self-registers WeaveAdkPlugin ("Plugin 'weave' registered."); the model call
+then fails without GEMINI_API_KEY, which is how the env-var bug was found.
