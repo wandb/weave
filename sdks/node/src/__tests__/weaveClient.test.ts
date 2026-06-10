@@ -2,7 +2,6 @@ import {ReadableStream} from 'stream/web';
 import {type Api as TraceServerApi} from '../generated/traceServerApi';
 import {StringPrompt} from '../prompt';
 import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
-import {type WandbServerApi} from '../wandb/wandbServerApi';
 import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
 
@@ -49,8 +48,7 @@ type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
 describe('WeaveClient', () => {
   let client: WeaveClient;
   let mockTraceServerApi: MockedTraceServer;
-  let mockWandbServerApi: jest.Mocked<WandbServerApi>;
-
+  
   beforeEach(() => {
     mockTraceServerApi = {
       calls: {
@@ -64,7 +62,6 @@ describe('WeaveClient', () => {
         genaiTracesChatAgentsTracesChatPost: jest.fn(),
       },
     } as any;
-    mockWandbServerApi = {} as any;
     client = new WeaveClient({
       traceServerApi: mockTraceServerApi,
       projectId: 'test-project',
@@ -207,7 +204,6 @@ describe('WeaveClient', () => {
   describe('Batch Processing', () => {
     let client: WeaveClient;
     let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
-    let mockWandbServerApi: jest.Mocked<WandbServerApi>;
 
     beforeEach(() => {
       mockTraceServerApi = {
@@ -215,7 +211,6 @@ describe('WeaveClient', () => {
           callStartBatchCallUpsertBatchPost: jest.fn().mockResolvedValue({}),
         },
       } as any;
-      mockWandbServerApi = {} as any;
       client = new WeaveClient({
         traceServerApi: mockTraceServerApi,
         projectId: 'test-project',
@@ -606,14 +601,12 @@ describe('WeaveClient', () => {
   describe('linkPromptToRegistry', () => {
     let client: WeaveClient;
     let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
-    let mockWandbServerApi: jest.Mocked<WandbServerApi>;
     let mockTransport: jest.SpyInstance;
 
     beforeEach(() => {
       mockTraceServerApi = {
         request: jest.fn(),
       } as any;
-      mockWandbServerApi = {} as any;
       client = new WeaveClient({
         traceServerApi: mockTraceServerApi,
         projectId: 'current-entity/current-project',
