@@ -26,8 +26,10 @@ def test_server_functionality(trace_server: TestOnlyUserInjectingExternalTraceSe
 
 The trace server backend can be configured via pytest flags:
 - `--trace-server=sqlite`: Use SQLite backend (in-memory)
-- `--trace-server=clickhouse`: Use ClickHouse backend (default)
+- `--trace-server=clickhouse`: Use ClickHouse backend (default; expects a reachable server, auto-starting docker locally when missing)
+- `--trace-server=clickhouse-local`: Use ClickHouse backend served by an auto-started local `clickhouse server` binary — no docker. The binary is resolved via `WEAVE_CLICKHOUSE_BINARY`, then PATH; `bin/get_clickhouse.sh` downloads one (macOS: `brew install --cask clickhouse` also works)
 - `--ch` or `--clickhouse`: Shorthand for ClickHouse backend
+- `--clickhouse-local`: Shorthand for the clickhouse-local backend
 
 ### Architecture:
 

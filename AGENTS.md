@@ -129,13 +129,29 @@ The `--trace-server` flag controls which **backend** (database) is used for test
 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=sqlite
 ```
 
-**ClickHouse (Required for Full Testing):**
+**ClickHouse Local (Recommended for ClickHouse Testing — no Docker):**
+
+```bash
+nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=clickhouse-local
+```
+
+This auto-starts a real `clickhouse server` binary for the pytest session (one
+per invocation, shared across xdist workers) and tears it down afterwards. The
+binary is resolved via the `WEAVE_CLICKHOUSE_BINARY` env var, then `clickhouse`
+/ `clickhouse-server` on PATH. To install one: `bin/get_clickhouse.sh` (Linux
+pins the CI version; macOS gets a recent build) or `brew install --cask
+clickhouse` on macOS.
+
+**ClickHouse via Docker (external server):**
 
 ```bash
 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=clickhouse --clickhouse-process=true
 ```
 
-**Note:** ClickHouse tests require Docker to be running. If Docker is not available or you encounter Docker connection errors, use SQLite backend with `--trace-server=sqlite`.
+**Note:** `--trace-server=clickhouse` expects a reachable server (auto-starting
+Docker locally if missing) and requires Docker to be running. Prefer
+`--trace-server=clickhouse-local`, which needs no Docker. If neither a binary
+nor Docker is available, use the SQLite backend with `--trace-server=sqlite`.
 
 #### Remote HTTP Trace Server Implementation Selection
 

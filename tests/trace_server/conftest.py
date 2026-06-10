@@ -8,6 +8,9 @@ import pytest
 
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from tests.trace.util import client_is_sqlite
+from tests.trace_server.conftest_lib.clickhouse_local import (
+    get_clickhouse_local_address,
+)
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     UserInjectingExternalTraceServer,
@@ -28,7 +31,10 @@ from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
-pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
+pytest_plugins = [
+    "tests.trace_server.conftest_lib.clickhouse_server",
+    "tests.trace_server.conftest_lib.clickhouse_local",
+]
 
 
 @dataclass(frozen=True)
@@ -48,7 +54,8 @@ def pytest_addoption(parser):
             "--trace-server",
             action="store",
             default="clickhouse",
-            help="Specify the backend to use: sqlite or clickhouse",
+            help="Specify the backend to use: sqlite, clickhouse, or "
+            "clickhouse-local (auto-started local server binary, no docker)",
         )
         parser.addoption(
             "--ch",
@@ -67,6 +74,12 @@ def pytest_addoption(parser):
             action="store",
             default="false",
             help="Use a clickhouse process instead of a container",
+        )
+        parser.addoption(
+            "--clickhouse-local",
+            action="store_true",
+            help="Use an auto-started local ClickHouse server binary "
+            "(shorthand for --trace-server=clickhouse-local)",
         )
         parser.addoption(
             "--remote-http-trace-server",
@@ -162,10 +175,36 @@ def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
     return [row[0] for row in result.result_rows if row[0] not in SEED_DATA_TABLES]
 
 
+def _discover_dirty_tables(ch_client, database: str) -> set[str]:
+    """Tables that may hold rows and therefore need a truncate.
+
+    total_rows/total_bytes come from part metadata — one cheap system.tables
+    read instead of a TRUNCATE round trip per table. NULL means "not quickly
+    determinable" (non-MergeTree engines): treat as dirty. Lightweight-delete
+    masks and update patch parts only ever leave total_rows OVER-counting, so
+    this can truncate a table with no visible rows but never skip one that
+    has any.
+    """
+    result = ch_client.query(
+        "SELECT name FROM system.tables "
+        f"WHERE database = '{database}' "
+        "AND (total_rows IS NULL OR total_rows > 0 OR total_bytes > 0)"
+    )
+    return {row[0] for row in result.result_rows}
+
+
 def _truncate_all_tables(ch_client, database: str, tables: list[str]) -> None:
-    """Truncate all data tables in the database for test isolation."""
+    """Truncate data tables for test isolation, skipping provably empty ones.
+
+    Most tests touch a handful of the ~30 truncatable tables; truncating only
+    the dirty ones cuts per-test fixture overhead from ~30 round trips to a
+    metadata read plus a few.
+    """
+    dirty = _discover_dirty_tables(ch_client, database)
     on_cluster = _on_cluster_clause()
     for table in tables:
+        if table not in dirty:
+            continue
         ch_client.command(f"TRUNCATE TABLE {database}.{table}{on_cluster} SYNC")
 
 
@@ -268,20 +307,25 @@ def _ch_session_server(
     else:
         os.environ["WF_CLICKHOUSE_DATABASE"] = original_db
 
-    # Session cleanup: drop databases
-    teardown_on_cluster = _on_cluster_clause()
-    try:
-        ch_server.ch_client.command(
-            f"DROP DATABASE IF EXISTS {management_db}{teardown_on_cluster} SYNC"
-        )
-    except Exception:
-        pass
-    try:
-        ch_server.ch_client.command(
-            f"DROP DATABASE IF EXISTS {unique_db}{teardown_on_cluster} SYNC"
-        )
-    except Exception:
-        pass
+    # Session cleanup: drop databases. Skipped for clickhouse-local — that
+    # server (and its data dir) is destroyed at pytest_unconfigure moments
+    # later, and a synchronous DROP over a session's accumulated state is
+    # pure ceremony. External/dockerized servers outlive the session and do
+    # need the cleanup.
+    if get_clickhouse_local_address(request.config) is None:
+        teardown_on_cluster = _on_cluster_clause()
+        try:
+            ch_server.ch_client.command(
+                f"DROP DATABASE IF EXISTS {management_db}{teardown_on_cluster} SYNC"
+            )
+        except Exception:
+            pass
+        try:
+            ch_server.ch_client.command(
+                f"DROP DATABASE IF EXISTS {unique_db}{teardown_on_cluster} SYNC"
+            )
+        except Exception:
+            pass
     try:
         ch_server.ch_client.close()
     except Exception:

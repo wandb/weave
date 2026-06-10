@@ -8,6 +8,9 @@ from collections.abc import Callable, Generator
 
 import pytest
 
+from tests.trace_server.conftest_lib.clickhouse_local import (
+    get_clickhouse_local_address,
+)
 from tests.trace_server.conftest_lib.container_management import check_server_up
 from weave.trace_server import environment as ts_env
 
@@ -183,6 +186,12 @@ def ensure_clickhouse_db(
     request,
 ) -> Callable[[], Generator[tuple[str, int], None, None]]:
     def ensure_clickhouse_db_inner() -> Generator[tuple[str, int], None, None]:
+        # clickhouse-local mode: the session-owned server was started at
+        # pytest_configure time; nothing to provision or clean up here.
+        local_address = get_clickhouse_local_address(request.config)
+        if local_address is not None:
+            yield local_address
+            return
         host, port = ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
         if os.environ.get("CI"):
             yield host, port
