@@ -187,7 +187,7 @@ class _SpanBase(BaseModel):
         self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
         self._otel_span.record_exception(exc_val)
 
-    def _check_recording(self, operation: str, key: str) -> bool:
+    def _check_recording(self, operation: str, key: str | list[str]) -> bool:
         """Return True if the OTel span is recording.
 
         Else log a warning naming the caller-facing fix. Silent when OTel
@@ -223,6 +223,18 @@ class _SpanBase(BaseModel):
         """
         if self._check_recording("set_attribute", key):
             self._otel_span.set_attribute(key, value)
+        return self
+
+    def set_attributes(self, attributes: dict[str, Any]) -> Self:
+        """Bulk-stamp OTel attributes. Mirrors OTel's ``Span.set_attributes``.
+
+        Convenience over repeated :meth:`set_attribute` when the caller has
+        a pre-built dict (e.g. forwarding attributes from an upstream span
+        or a transcript replay). Same no-op + warning semantics as
+        :meth:`set_attribute`.
+        """
+        if self._check_recording("set_attributes", list(attributes)):
+            self._otel_span.set_attributes(attributes)
         return self
 
     def add_event(

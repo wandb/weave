@@ -94,14 +94,29 @@ def test_add_event_no_op_after_end(
 
 
 @pytest.mark.parametrize(
+    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
+)
+def test_set_attributes_lands_on_span(
+    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
+) -> None:
+    """Bulk ``set_attributes`` lands every key on the OTel span."""
+    with Session(session_id="test-session"), factory() as span_obj:
+        span_obj.set_attributes({"weave.first": "one", "weave.second": "two"})
+    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
+    assert finished_span.attributes["weave.first"] == "one"
+    assert finished_span.attributes["weave.second"] == "two"
+
+
+@pytest.mark.parametrize(
     ("_class_label", "factory", "_span_name"), CASES, ids=CLASS_LABELS
 )
 def test_returns_self_for_chaining(
     otel_spans: InMemorySpanExporter, _class_label, factory, _span_name
 ) -> None:
-    """Both methods return ``self`` for fluent chaining on a live span."""
+    """All three mutators return ``self`` for fluent chaining on a live span."""
     with Session(session_id="test-session"), factory() as span_obj:
         assert span_obj.set_attribute("key", "value") is span_obj
+        assert span_obj.set_attributes({"key": "value"}) is span_obj
         assert span_obj.add_event("event-name") is span_obj
 
 
