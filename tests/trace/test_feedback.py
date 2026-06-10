@@ -940,6 +940,33 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
         ],
     )
 
+    # --- All-time total: a from-the-epoch range that exceeds the usual 31-day cap.
+    # Past the cap only a bare project-wide total is allowed (no bucket, no
+    # group_by, no filters), so this rolls up EVERY feedback row in the project --
+    # including the non-agent-monitor note (total 5, not 4). ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=0,
+            before_ms=before_ms,
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=0,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={},
+                total_count=5,  # 4 agent_monitor rows + the note
+                scored_count=3,  # a3 and the note emitted nothing
+                tag_counts={"good": 1, "nsfw": 1, "slow": 1},
+                rating_counts={"_rating_": 2},
+                rating_sums={"_rating_": 1.25},
+            ),
+        ],
+    )
+
     # --- Filter: scorer_ids prefix-match the runnable_ref's objectID:digest (its
     # last path segment), so "scorer_a" selects only scorer A. A trailing "*" is
     # decoration and stripped, so it must yield the same result.

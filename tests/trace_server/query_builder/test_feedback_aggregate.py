@@ -330,9 +330,32 @@ def test_feedback_aggregate_req_validation():
     with pytest.raises(ValidationError):
         _make_req(before_ms=_AFTER_MS)
 
-    # Range cannot exceed the 31-day cap.
+    # Range cannot exceed the 31-day cap (this request buckets, so it stays capped).
     with pytest.raises(ValidationError):
         _make_req(after_ms=0, before_ms=DAY_IN_MS * 32, time_bucket_seconds=86_400)
+
+    # All-time total: a bare project-wide rollup (no bucket, no group_by, no
+    # filters) lifts the 31-day cap, so the client can request from the epoch.
+    assert (
+        _make_req(
+            after_ms=0, before_ms=DAY_IN_MS * 365, time_bucket_seconds=None
+        ).after_ms
+        == 0
+    )
+
+    # The exemption is only for that bare total. Over the cap, the request is
+    # rejected if it adds a group_by, a time bucket, or any filter.
+    over_cap = {"after_ms": 0, "before_ms": DAY_IN_MS * 365}
+    for disqualifier in (
+        {"time_bucket_seconds": None, "group_by": ["runnable_ref"]},
+        {"time_bucket_seconds": 3600},
+        {"time_bucket_seconds": None, "feedback_types": ["wandb.agent_monitor"]},
+        {"time_bucket_seconds": None, "tags": ["nsfw"]},
+        {"time_bucket_seconds": None, "scorer_ids": ["sc"]},
+        {"time_bucket_seconds": None, "rating_min": 0.5},
+    ):
+        with pytest.raises(ValidationError):
+            _make_req(**over_cap, **disqualifier)
 
     # Bucket count is capped (1 day at 1s buckets = 86,400 buckets).
     with pytest.raises(ValidationError):

@@ -1543,10 +1543,23 @@ class FeedbackAggregateReq(BaseModelStrict):
         time_range_ms = self.before_ms - self.after_ms
         if time_range_ms <= 0:
             raise ValueError("before_ms must be greater than after_ms")
+        # Limit the time range for this query EXCEPT to fetch an ungrouped, unfiltered, all-time total
         if time_range_ms > MAX_FEEDBACK_AGG_TIME_RANGE_DAYS * DAY_IN_MS:
-            raise ValueError(
-                f"Feedback request range cannot exceed {MAX_FEEDBACK_AGG_TIME_RANGE_DAYS} days"
+            has_filter = bool(
+                self.feedback_types
+                or self.tags
+                or self.monitor_ids
+                or self.scorer_ids
+                or self.span_agent_names
+                or self.span_types
+                or self.rating_min is not None
+                or self.rating_max is not None
             )
+            if self.time_bucket_seconds is not None or self.group_by or has_filter:
+                raise ValueError(
+                    f"Feedback requests over {MAX_FEEDBACK_AGG_TIME_RANGE_DAYS} days must be a "
+                    "project-wide total: no time_bucket_seconds, no group_by, and no filters."
+                )
         # Only cap the bucket count when bucketing; None means a single rollup row.
         if self.time_bucket_seconds is not None:
             n_buckets = (time_range_ms / 1000) / self.time_bucket_seconds
