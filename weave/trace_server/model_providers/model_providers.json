@@ -15,6 +15,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "JetBrains/Mellum2-12B-A2.5B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "MiniMaxAI/MiniMax-M2.5": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -28,6 +32,10 @@
     "api_key_name": "WANDB_API_KEY"
   },
   "zai-org/GLM-4.5": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
@@ -419,6 +427,22 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "anthropic.claude-fable-5": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "global.anthropic.claude-fable-5": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "us.anthropic.claude-fable-5": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "eu.anthropic.claude-fable-5": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "anthropic.claude-opus-4-8": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -436,6 +460,10 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "au.anthropic.claude-opus-4-8": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "jp.anthropic.claude-opus-4-7": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
@@ -544,6 +572,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/claude-opus-4-7": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/claude-fable-5": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1599,6 +1631,10 @@
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure_ai/kimi-k2.6": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure_ai/ministral-3b": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
@@ -2298,10 +2334,6 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
-  "claude-fable-5": {
-    "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
-  },
   "claude-opus-4-20250514": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
@@ -2327,6 +2359,10 @@
     "api_key_name": "ANTHROPIC_API_KEY"
   },
   "claude-opus-4-7-20260416": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
+  "claude-fable-5": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
@@ -4095,6 +4131,10 @@
     "api_key_name": "MISTRAL_API_KEY"
   },
   "mistral/ministral-8b-2512": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/ministral-8b-latest": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
