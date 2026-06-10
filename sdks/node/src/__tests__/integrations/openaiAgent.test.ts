@@ -31,6 +31,8 @@ import {Settings} from '../../settings';
 import {initWithCustomTraceServer} from '../clientMock';
 import {InMemoryTraceServer, Call} from '../helpers/inMemoryTraceServer';
 import {agentsInstrumentedHolder} from 'weave/integrations/openai.agent';
+import {wrapOpenAIChatCompletionsCreate} from '../../integrations/openai';
+import {makeAPIPromiseShim} from '../openaiMock';
 
 describe('OpenAI Agents Integration', () => {
   withOpenAITracingEnabled();
@@ -599,6 +601,42 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(executeToolSpan.spanContext().traceId).toBe(
       agentSpan!.spanContext().traceId
     );
+  });
+
+  test('OpenAI SDK calls inside an agent context are not double-traced', async () => {
+    // Under OTel V2 the agents OTel processor already emits a `chat` span
+    // for every model call (with messages + usage). The OpenAI integration's
+    // own Weave call would duplicate that record, so it should bypass when
+    // an agents trace is active.
+    const mockResponse = {
+      id: 'resp-1',
+      object: 'chat.completion',
+      model: 'gpt-4o-mini',
+      choices: [{index: 0, message: {role: 'assistant', content: 'hi'}}],
+      usage: {prompt_tokens: 1, completion_tokens: 1, total_tokens: 2},
+    };
+    const mockCreate = jest.fn(() => makeAPIPromiseShim(mockResponse));
+    const wrapped = wrapOpenAIChatCompletionsCreate(
+      mockCreate as any,
+      'openai.chat.completions.create'
+    );
+
+    await withTrace('Workflow', async () => {
+      await wrapped({
+        model: 'gpt-4o-mini',
+        messages: [{role: 'user', content: 'hi'}],
+      });
+    });
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+
+    // Wait for any fire-and-forget finishCall — if suppression failed and
+    // a call WAS created, we want to see it.
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const calls = await inMemoryTraceServer.getCalls(testProjectName);
+    expect(
+      calls.find(c => c.op_name === 'openai.chat.completions.create')
+    ).toBeUndefined();
   });
 
   async function emittedSpans(): Promise<ReadableSpan[]> {
