@@ -1,0 +1,22 @@
+## Conversation
+PR 9 (final) of the rebuilt ts-split stack. The user's review feedback is fully addressed: weave/shared no longer exists anywhere in the stack's end state (equivalent implementations on both sides, identity-gated, with weave.shared tombstoned in forbidden_modules and a meta-test), and the dispatcher seam is a typing.Protocol.
+
+## Actions
+- Doc/AGENTS/pyproject framing: burn-down -> maintain-zero.
+
+## Errors & Mistakes
+None in this commit.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- THE INVARIANTS: (1) ignore lists stay empty; (2) the interface mirror trees stay file-for-file byte-identical modulo weave.trace_server.interface <-> weave.interface (conformance test); (3) every weave/* package stays governed (meta-test); (4) no __init__.py deletions under weave/ (grimp blindness); (5) weave/shared stays deleted (meta-test + forbidden-module tombstones).
+- Remaining work: the doc's Cutover section. The deferred decision (what backs the client fixture post-removal) blocks ONLY the final removal PR.
+- ClickHouse-backend runs were NOT done locally for this stack; SQLite suites + gates are green throughout. CI covers ClickHouse on submit.
+
+## Codebase Discoveries
+None new.
+
+## Open Questions
+- Cutover timing/coordination with core (submodule bump; core repoints to weave.trace_server.interface.* and weave.eval_worker.*).
