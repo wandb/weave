@@ -2298,6 +2298,10 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "claude-fable-5": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
   "claude-opus-4-20250514": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
