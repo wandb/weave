@@ -29,10 +29,10 @@ import * as weave from '../..';
 import {clearWeaveTracerProvider} from '../../genai/provider';
 import {Settings} from '../../settings';
 import {initWithCustomTraceServer} from '../clientMock';
-import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
-import {agentsInstrumentedHolder} from 'weave/integrations/openai.agent';
 import {wrapOpenAIChatCompletionsCreate} from '../../integrations/openai';
 import {makeAPIPromiseShim} from '../openaiMock';
+import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
+import state from 'weave/state';
 
 describe('OpenAI Agents Integration', () => {
   withOpenAITracingEnabled();
@@ -45,7 +45,7 @@ describe('OpenAI Agents Integration', () => {
     initWithCustomTraceServer(testProjectName, inMemoryTraceServer);
 
     setTraceProcessors([]);
-    agentsInstrumentedHolder.value = false;
+    state.integrations.openaiAgents.instrumented = false;
     await weave.instrumentOpenAIAgents();
   });
 
@@ -241,7 +241,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     clearWeaveTracerProvider();
     setTraceProcessors([]);
-    agentsInstrumentedHolder.value = false;
+    state.integrations.openaiAgents.instrumented = false;
     await weave.instrumentOpenAIAgents();
   });
 
