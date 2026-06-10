@@ -93,11 +93,16 @@ def test_add_event_no_op_after_end(
     assert len(finished_span.events) == 0
 
 
-def test_returns_self_for_chaining() -> None:
-    """Both methods return ``self`` — checked on Tool (mixin, same on all)."""
-    tool = Tool(name="test-tool")
-    assert tool.set_attribute("key", "value") is tool
-    assert tool.add_event("event-name") is tool
+@pytest.mark.parametrize(
+    ("_class_label", "factory", "_span_name"), CASES, ids=CLASS_LABELS
+)
+def test_returns_self_for_chaining(
+    otel_spans: InMemorySpanExporter, _class_label, factory, _span_name
+) -> None:
+    """Both methods return ``self`` for fluent chaining on a live span."""
+    with Session(session_id="test-session"), factory() as span_obj:
+        assert span_obj.set_attribute("key", "value") is span_obj
+        assert span_obj.add_event("event-name") is span_obj
 
 
 def test_set_attribute_accepts_sequence_value(
@@ -110,11 +115,12 @@ def test_set_attribute_accepts_sequence_value(
     assert tuple(chat_span.attributes["gen_ai.response.finish_reasons"]) == ("stop",)
 
 
-def test_no_op_on_unentered_span() -> None:
-    """No OTel span ever created (caller never entered the context manager)."""
+def test_no_op_on_unentered_span(otel_spans: InMemorySpanExporter) -> None:
+    """Unentered span doesn't crash and emits no OTel output."""
     tool = Tool(name="test-tool")
-    assert tool.set_attribute("key", "value") is tool
-    assert tool.add_event("event-name") is tool
+    tool.set_attribute("key", "value")
+    tool.add_event("event-name")
+    assert len(otel_spans.get_finished_spans()) == 0
 
 
 def test_warns_when_span_not_started(caplog: pytest.LogCaptureFixture) -> None:
