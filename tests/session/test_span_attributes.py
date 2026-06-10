@@ -1,8 +1,8 @@
-"""Tests for ``set_attribute``, ``set_attributes``, and ``add_event``.
+"""Tests for ``set_attributes`` and ``add_event``.
 
-All three live on ``_SpanBase`` so every span class (Tool, LLM, SubAgent,
-Turn) gets identical behavior. Tests are parametrized across the four
-span classes; the three methods get one test each so each test reads
+Both live on ``_SpanBase`` so every span class (Tool, LLM, SubAgent, Turn)
+gets identical behavior. Tests are parametrized across the four span
+classes; the two methods get one test each so each test reads
 top-to-bottom without indirection.
 """
 
@@ -33,49 +33,7 @@ def _only_span(spans: list, span_name: str):
 
 
 # ---------------------------------------------------------------------------
-# set_attribute
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
-)
-def test_set_attribute_lands_on_span(
-    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
-) -> None:
-    with Session(session_id="test-session"), factory() as span_obj:
-        span_obj.set_attribute("weave.tag", "value")
-    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
-    assert finished_span.attributes["weave.tag"] == "value"
-
-
-@pytest.mark.parametrize(
-    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
-)
-def test_set_attribute_no_op_after_end(
-    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
-) -> None:
-    with Session(session_id="test-session"):
-        span_obj = factory()
-        with span_obj:
-            pass
-        span_obj.set_attribute("weave.late", "value")
-    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
-    assert "weave.late" not in (finished_span.attributes or {})
-
-
-def test_set_attribute_accepts_sequence_value(
-    otel_spans: InMemorySpanExporter,
-) -> None:
-    """OTel accepts ``Sequence[str]`` — used for e.g. ``gen_ai.response.finish_reasons``."""
-    with Session(session_id="test-session"), LLM(model="gpt-4o") as llm:
-        llm.set_attribute("gen_ai.response.finish_reasons", ["stop"])
-    chat_span = _only_span(otel_spans.get_finished_spans(), "chat gpt-4o")
-    assert tuple(chat_span.attributes["gen_ai.response.finish_reasons"]) == ("stop",)
-
-
-# ---------------------------------------------------------------------------
-# set_attributes (bulk)
+# set_attributes
 # ---------------------------------------------------------------------------
 
 
@@ -106,6 +64,16 @@ def test_set_attributes_no_op_after_end(
     finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
     assert "weave.late_a" not in (finished_span.attributes or {})
     assert "weave.late_b" not in (finished_span.attributes or {})
+
+
+def test_set_attributes_accepts_sequence_value(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """OTel accepts ``Sequence[str]`` — used for e.g. ``gen_ai.response.finish_reasons``."""
+    with Session(session_id="test-session"), LLM(model="gpt-4o") as llm:
+        llm.set_attributes({"gen_ai.response.finish_reasons": ["stop"]})
+    chat_span = _only_span(otel_spans.get_finished_spans(), "chat gpt-4o")
+    assert tuple(chat_span.attributes["gen_ai.response.finish_reasons"]) == ("stop",)
 
 
 # ---------------------------------------------------------------------------
@@ -153,9 +121,8 @@ def test_add_event_no_op_after_end(
 def test_returns_self_for_chaining(
     otel_spans: InMemorySpanExporter, _class_label, factory, _span_name
 ) -> None:
-    """All three mutators return ``self`` for fluent chaining on a live span."""
+    """Both mutators return ``self`` for fluent chaining on a live span."""
     with Session(session_id="test-session"), factory() as span_obj:
-        assert span_obj.set_attribute("key", "value") is span_obj
         assert span_obj.set_attributes({"key": "value"}) is span_obj
         assert span_obj.add_event("event-name") is span_obj
 
@@ -163,31 +130,26 @@ def test_returns_self_for_chaining(
 def test_warns_when_span_not_started(
     caplog: pytest.LogCaptureFixture, otel_spans: InMemorySpanExporter
 ) -> None:
-    """All three mutators warn and emit no span when called before ``with``."""
+    """Both mutators warn and emit no span when called before ``with``."""
     caplog.set_level(logging.WARNING, logger="weave.session.session")
     tool = Tool(name="test-tool")
-    tool.set_attribute("weave.tag", "value")
     tool.set_attributes({"weave.first": "one"})
     tool.add_event("weave.evt")
     messages = [record.message for record in caplog.records]
-    # The trailing "(" disambiguates set_attribute from set_attributes.
-    assert any("set_attribute(" in m and "span not started" in m for m in messages)
-    assert any("set_attributes(" in m and "span not started" in m for m in messages)
-    assert any("add_event(" in m and "span not started" in m for m in messages)
+    assert any("set_attributes" in m and "span not started" in m for m in messages)
+    assert any("add_event" in m and "span not started" in m for m in messages)
     assert len(otel_spans.get_finished_spans()) == 0
 
 
 def test_warns_when_span_already_ended(caplog: pytest.LogCaptureFixture) -> None:
-    """All three mutators warn when called after ``end()``."""
+    """Both mutators warn when called after ``end()``."""
     caplog.set_level(logging.WARNING, logger="weave.session.session")
     with Session(session_id="test-session"):
         tool = Tool(name="test-tool")
         with tool:
             pass
-        tool.set_attribute("weave.tag", "value")
         tool.set_attributes({"weave.first": "one"})
         tool.add_event("weave.evt")
     messages = [record.message for record in caplog.records]
-    assert any("set_attribute(" in m and "span already ended" in m for m in messages)
-    assert any("set_attributes(" in m and "span already ended" in m for m in messages)
-    assert any("add_event(" in m and "span already ended" in m for m in messages)
+    assert any("set_attributes" in m and "span already ended" in m for m in messages)
+    assert any("add_event" in m and "span already ended" in m for m in messages)

@@ -220,25 +220,17 @@ class _SpanBase(BaseModel):
             return None
         return self._otel_span
 
-    def set_attribute(self, key: str, value: Any) -> Self:
-        """Stamp an arbitrary OTel attribute on this span.
+    def set_attributes(self, attributes: dict[str, Any]) -> Self:
+        """Stamp arbitrary OTel attributes on this span.
+
+        Pass a dict whether you have one key or many — single-key callers
+        use ``span.set_attributes({"weave.tag": "value"})``. Mirrors OTel's
+        ``Span.set_attributes``.
 
         Must be called between span start and span end — i.e. inside a
         ``with`` block. Outside that window the call is a no-op and logs
         a warning. For batch ingest, populate the object's declared fields
         directly and pass it to ``log_turn`` / ``log_session``.
-        """
-        if span := self._recording_span("set_attribute", key):
-            span.set_attribute(key, value)
-        return self
-
-    def set_attributes(self, attributes: dict[str, Any]) -> Self:
-        """Bulk-stamp OTel attributes. Mirrors OTel's ``Span.set_attributes``.
-
-        Convenience over repeated ``set_attribute`` when the caller has a
-        pre-built dict (e.g. forwarding attributes from an upstream span
-        or a transcript replay). Same no-op + warning semantics as
-        ``set_attribute``.
         """
         if span := self._recording_span("set_attributes", list(attributes)):
             span.set_attributes(attributes)
