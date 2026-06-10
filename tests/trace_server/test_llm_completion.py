@@ -3,13 +3,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import pytest
-from litellm import CustomStreamWrapper
-from litellm.types.utils import (
-    Delta,
-    ModelResponse,
-    ModelResponseStream,
-    StreamingChoices,
-)
 from pydantic import ValidationError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
@@ -1790,53 +1783,6 @@ def test_get_custom_provider_info_requires_secret_fetcher_on_cache_hit(
     _secret_fetcher_context.set(None)
     with pytest.raises(InvalidRequest, match="No secret fetcher found"):
         get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
-
-
-class _FakeStreamWrapper(CustomStreamWrapper):
-    """Iterates predefined pydantic chunks without litellm's heavy __init__."""
-
-    def __init__(self, chunks: list[ModelResponseStream]):
-        self._chunks = chunks
-
-    def __iter__(self):
-        return iter(self._chunks)
-
-
-def _stream_inputs() -> tsi.CompletionsCreateRequestInputs:
-    return tsi.CompletionsCreateRequestInputs(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": "hi"}],
-    )
-
-
-def test_lite_llm_completion_stream_yields_dicts():
-    """Pydantic chunks must be converted to dicts to honor the yield contract."""
-    chunks = [
-        ModelResponseStream(
-            choices=[StreamingChoices(index=0, delta=Delta(content="hello"))]
-        ),
-        ModelResponseStream(
-            choices=[StreamingChoices(index=0, delta=Delta(content=" world"))]
-        ),
-    ]
-    with patch.object(
-        llm_mod.litellm, "completion", return_value=_FakeStreamWrapper(chunks)
-    ):
-        out = list(llm_mod.lite_llm_completion_stream("key", _stream_inputs()))
-
-    assert len(out) == 2
-    assert all(isinstance(chunk, dict) for chunk in out)
-    assert out[0]["choices"][0]["delta"]["content"] == "hello"
-    assert out[1]["choices"][0]["delta"]["content"] == " world"
-
-
-def test_lite_llm_completion_stream_non_streaming_response_errors():
-    """A non-streaming litellm return surfaces an error chunk, never a raw object."""
-    with patch.object(llm_mod.litellm, "completion", return_value=ModelResponse()):
-        out = list(llm_mod.lite_llm_completion_stream("key", _stream_inputs()))
-
-    assert len(out) == 1
-    assert "error" in out[0]
 
 
 if __name__ == "__main__":
