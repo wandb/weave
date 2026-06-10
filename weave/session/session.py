@@ -187,9 +187,42 @@ class _SpanBase(BaseModel):
         self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
         self._otel_span.record_exception(exc_val)
 
+    def _check_recording(self, operation: str, key: str) -> bool:
+        """Return True if the OTel span is recording.
+
+        Else log a warning naming the caller-facing fix. Silent when OTel
+        isn't installed or Weave is disabled — both are intentional configs.
+        """
+        if not _OTEL_AVAILABLE or should_disable_weave():
+            return False
+        if self._otel_span is None:
+            logger.warning(
+                "%s(%r) ignored: span not started. Use `with` to start a "
+                "streaming span, or pass the populated object to log_turn() "
+                "for batch ingest.",
+                operation,
+                key,
+            )
+            return False
+        if not self._otel_span.is_recording():
+            logger.warning(
+                "%s(%r) ignored: span already ended. Set attributes before "
+                "exiting `with` or calling .end().",
+                operation,
+                key,
+            )
+            return False
+        return True
+
     def set_attribute(self, key: str, value: Any) -> Self:
-        """Stamp an arbitrary OTel attribute. No-op after ``end()``."""
-        if self._otel_span is not None and self._otel_span.is_recording():
+        """Stamp an arbitrary OTel attribute on this span.
+
+        Must be called between span start and span end — i.e. inside a
+        ``with`` block. Outside that window the call is a no-op and logs
+        a warning. For batch ingest, populate the object's declared fields
+        directly and pass it to ``log_turn`` / ``log_session``.
+        """
+        if self._check_recording("set_attribute", key):
             self._otel_span.set_attribute(key, value)
         return self
 
@@ -199,8 +232,21 @@ class _SpanBase(BaseModel):
         attributes: dict[str, Any] | None = None,
         timestamp: datetime | None = None,
     ) -> Self:
-        """Record an OTel span event. No-op after ``end()``."""
-        if self._otel_span is not None and self._otel_span.is_recording():
+        """Record an OTel span event at a point in time within this span.
+
+        Examples:
+            - ``weave.permission_request`` — record that a permission
+              prompt was shown; attributes carry the suggested options
+            - Lifecycle markers — ``spawned`` / ``streaming`` / ``finished``
+              to time sub-operations inside the span
+            - Custom milestones — anything that happens at a point in time
+              within the span's lifetime (vs an attribute, which is a
+              property of the span as a whole)
+
+        Must be called between span start and span end (inside ``with``).
+        Outside that window the call is a no-op and logs a warning.
+        """
+        if self._check_recording("add_event", name):
             timestamp_ns = (
                 int(timestamp.timestamp() * 1_000_000_000) if timestamp else None
             )

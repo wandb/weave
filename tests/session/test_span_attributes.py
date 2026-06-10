@@ -7,6 +7,7 @@ classes to lock in uniformity.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 import pytest
@@ -114,3 +115,39 @@ def test_no_op_on_unentered_span() -> None:
     tool = Tool(name="test-tool")
     assert tool.set_attribute("key", "value") is tool
     assert tool.add_event("event-name") is tool
+
+
+def test_warns_when_span_not_started(caplog: pytest.LogCaptureFixture) -> None:
+    """Calling set_attribute / add_event on an unentered span warns the user."""
+    caplog.set_level(logging.WARNING, logger="weave.session.session")
+    tool = Tool(name="test-tool")
+    tool.set_attribute("weave.tag", "value")
+    tool.add_event("weave.evt")
+    messages = [record.message for record in caplog.records]
+    assert any(
+        "set_attribute" in message and "span not started" in message
+        for message in messages
+    )
+    assert any(
+        "add_event" in message and "span not started" in message for message in messages
+    )
+
+
+def test_warns_when_span_already_ended(caplog: pytest.LogCaptureFixture) -> None:
+    """Calling set_attribute / add_event after end() warns the user."""
+    caplog.set_level(logging.WARNING, logger="weave.session.session")
+    with Session(session_id="test-session"):
+        tool = Tool(name="test-tool")
+        with tool:
+            pass
+        tool.set_attribute("weave.tag", "value")
+        tool.add_event("weave.evt")
+    messages = [record.message for record in caplog.records]
+    assert any(
+        "set_attribute" in message and "span already ended" in message
+        for message in messages
+    )
+    assert any(
+        "add_event" in message and "span already ended" in message
+        for message in messages
+    )
