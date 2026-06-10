@@ -1,0 +1,24 @@
+## Conversation
+PR 6 of the rebuilt (round 2) ts-split stack: the small twin lifts, replayed from round 1 with interface-mirror paths.
+
+## Actions
+- Extracted format_message_with_template_vars + IncorrectPromptVarError from weave/prompt/prompt.py verbatim into message_templating twins; prompt.py re-exports (noqa F401), Prompt.format_message delegates as before.
+- op_names twins (AgentSpanOpName + AGENT_SPAN_OP_NAMES); flow/monitor.py re-exports.
+- kafka_events / llm_completion -> server twins; flow/llm_structured_completion_model -> client copy.
+- Burned the 2 contract-2 entries. Conformance subtree picks the new pairs up with zero gate changes (file-set equality both directions).
+
+## Errors & Mistakes
+- gt create initially failed: round-1 branch names still existed. Deleted the round-1 ts-split-* branches (all preserved at backup/ts-split-v1-*).
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- Twin docstrings must never name the server-side dotted path; the conformance map rewrites weave.trace_server.interface -> weave.interface in COMMENTS too.
+- Test coverage: tests/flow/test_prompt.py + tests/trace_server/test_llm_completion.py + test_agent_scorer_event_producer.py (84 passed with the gates).
+
+## Codebase Discoveries
+None new.
+
+## Open Questions
+None.
