@@ -1,0 +1,30 @@
+## Conversation
+PR 1 (commit 2/2) of the ts-split stack. User asked for: a short markdown plan + a multi-PR stack so (1) no client code imports trace_server, (2) no trace_server code imports weave AT ALL (user explicitly chose strict zero over my weave.shared-as-shared-layer recommendation, with eyes open to ~6-7k lines of in-repo twin duplication), (3) workers may import trace_server but never the client, (4) the dir moves to core verbatim, killing core's cp -RL copy step. Lint-first with burn-down ignores. User answers via grill-me: fresh guard-first stack (mine andrew/ts-v2-* for the hard moves), strict zero, eval worker -> weave/eval_worker with dispatcher Protocol seam, test-backend deferred as open question, NO pushing (stack stays local).
+
+## Actions
+- Cherry-picked 88401dfd0b (v2 guard: pyproject [tool.importlinter] 3 contracts + baselines, prek hook language:system, import-linter in dev group, uv.lock, AGENTS.md section). Clean pick onto master+companion.
+- Strict-zero adaptation: added "weave.shared" to C2 forbidden_modules + 21 baseline entries (generated from /usr/bin/grep of actual imports); rewrote [tool.importlinter] header comment; rewrote AGENTS.md contract 2/3 descriptions; wrote docs/TRACE_SERVER_DECOUPLING.md (the deliverable plan doc); added tests/trace_server/test_import_contract.py (4 meta-tests: enumeration completeness, root-package-import ban w/ 2-file baseline, root-modules clean, namespace guard).
+- Verified: lint-imports green (3 kept), 4 meta-tests pass, ruff clean.
+
+## Errors & Mistakes
+- First baseline used "X -> weave.shared" for `from weave.shared import refs_internal as ri` lines. import-linter ERRORED "No matches for ignored import": grimp resolves from-imports of SUBMODULES to the submodule edge (X -> weave.shared.refs_internal). Fixed by targeted replace. Lesson: generate ignore entries from grimp's view, not from grep of import statements.
+- Repeated earlier in session: this Bash tool's rg shim does NOT honor -g '!dir/**' excludes; use /usr/bin/grep --exclude-dir for inventories (memory note reference_bash_grep_is_ripgrep already warned about shim quirks).
+
+## Dead Ends
+- Considered forbidding the root package "weave" in C2 to catch `import weave` / `from weave import Model`: impossible -- every intra-server import is a descendant of weave, so the contract would flag everything. Covered instead by the meta-test's ROOT_IMPORT_BASELINE (llm_structured_model.py, evaluate_model_worker.py).
+
+## Hints for Future Agents
+- import-linter ERRORS on unmatched ignore_imports entries -> burn-down is self-enforcing: severing a coupling REQUIRES deleting its entries in the same PR or CI fails. Never add entries.
+- The `auto_summarize` reference in object_creation_utils.py is inside a STRING LITERAL (placeholder op source) -- it is data, not an import edge. Don't "fix" it.
+- C2 ignore entries for `from weave.shared import refs_internal` point at weave.shared.refs_internal (submodule), not weave.shared.
+- The prek hook must stay language:system so uv run uses the project env (grimp imports real weave).
+- tests/ is OUTSIDE root_package weave -- test-side cross-imports are invisible to the guard by design until cutover.
+
+## Codebase Discoveries
+- v2 stack (andrew/ts-v2-*, 15 commits, 4 behind master) is proven prior art for nearly every later PR: shared-registry callback, llm_structured split + digest gate, relocate-contract closure set (tsi pulls agents/{types,constants,schema,semconv}), eval-worker move, per-side digest impls + conformance corpus, interface-protocol split. Mine with git show before implementing PRs 2-7.
+- Core's services/weave-trace already has its own src/workers/evaluate_model_worker + dispatcher wrapping ours, and imports the weave SDK in its own src/ -- relocating our eval worker client-side does not strand core.
+- Servers import ONLY EvaluateModelDispatcher from the worker (clickhouse_trace_server_batched.py:317, sqlite_trace_server.py:101); EvaluateModel arg types were already lifted into tsi (comment at trace_server_interface.py:1968).
+
+## Open Questions
+- What backs the weave repo's `client` fixture after the server leaves (pip server pkg from core / docker / keep sqlite)? Deliberately deferred; recorded in docs/TRACE_SERVER_DECOUPLING.md.
+- weave/trace_server_version.py ownership at cutover.
