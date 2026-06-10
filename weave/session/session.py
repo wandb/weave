@@ -187,14 +187,16 @@ class _SpanBase(BaseModel):
         self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
         self._otel_span.record_exception(exc_val)
 
-    def _check_recording(self, operation: str, key: str | list[str]) -> bool:
-        """Return True if the OTel span is recording.
+    def _recording_span(self, operation: str, key: str | list[str]) -> _OTelSpan | None:
+        """Return the OTel span if it's recording, else ``None``.
 
-        Else log a warning naming the caller-facing fix. Silent when OTel
-        isn't installed or Weave is disabled — both are intentional configs.
+        Logs a warning naming the caller-facing fix when not recording.
+        Silent when OTel isn't installed or Weave is disabled — both are
+        intentional configs. Returning the span (instead of a bool) lets
+        mypy narrow it through the caller's ``if`` guard.
         """
         if not _OTEL_AVAILABLE or should_disable_weave():
-            return False
+            return None
         key_repr = (
             "{" + ", ".join(map(repr, key)) + "}"
             if isinstance(key, list)
@@ -207,7 +209,7 @@ class _SpanBase(BaseModel):
                 operation,
                 key_repr,
             )
-            return False
+            return None
         if not self._otel_span.is_recording():
             logger.warning(
                 "%s(%s) ignored: span already ended. Set attributes before "
@@ -215,8 +217,8 @@ class _SpanBase(BaseModel):
                 operation,
                 key_repr,
             )
-            return False
-        return True
+            return None
+        return self._otel_span
 
     def set_attribute(self, key: str, value: Any) -> Self:
         """Stamp an arbitrary OTel attribute on this span.
@@ -226,8 +228,8 @@ class _SpanBase(BaseModel):
         a warning. For batch ingest, populate the object's declared fields
         directly and pass it to ``log_turn`` / ``log_session``.
         """
-        if self._check_recording("set_attribute", key):
-            self._otel_span.set_attribute(key, value)
+        if span := self._recording_span("set_attribute", key):
+            span.set_attribute(key, value)
         return self
 
     def set_attributes(self, attributes: dict[str, Any]) -> Self:
@@ -238,8 +240,8 @@ class _SpanBase(BaseModel):
         or a transcript replay). Same no-op + warning semantics as
         ``set_attribute``.
         """
-        if self._check_recording("set_attributes", list(attributes)):
-            self._otel_span.set_attributes(attributes)
+        if span := self._recording_span("set_attributes", list(attributes)):
+            span.set_attributes(attributes)
         return self
 
     def add_event(
@@ -260,10 +262,8 @@ class _SpanBase(BaseModel):
         Must be called between span start and span end (inside ``with``).
         Outside that window the call is a no-op and logs a warning.
         """
-        if self._check_recording("add_event", name):
-            self._otel_span.add_event(
-                name, attributes=attributes, timestamp=_to_ns(timestamp)
-            )
+        if span := self._recording_span("add_event", name):
+            span.add_event(name, attributes=attributes, timestamp=_to_ns(timestamp))
         return self
 
 
