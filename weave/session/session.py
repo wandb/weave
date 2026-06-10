@@ -130,6 +130,10 @@ class _SpanBase(BaseModel):
 
     _otel_span: _OTelSpan | None = PrivateAttr(default=None)
     _otel_token: _OTelToken | None = PrivateAttr(default=None)
+    # Explicit OTel parent context, set by ``SubAgent.llm/tool/subagent`` on
+    # children it creates so they nest under the SubAgent's span regardless of
+    # what's on the ambient OTel context stack at ``__enter__`` time.
+    _parent_otel_context: Any = PrivateAttr(default=None)
 
     def _start_otel_span(
         self,
@@ -144,6 +148,10 @@ class _SpanBase(BaseModel):
         the SDK object was constructed (e.g. ``Turn.started_at``) so the
         OTel span timestamp matches the user-visible start, not the moment
         ``__enter__`` happened to run.
+
+        When ``_parent_otel_context`` is set (a child of a SubAgent), that
+        context wins over ambient. ``new_trace`` is only honored when no
+        explicit parent was provided.
         """
         if not _OTEL_AVAILABLE or should_disable_weave():
             return
@@ -151,7 +159,9 @@ class _SpanBase(BaseModel):
         kwargs: dict[str, Any] = {}
         if start_time_ns is not None:
             kwargs["start_time"] = start_time_ns
-        if new_trace:
+        if self._parent_otel_context is not None:
+            kwargs["context"] = self._parent_otel_context
+        elif new_trace:
             kwargs["context"] = Context()
         self._otel_span = tracer.start_span(name, **kwargs)
         self._otel_token = otel_context.attach(
@@ -643,6 +653,12 @@ class SubAgent(_SpanBase):
     ended_at: datetime | None = None
 
     _ended: bool = PrivateAttr(default=False)
+    # OTel context captured at ``__enter__`` time (parent context with this
+    # SubAgent's span as current). Threaded to child LLM/Tool/SubAgent spans
+    # so they nest under this SubAgent even if the ambient OTel context has
+    # since drifted (e.g. caller never entered ``with sub:`` or exited it
+    # before creating the child).
+    _own_otel_context: Any = PrivateAttr(default=None)
 
     def llm(
         self,
@@ -655,18 +671,41 @@ class SubAgent(_SpanBase):
 
         Sets the ``_current_llm`` contextvar so the LLM is visible via
         ``get_current_llm()`` regardless of whether a context manager is used.
+        Pins the LLM's OTel parent to this SubAgent's span when the SubAgent
+        has been entered.
         """
         llm = LLM(
             model=model or self.model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
         )
+        if self._own_otel_context is not None:
+            llm._parent_otel_context = self._own_otel_context
         llm._token = _current_llm.set(llm)
         return llm
 
     def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
-        """Start a tool execution within this sub-agent."""
-        return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        """Start a tool execution within this sub-agent.
+
+        Pins the Tool's OTel parent to this SubAgent's span when the SubAgent
+        has been entered.
+        """
+        tool = Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        if self._own_otel_context is not None:
+            tool._parent_otel_context = self._own_otel_context
+        return tool
+
+    def subagent(self, *, name: str = "", model: str = "") -> SubAgent:
+        """Start a nested sub-agent under this one.
+
+        Pins the nested SubAgent's OTel parent to this SubAgent's span when
+        this SubAgent has been entered. Mirrors ``Turn.subagent()`` and the
+        TypeScript ``startSubagent`` factory on SubAgent.
+        """
+        sub = SubAgent(name=name, model=model or self.model)
+        if self._own_otel_context is not None:
+            sub._parent_otel_context = self._own_otel_context
+        return sub
 
     def _build_attrs(self, *, session_id: str, session_name: str) -> dict[str, Any]:
         """Build the full OTel attribute dict for this sub-agent span.
@@ -703,6 +742,8 @@ class SubAgent(_SpanBase):
     def __enter__(self) -> Self:
         self.started_at = datetime.now(timezone.utc)
         self._start_otel_span(f"invoke_agent {self.name}")
+        if _OTEL_AVAILABLE and self._otel_span is not None:
+            self._own_otel_context = otel_trace.set_span_in_context(self._otel_span)
         return self
 
     def __exit__(
