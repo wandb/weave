@@ -19,6 +19,7 @@ import {
   FunctionTool,
   InMemoryRunner,
   LlmAgent,
+  SequentialAgent,
   type LlmRequest,
   type LlmResponse,
 } from '@google/adk';
@@ -247,8 +248,11 @@ describe('Google ADK integration', () => {
         newMessage: userMessage('hello'),
       });
 
-      const [root] = byOperation(exporter.getFinishedSpans(), 'invoke_agent');
-      expect(root).toBeDefined();
+      const root = requireSpan(
+        byOperation(exporter.getFinishedSpans(), 'invoke_agent').find(
+          span => !span.parentSpanId
+        )
+      );
       expect(root.name).toBe('invoke_agent runner_agent');
       expect(root.attributes).toMatchObject({
         'gen_ai.agent.name': 'runner_agent',
@@ -625,13 +629,18 @@ describe('Google ADK integration', () => {
       const chatSpans = byOperation(spans, 'chat');
       const toolSpans = byOperation(spans, 'execute_tool');
 
-      expect(invokeAgentSpans).toHaveLength(1);
+      // Root invocation + the synthesized per-agent span.
+      expect(invokeAgentSpans).toHaveLength(2);
       expect(chatSpans).toHaveLength(2);
       expect(toolSpans).toHaveLength(1);
 
-      const [root] = invokeAgentSpans;
+      const root = requireSpan(
+        invokeAgentSpans.find(span => !span.parentSpanId)
+      );
+      const agentSpan = requireSpan(
+        invokeAgentSpans.find(span => span.parentSpanId)
+      );
       const [toolSpan] = toolSpans;
-      expect(root.parentSpanId).toBeUndefined();
 
       // Every span shares the root's OTel trace and the session id.
       for (const span of spans) {
@@ -642,11 +651,14 @@ describe('Google ADK integration', () => {
         });
       }
 
-      // Structure: root invoke_agent → (chat, chat, tool).
+      // Structure: root invoke_agent → invoke_agent → (chat, chat, tool).
       expect(root.name).toBe('invoke_agent weather_agent');
-      expect(root.attributes['gen_ai.agent.name']).toBe('weather_agent');
+      expect(agentSpan.parentSpanId).toBe(spanId(root));
+      expect(agentSpan.attributes).toMatchObject({
+        'gen_ai.agent.name': 'weather_agent',
+      });
       for (const span of [...chatSpans, ...toolSpans]) {
-        expect(span.parentSpanId).toBe(spanId(root));
+        expect(span.parentSpanId).toBe(spanId(agentSpan));
       }
 
       // Root carries the user message in and the final answer out.
@@ -697,6 +709,108 @@ describe('Google ADK integration', () => {
         'gen_ai.tool.call.arguments': expect.stringContaining('Paris'),
         'gen_ai.tool.call.result': expect.stringContaining('sunny'),
       });
+    });
+
+    test('nests sub-agents under workflow agents', async () => {
+      const first = new LlmAgent({
+        name: 'first_agent',
+        description: 'first',
+        model: new ScriptedLlm(TEST_MODEL, [[textResponse('first done')]]),
+      });
+      const second = new LlmAgent({
+        name: 'second_agent',
+        description: 'second',
+        model: new ScriptedLlm(TEST_MODEL, [[textResponse('second done')]]),
+      });
+      const pipeline = new SequentialAgent({
+        name: 'pipeline',
+        description: 'runs both agents',
+        subAgents: [first, second],
+      });
+
+      const runner = new InMemoryRunner({
+        agent: pipeline,
+        appName: 'weave-adk-test',
+        plugins: [new WeaveAdkPlugin()],
+      });
+      const session = await runner.sessionService.createSession({
+        appName: 'weave-adk-test',
+        userId: 'user-1',
+      });
+
+      await runToCompletion(runner, {
+        userId: 'user-1',
+        sessionId: session.id,
+        newMessage: userMessage('go'),
+      });
+
+      const spans = exporter.getFinishedSpans();
+      const invokeAgentSpans = byOperation(spans, 'invoke_agent');
+      const chatSpans = byOperation(spans, 'chat');
+
+      const root = requireSpan(
+        invokeAgentSpans.find(span => !span.parentSpanId)
+      );
+      const byAgent = (name: string) =>
+        requireSpan(
+          invokeAgentSpans.find(
+            span =>
+              span.parentSpanId && span.attributes['gen_ai.agent.name'] === name
+          )
+        );
+      const pipelineSpan = byAgent('pipeline');
+      const firstSpan = byAgent('first_agent');
+      const secondSpan = byAgent('second_agent');
+
+      expect(pipelineSpan.parentSpanId).toBe(spanId(root));
+      expect(firstSpan.parentSpanId).toBe(spanId(pipelineSpan));
+      expect(secondSpan.parentSpanId).toBe(spanId(pipelineSpan));
+
+      expect(chatSpans).toHaveLength(2);
+      const chatParents = chatSpans.map(span => span.parentSpanId).sort();
+      expect(chatParents).toEqual(
+        [spanId(firstSpan), spanId(secondSpan)].sort()
+      );
+    });
+
+    test('agents outside the agent tree nest under the innermost open tool span', async () => {
+      const plugin = new WeaveAdkPlugin();
+      const tool = {name: 'agent_tool', description: 'wraps an agent'} as any;
+      const toolContext = {
+        invocationId: INVOCATION_ID,
+        agentName: 'agent_a',
+        functionCallId: 'fc-2',
+      } as any;
+
+      await plugin.beforeRunCallback({
+        invocationContext: invocationContext(),
+      });
+      await plugin.beforeToolCallback({tool, toolArgs: {}, toolContext});
+      // An AgentTool-wrapped agent is not in the root agent's tree.
+      await plugin.beforeModelCallback({
+        callbackContext: callbackContext('outside_agent'),
+        llmRequest: {model: TEST_MODEL, contents: []} as any,
+      });
+      await plugin.afterModelCallback({
+        callbackContext: callbackContext('outside_agent'),
+        llmResponse: {content: {role: 'model', parts: [{text: 'ok'}]}},
+      });
+      await plugin.afterToolCallback({
+        tool,
+        toolArgs: {},
+        toolContext,
+        result: {ok: true},
+      });
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+
+      const spans = exporter.getFinishedSpans();
+      const toolSpan = byOperation(spans, 'execute_tool')[0];
+      const outsideAgent = requireSpan(
+        byOperation(spans, 'invoke_agent').find(
+          span => span.attributes['gen_ai.agent.name'] === 'outside_agent'
+        )
+      );
+      expect(outsideAgent.parentSpanId).toBe(spanId(toolSpan));
     });
 
     test('tool errors record span errors; the late afterToolCallback is ignored', async () => {
