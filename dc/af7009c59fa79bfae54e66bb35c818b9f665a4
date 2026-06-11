@@ -1,0 +1,166 @@
+## Restructure addendum (2026-06-10, feedback round)
+This commit MERGES the former PR 2 (server contract consolidation,
+1525137df0) and PR 3 (client mirror, dab8b857de) of the round-3 stack, per
+user feedback: "minimize the churn between file edits". The old split
+double-codemodded 96 files (~500 lines): PR 2 rewrote client imports to
+weave.trace_server.interface.*, PR 3 immediately rewrote the same lines to
+weave.interface.*. Merged, every consumer import line is touched exactly
+once. The import-linter guard (formerly PR 1, second commit) moved ABOVE
+this commit so its ignore_imports baselines are written once against final
+module paths -- the old order forced a 42-entry rename pass in PR 2 plus a
+restructure in PR 3 (~160 noise lines in pyproject.toml).
+Also new here per feedback: both interface constants.py twins open with a
+sync header (shared client/server wire keys; why they must stay in sync).
+Tree identity: this commit's tree == dab8b857de's tree MINUS guard content
+(pyproject linter section, import-linter dep in uv.lock,
+.pre-commit-config lint-imports hook, AGENTS.md boundary section,
+docs/TRACE_SERVER_DECOUPLING.md, tests/trace_server/test_import_contract.py)
+PLUS the constants headers. Original notes of both merged commits follow.
+
+=============== ORIGINAL NOTE: 1525137df0 (server interface) ===============
+## Conversation
+Round 3 ts-split PR 2: server contract consolidation, rebuilt under the user's
+5 rules (.context/ts-split-round3-design.md). Key delta vs round 2 (194ff8d864):
+rule 5 -- the interface tree is PURE CONTRACT, so the impl modules round 2
+moved in (trace_server_converter, validation_util, ids) now STAY at their
+master homes. They become per-side implementations in PR 4.
+
+## Actions
+- cherry-pick --no-commit 194ff8d864 onto the round-3 guard. 3 conflicts:
+  - pyproject.toml: resolved by `git checkout HEAD -- pyproject.toml` +
+    scripted path-remap of ONLY the 6 moved flat contract modules
+    (tsi/common/constants/errors/service/http_service). Round-2's version
+    carried flow entries + PR2-transient comments that round 3 must not have.
+  - evaluate_model_worker.py: kept master's schema import (round 3 has no
+    split yet) + took the tsi path remap.
+  - weave/flow/llm_structured_completion_model.py: DU (deleted in HEAD,
+    updated in pick) -- git rm; round 3 has no flow runnable, ever (rule 2).
+- git mv'd converter/validation_util/ids back out of interface/; scripted
+  un-rewrite of their import paths across weave/tests/scripts (20 files);
+  fixed the one bare-form import (validation.py `from ...interface import
+  validation_util`).
+- CHValidationError inversion: defined in interface/errors.py, validation_util
+  imports it back. Other importers (tests) still resolve via validation_util's
+  namespace -- no churn.
+- llm_structured_model.py (unsplit, master content): remapped its
+  `weave.trace_server.trace_server_interface` import to the new interface path
+  -- round-2's codemod never needed this because its PR 2 had already
+  rewritten the file. Found via import smoke failure.
+- Added test_interface_trees_are_import_leaves (AST): every interface tree
+  imports only itself; INTERFACE_LEAF_BASELINE = {llm_structured_model.py}
+  (pre-existing master coupling, burned by PR 5). Client tree auto-joins the
+  check when PR 3 creates it.
+- ruff check --fix + format on all touched files (15 import-order fixes);
+  re-verified gates after (round-2 lesson: late ruff fixes broke the mirror).
+- Verified: lint-imports 3 kept; 8 meta-tests; converter/ids/service tests
+  24 passed; import smoke ok.
+
+## Errors & Mistakes
+- `uv run` without --no-sync RESYNCED the venv and stripped the test extras
+  (Levenshtein vanished, scorers import chain broke). Repaired with
+  `uv sync --group test --group dev --extra scorers --extra trace_server
+  --extra wandb`; ALL subsequent uv run calls use --no-sync.
+- An Edit-tool failure left conflict markers in the worker file while a
+  parallel `git add` staged them; caught by re-grep for markers. When
+  resolving conflicts, always re-grep for <<<<<<< after staging.
+
+## Dead Ends
+- Considered an import-linter contract for server-interface leafness:
+  impossible to express (forbidding the parent package flags intra-tree
+  imports). AST meta-test instead; the client mirror ALSO gets the
+  import-linter leaf contract in PR 3 (expressible there since
+  weave.interface is not nested in a forbidden module).
+
+## Hints for Future Agents
+- The unsplit llm_structured_model carries client imports (weave root,
+  prompt.prompt, trace.vals, weave_client_context, utils.project_id). They are
+  baselined in THREE places until PR 5: C2 ignores, ROOT_IMPORT_BASELINE, and
+  INTERFACE_LEAF_BASELINE. The split burns all three.
+- url_safety in interface/ is a DOCUMENTED judgment call: pure deterministic
+  constraint predicate used by the Provider schema validator (VULNMGMT-770).
+  No sockets/DNS at runtime -- socket.inet_aton is just a parser.
+- ch_sentinel_values re-exports SENTINEL_EPOCH from interface/agents/schema --
+  do not invert back.
+
+## Codebase Discoveries
+- import-linter errors on unmatched ignore entries; grimp cannot resolve
+  import targets under namespace packages (weave.flow.* edges are simply
+  absent from the graph).
+
+## Open Questions
+None.
+
+=============== ORIGINAL NOTE: dab8b857de (client mirror) ===============
+## Conversation
+Round 3 ts-split PR 3: the client interface mirror, rebuilt under the user's 5
+rules (.context/ts-split-round3-design.md). Key deltas vs round 2 (f750cd4ad7):
+(a) SUBSET mirror -- the client copies only contract it consumes; (b) the
+mirror carries NO impl (rule 5): no digest/refs_internal/converter/
+validation_util/ids twins; (c) ZERO transitional entries (rule 3) -- round 2
+added 2 weave.shared.refs_internal leaf-contract entries + an I001 exemption
+here; round 3's mirror is leaf-clean from birth because the impl never enters.
+
+## Actions
+- cherry-pick --no-commit f750cd4ad7. 19 conflicts, resolved by category:
+  - kept MINE (no runnable at this level): library_cases, test_evaluation_ref_get,
+    test_llm_as_a_judge_scorer, test_llm_structured_completion_model,
+    shared/object_class_util (lazy registry import stays weave.trace.base_objects).
+  - git rm weave/flow/llm_structured_completion_model.py (DU; rule 2).
+  - took THEIRS + scripted un-rewrite for the rest (14 files).
+- serialize.py: reverted round-2's runnable-resolution block in from_json to
+  master's registry-only form (registry stays at the server path until PR 5).
+- REGENERATED weave/interface from MY server tree. Exclusions:
+  llm_structured_model + builtin_object_registry ONLY. First attempt also
+  excluded agents/schema + agents/semconv -- WRONG: agents/types (in tsi's
+  closure) imports BOTH. Import-smoke of every mirror module caught it.
+- Conformance gate rewritten for SUBSET semantics (orphan client files fail;
+  REQUIRED_CLIENT_MODULES guards against an empty mirror).
+- pyproject: C1 burned to 9 remaining entries; weave.interface leaf contract
+  added with ignore_imports = [].
+- tests/trace/test_base_object_classes.py: test_only_example import repointed
+  BACK to the server path -- at this level weave.trace.base_objects re-exports
+  SERVER classes (registry not mirrored) and pydantic rejects cross-tree class
+  identity (model_type ValidationError). 9 tests failed until repointed.
+- FLOW_TO_SERVER_BASELINE burned to empty (flow repoints rode the pick).
+- AMENDED post-commit: tests/trace/test_weave_client.py line 14 carried
+  round-2's `from weave.flow.llm_structured_completion_model import ...`
+  (a phantom at this level -- module never exists in round 3). Caught while
+  building PR 4; fixed to the server schema path here so THIS PR is
+  independently green. Lesson: after adopting picked test files, run
+  COLLECTION (`pytest --co`) on the full tests/trace tree, not just targeted
+  suites.
+
+## Errors & Mistakes
+- The agents/schema+semconv exclusion broke 5 mirror modules at import time.
+- The phantom flow import above survived my first verification batch because
+  I never collected test_weave_client.py at this level.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- weave/interface is regenerated-not-edited: change the SERVER copy and re-run
+  the copy+rewrite (or edit both; the gate enforces).
+- The 9 remaining C1 entries: 5x ids + converter burn in PR 4; scorer +
+  registry x2 burn in PR 5.
+- test_base_object_classes' server-path import flips to the mirror in PR 5.
+
+## Codebase Discoveries
+- agents/types.py is in tsi's closure and pulls agents/{constants,schema,
+  semconv} -- the whole agents contract rides the mirror even though no client
+  code imports it directly.
+
+## Open Questions
+None.
+## Addendum (round-3 fix-forward)
+Amended twice during stack verification:
+1. tests/trace/test_weave_client.py phantom flow import (see earlier section).
+2. tests/trace/test_client_trace.py twin-class fixes found by the ClickHouse
+   battery at the stack tip: (a) CHValidationError must be caught as the
+   CLIENT copy (the fixture translates contract errors at the boundary);
+   (b) test_large_keys_are_stripped_call's monkeypatched _insert_call_batch
+   raises INSIDE server internals and must raise the SERVER's InsertTooLarge
+   (imported as ServerInsertTooLarge) or _flush_calls' except clause cannot
+   catch it and the error escapes to the client futures. Round 2 never hit
+   either: both tests skip on sqlite and round 2 never ran ClickHouse
+   locally.
