@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Literal, TypeAlias, get_args
 
 from pydantic import Field, field_validator
@@ -98,6 +99,16 @@ class Monitor(Object):
 
     # Debounced scoring is enabled when this is present, and disabled when it is not.
     scorer_debounce_config: ScorerDebounceConfig | None = None
+
+    status: Literal["ok", "error"] | None = Field(
+        default=None, description="Health of the monitor's most recent scoring cycle."
+    )
+    last_error: str | None = Field(
+        default=None, description="Error message from the most recent failed scoring."
+    )
+    last_error_at: datetime | None = Field(
+        default=None, description="When the most recent scoring failure occurred."
+    )
 
     @field_validator("op_names", mode="before")
     @classmethod
