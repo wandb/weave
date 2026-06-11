@@ -1907,6 +1907,13 @@ ALLOWED_CALL_FIELDS = {
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
+# Dotted prefixes routed to special handlers in `get_field_by_name`; keep in sync.
+ALLOWED_DYNAMIC_FIELD_PREFIXES = (
+    "feedback.*",
+    "annotation_queue_items.*",
+    "summary.weave.*",
+)
+
 # Fields that are stored as DateTime64 columns in ClickHouse. When comparing
 # these fields with numeric unix timestamps, the value must be converted to a
 # datetime string so ClickHouse can properly use primary key / ORDER BY indexes.
@@ -1943,21 +1950,16 @@ def get_field_by_name(name: str) -> CallsMergedField:
     return ALLOWED_CALL_FIELDS[name]
 
 
-ALLOWED_DYNAMIC_FIELD_PREFIXES = (
-    "feedback.*",
-    "annotation_queue_items.*",
-    "summary.weave.*",
-)
-
-
 def _invalid_field_message(name: str) -> str:
     """Build an actionable `field not allowed` message listing valid fields."""
     dotted_prefixes = tuple(
-        f"{field_name[: -len('_dump')]}.*"
+        f"{field_name.removesuffix('_dump')}.*"
         for field_name, field in ALLOWED_CALL_FIELDS.items()
         if isinstance(field, CallsMergedDynamicField)
     )
-    allowed = ", ".join(sorted(ALLOWED_CALL_FIELDS))
+    allowed = ", ".join(
+        sorted(name.removesuffix("_dump") for name in ALLOWED_CALL_FIELDS)
+    )
     prefixes = ", ".join(sorted(ALLOWED_DYNAMIC_FIELD_PREFIXES + dotted_prefixes))
     return (
         f"Field {name} is not allowed. "

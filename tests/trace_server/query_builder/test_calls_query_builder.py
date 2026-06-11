@@ -3260,11 +3260,11 @@ def test_invalid_field_message_lists_allowed_fields():
     """An unknown filter/sort field surfaces the full allowed-field list (read-path 403)."""
     expected = (
         "Field made_up_field is not allowed. "
-        "Allowed fields: attributes_dump, deleted_at, display_name, ended_at, "
-        "exception, expire_at, id, input_refs, inputs_dump, op_name, otel_dump, "
-        "output_dump, output_refs, parent_id, project_id, started_at, "
-        "storage_size_bytes, summary_dump, thread_id, total_storage_size_bytes, "
-        "trace_id, turn_id, wb_run_id, wb_run_step, wb_run_step_end, wb_user_id. "
+        "Allowed fields: attributes, deleted_at, display_name, ended_at, "
+        "exception, expire_at, id, input_refs, inputs, op_name, otel, output, "
+        "output_refs, parent_id, project_id, started_at, storage_size_bytes, "
+        "summary, thread_id, total_storage_size_bytes, trace_id, turn_id, "
+        "wb_run_id, wb_run_step, wb_run_step_end, wb_user_id. "
         "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
         "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
     )
