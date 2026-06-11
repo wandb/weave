@@ -103,6 +103,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_query,
     build_calls_stats_query,
     combine_conditions,
+    validate_monitor_query_fields,
 )
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
@@ -1993,6 +1994,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             expected=req.obj.expected_digest,
             actual=digest,
             label=f"obj {req.obj.object_id!r}",
+        )
+        validate_monitor_query_fields(
+            digest_result.base_object_class,
+            digest_result.leaf_object_class,
+            processed_val,
         )
 
         kind = get_kind(processed_val)

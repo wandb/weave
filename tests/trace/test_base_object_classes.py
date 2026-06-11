@@ -22,7 +22,7 @@ from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import ObjectNameTypeCollision
+from weave.trace_server.errors import InvalidFieldError, ObjectNameTypeCollision
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyNestedBaseModel,
 )
@@ -1153,3 +1153,105 @@ def test_obj_create_rejects_name_type_collision(client: WeaveClient):
             }
         )
     )
+
+
+def _monitor_val(query: dict | None) -> dict:
+    """A serialized Monitor object val carrying a query and weave class hierarchy."""
+    return {
+        "name": "test-monitor",
+        "description": None,
+        "sampling_rate": 1.0,
+        "scorers": [],
+        "op_names": [],
+        "query": query,
+        "is_traced": True,
+        "active": False,
+        "scorer_debounce_config": None,
+        "_type": "Monitor",
+        "_class_name": "Monitor",
+        "_bases": ["Object", "BaseModel"],
+    }
+
+
+def _create_monitor(client: WeaveClient, object_id: str, query: dict | None):
+    return client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": object_id,
+                    "val": _monitor_val(query),
+                }
+            }
+        )
+    )
+
+
+def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
+    """A Monitor query on an unknown field is rejected at create with the allowed list."""
+    bad_query = {
+        "$expr": {"$eq": [{"$getField": "operation_name"}, {"$literal": "predict"}]}
+    }
+    with pytest.raises(InvalidFieldError) as exc_info:
+        _create_monitor(client, "bad-monitor", bad_query)
+    message = str(exc_info.value)
+    assert "Field operation_name is not allowed" in message
+    assert "op_name" in message
+    assert "summary.weave.*" in message
+    assert "inputs.*" in message
+
+    # Nothing was stored for the rejected monitor.
+    objs_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {"project_id": client.project_id, "filter": {"object_ids": ["bad-monitor"]}}
+        )
+    )
+    assert objs_res.objs == []
+
+
+def test_monitor_create_accepts_valid_query_fields(client: WeaveClient):
+    """Static, dynamic, and absent monitor queries all create successfully."""
+    valid_query = {
+        "$expr": {
+            "$and": [
+                {"$eq": [{"$getField": "parent_id"}, {"$literal": None}]},
+                {
+                    "$eq": [
+                        {"$getField": "summary.weave.status"},
+                        {"$literal": "success"},
+                    ]
+                },
+            ]
+        }
+    }
+    dynamic_query = {
+        "$expr": {"$eq": [{"$getField": "inputs.foo"}, {"$literal": "bar"}]}
+    }
+
+    valid_res = _create_monitor(client, "valid-monitor", valid_query)
+    dynamic_res = _create_monitor(client, "dynamic-monitor", dynamic_query)
+    no_query_res = _create_monitor(client, "no-query-monitor", None)
+
+    assert valid_res.object_id == "valid-monitor"
+    assert dynamic_res.object_id == "dynamic-monitor"
+    assert no_query_res.object_id == "no-query-monitor"
+
+    objs_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client.project_id,
+                "filter": {
+                    "object_ids": [
+                        "valid-monitor",
+                        "dynamic-monitor",
+                        "no-query-monitor",
+                    ]
+                },
+            }
+        )
+    )
+    assert {obj.object_id for obj in objs_res.objs} == {
+        "valid-monitor",
+        "dynamic-monitor",
+        "no-query-monitor",
+    }

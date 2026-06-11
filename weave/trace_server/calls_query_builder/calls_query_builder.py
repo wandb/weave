@@ -1956,6 +1956,72 @@ def get_field_by_name(name: str) -> CallsMergedField:
     return ALLOWED_CALL_FIELDS[name]
 
 
+# Dotted prefixes get_field_by_name accepts beyond ALLOWED_CALL_FIELDS.
+ALLOWED_DYNAMIC_FIELD_PREFIXES = (
+    "feedback.*",
+    "annotation_queue_items.queue_id",
+    "summary.weave.*",
+    "inputs.*",
+    "output.*",
+    "attributes.*",
+    "summary.*",
+)
+
+
+MONITOR_OBJECT_CLASSES = frozenset({"Monitor", "ClassifierMonitor"})
+
+
+def validate_monitor_query_fields(
+    base_object_class: str | None,
+    leaf_object_class: str | None,
+    val: object,
+) -> None:
+    """Reject a Monitor whose `query` references a field outside the allowed set."""
+    if (
+        base_object_class not in MONITOR_OBJECT_CLASSES
+        and leaf_object_class not in MONITOR_OBJECT_CLASSES
+    ):
+        return
+    if not isinstance(val, dict):
+        return
+    raw_query = val.get("query")
+    if raw_query is None:
+        return
+    cleaned = _strip_weave_object_keys(raw_query)
+    validate_query_field_names(tsi_query.Query.model_validate(cleaned))
+
+
+def validate_query_field_names(query: tsi_query.Query) -> None:
+    """Validate every field reference in `query` against the allowed call fields."""
+    try:
+        process_query_to_conditions(query, ParamBuilder(), "calls_merged")
+    except InvalidFieldError as e:
+        raise InvalidFieldError(_invalid_field_message(str(e))) from e
+
+
+def _strip_weave_object_keys(value: object) -> object:
+    """Drop weave bookkeeping keys (`_type`, `_class_name`, `_bases`) from a serialized query."""
+    if isinstance(value, dict):
+        return {
+            k: _strip_weave_object_keys(v)
+            for k, v in value.items()
+            if not k.startswith("_")
+        }
+    if isinstance(value, list):
+        return [_strip_weave_object_keys(v) for v in value]
+    return value
+
+
+def _invalid_field_message(reason: str) -> str:
+    """Append the allowed field list and dynamic prefixes to a field rejection."""
+    allowed = ", ".join(sorted(ALLOWED_CALL_FIELDS))
+    prefixes = ", ".join(ALLOWED_DYNAMIC_FIELD_PREFIXES)
+    return (
+        f"{reason}. Allowed fields: {allowed}. "
+        f"Allowed dynamic field prefixes: {prefixes}"
+    )
+
+
 def _field_as_sql_maybe_agg(
     field: CallsMergedField,
     pb: ParamBuilder,
