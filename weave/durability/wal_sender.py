@@ -43,7 +43,12 @@ from typing import Any
 
 from pydantic import BaseModel
 from typing_extensions import Self
-from weave_server_sdk import models as tsi
+from weave_server_sdk.models import (
+    CallEndReq,
+    CallStartReq,
+    ObjCreateReq,
+    TableCreateReq,
+)
 
 from weave.durability.wal import (
     WALConsumer,
@@ -298,10 +303,10 @@ class BackgroundWALSender:
 # Prefer this over dynamic getattr — type checkers and humans can
 # verify correctness at a glance.
 _RECORD_TYPE_TO_REQ: dict[str, type[BaseModel]] = {
-    "call_start": tsi.CallStartReq,
-    "call_end": tsi.CallEndReq,
-    "obj_create": tsi.ObjCreateReq,
-    "table_create": tsi.TableCreateReq,
+    "call_start": CallStartReq,
+    "call_end": CallEndReq,
+    "obj_create": ObjCreateReq,
+    "table_create": TableCreateReq,
     "file_create": FileCreateReq,
 }
 

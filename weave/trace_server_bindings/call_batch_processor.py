@@ -16,7 +16,6 @@ from queue import Full
 
 from cachetools import TTLCache
 
-from weave.trace_server_bindings import models as tsi
 from weave.trace_server_bindings.async_batch_processor import (
     AsyncBatchProcessor,
     SkipIndividualProcessingError,
@@ -24,6 +23,7 @@ from weave.trace_server_bindings.async_batch_processor import (
 )
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
+    CompletedCallSchemaForInsert,
     EndBatchItem,
     StartBatchItem,
 )
@@ -302,7 +302,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         if start.req.start.trace_id is None:
             raise ValueError("Cannot create complete call: start item missing trace_id")
 
-        complete_call = tsi.CompletedCallSchemaForInsert(
+        complete_call = CompletedCallSchemaForInsert(
             project_id=start.req.start.project_id,
             id=start.req.start.id,
             trace_id=start.req.start.trace_id,

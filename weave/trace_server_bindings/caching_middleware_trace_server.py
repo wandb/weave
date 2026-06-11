@@ -10,6 +10,30 @@ from typing import Any, TypedDict, TypeVar
 
 from pydantic import BaseModel
 from typing_extensions import Self
+from weave_server_sdk.models import (
+    FileContentReadReq,
+    FileCreateRes,
+    FilesStatsReq,
+    FilesStatsRes,
+    ObjAddTagsRes,
+    ObjCreateReq,
+    ObjCreateRes,
+    ObjDeleteReq,
+    ObjDeleteRes,
+    ObjReadReq,
+    ObjReadRes,
+    ObjRemoveAliasesRes,
+    ObjRemoveTagsRes,
+    ObjSetAliasesRes,
+    RefsReadBatchReq,
+    RefsReadBatchRes,
+    TableQueryReq,
+    TableQueryRes,
+    TableQueryStatsBatchReq,
+    TableQueryStatsBatchRes,
+    TableQueryStatsReq,
+    TableQueryStatsRes,
+)
 
 from weave import version
 from weave.trace.refs import ObjectRef, Ref
@@ -18,11 +42,18 @@ from weave.trace.settings import (
     server_cache_size_limit,
     use_server_cache,
 )
-from weave.trace_server_bindings import models as tsi
 from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.delegating_trace_server import (
     DelegatingTraceServerMixin,
+)
+from weave.trace_server_bindings.models import (
+    FileContentReadRes,
+    FileCreateReq,
+    ObjAddTagsReq,
+    ObjRemoveAliasesReq,
+    ObjRemoveTagsReq,
+    ObjSetAliasesReq,
 )
 
 logger = logging.getLogger(__name__)
@@ -301,27 +332,27 @@ class CachingMiddlewareTraceServer(
         return disk_layer._cache.volume()
 
     # Cacheable Methods:
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.obj_read(req)
         return self._with_cache_pydantic(
             self._next_trace_server.obj_read,
             req,
-            tsi.ObjReadRes,
+            ObjReadRes,
             make_cache_key=_obj_read_cache_key,
         )
 
     # Obj API
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
         # All obj_create requests are cacheable!
         return self._with_cache_pydantic(
             self._next_trace_server.obj_create,
             req,
-            tsi.ObjCreateRes,
+            ObjCreateRes,
             make_cache_key=_obj_create_cache_key,
         )
 
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes:
         obj_fields: dict[str, Any] = {
             "project_id": req.project_id,
             "object_id": req.object_id,
@@ -368,21 +399,21 @@ class CachingMiddlewareTraceServer(
             )
         )
 
-    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+    def obj_add_tags(self, req: ObjAddTagsReq) -> ObjAddTagsRes:
         # Capture fields before forwarding — downstream adapters may mutate req
         project_id, object_id, digest = req.project_id, req.object_id, req.digest
         res = self._next_trace_server.obj_add_tags(req)
         self._invalidate_obj_read_cache_version(project_id, object_id, digest)
         return res
 
-    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+    def obj_remove_tags(self, req: ObjRemoveTagsReq) -> ObjRemoveTagsRes:
         # Capture fields before forwarding — downstream adapters may mutate req
         project_id, object_id, digest = req.project_id, req.object_id, req.digest
         res = self._next_trace_server.obj_remove_tags(req)
         self._invalidate_obj_read_cache_version(project_id, object_id, digest)
         return res
 
-    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+    def obj_set_aliases(self, req: ObjSetAliasesReq) -> ObjSetAliasesRes:
         # Capture fields before forwarding — downstream adapters may mutate req.
         # Alias assignment may move the alias from another version, so
         # invalidate all versions of this object.
@@ -391,9 +422,7 @@ class CachingMiddlewareTraceServer(
         self._invalidate_obj_read_cache_all(project_id, object_id)
         return res
 
-    def obj_remove_aliases(
-        self, req: tsi.ObjRemoveAliasesReq
-    ) -> tsi.ObjRemoveAliasesRes:
+    def obj_remove_aliases(self, req: ObjRemoveAliasesReq) -> ObjRemoveAliasesRes:
         # Capture fields before forwarding — downstream adapters may mutate req.
         # Alias removal doesn't include digest; invalidate all versions for this object.
         project_id, object_id = req.project_id, req.object_id
@@ -401,35 +430,35 @@ class CachingMiddlewareTraceServer(
         self._invalidate_obj_read_cache_all(project_id, object_id)
         return res
 
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+    def table_query(self, req: TableQueryReq) -> TableQueryRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query(req)
         return self._with_cache_pydantic(
-            self._next_trace_server.table_query, req, tsi.TableQueryRes
+            self._next_trace_server.table_query, req, TableQueryRes
         )
 
     # This is a legacy endpoint, it should be removed once the client is mostly updated
-    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+    def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query_stats(req)
         return self._with_cache_pydantic(
             self._next_trace_server.table_query_stats,
             req,
-            tsi.TableQueryStatsRes,
+            TableQueryStatsRes,
         )
 
     def table_query_stats_batch(
-        self, req: tsi.TableQueryStatsBatchReq
-    ) -> tsi.TableQueryStatsBatchRes:
+        self, req: TableQueryStatsBatchReq
+    ) -> TableQueryStatsBatchRes:
         if any(not digest_is_cacheable(digest) for digest in req.digests or []):
             return self._next_trace_server.table_query_stats_batch(req)
         return self._with_cache_pydantic(
             self._next_trace_server.table_query_stats_batch,
             req,
-            tsi.TableQueryStatsBatchRes,
+            TableQueryStatsBatchRes,
         )
 
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
         """Read multiple refs, utilizing cache for individual refs.
 
         This method implements special caching logic to:
@@ -460,7 +489,7 @@ class CachingMiddlewareTraceServer(
                 needed_indices.append(needed_ndx)
 
         if needed_refs:
-            new_req = tsi.RefsReadBatchReq(refs=needed_refs)
+            new_req = RefsReadBatchReq(refs=needed_refs)
             needed_results = self._next_trace_server.refs_read_batch(new_req)
             for needed_ndx, needed_ref, needed_val in zip(
                 needed_indices, needed_refs, needed_results.vals, strict=False
@@ -480,30 +509,30 @@ class CachingMiddlewareTraceServer(
                 except Exception:
                     logger.exception("Error parsing ref for caching")
 
-        return tsi.RefsReadBatchRes(vals=final_results)
+        return RefsReadBatchRes(vals=final_results)
 
     # File API
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    def file_create(self, req: FileCreateReq) -> FileCreateRes:
         # All file_create requests are cacheable!
         return self._with_cache_pydantic(
-            self._next_trace_server.file_create, req, tsi.FileCreateRes
+            self._next_trace_server.file_create, req, FileCreateRes
         )
 
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
         return self._with_cache(
             self._next_trace_server.file_content_read,
             req,
             "file_content_read",
             lambda req: req.model_dump_json(),
             lambda res: res.content,
-            lambda content: tsi.FileContentReadRes(content=content),
+            lambda content: FileContentReadRes(content=content),
         )
 
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+    def files_stats(self, req: FilesStatsReq) -> FilesStatsRes:
         return self._with_cache_pydantic(
             self._next_trace_server.files_stats,
             req,
-            tsi.FilesStatsRes,
+            FilesStatsRes,
         )
 
 
@@ -517,12 +546,12 @@ def _reorder_leading(d: dict[str, Any], leading: tuple[str, ...]) -> dict[str, A
     return {key: d.pop(key) for key in leading} | d
 
 
-def _obj_read_cache_key(req: tsi.ObjReadReq) -> str:
+def _obj_read_cache_key(req: ObjReadReq) -> str:
     raw = _reorder_leading(req.model_dump(), ("project_id", "object_id", "digest"))
     return json.dumps(_bytes_to_base64(raw), ensure_ascii=False)
 
 
-def _obj_create_cache_key(req: tsi.ObjCreateReq) -> str:
+def _obj_create_cache_key(req: ObjCreateReq) -> str:
     obj = _reorder_leading(req.model_dump()["obj"], ("project_id", "object_id"))
     return json.dumps({"obj": _bytes_to_base64(obj)}, ensure_ascii=False)
 

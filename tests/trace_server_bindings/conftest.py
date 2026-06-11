@@ -5,7 +5,12 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 import tenacity
-from weave_server_sdk import models as tsi
+from weave_server_sdk.models import (
+    CallEndReq,
+    CallStartReq,
+    EndedCallSchemaForInsert,
+    StartedCallSchemaForInsert,
+)
 
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import (
@@ -20,9 +25,9 @@ from weave.trace_server_bindings.remote_http_trace_server import (
 def generate_start(
     id: str | None = None,
     project_id: str = "test",
-) -> tsi.StartedCallSchemaForInsert:
+) -> StartedCallSchemaForInsert:
     """Generate a test StartedCallSchemaForInsert."""
-    return tsi.StartedCallSchemaForInsert(
+    return StartedCallSchemaForInsert(
         project_id=project_id,
         id=id or generate_id(),
         op_name="test_name",
@@ -37,9 +42,9 @@ def generate_start(
 def generate_end(
     id: str | None = None,
     project_id: str = "test",
-) -> tsi.EndedCallSchemaForInsert:
+) -> EndedCallSchemaForInsert:
     """Generate a test EndedCallSchemaForInsert."""
-    return tsi.EndedCallSchemaForInsert(
+    return EndedCallSchemaForInsert(
         project_id=project_id,
         id=id or generate_id(),
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc)
@@ -53,11 +58,11 @@ def generate_end(
 def generate_call_start_end_pair(
     id: str | None = None,
     project_id: str = "test",
-) -> tuple[tsi.CallStartReq, tsi.CallEndReq]:
+) -> tuple[CallStartReq, CallEndReq]:
     """Generate a matching pair of CallStartReq and CallEndReq for testing."""
     start = generate_start(id, project_id)
     end = generate_end(id, project_id)
-    return tsi.CallStartReq(start=start), tsi.CallEndReq(end=end)
+    return CallStartReq(start=start), CallEndReq(end=end)
 
 
 # =============================================================================

@@ -19,6 +19,17 @@ import httpx
 import pytest
 import tenacity
 from pydantic import ValidationError
+from weave_server_sdk.models import (
+    CallEndReq,
+    CallSchema,
+    CallsQueryReq,
+    CallStartReq,
+    CallStartRes,
+    EndedCallSchemaForInsert,
+    FeedbackCreateReq,
+    ObjReadReq,
+    ObjReadRes,
+)
 
 from tests.trace_server_bindings.conftest import (
     SpyTransport,
@@ -27,7 +38,6 @@ from tests.trace_server_bindings.conftest import (
     generate_start,
 )
 from weave.trace.display.term import configure_logger
-from weave.trace_server_bindings import models as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.http_utils import (
@@ -35,8 +45,11 @@ from weave.trace_server_bindings.http_utils import (
     CallsCompleteModeRequired,
 )
 from weave.trace_server_bindings.models import (
+    CallsUpsertCompleteReq,
     CompleteBatchItem,
+    CompletedCallSchemaForInsert,
     EndBatchItem,
+    FileCreateReq,
     StartBatchItem,
 )
 
@@ -69,7 +82,7 @@ def shutdown(server: RemoteHTTPTraceServer) -> None:
 
 def call_start_ok_response(call_id: str) -> httpx.Response:
     return httpx.Response(
-        200, json=tsi.CallStartRes(id=call_id, trace_id="test_trace_id").model_dump()
+        200, json=CallStartRes(id=call_id, trace_id="test_trace_id").model_dump()
     )
 
 
@@ -91,7 +104,7 @@ def test_call_start_ok():
     server = make_server(transport)
 
     start = generate_start(call_id)
-    result = server.call_start(tsi.CallStartReq(start=start))
+    result = server.call_start(CallStartReq(start=start))
 
     assert transport.urls == [f"{BASE_URL}/call/start"]
     sent = json.loads(transport.requests[0].content)
@@ -108,7 +121,7 @@ def test_400_no_retry():
 
     start = generate_start(call_id)
     with pytest.raises(httpx.HTTPStatusError):
-        server.call_start(tsi.CallStartReq(start=start))
+        server.call_start(CallStartReq(start=start))
 
     # Should only be called once (no retry for 400)
     assert len(transport.requests) == 1
@@ -119,7 +132,7 @@ def test_invalid_no_retry():
     transport = SpyTransport()
     server = make_server(transport)
     with pytest.raises(ValidationError):
-        server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
+        server.call_start(CallStartReq(start={"invalid": "broken"}))
     assert len(transport.requests) == 0
 
 
@@ -140,7 +153,7 @@ def test_500_502_503_504_429_retry(monkeypatch):
     server = make_server(transport)
 
     start = generate_start(call_id)
-    result = server.call_start(tsi.CallStartReq(start=start))
+    result = server.call_start(CallStartReq(start=start))
     assert result.id == call_id
     assert len(transport.requests) == 6
 
@@ -161,7 +174,7 @@ def test_other_error_retry(monkeypatch):
     server = make_server(transport)
 
     start = generate_start(call_id)
-    result = server.call_start(tsi.CallStartReq(start=start))
+    result = server.call_start(CallStartReq(start=start))
     assert result.id == call_id
 
 
@@ -173,7 +186,7 @@ def test_retry_id_header_injected(monkeypatch):
     transport = SpyTransport(httpx.Response(500), call_start_ok_response(call_id))
     server = make_server(transport)
 
-    server.call_start(tsi.CallStartReq(start=generate_start(call_id)))
+    server.call_start(CallStartReq(start=generate_start(call_id)))
 
     retry_ids = [r.headers.get("X-Weave-Retry-Id") for r in transport.requests]
     assert all(retry_ids)
@@ -189,7 +202,7 @@ def test_extra_headers_and_auth_are_sent():
         transport, auth=("api", "secret-key"), extra_headers={"X-Custom": "yes"}
     )
 
-    server.call_start(tsi.CallStartReq(start=generate_start(call_id)))
+    server.call_start(CallStartReq(start=generate_start(call_id)))
 
     request = transport.requests[0]
     assert request.headers["X-Custom"] == "yes"
@@ -203,11 +216,11 @@ def test_set_auth_applies_to_subsequent_requests():
     transport.default_response = call_start_ok_response(call_id)
     server = make_server(transport)
 
-    server.call_start(tsi.CallStartReq(start=generate_start(call_id)))
+    server.call_start(CallStartReq(start=generate_start(call_id)))
     assert "Authorization" not in transport.requests[0].headers
 
     server.set_auth(("api", "secret-key"))
-    server.call_start(tsi.CallStartReq(start=generate_start(call_id)))
+    server.call_start(CallStartReq(start=generate_start(call_id)))
     assert transport.requests[1].headers["Authorization"].startswith("Basic ")
 
 
@@ -236,11 +249,11 @@ def test_typed_sdk_route_obj_read():
     server = make_server(transport)
 
     res = server.obj_read(
-        tsi.ObjReadReq(project_id="entity/project", object_id="my-obj", digest="abc")
+        ObjReadReq(project_id="entity/project", object_id="my-obj", digest="abc")
     )
 
     assert transport.urls == [f"{BASE_URL}/obj/read"]
-    assert isinstance(res, tsi.ObjReadRes)
+    assert isinstance(res, ObjReadRes)
     assert res.obj.object_id == "my-obj"
     assert res.obj.val == {"a": 1}
 
@@ -251,7 +264,7 @@ def test_calls_complete_batch_endpoint_and_payload(monkeypatch):
     transport = SpyTransport()
     server = make_server(transport, should_batch=True)
 
-    complete = tsi.CompletedCallSchemaForInsert(
+    complete = CompletedCallSchemaForInsert(
         project_id="entity/project",
         id="call-id",
         trace_id="trace-id",
@@ -272,7 +285,7 @@ def test_calls_complete_batch_endpoint_and_payload(monkeypatch):
 
     assert transport.urls == [f"{BASE_URL}/v2/entity/project/calls/complete"]
     payload = json.loads(transport.requests[0].content)
-    expected = tsi.CallsUpsertCompleteReq(batch=[complete]).model_dump(mode="json")
+    expected = CallsUpsertCompleteReq(batch=[complete]).model_dump(mode="json")
     assert payload == expected
 
 
@@ -286,7 +299,7 @@ def test_eager_calls_use_v2_start_end_endpoints():
     started_at = ended_at - datetime.timedelta(seconds=1)
     # started_at rides as an extra field (the published SDK model doesn't
     # declare it yet).
-    end = tsi.EndedCallSchemaForInsert(
+    end = EndedCallSchemaForInsert(
         project_id="entity/project",
         id="call-id",
         ended_at=ended_at,
@@ -297,8 +310,8 @@ def test_eager_calls_use_v2_start_end_endpoints():
     try:
         server._flush_calls_eager(
             [
-                StartBatchItem(req=tsi.CallStartReq(start=start)),
-                EndBatchItem(req=tsi.CallEndReq(end=end)),
+                StartBatchItem(req=CallStartReq(start=start)),
+                EndBatchItem(req=CallEndReq(end=end)),
             ]
         )
 
@@ -326,7 +339,7 @@ def test_eager_non_retryable_error_drops_item(caplog):
 
     caplog.set_level(logging.ERROR)
     try:
-        server._flush_calls_eager([StartBatchItem(req=tsi.CallStartReq(start=start))])
+        server._flush_calls_eager([StartBatchItem(req=CallStartReq(start=start))])
     finally:
         shutdown(server)
 
@@ -359,8 +372,8 @@ def test_eager_retryable_error_logs_and_continues(caplog):
         # Should NOT raise - logs and drops item 1, continues with item 2
         server._flush_calls_eager(
             [
-                StartBatchItem(req=tsi.CallStartReq(start=start1)),
-                StartBatchItem(req=tsi.CallStartReq(start=start2)),
+                StartBatchItem(req=CallStartReq(start=start1)),
+                StartBatchItem(req=CallStartReq(start=start2)),
             ]
         )
     finally:
@@ -385,7 +398,7 @@ def test_timeout_retry_mechanism(monkeypatch):
     server = make_server(transport, should_batch=True)
 
     # Trying to send a batch should fail 2 times, then succeed
-    server.call_start(tsi.CallStartReq(start=generate_start()))
+    server.call_start(CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
 
     assert len(transport.requests) == 3
@@ -424,7 +437,7 @@ def test_post_timeout(monkeypatch, log_collector):
     )
     server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
 
-    server.call_start(tsi.CallStartReq(start=generate_start()))
+    server.call_start(CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
     logs = log_collector.get_warning_logs()
     assert len(logs) >= 1
@@ -447,7 +460,7 @@ def test_post_timeout(monkeypatch, log_collector):
     )
     new_server._call_sdk = fast_retried_call_sdk
 
-    response = new_server.call_start(tsi.CallStartReq(start=generate_start(call_id)))
+    response = new_server.call_start(CallStartReq(start=generate_start(call_id)))
     assert response.id == call_id
     assert response.trace_id == "test_trace_id"
 
@@ -469,9 +482,9 @@ def test_auto_upgrade_to_calls_complete_on_error(monkeypatch):
 
     call_id = generate_id()
     start = StartBatchItem(
-        req=tsi.CallStartReq(start=generate_start(call_id, "entity/project"))
+        req=CallStartReq(start=generate_start(call_id, "entity/project"))
     )
-    end = EndBatchItem(req=tsi.CallEndReq(end=generate_end(call_id, "entity/project")))
+    end = EndBatchItem(req=CallEndReq(end=generate_end(call_id, "entity/project")))
 
     try:
         server._flush_calls([start, end])
@@ -493,7 +506,7 @@ def test_eager_calls_complete_required_is_reraised(monkeypatch):
     server = make_server(transport, should_batch=True)
 
     start = StartBatchItem(
-        req=tsi.CallStartReq(start=generate_start("call-id", "entity/project"))
+        req=CallStartReq(start=generate_start("call-id", "entity/project"))
     )
 
     try:
@@ -524,13 +537,11 @@ def test_calls_query_stream_parses_jsonl():
     )
     server = make_server(transport)
 
-    calls = list(
-        server.calls_query_stream(tsi.CallsQueryReq(project_id="entity/project"))
-    )
+    calls = list(server.calls_query_stream(CallsQueryReq(project_id="entity/project")))
 
     assert transport.urls == [f"{BASE_URL}/calls/stream_query"]
     assert [c.id for c in calls] == ["call-1", "call-2"]
-    assert all(isinstance(c, tsi.CallSchema) for c in calls)
+    assert all(isinstance(c, CallSchema) for c in calls)
 
 
 def test_file_create_sends_multipart():
@@ -539,9 +550,7 @@ def test_file_create_sends_multipart():
     server = make_server(transport)
 
     res = server.file_create(
-        tsi.FileCreateReq(
-            project_id="entity/project", name="file.txt", content=b"hello"
-        )
+        FileCreateReq(project_id="entity/project", name="file.txt", content=b"hello")
     )
 
     assert res.digest == "digest-1"
@@ -568,7 +577,7 @@ def test_feedback_create_unbatched_uses_single_route():
     server = make_server(transport)
 
     res = server.feedback_create(
-        tsi.FeedbackCreateReq(
+        FeedbackCreateReq(
             project_id="entity/project",
             weave_ref="weave:///entity/project/call/call-1",
             feedback_type="wandb.note.1",

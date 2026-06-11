@@ -18,7 +18,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
-from weave_server_sdk import models as tsi
+from weave_server_sdk.models import GenAISpanRef
 
 from weave.evaluation.eval import (
     _attach_genai_span_ref_to_call_summary,
@@ -101,7 +101,7 @@ class EvalLinkSpanProcessor(SpanProcessor):
         trace_id = format(ctx.trace_id, "032x")
         span_id = format(ctx.span_id, "016x")
 
-        ref = tsi.GenAISpanRef(trace_id=trace_id, span_id=span_id)
+        ref = GenAISpanRef(trace_id=trace_id, span_id=span_id)
         _attach_genai_span_ref_to_call_summary(call, ref)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:

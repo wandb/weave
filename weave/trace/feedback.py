@@ -8,8 +8,12 @@ from collections.abc import Iterable, Iterator
 from typing import Any
 
 from pydantic import Field
-from weave_server_sdk import models as tsi
-from weave_server_sdk.models import Query
+from weave_server_sdk.models import (
+    FeedbackCreateReq,
+    FeedbackPurgeReq,
+    FeedbackQueryReq,
+    Query,
+)
 
 from weave.trace import util
 from weave.trace.context import weave_client_context
@@ -21,7 +25,7 @@ from weave.trace.refs import ObjectRef, Ref
 from weave.utils.project_id import to_project_id
 
 
-class Feedback(tsi.FeedbackCreateReq):
+class Feedback(FeedbackCreateReq):
     """A feedback row, as returned by feedback queries.
 
     The generated SDK models feedback query results as plain dicts
@@ -105,7 +109,7 @@ class FeedbackQuery:
     project: str
 
     show_refs: bool
-    _query: tsi.Query
+    _query: Query
     offset: int | None
     limit: int | None
 
@@ -147,7 +151,7 @@ class FeedbackQuery:
                 "direction": "asc",
             },
         ]
-        req = tsi.FeedbackQueryReq(
+        req = FeedbackQueryReq(
             project_id=to_project_id(self.entity, self.project),
             query=self._query,
             sort_by=sort_by,
@@ -214,7 +218,7 @@ class RefFeedbackQuery(FeedbackQuery):
         creator: str | None,
         annotation_ref: str | None = None,
     ) -> str:
-        freq = tsi.FeedbackCreateReq(
+        freq = FeedbackCreateReq(
             project_id=to_project_id(self.entity, self.project),
             weave_ref=self.weave_ref,
             feedback_type=feedback_type,
@@ -282,7 +286,7 @@ class RefFeedbackQuery(FeedbackQuery):
                 ],
             }
         }
-        req = tsi.FeedbackPurgeReq(
+        req = FeedbackPurgeReq(
             project_id=to_project_id(self.entity, self.project),
             query=Query(**query),
         )

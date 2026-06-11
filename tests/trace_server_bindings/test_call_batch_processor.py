@@ -6,11 +6,17 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+from weave_server_sdk.models import (
+    CallEndReq,
+    CallStartReq,
+    EndedCallSchemaForInsert,
+    StartedCallSchemaForInsert,
+)
 
-from weave.trace_server_bindings import models as tsi
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
+    CompletedCallSchemaForInsert,
     EndBatchItem,
     StartBatchItem,
 )
@@ -35,7 +41,7 @@ def _make_start_item(
         'call-1'
     """
     started_at = datetime.datetime.now(datetime.timezone.utc)
-    start = tsi.StartedCallSchemaForInsert(
+    start = StartedCallSchemaForInsert(
         project_id=project_id,
         id=call_id,
         trace_id=trace_id,
@@ -44,7 +50,7 @@ def _make_start_item(
         attributes={},
         inputs={},
     )
-    return StartBatchItem(req=tsi.CallStartReq(start=start))
+    return StartBatchItem(req=CallStartReq(start=start))
 
 
 def _make_end_item(call_id: str, *, project_id: str = "proj") -> EndBatchItem:
@@ -63,13 +69,13 @@ def _make_end_item(call_id: str, *, project_id: str = "proj") -> EndBatchItem:
         'call-1'
     """
     ended_at = datetime.datetime.now(datetime.timezone.utc)
-    end = tsi.EndedCallSchemaForInsert(
+    end = EndedCallSchemaForInsert(
         project_id=project_id,
         id=call_id,
         ended_at=ended_at,
         summary={},
     )
-    return EndBatchItem(req=tsi.CallEndReq(end=end))
+    return EndBatchItem(req=CallEndReq(end=end))
 
 
 def _make_complete_item(
@@ -92,7 +98,7 @@ def _make_complete_item(
     """
     started_at = datetime.datetime.now(datetime.timezone.utc)
     ended_at = started_at + datetime.timedelta(seconds=1)
-    complete = tsi.CompletedCallSchemaForInsert(
+    complete = CompletedCallSchemaForInsert(
         project_id=project_id,
         id=call_id,
         trace_id=trace_id,
@@ -193,7 +199,7 @@ def test_missing_trace_id_raises_value_error() -> None:
     processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
 
     started_at = datetime.datetime.now(datetime.timezone.utc)
-    start = tsi.StartedCallSchemaForInsert(
+    start = StartedCallSchemaForInsert(
         project_id="proj",
         id="call-1",
         trace_id=None,
@@ -202,7 +208,7 @@ def test_missing_trace_id_raises_value_error() -> None:
         attributes={},
         inputs={},
     )
-    start_item = StartBatchItem(req=tsi.CallStartReq(start=start))
+    start_item = StartBatchItem(req=CallStartReq(start=start))
     end_item = _make_end_item("call-1")
 
     processor.enqueue([start_item])

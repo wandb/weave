@@ -13,7 +13,10 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-from weave_server_sdk import models as tsi
+from weave_server_sdk.models import (
+    CallEndReq,
+    CallStartReq,
+)
 
 from tests.trace_server_bindings.conftest import (
     generate_call_start_end_pair,
@@ -91,7 +94,7 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
     start.attributes = {
         "large_data": "x" * server.remote_request_bytes_limit,
     }
-    batch = [StartBatchItem(req=tsi.CallStartReq(start=start))]
+    batch = [StartBatchItem(req=CallStartReq(start=start))]
 
     # Verify the single item is actually large enough to trigger the error message
     data = Batch(batch=batch).model_dump_json()
@@ -120,8 +123,8 @@ def test_multi_level_recursive_splitting(server):
         end = generate_end()
         if i % 5 == 0:
             start.attributes = {"data": "x" * 500}
-        batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
-        batch.append(EndBatchItem(req=tsi.CallEndReq(end=end)))
+        batch.append(StartBatchItem(req=CallStartReq(start=start)))
+        batch.append(EndBatchItem(req=CallEndReq(end=end)))
 
     # Process the batch
     server._flush_calls(batch)
@@ -181,14 +184,14 @@ def test_non_uniform_batch_items(server):
     # Add one medium item
     start = generate_start()
     start.attributes = {"medium_data": "y" * 300}
-    batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
+    batch.append(StartBatchItem(req=CallStartReq(start=start)))
 
     # Add one large item (but still under the limit)
     start = generate_start()
     start.attributes = {
         "large_data": "z" * (server.remote_request_bytes_limit // 2),
     }
-    batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
+    batch.append(StartBatchItem(req=CallStartReq(start=start)))
 
     # Process the batch
     server._flush_calls(batch)
