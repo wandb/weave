@@ -46,7 +46,8 @@ describe('SubAgent', () => {
     return found;
   };
 
-  it('setAttributes records attributes on the subagent span; no-op after end()', () => {
+  it('setAttributes records attributes on the subagent span; warns + no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     const sub = turn.startSubagent({name: 'researcher'});
     sub.setAttributes({
@@ -63,9 +64,14 @@ describe('SubAgent', () => {
     );
     expect(subSpan.attributes['weave.tag']).toBe('enterprise');
     expect(subSpan.attributes['after.end']).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('SubAgent.setAttributes() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 
-  it('addEvent records a span event on the subagent span; no-op after end()', () => {
+  it('addEvent records a span event on the subagent span; warns + no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     const sub = turn.startSubagent({name: 'researcher'});
     sub.addEvent('weave.lifecycle', {state: 'spawned'});
@@ -76,5 +82,9 @@ describe('SubAgent', () => {
     const subSpan = findSub(getExporter().getFinishedSpans());
     expect(subSpan.events).toHaveLength(1);
     expect(subSpan.events[0].name).toBe('weave.lifecycle');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('SubAgent.addEvent() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 });

@@ -63,7 +63,8 @@ describe('Tool', () => {
     expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
   });
 
-  it('setAttributes records attributes on the tool span; no-op after end()', () => {
+  it('setAttributes records attributes on the tool span; warns + no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     const tool = turn.startTool({name: 'get_weather'});
     tool.setAttributes({
@@ -80,9 +81,14 @@ describe('Tool', () => {
     );
     expect(toolSpan.attributes['weave.tag']).toBe('enterprise');
     expect(toolSpan.attributes['after.end']).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Tool.setAttributes() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 
-  it('addEvent records a span event on the tool span; no-op after end()', () => {
+  it('addEvent records a span event on the tool span; warns + no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     const tool = turn.startTool({name: 'get_weather'});
     tool.addEvent('weave.permission_request', {
@@ -98,5 +104,9 @@ describe('Tool', () => {
     expect(
       toolSpan.events[0].attributes?.['weave.permission.suggestions']
     ).toBe('[]');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Tool.addEvent() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 });

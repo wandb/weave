@@ -71,7 +71,8 @@ describe('Turn.setAttributes', () => {
     turn.end();
   });
 
-  it('is a no-op after end()', () => {
+  it('warns and is a no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     turn.end();
     turn.setAttributes({'after.end': 'x'});
@@ -79,6 +80,10 @@ describe('Turn.setAttributes', () => {
     expect(
       findSpan(spans, 'invoke_agent').attributes['after.end']
     ).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Turn.setAttributes() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 });
 
@@ -104,7 +109,8 @@ describe('Turn.setAttribute (deprecated alias)', () => {
     turn.end();
   });
 
-  it('is a no-op after end()', () => {
+  it('warns and is a no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     turn.end();
     turn.setAttribute('after.end', 'x');
@@ -112,6 +118,11 @@ describe('Turn.setAttribute (deprecated alias)', () => {
     expect(
       findSpan(spans, 'invoke_agent').attributes['after.end']
     ).toBeUndefined();
+    // Alias delegates to setAttributes, so the warning names setAttributes.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Turn.setAttributes() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 });
 
@@ -140,7 +151,8 @@ describe('Turn.addEvent', () => {
     ).toBeDefined();
   });
 
-  it('is a no-op after end()', () => {
+  it('warns and is a no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     turn.end();
     turn.addEvent('after.end');
@@ -148,5 +160,9 @@ describe('Turn.addEvent', () => {
     expect(
       findSpan(spans, 'invoke_agent').events.find(e => e.name === 'after.end')
     ).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Turn.addEvent() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 });

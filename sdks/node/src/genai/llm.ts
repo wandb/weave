@@ -338,19 +338,6 @@ export class LLM extends SpanBase {
     }
     return ensureParts(last);
   }
-
-  /** Warn if called after `end()`. Returns `true` if the caller should
-   *  short-circuit; the span is already closed, so any further mutation can
-   *  no longer reach the trace. */
-  private _warnIfEnded(method: string): boolean {
-    if (this._ended) {
-      console.warn(
-        `weave.LLM.${method}() called after end() — data will not be recorded on the span.`
-      );
-      return true;
-    }
-    return false;
-  }
 }
 
 function ensureParts(msg: Message): MessagePart[] {
