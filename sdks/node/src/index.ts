@@ -38,7 +38,6 @@ export {
   startTool,
   startTurn,
 } from './genai';
-export {getWeaveTracer} from './genai/provider';
 // Type-only: consumers can name these in their own signatures, but the
 // runtime values aren't reachable — construction is private to the SDK's
 // top-level entry-point functions.

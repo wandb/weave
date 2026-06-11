@@ -63,36 +63,11 @@ describe('Tool', () => {
     expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
   });
 
-  it('setAttribute records arbitrary string attribute on the tool span', () => {
+  it('setAttribute and addEvent record on the tool span', () => {
     const turn = Turn.create({conversationId: 'conv-1'});
     const tool = turn.startTool({name: 'get_weather', toolCallId: 'tc-1'});
-    tool.setAttribute('weave.display_name', 'get_weather: Tokyo');
-    tool.end();
-    turn.end();
-
-    const spans = getExporter().getFinishedSpans();
-    const toolSpan = findSpan(spans, 'execute_tool');
-    expect(toolSpan.attributes['weave.display_name']).toBe(
-      'get_weather: Tokyo'
-    );
-  });
-
-  it('setAttribute is a no-op after end()', () => {
-    const turn = Turn.create({});
-    const tool = turn.startTool({name: 'f'});
-    tool.end();
-    tool.setAttribute('weave.display_name', 'too-late');
-    turn.end();
-
-    const spans = getExporter().getFinishedSpans();
-    const toolSpan = findSpan(spans, 'execute_tool');
-    expect(toolSpan.attributes['weave.display_name']).toBeUndefined();
-  });
-
-  it('addEvent records a span event with attributes and timestamp', () => {
-    const turn = Turn.create({});
-    const tool = turn.startTool({name: 'f'});
     const ts = new Date('2026-01-01T00:00:00Z');
+    tool.setAttribute('weave.display_name', 'get_weather: Tokyo');
     tool.addEvent(
       'weave.permission_request',
       {'weave.permission.suggestions': '[]'},
@@ -103,11 +78,14 @@ describe('Tool', () => {
 
     const spans = getExporter().getFinishedSpans();
     const toolSpan = findSpan(spans, 'execute_tool');
+    expect(toolSpan.attributes['weave.display_name']).toBe(
+      'get_weather: Tokyo'
+    );
     expect(toolSpan.events).toHaveLength(1);
     expect(toolSpan.events[0].name).toBe('weave.permission_request');
-    expect(toolSpan.events[0].attributes?.['weave.permission.suggestions']).toBe(
-      '[]'
-    );
+    expect(
+      toolSpan.events[0].attributes?.['weave.permission.suggestions']
+    ).toBe('[]');
     // Span event time is [seconds, nanoseconds]; verify seconds match.
     const MILLIS_PER_SECOND = 1000;
     expect(toolSpan.events[0].time[0]).toBe(
@@ -115,15 +93,17 @@ describe('Tool', () => {
     );
   });
 
-  it('addEvent is a no-op after end()', () => {
+  it('setAttribute and addEvent are no-ops after end()', () => {
     const turn = Turn.create({});
     const tool = turn.startTool({name: 'f'});
     tool.end();
+    tool.setAttribute('weave.display_name', 'too-late');
     tool.addEvent('weave.permission_request');
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
     const toolSpan = findSpan(spans, 'execute_tool');
+    expect(toolSpan.attributes['weave.display_name']).toBeUndefined();
     expect(toolSpan.events).toHaveLength(0);
   });
 });

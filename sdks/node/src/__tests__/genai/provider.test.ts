@@ -74,9 +74,4 @@ describe('otel/provider', () => {
     expect(flushSpy).toHaveBeenCalledTimes(1);
     flushSpy.mockRestore();
   });
-
-  it('getWeaveTracer is re-exported from the package entry point', async () => {
-    const weave = await import('../../index');
-    expect(typeof weave.getWeaveTracer).toBe('function');
-  });
 });
