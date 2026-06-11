@@ -80,3 +80,6 @@ whole-tree mirror carrying impl twins.
 
 ## Open Questions
 None.
+
+## Addendum (round 4 restack)
+Baselines adjusted for the staging PR's removals: the wrapper/base_objects/registry C1 entries and the shared->base_objects C3 entry are obsolete (their importers were deleted or repointed); the scorer + serialize C1 entries point at the server-path llm class (severed by the llm-structured split PR); the shared object_class_util -> contract-registry edge is baselined on the shared contract (dissolves with weave/shared). The interface-layer contract stays EMPTY -- the mirror is a pure import leaf from birth, enforced by this PR's meta-test.
