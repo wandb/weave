@@ -121,3 +121,10 @@ None.
 
 ## Addendum (review round 3 follow-through)
 The per-side refs_internal split reintroduced an untranslated wire error: weave.trace_server.refs_internal.InvalidInternalRef (and trace_server_converter's same-named class) escaped the in-process wire boundary raw, while tests/trace/test_trace_server.py::test_robust_to_url_sensitive_chars expects the CLIENT's weave.trace.refs_internal.InvalidInternalRef. Fix, consistent with the wire design: both server-side classes registered at 400 and added to CONTRACT_ERROR_TYPES (they share the wire name "InvalidInternalRef"); the client-side catalog in tests/conftest.py becomes an ordered module tuple (weave.interface.errors, then weave.trace.refs_internal) so the client rebuilds ITS class from the payload name; the registry-sync conformance test checks the same catalog. Caught by the tip seam battery after the restack.
+
+## Addendum (round 4 restack)
+Rebased over the staging PR (client builtin-object surface removed) + rebuilt interface/guard. Conflict resolution notes:
+- pyproject C1: the ids/converter baselines this PR burns were already in HEAD's list; the registry entries it used to keep (trace.base_objects/serialize -> registry) no longer exist (staging deleted base_objects; serialize lost its registry import). C1 now keeps only the two llm entries plus a NEW entry: weave.trace.object_class_util -> contract registry (digest parity -- the client twin canonicalizes raw-dict publishes like the server; was baselined on the dead C3 shared contract as weave.shared.object_class_util -> registry).
+- The C3 'Shared foundation' contract is deleted whole; weave.shared becomes a forbidden tombstone in C1 (and stays one in C2/C4).
+- tests/trace/test_weave_client.py auto-merged cleanly this round because the interface-level isort fix moved the llm import to its sorted home; WILDCARD now imports from the server twin weave.trace_server.trace_server_interface_util (verified l.70).
+- Rename-merge worked FOR us here: object_class_util twins inherited the staging PR's repointed lazy registry import + comment in both per-side copies (verified content, not assumed).
