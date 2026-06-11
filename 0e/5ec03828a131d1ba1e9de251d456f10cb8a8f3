@@ -68,3 +68,13 @@ MODEL/INTERFACE modules are banned).
 ## Open Questions
 - client._objects still requires the SDK ObjectVersionFilter; a casting-style
   coercion could be added if legacy user code passes tsi filters.
+
+## Addendum (stack split, 2026-06-11)
+Re-cut during the #7177 split (parent chain gained the stainless-removal
+commit). Tree identical to pre-split 801dbac8af except: dead
+remote_only/stainless_only markers gone (removed below), weave_init res
+one-liner lost its annotation (standalone-mypy fix, see parent note), and
+THREE weave_client.py comments that this commit had REGRESSED from
+RemoteHTTPTraceServer back to StainlessRemoteHTTPTraceServer (lines
+439/2203/3103 — cherry-source artifacts from the old stack where the class
+had the stainless name) now say RemoteHTTPTraceServer again.
