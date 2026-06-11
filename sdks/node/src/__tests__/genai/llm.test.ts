@@ -295,12 +295,14 @@ describe('LLM (via Turn.startLLM)', () => {
       );
     });
 
-    it('setAttribute stamps arbitrary attribute on the chat span', () => {
+    it('setAttributes stamps arbitrary attributes on the chat span', () => {
       const turn = Turn.create({});
       const llm = turn.startLLM({model: 'gpt-4o'});
-      llm.setAttribute('gen_ai.response.id', 'resp-abc');
-      llm.setAttribute('gen_ai.response.finish_reasons', ['stop']);
-      llm.setAttribute('gen_ai.output.type', 'text');
+      llm.setAttributes({
+        'gen_ai.response.id': 'resp-abc',
+        'gen_ai.response.finish_reasons': ['stop'],
+        'gen_ai.output.type': 'text',
+      });
       llm.end();
       turn.end();
 
@@ -329,7 +331,7 @@ describe('LLM (via Turn.startLLM)', () => {
       });
       llm.attachMediaUrl('https://example.com/x', {modality: 'image'});
       llm.record({inputMessages: [{role: 'user', content: 'after end'}]});
-      llm.setAttribute('weave.too_late', 'x');
+      llm.setAttributes({'weave.too_late': 'x'});
 
       // One warning per method.
       expect(warnSpy).toHaveBeenCalledTimes(6);
@@ -339,7 +341,7 @@ describe('LLM (via Turn.startLLM)', () => {
         'attachMedia',
         'attachMediaUrl',
         'record',
-        'setAttribute',
+        'setAttributes',
       ]) {
         expect(warnSpy).toHaveBeenCalledWith(
           expect.stringContaining(`LLM.${method}() called after end()`)
@@ -354,7 +356,7 @@ describe('LLM (via Turn.startLLM)', () => {
       turn.end();
       warnSpy.mockRestore();
 
-      // The dropped setAttribute never reached the span either.
+      // The dropped setAttributes never reached the span either.
       const spans = getExporter().getFinishedSpans();
       const llmSpan = findSpan(spans, 'chat');
       expect(llmSpan.attributes['weave.too_late']).toBeUndefined();
