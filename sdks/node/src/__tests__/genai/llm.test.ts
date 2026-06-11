@@ -276,6 +276,36 @@ describe('LLM (via Turn.startLLM)', () => {
       turn.end();
     });
 
+    it('setAttributes records attributes on the chat span; no-op after end()', () => {
+      const turn = Turn.create({});
+      const llm = turn.startLLM({model: 'gpt-4o'});
+      llm.setAttributes({
+        'gen_ai.response.id': 'resp-abc',
+        'gen_ai.output.type': 'text',
+      });
+      llm.end();
+      llm.setAttributes({'after.end': 'x'});
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      expect(llmSpan.attributes['gen_ai.response.id']).toBe('resp-abc');
+      expect(llmSpan.attributes['gen_ai.output.type']).toBe('text');
+      expect(llmSpan.attributes['after.end']).toBeUndefined();
+    });
+
+    it('addEvent records a span event on the chat span; no-op after end()', () => {
+      const turn = Turn.create({});
+      const llm = turn.startLLM({model: 'gpt-4o'});
+      llm.addEvent('gen_ai.content.completion', {finish_reason: 'stop'});
+      llm.end();
+      llm.addEvent('after.end');
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      expect(llmSpan.events).toHaveLength(1);
+      expect(llmSpan.events[0].name).toBe('gen_ai.content.completion');
+    });
+
     it('accumulators called after end() warn and do not mutate state', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 

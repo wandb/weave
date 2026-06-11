@@ -52,7 +52,39 @@ describe('Turn', () => {
   });
 });
 
-describe('Turn.setAttribute', () => {
+describe('Turn.setAttributes', () => {
+  setupGenAITestEnvironment();
+  const getExporter = setupExporterPerTest();
+
+  it('writes multiple attributes to the underlying span', () => {
+    const turn = Turn.create({});
+    turn.setAttributes({'weave.cost.usd': 0.42, 'weave.tag': 'enterprise'});
+    turn.end();
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.attributes['weave.cost.usd']).toBe(0.42);
+    expect(span.attributes['weave.tag']).toBe('enterprise');
+  });
+
+  it('returns this for chaining', () => {
+    const turn = Turn.create({});
+    expect(turn.setAttributes({k: 'v'})).toBe(turn);
+    turn.end();
+  });
+
+  it('is a no-op after end()', () => {
+    const turn = Turn.create({});
+    turn.end();
+    turn.setAttributes({'after.end': 'x'});
+    const spans = getExporter().getFinishedSpans();
+    expect(
+      findSpan(spans, 'invoke_agent').attributes['after.end']
+    ).toBeUndefined();
+  });
+});
+
+// Deprecated singular alias, retained Turn-only for back-compat (delegates to
+// setAttributes). The other emitters never shipped a singular form.
+describe('Turn.setAttribute (deprecated alias)', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
