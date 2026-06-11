@@ -2,6 +2,12 @@
 
 This module provides query building functions for the queue-based call annotation system,
 following the same patterns as threads_query_builder.py and other query builders in the codebase.
+
+NOTE: annotation_queue_items is the first instance of the "membership pattern"
+(dataset_sources is the second). Shared invariants — deterministic ids,
+soft-delete tombstones, idempotent relink, and read-side dedup via
+GROUP BY + argMax (never FINAL) — are documented in
+weave/trace_server/docs/membership_pattern.md.
 """
 
 import datetime
