@@ -7,6 +7,15 @@ from collections.abc import Callable
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, TypedDict
 
+from weave_server_sdk.models import (
+    CallSchema,
+    CallsFilter,
+    CallsQueryReq,
+    CallsQueryStatsReq,
+    Query,
+    SortBy,
+)
+
 from weave.trace import urls
 from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
@@ -17,16 +26,8 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
-from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
-from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_interface import (
-    CallSchema,
-    CallsFilter,
-    CallsQueryReq,
-    CallsQueryStatsReq,
-    TraceServerInterface,
-)
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id
@@ -345,7 +346,7 @@ def elide_display_name(name: str) -> str:
 
 
 def _make_calls_iterator(
-    server: TraceServerInterface,
+    server: TraceServerClientInterface,
     project_id: str,
     filter: CallsFilter,
     limit_override: int | None = None,
@@ -424,7 +425,10 @@ def _make_calls_iterator(
 
 
 def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
+    entity: str,
+    project: str,
+    server_call: CallSchema,
+    server: TraceServerClientInterface,
 ) -> WeaveObject:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")

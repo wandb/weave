@@ -15,6 +15,51 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
 from httpx import HTTPStatusError as HTTPError
+from weave_server_sdk.models import (
+    AnnotationQueueAddCallsRes,
+    AnnotationQueueCreateReq,
+    AnnotationQueueItemSchema,
+    AnnotationQueueItemsFilter,
+    AnnotationQueueSchema,
+    AnnotationQueuesQueryReq,
+    AnnotationQueuesStatsReq,
+    AnnotationQueueStatsSchema,
+    CallEndReq,
+    CallsDeleteReq,
+    CallsFilter,
+    CallsQueryReq,
+    CallStartReq,
+    CallUpdateReq,
+    CostCreateInput,
+    CostCreateReq,
+    CostCreateRes,
+    CostPurgeReq,
+    CostQueryOutput,
+    CostQueryReq,
+    EndedCallSchemaForInsert,
+    FeedbackCreateReq,
+    FileCreateRes,
+    ObjCreateReq,
+    ObjCreateRes,
+    ObjDeleteReq,
+    ObjectVersionFilter,
+    ObjQueryReq,
+    ObjReadReq,
+    ObjSchema,
+    ObjSchemaForInsert,
+    Query,
+    RefsReadBatchReq,
+    SortBy,
+    StartedCallSchemaForInsert,
+    TableAppendSpec,
+    TableAppendSpecPayload,
+    TableCreateFromDigestsReq,
+    TableCreateReq,
+    TableCreateRes,
+    TableSchemaForInsert,
+    TableUpdateReq,
+    TraceStatus,
+)
 
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
@@ -35,7 +80,13 @@ from weave.trace.call import (
     elide_display_name,
     make_client_call,
 )
-from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
+from weave.trace.casting import (
+    CallsFilterLike,
+    QueryLike,
+    SortByLike,
+    cast_to_query,
+    cast_to_sort_by,
+)
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
@@ -106,7 +157,6 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
-from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
 from weave.trace_server.ids import generate_id
@@ -116,61 +166,6 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
-from weave.trace_server.trace_server_interface import (
-    AliasesListReq,
-    AnnotationQueueAddCallsReq,
-    AnnotationQueueAddCallsRes,
-    AnnotationQueueCreateReq,
-    AnnotationQueueDeleteReq,
-    AnnotationQueueItemSchema,
-    AnnotationQueueItemsQueryReq,
-    AnnotationQueueReadReq,
-    AnnotationQueueSchema,
-    AnnotationQueuesQueryReq,
-    AnnotationQueuesStatsReq,
-    AnnotationQueueStatsSchema,
-    AnnotationQueueUpdateReq,
-    CallEndReq,
-    CallsDeleteReq,
-    CallsFilter,
-    CallsQueryReq,
-    CallStartReq,
-    CallUpdateReq,
-    CostCreateInput,
-    CostCreateReq,
-    CostCreateRes,
-    CostPurgeReq,
-    CostQueryOutput,
-    CostQueryReq,
-    EndedCallSchemaForInsertWithStartedAt,
-    FeedbackCreateReq,
-    FileCreateReq,
-    FileCreateRes,
-    ObjAddTagsReq,
-    ObjCreateReq,
-    ObjCreateRes,
-    ObjDeleteReq,
-    ObjectVersionFilter,
-    ObjQueryReq,
-    ObjReadReq,
-    ObjRemoveAliasesReq,
-    ObjRemoveTagsReq,
-    ObjSchema,
-    ObjSchemaForInsert,
-    ObjSetAliasesReq,
-    Query,
-    RefsReadBatchReq,
-    StartedCallSchemaForInsert,
-    TableAppendSpec,
-    TableAppendSpecPayload,
-    TableCreateFromDigestsReq,
-    TableCreateReq,
-    TableCreateRes,
-    TableSchemaForInsert,
-    TableUpdateReq,
-    TagsListReq,
-    TraceStatus,
-)
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -186,7 +181,26 @@ from weave.trace_server_bindings.link_asset_to_registry import (
     LinkAssetToRegistryTarget,
     link_asset_to_registry,
 )
-from weave.trace_server_bindings.models import StartBatchItem
+
+# Binding gap models: request envelopes for routes whose ids travel in the
+# URL path, the multipart file upload, and the batch envelope for the eager
+# start path — none expressible in weave-server-sdk 0.0.1. Remove when a
+# regenerated SDK covers them.
+from weave.trace_server_bindings.models import (  # noqa: TID251
+    AliasesListReq,
+    AnnotationQueueAddCallsReq,
+    AnnotationQueueDeleteReq,
+    AnnotationQueueItemsQueryReq,
+    AnnotationQueueReadReq,
+    AnnotationQueueUpdateReq,
+    FileCreateReq,
+    ObjAddTagsReq,
+    ObjRemoveAliasesReq,
+    ObjRemoveTagsReq,
+    ObjSetAliasesReq,
+    StartBatchItem,
+    TagsListReq,
+)
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.capture_info import get_capture_info
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
@@ -203,6 +217,11 @@ if TYPE_CHECKING:
 ALLOW_MIXED_PROJECT_REFS = False
 
 logger = logging.getLogger(__name__)
+
+# tsi.TraceStatus is a Literal type in weave-server-sdk; runtime constants for
+# building summary status counts.
+TRACE_STATUS_SUCCESS: TraceStatus = "success"
+TRACE_STATUS_ERROR: TraceStatus = "error"
 
 
 class NoInternalProjectIDError(Exception):
@@ -805,7 +824,9 @@ class WeaveClient:
                 AnnotationQueuesQueryReq(
                     project_id=self.project_id,
                     name=name,
-                    sort_by=sort_by,
+                    sort_by=[cast_to_sort_by(s) for s in sort_by]
+                    if sort_by is not None
+                    else None,
                     limit=limit,
                     offset=offset,
                 )
@@ -884,8 +905,14 @@ class WeaveClient:
             AnnotationQueueItemsQueryReq(
                 project_id=self.project_id,
                 queue_id=queue_id,
-                filter=filter,
-                sort_by=sort_by,
+                filter=AnnotationQueueItemsFilter.model_validate(
+                    filter.model_dump(by_alias=True)
+                )
+                if filter is not None
+                else None,
+                sort_by=[cast_to_sort_by(s) for s in sort_by]
+                if sort_by is not None
+                else None,
                 limit=limit,
                 offset=offset,
                 include_position=include_position,
@@ -1204,12 +1231,12 @@ class WeaveClient:
         # Create client-side rollup of status_counts_by_op
         status_counts_dict = computed_summary.setdefault(
             RESERVED_SUMMARY_STATUS_COUNTS_KEY,
-            {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
+            {TRACE_STATUS_SUCCESS: 0, TRACE_STATUS_ERROR: 0},
         )
         if exception:
-            status_counts_dict[TraceStatus.ERROR] += 1
+            status_counts_dict[TRACE_STATUS_ERROR] += 1
         else:
-            status_counts_dict[TraceStatus.SUCCESS] += 1
+            status_counts_dict[TRACE_STATUS_SUCCESS] += 1
 
         # Merge any user-provided summary values with computed values
         merged_summary = copy.deepcopy(call.summary or {})
@@ -1255,7 +1282,10 @@ class WeaveClient:
             )
 
             call_end_req = CallEndReq(
-                end=EndedCallSchemaForInsertWithStartedAt(
+                # started_at is an extra field: the published SDK's
+                # EndedCallSchemaForInsert does not declare it yet, and the
+                # models allow extras.
+                end=EndedCallSchemaForInsert(
                     project_id=project_id,
                     id=call.id,
                     started_at=call.started_at,
@@ -1711,7 +1741,7 @@ class WeaveClient:
 
             # Find all feedback objects with a specific feedback type with
             # mongo-style query.
-            from weave.trace_server.interface.query import Query
+            from weave_server_sdk.models import Query
 
             query = Query(
                 **{
@@ -1748,8 +1778,10 @@ class WeaveClient:
                     {"$literal": query},
                 ],
             }
-        elif isinstance(query, Query):
-            expr = query.expr_
+        elif query is not None:
+            # Accept Query, foreign model families (e.g. legacy tsi.Query),
+            # and raw dicts.
+            expr = cast_to_query(query).expr
 
         if reaction:
             expr = {
@@ -1892,8 +1924,10 @@ class WeaveClient:
                     {"$literal": query},
                 ],
             }
-        elif isinstance(query, Query):
-            expr = query.expr_
+        elif query is not None:
+            # Accept Query, foreign model families (e.g. legacy tsi.Query),
+            # and raw dicts.
+            expr = cast_to_query(query).expr
 
         if llm_ids:
             expr = {

@@ -8,7 +8,11 @@ from collections import OrderedDict
 from concurrent.futures import Future
 from typing import Generic, TypeVar
 
-from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateRes
+from weave_server_sdk.models import FileCreateRes
+
+# FileCreateReq is a binding gap model (multipart upload is not expressible
+# in weave-server-sdk 0.0.1); remove when a regenerated SDK covers it.
+from weave.trace_server_bindings.models import FileCreateReq  # noqa: TID251
 
 # Define generic type variables
 K = TypeVar("K")  # Key type

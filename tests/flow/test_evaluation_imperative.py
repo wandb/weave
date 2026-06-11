@@ -6,13 +6,13 @@ from collections.abc import Callable
 from typing import TypedDict
 
 import pytest
+from weave_server_sdk.models import ObjectVersionFilter
 
 import weave
 from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
-from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
 class ExampleRow(TypedDict):

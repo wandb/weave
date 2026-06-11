@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
+from tests.trace_server.conftest_lib.request_coercion import RequestCoercingTraceServer
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
@@ -460,7 +461,9 @@ def create_client(
     elif trace_server_flag == "http":
         server = RemoteHTTPTraceServer(trace_server_flag)
     else:
-        server = trace_server
+        # The client sends weave_server_sdk models; the in-process servers
+        # parse them with their own request types, like the HTTP seam would.
+        server = RequestCoercingTraceServer(trace_server)
 
     # Removing this as it lead to passing tests that were not passing in prod!
     # Keeping off for now until it is the default behavior.

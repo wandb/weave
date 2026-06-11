@@ -11,6 +11,8 @@ from typing import Any, Literal
 
 from pydantic import PrivateAttr
 from typing_extensions import Self
+from weave_server_sdk import models as tsi
+from weave_server_sdk.models import CallsFilter
 
 from weave.dataset.dataset import Dataset
 from weave.flow import util
@@ -41,8 +43,6 @@ from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
 from weave.trace_server import constants
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
 
 logger = logging.getLogger(__name__)

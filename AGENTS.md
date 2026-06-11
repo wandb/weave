@@ -72,6 +72,34 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
+  - `weave/trace_server_bindings` - Client-side remote server binding (backed by `weave_server_sdk`)
+
+### Client/Server Layering (lint-enforced)
+
+Client code must not use the trace server's interface/model modules. This is
+enforced incrementally by ruff `TID251` (`flake8-tidy-imports.banned-api` in
+`pyproject.toml`); the server package itself, `tests/`, `scripts/`, and
+`trace_server_mock/` are exempt.
+
+- API request/response types come from `weave_server_sdk.models` — generated
+  from the trace server's OpenAPI spec (the source of truth; the generator
+  lives in wandb/core `services/weave-trace/tools/codegen`). The package is
+  TEMPORARILY resolved from test PyPI via `[tool.uv.sources]`.
+- Surface the published SDK cannot express yet (endpoints excluded from the
+  OpenAPI spec, 0.0.1 codegen gaps) lives in
+  `weave/trace_server_bindings/models.py` as documented gap models — prefer
+  deleting these when a regenerated SDK covers them. Never fall back to the
+  server's tsi models in client code.
+- Client code outside the bindings package must not import
+  `weave.trace_server_bindings.models` either (also TID251-banned): API types
+  come from `weave_server_sdk` directly. Where a gap model is genuinely
+  unavoidable today, the import carries a spot-level
+  `# noqa: TID251` with a reason, so the exemption list burns down as the
+  SDK regenerates.
+- In tests, construct `weave_server_sdk.models` (or plain JSON dicts), not
+  tsi models. The in-process test servers parse incoming requests with their
+  own types via `tests/trace_server/conftest_lib/request_coercion.py` — the
+  in-process equivalent of the HTTP seam.
 
 ## Generated Files — Do Not Hand-Edit
 

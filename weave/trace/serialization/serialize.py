@@ -12,10 +12,11 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
-from weave.trace_server.trace_server_interface import (
-    FileCreateReq,
-    TraceServerInterface,
-)
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+
+# FileCreateReq is a binding gap model (multipart upload is not expressible
+# in weave-server-sdk 0.0.1); remove when a regenerated SDK covers it.
+from weave.trace_server_bindings.models import FileCreateReq  # noqa: TID251
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
@@ -400,7 +401,7 @@ def isinstance_namedtuple(obj: Any) -> bool:
     )
 
 
-def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
+def from_json(obj: Any, project_id: str, server: TraceServerClientInterface) -> Any:
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):

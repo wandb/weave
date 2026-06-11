@@ -1,10 +1,10 @@
 import pytest
 from pydantic import ValidationError
+from weave_server_sdk.models import Query
 
 from weave.flow.monitor import Monitor
 from weave.scorers import ValidJSONScorer
 from weave.trace.api import publish
-from weave.trace_server.interface.query import Query
 
 
 def test_init_pass():

@@ -32,7 +32,7 @@ from weave.durability.wal_sender import (
 from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace import weave_client
 from weave.trace.settings import UserSettings, override_settings
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import models as tsi
 
 
 def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
@@ -119,6 +119,7 @@ class TestWALClientWrites:
                     "val": {"model": "gpt-4", "temp": 0.7},
                     "builtin_object_class": None,
                     "expected_digest": None,
+                    "set_base_object_class": None,
                     "wb_user_id": None,
                 }
             },
@@ -398,6 +399,7 @@ class TestWALManagerLifecycle:
                     "val": {"hello": "world"},
                     "builtin_object_class": None,
                     "expected_digest": None,
+                    "set_base_object_class": None,
                     "wb_user_id": None,
                 }
             },
