@@ -25,7 +25,11 @@ def score_remote_call(request_body: dict[str, Any]) -> dict[str, Any]:
     message = inputs.get("message", "") if isinstance(inputs, dict) else ""
     if not isinstance(message, str):
         message = ""
+    message_length = len(message)
+    rating = min(message_length / 100, 1.0)
 
     return {
-        "message_length": len(message),
+        "value": round(rating, 2),
+        "reason": f"Message length is {message_length} characters.",
+        "confidence": 1.0,
     }
