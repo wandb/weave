@@ -66,3 +66,18 @@ None.
 
 ## Open Questions
 None.
+
+## Addendum (post-amend)
+The first cut kept d34b's one-liner `res: TraceServerClientInterface =
+RemoteHTTPTraceServer.from_env(...)` — mypy rejects it (attr-defined:
+set_auth) because an annotated assignment pins the declared protocol type
+and set_auth only exists on the concrete bindings, not on
+ServiceInterface/FullTraceServerInterface. Master only passed because its
+if/else assigned into a bare-annotated variable, which mypy narrows.
+Fix: drop the annotation (res = RemoteHTTPTraceServer.from_env(...)); the
+return statement performs the same structural check.
+VERIFIED: d34b793bdb itself fails the standalone mypy hook on this exact
+line (weave_init.py:338) — a latent failure masked at stack tips where PR
+B's client protocol gained set_auth. The restacked 01/02/03 all adopt the
+no-annotation form. Lesson: run hooks per-PR, not just at the tip; prek
+stashes UNSTAGED changes, so stage fixes before re-running hooks.
