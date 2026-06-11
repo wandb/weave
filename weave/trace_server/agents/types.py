@@ -908,6 +908,9 @@ class AgentChatMessage(BaseModel):
     type: AgentChatMessageType
     span_id: str | None = None
     agent_name: str | None = None
+    # Denormalized from the message's span so reaction feedback can carry them.
+    agent_version: str | None = None
+    status_code: str | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None
@@ -960,6 +963,10 @@ class AgentTraceChatRes(BaseModel):
 
     trace_id: str
     root_span_name: str | None = None
+    # Root span's agent metadata, so a turn-level reaction can carry them.
+    agent_name: str | None = None
+    agent_version: str | None = None
+    status_code: str | None = None
     provider: str | None = None
     total_duration_ms: int | None = Field(
         default=None,
