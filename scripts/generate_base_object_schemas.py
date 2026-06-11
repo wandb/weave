@@ -3,15 +3,14 @@ from pathlib import Path
 
 from pydantic import create_model
 
-from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+from weave.shared.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
 
 OUTPUT_DIR = (
     Path(__file__).parent.parent
     / "weave"
-    / "trace_server"
-    / "interface"
+    / "shared"
     / "builtin_object_classes"
     / "generated"
 )

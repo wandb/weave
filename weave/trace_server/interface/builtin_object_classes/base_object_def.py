@@ -1,10 +1,11 @@
-import pydantic
+"""Back-compat shim: implementation moved to weave.shared.builtin_object_classes.base_object_def."""
 
-RefStr = str
+from typing import Any
+
+from weave.shared.builtin_object_classes import base_object_def as _impl
+from weave.shared.builtin_object_classes.base_object_def import *  # noqa: F403
 
 
-# This is just an alternative to weave.Object for the server side.
-# I _think_ this will go away once we have the full weave system on the server
-class BaseObject(pydantic.BaseModel):
-    name: str | None = None
-    description: str | None = None
+def __getattr__(name: str) -> Any:
+    # Forward names that star-import misses (e.g. excluded by __all__).
+    return getattr(_impl, name)

@@ -1,14 +1,11 @@
-from pydantic import BaseModel
+"""Back-compat shim: implementation moved to weave.shared.builtin_object_classes.leaderboard."""
 
-from weave.trace_server.interface.builtin_object_classes import base_object_def
+from typing import Any
 
-
-class LeaderboardColumn(BaseModel):
-    evaluation_object_ref: base_object_def.RefStr
-    scorer_name: str
-    summary_metric_path: str
-    should_minimize: bool | None = None
+from weave.shared.builtin_object_classes import leaderboard as _impl
+from weave.shared.builtin_object_classes.leaderboard import *  # noqa: F403
 
 
-class Leaderboard(base_object_def.BaseObject):
-    columns: list[LeaderboardColumn]
+def __getattr__(name: str) -> Any:
+    # Forward names that star-import misses (e.g. excluded by __all__).
+    return getattr(_impl, name)

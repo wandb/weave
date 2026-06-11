@@ -1,34 +1,11 @@
-from pydantic import BaseModel, Field
+"""Back-compat shim: implementation moved to weave.shared.builtin_object_classes.test_only_example."""
 
-from weave.trace_server.interface.builtin_object_classes import base_object_def
+from typing import Any
 
-
-class TestOnlyNestedBaseModel(BaseModel):
-    a: int
-    aliased_property: int = Field(alias="aliased_property_alias")
+from weave.shared.builtin_object_classes import test_only_example as _impl
+from weave.shared.builtin_object_classes.test_only_example import *  # noqa: F403
 
 
-class TestOnlyNestedBaseObject(base_object_def.BaseObject):
-    b: int
-
-
-class TestOnlyInheritedBaseObject(TestOnlyNestedBaseObject):
-    """A builtin object that inherits from another builtin object for testing inheritance."""
-
-    c: int
-    additional_field: str = "default_value"
-
-
-class TestOnlyExample(base_object_def.BaseObject):
-    primitive: int
-    nested_base_model: TestOnlyNestedBaseModel
-    # Important: `RefStr` is just an alias for `str`. When defining `BaseObject`s, we
-    # should never have a property point to another `BaseObject`. This is because each
-    # base object is stored in the database and should be treated like a foreign key.
-    #
-    # It would be nice to have a way to ensure that no `BaseObject` has any `BaseObject`
-    # properties.
-    nested_base_object: base_object_def.RefStr
-
-
-__all__ = ["TestOnlyExample", "TestOnlyInheritedBaseObject", "TestOnlyNestedBaseObject"]
+def __getattr__(name: str) -> Any:
+    # Forward names that star-import misses (e.g. excluded by __all__).
+    return getattr(_impl, name)

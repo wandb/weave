@@ -193,7 +193,7 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+    "weave.shared.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_text_response(mock_get_client):
     """Test the predict function with mocked LLM API response for text format."""
@@ -245,7 +245,7 @@ def test_llm_structured_completion_model_predict_text_response(mock_get_client):
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+    "weave.shared.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_json_response(mock_get_client):
     """Test the predict function with mocked LLM API response for JSON format."""
@@ -284,7 +284,7 @@ def test_llm_structured_completion_model_predict_json_response(mock_get_client):
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+    "weave.shared.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_with_template(mock_get_client):
     """Test the predict function with message templates and template variables."""
@@ -343,7 +343,7 @@ def test_llm_structured_completion_model_predict_with_template(mock_get_client):
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+    "weave.shared.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_with_config_override(mock_get_client):
     """Test the predict function with config parameter overriding defaults."""
@@ -395,7 +395,7 @@ def test_llm_structured_completion_model_predict_with_config_override(mock_get_c
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+    "weave.shared.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_error_handling(mock_get_client):
     """Test the predict function error handling."""
@@ -656,7 +656,7 @@ def test_cast_to_message():
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+    "weave.shared.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_with_prompt(
     mock_get_client, client: WeaveClient
@@ -733,7 +733,7 @@ def test_llm_structured_completion_model_predict_with_prompt(
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+    "weave.shared.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_prompt_takes_precedence(
     mock_get_client, client: WeaveClient

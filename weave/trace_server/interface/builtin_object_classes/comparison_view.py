@@ -1,50 +1,11 @@
-"""ComparisonView builtin object class for saving comparison view configurations.
+"""Back-compat shim: implementation moved to weave.shared.builtin_object_classes.comparison_view."""
 
-This allows users to save and restore comparison configurations including
-evaluation call IDs and selected metrics.
-"""
+from typing import Any
 
-from pydantic import BaseModel
-
-from weave.trace_server.interface.builtin_object_classes import base_object_def
+from weave.shared.builtin_object_classes import comparison_view as _impl
+from weave.shared.builtin_object_classes.comparison_view import *  # noqa: F403
 
 
-class ComparisonViewDefinition(BaseModel):
-    """Definition of a comparison view's configuration.
-
-    Args:
-        evaluation_call_ids (list[str]): List of evaluation call IDs being compared.
-        selected_metrics (list[str] | None): List of metrics that are visible in plots.
-
-    Examples:
-        >>> definition = ComparisonViewDefinition(
-        ...     evaluation_call_ids=["call_1", "call_2"],
-        ...     selected_metrics=["accuracy", "f1_score"]
-        ... )
-    """
-
-    evaluation_call_ids: list[str]
-    selected_metrics: list[str] | None = None
-
-
-class ComparisonView(base_object_def.BaseObject):
-    """A saved comparison view configuration.
-
-    Args:
-        label (str): Human-readable name for the comparison view.
-        definition (ComparisonViewDefinition): The view's configuration.
-
-    Examples:
-        >>> view = ComparisonView(
-        ...     label="My Comparison",
-        ...     definition=ComparisonViewDefinition(
-        ...         evaluation_call_ids=["call_1", "call_2"]
-        ...     )
-        ... )
-    """
-
-    label: str
-    definition: ComparisonViewDefinition
-
-
-__all__ = ["ComparisonView", "ComparisonViewDefinition"]
+def __getattr__(name: str) -> Any:
+    # Forward names that star-import misses (e.g. excluded by __all__).
+    return getattr(_impl, name)
