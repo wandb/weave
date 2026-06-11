@@ -1,0 +1,48 @@
+## Conversation
+Part 8/8 (top) of the fake trace server stack. The user first asked for the
+fake server (built and verified as one commit — preserved with its full
+note at backup/fake-ts-monolith = 47ce0eb23f), then asked to break it into
+smaller review chunks as a PR stack. Parts 1-7 rebuild the module
+progressively; this part wires it into the test suite.
+
+## Actions
+- Restored the monolith's test/docs changes onto the completed module stack
+  (git checkout backup/fake-ts-monolith -- <paths>).
+- Verified `git diff backup/fake-ts-monolith HEAD` is exactly the 8-line
+  dead-constant removal (EXPIRE_AT_NEVER_TEXT, _UNRESOLVED) — i.e. the
+  stack reproduces the verified tree.
+- Stack construction itself: /tmp/build_stack.py split the canonical file
+  into named segments (decorators/banners attach forward), tagged each with
+  a stage, emitted cumulative stage files, trimmed imports per stage with
+  ruff F401 --fix, formatted, and asserted stage7 == canonical. Every stage
+  was lint-clean, importable, and constructible.
+- Re-ran verification on the stack top: smoke suites + full trace_server
+  shard with --trace-server=fake.
+
+## Errors & Mistakes
+None during the split. Historical build mistakes live in the monolith note
+and the chunk notes where their fixes reside (affinity in part 5, count(*)
+in part 4, hoisted filter validation in part 5).
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- KNOWN pre-existing local failures (fail at HEAD on sqlite too, verified
+  via git stash): tests/flow test_evaluation_invalid_model_name_* and
+  test_from_obj_unwraps_nested_weave_object (WeaveInitError standalone),
+  tests/trace/test_weave_client_threaded.py::test_flask_server (sandbox
+  port binding).
+- The fake is selected only via --trace-server=fake; no CI shard uses it
+  yet. Adding a nox shard is the natural follow-up.
+- client_is_sqlite treating the fake as sqlite is LOAD-BEARING for ~156
+  test gates; if you ever need to distinguish them, add a new predicate
+  instead of changing that one.
+
+## Codebase Discoveries
+- gt stacking in Conductor worktrees: master is checked out in a sibling
+  worktree, so branches were created with `git checkout -b <name> master`
+  (new branch at master's commit — allowed) and adopted with `gt track`.
+
+## Open Questions
+- Whether to enable a CI shard for the fake backend.
