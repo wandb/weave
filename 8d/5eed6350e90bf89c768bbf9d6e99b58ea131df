@@ -43,3 +43,17 @@ None (this PR is a re-cut of already-validated content).
 ## Open Questions
 - PR B retypes this same surface to weave_server_sdk models with gap models
   for everything the published SDK cannot express.
+
+## Addendum (stack split, 2026-06-11)
+This commit was re-cut when the user asked to split the original #7177 into
+(1) stainless removal and (2) the rebuild. The stainless-removal hunks now
+live in the parent commit (chore(weave): remove experimental
+StainlessRemoteHTTPTraceServer); this commit's tree is byte-identical to the
+pre-split d34b793bdb EXCEPT three deliberate fixes: the dead
+remote_only/stainless_only pytest markers are gone (removed by the parent),
+weave_client.py's _get_call_processor docstring no longer names the deleted
+class, and weave_init's res one-liner dropped its variable annotation —
+the annotated form pinned the protocol type and failed the standalone mypy
+hook (set_auth is only on the concrete binding; latent failure verified on
+d34b793bdb itself, masked at stack tips where the client protocol has
+set_auth).
