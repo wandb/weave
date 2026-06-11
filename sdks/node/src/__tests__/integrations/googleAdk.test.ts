@@ -43,6 +43,7 @@ import {
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
 import {WeaveAdkPlugin} from '../../integrations/googleAdk';
+import {commonPatchGoogleGenAI} from '../../integrations/googleGenAI';
 import {initWithCustomTraceServer} from '../clientMock';
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 
@@ -758,6 +759,47 @@ describe('Google ADK integration', () => {
         String(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT])
       );
       expect(parsed).toEqual({count: '42', label: 'ok', self: '[Circular]'});
+    });
+  });
+
+  describe('google genai client exclusion', () => {
+    function fakeGenAIExports() {
+      class FakeModels {
+        async generateContent(..._args: any[]) {
+          return {text: 'ok'};
+        }
+        async generateContentStream(..._args: any[]) {
+          return (async function* () {})();
+        }
+      }
+      class FakeGoogleGenAI {
+        models: any;
+        constructor(public readonly options: any) {
+          this.models = new FakeModels();
+        }
+      }
+      return {GoogleGenAI: FakeGoogleGenAI};
+    }
+
+    test('ADK-internal clients (x-goog-api-client: google-adk/…) are not wrapped', () => {
+      const exports = commonPatchGoogleGenAI(fakeGenAIExports());
+      const adkClient = new exports.GoogleGenAI({
+        apiKey: 'k',
+        httpOptions: {
+          headers: {
+            'x-goog-api-client': 'google-adk/1.2.0 gl-typescript/v24.0.0',
+            'user-agent': 'google-adk/1.2.0 gl-typescript/v24.0.0',
+          },
+        },
+      });
+      // Unwrapped: plain models object, no weave op replacement.
+      expect(adkClient.models.generateContent.name).toBe('generateContent');
+
+      const userClient = new exports.GoogleGenAI({apiKey: 'k'});
+      // Wrapped: generateContent is replaced by a weave op.
+      expect(userClient.models.generateContent.name).not.toBe(
+        'generateContent'
+      );
     });
   });
 });
