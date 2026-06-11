@@ -1,3 +1,55 @@
+## Review-feedback addendum (2026-06-10, round 2 of feedback)
+Two Conductor review comments addressed in this commit:
+1. tests/conftest.py twin-error translation "is a smell ... the server should
+   emit a specific payload that the client can interpret entirely from JSON
+   and reconstruct client side":
+   - interface/errors.py twins now hold ONLY ErrorCode + exception classes
+     (stdlib imports only). The ErrorRegistry/formatters/ErrorWithStatus/
+     handle_server_exception/get_registered_error_classes/
+     handle_clickhouse_query_error machinery went BACK to
+     weave/trace_server/errors.py (master's path -- core's imports of those
+     helpers need no repoint at cutover). Import repoints:
+     clickhouse_trace_server_batched.py, tests/trace_server/test_errors.py,
+     tests/trace_server/test_clickhouse_batching.py split class imports
+     (interface) from helper imports (trace_server.errors).
+   - Payload contract: ErrorRegistry.handle_exception setdefaults
+     "error_type" (class name) for CONTRACT_ERROR_TYPES = (Error,
+     CHValidationError, InvalidIdFormat, RunNotFound). New structured
+     formatters: ObjectNameTypeCollision (object_id/kind/
+     new_base_object_class/existing_base_object_classes -- required because
+     tests/trace/test_base_object_classes.py asserts those attrs through the
+     client fixture) and CallsCompleteModeRequired (project_id/
+     min_sdk_version). tests/trace_server/test_errors.py's pinned collision
+     payload TIGHTENED to include the new fields.
+   - conftest _translating_server_errors: catches CONTRACT_ERROR_TYPES,
+     serializes via handle_server_exception, json.dumps->json.loads for
+     wire purity, rebuilds the CLIENT-copy exception from the payload alone
+     (_client_error_from_wire_payload: special-cases the 4 structured
+     classes, generic cls(reason) otherwise, loud AssertionError if a
+     contract error lacks error_type i.e. was never registered).
+     _SERVER_TO_CLIENT_MODULE_REWRITES + _client_twin_error_module +
+     __dict__ transplant DELETED. Non-contract exceptions (ValueError,
+     pydantic ValidationError, test bugs) propagate raw, unchanged.
+2. scripts/generate_base_object_schemas.py "intended for the trace_server
+   ... client should not need generated schemas at all":
+   - Client copy weave/interface/builtin_object_classes/generated/*.json
+     DELETED (nothing client-side reads it; consumer is frontend codegen --
+     yarn generate-schemas via root Makefile, see
+     dev_docs/BuiltinObjectClasses.md).
+   - Script moved scripts/ -> weave/trace_server/scripts/ (joins
+     costs/model_providers in-tree tooling convention in weave/Makefile),
+     content reverted to master's single-emit + OUTPUT_DIR now relative to
+     the trace_server tree (parents[1]) so it moves to core verbatim.
+     weave/Makefile + dev_docs updated; weave/trace_server/scripts/ gets
+     __init__.py (grimp rule).
+Verified at this commit: identity gate 25 twins (generated JSON pair gone),
+test_errors 11, clickhouse_batching slice, test_base_object_classes 30 incl.
+collision-attr assertions via fixture, test_weave_client 87,
+client_side_digests+digest_validation 40, ruff+format clean, generator
+regen byte-stable, twins byte-identical.
+Gotcha: pytest exact-payload pin in test_object_name_type_collision_maps_to_400
+needed the new fields added (tighten, not weaken).
+
 ## Restructure addendum (2026-06-10, feedback round)
 This commit MERGES the former PR 2 (server contract consolidation,
 1525137df0) and PR 3 (client mirror, dab8b857de) of the round-3 stack, per
