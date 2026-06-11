@@ -83,3 +83,11 @@ the weave.model RUNNABLE here (it instantiates the model and the evaluate path
 calls prepare_completion_request/predict -- schema instances have neither).
 Found by the full test_weave_client battery at the stack tip; the targeted
 PR 5 suites missed it because this test lives in test_weave_client.py.
+
+## Addendum (round 4 restack)
+Adapted to the staging PR (client builtin-object surface removed). Key deviations from this note's original Actions:
+- The mirror does NOT regain the full builtin_object_classes set (round-3 design said 'registry joins the mirror; 27 files'). Round-4 instruction: builtin classes return to the client in a FOLLOW-UP PR as generated models, not in this stack. Only the slim llm schema joins the mirror (byte-mirror verified). The mirror registry that the rebase carried in was DELETED -- it would import schema modules that no longer exist client-side, and nothing client-side may use it.
+- Consequence: C1 ignore does NOT reach zero here; it holds exactly ONE documented entry (weave.trace.object_class_util -> contract registry, digest parity). serialize.py does NOT use a registry fallback: it materializes exactly one builtin by name -- the runnable from weave.model -- and everything else falls through to ObjectRecord (staging's narrow-guard structure kept, runnable import swapped in).
+- weave/trace/base_objects.py + tests/trace/test_base_object_classes.py: DU conflicts (deleted by staging, edited by this commit's original form) -> stay deleted; the registration/flip edits are moot.
+- Indentation bug during resolution: the serialize.py heredoc resolution inserted 'elif (' at column 0 -> SyntaxError at l.430, caught by lint-imports failing to parse; fixed by hand.
+- Verified at this level: lint-imports 3 kept / 0 broken; 97 contract+conformance tests (llm golden digest canary green); llm 20 + judge + eval_ref + data_serialization (52 passed, 1 skipped); workers+executor 23 passed; ruff clean on changed files. weave/trace_server/workers has no tracked files (only stale __pycache__ on disk).
