@@ -1,0 +1,39 @@
+## Conversation
+Follow-up to the monolithic fake-trace-server commit (see the note on
+backup/fake-ts-monolith = 47ce0eb23f for the full build history, errors, and
+dead ends). User asked to break the implementation into smaller,
+review-friendly chunks as a stack of PRs. This is part 1/8.
+
+## Actions
+Generated mechanically from the verified monolith by /tmp/build_stack.py:
+the canonical file was parsed into named def/method segments (decorators and
+banner comments attach to the following definition), each tagged with a
+stage; stage N's file is the concatenation of all segments with stage <= N
+in original file order, with imports trimmed per stage via ruff F401 --fix.
+Stage 7 was asserted byte-identical to the verified file. Each stage was
+ruff-checked, imported, and constructed before committing.
+
+## Errors & Mistakes
+None in this chunk. Two dead module constants discovered during the split
+(EXPIRE_AT_NEVER_TEXT, _UNRESOLVED — leftovers from the pre-compile
+evaluator) were deleted from the canonical file before splitting; that
+8-line deletion is the ONLY diff between this stack's top and the verified
+monolith.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- The class subclasses a Protocol, so partial method sets import fine;
+  nothing constructs the fake until the final wiring PR.
+- _init_storage documents the keying decisions (calls keyed by id globally,
+  table rows first-writer-wins by digest) — these mirror SQLite PK/UNIQUE
+  semantics on purpose; do not project-scope them.
+- The parity stubs raise the same messages as SQLite so backend-gated tests
+  skip identically; keep messages in sync if SQLite's change.
+
+## Codebase Discoveries
+See the monolith note.
+
+## Open Questions
+None for this chunk.
