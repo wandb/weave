@@ -1,4 +1,5 @@
 import {
+  type AttributeValue,
   type Context,
   ROOT_CONTEXT,
   type Span,
@@ -123,6 +124,16 @@ export class Turn extends SpanBase {
       parentContext: this.context,
       conversationId: this.conversationId,
     });
+  }
+
+  /**
+   * @deprecated Use {@link setAttributes} instead, which mirrors the Python
+   * SDK's `set_attributes` and OTel's `Span.setAttributes`. Retained as a thin
+   * alias so existing single-attribute callers keep working. Only `Turn`
+   * carries this — the other emitters never shipped a singular form.
+   */
+  setAttribute(key: string, value: AttributeValue): this {
+    return this.setAttributes({[key]: value});
   }
 
   /** Close the Turn span. Idempotent. Pass `error` to mark it as failed. */

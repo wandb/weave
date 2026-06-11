@@ -12,9 +12,9 @@ import {
 
 /**
  * Parametrized coverage for the shared `SpanBase` mutators
- * (`setAttribute` / `setAttributes` / `addEvent`) across all four span
- * wrappers. Mirrors the Python SDK's `test_span_attributes.py`, which runs the
- * same assertions over `(Tool, LLM, SubAgent, Turn)`.
+ * (`setAttributes` / `addEvent`) across all four span wrappers. Mirrors the
+ * Python SDK's `test_span_attributes.py`, which runs the same assertions over
+ * `(Tool, LLM, SubAgent, Turn)`.
  */
 interface SpanCase {
   label: string;
@@ -97,30 +97,6 @@ const CASES: SpanCase[] = [
 describe.each(CASES)('SpanBase mutators on $label', ({start}) => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
-
-  it('setAttribute writes a single attribute to the span', () => {
-    const {target, endAll, locate} = start();
-    target.setAttribute('weave.cost.usd', 0.42);
-    endAll();
-    expect(
-      locate(getExporter().getFinishedSpans()).attributes['weave.cost.usd']
-    ).toBe(0.42);
-  });
-
-  it('setAttribute returns this for chaining', () => {
-    const {target, endAll} = start();
-    expect(target.setAttribute('k', 'v')).toBe(target);
-    endAll();
-  });
-
-  it('setAttribute is a no-op after end()', () => {
-    const {target, endAll, locate} = start();
-    endAll();
-    target.setAttribute('after.end', 'x');
-    expect(
-      locate(getExporter().getFinishedSpans()).attributes['after.end']
-    ).toBeUndefined();
-  });
 
   it('setAttributes writes multiple attributes at once', () => {
     const {target, endAll, locate} = start();

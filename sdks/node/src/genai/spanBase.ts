@@ -1,9 +1,4 @@
-import type {
-  Attributes,
-  AttributeValue,
-  Span,
-  TimeInput,
-} from '@opentelemetry/api';
+import type {Attributes, Span, TimeInput} from '@opentelemetry/api';
 
 /**
  * Shared base for the four GenAI span wrappers (`Tool`, `LLM`, `SubAgent`,
@@ -12,7 +7,7 @@ import type {
  * surface.
  *
  * Mirrors the Python SDK's `_SpanBase` mixin (wandb/weave#7131): rather than
- * re-declaring `setAttribute`/`addEvent` on each class, the implementation
+ * re-declaring `setAttributes`/`addEvent` on each class, the implementation
  * lives here once and covers all four uniformly.
  *
  * All mutators are no-ops after `end()` — the span is closed, so further
@@ -22,20 +17,6 @@ export abstract class SpanBase {
   protected _ended = false;
 
   protected constructor(protected readonly span: Span) {}
-
-  /**
-   * Set a single attribute on the span. Useful for stamping metadata that
-   * becomes known mid-span (e.g. `weave.display_name`, cumulative cost, token
-   * usage). No-op after `end()`. Mirrors OTel `Span.setAttribute`.
-   *
-   * @example
-   * span.setAttribute('weave.cost.usd', 0.42);
-   */
-  setAttribute(key: string, value: AttributeValue): this {
-    if (this._ended) return this;
-    this.span.setAttribute(key, value);
-    return this;
-  }
 
   /**
    * Set multiple attributes on the span at once. No-op after `end()`. Mirrors
