@@ -1,0 +1,84 @@
+## Conversation
+PR5 of the SDK-uptake stack (plan: .context/sdk-uptake-plan.md): the seam
+retype + client migration, done as ONE PR per Codex consult (no
+lenient-coercion intermediate where the protocol says SDK but callers send
+tsi — pydantic rejects foreign model families outright, verified).
+
+## Actions
+Bindings: client_interface rewritten (43 methods, SDK-typed, client-owned);
+models.py gap models; stainless server SDK-native (v2 wrappers dropped —
+_sdk.v2_* is the surface); delegating mixin derives names from the new
+protocol; caching middleware retyped + explicit-leading-field cache keys;
+http_utils/call_batch_processor/link_asset retyped.
+Client: ~20 files tsi->weave_server_sdk.models; TraceServerInterface ->
+TraceServerClientInterface annotations; saved_view operand translation
+rewritten for SDK field names (eq/gt/gte/contains/convert/literal/get_field —
+no trailing underscore except python keywords not_/and_/or_) + dict-leaf
+parsing via TypeAdapter; get_feedback/casting coerce foreign families.
+Tests: SdkBridgeTraceServer at the fixture seam; chain walker hardened;
+bindings tests moved to SDK models; a handful of cross-family equality tests
+switched families; WAL golden dicts gained set_base_object_class; Monitor
+serialization golden updated (leaf operands lose _type metadata).
+
+## Errors & Mistakes (the valuable part)
+1. pydantic CANNOT validate a foreign BaseModel instance (no from_attributes):
+   tsi.X into sdk.X raises. This killed the lenient-coercion idea and forced
+   the explicit tests bridge. Verified empirically before building.
+2. Subclassing an SDK model to add started_at LOSES the field in NESTED
+   serialization (parent-typed field serializes by parent schema). extra=allow
+   extras DO survive nested dumps — that's why started_at rides as an extra
+   field, not a subclass.
+3. tsi SummaryInsertMap is a TypedDict(total=False): usage key present-but-None
+   is INVALID. SDK dumps include None fields by default -> bridge must dump
+   with exclude_none=True (matches the SDK's own wire encoding).
+4. SDK models declare fields in sorted order; the caching middleware's
+   prefix-invalidation matched the serialized request's LEADING fields ->
+   silently stale obj_read cache after alias reassignment. Fixed with explicit
+   ordered cache keys (_obj_read_cache_key/_obj_create_cache_key). This bug
+   produced NO error — only wrong data. Beware serialization-order coupling.
+5. SDK Query field is `expr` (tsi: `expr_`); operand lists are list[Any] so
+   leaf operands stay raw dicts after validation. saved_view needed _parse_operand
+   on access. ALSO means serialized Monitor queries lose _type metadata —
+   golden updated; old stored objects still deserialize fine.
+6. get_feedback's isinstance(query, Query) silently no-op'd the filter when
+   tests passed tsi.Query (returned ALL feedback — silent wrong-data again).
+   Public boundaries now coerce any BaseModel via dump/validate.
+7. Strictness regression: SDK models allow extras, so bad filter keys stopped
+   raising. casting.py rejects unknown dict keys explicitly (test intent
+   preserved per tests-only-tighten).
+8. Test chain walker: THREE wrappers forward attributes (ServerRecorder
+   __getattribute__, DelegatingTraceServerMixin, TestOnlyFlushingTraceServer
+   __getattr__) — getattr probing tunnels through layers and SKIPS them. Probe
+   vars(current) instead, and know the attr per wrapper (_server, _tsi_server,
+   server, _next_trace_server, _internal_trace_server).
+
+## Dead Ends
+- Flattening tag/alias/queue methods to SDK path+body signatures: ~190 test
+  call sites use req-style. Kept req envelopes composed FROM SDK bodies.
+- op_read/dataset_read caching overrides in middleware: dropped (not client
+  surface; misses returned tsi while hits returned SDK — incoherent).
+
+## Hints for Future Agents
+- The tests bridge is tests/trace_server/sdk_bridge.py; wired in
+  tests/conftest.create_client. Non-protocol methods pass through UNCONVERTED:
+  tests calling them must keep using tsi reqs (or extend the bridge, as done
+  for calls_query when stream/non-stream equality mattered).
+- network_proxy tests construct SDK models for binding calls (binding rejects
+  tsi); the rest of test_weave_client stays tsi via the bridge.
+- Pre-existing/order-dependent failures NOT from this stack: test_flask_server,
+  eval_imperative invalid_model_name*, test_from_obj_unwraps_nested_weave_object,
+  tests/session/test_session_settings under -p no:randomly full runs.
+- import weave now pays for weave_server_sdk.models at import time via
+  weave_client -> casting; if cold-start regresses, lazy-load candidates are
+  casting.py and feedback.py.
+
+## Codebase Discoveries
+- SDK FeedbackCreateReq DOES declare id (client-assignable for batching).
+- WeaveClient's server is wrapped by TestOnlyFlushingTraceServer in tests —
+  client.server in tests is NOT the recorder directly.
+
+## Open Questions
+- The Feedback gap row model lives in bindings models; consider asking the
+  SDK to expose a Feedback row schema.
+- calls_query_stream buffers per-line over the raw stream (unchanged), but
+  table_query_stream still fakes streaming via table_query.
