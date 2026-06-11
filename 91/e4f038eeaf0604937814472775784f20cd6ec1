@@ -47,3 +47,27 @@ None in this slice (see old-stack notes for the original design dead ends).
 ## Open Questions
 - Whether to close old draft PRs #7135-#7138 once this stack is submitted —
   user decision.
+
+---
+
+# ADDENDUM: transport reworked to the agents OTel endpoint (2026-06-10)
+
+User directive: ADK runs must log to the AGENTS OTel endpoint
+(/agents/otel/v1/traces) so they appear in the Weave Agents view — the
+original calls transport (saveCallStart/End) only fed the Traces page. The
+stack was rebuilt in place (same branch names/positions) with the plugin
+emitting GenAI-semconv OTel spans through getWeaveTracer (shared provider,
+src/genai/provider.ts) — same pipeline as piCodingAgent and the
+openai-agents WeaveOtelTracingProcessor, same conventions as the Python
+google_adk integration (weave/integrations/google_adk: extractors mirrored
+incl. ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS gate, GOOGLE_GENAI_USE_VERTEXAI
+provider naming, parts-model messages, tool definitions). Calls-era
+versions of these slices: 91e4f038ee^..4fde323b1c history (notes on
+c059413134 / ac1e328342 / d1cab0e03e / 4fde323b1c).
+
+Key mechanics: spans parented via otelTrace.setSpan contexts; plugin
+beforeExit hook registers BEFORE the provider's (listeners fire in
+registration order — dangling spans must end before the provider flush);
+tests inject InMemorySpanExporter via settings.genai.spanProcessor +
+clearWeaveTracerProvider between tests; semconv.ts gained
+gen_ai.agent.description/id + gen_ai.tool.definitions.
