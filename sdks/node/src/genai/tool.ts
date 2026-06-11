@@ -1,4 +1,9 @@
-import {type Span, SpanKind, SpanStatusCode} from '@opentelemetry/api';
+import {
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+  type TimeInput,
+} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
@@ -17,6 +22,9 @@ export interface ToolInit {
   name: string;
   args?: string;
   toolCallId?: string;
+  /** Backdate the span's start time. Used when reconstructing tool spans from
+   *  post-hoc data (e.g. transcript replay). */
+  startTime?: TimeInput;
 }
 
 /**
@@ -71,17 +79,21 @@ export class Tool extends SpanBase {
     }
     const span = tracer.startSpan(
       'execute_tool',
-      {kind: SpanKind.INTERNAL, attributes},
+      {
+        kind: SpanKind.INTERNAL,
+        attributes,
+        ...(opts.startTime !== undefined ? {startTime: opts.startTime} : {}),
+      },
       opts.parentContext
     );
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
   }
 
   /**
-   * Flush `result` to the span and close it. Idempotent. Pass `error` to
-   * mark the span as failed.
+   * Flush `result` to the span and close it. Idempotent. Pass `error` to mark
+   * the span as failed; pass `endTime` to backdate the close.
    */
-  end(opts?: {error?: Error}): void {
+  end(opts?: {error?: Error; endTime?: TimeInput}): void {
     if (this._ended) {
       return;
     }
@@ -96,6 +108,6 @@ export class Tool extends SpanBase {
         message: opts.error.message,
       });
     }
-    this.span.end();
+    this.span.end(opts?.endTime);
   }
 }

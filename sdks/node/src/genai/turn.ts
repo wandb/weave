@@ -4,6 +4,7 @@ import {
   type Span,
   SpanKind,
   SpanStatusCode,
+  type TimeInput,
   trace,
 } from '@opentelemetry/api';
 
@@ -24,6 +25,9 @@ import {Tool, type ToolInit} from './tool';
 export interface TurnInit {
   agentName?: string;
   model?: string;
+  /** Backdate the span's start time. Used when reconstructing agent spans from
+   *  post-hoc data (e.g. transcript replay). */
+  startTime?: TimeInput;
 }
 
 /**
@@ -84,7 +88,11 @@ export class Turn extends SpanBase {
     // library's active context.
     const span = tracer.startSpan(
       'invoke_agent',
-      {kind: SpanKind.CLIENT, attributes},
+      {
+        kind: SpanKind.CLIENT,
+        attributes,
+        ...(opts.startTime !== undefined ? {startTime: opts.startTime} : {}),
+      },
       ROOT_CONTEXT
     );
     const turn = new Turn(
@@ -125,8 +133,11 @@ export class Turn extends SpanBase {
     });
   }
 
-  /** Close the Turn span. Idempotent. Pass `error` to mark it as failed. */
-  end(opts?: {error?: Error}): void {
+  /**
+   * Close the Turn span. Idempotent. Pass `error` to mark it as failed; pass
+   * `endTime` to backdate the close.
+   */
+  end(opts?: {error?: Error; endTime?: TimeInput}): void {
     if (this._ended) {
       return;
     }
@@ -138,7 +149,7 @@ export class Turn extends SpanBase {
         message: opts.error.message,
       });
     }
-    this.span.end();
+    this.span.end(opts?.endTime);
     const state = _getGenaiState();
     if (state.turn === this) {
       state.turn = null;

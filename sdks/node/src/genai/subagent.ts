@@ -1,4 +1,9 @@
-import {type Span, SpanKind, SpanStatusCode} from '@opentelemetry/api';
+import {
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+  type TimeInput,
+} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
@@ -14,6 +19,9 @@ import {
 export interface SubAgentInit {
   name: string;
   model?: string;
+  /** Backdate the span's start time. Used when reconstructing agent spans from
+   *  post-hoc data (e.g. transcript replay). */
+  startTime?: TimeInput;
 }
 
 /**
@@ -56,14 +64,21 @@ export class SubAgent extends SpanBase {
     }
     const span = tracer.startSpan(
       'invoke_agent',
-      {kind: SpanKind.CLIENT, attributes},
+      {
+        kind: SpanKind.CLIENT,
+        attributes,
+        ...(opts.startTime !== undefined ? {startTime: opts.startTime} : {}),
+      },
       opts.parentContext
     );
     return new SubAgent(span, opts.name, opts.model ?? '');
   }
 
-  /** Close the SubAgent span. Idempotent. Pass `error` to mark it as failed. */
-  end(opts?: {error?: Error}): void {
+  /**
+   * Close the SubAgent span. Idempotent. Pass `error` to mark it as failed;
+   * pass `endTime` to backdate the close.
+   */
+  end(opts?: {error?: Error; endTime?: TimeInput}): void {
     if (this._ended) {
       return;
     }
@@ -75,6 +90,6 @@ export class SubAgent extends SpanBase {
         message: opts.error.message,
       });
     }
-    this.span.end();
+    this.span.end(opts?.endTime);
   }
 }
