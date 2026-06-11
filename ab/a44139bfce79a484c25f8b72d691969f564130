@@ -1,0 +1,37 @@
+## Conversation
+PR C, added on review feedback (Conductor comments on PR B): the SDK models
+alias had to be consistent (`as tsi`) for the migration step — done by
+amending PR B — and a final PR should then import the models directly. This
+is that final PR.
+
+## Actions
+- Script-converted every `from weave_server_sdk import models as tsi` file
+  (18 files) to direct named imports: collected `tsi.X` references per file,
+  verified each name exists in weave_server_sdk.models, checked for module-
+  level name collisions, generated the import block, stripped the prefix.
+- The binding imports 139 model names; explicit by design.
+- ruff --fix cleaned import ordering; full lint/format/type hooks pass.
+
+## Errors & Mistakes
+None; the converter asserted SDK-name existence and collision-freedom before
+touching each file.
+
+## Dead Ends
+- Considered `from weave_server_sdk import models` + `models.X` for the
+  heavy files instead of long named-import blocks; named imports won for
+  consistency (weave_client.py already set that precedent). The one
+  module-qualified exception (test_weave_client.py) exists to disambiguate
+  from the server-tsi alias used by the coercion-seam tests in the same file.
+
+## Hints for Future Agents
+- The validation suite for this stack: bindings 58/58; trace+flow+compat+
+  utils+session+shared = 2137 passed; the 10 standing failures are the known
+  pre-existing set (flask server, eval_imperative invalid_model_name family,
+  from_obj_unwraps, session-settings trio under -p no:randomly).
+- `uv sync --group dev` prunes test deps; re-sync --group test before pytest.
+
+## Codebase Discoveries
+None.
+
+## Open Questions
+None.
