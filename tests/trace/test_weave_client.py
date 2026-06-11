@@ -27,6 +27,7 @@ from tests.trace.util import (
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     UserInjectingExternalTraceServer,
 )
+from tests.trace_server.helpers import force_optimize
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
@@ -1868,7 +1869,7 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
     # ClickHouse merges data asynchronously, so queries may see unmerged data.
     # OPTIMIZE TABLE ... FINAL forces an immediate merge to ensure consistency for tests.
     if clickhouse_client:
-        clickhouse_client.command("OPTIMIZE TABLE calls_merged_stats FINAL")
+        force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Get calls via get_calls with storage size parameters
     client_calls = list(

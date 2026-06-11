@@ -210,6 +210,7 @@ jobs:
             --env CLICKHOUSE_PASSWORD= \
             --env CLICKHOUSE_DB=default \
             --publish 8123:8123 \
+            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro \
             "$image"
           for _i in {1..30}; do
             if wget -q -O- 'http://localhost:8123/ping' >/dev/null; then
@@ -303,6 +304,7 @@ jobs:
             -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
             -p 8130:8123 \
             -v ${{ github.workspace }}/tests/trace_server/conftest_lib/clickhouse_keeper_config.xml:/etc/clickhouse-server/config.d/keeper.xml \
+            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro \
             --name weave-test-keeper \
             --ulimit nofile=262144:262144 \
             "$image"

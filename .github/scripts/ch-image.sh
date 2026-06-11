@@ -5,7 +5,7 @@
 set -uo pipefail
 
 # Single source of truth for the ClickHouse image version used across CI.
-tag="${1:-25.11.2.24}"
+tag="${1:-26.4}"
 ghcr="ghcr.io/wandb/clickhouse-server:${tag}"
 hub="clickhouse/clickhouse-server:${tag}"
 
