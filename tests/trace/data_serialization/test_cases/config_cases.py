@@ -151,6 +151,79 @@ config_cases = [
                 "aggregation_method": "all_messages",
                 "timeout_seconds": 60.1,
             },
+            "status": None,
+            "last_error": None,
+            "last_error_at": None,
+            "_class_name": "Monitor",
+            "_bases": ["Object", "BaseModel"],
+        },
+        exp_objects=[],
+        exp_files=[],
+        # Sad ... equality is really a pain to assert here (and is broken)
+        # TODO: Write a good equality check and make it work
+        equality_check=lambda a, b: True,
+    ),
+    SerializationTestCase(
+        id="Monitor (legacy v3, before health fields)",
+        runtime_object_factory=lambda: Monitor(
+            name="test_monitor",
+            sampling_rate=0.5,
+            scorers=[],
+            op_names=["weave.genai.turn_ended"],
+            query={
+                "$expr": {
+                    "$gt": [
+                        {"$getField": "started_at"},
+                        {"$literal": 1742540400},
+                    ]
+                }
+            },
+            scorer_debounce_config={
+                "aggregation_field": "trace_id",
+                "aggregation_method": "all_messages",
+                "timeout_seconds": 60.1,
+            },
+        ),
+        inline_call_param=False,
+        is_legacy=True,
+        exp_json={
+            "_type": "Monitor",
+            "name": "test_monitor",
+            "description": None,
+            "sampling_rate": 0.5,
+            "scorers": [],
+            "op_names": ["weave.genai.turn_ended"],
+            "query": {
+                "_type": "Query",
+                "$expr": {
+                    "_type": "GtOperation",
+                    "$gt": [
+                        {
+                            "_type": "GetFieldOperator",
+                            "$getField": "started_at",
+                            "_class_name": "GetFieldOperator",
+                            "_bases": ["BaseModel"],
+                        },
+                        {
+                            "_type": "LiteralOperation",
+                            "$literal": 1742540400,
+                            "_class_name": "LiteralOperation",
+                            "_bases": ["BaseModel"],
+                        },
+                    ],
+                    "_class_name": "GtOperation",
+                    "_bases": ["BaseModel"],
+                },
+                "_class_name": "Query",
+                "_bases": ["BaseModel"],
+            },
+            "is_traced": True,
+            "active": False,
+            "scorer_debounce_config": {
+                "aggregation_field": "trace_id",
+                "aggregation_method": "all_messages",
+                "timeout_seconds": 60.1,
+            },
             "_class_name": "Monitor",
             "_bases": ["Object", "BaseModel"],
         },
@@ -297,6 +370,42 @@ config_cases = [
         ),
         inline_call_param=False,
         is_legacy=False,
+        exp_json={
+            "_type": "ClassifierMonitor",
+            "name": "test_classifier_monitor",
+            "description": None,
+            "sampling_rate": 0.75,
+            "scorers": [],
+            "op_names": ["weave.genai.turn_ended"],
+            "query": None,
+            "is_traced": False,
+            "active": False,
+            "scorer_debounce_config": None,
+            "status": None,
+            "last_error": None,
+            "last_error_at": None,
+            "prompt_header": None,
+            "prompt_footer": None,
+            "_class_name": "ClassifierMonitor",
+            "_bases": ["Monitor", "Object", "BaseModel"],
+        },
+        exp_objects=[],
+        exp_files=[],
+        # Sad ... equality is really a pain to assert here (and is broken)
+        # TODO: Write a good equality check and make it work
+        equality_check=lambda a, b: True,
+    ),
+    SerializationTestCase(
+        id="ClassifierMonitor (legacy v1, before health fields)",
+        runtime_object_factory=lambda: ClassifierMonitor(
+            name="test_classifier_monitor",
+            sampling_rate=0.75,
+            scorers=[],
+            op_names=["weave.genai.turn_ended"],
+            is_traced=False,
+        ),
+        inline_call_param=False,
+        is_legacy=True,
         exp_json={
             "_type": "ClassifierMonitor",
             "name": "test_classifier_monitor",
