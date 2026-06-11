@@ -52,34 +52,44 @@ describe('Turn', () => {
   });
 });
 
-describe('Turn.setAttribute', () => {
+describe('Turn.setAttributes', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('writes an attribute to the underlying span', () => {
+  it('writes attributes to the underlying span', () => {
     const turn = Turn.create({});
-    turn.setAttribute('weave.cost.usd', 0.42);
+    turn.setAttributes({'weave.cost.usd': 0.42, 'weave.tag': 'enterprise'});
     turn.end();
     const spans = getExporter().getFinishedSpans();
-    expect(findSpan(spans, 'invoke_agent').attributes['weave.cost.usd']).toBe(
-      0.42
-    );
+    const turnSpan = findSpan(spans, 'invoke_agent');
+    expect(turnSpan.attributes['weave.cost.usd']).toBe(0.42);
+    expect(turnSpan.attributes['weave.tag']).toBe('enterprise');
   });
 
   it('returns this for chaining', () => {
     const turn = Turn.create({});
-    expect(turn.setAttribute('k', 'v')).toBe(turn);
+    expect(turn.setAttributes({k: 'v'})).toBe(turn);
     turn.end();
   });
 
   it('is a no-op after end()', () => {
     const turn = Turn.create({});
     turn.end();
-    turn.setAttribute('after.end', 'x');
+    turn.setAttributes({'after.end': 'x'});
     const spans = getExporter().getFinishedSpans();
     expect(
       findSpan(spans, 'invoke_agent').attributes['after.end']
     ).toBeUndefined();
+  });
+
+  it('deprecated setAttribute alias delegates to setAttributes', () => {
+    const turn = Turn.create({});
+    expect(turn.setAttribute('weave.cost.usd', 0.42)).toBe(turn);
+    turn.end();
+    const spans = getExporter().getFinishedSpans();
+    expect(findSpan(spans, 'invoke_agent').attributes['weave.cost.usd']).toBe(
+      0.42
+    );
   });
 });
 
