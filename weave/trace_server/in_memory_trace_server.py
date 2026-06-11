@@ -17,11 +17,17 @@
 import datetime
 import json
 import logging
+import math
+import re
+import statistics
 import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, cast
 
+from clickhouse_connect.driver.exceptions import DatabaseError
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
 from weave.shared import refs_internal as ri
@@ -36,6 +42,11 @@ from weave.shared.trace_server_interface_util import (
     extract_refs_from_values,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.stats_query_base import (
+    GRANULARITY_1H,
+    auto_select_granularity_seconds,
+    ensure_max_buckets,
+)
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 
 # Completion request preparation (prompt resolution, provider/secret setup) is
@@ -53,8 +64,26 @@ from weave.trace_server.errors import (
     ObjectNameTypeCollision,
     RequestTooLarge,
 )
+from weave.trace_server.feedback import (
+    TABLE_FEEDBACK,
+    format_feedback_to_res,
+    format_feedback_to_row,
+    process_feedback_payload,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
+)
+from weave.trace_server.feedback_payload_schema import discover_payload_schema
+from weave.trace_server.ids import generate_id
+from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.orm import Table, split_escaped_field_path
+from weave.trace_server.token_costs import (
+    DEFAULT_PRICING_LEVEL_ID,
+    LLM_TOKEN_PRICES_TABLE,
+    PRICING_LEVELS,
+    validate_cost_purge_req,
+)
 from weave.trace_server.trace_server_common import (
     apply_tags_and_synth_latest_in_place,
     digest_is_content_hash,
@@ -74,6 +103,10 @@ logger = logging.getLogger(__name__)
 
 MAX_REFS_BATCH_SIZE = 1000
 MAX_OTEL_ERROR_MESSAGES = 20
+
+_DEFAULT_COSTS_FILE = str(
+    Path(__file__).parent / "migrations" / "006_seed_costs.up.sql"
+)
 
 
 def _ensure_tz(dt: datetime.datetime) -> datetime.datetime:
@@ -155,6 +188,234 @@ def _json_extract(parsed: Any, path_parts: list[str] | None) -> tuple[Any, str |
     return (str(val), "text")
 
 
+def _ch_json_value(parsed: Any, path_parts: list[str] | None) -> str:
+    """Mirror the ClickHouse dynamic-field read:
+    coalesce(nullIf(JSON_VALUE(dump, path), 'null'), '').
+
+    The trace server enables function_json_value_return_type_allow_complex,
+    so objects/arrays render as minified JSON text. Missing paths and JSON
+    nulls read as ''. Numbers are normalized (5.0 -> '5', 1e3 -> '1000'),
+    booleans render as 'true'/'false', strings are unquoted.
+    """
+    val = parsed
+    for part in path_parts or []:
+        if isinstance(val, dict):
+            if part not in val:
+                return ""
+            val = val[part]
+        elif isinstance(val, list):
+            try:
+                idx = int(part)
+            except ValueError:
+                return ""
+            if idx < 0 or idx >= len(val):
+                return ""
+            val = val[idx]
+        else:
+            return ""
+    if val is None:
+        return ""
+    if isinstance(val, bool):
+        return "true" if val else "false"
+    if isinstance(val, str):
+        return val
+    if isinstance(val, (dict, list)):
+        return _minify_json(val)
+    if isinstance(val, float) and val.is_integer() and not math.isinf(val):
+        return str(int(val))
+    return str(val)
+
+
+_CH_INT64_RE = re.compile(r"^[+-]?\d+$")
+
+
+def _to_int64_or_null(value: Any) -> int | None:
+    """ClickHouse toInt64OrNull over a string expression."""
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    text = text.strip()
+    if not _CH_INT64_RE.match(text):
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def _to_float64_or_null(value: Any) -> float | None:
+    """ClickHouse toFloat64OrNull over a string expression."""
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _to_uint8_or_null(value: Any) -> int | None:
+    """ClickHouse toUInt8OrNull over a string expression."""
+    parsed = _to_int64_or_null(value)
+    if parsed is None or parsed < 0 or parsed > 255:
+        return None
+    return parsed
+
+
+def _ch_cast_json_value(value: str | None, cast_to: str | None) -> Any:
+    """Mirror clickhouse_cast_json_value applied to a JSON_VALUE string."""
+    if cast_to is None or cast_to == "string":
+        return value
+    if cast_to == "int":
+        return _to_int64_or_null(value)
+    if cast_to in {"double", "float"}:
+        return _to_float64_or_null(value)
+    if cast_to == "bool":
+        if value == "true":
+            return 1
+        if value == "false":
+            return 0
+        return _to_uint8_or_null(value)
+    raise ValueError(f"Unknown cast: {cast_to}")
+
+
+def _to_ch_string(value: Any) -> str | None:
+    """ClickHouse toString over a scalar."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _ch_compare(lhs: Any, rhs: Any, op: str) -> bool | None:
+    """Typed comparison with NULL propagation (ClickHouse semantics).
+
+    Both sides arrive same-typed (the inferred-cast machinery aligns them);
+    bools coerce to ints, ints/floats interoperate, datetimes compare
+    temporally.
+    """
+    if lhs is None or rhs is None:
+        return None
+    if isinstance(lhs, bool):
+        lhs = int(lhs)
+    if isinstance(rhs, bool):
+        rhs = int(rhs)
+    if isinstance(lhs, datetime.datetime):
+        lhs = _ensure_tz(lhs)
+    if isinstance(rhs, datetime.datetime):
+        rhs = _ensure_tz(rhs)
+    # Cross-type numeric/string comparisons would be a CH type error; the
+    # inferred casts prevent them for valid queries. Treat as no-match.
+    lhs_numeric = isinstance(lhs, (int, float))
+    rhs_numeric = isinstance(rhs, (int, float))
+    if lhs_numeric != rhs_numeric:
+        return None
+    try:
+        if op == "eq":
+            return bool(lhs == rhs)
+        if op == "gt":
+            return bool(lhs > rhs)
+        if op == "gte":
+            return bool(lhs >= rhs)
+        if op == "lt":
+            return bool(lhs < rhs)
+        if op == "lte":
+            return bool(lhs <= rhs)
+    except TypeError:
+        return None
+    raise ValueError(f"Unknown comparison op: {op}")
+
+
+def _ch_position(haystack: Any, needle: Any, case_insensitive: bool) -> bool:
+    """ClickHouse position()/positionCaseInsensitive() > 0 over strings."""
+    if not isinstance(haystack, str) or not isinstance(needle, str):
+        return False
+    if case_insensitive:
+        return needle.lower() in haystack.lower()
+    return needle in haystack
+
+
+def _ch_sorted_by_terms(
+    rows: list[Any],
+    terms: list[tuple[Any, str]],
+    value_fn: Any,
+) -> list[Any]:
+    """Sort rows by (term, direction) pairs with ClickHouse semantics:
+    NULLs order last for both ASC and DESC. Applies stable sorts from the
+    last term to the first.
+    """
+    result = list(rows)
+    for term, direction in reversed(terms):
+        reverse = direction.lower() == "desc"
+
+        def value_of(row: Any, _term: Any = term) -> Any:
+            value = value_fn(row, _term)
+            if isinstance(value, bool):
+                return int(value)
+            if isinstance(value, datetime.datetime):
+                return _ensure_tz(value)
+            return value
+
+        # Two stable passes per term: order non-NULL values by direction,
+        # then float NULLs to the end regardless of direction.
+        result.sort(
+            key=lambda row: _OrderableOrNone(value_of(row)),
+            reverse=reverse,
+        )
+        result.sort(key=lambda row: value_of(row) is None)
+    return result
+
+
+class _OrderableOrNone:  # noqa: PLW1641 (sort key; never hashed)
+    """Sort key wrapper: None compares equal to everything (its final
+    position is decided by the stable NULLs-last pass).
+    """
+
+    __slots__ = ("value",)
+
+    def __init__(self, value: Any) -> None:
+        self.value = value
+
+    def __lt__(self, other: "_OrderableOrNone") -> bool:
+        if self.value is None or other.value is None:
+            return False
+        try:
+            return self.value < other.value
+        except TypeError:
+            return False
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, _OrderableOrNone):
+            return NotImplemented
+        return self.value == other.value
+
+
+def _to_sql_text(value: Any) -> str | None:
+    """Coerce a value to its stored text rendering (bools -> 1/0, floats
+    keep a trailing .0, containers minify). Feeds the generic sorters and
+    the ORM contains path, which only ever see strings in practice.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, float):
+        if value == int(value) and not math.isinf(value) and not math.isnan(value):
+            return f"{value:.1f}"
+        return str(value)
+    if isinstance(value, (int, str)):
+        return str(value)
+    return _minify_json(value)
+
+
 def _value_rank(value: Any) -> int:
     # Legacy storage-class ranks (NULL < numeric < text), used by the
     # remaining generic sorters until they move to _ch_sorted_by_terms.
@@ -163,6 +424,11 @@ def _value_rank(value: Any) -> int:
     if isinstance(value, (bool, int, float)):
         return 1
     return 2
+
+
+def _truthy(value: Any) -> bool:
+    """SQL WHERE-clause truthiness: NULL, 0, and false filter out."""
+    return bool(value) if value is not None else False
 
 
 def _sort_key_for_term(value: Any) -> tuple[int, Any]:
@@ -213,6 +479,179 @@ def _get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
+
+
+def _normalize_datetime_for_costs(
+    value: datetime.datetime | str | None,
+) -> datetime.datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=datetime.timezone.utc)
+    return value.astimezone(datetime.timezone.utc)
+
+
+def _serialize_cost_datetime(value: datetime.datetime) -> str:
+    normalized = _normalize_datetime_for_costs(value)
+    assert normalized is not None
+    return normalized.isoformat()
+
+
+def _safe_int_for_costs(value: Any) -> int:
+    try:
+        return int(value) if value is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _cost_usage_from_summary(
+    summary: dict[str, Any] | None,
+) -> dict[str, dict[str, int]]:
+    usage_map = (summary or {}).get("usage")
+    if not isinstance(usage_map, dict):
+        return {}
+
+    normalized_usage: dict[str, dict[str, int]] = {}
+    for llm_id, usage in usage_map.items():
+        if not isinstance(usage, dict):
+            continue
+        normalized_usage[str(llm_id)] = {
+            "prompt_tokens": _safe_int_for_costs(usage.get("prompt_tokens"))
+            + _safe_int_for_costs(usage.get("input_tokens")),
+            "completion_tokens": _safe_int_for_costs(usage.get("completion_tokens"))
+            + _safe_int_for_costs(usage.get("output_tokens")),
+            "requests": _safe_int_for_costs(usage.get("requests")),
+            # Match ClickHouse: keep total_tokens as-reported rather than deriving it.
+            "total_tokens": _safe_int_for_costs(usage.get("total_tokens")),
+            "cache_read_input_tokens": _safe_int_for_costs(
+                usage.get("cache_read_input_tokens")
+            ),
+            "cache_creation_input_tokens": _safe_int_for_costs(
+                usage.get("cache_creation_input_tokens")
+            ),
+        }
+    return normalized_usage
+
+
+@lru_cache(maxsize=1)
+def _load_default_cost_definitions() -> tuple[dict[str, Any], ...]:
+    with open(_DEFAULT_COSTS_FILE, encoding="utf-8") as f:
+        seed_sql = f.read()
+
+    now = _serialize_cost_datetime(datetime.datetime.now(datetime.timezone.utc))
+    default_rows: list[dict[str, Any]] = []
+    row_pattern = re.compile(
+        r"\(generateUUIDv4\(\), '([^']+)', '([^']+)', '([^']+)', '([^']+)', now\(\), ([^,]+), '([^']+)', ([^,]+), '([^']+)', '([^']+)', now\(\)\)"
+    )
+    for match in row_pattern.finditer(seed_sql):
+        (
+            pricing_level,
+            pricing_level_id,
+            provider_id,
+            llm_id,
+            prompt_token_cost,
+            prompt_token_cost_unit,
+            completion_token_cost,
+            completion_token_cost_unit,
+            created_by,
+        ) = match.groups()
+        default_rows.append(
+            {
+                "pricing_level": pricing_level,
+                "pricing_level_id": pricing_level_id,
+                "provider_id": provider_id,
+                "llm_id": llm_id,
+                "effective_date": now,
+                "prompt_token_cost": float(prompt_token_cost),
+                "completion_token_cost": float(completion_token_cost),
+                "prompt_token_cost_unit": prompt_token_cost_unit,
+                "completion_token_cost_unit": completion_token_cost_unit,
+                "created_by": created_by,
+                "created_at": now,
+            }
+        )
+    return tuple(default_rows)
+
+
+# Agent-monitor scores land under this scorer_ratings key; the feedback
+# aggregate rating filter targets it (mirrors feedback_agg_query_builder).
+_FEEDBACK_RATING_KEY = "_rating_"
+
+
+def _ref_object_id(ref: str | None) -> str:
+    """A ref's object id: the last path segment's name, before any ':digest'
+    (the splitByChar expression in the aggregate query builder).
+    """
+    return (ref or "").split("/")[-1].split(":")[0]
+
+
+def _object_id_matches(ref: str | None, values: list[str]) -> bool:
+    """Exact object-id match by default; a trailing '*' opts into prefix."""
+    object_id = _ref_object_id(ref)
+    for value in values:
+        if value.endswith("*"):
+            if object_id.startswith(value.rstrip("*")):
+                return True
+        elif object_id == value:
+            return True
+    return False
+
+
+def _feedback_aggregate_dimension(row: dict[str, Any], dimension: str) -> Any:
+    """A row's value for a client-facing group_by dimension. `scorer_id` is
+    derived from runnable_ref; every other dimension is a stored column.
+    """
+    if dimension == "scorer_id":
+        return _ref_object_id(row.get("runnable_ref"))
+    return row.get(dimension)
+
+
+def _feedback_aggregate_matches(
+    row: dict[str, Any], req: tsi.FeedbackAggregateReq
+) -> bool:
+    """The WHERE clause of build_feedback_aggregate_query, row at a time."""
+    if row["project_id"] != req.project_id:
+        return False
+    created_ms = row["created_at"].timestamp() * 1000
+    if not (req.after_ms <= created_ms < req.before_ms):
+        return False
+    if req.feedback_types and not any(
+        (row.get("feedback_type") or "").startswith(value.rstrip("*"))
+        for value in req.feedback_types
+    ):
+        return False
+    if req.monitor_ids and not _object_id_matches(
+        row.get("trigger_ref"), req.monitor_ids
+    ):
+        return False
+    if req.scorer_ids and not _object_id_matches(
+        row.get("runnable_ref"), req.scorer_ids
+    ):
+        return False
+    if req.span_agent_names and row.get("span_agent_name") not in req.span_agent_names:
+        return False
+    if req.span_types:
+        # The span type is the weave_ref's second-to-last path segment.
+        segments = (row.get("weave_ref") or "").split("/")
+        span_type = segments[-2] if len(segments) >= 2 else ""
+        if span_type not in req.span_types:
+            return False
+    if req.tags:
+        row_tags = row.get("scorer_tags") or []
+        if not any(tag in row_tags for tag in req.tags):
+            return False
+    if req.rating_min is not None or req.rating_max is not None:
+        ratings = row.get("scorer_ratings") or {}
+        if _FEEDBACK_RATING_KEY not in ratings:
+            return False
+        rating = ratings[_FEEDBACK_RATING_KEY]
+        if req.rating_min is not None and not (rating >= req.rating_min):
+            return False
+        if req.rating_max is not None and not (rating <= req.rating_max):
+            return False
+    return True
 
 
 @dataclass(slots=True)
@@ -603,6 +1042,192 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     + len(summary_json)
                 )
         return tsi.CallEndRes()
+
+    # ------------------------------------------------------------------
+    # Cost application (the llm_token_prices join both backends perform)
+    # ------------------------------------------------------------------
+
+    def _ensure_default_costs(self) -> bool:
+        for row in self._llm_token_prices:
+            if (
+                row["pricing_level"] == PRICING_LEVELS["DEFAULT"]
+                and row["pricing_level_id"] == DEFAULT_PRICING_LEVEL_ID
+            ):
+                return False
+
+        for row in _load_default_cost_definitions():
+            self._llm_token_prices.append(
+                {
+                    "id": generate_id(),
+                    "pricing_level": row["pricing_level"],
+                    "pricing_level_id": row["pricing_level_id"],
+                    "provider_id": row["provider_id"],
+                    "llm_id": row["llm_id"],
+                    "effective_date": row["effective_date"],
+                    "prompt_token_cost": row["prompt_token_cost"],
+                    "completion_token_cost": row["completion_token_cost"],
+                    "cache_read_input_token_cost": row.get(
+                        "cache_read_input_token_cost", 0
+                    ),
+                    "cache_creation_input_token_cost": row.get(
+                        "cache_creation_input_token_cost", 0
+                    ),
+                    "prompt_token_cost_unit": row["prompt_token_cost_unit"],
+                    "completion_token_cost_unit": row["completion_token_cost_unit"],
+                    "created_by": row["created_by"],
+                    "created_at": row["created_at"],
+                }
+            )
+        return True
+
+    def _pick_best_cost_row(
+        self,
+        rows: list[dict[str, Any]],
+        started_at: datetime.datetime,
+        project_id: str,
+    ) -> dict[str, Any] | None:
+        if not rows:
+            return None
+
+        def rank_key(row: dict[str, Any]) -> tuple[int, int, float]:
+            effective_date = _normalize_datetime_for_costs(row["effective_date"])
+            assert effective_date is not None
+            is_future = 1 if effective_date > started_at else 0
+            if (
+                row["pricing_level"] == PRICING_LEVELS["PROJECT"]
+                and row["pricing_level_id"] == project_id
+            ):
+                pricing_rank = 0
+            elif (
+                row["pricing_level"] == PRICING_LEVELS["DEFAULT"]
+                and row["pricing_level_id"] == DEFAULT_PRICING_LEVEL_ID
+            ):
+                pricing_rank = 1
+            else:
+                pricing_rank = 2
+            return (is_future, pricing_rank, -effective_date.timestamp())
+
+        return min(rows, key=rank_key)
+
+    def _apply_costs_to_calls(
+        self,
+        calls: list[dict[str, Any]],
+        project_id: str,
+    ) -> None:
+        usage_by_call_id: dict[str, dict[str, dict[str, int]]] = {}
+        llm_ids: set[str] = set()
+
+        for call in calls:
+            summary = call.get("summary")
+            if not isinstance(summary, dict):
+                continue
+            usage_by_model = _cost_usage_from_summary(summary)
+            if not usage_by_model:
+                continue
+            usage_by_call_id[call["id"]] = usage_by_model
+            llm_ids.update(usage_by_model.keys())
+
+        if not llm_ids:
+            return
+
+        with self.lock:
+            self._ensure_default_costs()
+            price_rows = [
+                dict(row)
+                for row in self._llm_token_prices
+                if row["llm_id"] in llm_ids
+                and (
+                    (
+                        row["pricing_level"] == PRICING_LEVELS["PROJECT"]
+                        and row["pricing_level_id"] == project_id
+                    )
+                    or (
+                        row["pricing_level"] == PRICING_LEVELS["DEFAULT"]
+                        and row["pricing_level_id"] == DEFAULT_PRICING_LEVEL_ID
+                    )
+                )
+            ]
+
+        price_rows_by_llm: dict[str, list[dict[str, Any]]] = {}
+        for row in price_rows:
+            price_rows_by_llm.setdefault(str(row["llm_id"]), []).append(row)
+
+        for call in calls:
+            summary = call.get("summary")
+            if not isinstance(summary, dict):
+                continue
+
+            weave_summary = summary.get("weave")
+            if not isinstance(weave_summary, dict):
+                weave_summary = {}
+                summary["weave"] = weave_summary
+            else:
+                weave_summary.pop("costs", None)
+
+            started_at = _normalize_datetime_for_costs(call.get("started_at"))
+            assert started_at is not None
+
+            call_costs: dict[str, dict[str, Any]] = {}
+            for llm_id, usage in usage_by_call_id.get(call["id"], {}).items():
+                best_row = self._pick_best_cost_row(
+                    price_rows_by_llm.get(llm_id, []), started_at, project_id
+                )
+                if best_row is None:
+                    continue
+
+                prompt_cost = float(best_row["prompt_token_cost"] or 0.0)
+                completion_cost = float(best_row["completion_token_cost"] or 0.0)
+                cache_read_cost = float(
+                    best_row.get("cache_read_input_token_cost") or 0.0
+                )
+                cache_creation_cost = float(
+                    best_row.get("cache_creation_input_token_cost") or 0.0
+                )
+                prompt_tokens = usage["prompt_tokens"]
+                completion_tokens = usage["completion_tokens"]
+                cache_read_input_tokens = usage.get("cache_read_input_tokens", 0)
+                cache_creation_input_tokens = usage.get(
+                    "cache_creation_input_tokens", 0
+                )
+
+                call_costs[llm_id] = {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "cache_read_input_tokens": cache_read_input_tokens,
+                    "cache_creation_input_tokens": cache_creation_input_tokens,
+                    "requests": usage["requests"],
+                    "total_tokens": usage["total_tokens"],
+                    # Subtract cached tokens: they are billed at the cache
+                    # rate, not the regular input rate.
+                    "prompt_tokens_total_cost": (
+                        prompt_tokens
+                        - cache_read_input_tokens
+                        - cache_creation_input_tokens
+                    )
+                    * prompt_cost,
+                    "completion_tokens_total_cost": completion_tokens * completion_cost,
+                    "cache_read_input_tokens_total_cost": cache_read_input_tokens
+                    * cache_read_cost,
+                    "cache_creation_input_tokens_total_cost": cache_creation_input_tokens
+                    * cache_creation_cost,
+                    "prompt_token_cost": prompt_cost,
+                    "completion_token_cost": completion_cost,
+                    "cache_read_input_token_cost": cache_read_cost,
+                    "cache_creation_input_token_cost": cache_creation_cost,
+                    "prompt_token_cost_unit": best_row["prompt_token_cost_unit"],
+                    "completion_token_cost_unit": best_row[
+                        "completion_token_cost_unit"
+                    ],
+                    "effective_date": best_row["effective_date"],
+                    "provider_id": best_row["provider_id"],
+                    "pricing_level": best_row["pricing_level"],
+                    "pricing_level_id": best_row["pricing_level_id"],
+                    "created_at": best_row["created_at"],
+                    "created_by": best_row["created_by"],
+                }
+
+            if call_costs:
+                weave_summary["costs"] = call_costs
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
@@ -1483,6 +2108,484 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         return tsi.FilesStatsRes(total_size_bytes=total)
 
     # ------------------------------------------------------------------
+    # Feedback
+    # ------------------------------------------------------------------
+
+    def _feedback_row_for_storage(self, row: dict[str, Any]) -> dict[str, Any]:
+        """Normalize a freshly created feedback row for storage: created_at
+        as a tz-aware datetime (ClickHouse returns DateTime64 values) and the
+        payload normalized through JSON serialization.
+        """
+        stored = dict(row)
+        created_at = stored["created_at"]
+        if isinstance(created_at, datetime.datetime):
+            stored["created_at"] = _ensure_tz(created_at)
+        stored["payload"] = json.loads(json.dumps(stored["payload"]))
+        for col in (
+            "scorer_tags",
+            "scorer_tag_reasons",
+            "scorer_tag_confidences",
+            "scorer_ratings",
+            "scorer_rating_reasons",
+            "scorer_rating_confidences",
+        ):
+            stored[col] = json.loads(json.dumps(stored.get(col)))
+        return stored
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        assert_non_null_wb_user_id(req)
+        validate_feedback_create_req(req, self)
+
+        processed_payload = process_feedback_payload(req)
+        row = format_feedback_to_row(req, processed_payload)
+        with self.lock:
+            self._feedback.append(self._feedback_row_for_storage(row))
+
+        return format_feedback_to_res(row)
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        rows_to_insert = []
+        results = []
+
+        for feedback_req in req.batch:
+            assert_non_null_wb_user_id(feedback_req)
+            validate_feedback_create_req(feedback_req, self)
+
+            processed_payload = process_feedback_payload(feedback_req)
+            row = format_feedback_to_row(feedback_req, processed_payload)
+            rows_to_insert.append(row)
+            results.append(format_feedback_to_res(row))
+
+        if rows_to_insert:
+            with self.lock:
+                for row in rows_to_insert:
+                    self._feedback.append(self._feedback_row_for_storage(row))
+
+        return tsi.FeedbackCreateBatchRes(res=results)
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        with self.lock:
+            rows = list(self._feedback)
+        result = _orm_select(
+            TABLE_FEEDBACK,
+            rows,
+            project_id=req.project_id,
+            fields=req.fields,
+            query=req.query,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        return tsi.FeedbackQueryRes(result=result)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        validate_feedback_purge_req(req)
+        with self.lock:
+            keep = []
+            for row in self._feedback:
+                if row["project_id"] == req.project_id and _truthy(
+                    _orm_eval_query(TABLE_FEEDBACK, row, req.query)
+                ):
+                    continue
+                keep.append(row)
+            self._feedback = keep
+        return tsi.FeedbackPurgeRes()
+
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        # Validate the replacement payload before purging — if validation
+        # rejects we want the old row preserved, not destroyed.
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        validate_feedback_create_req(create_req, self)
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            },
+        )
+        self.feedback_purge(purge_request)
+        create_result = self.feedback_create(create_req)
+
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
+
+    def _fetch_feedback_stats_rows(
+        self,
+        project_id: str,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        feedback_type: str | None = None,
+        trigger_ref: str | None = None,
+    ) -> list[tuple[str, str]]:
+        """(created_at, payload_dump) tuples for the stats window."""
+        with self.lock:
+            rows = list(self._feedback)
+        result: list[tuple[Any, str]] = []
+        for row in rows:
+            if row["project_id"] != project_id:
+                continue
+            created_at = row["created_at"]
+            if not (_ensure_tz(start) <= created_at < _ensure_tz(end)):
+                continue
+            if feedback_type is not None and row["feedback_type"] != feedback_type:
+                continue
+            if trigger_ref is not None:
+                row_trigger = row.get("trigger_ref")
+                if trigger_ref.endswith(":*"):
+                    if row_trigger is None or not row_trigger.startswith(
+                        trigger_ref[:-2]
+                    ):
+                        continue
+                elif row_trigger != trigger_ref:
+                    continue
+            result.append((created_at, json.dumps(row["payload"])))
+        return result
+
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        """Compute feedback stats with in-memory rows + Python aggregation."""
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        if not req.metrics:
+            return tsi.FeedbackStatsRes(
+                start=req.start,
+                end=end,
+                granularity=GRANULARITY_1H,
+                timezone=req.timezone or "UTC",
+                buckets=[],
+            )
+
+        start = req.start
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=datetime.timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=datetime.timezone.utc)
+
+        time_range = end - start
+        granularity = req.granularity or auto_select_granularity_seconds(time_range)
+        granularity = ensure_max_buckets(granularity, time_range.total_seconds())
+
+        rows = self._fetch_feedback_stats_rows(
+            req.project_id,
+            start,
+            end,
+            req.feedback_type,
+            req.trigger_ref,
+        )
+
+        metrics = [m for m in req.metrics if m.aggregations or m.percentiles]
+
+        bucket_data: dict[datetime.datetime, dict[str, list[Any]]] = {}
+        bucket_counts: dict[datetime.datetime, int] = {}
+        all_values: dict[str, list[Any]] = {m.json_path: [] for m in metrics}
+
+        for created_at_value, payload_str in rows:
+            ts = (
+                created_at_value
+                if isinstance(created_at_value, datetime.datetime)
+                else _parse_feedback_row_ts(created_at_value)
+            )
+            bk = _stats_bucket_key(_ensure_tz(ts), start, granularity)
+            if bk not in bucket_data:
+                bucket_data[bk] = {m.json_path: [] for m in metrics}
+            bucket_counts[bk] = bucket_counts.get(bk, 0) + 1
+            for m in metrics:
+                val = _extract_stats_value(payload_str or "", m.json_path, m.value_type)
+                if val is not None:
+                    bucket_data[bk][m.json_path].append(val)
+                    all_values[m.json_path].append(val)
+
+        all_bucket_starts = []
+        t = start
+        while t < end:
+            all_bucket_starts.append(t)
+            t += datetime.timedelta(seconds=granularity)
+
+        buckets: list[dict[str, Any]] = []
+        for bk in all_bucket_starts:
+            row_dict: dict[str, Any] = {"timestamp": bk}
+            for m in metrics:
+                slug = m.json_path.replace(".", "_")
+                vals = bucket_data.get(bk, {}).get(m.json_path, [])
+                if m.value_type == "boolean":
+                    bool_vals = vals
+                    for agg in m.aggregations or []:
+                        if agg.value == "count_true":
+                            row_dict[f"count_true_{slug}"] = sum(
+                                1 for v in bool_vals if v is True
+                            )
+                        elif agg.value == "count_false":
+                            row_dict[f"count_false_{slug}"] = sum(
+                                1 for v in bool_vals if v is False
+                            )
+                else:
+                    numeric_vals = [float(v) for v in vals if v is not None]
+                    for agg in m.aggregations or []:
+                        row_dict[f"{agg.value}_{slug}"] = _compute_stats_agg(
+                            numeric_vals, agg.value
+                        )
+                    for pct in m.percentiles or []:
+                        key = f"p{pct:g}"
+                        row_dict[f"{key}_{slug}"] = _compute_stats_percentile(
+                            numeric_vals, pct
+                        )
+            row_dict["count"] = bucket_counts.get(bk, 0)
+            buckets.append(row_dict)
+
+        window_stats: dict[str, dict[str, float | None]] | None = None
+        has_window_aggs = any(m.aggregations or m.percentiles for m in metrics)
+        if has_window_aggs:
+            window_stats = {}
+            for m in metrics:
+                slug = m.json_path.replace(".", "_")
+                vals = all_values[m.json_path]
+                stat: dict[str, float | None] = {}
+                if m.value_type == "boolean":
+                    for agg in m.aggregations or []:
+                        if agg.value == "count_true":
+                            stat["count_true"] = float(
+                                sum(1 for v in vals if v is True)
+                            )
+                        elif agg.value == "count_false":
+                            stat["count_false"] = float(
+                                sum(1 for v in vals if v is False)
+                            )
+                else:
+                    numeric_vals = [float(v) for v in vals if v is not None]
+                    for agg in m.aggregations or []:
+                        stat[agg.value] = _compute_stats_agg(numeric_vals, agg.value)
+                    for pct in m.percentiles or []:
+                        key = f"p{pct:g}"
+                        stat[key] = _compute_stats_percentile(numeric_vals, pct)
+                window_stats[slug] = stat
+
+        return tsi.FeedbackStatsRes(
+            start=start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone or "UTC",
+            buckets=buckets,
+            window_stats=window_stats,
+        )
+
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Mirror build_feedback_aggregate_query evaluated over stored rows:
+        the same WHERE filters, time-bucket/group_by keys, and sumMap-style
+        per-key tallies. Like ClickHouse, a query with no grouping keys at
+        all returns exactly one global rollup row.
+        """
+        with self.lock:
+            rows = [
+                row for row in self._feedback if _feedback_aggregate_matches(row, req)
+            ]
+
+        bucketed = req.time_bucket_seconds is not None
+        groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+        for row in rows:
+            key: list[Any] = []
+            if bucketed:
+                epoch_s = row["created_at"].timestamp()
+                bucket_start_s = (
+                    int(epoch_s // req.time_bucket_seconds) * req.time_bucket_seconds
+                )
+                key.append(bucket_start_s * 1000)
+            for dimension in req.group_by:
+                key.append(_feedback_aggregate_dimension(row, dimension))
+            groups.setdefault(tuple(key), []).append(row)
+
+        if not bucketed and not req.group_by:
+            # No GROUP BY keys: ClickHouse global aggregation always yields
+            # one row, even over an empty selection.
+            groups.setdefault((), [])
+
+        # ORDER BY bucket for a time series; otherwise by the group_by
+        # dimensions for a deterministic row order.
+        if bucketed:
+            ordered_keys = sorted(groups, key=lambda key: key[0])
+        else:
+            ordered_keys = sorted(groups)
+
+        buckets: list[tsi.FeedbackAggregateBucket] = []
+        for key in ordered_keys:
+            group_rows = groups[key]
+            tag_counts: dict[str, int] = {}
+            rating_sums: dict[str, float] = {}
+            rating_counts: dict[str, int] = {}
+            scored_count = 0
+            for row in group_rows:
+                tags = row.get("scorer_tags") or []
+                ratings = row.get("scorer_ratings") or {}
+                if tags or ratings:
+                    scored_count += 1
+                for tag in tags:
+                    tag_counts[tag] = tag_counts.get(tag, 0) + 1
+                for rating_key, rating_value in ratings.items():
+                    rating_sums[rating_key] = rating_sums.get(rating_key, 0.0) + float(
+                        rating_value
+                    )
+                    rating_counts[rating_key] = rating_counts.get(rating_key, 0) + 1
+            dims = key[1:] if bucketed else key
+            buckets.append(
+                tsi.FeedbackAggregateBucket(
+                    time_bucket_start_ms=key[0] if bucketed else None,
+                    group={
+                        dimension: str(value)
+                        for dimension, value in zip(req.group_by, dims, strict=True)
+                    },
+                    total_count=len(group_rows),
+                    scored_count=scored_count,
+                    tag_counts=tag_counts,
+                    rating_counts=rating_counts,
+                    rating_sums=rating_sums,
+                )
+            )
+
+        return tsi.FeedbackAggregateRes(
+            time_bucket_seconds=req.time_bucket_seconds,
+            after_ms=req.after_ms,
+            before_ms=req.before_ms,
+            buckets=buckets,
+        )
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        start = req.start
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=datetime.timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=datetime.timezone.utc)
+
+        rows = self._fetch_feedback_stats_rows(
+            req.project_id,
+            start,
+            end,
+            req.feedback_type,
+            req.trigger_ref,
+        )
+        payload_strs = [row[1] for row in rows if row[1]]
+        if req.sample_limit and len(payload_strs) > req.sample_limit:
+            payload_strs = payload_strs[: req.sample_limit]
+
+        paths = discover_payload_schema(payload_strs)
+        return tsi.FeedbackPayloadSchemaRes(paths=paths)
+
+    # ------------------------------------------------------------------
+    # Costs API
+    # ------------------------------------------------------------------
+
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        assert_non_null_wb_user_id(req)
+        created_at = _serialize_cost_datetime(
+            datetime.datetime.now(datetime.timezone.utc)
+        )
+
+        created_costs: list[tuple[str, str]] = []
+        with self.lock:
+            for llm_id, cost in req.costs.items():
+                cost_id = generate_id()
+                row = {
+                    "id": cost_id,
+                    "pricing_level": PRICING_LEVELS["PROJECT"],
+                    "pricing_level_id": req.project_id,
+                    "provider_id": cost.provider_id or "default",
+                    "llm_id": llm_id,
+                    "effective_date": _serialize_cost_datetime(
+                        cost.effective_date
+                        or datetime.datetime.now(datetime.timezone.utc)
+                    ),
+                    "prompt_token_cost": cost.prompt_token_cost,
+                    "completion_token_cost": cost.completion_token_cost,
+                    "prompt_token_cost_unit": cost.prompt_token_cost_unit or "USD",
+                    "completion_token_cost_unit": cost.completion_token_cost_unit
+                    or "USD",
+                    "created_by": req.wb_user_id,
+                    "created_at": created_at,
+                }
+                self._llm_token_prices.append(row)
+                created_costs.append((cost_id, llm_id))
+        return tsi.CostCreateRes(ids=created_costs)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        expr = {
+            "$and": [
+                (
+                    req.query.expr_
+                    if req.query
+                    else {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": req.project_id},
+                        ],
+                    }
+                ),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": PRICING_LEVELS["PROJECT"]},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        with self.lock:
+            rows = [dict(row) for row in self._llm_token_prices]
+        results = _orm_select(
+            LLM_TOKEN_PRICES_TABLE,
+            rows,
+            project_id=None,
+            fields=req.fields,
+            query=query_with_pricing_level,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        return tsi.CostQueryRes(results=results)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        validate_cost_purge_req(req)
+        expr = {
+            "$and": [
+                req.query.expr_,
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": PRICING_LEVELS["PROJECT"]},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        with self.lock:
+            self._llm_token_prices = [
+                row
+                for row in self._llm_token_prices
+                if not _truthy(
+                    _orm_eval_query(
+                        LLM_TOKEN_PRICES_TABLE, row, query_with_pricing_level
+                    )
+                )
+            ]
+        return tsi.CostPurgeRes()
+
+    # ------------------------------------------------------------------
     # OTel export
     # ------------------------------------------------------------------
 
@@ -1598,3 +2701,468 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             )
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
+
+
+# ---------------------------------------------------------------------------
+# ORM-equivalent row evaluation (feedback + costs tables)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True, frozen=True)
+class _OrmDatetimeLiteral:
+    """Marker operand: a datetime-normalized literal produced by
+    `_orm_maybe_datetime_literal`.
+    """
+
+    value: datetime.datetime
+
+
+def _orm_field_value(
+    table: Table,
+    row: dict[str, Any],
+    field_name: str,
+    cast_to: str | None = None,
+) -> Any:
+    """Resolve a field reference against a stored row, mirroring
+    `_transform_external_field_to_internal_field` (ClickHouse flavor):
+    dotted JSON access goes through JSON_VALUE with a default string cast.
+    """
+    for prefix in (*table.map_string_cols, *table.map_float_cols):
+        if field_name == prefix:
+            return row.get(prefix)
+        if field_name.startswith(prefix + "."):
+            key = field_name[len(prefix) + 1 :]
+            # mapContains-guarded access: absent keys read as NULL.
+            mapping = row.get(prefix) or {}
+            if key not in mapping:
+                return None
+            value = mapping[key]
+            if prefix in table.map_string_cols or cast_to in {None, "string", "exists"}:
+                if cast_to == "exists":
+                    return value is not None
+                return value
+            return value
+    for prefix in table.json_cols:
+        if field_name == prefix or field_name.startswith(prefix + "."):
+            col = row.get(prefix)
+            parts = (
+                split_escaped_field_path(field_name[len(prefix) + 1 :])
+                if field_name != prefix
+                else []
+            )
+            if cast_to == "exists":
+                # JSON_EXISTS: true whenever the path exists (incl. nulls).
+                if col is None:
+                    return False
+                if not parts:
+                    return True
+                value = col
+                for part in parts:
+                    if isinstance(value, dict) and part in value:
+                        value = value[part]
+                    elif isinstance(value, list):
+                        try:
+                            idx = int(part)
+                        except ValueError:
+                            return False
+                        if idx < 0 or idx >= len(value):
+                            return False
+                        value = value[idx]
+                    else:
+                        return False
+                return True
+            if col is None and not parts:
+                return None
+            value = _ch_json_value(col, parts)
+            return _ch_cast_json_value(value, cast_to or "string")
+    if field_name in table.array_string_cols:
+        return row.get(field_name) or []
+    if field_name not in {c.name for c in table.cols}:
+        raise ValueError(f"Unknown field: {field_name}")
+    return row.get(field_name)
+
+
+def _orm_field_exists(table: Table, row: dict[str, Any], field_name: str) -> bool:
+    """JSON_EXISTS-equivalent for dynamic fields (explicit null still exists)."""
+    result = _orm_field_value(table, row, field_name, cast_to="exists")
+    return bool(result)
+
+
+def _orm_literal_value(literal: Any) -> Any:
+    if isinstance(literal, bool):
+        # Bools compare numerically (ClickHouse Bool is UInt8 underneath).
+        return 1 if literal else 0
+    if literal is None or isinstance(literal, (str, int, float)):
+        return literal
+    raise ValueError(f"Unknown value type: {literal}")
+
+
+def _orm_maybe_datetime_literal(table: Table, lhs: Any, rhs: Any) -> tuple[Any, Any]:
+    """Mirror `maybe_convert_datetime_operands`: a literal compared against a
+    DateTime column is normalized to 'YYYY-MM-DD HH:MM:SS.ffffff'.
+    """
+    from weave.trace_server.orm import (
+        parse_string_to_utc_timestamp,
+    )
+
+    operands = [lhs, rhs]
+    field_idx = None
+    literal_idx = None
+    timestamp: float | None = None
+    for i, op in enumerate(operands):
+        if (
+            isinstance(op, tsi_query.GetFieldOperator)
+            and op.get_field_ in table.datetime_cols
+        ):
+            field_idx = i
+        elif isinstance(op, tsi_query.LiteralOperation):
+            lit = op.literal_
+            if isinstance(lit, bool):
+                continue
+            if isinstance(lit, (int, float)):
+                literal_idx = i
+                timestamp = float(lit)
+            elif isinstance(lit, str):
+                parsed = parse_string_to_utc_timestamp(lit)
+                if parsed is not None:
+                    literal_idx = i
+                    timestamp = parsed
+
+    if field_idx is None or literal_idx is None or timestamp is None:
+        return lhs, rhs
+
+    converted = datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
+    operands[literal_idx] = _OrmDatetimeLiteral(converted)
+    return operands[0], operands[1]
+
+
+def _orm_eval_query(table: Table, row: dict[str, Any], query: tsi.Query) -> Any:
+    """Evaluate a Query against a stored row, mirroring the ORM layer's
+    `_process_query_to_conditions` as ClickHouse runs it.
+    """
+
+    def process_operation(operation: tsi_query.Operation) -> Any:
+        if isinstance(operation, tsi_query.AndOperation):
+            if len(operation.and_) == 0:
+                raise ValueError("Empty AND operation")
+            elif len(operation.and_) == 1:
+                return process_operand(operation.and_[0])
+            return all(_truthy(process_operand(op)) for op in operation.and_)
+        elif isinstance(operation, tsi_query.OrOperation):
+            if len(operation.or_) == 0:
+                raise ValueError("Empty OR operation")
+            elif len(operation.or_) == 1:
+                return process_operand(operation.or_[0])
+            return any(_truthy(process_operand(op)) for op in operation.or_)
+        elif isinstance(operation, tsi_query.NotOperation):
+            inner = process_operand(operation.not_[0])
+            if inner is None:
+                return None
+            return not _truthy(inner)
+        elif isinstance(operation, tsi_query.EqOperation):
+            lhs, rhs = process_binary_operands(*operation.eq_)
+            return _ch_compare(lhs, rhs, "eq")
+        elif isinstance(operation, tsi_query.GtOperation):
+            lhs, rhs = process_binary_operands(*operation.gt_)
+            return _ch_compare(lhs, rhs, "gt")
+        elif isinstance(operation, tsi_query.LtOperation):
+            lhs, rhs = process_binary_operands(*operation.lt_)
+            return _ch_compare(lhs, rhs, "lt")
+        elif isinstance(operation, tsi_query.GteOperation):
+            lhs, rhs = process_binary_operands(*operation.gte_)
+            return _ch_compare(lhs, rhs, "gte")
+        elif isinstance(operation, tsi_query.LteOperation):
+            lhs, rhs = process_binary_operands(*operation.lte_)
+            return _ch_compare(lhs, rhs, "lte")
+        elif isinstance(operation, tsi_query.InOperation):
+            in_cast = tsi_query.infer_shared_literal_filter_cast(operation.in_[1])
+            lhs = process_operand(operation.in_[0], cast=in_cast)
+            if lhs is None:
+                return None
+            return any(
+                _truthy(_ch_compare(lhs, process_operand(op), "eq"))
+                for op in operation.in_[1]
+            )
+        elif isinstance(operation, tsi_query.ContainsOperation):
+            input_operand = operation.contains_.input
+            if (
+                isinstance(input_operand, tsi_query.GetFieldOperator)
+                and input_operand.get_field_ in table.array_string_cols
+            ):
+                # Array membership semantics for Array(String) columns.
+                rhs = process_operand(operation.contains_.substr)
+                values = row.get(input_operand.get_field_) or []
+                if operation.contains_.case_insensitive:
+                    rhs_text = _to_sql_text(rhs)
+                    rhs_lower = rhs_text.lower() if rhs_text is not None else None
+                    return any(
+                        isinstance(v, str) and v.lower() == rhs_lower for v in values
+                    )
+                return rhs in values
+            lhs = process_operand(input_operand)
+            rhs = process_operand(operation.contains_.substr)
+            if isinstance(rhs, (bool, int, float)):
+                # ClickHouse position() rejects non-string needles; surface
+                # the same driver error the real backend produces.
+                type_name = "Int64" if isinstance(rhs, int) else "Float64"
+                raise DatabaseError(
+                    f"Illegal type {type_name} of argument of function position"
+                )
+            return _ch_position(lhs, rhs, operation.contains_.case_insensitive)
+        else:
+            raise TypeError(f"Unknown operation type: {operation}")
+
+    def process_binary_operands(
+        lhs_op: tsi_query.Operand, rhs_op: tsi_query.Operand
+    ) -> tuple[Any, Any]:
+        lhs_op, rhs_op = _orm_maybe_datetime_literal(table, lhs_op, rhs_op)
+        lhs_cast = (
+            tsi_query.infer_literal_filter_cast(rhs_op)
+            if isinstance(rhs_op, tsi_query.LiteralOperation)
+            else None
+        )
+        rhs_cast = (
+            tsi_query.infer_literal_filter_cast(lhs_op)
+            if isinstance(lhs_op, tsi_query.LiteralOperation)
+            else None
+        )
+        return (
+            process_operand(lhs_op, cast=lhs_cast),
+            process_operand(rhs_op, cast=rhs_cast),
+        )
+
+    def process_operand(operand: tsi_query.Operand, cast: str | None = None) -> Any:
+        if isinstance(operand, _OrmDatetimeLiteral):
+            return operand.value
+        if isinstance(operand, tsi_query.LiteralOperation):
+            return _orm_literal_value(operand.literal_)
+        elif isinstance(operand, tsi_query.GetFieldOperator):
+            return _orm_field_value(table, row, operand.get_field_, cast_to=cast)
+        elif isinstance(operand, tsi_query.ConvertOperation):
+            value = process_operand(operand.convert_.input)
+            convert_to = operand.convert_.to
+            if convert_to == "exists":
+                return value is not None
+            return _ch_cast_json_value(_to_ch_string(value), convert_to)
+        elif isinstance(
+            operand,
+            (
+                tsi_query.AndOperation,
+                tsi_query.OrOperation,
+                tsi_query.NotOperation,
+                tsi_query.EqOperation,
+                tsi_query.GtOperation,
+                tsi_query.LtOperation,
+                tsi_query.GteOperation,
+                tsi_query.LteOperation,
+                tsi_query.InOperation,
+                tsi_query.ContainsOperation,
+            ),
+        ):
+            return process_operation(operand)
+        else:
+            raise TypeError(f"Unknown operand type: {operand}")
+
+    return process_operation(query.expr_)
+
+
+def _orm_is_dynamic_field(table: Table, field_name: str) -> bool:
+    if field_name in table.json_cols:
+        return True
+    return any(field_name.startswith(col + ".") for col in table.json_cols)
+
+
+def _orm_select(
+    table: Table,
+    rows: list[dict[str, Any]],
+    *,
+    project_id: str | None,
+    fields: list[str] | None,
+    query: tsi.Query | None,
+    sort_by: list[SortBy] | None,
+    limit: int | None,
+    offset: int | None,
+) -> list[dict[str, Any]]:
+    """Mirror `Table.select()....prepare()` + `tuples_to_rows` on stored rows."""
+    if limit is not None and limit < 0:
+        raise ValueError("Limit must be non-negative")
+    if offset is not None and offset < 0:
+        raise ValueError("Offset must be non-negative")
+    if sort_by:
+        for o in sort_by:
+            assert o.direction in {
+                "ASC",
+                "DESC",
+                "asc",
+                "desc",
+            }, f"Invalid order_by direction: {o.direction}"
+
+    matched = rows
+    if project_id is not None:
+        matched = [row for row in matched if row.get("project_id") == project_id]
+    if query is not None:
+        matched = [
+            row for row in matched if _truthy(_orm_eval_query(table, row, query))
+        ]
+
+    if sort_by:
+        # Dynamic (JSON) fields sort with an existence term first, then the
+        # toFloat64OrNull cast, then the raw string — the ClickHouse
+        # dynamic-field sort triple.
+        sort_terms: list[tuple[tuple[str, str], str]] = []
+        for clause in sort_by:
+            if _orm_is_dynamic_field(table, clause.field):
+                sort_terms.append(((clause.field, "exists"), "desc"))
+                sort_terms.append(((clause.field, "double"), clause.direction))
+                sort_terms.append(((clause.field, "value"), clause.direction))
+            else:
+                sort_terms.append(((clause.field, "value"), clause.direction))
+
+        def sort_value(row: dict[str, Any], term: tuple[str, str]) -> Any:
+            field_name, mode = term
+            if mode == "exists":
+                return 1 if _orm_field_exists(table, row, field_name) else 0
+            if mode == "double":
+                value = _orm_field_value(table, row, field_name)
+                return _to_float64_or_null(_to_ch_string(value))
+            return _orm_field_value(table, row, field_name)
+
+        matched = _ch_sorted_by_terms(matched, sort_terms, sort_value)
+
+    # Field selection: default = all columns.
+    fieldnames = fields or [c.name for c in table.cols]
+
+    if any(f.lower() == "count(*)" for f in fieldnames):
+        # Aggregate query: one result row (LIMIT/OFFSET apply to that row,
+        # not the counted rows). count(*) counts every matched row;
+        # non-aggregate fields take the last row's values (permissive
+        # no-GROUP-BY behavior; callers only request count(*) alone);
+        # no rows yields (0, NULL, ...).
+        out: dict[str, Any] = {}
+        last_row = matched[-1] if matched else None
+        for field_name in fieldnames:
+            if field_name.lower() == "count(*)":
+                out[field_name] = len(matched)
+            elif last_row is None:
+                out[field_name] = None
+            else:
+                normalized = (
+                    field_name[:-5] if field_name.endswith("_dump") else field_name
+                )
+                if normalized in table.col_types:
+                    out[normalized] = _json_deep_copy(last_row.get(normalized))
+                else:
+                    out[field_name] = _json_deep_copy(
+                        _orm_field_value(table, last_row, field_name)
+                    )
+        agg_rows = [out]
+        if offset is not None:
+            agg_rows = agg_rows[offset:]
+        if limit is not None:
+            agg_rows = agg_rows[:limit]
+        return agg_rows
+
+    if offset is not None:
+        matched = matched[offset:]
+    if limit is not None:
+        matched = matched[:limit]
+
+    result = []
+    for row in matched:
+        out: dict[str, Any] = {}
+        for field_name in fieldnames:
+            normalized = field_name[:-5] if field_name.endswith("_dump") else field_name
+            if normalized in table.col_types:
+                value = row.get(normalized)
+                out[normalized] = _json_deep_copy(value)
+            else:
+                out[field_name] = _json_deep_copy(
+                    _orm_field_value(table, row, field_name)
+                )
+        result.append(out)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Feedback stats helpers (Python ports of methods/feedback_stats.py)
+# ---------------------------------------------------------------------------
+
+
+def _extract_stats_value(payload_str: str, json_path: str, value_type: str) -> Any:
+    """Extract a value from a JSON payload string at a dot path."""
+    try:
+        obj = json.loads(payload_str)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    for part in json_path.split("."):
+        if not isinstance(obj, dict):
+            return None
+        obj = obj.get(part)
+        if obj is None:
+            return None
+    if value_type == "numeric":
+        try:
+            return float(obj)
+        except (TypeError, ValueError):
+            return None
+    if value_type == "boolean":
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, str):
+            if obj.lower() == "true":
+                return True
+            if obj.lower() == "false":
+                return False
+        return None
+    return obj
+
+
+def _parse_feedback_row_ts(created_at_str: str) -> datetime.datetime:
+    """Parse a stored created_at string into a UTC datetime."""
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            return datetime.datetime.strptime(created_at_str, fmt).replace(
+                tzinfo=datetime.timezone.utc
+            )
+        except ValueError:
+            continue
+    return datetime.datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+
+
+def _stats_bucket_key(
+    ts: datetime.datetime, start: datetime.datetime, granularity: int
+) -> datetime.datetime:
+    offset = int((ts - start).total_seconds())
+    bucket_offset = (offset // granularity) * granularity
+    return start + datetime.timedelta(seconds=bucket_offset)
+
+
+def _compute_stats_agg(
+    values: list[float],
+    agg: str,
+) -> float | None:
+    if not values:
+        return None
+    if agg == "avg":
+        return statistics.mean(values)
+    if agg == "sum":
+        return math.fsum(values)
+    if agg == "min":
+        return min(values)
+    if agg == "max":
+        return max(values)
+    if agg == "count":
+        return float(len(values))
+    return None
+
+
+def _compute_stats_percentile(values: list[float], pct: float) -> float | None:
+    if not values:
+        return None
+    s = sorted(values)
+    k = (pct / 100.0) * (len(s) - 1)
+    f = int(k)
+    c = f + 1
+    if c >= len(s):
+        return s[-1]
+    return s[f] + (k - f) * (s[c] - s[f])
