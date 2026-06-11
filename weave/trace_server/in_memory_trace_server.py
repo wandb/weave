@@ -4217,6 +4217,412 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         {"call_started_at", "call_op_name", "created_at", "updated_at"}
     )
 
+    def _queue_to_schema(self, queue: dict[str, Any]) -> tsi.AnnotationQueueSchema:
+        return tsi.AnnotationQueueSchema(
+            id=queue["id"],
+            project_id=queue["project_id"],
+            name=queue["name"],
+            description=queue["description"] or "",
+            scorer_refs=list(queue["scorer_refs"]),
+            created_at=_ensure_tz(queue["created_at"]),
+            created_by=queue["created_by"],
+            updated_at=_ensure_tz(queue["updated_at"]),
+            deleted_at=queue["deleted_at"],
+        )
+
+    def _live_queue(self, project_id: str, queue_id: str) -> dict[str, Any] | None:
+        queue = self._annotation_queues.get(queue_id)
+        if (
+            queue is None
+            or queue["project_id"] != project_id
+            or queue["deleted_at"] is not None
+        ):
+            return None
+        return queue
+
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        assert_non_null_wb_user_id(req)
+        queue_id = generate_id()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        with self.lock:
+            self._annotation_queues[queue_id] = {
+                "id": queue_id,
+                "project_id": req.project_id,
+                "name": req.name,
+                "description": req.description,
+                "scorer_refs": list(req.scorer_refs),
+                "created_at": now,
+                "created_by": req.wb_user_id,
+                "updated_at": now,
+                "deleted_at": None,
+            }
+        return tsi.AnnotationQueueCreateRes(id=queue_id)
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        with self.lock:
+            queues = [
+                queue
+                for queue in self._annotation_queues.values()
+                if queue["project_id"] == req.project_id and queue["deleted_at"] is None
+            ]
+        if req.name:
+            needle = req.name.lower()
+            queues = [q for q in queues if needle in q["name"].lower()]
+
+        sort_terms: list[tuple[str, str]] = []
+        if req.sort_by:
+            for sort in req.sort_by:
+                if sort.field in self._QUEUE_SORT_FIELDS and sort.direction.lower() in {
+                    "asc",
+                    "desc",
+                }:
+                    sort_terms.append((sort.field, sort.direction))
+        if sort_terms:
+            sort_terms.append(("id", "asc"))
+        else:
+            sort_terms = [("created_at", "desc"), ("id", "asc")]
+        queues = _ch_sorted_by_terms(queues, sort_terms, lambda q, term: q[term])
+
+        if req.offset is not None and req.offset > 0:
+            queues = queues[req.offset :]
+        if req.limit is not None and req.limit >= 0:
+            queues = queues[: req.limit]
+
+        for queue in queues:
+            if queue["created_at"] is None or queue["updated_at"] is None:
+                continue
+            yield self._queue_to_schema(queue)
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        with self.lock:
+            queue = self._live_queue(req.project_id, req.queue_id)
+        if queue is None:
+            raise NotFoundError(f"Queue {req.queue_id} not found")
+        return tsi.AnnotationQueueReadRes(queue=self._queue_to_schema(queue))
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        assert_non_null_wb_user_id(req)
+        with self.lock:
+            queue = self._live_queue(req.project_id, req.queue_id)
+            if queue is None:
+                raise NotFoundError(
+                    f"Queue {req.queue_id} not found or already deleted"
+                )
+            if req.name is None and req.description is None and req.scorer_refs is None:
+                return tsi.AnnotationQueueUpdateRes(queue=self._queue_to_schema(queue))
+            if req.name is not None:
+                queue["name"] = req.name
+            if req.description is not None:
+                queue["description"] = req.description
+            if req.scorer_refs is not None:
+                queue["scorer_refs"] = list(req.scorer_refs)
+            queue["updated_at"] = datetime.datetime.now(datetime.timezone.utc)
+            return tsi.AnnotationQueueUpdateRes(queue=self._queue_to_schema(queue))
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        with self.lock:
+            queue = self._live_queue(req.project_id, req.queue_id)
+            if queue is None:
+                raise NotFoundError(
+                    f"Queue {req.queue_id} not found or already deleted"
+                )
+            now = datetime.datetime.now(datetime.timezone.utc)
+            queue["deleted_at"] = now
+            queue["updated_at"] = now
+            # No cascade: items and progress rows stay (mirrors ClickHouse).
+            return tsi.AnnotationQueueDeleteRes(queue=self._queue_to_schema(queue))
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        assert_non_null_wb_user_id(req)
+        with self.lock:
+            existing_call_ids = {
+                item["call_id"]
+                for item in self._annotation_queue_items.values()
+                if item["project_id"] == req.project_id
+                and item["queue_id"] == req.queue_id
+                and item["deleted_at"] is None
+                and item["call_id"] in set(req.call_ids)
+            }
+            new_call_ids = [
+                call_id for call_id in req.call_ids if call_id not in existing_call_ids
+            ]
+            if not new_call_ids:
+                return tsi.AnnotationQueueAddCallsRes(
+                    added_count=0, duplicates=len(req.call_ids)
+                )
+
+            calls_data = [
+                rec
+                for call_id in new_call_ids
+                if (rec := self._calls.get(call_id)) is not None
+                and rec.project_id == req.project_id
+                and rec.deleted_at is None
+            ]
+            if not calls_data:
+                return tsi.AnnotationQueueAddCallsRes(
+                    added_count=0, duplicates=len(existing_call_ids)
+                )
+
+            now = datetime.datetime.now(datetime.timezone.utc)
+            for rec in calls_data:
+                item_id = generate_id()
+                self._annotation_queue_items[item_id] = {
+                    "id": item_id,
+                    "project_id": req.project_id,
+                    "queue_id": req.queue_id,
+                    "call_id": rec.id,
+                    "call_started_at": rec.started_at,
+                    "call_ended_at": rec.ended_at,
+                    "call_op_name": rec.op_name or "",
+                    "call_trace_id": rec.trace_id or "",
+                    "display_fields": list(req.display_fields),
+                    "added_by": req.wb_user_id,
+                    "created_at": now,
+                    "created_by": req.wb_user_id,
+                    "updated_at": now,
+                    "deleted_at": None,
+                }
+        return tsi.AnnotationQueueAddCallsRes(
+            added_count=len(calls_data), duplicates=len(existing_call_ids)
+        )
+
+    def _item_progress_state(self, item_id: str) -> tuple[str, str | None]:
+        """Global most-recent state across annotators (argMax by updated_at);
+        defaults to 'unstarted' with no annotator.
+        """
+        progress_rows = [
+            row
+            for row in self._annotation_progress.values()
+            if row["queue_item_id"] == item_id and row["deleted_at"] is None
+        ]
+        if not progress_rows:
+            # ClickHouse String default is the empty string, not NULL.
+            return ("unstarted", "")
+        latest = max(progress_rows, key=lambda row: row["updated_at"])
+        return (latest["annotation_state"], latest["annotator_id"])
+
+    def _queue_item_to_schema(
+        self,
+        item: dict[str, Any],
+        position_in_queue: int | None = None,
+    ) -> tsi.AnnotationQueueItemSchema:
+        state, annotator = self._item_progress_state(item["id"])
+        return tsi.AnnotationQueueItemSchema(
+            id=item["id"],
+            project_id=item["project_id"],
+            queue_id=item["queue_id"],
+            call_id=item["call_id"],
+            call_started_at=item["call_started_at"],
+            call_ended_at=item["call_ended_at"],
+            call_op_name=item["call_op_name"],
+            call_trace_id=item["call_trace_id"],
+            display_fields=list(item["display_fields"]),
+            added_by=item["added_by"],
+            annotation_state=state,
+            annotator_user_id=annotator,
+            created_at=item["created_at"],
+            created_by=item["created_by"],
+            updated_at=item["updated_at"],
+            deleted_at=item["deleted_at"],
+            position_in_queue=position_in_queue,
+        )
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        with self.lock:
+            items = [
+                item
+                for item in self._annotation_queue_items.values()
+                if item["project_id"] == req.project_id
+                and item["queue_id"] == req.queue_id
+                and item["deleted_at"] is None
+            ]
+
+        item_filter = req.filter
+        if item_filter is not None:
+            if item_filter.id is not None:
+                items = [i for i in items if i["id"] == item_filter.id]
+            if item_filter.call_id is not None:
+                items = [i for i in items if i["call_id"] == item_filter.call_id]
+            if item_filter.call_op_name is not None:
+                items = [
+                    i for i in items if i["call_op_name"] == item_filter.call_op_name
+                ]
+            if item_filter.call_trace_id is not None:
+                items = [
+                    i for i in items if i["call_trace_id"] == item_filter.call_trace_id
+                ]
+            if item_filter.added_by is not None:
+                items = [i for i in items if i["added_by"] == item_filter.added_by]
+
+        sort_terms: list[tuple[str, str]] = []
+        if req.sort_by:
+            for sort in req.sort_by:
+                if (
+                    sort.field in self._QUEUE_ITEM_SORT_FIELDS
+                    and sort.direction.lower() in {"asc", "desc"}
+                ):
+                    sort_terms.append((sort.field, sort.direction))
+        if sort_terms:
+            sort_terms.append(("id", "asc"))
+        else:
+            sort_terms = [("created_at", "asc"), ("id", "asc")]
+        items = _ch_sorted_by_terms(items, sort_terms, lambda i, term: i[term])
+
+        # State filter applies after aggregation (the state is computed from
+        # the progress join).
+        if item_filter is not None and item_filter.annotation_states:
+            allowed = set(item_filter.annotation_states)
+            items = [
+                i for i in items if self._item_progress_state(i["id"])[0] in allowed
+            ]
+
+        positions: dict[str, int] = {}
+        if req.include_position:
+            # 1-based positions over the full filtered + sorted set, before
+            # pagination.
+            positions = {item["id"]: idx + 1 for idx, item in enumerate(items)}
+
+        if req.offset is not None and req.offset > 0:
+            items = items[req.offset :]
+        if req.limit is not None and req.limit >= 0:
+            items = items[: req.limit]
+
+        return tsi.AnnotationQueueItemsQueryRes(
+            items=[
+                self._queue_item_to_schema(
+                    item, positions.get(item["id"]) if req.include_position else None
+                )
+                for item in items
+            ]
+        )
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        if not req.queue_ids:
+            return tsi.AnnotationQueuesStatsRes(stats=[])
+        with self.lock:
+            stats = []
+            for queue_id in req.queue_ids:
+                total_items = sum(
+                    1
+                    for item in self._annotation_queue_items.values()
+                    if item["project_id"] == req.project_id
+                    and item["queue_id"] == queue_id
+                    and item["deleted_at"] is None
+                )
+                completed_items = len(
+                    {
+                        row["queue_item_id"]
+                        for row in self._annotation_progress.values()
+                        if row["project_id"] == req.project_id
+                        and row["queue_id"] == queue_id
+                        and row["annotation_state"] in {"completed", "skipped"}
+                        and row["deleted_at"] is None
+                    }
+                )
+                stats.append(
+                    tsi.AnnotationQueueStatsSchema(
+                        queue_id=queue_id,
+                        total_items=total_items,
+                        completed_items=completed_items,
+                    )
+                )
+        return tsi.AnnotationQueuesStatsRes(stats=stats)
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        allowed_states = {"completed", "skipped", "in_progress"}
+        if req.annotation_state not in allowed_states:
+            raise ValueError(
+                f"Invalid annotation_state '{req.annotation_state}'. "
+                f"Must be one of: {', '.join(sorted(allowed_states))}"
+            )
+        annotator_id = req.wb_user_id
+        if not annotator_id:
+            raise ValueError("wb_user_id is required")
+
+        with self.lock:
+            own_rows = [
+                row
+                for row in self._annotation_progress.values()
+                if row["project_id"] == req.project_id
+                and row["queue_item_id"] == req.item_id
+                and row["annotator_id"] == annotator_id
+                and row["deleted_at"] is None
+            ]
+            current_state = own_rows[0]["annotation_state"] if own_rows else None
+            has_record = bool(own_rows)
+
+            item = self._annotation_queue_items.get(req.item_id)
+            item_exists = (
+                item is not None
+                and item["project_id"] == req.project_id
+                and item["queue_id"] == req.queue_id
+                and item["deleted_at"] is None
+            )
+
+            if current_state == req.annotation_state:
+                pass  # Idempotent no-op.
+            elif req.annotation_state == "in_progress" and has_record:
+                raise ValueError(
+                    "Cannot transition to 'in_progress' when a record already "
+                    f"exists (current state: '{current_state}')"
+                )
+            elif current_state is not None and current_state not in {
+                "in_progress",
+                "unstarted",
+            }:
+                raise ValueError(
+                    f"Invalid state transition from '{current_state}' to "
+                    f"'{req.annotation_state}'. Only transitions from "
+                    "'in_progress' or 'unstarted' are allowed."
+                )
+
+            if not item_exists:
+                raise ValueError(
+                    f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
+                )
+
+            if current_state != req.annotation_state:
+                now = datetime.datetime.now(datetime.timezone.utc)
+                if has_record:
+                    own_rows[0]["annotation_state"] = req.annotation_state
+                    own_rows[0]["updated_at"] = now
+                else:
+                    progress_id = generate_id()
+                    self._annotation_progress[progress_id] = {
+                        "id": progress_id,
+                        "project_id": req.project_id,
+                        "queue_item_id": req.item_id,
+                        "queue_id": req.queue_id,
+                        "annotator_id": annotator_id,
+                        "annotation_state": req.annotation_state,
+                        "created_at": now,
+                        "updated_at": now,
+                        "deleted_at": None,
+                    }
+
+            assert item is not None
+            return tsi.AnnotatorQueueItemsProgressUpdateRes(
+                item=self._queue_item_to_schema(item)
+            )
+
     # ------------------------------------------------------------------
     # Evaluate model / rescore
     # ------------------------------------------------------------------
