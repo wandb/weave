@@ -118,3 +118,6 @@ the byte-identical mirror (which violated rule 5: impl in interface).
 
 ## Open Questions
 None.
+
+## Addendum (review round 3 follow-through)
+The per-side refs_internal split reintroduced an untranslated wire error: weave.trace_server.refs_internal.InvalidInternalRef (and trace_server_converter's same-named class) escaped the in-process wire boundary raw, while tests/trace/test_trace_server.py::test_robust_to_url_sensitive_chars expects the CLIENT's weave.trace.refs_internal.InvalidInternalRef. Fix, consistent with the wire design: both server-side classes registered at 400 and added to CONTRACT_ERROR_TYPES (they share the wire name "InvalidInternalRef"); the client-side catalog in tests/conftest.py becomes an ordered module tuple (weave.interface.errors, then weave.trace.refs_internal) so the client rebuilds ITS class from the payload name; the registry-sync conformance test checks the same catalog. Caught by the tip seam battery after the restack.
