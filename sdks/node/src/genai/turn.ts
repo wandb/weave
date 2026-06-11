@@ -1,6 +1,6 @@
 import {
-  type AttributeValue,
   type Attributes,
+  type AttributeValue,
   type Context,
   ROOT_CONTEXT,
   type Span,
@@ -128,17 +128,28 @@ export class Turn {
   }
 
   /**
-   * Set a single attribute on the Turn span. Useful for stamping running
-   * totals (e.g. cumulative cost, token usage) or other metadata that becomes
-   * known mid-turn. No-op after `end()`. Mirrors OTel `Span.setAttribute`.
+   * Stamp arbitrary attributes on the Turn span. Pass an object whether you
+   * have one key or many. Useful for stamping running totals (e.g. cumulative
+   * cost, token usage) or other metadata that becomes known mid-turn. No-op
+   * after `end()`. Mirrors OTel `Span.setAttributes` and the Python SDK's
+   * `set_attributes`.
    *
    * @example
-   * turn.setAttribute('gen_ai.usage.input_tokens', totalInputTokens);
+   * turn.setAttributes({'gen_ai.usage.input_tokens': totalInputTokens});
+   */
+  setAttributes(attributes: Attributes): this {
+    if (this._ended) return this;
+    this.span.setAttributes(attributes);
+    return this;
+  }
+
+  /**
+   * @deprecated Use {@link setAttributes} instead, which mirrors the Python
+   * SDK's `set_attributes` and OTel's `Span.setAttributes`. Retained as a
+   * thin alias so existing single-attribute callers keep working.
    */
   setAttribute(key: string, value: AttributeValue): this {
-    if (this._ended) return this;
-    this.span.setAttribute(key, value);
-    return this;
+    return this.setAttributes({[key]: value});
   }
 
   /**
