@@ -1,0 +1,392 @@
+"""Query builder for the dataset_sources membership table.
+
+`dataset_sources` is the second instance of the "membership pattern" (the first
+is `annotation_queue_items`, migration 023). Shared invariants — deterministic
+ids, soft-delete tombstones, idempotent relink, and read-side dedup via
+GROUP BY + argMax (never FINAL) — are documented in
+weave/trace_server/docs/membership_pattern.md.
+
+ARCHITECTURE NOTE: this module deliberately owns NO SQL against tables it does
+not own. Existence/cached-field fetches for the source entities live in their
+owners' builders:
+  - calls: ``make_queue_add_calls_fetch_calls_query`` (annotation_queues builder,
+    which queries the calls_merged / calls_complete tables the calls feature owns)
+  - spans: ``make_spans_existence_query`` (agent_query_builder)
+This module only builds SQL against the ``dataset_sources`` table itself.
+
+Every SELECT here collapses ReplacingMergeTree versions with
+``GROUP BY <logical key>`` + ``argMax(col, (updated_at, id))`` — NEVER ``FINAL``
+(benchmarked ~100x slower). All user-supplied values go through ``ParamBuilder``;
+no f-string interpolation of user data.
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from weave.trace_server.calls_query_builder.calls_query_builder import (
+    _format_table_name_with_cluster,
+)
+from weave.trace_server.orm import ParamBuilder
+
+# Stable namespace for deterministic UUIDv5 link ids. Generated once and frozen;
+# changing this would re-key every existing link and break idempotent relink.
+DATASET_SOURCE_LINK_NAMESPACE = uuid.UUID("9f2c1d3e-7b4a-5c6d-8e9f-0a1b2c3d4e5f")
+
+# Physical column order for INSERTs into dataset_sources. Both backends build
+# rows in exactly this order (the ClickHouse insert and the SQLite insert), so
+# keep this list authoritative.
+DATASET_SOURCES_INSERT_COLUMNS = [
+    "id",
+    "project_id",
+    "dataset_object_id",
+    "row_digest",
+    "source_kind",
+    "source_id",
+    "source_trace_id",
+    "source_started_at",
+    "source_display_name",
+    "link_metadata",
+    "added_by",
+    "created_at",
+    "updated_at",
+    "deleted_at",
+]
+
+
+def deterministic_link_id(
+    project_id: str,
+    dataset_object_id: str,
+    row_digest: str,
+    source_kind: str,
+    source_id: str,
+) -> str:
+    """Deterministic UUIDv5 over the logical key.
+
+    The logical key
+    ``(project_id, dataset_object_id, row_digest, source_kind, source_id)``
+    uniquely identifies a link independent of its surrogate row version. Because
+    the id is a pure function of the logical key, relinking the same key always
+    yields the same id (idempotent relink, no read-before-write needed).
+
+    ``source_kind`` is the string enum value ("call" / "span").
+    """
+    name = f"{project_id}/{dataset_object_id}/{row_digest}/{source_kind}/{source_id}"
+    return str(uuid.uuid5(DATASET_SOURCE_LINK_NAMESPACE, name))
+
+
+# Payload columns selected by argMax-collapsed reads. The aggregation key is the
+# logical key, so these are every other column we need to materialize a row.
+_ARGMAX_PAYLOAD_COLUMNS = [
+    "id",
+    "source_trace_id",
+    "source_started_at",
+    "source_display_name",
+    "link_metadata",
+    "added_by",
+    "created_at",
+    "updated_at",
+    "deleted_at",
+]
+
+# Nullable columns need tuple-wrapped argMax — see _argmax_select docstring.
+_NULLABLE_PAYLOAD_COLUMNS = {"added_by", "deleted_at"}
+
+
+def _argmax_select(columns: list[str]) -> str:
+    """Build ``argMax(ds.col, (ds.updated_at, ds.id)) AS col`` per payload column.
+
+    Note: ``id`` itself is resolved with argMax over ``updated_at`` only (it is
+    part of the version-tiebreaker tuple and constant within a logical key, so
+    ``argMax(id, updated_at)`` is well defined). Every other column uses the
+    full ``(updated_at, id)`` tiebreaker so two versions sharing an updated_at
+    resolve deterministically.
+
+    Column references are qualified with the ``ds`` table alias because the
+    output aliases (``AS updated_at``, ``AS id``) would otherwise shadow the
+    raw columns inside sibling aggregate arguments — ClickHouse rejects that
+    with ILLEGAL_AGGREGATION. Qualified references always resolve to the
+    table column, never the alias.
+
+    Nullable columns (``deleted_at``, ``added_by``) are tuple-wrapped:
+    ClickHouse aggregate functions SKIP NULL values of the aggregated
+    expression, so a bare ``argMax(deleted_at, ...)`` would return the
+    latest NON-NULL deleted_at — i.e. a restored (un-deleted) link would
+    read as deleted forever, because its tombstone version's timestamp
+    out-survives the restore version's NULL. Tuples are never NULL, so
+    ``argMax(tuple(col), ...).1`` faithfully returns the latest version's
+    value, NULL included.
+    """
+    parts = []
+    for col in columns:
+        if col == "id":
+            parts.append("argMax(ds.id, ds.updated_at) AS id")
+        elif col in _NULLABLE_PAYLOAD_COLUMNS:
+            parts.append(
+                f"tupleElement(argMax(tuple(ds.{col}), (ds.updated_at, ds.id)), 1)"
+                f" AS {col}"
+            )
+        else:
+            parts.append(f"argMax(ds.{col}, (ds.updated_at, ds.id)) AS {col}")
+    return ",\n            ".join(parts)
+
+
+# Logical-key columns, in canonical order. These are the GROUP BY for every read.
+_LOGICAL_KEY_COLUMNS = [
+    "project_id",
+    "dataset_object_id",
+    "row_digest",
+    "source_kind",
+    "source_id",
+]
+
+
+def make_link_state_query(
+    project_id: str,
+    dataset_object_id: str,
+    logical_keys: list[tuple[str, str]],
+    pb: ParamBuilder,
+) -> str:
+    """Collapsed current state for a set of links being written.
+
+    ``logical_keys`` is a list of ``(row_digest, source_id)`` pairs. We filter on
+    the ``row_digest IN (...) AND source_id IN (...)`` supersets (both bounded by
+    the request size) and let the caller match exact logical keys in Python —
+    this keeps the binding to two array params instead of a per-key OR chain.
+    Includes the collapsed ``deleted_at`` and ``created_at`` so the caller can
+    compute created/restore status and carry created_at forward.
+
+    Used by dataset_sources_link when include_created_status=True.
+    """
+    project_param = pb.add(project_id, param_type="String")
+    dataset_param = pb.add(dataset_object_id, param_type="String")
+
+    row_digests = sorted({rd for rd, _ in logical_keys})
+    source_ids = sorted({sid for _, sid in logical_keys})
+    row_digests_param = pb.add(row_digests, param_type="Array(String)")
+    source_ids_param = pb.add(source_ids, param_type="Array(String)")
+
+    group_by = ", ".join(f"ds.{c}" for c in _LOGICAL_KEY_COLUMNS)
+    payload = _argmax_select(_ARGMAX_PAYLOAD_COLUMNS)
+
+    return f"""
+        SELECT
+            ds.project_id,
+            ds.dataset_object_id,
+            ds.row_digest,
+            ds.source_kind,
+            ds.source_id,
+            {payload}
+        FROM dataset_sources AS ds
+        WHERE ds.project_id = {project_param}
+            AND ds.dataset_object_id = {dataset_param}
+            AND ds.row_digest IN {row_digests_param}
+            AND ds.source_id IN {source_ids_param}
+        GROUP BY {group_by}
+    """
+
+
+def make_link_state_by_ids_query(
+    project_id: str,
+    link_ids: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Collapsed current state for a set of link ids.
+
+    ``id`` is NOT in the table ORDER BY prefix, so this scans the project's
+    partitions filtered by ``id IN (...)``. Delete batches are small, so the
+    scan is acceptable. We GROUP BY the logical key (the correct aggregation
+    unit) and emit the logical-key columns alongside the payload so callers can
+    rebuild a full row to write a tombstone version.
+
+    Used by dataset_sources_link_delete.
+    """
+    project_param = pb.add(project_id, param_type="String")
+    ids_param = pb.add(link_ids, param_type="Array(String)")
+
+    group_by = ", ".join(f"ds.{c}" for c in _LOGICAL_KEY_COLUMNS)
+    payload = _argmax_select(_ARGMAX_PAYLOAD_COLUMNS)
+
+    return f"""
+        SELECT
+            ds.project_id,
+            ds.dataset_object_id,
+            ds.row_digest,
+            ds.source_kind,
+            ds.source_id,
+            {payload}
+        FROM dataset_sources AS ds
+        WHERE ds.project_id = {project_param}
+            AND ds.id IN {ids_param}
+        GROUP BY {group_by}
+    """
+
+
+def make_dataset_sources_select(
+    project_id: str,
+    dataset_object_id: str,
+    pb: ParamBuilder,
+    *,
+    row_digests: list[str] | None = None,
+    source_kinds: list[str] | None = None,
+    include_deleted: bool = False,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> str:
+    """Forward query: dataset -> sources.
+
+    Prefix scan on (project_id, dataset_object_id) with optional row_digest IN
+    and source_kind IN narrowing. Collapses versions via GROUP BY logical key +
+    argMax. ``include_deleted=False`` filters the COLLAPSED deleted_at via HAVING
+    (must run AFTER the argMax so a tombstone version actually hides the link —
+    a pre-collapse WHERE deleted_at IS NULL would wrongly resurface a link that
+    has a live earlier version and a later tombstone).
+    """
+    project_param = pb.add(project_id, param_type="String")
+    dataset_param = pb.add(dataset_object_id, param_type="String")
+
+    where = [
+        f"ds.project_id = {project_param}",
+        f"ds.dataset_object_id = {dataset_param}",
+    ]
+    if row_digests is not None:
+        rd_param = pb.add(row_digests, param_type="Array(String)")
+        where.append(f"ds.row_digest IN {rd_param}")
+    if source_kinds is not None:
+        sk_param = pb.add(source_kinds, param_type="Array(String)")
+        where.append(f"ds.source_kind IN {sk_param}")
+    where_sql = " AND ".join(where)
+
+    group_by = ", ".join(f"ds.{c}" for c in _LOGICAL_KEY_COLUMNS)
+    payload = _argmax_select(_ARGMAX_PAYLOAD_COLUMNS)
+
+    # HAVING intentionally references the collapsed alias (the argMax output),
+    # not the raw column — a tombstone latest-version must hide the link.
+    having_sql = "" if include_deleted else "HAVING deleted_at IS NULL"
+
+    query = f"""
+        SELECT
+            ds.project_id,
+            ds.dataset_object_id,
+            ds.row_digest,
+            ds.source_kind,
+            ds.source_id,
+            {payload}
+        FROM dataset_sources AS ds
+        WHERE {where_sql}
+        GROUP BY {group_by}
+        {having_sql}
+        ORDER BY ds.row_digest ASC, ds.source_kind ASC, ds.source_id ASC
+    """
+
+    if limit is not None:
+        limit_param = pb.add(limit, param_type="Int64")
+        query += f"\n        LIMIT {limit_param}"
+    if offset is not None:
+        offset_param = pb.add(offset, param_type="Int64")
+        query += f"\n        OFFSET {offset_param}"
+
+    return query
+
+
+def make_source_datasets_select(
+    project_id: str,
+    sources: list[tuple[str, str, str]],
+    pb: ParamBuilder,
+    *,
+    include_deleted: bool,
+    row_digests_cap: int,
+) -> str:
+    """Reverse query: sources -> datasets.
+
+    ``sources`` is a list of ``(source_kind, source_id, source_trace_id)``.
+    Bloom-assisted: WHERE source_id IN (...) lets ClickHouse skip granules via
+    the source_id bloom filter, then we match exact
+    (source_kind, source_id, source_trace_id) tuples.
+
+    Two-level aggregation:
+      - inner: collapse versions per logical key (argMax deleted_at, carry
+        created_at). include_deleted=False drops collapsed-deleted rows here.
+      - outer: group by (source_kind, source_id, source_trace_id,
+        dataset_object_id), capping row_digests at ``row_digests_cap`` via
+        groupArray(N)(...), and report the true total + truncation flag +
+        earliest first_seen_at.
+    """
+    project_param = pb.add(project_id, param_type="String")
+
+    source_ids = sorted({sid for _, sid, _ in sources})
+    source_ids_param = pb.add(source_ids, param_type="Array(String)")
+
+    # Exact-match tuple set: (source_kind, source_id, source_trace_id).
+    # References qualified with the ds alias so the inner SELECT's output
+    # aliases cannot shadow them (see _argmax_select docstring).
+    tuple_clauses = []
+    for kind, sid, trace_id in sources:
+        kind_param = pb.add(kind, param_type="String")
+        sid_param = pb.add(sid, param_type="String")
+        trace_param = pb.add(trace_id, param_type="String")
+        tuple_clauses.append(
+            f"(ds.source_kind = {kind_param} AND ds.source_id = {sid_param} "
+            f"AND ds.source_trace_id = {trace_param})"
+        )
+    exact_match_sql = " OR ".join(tuple_clauses)
+
+    group_by_inner = ", ".join(f"ds.{c}" for c in _LOGICAL_KEY_COLUMNS)
+    # HAVING intentionally references the collapsed alias (argMax output).
+    inner_having = "" if include_deleted else "HAVING deleted_at IS NULL"
+
+    # groupArray(N) requires N as a parametric literal (not a query-bound
+    # parameter). row_digests_cap is a server-controlled constant
+    # (MAX_ROW_DIGESTS_PER_RESULT), never user input, so coerce to a bounded
+    # int and inline it.
+    cap_literal = int(row_digests_cap)
+    if cap_literal < 1:
+        raise ValueError(f"row_digests_cap must be >= 1, got {row_digests_cap!r}")
+
+    return f"""
+        SELECT
+            source_kind,
+            source_id,
+            source_trace_id,
+            dataset_object_id,
+            groupArray({cap_literal})(row_digest) AS row_digests,
+            count() AS row_digests_total_count,
+            min(created_at) AS first_seen_at
+        FROM (
+            SELECT
+                ds.project_id,
+                ds.dataset_object_id,
+                ds.row_digest,
+                ds.source_kind,
+                ds.source_id,
+                argMax(ds.source_trace_id, (ds.updated_at, ds.id)) AS source_trace_id,
+                argMax(ds.created_at, (ds.updated_at, ds.id)) AS created_at,
+                tupleElement(
+                    argMax(tuple(ds.deleted_at), (ds.updated_at, ds.id)), 1
+                ) AS deleted_at
+            FROM dataset_sources AS ds
+            WHERE ds.project_id = {project_param}
+                AND ds.source_id IN {source_ids_param}
+                AND ({exact_match_sql})
+            GROUP BY {group_by_inner}
+            {inner_having}
+        )
+        GROUP BY source_kind, source_id, source_trace_id, dataset_object_id
+        ORDER BY source_kind ASC, source_id ASC, source_trace_id ASC,
+            dataset_object_id ASC
+    """
+
+
+# Re-export so callers can format the local mutation table name if ever needed
+# (dataset_sources never mutates — insert-only — but keep symmetry with the
+# annotation_queues builder which exposes the same helper).
+__all__ = [
+    "DATASET_SOURCES_INSERT_COLUMNS",
+    "DATASET_SOURCE_LINK_NAMESPACE",
+    "_format_table_name_with_cluster",
+    "deterministic_link_id",
+    "make_dataset_sources_select",
+    "make_link_state_by_ids_query",
+    "make_link_state_query",
+    "make_source_datasets_select",
+]

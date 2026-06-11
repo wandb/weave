@@ -1159,6 +1159,47 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.AnnotatorQueueItemsProgressUpdateRes,
         )
 
+    # Dataset Sources API
+    def dataset_sources_link(
+        self, req: tsi.DatasetSourcesLinkReq
+    ) -> tsi.DatasetSourcesLinkRes:
+        return self._generic_request(
+            "/dataset_sources/link",
+            req,
+            tsi.DatasetSourcesLinkReq,
+            tsi.DatasetSourcesLinkRes,
+        )
+
+    def dataset_sources_link_delete(
+        self, req: tsi.DatasetSourcesLinkDeleteReq
+    ) -> tsi.DatasetSourcesLinkDeleteRes:
+        return self._generic_request(
+            "/dataset_sources/link_delete",
+            req,
+            tsi.DatasetSourcesLinkDeleteReq,
+            tsi.DatasetSourcesLinkDeleteRes,
+        )
+
+    def dataset_sources_query(
+        self, req: tsi.DatasetSourcesQueryReq
+    ) -> tsi.DatasetSourcesQueryRes:
+        return self._generic_request(
+            "/dataset_sources/query",
+            req,
+            tsi.DatasetSourcesQueryReq,
+            tsi.DatasetSourcesQueryRes,
+        )
+
+    def source_datasets_query(
+        self, req: tsi.SourceDatasetsQueryReq
+    ) -> tsi.SourceDatasetsQueryRes:
+        return self._generic_request(
+            "/dataset_sources/source_datasets_query",
+            req,
+            tsi.SourceDatasetsQueryReq,
+            tsi.SourceDatasetsQueryRes,
+        )
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         raise NotImplementedError("evaluate_model is not implemented")
 

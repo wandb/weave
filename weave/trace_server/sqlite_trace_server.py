@@ -41,6 +41,7 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     ObjectNameTypeCollision,
+    RequestTooLarge,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -64,6 +65,9 @@ from weave.trace_server.methods.sqlite_feedback_stats import (
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import Row, quote_json_path, quote_json_path_parts
+from weave.trace_server.query_builder.dataset_sources_query_builder import (
+    deterministic_link_id,
+)
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
@@ -515,6 +519,53 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             """
             CREATE INDEX IF NOT EXISTS idx_llm_token_prices_lookup
             ON llm_token_prices (llm_id, pricing_level, pricing_level_id, effective_date)
+            """
+        )
+        # Dataset row provenance: links dataset rows to their source calls/spans.
+        # Second instance of the membership pattern (see annotation_queue_items).
+        # Shared invariants: weave/trace_server/docs/membership_pattern.md
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_sources (
+                id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                dataset_object_id TEXT NOT NULL,
+                row_digest TEXT NOT NULL,
+                source_kind TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                source_trace_id TEXT NOT NULL,
+                source_started_at TEXT NOT NULL,
+                source_display_name TEXT NOT NULL,
+                link_metadata TEXT NOT NULL DEFAULT '',
+                added_by TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                deleted_at TEXT
+            )
+            """
+        )
+        # UNIQUE index on the logical key powers the natural upsert
+        # (INSERT ... ON CONFLICT DO UPDATE). ClickHouse achieves the same
+        # collapse via ReplacingMergeTree + read-side argMax; SQLite has no
+        # merge semantics, so one physical row per logical key is the model.
+        cursor.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_dataset_sources_logical_key
+            ON dataset_sources (
+                project_id, dataset_object_id, row_digest, source_kind, source_id
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_dataset_sources_forward
+            ON dataset_sources (project_id, dataset_object_id, row_digest)
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_dataset_sources_reverse
+            ON dataset_sources (project_id, source_kind, source_id)
             """
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
@@ -3204,6 +3255,308 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Annotation queues not supported in SQLite."""
         raise NotImplementedError("Annotation queues are not supported in SQLite")
 
+    # Dataset Sources API
+    #
+    # Observable semantics match the ClickHouse backend exactly. ClickHouse is
+    # insert-only over ReplacingMergeTree + read-side argMax; SQLite has no merge
+    # semantics, so we keep ONE physical row per logical key via a natural upsert
+    # (INSERT ... ON CONFLICT DO UPDATE on the UNIQUE logical-key index) and a
+    # real UPDATE for soft-delete. The deterministic id helper is shared with
+    # ClickHouse so the same logical key yields the same id on both backends.
+    #
+    # SPANS ARE NOT SUPPORTED IN SQLITE: there is no spans table in the SQLite
+    # backend (agent spans only exist in ClickHouse). source_kind='span' links
+    # therefore validate-fail with a clear NotImplementedError rather than
+    # silently fabricating cached fields. See the task report.
+    def dataset_sources_link(
+        self, req: tsi.DatasetSourcesLinkReq
+    ) -> tsi.DatasetSourcesLinkRes:
+        flat: list[tuple[str, tsi.SourceRef, dict[str, Any] | None]] = []
+        for payload in req.links:
+            for source in payload.sources:
+                flat.append((payload.row_digest, source, payload.link_metadata))
+
+        if len(flat) > tsi.MAX_DATASET_SOURCE_LINKS_PER_REQUEST:
+            raise RequestTooLarge(
+                f"dataset_sources_link accepts at most "
+                f"{tsi.MAX_DATASET_SOURCE_LINKS_PER_REQUEST} links per request, "
+                f"got {len(flat)}"
+            )
+
+        if not flat:
+            return tsi.DatasetSourcesLinkRes(entries=[])
+
+        if any(
+            source.source_kind == tsi.SourceKind.SPAN for _rd, source, _meta in flat
+        ):
+            raise NotImplementedError(
+                "dataset_sources_link: source_kind='span' is not supported by the "
+                "SQLite backend (the SQLite backend has no spans table; agent "
+                "spans only exist in ClickHouse). Use the ClickHouse backend for "
+                "span provenance links."
+            )
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            # Validate call existence + fetch cached display fields.
+            call_ids = sorted(
+                {source.source_id for _rd, source, _meta in flat}
+            )
+            placeholders = ",".join("?" for _ in call_ids)
+            cursor.execute(
+                f"""
+                SELECT id, op_name, started_at, trace_id
+                FROM calls
+                WHERE project_id = ? AND id IN ({placeholders})
+                """,
+                (req.project_id, *call_ids),
+            )
+            call_fields: dict[str, tuple[str, str, str]] = {
+                row[0]: (row[1] or "", row[2], row[3] or "")
+                for row in cursor.fetchall()
+            }
+            missing = sorted({cid for cid in call_ids if cid not in call_fields})
+            if missing:
+                raise InvalidRequest(
+                    "dataset_sources_link: the following sources were not found "
+                    f"in project {req.project_id!r}: "
+                    f"{[('call', cid) for cid in missing]}"
+                )
+
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+            entries: list[tsi.DatasetSourcesLinkResEntry] = []
+            for row_digest, source, meta in flat:
+                kind = source.source_kind.value
+                display_name, started_at, _trace_id = call_fields[source.source_id]
+                link_id = deterministic_link_id(
+                    req.project_id,
+                    req.dataset_object_id,
+                    row_digest,
+                    kind,
+                    source.source_id,
+                )
+                link_metadata_str = json.dumps(meta) if meta else ""
+
+                created: bool | None = None
+                if req.include_created_status:
+                    cursor.execute(
+                        "SELECT created_at FROM dataset_sources WHERE id = ?",
+                        (link_id,),
+                    )
+                    prior = cursor.fetchone()
+                    # created=False means a row already existed (live OR
+                    # tombstoned -> restore). No prior row -> created=True.
+                    created = prior is None
+
+                # Natural upsert keyed on the logical key. On conflict this is a
+                # relink/restore: bump updated_at, clear deleted_at, refresh
+                # cached source fields + metadata + added_by. created_at is
+                # PRESERVED on conflict (DO NOT touch it) to keep first_seen
+                # semantics when status was checked; when status was not checked
+                # (blind), ClickHouse refreshes created_at to now. To match that
+                # divergence we conditionally refresh created_at below.
+                refresh_created_at = not req.include_created_status
+                cursor.execute(
+                    """
+                    INSERT INTO dataset_sources (
+                        id, project_id, dataset_object_id, row_digest,
+                        source_kind, source_id, source_trace_id,
+                        source_started_at, source_display_name, link_metadata,
+                        added_by, created_at, updated_at, deleted_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                    ON CONFLICT (
+                        project_id, dataset_object_id, row_digest,
+                        source_kind, source_id
+                    ) DO UPDATE SET
+                        source_trace_id = excluded.source_trace_id,
+                        source_started_at = excluded.source_started_at,
+                        source_display_name = excluded.source_display_name,
+                        link_metadata = excluded.link_metadata,
+                        added_by = excluded.added_by,
+                        updated_at = excluded.updated_at,
+                        deleted_at = NULL,
+                        created_at = CASE WHEN ? THEN excluded.created_at
+                                          ELSE dataset_sources.created_at END
+                    """,
+                    (
+                        link_id,
+                        req.project_id,
+                        req.dataset_object_id,
+                        row_digest,
+                        kind,
+                        source.source_id,
+                        source.source_trace_id,
+                        started_at,
+                        display_name,
+                        link_metadata_str,
+                        req.wb_user_id,
+                        now_iso,  # created_at (used for fresh inserts)
+                        now_iso,  # updated_at
+                        1 if refresh_created_at else 0,
+                    ),
+                )
+                entries.append(
+                    tsi.DatasetSourcesLinkResEntry(link_id=link_id, created=created)
+                )
+            conn.commit()
+
+        return tsi.DatasetSourcesLinkRes(entries=entries)
+
+    def dataset_sources_link_delete(
+        self, req: tsi.DatasetSourcesLinkDeleteReq
+    ) -> tsi.DatasetSourcesLinkDeleteRes:
+        if not req.link_ids:
+            return tsi.DatasetSourcesLinkDeleteRes(entries=[])
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            placeholders = ",".join("?" for _ in req.link_ids)
+            cursor.execute(
+                f"""
+                SELECT id, deleted_at
+                FROM dataset_sources
+                WHERE project_id = ? AND id IN ({placeholders})
+                """,
+                (req.project_id, *req.link_ids),
+            )
+            state: dict[str, str | None] = {
+                row[0]: row[1] for row in cursor.fetchall()
+            }
+            missing = [lid for lid in req.link_ids if lid not in state]
+            if missing:
+                raise InvalidRequest(
+                    "dataset_sources_link_delete: the following link ids were "
+                    f"not found in project {req.project_id!r}: {missing}"
+                )
+
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            entries: list[tsi.DatasetSourcesLinkDeleteResEntry] = []
+            for link_id in req.link_ids:
+                if state[link_id] is not None:
+                    # Already soft-deleted: no write.
+                    entries.append(
+                        tsi.DatasetSourcesLinkDeleteResEntry(
+                            link_id=link_id, deleted=False
+                        )
+                    )
+                    continue
+                cursor.execute(
+                    """
+                    UPDATE dataset_sources
+                    SET deleted_at = ?, updated_at = ?
+                    WHERE project_id = ? AND id = ?
+                    """,
+                    (now_iso, now_iso, req.project_id, link_id),
+                )
+                entries.append(
+                    tsi.DatasetSourcesLinkDeleteResEntry(link_id=link_id, deleted=True)
+                )
+            conn.commit()
+
+        return tsi.DatasetSourcesLinkDeleteRes(entries=entries)
+
+    def dataset_sources_query(
+        self, req: tsi.DatasetSourcesQueryReq
+    ) -> tsi.DatasetSourcesQueryRes:
+        _, cursor = get_conn_cursor(self.db_path)
+        where = ["project_id = ?", "dataset_object_id = ?"]
+        params: list[Any] = [req.project_id, req.dataset_object_id]
+        if req.row_digests is not None:
+            ph = ",".join("?" for _ in req.row_digests)
+            where.append(f"row_digest IN ({ph})")
+            params.extend(req.row_digests)
+        if req.source_kinds is not None:
+            kinds = [k.value for k in req.source_kinds]
+            ph = ",".join("?" for _ in kinds)
+            where.append(f"source_kind IN ({ph})")
+            params.extend(kinds)
+        if not req.include_deleted:
+            where.append("deleted_at IS NULL")
+        sql = f"""
+            SELECT id, row_digest, source_kind, source_id, source_trace_id,
+                   source_started_at, source_display_name, link_metadata,
+                   added_by, created_at, updated_at, deleted_at
+            FROM dataset_sources
+            WHERE {" AND ".join(where)}
+            ORDER BY row_digest ASC, source_kind ASC, source_id ASC
+        """
+        if req.limit is not None:
+            sql += "\n            LIMIT ?"
+            params.append(req.limit)
+        if req.offset is not None:
+            # SQLite requires LIMIT before OFFSET; default to -1 (no limit).
+            if req.limit is None:
+                sql += "\n            LIMIT -1"
+            sql += " OFFSET ?"
+            params.append(req.offset)
+        cursor.execute(sql, params)
+        links = [
+            _sqlite_dataset_source_link_from_row(row) for row in cursor.fetchall()
+        ]
+        return tsi.DatasetSourcesQueryRes(links=links)
+
+    def source_datasets_query(
+        self, req: tsi.SourceDatasetsQueryReq
+    ) -> tsi.SourceDatasetsQueryRes:
+        if not req.sources:
+            return tsi.SourceDatasetsQueryRes(memberships=[])
+
+        _, cursor = get_conn_cursor(self.db_path)
+        source_ids = sorted({s.source_id for s in req.sources})
+        ph = ",".join("?" for _ in source_ids)
+        where = ["project_id = ?", f"source_id IN ({ph})"]
+        params: list[Any] = [req.project_id, *source_ids]
+        if not req.include_deleted:
+            where.append("deleted_at IS NULL")
+        cursor.execute(
+            f"""
+            SELECT source_kind, source_id, source_trace_id, dataset_object_id,
+                   row_digest, created_at
+            FROM dataset_sources
+            WHERE {" AND ".join(where)}
+            """,
+            params,
+        )
+        # Exact (kind, id, trace_id) match set requested.
+        requested = {
+            (s.source_kind.value, s.source_id, s.source_trace_id) for s in req.sources
+        }
+        # Aggregate per (source_kind, source_id, source_trace_id, dataset_object_id).
+        agg: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+        for kind, sid, trace_id, dataset_object_id, row_digest, created_at in (
+            cursor.fetchall()
+        ):
+            if (kind, sid, trace_id) not in requested:
+                continue
+            key = (kind, sid, trace_id, dataset_object_id)
+            bucket = agg.setdefault(
+                key, {"row_digests": [], "first_seen_at": created_at}
+            )
+            bucket["row_digests"].append(row_digest)
+            bucket["first_seen_at"] = min(bucket["first_seen_at"], created_at)
+
+        cap = tsi.MAX_ROW_DIGESTS_PER_RESULT
+        memberships = []
+        for (kind, sid, trace_id, dataset_object_id), bucket in sorted(agg.items()):
+            digests = bucket["row_digests"]
+            total = len(digests)
+            memberships.append(
+                tsi.SourceDatasetMembership(
+                    source_kind=tsi.SourceKind(kind),
+                    source_id=sid,
+                    source_trace_id=trace_id,
+                    dataset_object_id=dataset_object_id,
+                    row_digests=digests[:cap],
+                    row_digests_truncated=total > cap,
+                    row_digests_total_count=total,
+                    first_seen_at=datetime.datetime.fromisoformat(
+                        bucket["first_seen_at"]
+                    ),
+                )
+            )
+        return tsi.SourceDatasetsQueryRes(memberships=memberships)
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         if self._evaluate_model_dispatcher is None:
             raise ValueError("Evaluate model dispatcher is not set")
@@ -5276,6 +5629,52 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tsi.TableRowSchema]:
         results = self.table_query(req)
         yield from results.rows
+
+
+def _sqlite_dataset_source_link_from_row(
+    row: tuple[Any, ...],
+) -> tsi.DatasetSourceLinkSchema:
+    """Hydrate a DatasetSourceLinkSchema from a dataset_sources SQLite row.
+
+    Column order must match the SELECT in dataset_sources_query:
+    id, row_digest, source_kind, source_id, source_trace_id, source_started_at,
+    source_display_name, link_metadata, added_by, created_at, updated_at,
+    deleted_at. Datetimes are stored as ISO strings; link_metadata as a JSON
+    string ('' for None).
+    """
+    (
+        id_,
+        row_digest,
+        source_kind,
+        source_id,
+        source_trace_id,
+        source_started_at,
+        source_display_name,
+        link_metadata,
+        added_by,
+        created_at,
+        updated_at,
+        deleted_at,
+    ) = row
+    metadata = json.loads(link_metadata) if link_metadata else None
+    return tsi.DatasetSourceLinkSchema(
+        id=id_,
+        row_digest=row_digest,
+        source_kind=tsi.SourceKind(source_kind),
+        source_id=source_id,
+        source_trace_id=source_trace_id,
+        source_started_at=datetime.datetime.fromisoformat(source_started_at),
+        source_display_name=source_display_name,
+        link_metadata=metadata,
+        added_by=added_by,
+        created_at=datetime.datetime.fromisoformat(created_at),
+        updated_at=datetime.datetime.fromisoformat(updated_at),
+        deleted_at=(
+            datetime.datetime.fromisoformat(deleted_at)
+            if deleted_at is not None
+            else None
+        ),
+    )
 
 
 def get_type(val: Any) -> str:

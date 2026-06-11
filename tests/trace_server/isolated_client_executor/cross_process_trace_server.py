@@ -473,6 +473,30 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Get stats for multiple annotation queues."""
         return self._send_request("annotation_queues_stats", req)
 
+    def dataset_sources_link(
+        self, req: tsi.DatasetSourcesLinkReq
+    ) -> tsi.DatasetSourcesLinkRes:
+        """Link dataset rows to their provenance sources."""
+        return self._send_request("dataset_sources_link", req)
+
+    def dataset_sources_link_delete(
+        self, req: tsi.DatasetSourcesLinkDeleteReq
+    ) -> tsi.DatasetSourcesLinkDeleteRes:
+        """Soft-delete dataset source links by id."""
+        return self._send_request("dataset_sources_link_delete", req)
+
+    def dataset_sources_query(
+        self, req: tsi.DatasetSourcesQueryReq
+    ) -> tsi.DatasetSourcesQueryRes:
+        """Forward query: dataset -> sources."""
+        return self._send_request("dataset_sources_query", req)
+
+    def source_datasets_query(
+        self, req: tsi.SourceDatasetsQueryReq
+    ) -> tsi.SourceDatasetsQueryRes:
+        """Reverse query: sources -> datasets."""
+        return self._send_request("source_datasets_query", req)
+
 
 class CrossProcessTraceServerReceiver:
     """Receives requests from a child process and executes them on a local trace server.
