@@ -1956,18 +1956,25 @@ def get_field_by_name(name: str) -> CallsMergedField:
     return ALLOWED_CALL_FIELDS[name]
 
 
-# Dotted prefixes get_field_by_name accepts beyond ALLOWED_CALL_FIELDS.
-ALLOWED_DYNAMIC_FIELD_PREFIXES = (
+# Dotted prefixes get_field_by_name accepts beyond ALLOWED_CALL_FIELDS. The
+# dynamic-field prefixes are derived from ALLOWED_CALL_FIELDS so they can't
+# drift as `*_dump` dynamic fields are added or removed.
+_DUMP_SUFFIX = "_dump"
+_SPECIAL_DYNAMIC_FIELD_PREFIXES = (
     "feedback.*",
     "annotation_queue_items.queue_id",
     "summary.weave.*",
-    "inputs.*",
-    "output.*",
-    "attributes.*",
-    "summary.*",
+)
+ALLOWED_DYNAMIC_FIELD_PREFIXES = _SPECIAL_DYNAMIC_FIELD_PREFIXES + tuple(
+    f"{name[: -len(_DUMP_SUFFIX)]}.*"
+    for name, field in ALLOWED_CALL_FIELDS.items()
+    if isinstance(field, CallsMergedDynamicField) and name.endswith(_DUMP_SUFFIX)
 )
 
 
+# Serialized `_class_name`/`_bases` values for Monitor objects. These mirror the
+# SDK classes in weave/flow/monitor.py but are kept as server-side strings on
+# purpose: the trace server must not import from weave/flow.
 MONITOR_OBJECT_CLASSES = frozenset({"Monitor", "ClassifierMonitor"})
 
 
