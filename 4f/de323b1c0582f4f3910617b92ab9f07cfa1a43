@@ -79,3 +79,36 @@ who do not use ADK. Findings (no fixes needed — design is fully lazy):
 
 Bench method: git worktree --detach at merge-base in /tmp, symlinked
 node_modules, npm run build both sides, 12x require() timing each.
+
+---
+
+# ADDENDUM: offline smoke script (2026-06-10)
+
+User asked for a minimal locally-runnable verification script, run and
+verified by the agent. Added examples/googleAdkSmoke.ts: no keys, no
+network — ScriptedLlm (BaseLlm subclass) plays Gemini, an inline node http
+server plays the trace server recording /call/upsert_batch bodies, and the
+script self-checks 11 properties (auto-registration with NO plugin passed,
+op counts, root->invoke_agent->{call_llm,execute_tool} parenting, matching
+ends, per-model usage on call_llm ends, final answer as invocation output),
+exiting 0/1. Run: cd sdks/node && npm run build && npx tsx
+examples/googleAdkSmoke.ts.
+
+Verified PASS (all 11 checks; ADK logs "Plugin 'weave' registered.").
+
+Gotchas discovered while writing it:
+- The workspace had been switched back to slice 3 (no auto-instrumentation)
+  between sessions, so the first smoke run failed auto-registration and
+  recorded zero calls — NOT an integration bug. With slice 4 checked out it
+  passes, including under npx tsx (tsx resolves 'weave' to src via tsconfig
+  paths and routes @google/adk through the patched CJS require, so the
+  module hook fires).
+- Slices 1-2 had been rebased onto newer master outside this session;
+  gt restack rebased 3-4 on top (no conflicts) and notes were re-copied to
+  the new SHAs.
+- bare-specifier resolution happens from the script's directory, so the
+  smoke script must live inside sdks/node (e.g. examples/) to resolve
+  weave/@google/adk.
+- init('entity/project') (with a slash) performs no wandb-api call, so the
+  inline server only needs to answer /call/upsert_batch (and 200 anything
+  else) — batch items are {mode:'start'|'end', req:{start|end:{...}}}.
