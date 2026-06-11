@@ -33,7 +33,7 @@ def test_request_hook_logs_when_enabled(monkeypatch):
     request = httpx.Request("GET", "https://api.wandb.ai/calls")
 
     with patch.object(http_requests, "pprint_request") as mock_pprint_request:
-        http_requests._log_request(request)
+        http_requests.log_request(request)
 
     mock_pprint_request.assert_called_once_with(request)
     assert isinstance(request.extensions.get("weave_start_time"), float)
@@ -43,7 +43,7 @@ def test_request_hook_noop_when_disabled():
     request = httpx.Request("GET", "https://api.wandb.ai/calls")
 
     with patch.object(http_requests, "pprint_request") as mock_pprint_request:
-        http_requests._log_request(request)
+        http_requests.log_request(request)
 
     mock_pprint_request.assert_not_called()
     assert "weave_start_time" not in request.extensions
@@ -59,7 +59,7 @@ def test_response_hook_logs_when_enabled(monkeypatch):
         patch.object(http_requests, "pprint_response") as mock_pprint_response,
         patch("weave.utils.http_requests.time", return_value=2.0),
     ):
-        http_requests._log_response(response)
+        http_requests.log_response(response)
 
     mock_pprint_response.assert_called_once_with(response)
 
