@@ -1,5 +1,4 @@
 import {
-  type Attributes,
   type Context,
   type Span,
   SpanKind,
@@ -216,18 +215,6 @@ export class LLM {
     if (opts.reasoning !== undefined) {
       this.reasoning = opts.reasoning;
     }
-    return this;
-  }
-
-  /** Stamp arbitrary attributes on the chat span. Pass an object whether you
-   *  have one key or many. Useful for `gen_ai.response.{model,id,finish_reasons}`
-   *  and `gen_ai.output.type`. No-op (with warning) after `end()`. Mirrors OTel
-   *  `Span.setAttributes` and the Python SDK's `set_attributes`. */
-  setAttributes(attributes: Attributes): this {
-    if (this._warnIfEnded('setAttributes')) {
-      return this;
-    }
-    this.span.setAttributes(attributes);
     return this;
   }
 

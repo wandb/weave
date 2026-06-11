@@ -295,26 +295,6 @@ describe('LLM (via Turn.startLLM)', () => {
       );
     });
 
-    it('setAttributes stamps arbitrary attributes on the chat span', () => {
-      const turn = Turn.create({});
-      const llm = turn.startLLM({model: 'gpt-4o'});
-      llm.setAttributes({
-        'gen_ai.response.id': 'resp-abc',
-        'gen_ai.response.finish_reasons': ['stop'],
-        'gen_ai.output.type': 'text',
-      });
-      llm.end();
-      turn.end();
-
-      const spans = getExporter().getFinishedSpans();
-      const llmSpan = findSpan(spans, 'chat');
-      expect(llmSpan.attributes['gen_ai.response.id']).toBe('resp-abc');
-      expect(llmSpan.attributes['gen_ai.response.finish_reasons']).toEqual([
-        'stop',
-      ]);
-      expect(llmSpan.attributes['gen_ai.output.type']).toBe('text');
-    });
-
     it('accumulators called after end() warn and do not mutate state', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -331,17 +311,15 @@ describe('LLM (via Turn.startLLM)', () => {
       });
       llm.attachMediaUrl('https://example.com/x', {modality: 'image'});
       llm.record({inputMessages: [{role: 'user', content: 'after end'}]});
-      llm.setAttributes({'weave.too_late': 'x'});
 
       // One warning per method.
-      expect(warnSpy).toHaveBeenCalledTimes(6);
+      expect(warnSpy).toHaveBeenCalledTimes(5);
       for (const method of [
         'output',
         'think',
         'attachMedia',
         'attachMediaUrl',
         'record',
-        'setAttributes',
       ]) {
         expect(warnSpy).toHaveBeenCalledWith(
           expect.stringContaining(`LLM.${method}() called after end()`)
@@ -355,11 +333,6 @@ describe('LLM (via Turn.startLLM)', () => {
 
       turn.end();
       warnSpy.mockRestore();
-
-      // The dropped setAttributes never reached the span either.
-      const spans = getExporter().getFinishedSpans();
-      const llmSpan = findSpan(spans, 'chat');
-      expect(llmSpan.attributes['weave.too_late']).toBeUndefined();
     });
   });
 });
