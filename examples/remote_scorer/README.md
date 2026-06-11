@@ -40,7 +40,16 @@ The endpoint must return HTTP 200 with a JSON object. The required top-level
 contract fields are:
 
 - `schema_version`: required integer; must be `1`.
-- `result`: required; can be any JSON-serializable shape you choose.
+- `result`: required structured scorer output. By default, Weave requires this
+  to match the scorer result schema so feedback can be stored in typed scorer
+  columns.
+
+The simplest structured result is one score object:
+
+- `value`: required; either a tag string, max 36 characters, or a numeric rating
+  from `0.0` to `1.0`.
+- `reason`: optional string explaining the score.
+- `confidence`: optional numeric confidence from `0.0` to `1.0`.
 
 For example:
 
@@ -48,13 +57,17 @@ For example:
 {
   "schema_version": 1,
   "result": {
-    "message_length": 32
+    "value": 0.32,
+    "reason": "Message length is 32 characters.",
+    "confidence": 1.0
   }
 }
 ```
 
 Non-200 responses are treated as scorer failures by Weave. The `result` value is
-the scorer output that Weave records as feedback.
+the scorer output that Weave records as feedback. Weave also accepts multiple
+structured score objects as either a bare list, for example
+`[{"value": "short"}, {"value": 0.32}]`, or under a `scores` key.
 
 ## Auth
 
@@ -191,5 +204,6 @@ adopting this exact FastAPI app. The important production requirements are:
 - HTTPS endpoint reachable from Weave.
 - Host allowlist configured if the Weave deployment requires it.
 - Bearer-token validation implemented with your identity/security standards.
-- HTTP 200 response body shaped as `{"schema_version": 1, "result": ...}`.
+- HTTP 200 response body shaped as
+  `{"schema_version": 1, "result": {"value": 0.9, "reason": "...", "confidence": 1.0}}`.
 - Optional dedupe uses `Idempotency-Key`.
