@@ -44,3 +44,38 @@ None new.
   note.
 - weave-docs site (guides/integrations) not updated; follow-up if the
   integration should be documented publicly.
+
+---
+
+# ADDENDUM: non-ADK-user runtime impact audit (2026-06-10)
+
+User asked to verify the integration has no runtime impact on weave users
+who do not use ADK. Findings (no fixes needed — design is fully lazy):
+
+- Registration (instrumentGoogleADK at import weave): two in-memory Map
+  pushes in instrumentations.ts. No I/O, no module resolution, no semver
+  eval. NODE_DEBUG=module on the built dist shows ZERO '@google/adk'
+  lookups during import (the only 'adk' matches are weave's own
+  googleAdk.js file loading).
+- CJS hot path: Module.prototype.require patch is PRE-EXISTING weave core
+  (utils/commonJSLoader.ts); per-require cost is one O(1) Map.has on
+  '<name>@<subPath>'. The expensive branch (requirePackageJson + semifies +
+  hook) runs only when '@google/adk@dist/cjs/index.js' is actually required.
+- ESM: only for hosts that opt into --import=weave/instrument; adds one
+  import-in-the-middle Hook(['@google/adk']) — parity with the existing 5
+  integrations.
+- Import-time A/B (12 runs each, dist built at stack merge-base 0b0ea6e1a9
+  vs stack top): median 115.3ms vs 105.9ms, mins 90.6 vs 90.0 — delta below
+  noise.
+- Process listeners after import: beforeExit 0 / exit 0, identical to base.
+  registerBeforeExitHookOnce only fires on the first traced ADK invocation.
+- genai constructor check (isAdkInternalClientOptions): runs only for
+  @google/genai users, O(#headers) per client construction; non-ADK clients
+  keep being wrapped identically (51 genai tests green).
+- Dependencies: runtime "dependencies" unchanged; @google/adk + lodash are
+  devDependencies; the lodash-es->lodash mapping is jest-only.
+- No-ADK e2e: hostApps fixtures install the packed SDK into hosts WITHOUT
+  @google/adk and pass (cjs-basic + esm-basic, run in the full suite).
+
+Bench method: git worktree --detach at merge-base in /tmp, symlinked
+node_modules, npm run build both sides, 12x require() timing each.
