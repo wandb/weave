@@ -72,6 +72,29 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
+  - `weave/trace_server_bindings` - Client-side remote server binding (backed by `weave_server_sdk`)
+  - `weave/shared` - Utilities shared between the client and the trace server
+
+### Client/Server Layering (lint-enforced)
+
+Client code must NOT import from `weave.trace_server`. This is enforced by
+ruff `TID251` (`flake8-tidy-imports.banned-api` in `pyproject.toml`). The
+server package itself, `tests/`, and `scripts/` are exempt.
+
+- API request/response types come from `weave_server_sdk.models` — the
+  package is generated from the trace server's OpenAPI spec (the source of
+  truth; generator lives in wandb/core `services/weave-trace/tools/codegen`).
+  It is TEMPORARILY resolved from test PyPI via `[tool.uv.sources]`.
+- Surface the published SDK cannot express yet (multipart file upload,
+  calls_complete, completions, URL-path request envelopes) lives in
+  `weave/trace_server_bindings/models.py` as documented gap models — prefer
+  deleting these when a regenerated SDK covers them.
+- Code shared by both sides (ids, constants, errors, feedback types, builtin
+  object schemas, ref converters) lives in `weave/shared`; the old
+  `weave.trace_server.*` import paths still work via shims for back-compat.
+- In tests, in-process servers still speak the server's tsi types; the
+  `client` fixture converts at the seam via
+  `tests/trace_server/sdk_bridge.py`.
 
 ## Generated Files — Do Not Hand-Edit
 

@@ -240,6 +240,7 @@ select = [
   "FIX003",  # https://docs.astral.sh/ruff/rules/line-contains-xxx/
   "I",       # https://docs.astral.sh/ruff/rules/#isort-i
   "W",       # https://docs.astral.sh/ruff/rules/#warning-w
+  "TID251",  # banned-api: client code must not import weave.trace_server (see flake8-tidy-imports below)
   "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
   "TRY",     # https://docs.astral.sh/ruff/rules/#tryceratops-try
@@ -325,12 +326,27 @@ line-length = 88
 show-fixes = true
 exclude = ["rules"]
 
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# The client must not depend on the trace server implementation. API types
+# come from weave_server_sdk (generated from the OpenAPI spec); shared
+# client/server code lives in weave/shared; the remote binding lives in
+# weave/trace_server_bindings. The server package itself, tests, and scripts
+# are exempt via per-file-ignores below.
+"weave.trace_server".msg = "Client code must not import from weave.trace_server. Use weave_server_sdk.models for API types, weave.shared for shared utilities, or weave.trace_server_bindings for the remote binding."
+
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
-# Tests intentionally use async functions without await, compare known float values,
-# and use pytest.raises match strings with regex-like characters.
-"tests/**/*.py" = ["RUF029", "RUF043", "RUF069"]
+# The trace server may import itself; tests exercise the server directly and
+# convert between model families at the fixture seam; scripts are operational
+# tooling for the server.
+"weave/trace_server/**/*.py" = ["TID251"]
+"scripts/**/*.py" = ["TID251"]
+"trace_server_mock/**/*.py" = ["TID251"]
+# Tests intentionally use async functions without await, compare known float
+# values, use pytest.raises match strings with regex-like characters, and may
+# exercise the trace server directly (TID251).
+"tests/**/*.py" = ["RUF029", "RUF043", "RUF069", "TID251"]
 "weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
 "weave/trace_server/costs/update_costs.py" = ["PLW1514"]
 "weave/type_handlers/Video/video.py" = ["PLW0603"]

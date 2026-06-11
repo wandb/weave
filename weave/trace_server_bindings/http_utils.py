@@ -393,7 +393,7 @@ def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
 
 
 # Error code from server when project requires calls_complete mode
-# This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.trace_server.errors
+# This matches ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.shared.errors
 ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
 
 
