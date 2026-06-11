@@ -1351,13 +1351,18 @@ def test_skip_materialize_command_distributed(distributed_migrator):
     assert distributed_migrator.ch_client.database == "original_db"
 
 
-def test_skip_insert_command_distributed(distributed_migrator):
-    """Test that INSERT INTO commands are skipped in distributed mode."""
-    insert_command = "INSERT INTO calls_complete_new SELECT * FROM calls_complete"
-
-    distributed_migrator._execute_migration_command("test_db", insert_command)
-
+def test_insert_command_distributed(distributed_migrator):
+    """INSERT ... SELECT backfills are skipped; INSERT ... VALUES seeds run synchronously."""
+    backfill = "INSERT INTO calls_complete_new SELECT * FROM calls_complete"
+    distributed_migrator._execute_migration_command("test_db", backfill)
     assert distributed_migrator.ch_client.command.call_count == 0
+
+    seed = "INSERT INTO llm_token_prices (id, llm_id) VALUES ('a', 'gpt-4')"
+    distributed_migrator._execute_migration_command("test_db", seed)
+    assert distributed_migrator.ch_client.command.call_count == 1
+    args, kwargs = distributed_migrator.ch_client.command.call_args
+    assert args[0] == seed
+    assert kwargs == {"settings": {"distributed_foreground_insert": 1}}
     assert distributed_migrator.ch_client.database == "original_db"
 
 

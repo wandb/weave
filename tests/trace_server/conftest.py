@@ -159,7 +159,10 @@ def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
         "AND engine NOT IN ('View', 'MaterializedView', 'Distributed') "
         "ORDER BY name"
     )
-    return [row[0] for row in result.result_rows if row[0] not in SEED_DATA_TABLES]
+    seed_tables = SEED_DATA_TABLES | {
+        t + ch_settings.LOCAL_TABLE_SUFFIX for t in SEED_DATA_TABLES
+    }
+    return [row[0] for row in result.result_rows if row[0] not in seed_tables]
 
 
 def _truncate_all_tables(ch_client, database: str, tables: list[str]) -> None:
