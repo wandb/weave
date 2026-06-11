@@ -93,7 +93,9 @@ describe('Tool', () => {
     );
   });
 
-  it('setAttribute and addEvent are no-ops after end()', () => {
+  it('setAttribute and addEvent warn and no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
     const turn = Turn.create({});
     const tool = turn.startTool({name: 'f'});
     tool.end();
@@ -101,9 +103,20 @@ describe('Tool', () => {
     tool.addEvent('weave.permission_request');
     turn.end();
 
+    // One warning per method, naming the method that was called too late.
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+    for (const method of ['setAttribute', 'addEvent']) {
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Tool.${method}() called after end()`)
+      );
+    }
+
+    // Nothing reached the span.
     const spans = getExporter().getFinishedSpans();
     const toolSpan = findSpan(spans, 'execute_tool');
     expect(toolSpan.attributes['weave.display_name']).toBeUndefined();
     expect(toolSpan.events).toHaveLength(0);
+
+    warnSpy.mockRestore();
   });
 });

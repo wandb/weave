@@ -83,18 +83,33 @@ export class Tool {
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
   }
 
-  /** Set a single attribute on the Tool span. No-op after `end()`. Mirrors OTel `Span.setAttribute`. */
+  /** Set a single attribute on the Tool span. Warns and no-ops after `end()`.
+   *  Mirrors OTel `Span.setAttribute`. */
   setAttribute(key: string, value: AttributeValue): this {
-    if (this._ended) return this;
+    if (this._warnIfEnded('setAttribute')) return this;
     this.span.setAttribute(key, value);
     return this;
   }
 
-  /** Add a named event to the Tool span. No-op after `end()`. Mirrors OTel `Span.addEvent`. */
+  /** Add a named event to the Tool span. Warns and no-ops after `end()`.
+   *  Mirrors OTel `Span.addEvent`. */
   addEvent(name: string, attributes?: Attributes, startTime?: TimeInput): this {
-    if (this._ended) return this;
+    if (this._warnIfEnded('addEvent')) return this;
     this.span.addEvent(name, attributes, startTime);
     return this;
+  }
+
+  /** Warn if called after `end()`. Returns `true` if the caller should
+   *  short-circuit; the span is already closed, so any further mutation can
+   *  no longer reach the trace. */
+  private _warnIfEnded(method: string): boolean {
+    if (this._ended) {
+      console.warn(
+        `weave.Tool.${method}() called after end() — data will not be recorded on the span.`
+      );
+      return true;
+    }
+    return false;
   }
 
   /**
