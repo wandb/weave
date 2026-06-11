@@ -18,7 +18,7 @@ from weave.trace.settings import (
     server_cache_size_limit,
     use_server_cache,
 )
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import models as tsi
 from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.delegating_trace_server import (
@@ -243,6 +243,7 @@ class CachingMiddlewareTraceServer(
         func: Callable[[TReq], TRes],
         req: TReq,
         res_type: type[TRes],
+        make_cache_key: Callable[[TReq], str] | None = None,
     ) -> TRes:
         """Cache the result of a function that takes and returns Pydantic models.
 
@@ -253,15 +254,28 @@ class CachingMiddlewareTraceServer(
             func: The function to cache results for
             req: The request object (must be a Pydantic model)
             res_type: The response type (must be a Pydantic model)
+            make_cache_key: Optional cache-key builder. Methods whose entries
+                are prefix-invalidated must use a key whose leading fields
+                match the invalidation prefix.
 
         Returns:
             The function result, either from cache or from calling func
         """
+
+        def call_and_normalize(r: TReq) -> TRes:
+            res = func(r)
+            # Wrapped servers may return a field-compatible foreign model
+            # family (e.g. the in-process test servers); normalize so hits
+            # and misses return the same declared type.
+            if not isinstance(res, res_type):
+                res = res_type.model_validate(res.model_dump(by_alias=True))
+            return res
+
         return self._with_cache(
-            func,
+            call_and_normalize,
             req,
             func.__name__,
-            pydantic_bytes_safe_dump,
+            make_cache_key or pydantic_bytes_safe_dump,
             lambda res: res.model_dump_json(),
             res_type.model_validate_json,
         )
@@ -291,14 +305,20 @@ class CachingMiddlewareTraceServer(
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.obj_read(req)
         return self._with_cache_pydantic(
-            self._next_trace_server.obj_read, req, tsi.ObjReadRes
+            self._next_trace_server.obj_read,
+            req,
+            tsi.ObjReadRes,
+            make_cache_key=_obj_read_cache_key,
         )
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         # All obj_create requests are cacheable!
         return self._with_cache_pydantic(
-            self._next_trace_server.obj_create, req, tsi.ObjCreateRes
+            self._next_trace_server.obj_create,
+            req,
+            tsi.ObjCreateRes,
+            make_cache_key=_obj_create_cache_key,
         )
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -393,7 +413,9 @@ class CachingMiddlewareTraceServer(
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query_stats(req)
         return self._with_cache_pydantic(
-            self._next_trace_server.table_query_stats, req, tsi.TableQueryStatsRes
+            self._next_trace_server.table_query_stats,
+            req,
+            tsi.TableQueryStatsRes,
         )
 
     def table_query_stats_batch(
@@ -484,20 +506,25 @@ class CachingMiddlewareTraceServer(
             tsi.FilesStatsRes,
         )
 
-    # Object APIs
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        if not digest_is_cacheable(req.digest):
-            return self._next_trace_server.op_read(req)
-        return self._with_cache_pydantic(
-            self._next_trace_server.op_read, req, tsi.OpReadRes
-        )
 
-    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
-        if not digest_is_cacheable(req.digest):
-            return self._next_trace_server.dataset_read(req)
-        return self._with_cache_pydantic(
-            self._next_trace_server.dataset_read, req, tsi.DatasetReadRes
-        )
+def _reorder_leading(d: dict[str, Any], leading: tuple[str, ...]) -> dict[str, Any]:
+    """Return a copy of d with `leading` keys first (in that order).
+
+    The generated SDK models declare fields in sorted order, but the cache's
+    prefix-invalidation scheme requires identifying fields to lead the
+    serialized key.
+    """
+    return {key: d.pop(key) for key in leading} | d
+
+
+def _obj_read_cache_key(req: tsi.ObjReadReq) -> str:
+    raw = _reorder_leading(req.model_dump(), ("project_id", "object_id", "digest"))
+    return json.dumps(_bytes_to_base64(raw), ensure_ascii=False)
+
+
+def _obj_create_cache_key(req: tsi.ObjCreateReq) -> str:
+    obj = _reorder_leading(req.model_dump()["obj"], ("project_id", "object_id"))
+    return json.dumps({"obj": _bytes_to_base64(obj)}, ensure_ascii=False)
 
 
 def _build_invalidation_prefix(namespace: str, match_fields: dict[str, Any]) -> str:
@@ -516,20 +543,19 @@ def _build_invalidation_prefix(namespace: str, match_fields: dict[str, Any]) -> 
     return f"{namespace}_{serialized.rstrip('}')}"
 
 
+def _bytes_to_base64(obj: Any) -> Any:
+    """Convert bytes to base64 strings for JSON serialization, recursively."""
+    if isinstance(obj, bytes):
+        return base64.b64encode(obj).decode("utf-8")
+    elif isinstance(obj, dict):
+        return {k: _bytes_to_base64(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_bytes_to_base64(v) for v in obj]
+    return obj
+
+
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
-    raw_dict = obj.model_dump()
-
-    # Convert bytes to base64 string for JSON serialization
-    def _bytes_to_base64(obj: Any) -> Any:
-        if isinstance(obj, bytes):
-            return base64.b64encode(obj).decode("utf-8")
-        elif isinstance(obj, dict):
-            return {k: _bytes_to_base64(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [_bytes_to_base64(v) for v in obj]
-        return obj
-
-    processed_dict = _bytes_to_base64(raw_dict)
+    processed_dict = _bytes_to_base64(obj.model_dump())
     return json.dumps(processed_dict, ensure_ascii=False)
 
 

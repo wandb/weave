@@ -31,8 +31,9 @@ from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
+    from weave_server_sdk.models import ServerInfoRes
+
     from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc
-    from weave.trace_server.service_interface import ServerInfoRes
 
 logger = logging.getLogger(__name__)
 

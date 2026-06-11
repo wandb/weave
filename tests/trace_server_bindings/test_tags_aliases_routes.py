@@ -13,7 +13,10 @@ import httpx
 import pytest
 
 from tests.trace_server_bindings.conftest import SpyTransport
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import models as tsi
+
+# Request envelopes for routes whose ids travel in the URL path; these are
+# client-side gap models (the generated SDK has body models only).
 from weave.trace_server_bindings.remote_http_trace_server import (
     RemoteHTTPTraceServer,
 )

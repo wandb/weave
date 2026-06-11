@@ -1,6 +1,7 @@
 import datetime
 
 import pytest
+from weave_server_sdk import models as tsi
 
 import weave
 from weave.flow.saved_view import (
@@ -11,7 +12,6 @@ from weave.flow.saved_view import (
     to_seconds,
 )
 from weave.trace.api import ObjectRef
-from weave.trace_server import trace_server_interface as tsi
 
 
 def test_to_seconds():

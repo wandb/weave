@@ -120,23 +120,15 @@ config_cases = [
             "sampling_rate": 0.5,
             "scorers": [],
             "op_names": ["weave.genai.turn_ended"],
+            # The generated query models type operand lists as list[Any], so
+            # leaf operands serialize as plain dicts (no _type metadata).
             "query": {
                 "_type": "Query",
                 "$expr": {
                     "_type": "GtOperation",
                     "$gt": [
-                        {
-                            "_type": "GetFieldOperator",
-                            "$getField": "started_at",
-                            "_class_name": "GetFieldOperator",
-                            "_bases": ["BaseModel"],
-                        },
-                        {
-                            "_type": "LiteralOperation",
-                            "$literal": 1742540400,
-                            "_class_name": "LiteralOperation",
-                            "_bases": ["BaseModel"],
-                        },
+                        {"$getField": "started_at"},
+                        {"$literal": 1742540400},
                     ],
                     "_class_name": "GtOperation",
                     "_bases": ["BaseModel"],

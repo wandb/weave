@@ -1,10 +1,33 @@
-from typing import Any
+from typing import Any, TypeAlias
 
-from weave.trace_server.interface.query import (
+from weave_server_sdk.models import (
+    AndOperation,
+    ContainsOperation,
+    ConvertOperation,
+    EqOperation,
     GetFieldOperator,
+    GteOperation,
+    GtOperation,
+    InOperation,
     LiteralOperation,
     NotOperation,
-    Operand,
+    OrOperation,
+)
+
+# The tsi query module exported an `Operand` union alias; the generated SDK
+# inlines the union instead, so spell it out here.
+Operand: TypeAlias = (
+    LiteralOperation
+    | GetFieldOperator
+    | ConvertOperation
+    | AndOperation
+    | OrOperation
+    | NotOperation
+    | EqOperation
+    | GtOperation
+    | GteOperation
+    | InOperation
+    | ContainsOperation
 )
 
 

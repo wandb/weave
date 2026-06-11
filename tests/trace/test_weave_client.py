@@ -12,6 +12,10 @@ import pydantic
 import pytest
 from pydantic import ValidationError
 
+# `tsi` aliases the server interface in this file (coercion-seam tests);
+# the binding-facing tests use the SDK models module unaliased.
+from weave_server_sdk import models
+
 import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
@@ -1601,8 +1605,8 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         100 * 1024
     )  # very large buffer to ensure a single request
     res = remote_client.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
+        models.TableCreateReq(
+            table=models.TableSchemaForInsert(
                 project_id=client.project_id,
                 rows=rows,
             )
@@ -4380,8 +4384,8 @@ def test_table_create_from_digests(network_proxy_client):
 
     # Create a table with these rows to get the row digests
     table_res = client.server.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
+        models.TableCreateReq(
+            table=models.TableSchemaForInsert(
                 project_id=client.project_id,
                 rows=rows,
             )
@@ -4393,7 +4397,7 @@ def test_table_create_from_digests(network_proxy_client):
 
     # Now create a new table using the same row digests
     from_digests_res = client.server.table_create_from_digests(
-        tsi.TableCreateFromDigestsReq(
+        models.TableCreateFromDigestsReq(
             project_id=client.project_id,
             row_digests=row_digests,
         )
@@ -4411,8 +4415,8 @@ def test_table_create_from_digests(network_proxy_client):
     ]
 
     more_table_res = client.server.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
+        models.TableCreateReq(
+            table=models.TableSchemaForInsert(
                 project_id=client.project_id,
                 rows=more_rows,
             )
@@ -4423,7 +4427,7 @@ def test_table_create_from_digests(network_proxy_client):
 
     # Test with a different order of row digests - should produce different digest
     combined_res = client.server.table_create_from_digests(
-        tsi.TableCreateFromDigestsReq(
+        models.TableCreateFromDigestsReq(
             project_id=client.project_id,
             row_digests=combined_digests,
         )
@@ -4431,7 +4435,7 @@ def test_table_create_from_digests(network_proxy_client):
 
     # now get the new table
     new_table_res = basic_client.server.table_query(
-        tsi.TableQueryReq(
+        models.TableQueryReq(
             project_id=client.project_id,
             digest=combined_res.digest,
         )
@@ -4450,7 +4454,7 @@ def test_table_create_from_digests(network_proxy_client):
     # Test with a different order of row digests - should produce different digest
     shuffled_digests = [row_digests[2], row_digests[0], row_digests[1]]  # [3, 1, 2]
     shuffled_res = client.server.table_create_from_digests(
-        tsi.TableCreateFromDigestsReq(
+        models.TableCreateFromDigestsReq(
             project_id=client.project_id,
             row_digests=shuffled_digests,
         )

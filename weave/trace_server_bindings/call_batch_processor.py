@@ -16,7 +16,7 @@ from queue import Full
 
 from cachetools import TTLCache
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import models as tsi
 from weave.trace_server_bindings.async_batch_processor import (
     AsyncBatchProcessor,
     SkipIndividualProcessingError,

@@ -13,13 +13,13 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
+from weave_server_sdk import models as tsi
 
 from tests.trace_server_bindings.conftest import (
     generate_call_start_end_pair,
     generate_end,
     generate_start,
 )
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import models as tsi
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,

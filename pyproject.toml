@@ -330,13 +330,20 @@ exclude = ["rules"]
 # list grows as the migration proceeds. The server package itself, tests, and
 # scripts are exempt via per-file-ignores below.
 "weave.trace_server.http_service_interface".msg = "Client code must not use the server's HTTP body models. Use weave_server_sdk.models (generated from the OpenAPI spec) instead."
+"weave.trace_server.trace_server_interface".msg = "Client code must not use the server's request/response models. Use weave_server_sdk.models (generated from the OpenAPI spec) or the gap models in weave.trace_server_bindings.models instead."
+"weave.trace_server.interface.query".msg = "Client code must not use the server's query AST models. Use weave_server_sdk.models instead."
+"weave.trace_server.common_interface".msg = "Client code must not use the server's common interface models. Use weave_server_sdk.models instead."
+"weave.trace_server.service_interface".msg = "Client code must not use the server's service interface. Use weave_server_sdk.models and weave.trace_server_bindings instead."
+"weave.trace_server_bindings.models".msg = "Client code must import API types from weave_server_sdk directly. The bindings' gap models exist only because weave-server-sdk 0.0.1 cannot express that surface; where one is unavoidable, use a spot-level noqa with a reason so the exemption burns down when the SDK regenerates."
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
-# The trace server may import its own modules; tests exercise the server
-# directly; scripts and the mock server are operational server tooling.
+# The trace server may import its own modules (and the bindings package its
+# own models); tests exercise the server directly; scripts and the mock
+# server are operational server tooling.
 "weave/trace_server/**/*.py" = ["TID251"]
+"weave/trace_server_bindings/**/*.py" = ["TID251"]
 "scripts/**/*.py" = ["TID251"]
 "trace_server_mock/**/*.py" = ["TID251"]
 # Tests intentionally use async functions without await, compare known float

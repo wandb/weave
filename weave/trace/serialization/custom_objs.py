@@ -4,6 +4,8 @@ import logging
 from collections.abc import Mapping
 from typing import Any, Literal, TypedDict
 
+from weave_server_sdk.models import FileContentReadReq
+
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     require_weave_client,
@@ -23,10 +25,7 @@ from weave.trace.serialization.serializer import (
     is_probably_legacy_inline_load,
 )
 from weave.trace.settings import should_allow_unsafe_custom_obj_decode
-from weave.trace_server.trace_server_interface import (
-    FileContentReadReq,
-    TraceServerInterface,
-)
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +179,7 @@ def _ensure_bytes(value: str | bytes) -> bytes:
 
 
 def _load_custom_obj_files(
-    project_id: str, server: TraceServerInterface, file_digests: dict
+    project_id: str, server: TraceServerClientInterface, file_digests: dict
 ) -> dict[str, bytes]:
     loaded_files: dict[str, bytes] = {}
     for name, digest in file_digests.items():
