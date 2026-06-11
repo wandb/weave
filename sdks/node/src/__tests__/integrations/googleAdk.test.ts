@@ -3,10 +3,10 @@
  *
  * The main tests run the real ADK runner (InMemoryRunner + a scripted
  * BaseLlm, no network) so they exercise ADK's actual plugin dispatch — this
- * matters because the integration depends on which callbacks ADK invokes.
- * Edge cases that are hard to reach through the runner (streaming partials,
- * synthetic tool keys, dangling-span cleanup) drive the plugin callbacks
- * directly.
+ * matters because the integration depends on which callbacks ADK invokes
+ * (e.g. ADK 1.2.0 never dispatches plugin agent callbacks). Edge cases that
+ * are hard to reach through the runner (streaming partials, synthetic tool
+ * keys, dangling-span cleanup) drive the plugin callbacks directly.
  *
  * Spans are captured with an `InMemorySpanExporter` injected through
  * `settings.genai.spanProcessor`, exactly how a user-supplied processor
@@ -38,6 +38,7 @@ import {
   FunctionTool,
   InMemoryRunner,
   LlmAgent,
+  SequentialAgent,
   type LlmRequest,
   type LlmResponse,
 } from '@google/adk';
@@ -235,33 +236,37 @@ describe('Google ADK integration', () => {
       const chatSpans = byOperation(spans, 'chat');
       const toolSpans = byOperation(spans, 'execute_tool');
 
-      expect(invokeAgentSpans).toHaveLength(1);
+      // Root invocation + the synthesized per-agent span.
+      expect(invokeAgentSpans).toHaveLength(2);
       expect(chatSpans).toHaveLength(2);
       expect(toolSpans).toHaveLength(1);
 
-      const [root] = invokeAgentSpans;
+      const root = invokeAgentSpans.find(span => !span.parentSpanId);
+      const agentSpan = invokeAgentSpans.find(span => span.parentSpanId);
       const [toolSpan] = toolSpans;
-      expect(root.parentSpanId).toBeUndefined();
+      expect(root).toBeDefined();
+      expect(agentSpan).toBeDefined();
 
       // Every span shares the root's OTel trace and the session id.
       for (const span of spans) {
-        expect(span.spanContext().traceId).toBe(root.spanContext().traceId);
+        expect(span.spanContext().traceId).toBe(root!.spanContext().traceId);
         expect(span.attributes['gen_ai.conversation.id']).toBe(session.id);
         expect(span.attributes['gen_ai.provider.name']).toBe('gemini');
       }
 
-      // Structure: root invoke_agent → (chat, chat, tool).
-      expect(root.name).toBe('invoke_agent weather_agent');
-      expect(root.attributes['gen_ai.agent.name']).toBe('weather_agent');
+      // Structure: root invoke_agent → invoke_agent → (chat, chat, tool).
+      expect(root!.name).toBe('invoke_agent weather_agent');
+      expect(agentSpan!.parentSpanId).toBe(spanId(root!));
+      expect(agentSpan!.attributes['gen_ai.agent.name']).toBe('weather_agent');
       for (const span of [...chatSpans, ...toolSpans]) {
-        expect(span.parentSpanId).toBe(spanId(root));
+        expect(span.parentSpanId).toBe(spanId(agentSpan!));
       }
 
       // Root carries the user message in and the final answer out.
-      expect(root.attributes['gen_ai.input.messages']).toContain(
+      expect(root!.attributes['gen_ai.input.messages']).toContain(
         'What is the weather in Paris?'
       );
-      expect(root.attributes['gen_ai.output.messages']).toContain(
+      expect(root!.attributes['gen_ai.output.messages']).toContain(
         'It is sunny in Paris.'
       );
 
@@ -295,6 +300,68 @@ describe('Google ADK integration', () => {
         'Paris'
       );
       expect(toolSpan.attributes['gen_ai.tool.call.result']).toContain('sunny');
+    });
+
+    test('nests sub-agents under workflow agents', async () => {
+      const first = new LlmAgent({
+        name: 'first_agent',
+        description: 'first',
+        model: new ScriptedLlm(TEST_MODEL, [[textResponse('first done')]]),
+      });
+      const second = new LlmAgent({
+        name: 'second_agent',
+        description: 'second',
+        model: new ScriptedLlm(TEST_MODEL, [[textResponse('second done')]]),
+      });
+      const pipeline = new SequentialAgent({
+        name: 'pipeline',
+        description: 'runs both agents',
+        subAgents: [first, second],
+      });
+
+      const runner = new InMemoryRunner({
+        agent: pipeline,
+        appName: 'weave-adk-test',
+        plugins: [new WeaveAdkPlugin()],
+      });
+      const session = await runner.sessionService.createSession({
+        appName: 'weave-adk-test',
+        userId: 'user-1',
+      });
+
+      await runToCompletion(runner, {
+        userId: 'user-1',
+        sessionId: session.id,
+        newMessage: userMessage('go'),
+      });
+
+      const spans = exporter.getFinishedSpans();
+      const invokeAgentSpans = byOperation(spans, 'invoke_agent');
+      const chatSpans = byOperation(spans, 'chat');
+
+      const root = invokeAgentSpans.find(span => !span.parentSpanId);
+      const byAgent = (name: string) =>
+        invokeAgentSpans.find(
+          span =>
+            span.parentSpanId && span.attributes['gen_ai.agent.name'] === name
+        );
+      const pipelineSpan = byAgent('pipeline');
+      const firstSpan = byAgent('first_agent');
+      const secondSpan = byAgent('second_agent');
+      expect(root).toBeDefined();
+      expect(pipelineSpan).toBeDefined();
+      expect(firstSpan).toBeDefined();
+      expect(secondSpan).toBeDefined();
+
+      expect(pipelineSpan!.parentSpanId).toBe(spanId(root!));
+      expect(firstSpan!.parentSpanId).toBe(spanId(pipelineSpan!));
+      expect(secondSpan!.parentSpanId).toBe(spanId(pipelineSpan!));
+
+      expect(chatSpans).toHaveLength(2);
+      const chatParents = chatSpans.map(span => span.parentSpanId).sort();
+      expect(chatParents).toEqual(
+        [spanId(firstSpan!), spanId(secondSpan!)].sort()
+      );
     });
 
     test('records model errors as span errors and still closes the run', async () => {
@@ -503,6 +570,45 @@ describe('Google ADK integration', () => {
       expect(
         toolSpans[0].attributes['gen_ai.tool.call.result']
       ).toBeUndefined();
+    });
+
+    test('agents outside the agent tree nest under the innermost open tool span', async () => {
+      const plugin = new WeaveAdkPlugin();
+      const tool = {name: 'agent_tool', description: 'wraps an agent'};
+      const toolContext = {
+        invocationId: INVOCATION_ID,
+        agentName: 'agent_a',
+        functionCallId: 'fc-2',
+      } as any;
+
+      await plugin.beforeRunCallback({
+        invocationContext: invocationContext(),
+      });
+      await plugin.beforeToolCallback({tool, toolArgs: {}, toolContext});
+      // An AgentTool-wrapped agent is not in the root agent's tree.
+      await plugin.beforeModelCallback({
+        callbackContext: callbackContext('outside_agent'),
+        llmRequest: {model: TEST_MODEL, contents: []},
+      });
+      await plugin.afterModelCallback({
+        callbackContext: callbackContext('outside_agent'),
+        llmResponse: {content: {role: 'model', parts: [{text: 'ok'}]}},
+      });
+      await plugin.afterToolCallback({
+        tool,
+        toolArgs: {},
+        toolContext,
+        result: {ok: true},
+      });
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+
+      const spans = exporter.getFinishedSpans();
+      const toolSpan = byOperation(spans, 'execute_tool')[0];
+      const outsideAgent = byOperation(spans, 'invoke_agent').find(
+        span => span.attributes['gen_ai.agent.name'] === 'outside_agent'
+      );
+      expect(outsideAgent).toBeDefined();
+      expect(outsideAgent!.parentSpanId).toBe(spanId(toolSpan));
     });
 
     test('afterRun ends dangling spans and marks them interrupted', async () => {

@@ -235,9 +235,12 @@ npm run test
 - `@google/adk`'s CJS dist `require()`s the ESM-only `lodash-es` (legal under
   Node >= 22 `require(esm)`, fatal under jest); the default jest project maps
   `^lodash-es$` → `lodash`.
-- Google ADK gotchas: ADK-internal `GoogleGenAI` clients are detected by the
-  `google-adk/` marker in their `x-goog-api-client` header and excluded from
-  the genai wrapper to avoid double-counted usage.
+- Google ADK gotchas: ADK 1.2.0 never dispatches plugin agent callbacks
+  (`runBefore/AfterAgentCallback` have no call sites), so `WeaveAdkPlugin`
+  synthesizes `invoke_agent` spans from `agentName` + the agent tree.
+  ADK-internal `GoogleGenAI` clients are detected by the `google-adk/` marker
+  in their `x-goog-api-client` header and excluded from the genai wrapper to
+  avoid double-counted usage.
 
 ## Code Review & PR Guidelines
 

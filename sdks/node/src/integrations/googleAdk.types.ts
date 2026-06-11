@@ -47,10 +47,15 @@ export interface AdkContent {
   parts?: AdkPart[];
 }
 
-/** `BaseAgent` — the fields the integration records. */
+/** `BaseAgent` — the fields needed to resolve the agent tree. `model` is
+ *  `string | BaseLlm` on `LlmAgent`; only the string form is recorded. */
 export interface AdkBaseAgent {
   name: string;
   description?: string;
+  model?: unknown;
+  parentAgent?: AdkBaseAgent;
+  subAgents?: AdkBaseAgent[];
+  findAgent?: (name: string) => AdkBaseAgent | undefined;
 }
 
 export interface AdkSession {

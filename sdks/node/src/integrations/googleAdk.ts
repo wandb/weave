@@ -14,6 +14,12 @@
  * callbacks also hand us live `LlmRequest` / `LlmResponse` / tool objects
  * instead of JSON-serialized span attributes.
  *
+ * Agent nesting: `@google/adk` 1.2.0 never dispatches plugin
+ * `beforeAgentCallback` / `afterAgentCallback`, so per-agent spans are
+ * synthesized lazily from `agentName` on model/tool callbacks, parented via
+ * the agent tree captured at run start. The agent callbacks are still
+ * implemented so nesting tightens once ADK wires them up.
+ *
  * Usage:
  * ```typescript
  * import {init, WeaveAdkPlugin} from 'weave';
@@ -127,6 +133,8 @@ const ATTR_ADK_INTERRUPTED = `${WEAVE_ATTR_PREFIX}.interrupted`;
 const ATTR_ADK_INVOCATION_ID = `${WEAVE_ATTR_PREFIX}.invocation_id`;
 const ATTR_ADK_APP_NAME = `${WEAVE_ATTR_PREFIX}.app_name`;
 const ATTR_ADK_USER_ID = `${WEAVE_ATTR_PREFIX}.user_id`;
+// Defensive bound when walking `parentAgent` chains.
+const MAX_AGENT_ANCESTRY_DEPTH = 100;
 
 // ADK's own opt-out env var for message-content capture: regulated users set
 // it to keep message bodies, system instructions and tool payloads off spans.
@@ -151,11 +159,19 @@ let beforeExitHookRegistered = false;
 interface InvocationState {
   invocationId: string;
   rootSpan: OtelSpan;
+  rootAgent: AdkBaseAgent | null;
   conversationId: string | undefined;
+  /** agentName → synthesized invoke_agent span. */
+  agentSpans: Map<string, OtelSpan>;
+  /** Creation order of agentSpans keys; ended in reverse (children first). */
+  agentSpanOrder: string[];
   /** agentName → in-flight chat span. */
   modelSpans: Map<string, OtelSpan>;
   /** functionCallId (or synthetic key) → in-flight execute_tool span. */
   toolSpans: Map<string, OtelSpan>;
+  /** Open tool keys, innermost last — fallback parent for out-of-tree
+   *  agents (e.g. agents wrapped as AgentTool). */
+  openToolKeys: string[];
   /** Per-(agent, tool) FIFO of synthetic keys when functionCallId is absent. */
   syntheticToolKeys: Map<string, string[]>;
   /** Content of the last non-partial event — the root span's output. */
@@ -492,6 +508,43 @@ function setLlmResponseAttributes(
 }
 
 // ---------------------------------------------------------------------------
+// Agent tree helpers
+// ---------------------------------------------------------------------------
+
+/** Finds `name` in the agent tree under `root` without trusting ADK methods. */
+function findAgentInTree(
+  root: AdkBaseAgent,
+  name: string
+): AdkBaseAgent | undefined {
+  if (typeof root.findAgent === 'function') {
+    try {
+      const found = root.findAgent(name);
+      if (found) {
+        return found;
+      }
+    } catch {
+      // fall through to the manual walk
+    }
+  }
+  const queue: AdkBaseAgent[] = [root];
+  const visited = new Set<AdkBaseAgent>();
+  while (queue.length > 0) {
+    const agent = queue.shift()!;
+    if (visited.has(agent)) {
+      continue;
+    }
+    visited.add(agent);
+    if (agent.name === name) {
+      return agent;
+    }
+    if (Array.isArray(agent.subAgents)) {
+      queue.push(...agent.subAgents);
+    }
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
 
@@ -592,9 +645,13 @@ export class WeaveAdkPlugin {
       this.invocations.set(invocationId, {
         invocationId,
         rootSpan,
+        rootAgent,
         conversationId,
+        agentSpans: new Map(),
+        agentSpanOrder: [],
         modelSpans: new Map(),
         toolSpans: new Map(),
+        openToolKeys: [],
         syntheticToolKeys: new Map(),
         finalContent: null,
         rootErrorType: undefined,
@@ -654,21 +711,45 @@ export class WeaveAdkPlugin {
   }
 
   // -------------------------------------------------------------------------
-  // Agent lifecycle (not dispatched by @google/adk 1.2.0 — no PluginManager
-  // call sites; no-ops so the full BasePlugin surface is present)
+  // Agent lifecycle (not dispatched by @google/adk 1.2.0; implemented so
+  // agent timing becomes exact once ADK wires them up)
   // -------------------------------------------------------------------------
 
-  async beforeAgentCallback(_params: {
+  async beforeAgentCallback(params: {
     agent: AdkBaseAgent;
     callbackContext: AdkCallbackContext;
   }): Promise<undefined> {
+    this.guard(() => {
+      const state = this.invocations.get(params.callbackContext?.invocationId);
+      if (!state || !params.agent?.name) {
+        return;
+      }
+      this.ensureAgentSpan(state, params.agent.name);
+    });
     return undefined;
   }
 
-  async afterAgentCallback(_params: {
+  async afterAgentCallback(params: {
     agent: AdkBaseAgent;
     callbackContext: AdkCallbackContext;
   }): Promise<undefined> {
+    this.guard(() => {
+      const state = this.invocations.get(params.callbackContext?.invocationId);
+      const agentName = params.agent?.name;
+      if (!state || !agentName) {
+        return;
+      }
+      const span = state.agentSpans.get(agentName);
+      if (!span) {
+        return;
+      }
+      span.end();
+      // Remove so a LoopAgent re-run of the same agent opens a fresh span.
+      state.agentSpans.delete(agentName);
+      state.agentSpanOrder = state.agentSpanOrder.filter(
+        name => name !== agentName
+      );
+    });
     return undefined;
   }
 
@@ -691,6 +772,7 @@ export class WeaveAdkPlugin {
       if (state.modelSpans.has(ctx.agentName)) {
         return;
       }
+      const agentSpan = this.ensureAgentSpan(state, ctx.agentName);
       const model = params.llmRequest?.model ?? UNKNOWN_MODEL;
       const attributes: Attributes = {
         [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_CHAT,
@@ -704,7 +786,7 @@ export class WeaveAdkPlugin {
       const span = this.tracer().startSpan(
         `${OPERATION_CHAT} ${model}`,
         {attributes},
-        this.childContext(state.rootSpan)
+        this.childContext(agentSpan)
       );
       setLlmRequestAttributes(span, params.llmRequest ?? {});
       state.modelSpans.set(ctx.agentName, span);
@@ -792,6 +874,7 @@ export class WeaveAdkPlugin {
       if (!state || !ctx?.agentName || !params.tool?.name) {
         return;
       }
+      const agentSpan = this.ensureAgentSpan(state, ctx.agentName);
       let key = ctx.functionCallId;
       if (!key || state.toolSpans.has(key)) {
         // Missing/duplicate functionCallId: mint a synthetic key, recovered
@@ -822,9 +905,10 @@ export class WeaveAdkPlugin {
       const span = this.tracer().startSpan(
         `${OPERATION_EXECUTE_TOOL} ${params.tool.name}`,
         {attributes},
-        this.childContext(state.rootSpan)
+        this.childContext(agentSpan)
       );
       state.toolSpans.set(key, span);
+      state.openToolKeys.push(key);
     });
     return undefined;
   }
@@ -885,6 +969,80 @@ export class WeaveAdkPlugin {
     }
   }
 
+  /**
+   * Returns the invoke_agent span for `agentName`, creating it and any
+   * missing ancestors on first activity.
+   */
+  private ensureAgentSpan(
+    state: InvocationState,
+    agentName: string,
+    depth: number = 0
+  ): OtelSpan {
+    const existing = state.agentSpans.get(agentName);
+    if (existing) {
+      return existing;
+    }
+
+    let parentSpan: OtelSpan;
+    let agent: AdkBaseAgent | undefined;
+    if (state.rootAgent) {
+      agent = findAgentInTree(state.rootAgent, agentName);
+    }
+    if (!agent || depth >= MAX_AGENT_ANCESTRY_DEPTH) {
+      // Out-of-tree agent (e.g. AgentTool): nest under the innermost open
+      // tool span, else the root.
+      parentSpan = this.innermostOpenToolSpan(state) ?? state.rootSpan;
+    } else if (
+      agent === state.rootAgent ||
+      !agent.parentAgent ||
+      agent.parentAgent.name === agentName
+    ) {
+      parentSpan = state.rootSpan;
+    } else {
+      parentSpan = this.ensureAgentSpan(
+        state,
+        agent.parentAgent.name,
+        depth + 1
+      );
+    }
+
+    const attributes: Attributes = {
+      [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_INVOKE_AGENT,
+      [ATTR_GEN_AI_PROVIDER_NAME]: providerName(),
+      [ATTR_GEN_AI_AGENT_NAME]: agentName,
+      [ATTR_GEN_AI_AGENT_ID]: state.invocationId,
+    };
+    if (agent?.description) {
+      attributes[ATTR_GEN_AI_AGENT_DESCRIPTION] = agent.description;
+    }
+    // `agent.model` is a model name string or a BaseLlm instance; only the
+    // string form is the OTel request.model (Python-integration parity).
+    if (typeof agent?.model === 'string' && agent.model) {
+      attributes[ATTR_GEN_AI_REQUEST_MODEL] = agent.model;
+    }
+    if (state.conversationId) {
+      attributes[ATTR_GEN_AI_CONVERSATION_ID] = state.conversationId;
+    }
+    const span = this.tracer().startSpan(
+      `${OPERATION_INVOKE_AGENT} ${agentName}`,
+      {attributes},
+      this.childContext(parentSpan)
+    );
+    state.agentSpans.set(agentName, span);
+    state.agentSpanOrder.push(agentName);
+    return span;
+  }
+
+  private innermostOpenToolSpan(state: InvocationState): OtelSpan | null {
+    for (let i = state.openToolKeys.length - 1; i >= 0; i--) {
+      const span = state.toolSpans.get(state.openToolKeys[i]);
+      if (span) {
+        return span;
+      }
+    }
+    return null;
+  }
+
   private endToolSpan(
     params: {
       tool: AdkBaseTool;
@@ -920,6 +1078,7 @@ export class WeaveAdkPlugin {
     }
     span.end();
     state.toolSpans.delete(key);
+    state.openToolKeys = state.openToolKeys.filter(k => k !== key);
   }
 
   private recordEventError(state: InvocationState, event: AdkEvent): void {
@@ -995,8 +1154,9 @@ export class WeaveAdkPlugin {
   }
 
   /**
-   * Ends every span of an invocation: model/tool leaves first, then the
-   * root. Leaves that never completed are marked interrupted.
+   * Ends every span of an invocation: model/tool leaves first, then agents
+   * in reverse creation order, then the root. Leaves that never completed
+   * are marked interrupted.
    */
   private finishInvocation(
     state: InvocationState,
@@ -1013,6 +1173,16 @@ export class WeaveAdkPlugin {
       span.end();
     }
     state.toolSpans.clear();
+    state.openToolKeys = [];
+
+    for (let i = state.agentSpanOrder.length - 1; i >= 0; i--) {
+      const span = state.agentSpans.get(state.agentSpanOrder[i]);
+      if (span) {
+        span.end();
+      }
+    }
+    state.agentSpans.clear();
+    state.agentSpanOrder = [];
 
     if (options.interrupted) {
       state.rootSpan.setAttribute(ATTR_ADK_INTERRUPTED, true);
