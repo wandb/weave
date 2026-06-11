@@ -157,5 +157,12 @@ function buildOtlpExporter(client: WeaveClient): OTLPTraceExporter {
   return new OTLPTraceExporter({
     url,
     headers: {Authorization: authHeader, project_id: client.projectId},
+    // No connection reuse: an idle keep-alive socket is a ref'd handle that
+    // holds the event loop open after the last export, so short-lived
+    // processes hang until the SERVER closes the connection (measured ~6s
+    // against a default node server) instead of exiting when their work is
+    // done. Cost is one TCP+TLS handshake per export batch (every ~5s under
+    // the default BatchSpanProcessor) — negligible for tracing traffic.
+    keepAlive: false,
   });
 }
