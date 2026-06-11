@@ -1,0 +1,27 @@
+## Conversation
+Part 6/8 of the fake trace server stack (split of the verified monolith;
+full history in the note on backup/fake-ts-monolith).
+
+## Actions
+Segments: op_*, dataset_*, scorer_*, evaluation_* (object CRUD), model_*.
+
+## Errors & Mistakes
+None in this chunk.
+
+## Dead Ends
+Considered extracting these into a mixin shared with the SQLite server —
+rejected to keep the change additive: the established pattern is that each
+backend carries its own copy (ClickHouse duplicates the same logic). If a
+third copy ever changes in lockstep, that is the moment to extract.
+
+## Hints for Future Agents
+- These methods only call interface methods from earlier parts of the stack
+  plus object_creation_utils builders; if a port diverges from the sqlite
+  version, diff against sqlite_trace_server.py first — they are meant to be
+  line-for-line.
+
+## Codebase Discoveries
+See the monolith note.
+
+## Open Questions
+None for this chunk.
