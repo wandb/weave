@@ -76,6 +76,10 @@ Quantization = Literal[
     "fp32",
 ]
 
+LifecycleStage = Literal["general-availability", "experimental", "retired"]
+
+InferenceEnvironment = Literal["cw-prod", "cw-qa"]
+
 
 class LLMModelDetails(TypedDict):
     # Field names are matching cross-language JSON, intentionally using camel case
@@ -87,6 +91,9 @@ class LLMModelDetails(TypedDict):
     # The "name" of the model for OR, it is not necessary that the model exist in OR
     labelOpenRouter: str
     status: str
+    lifecycleStage: LifecycleStage
+    availableIn: list[InferenceEnvironment]
+    launchedQuarter: str
     descriptionShort: str
     descriptionMedium: str
     launchDate: str
@@ -94,17 +101,21 @@ class LLMModelDetails(TypedDict):
     featureJsonMode: bool
     featureStructuredOutput: bool
     featureToolCalling: bool
+    featureLoRA: bool
+    featureTrainableServerlessRL: bool
     parameterCountTotal: int
     parameterCountActive: NotRequired[int]
     contextWindow: int
     quantization: Quantization
     priceCentsPerBillionTokensInput: int
+    priceCentsPerBillionTokensCached: int
     priceCentsPerBillionTokensOutput: int
     isAvailableOpenRouter: bool
     apiStyle: str
     modalities: list[str]
     modalitiesInput: list[str]
     modalitiesOutput: list[str]
+    tags: list[str]
     likesHuggingFace: int
     downloadsHuggingFace: int
     license: str

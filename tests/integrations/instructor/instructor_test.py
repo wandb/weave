@@ -48,7 +48,6 @@ def patch_instructor() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_openai(
     client: weave.trace.weave_client.WeaveClient,
@@ -90,7 +89,6 @@ def test_instructor_openai(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_openai_with_completion(
     client: weave.trace.weave_client.WeaveClient,
@@ -129,7 +127,6 @@ def test_instructor_openai_with_completion(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_instructor_openai_async(
@@ -175,7 +172,6 @@ async def test_instructor_openai_async(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_iterable(
     client: weave.trace.weave_client.WeaveClient,
@@ -233,7 +229,6 @@ def test_instructor_iterable(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_iterable_sync_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -282,7 +277,6 @@ def test_instructor_iterable_sync_stream(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_instructor_iterable_async_stream(
@@ -338,7 +332,6 @@ async def test_instructor_iterable_async_stream(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_partial_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -408,7 +401,6 @@ list of speakers.
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.asyncio
 async def test_instructor_partial_stream_async(

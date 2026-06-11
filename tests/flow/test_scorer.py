@@ -1,8 +1,9 @@
 from unittest.mock import MagicMock
 
+import pytest
 from pydantic import BaseModel
 
-from weave.flow.scorer import Scorer
+from weave.flow.scorer import Scorer, auto_summarize
 from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import WeaveDict, WeaveObject
 
@@ -78,3 +79,32 @@ def test_from_obj_unwraps_nested_weave_object():
     obj = _make_weave_object({"name": "s", "default_params": inner})
     scorer = ScorerWithNestedModel.from_obj(obj)
     assert scorer.default_params == NestedParams(temperature=0.9, top_p=0.8)
+
+
+# auto_summarize picks its branch from the type of data[0]. A list whose first
+# row is a pydantic BaseModel but whose later rows are WeaveDicts (dict
+# subclasses, e.g. after a trace-server roundtrip) used to crash with
+# AttributeError, because model_dump was called on every item. The fix guards
+# the conversion per element.
+
+
+class _Score(BaseModel):
+    correct: bool
+    confidence: float
+
+
+def _make_weave_dict(payload: dict) -> WeaveDict:
+    return WeaveDict(payload, server=MagicMock(), ref=None)
+
+
+@pytest.mark.trace_server
+def test_auto_summarize_mixed_basemodel_and_weave_dict():
+    """First row is a BaseModel, later rows are WeaveDicts: aggregate, don't crash."""
+    data = [
+        _Score(correct=True, confidence=0.9),
+        _make_weave_dict({"correct": False, "confidence": 0.4}),
+        _make_weave_dict({"correct": True, "confidence": 0.7}),
+    ]
+    result = auto_summarize(data)
+    assert result["correct"] == {"true_count": 2, "true_fraction": 2 / 3}
+    assert abs(result["confidence"]["mean"] - (0.9 + 0.4 + 0.7) / 3) < 1e-9

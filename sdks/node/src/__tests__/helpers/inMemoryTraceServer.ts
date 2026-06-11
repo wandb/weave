@@ -2,7 +2,7 @@ import {uuidv7} from 'uuidv7';
 
 // TODO: Maybe move the interfaces to something like trace_server_interface.py
 
-interface Call {
+export interface Call {
   project_id: string;
   id: string;
   op_name: string;

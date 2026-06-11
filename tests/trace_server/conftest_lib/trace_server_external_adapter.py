@@ -134,12 +134,6 @@ class UserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().cost_create(req)
 
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        req.wb_user_id = self._user_id
-        return super().actions_execute_batch(req)
-
     def annotation_queue_create(
         self, req: tsi.AnnotationQueueCreateReq
     ) -> tsi.AnnotationQueueCreateRes:

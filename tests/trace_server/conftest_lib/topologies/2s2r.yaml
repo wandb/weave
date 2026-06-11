@@ -46,7 +46,7 @@
 #   docker compose -f 2s2r.yaml down -v
 
 x-ch-node: &ch-node
-  image: clickhouse/clickhouse-server:25.11.2.24
+  image: clickhouse/clickhouse-server:26.4
   environment:
     CLICKHOUSE_DB: default
     CLICKHOUSE_USER: default

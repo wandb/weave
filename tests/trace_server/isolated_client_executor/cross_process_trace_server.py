@@ -385,12 +385,6 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Replace feedback."""
         return self._send_request("feedback_replace", req)
 
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        """Execute actions in batch."""
-        return self._send_request("actions_execute_batch", req)
-
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:

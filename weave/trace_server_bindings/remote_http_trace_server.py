@@ -934,6 +934,18 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Query the feedback table for aggregate scores over time."""
+        return self._generic_request(
+            "/feedback/aggregate",
+            req,
+            tsi.FeedbackAggregateReq,
+            tsi.FeedbackAggregateRes,
+        )
+
+    @validate_call
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
     ) -> tsi.FeedbackPayloadSchemaRes:
@@ -942,17 +954,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.FeedbackPayloadSchemaReq,
             tsi.FeedbackPayloadSchemaRes,
-        )
-
-    @validate_call
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        return self._generic_request(
-            "/actions/execute_batch",
-            req,
-            tsi.ActionsExecuteBatchReq,
-            tsi.ActionsExecuteBatchRes,
         )
 
     # Cost API
@@ -1168,6 +1169,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
         raise NotImplementedError("rescore is not implemented")
+
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        raise NotImplementedError("calls_score is not implemented")
 
     # === V2 APIs ===
 
