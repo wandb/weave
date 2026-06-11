@@ -201,9 +201,7 @@ def validate_feedback_create_req(
 
     # An agent user feedback's value is the tag in scorer_tags; an empty one is noise.
     if is_agent_user_feedback and not req.scorer_tags:
-        raise InvalidRequest(
-            "scorer_tags is required for agent user feedback"
-        )
+        raise InvalidRequest("scorer_tags is required for agent user feedback")
 
     # Validate the ref formats (we could even query the DB to ensure they exist and are valid)
     if req.annotation_ref:
