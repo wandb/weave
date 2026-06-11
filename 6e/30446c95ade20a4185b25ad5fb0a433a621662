@@ -1,0 +1,73 @@
+## Conversation
+This stack is round 2 of the in-memory fake trace server. Round 1 (PRs
+#7145-#7152 v3) replicated the SQLite trace server. The user then said:
+'It seems like a lot of this stack tries to replicate the sqlite trace
+server, when in reality it should probably replicate the clickhouse trace
+server. Please update the stack accordingly.' Everything here is the
+ClickHouse re-target: the fake now replicates ClickHouse (the production
+backend) at the interface level, client_is_sqlite(client) is False for the
+fake, and a new client_is_clickhouse(client) predicate gates tests that
+assert ClickHouse *internals* (SQL, table routing/residence, batching,
+bucket file storage, raw server._query access).
+
+## Verification protocol (applies to the whole stack)
+ClickHouse baselines: tests/trace_server 1336 passed/2 skipped/1 failed
+(test_skip_clickhouse_client, pre-existing); tests/trace 1679/26/1
+(test_flask_server, pre-existing env). Fake converged runs on this exact
+tree: tests/trace_server 1240 passed/105 skipped/0 failed; tests/trace
+1665 passed/42 skipped/1 failed (same flask test). Every extra fake skip
+was audited with -rs: all are explicit ClickHouse-only gates (the
+internals listed above) plus 26 environment skips identical on both
+backends. The CH-internals skip total in tests/trace is exactly the gate
+flips in the wiring commit. Secondary shards (flow/compat/utils/
+wandb_interface/session/shared/object) pass identically to sqlite
+(2 pre-existing env failures: test_evaluation_invalid_model_name_*,
+test_from_obj_unwraps_nested_weave_object — fail the same on sqlite,
+backend-independent).
+
+## This commit (stage 5/10: calls query engine)
+The heart of the CH re-target. _compile_calls_query compiles the mongo
+AST once into a closure-per-record predicate mirroring
+process_query_to_conditions. Key semantics, all verified against a live
+clickhouse server (26.5, clickhouse local) where in doubt:
+- JSON_VALUE runs with function_json_value_return_type_allow_complex=1
+  (set in clickhouse_trace_server_settings.py:71): objects/arrays come
+  back as minified JSON, numbers normalized ('5.0'->'5', '1e3'->'1000'),
+  missing/JSON-null -> '', bools 'true'/'false'. _ch_json_value
+  implements exactly this; the round-1 assumption (arrays -> '' per CH
+  defaults) was WRONG and test_calls_query_filter_contains_in_message_array
+  caught it.
+- Casts: _to_int64_or_null/_to_float64_or_null/_to_uint8_or_null mirror
+  to*OrNull; bool cast is the multiIf chain.
+- _ch_compare propagates NULL (None) through comparisons; eq-with-None
+  literal compiles to 'lhs is None'.
+- Sorts: _ch_sorted_by_terms does two stable passes per term with NULLS
+  LAST for both directions; dynamic fields sort by the (exists DESC,
+  toFloat64OrNull dir, toString dir) triple.
+- status CASE order error -> descendant_error -> running -> success;
+  latency_ms NULL while running; trace_name via regexpExtract.
+- DATETIME_COLUMN_FIELDS normalize datetime literals for comparisons.
+- InvalidFieldError for invalid fields; DISALLOWED_FILTERING_FIELDS
+  (storage sizes) raise like CH.
+- Multi-value feedback: has()/groupArrayIf/arrayExists ('*' = first
+  non-empty, anyIf '' default).
+- expand_columns: _compile_expanded_field/_resolve_ref_str_for_filter
+  resolve refs for filtering AND sorting.
+- _live_queue_ids_for_call is here (not the queues stage) because the
+  queue-membership filter in the compile engine is its first use; it only
+  reads the raw _annotation_queue_items store initialized in stage 1.
+- threads_query_stream: CH aggregation with interpolated quantiles
+  (p50/p99) — the closure was hoisted to _interpolated_quantile for
+  ruff B023 (closure over loop var).
+- project_stats: real tallies incl otel_dump_len; raises the CH
+  ValueError when no include flag is set.
+
+## Errors & Mistakes
+- The JSON_VALUE complex-allowed discovery above (round-1 assumption
+  wrong).
+- threads TypeError (str.replace on int) after the datetime switch — the
+  old string-parsing tail survived; rewritten wholesale.
+
+## Hints for Future Agents
+- calls_score lives in stage 7 and raises ValueError('Kafka producer is
+  not set') — the exact CH error when no producer is configured.
