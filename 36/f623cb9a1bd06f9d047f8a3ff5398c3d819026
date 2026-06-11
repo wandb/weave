@@ -1,0 +1,31 @@
+## Conversation
+Part 2/8 of the fake trace server stack (split of the verified monolith;
+full history in the note on backup/fake-ts-monolith).
+
+## Actions
+Segments: TTL helpers, call_start/call_end/batch/v2/calls_complete,
+calls_delete, call_update, project_ttl_settings_read/update, otel_export,
+plus MAX_OTEL_ERROR_MESSAGES.
+
+## Errors & Mistakes
+None in this chunk (validated as stage 2 of the mechanical split).
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- Writes JSON-normalize payloads via dumps/loads and record the dumped
+  lengths; storage_size_bytes stays None until call_end, mirroring the
+  SQLite column lifecycle (COALESCE fallback lives in the query PR).
+- calls_delete counts num_deleted = len(descendants + requested ids) even
+  for nonexistent ids, and is NOT project-scoped — SQLite parity.
+- expire_at is stored as text; both the computed EXPIRE_AT_NEVER isoformat
+  and the SQLite column default normalize to None on read.
+- tests/trace_server/test_ttl_insert_paths.py raw-reads _calls/_ttl_settings
+  directly (wired in part 8).
+
+## Codebase Discoveries
+See the monolith note.
+
+## Open Questions
+None for this chunk.
