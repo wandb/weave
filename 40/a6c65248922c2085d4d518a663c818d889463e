@@ -56,3 +56,6 @@ None.
 - Cutover timing/coordination with core (submodule bump; core repoints to
   weave.trace_server.interface.* and weave.eval_worker.*; conformance/ moves
   to core and gets git-referenced here).
+
+## Addendum (round 4 restack)
+The strict-zero declaration is softened to 'achieved up to ONE documented entry': round 4 removed builtin object classes from the client (staging PR), so the mirror carries no registry and the client digest twin (weave.trace.object_class_util) keeps a lazy import of the SERVER contract registry for digest parity. The entry is grandfathered in pyproject's C1 list with a burn-down story (builtin-schema codegen follow-up). Updated in the same breath: pyproject's Maintain-zero banner, docs/TRACE_SERVER_DECOUPLING.md (intro, enforcement bullet, bridge rules), AGENTS.md maintain-zero rule. C2's ignore list normalized from [\n] to [].
