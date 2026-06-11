@@ -112,3 +112,22 @@ Gotchas discovered while writing it:
 - init('entity/project') (with a slash) performs no wandb-api call, so the
   inline server only needs to answer /call/upsert_batch (and 200 anything
   else) — batch items are {mode:'start'|'end', req:{start|end:{...}}}.
+
+---
+
+# CORRECTION to the runtime-impact audit addendum
+
+The original audit's EMPIRICAL runs unknowingly used a slice-3 build: the
+workspace had been switched to andrew/google-adk-03-agent-hierarchy between
+sessions, so that dist had no hooks registration / auto-instrumentation
+(registry showed 8 keys, no adk). The code-read conclusions were unaffected.
+Re-run on the real slice-4 tip (4fde323b1c, after restack onto newer
+master):
+- CJS registry has '@google/adk@dist/cjs/index.js', ESM registry has
+  '@google/adk' — and import still performs ZERO '@google/adk' resolution
+  attempts (NODE_DEBUG=module count 0).
+- beforeExit/exit listeners after import: 0 / 0.
+- Clean import A/B at the new merge-base (35ff130437) vs tip, 12 runs,
+  same-moment machine: base median 267.6ms / min 144.5 vs tip 237.8 / min
+  147.9 — minimums within ~3ms, delta inside run-to-run noise.
+All audit conclusions stand on the real build.
