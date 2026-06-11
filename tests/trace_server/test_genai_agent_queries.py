@@ -899,6 +899,49 @@ def test_agent_span_stats_ungrouped_metrics(ch_server):
     assert row["count_true_invocations"] == 1
 
 
+def test_agent_span_stats_ungrouped_all_time(ch_server):
+    """Ungrouped >31-day request with the whole range as one bucket returns a
+    single row of all-time totals (no range-cap rejection).
+
+    Mirrors the client recipe: start=epoch, end=now, granularity=now-epoch.
+    Time buckets anchor to the epoch origin, so this is the range that
+    collapses to exactly one bucket.
+    """
+    project_id = _make_project_id("stats-all-time")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    epoch = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+    # Both spans predate `now` (started_at < end is exclusive) and one is far
+    # past MAX_AGENT_STATS_RANGE_DAYS.
+    recent = now - datetime.timedelta(minutes=1)
+    old = now - datetime.timedelta(days=100)
+
+    spans = [
+        _make_span(project_id, started_at=recent),
+        _make_span(project_id, started_at=old),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=epoch,
+            end=now,
+            granularity=int((now - epoch).total_seconds()) + 1,
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="spans",
+                    value_type="datetime",
+                    value=AgentSpanValueRef(source="field", key="started_at"),
+                    aggregations=["count"],
+                )
+            ],
+        )
+    )
+
+    assert len(res.rows) == 1
+    assert res.rows[0]["count_spans"] == 2
+
+
 def test_agent_span_stats_numeric_value_buckets(ch_server):
     """Stats API can bucket the full filtered span set by numeric value range."""
     project_id = _make_project_id("stats_hist")
