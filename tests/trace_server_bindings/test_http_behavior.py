@@ -1,7 +1,7 @@
 """HTTP behavior tests for StainlessRemoteHTTPTraceServer.
 
 These tests verify HTTP request/response handling, retry behavior for various
-status codes, and error handling specific to StainlessRemoteHTTPTraceServer.
+status codes, and error handling of the remote trace server binding.
 
 Mocking happens at the httpx transport boundary (the external seam), so the
 full stack — SDK encode/decode, event hooks, error translation, retry
@@ -21,6 +21,7 @@ import tenacity
 from pydantic import ValidationError
 
 from tests.trace_server_bindings.conftest import (
+    SpyTransport,
     generate_end,
     generate_id,
     generate_start,
@@ -43,40 +44,6 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
 )
 
 BASE_URL = "http://example.com"
-
-
-class SpyTransport(httpx.BaseTransport):
-    """httpx transport that records requests and replays queued responses.
-
-    Queue items may be ``httpx.Response`` objects or exceptions to raise.
-    When the queue is empty, returns ``default_response`` (200 ``{}`` unless
-    overridden).
-    """
-
-    def __init__(
-        self,
-        *items: httpx.Response | Exception,
-        default_response: httpx.Response | None = None,
-    ) -> None:
-        self.queue: list[httpx.Response | Exception] = list(items)
-        self.requests: list[httpx.Request] = []
-        self.default_response = default_response
-
-    def handle_request(self, request: httpx.Request) -> httpx.Response:
-        request.read()
-        self.requests.append(request)
-        if self.queue:
-            item = self.queue.pop(0)
-            if isinstance(item, Exception):
-                raise item
-            return item
-        if self.default_response is not None:
-            return self.default_response
-        return httpx.Response(200, json={})
-
-    @property
-    def urls(self) -> list[str]:
-        return [str(r.url) for r in self.requests]
 
 
 def make_server(

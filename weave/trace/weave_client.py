@@ -417,7 +417,7 @@ class WeaveClient:
         self._server_feedback_processor: AsyncBatchProcessor | None = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the call processor.
-        # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
+        # The `StainlessRemoteHTTPTraceServer` contains a call processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
         # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
@@ -2166,7 +2166,7 @@ class WeaveClient:
         """
         # DigestMismatchError: raised directly by local servers (SQLite, ClickHouse).
         is_local_mismatch = isinstance(e, DigestMismatchError)
-        # HTTPError 409: raised by RemoteHTTPTraceServer when the remote
+        # HTTPError 409: raised by StainlessRemoteHTTPTraceServer when the remote
         # server returns HTTP 409 Conflict for a digest mismatch.
         is_remote_mismatch = (
             isinstance(e, HTTPError)
@@ -2489,11 +2489,8 @@ class WeaveClient:
                 if hasattr(server, "_next_trace_server"):
                     server = server._next_trace_server
 
-                assert hasattr(server, "_post_request_executor")
-                assert hasattr(server._post_request_executor, "__wrapped__")
-                return server._post_request_executor.__wrapped__(
-                    server, "/table/create_from_digests", req
-                )
+                assert hasattr(server, "unretried_table_create_from_digests")
+                return server.unretried_table_create_from_digests(req)
 
             use_parallel_chunks = check_endpoint_exists(
                 test_func, test_req, "table_create_from_digests"
@@ -3069,7 +3066,7 @@ def sanitize_object_name(name: str) -> str:
 def _get_call_processor(server: Any) -> Any:
     """Get the call processor from a server, traversing through middleware wrappers.
 
-    Most production clients (RemoteHTTPTraceServer, StainlessRemoteHTTPTraceServer)
+    Most production clients (StainlessRemoteHTTPTraceServer)
     use batching and have a call_processor. This traverses through middleware like
     CachingMiddlewareTraceServer to find it.
 

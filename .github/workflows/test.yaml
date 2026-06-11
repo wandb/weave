@@ -149,7 +149,6 @@ jobs:
             "pandas_test",
             "fastmcp",
             "smolagents",
-            "stainless",
             "autogen_tests",
           ]
         # Shards that don't support certain Python versions. Excluding here
@@ -578,7 +577,6 @@ jobs:
             "pandas_test",
             "fastmcp",
             "smolagents",
-            "stainless",
             "autogen_tests",
           ]
         # Shards that don't support certain Python versions. Excluding here

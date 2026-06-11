@@ -921,6 +921,21 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.TableCreateFromDigestsRes,
         )
 
+    def unretried_table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Single-attempt variant used by the client's endpoint-availability
+        probe: a missing endpoint (404) must fail fast, and a flaky probe must
+        not stall table saves behind retries.
+        """
+        return self._via_sdk.__wrapped__(  # type: ignore[attr-defined]
+            self,
+            req,
+            sdk_models.TableCreateFromDigestsReq,
+            self._sdk.tables.create_create_from_digests,
+            tsi.TableCreateFromDigestsRes,
+        )
+
     @validate_call
     def table_query_stats_batch(
         self, req: tsi.TableQueryStatsReq

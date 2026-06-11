@@ -1,8 +1,7 @@
-"""Tests for RemoteHTTPTraceServer and StainlessRemoteHTTPTraceServer bindings.
+"""Tests for the StainlessRemoteHTTPTraceServer binding.
 
-These tests verify the batching, splitting, and retry behavior of both server
-implementations. The --remote-http-trace-server flag controls which implementation
-is tested (default: "remote", or "stainless").
+These tests verify the batching, splitting, and retry behavior of the remote
+trace server binding.
 """
 
 from __future__ import annotations
@@ -14,7 +13,6 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-import requests
 
 from tests.trace_server_bindings.conftest import (
     generate_call_start_end_pair,
@@ -26,9 +24,6 @@ from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
     StartBatchItem,
-)
-from weave.trace_server_bindings.remote_http_trace_server import (
-    RemoteHTTPTraceServer,
 )
 
 
@@ -214,12 +209,11 @@ def test_non_uniform_batch_items(server):
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
-def test_drop_data_when_queue_is_full(server, server_class, log_collector):
+def test_drop_data_when_queue_is_full(server, log_collector):
     """Test that items are dropped when the queue is full."""
-    # For StainlessRemoteHTTPTraceServer, set _dropped_item_count to 0
-    # so the next drop (1st) will log (logging happens at 1, 1001, 2001, etc.)
-    if server_class.__name__ == "StainlessRemoteHTTPTraceServer":
-        server.call_processor._dropped_item_count = 0
+    # Set _dropped_item_count to 0 so the next drop (1st) will log
+    # (logging happens at 1, 1001, 2001, etc.)
+    server.call_processor._dropped_item_count = 0
 
     # Replace the real queue with a mock that raises Full when put_nowait is called
     mock_queue = MagicMock()
@@ -245,7 +239,7 @@ def test_drop_data_when_queue_is_full(server, server_class, log_collector):
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
-def test_requeue_after_max_retries(server, server_class, caplog):
+def test_requeue_after_max_retries(server, caplog):
     """Test that batches are requeued after max retries."""
     caplog.set_level(logging.WARNING)
 
@@ -255,15 +249,9 @@ def test_requeue_after_max_retries(server, server_class, caplog):
     # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
     server.call_processor.enqueue = MagicMock()
 
-    # Use the appropriate exception type for each implementation
-    if server_class == RemoteHTTPTraceServer:
-        server._send_batch_to_server = MagicMock(
-            side_effect=httpx.ConnectError("Connection error")
-        )
-    else:
-        server._send_batch_to_server = MagicMock(
-            side_effect=requests.ConnectionError("Connection error")
-        )
+    server._send_batch_to_server = MagicMock(
+        side_effect=httpx.ConnectError("Connection error")
+    )
 
     # Create a batch
     start, end = generate_call_start_end_pair()

@@ -4,12 +4,12 @@ import json
 from unittest.mock import MagicMock
 
 from weave.trace import weave_init
-from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings import stainless_remote_http_trace_server
 
 
 def test_get_server_info_json_decode_error():
     """Test that _get_server_info returns None when server info cannot be decoded."""
-    mock_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
+    mock_server = MagicMock(spec=stainless_remote_http_trace_server.StainlessRemoteHTTPTraceServer)
     mock_server.server_info.side_effect = json.JSONDecodeError("test error", "doc", 0)
 
     result = weave_init._get_server_info(mock_server)
@@ -20,7 +20,7 @@ def test_get_server_info_json_decode_error():
 
 def test_get_server_info_success():
     """Test that _get_server_info returns server info when server is available."""
-    mock_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
+    mock_server = MagicMock(spec=stainless_remote_http_trace_server.StainlessRemoteHTTPTraceServer)
     server_info = {"version": "1.0.0"}
     mock_server.server_info.return_value = server_info
 
