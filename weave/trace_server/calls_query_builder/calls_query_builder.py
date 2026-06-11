@@ -1907,12 +1907,15 @@ ALLOWED_CALL_FIELDS = {
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
-# Dotted prefixes routed to special handlers in `get_field_by_name`; keep in sync.
+# Dotted prefixes routed to special handlers in `get_field_by_name`.
 ALLOWED_DYNAMIC_FIELD_PREFIXES = (
     "feedback.*",
     "annotation_queue_items.*",
     "summary.weave.*",
 )
+
+# Resolvable but internal; not advertised in `field not allowed` messages.
+_HIDDEN_MESSAGE_FIELDS = {"project_id", "deleted_at", "expire_at"}
 
 # Fields that are stored as DateTime64 columns in ClickHouse. When comparing
 # these fields with numeric unix timestamps, the value must be converted to a
@@ -1952,26 +1955,27 @@ def get_field_by_name(name: str) -> CallsMergedField:
 
 def _invalid_field_message(name: str) -> str:
     """`field not allowed` message for an unrecognized field."""
-    return f"Field {name} is not allowed. {_allowed_fields_clause(ALLOWED_CALL_FIELDS)}"
+    return f"Field {name} is not allowed. {_allowed_fields_clause()}"
 
 
 def _disallowed_filter_message(name: str) -> str:
     """`field not filterable/sortable` message for a recognized-but-blocked field."""
-    filterable = ALLOWED_CALL_FIELDS.keys() - DISALLOWED_FILTERING_FIELDS
     return (
         f"Field {name} cannot be used for filtering or sorting. "
-        f"{_allowed_fields_clause(filterable)}"
+        f"{_allowed_fields_clause(exclude=DISALLOWED_FILTERING_FIELDS)}"
     )
 
 
-def _allowed_fields_clause(field_names: Collection[str]) -> str:
-    """Render `Allowed fields: ...` + `Allowed dynamic prefixes: ...` for a field set."""
+def _allowed_fields_clause(exclude: Collection[str] = ()) -> str:
+    """Render the advertised `Allowed fields` + `Allowed dynamic prefixes` lists."""
+    hidden = _HIDDEN_MESSAGE_FIELDS.union(exclude)
+    names = [name for name in ALLOWED_CALL_FIELDS if name not in hidden]
     dotted_prefixes = tuple(
         f"{name.removesuffix('_dump')}.*"
-        for name in field_names
+        for name in names
         if isinstance(ALLOWED_CALL_FIELDS[name], CallsMergedDynamicField)
     )
-    allowed = ", ".join(sorted(name.removesuffix("_dump") for name in field_names))
+    allowed = ", ".join(sorted(name.removesuffix("_dump") for name in names))
     prefixes = ", ".join(sorted(ALLOWED_DYNAMIC_FIELD_PREFIXES + dotted_prefixes))
     return f"Allowed fields: {allowed}. Allowed dynamic prefixes: {prefixes}."
 

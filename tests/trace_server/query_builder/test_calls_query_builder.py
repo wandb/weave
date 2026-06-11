@@ -3231,10 +3231,10 @@ def test_filter_length_validation():
 def test_disallowed_fields():
     # the message lists filterable fields and never the rejected field itself
     clause = (
-        "Allowed fields: attributes, deleted_at, display_name, ended_at, "
-        "exception, expire_at, id, input_refs, inputs, op_name, otel, output, "
-        "output_refs, parent_id, project_id, started_at, summary, thread_id, "
-        "trace_id, turn_id, wb_run_id, wb_run_step, wb_run_step_end, wb_user_id. "
+        "Allowed fields: attributes, display_name, ended_at, exception, id, "
+        "input_refs, inputs, op_name, otel, output, output_refs, parent_id, "
+        "started_at, summary, thread_id, trace_id, turn_id, wb_run_id, "
+        "wb_run_step, wb_run_step_end, wb_user_id. "
         "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
         "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
     )
@@ -3271,14 +3271,16 @@ def test_disallowed_fields():
 
 
 def test_invalid_field_message_lists_allowed_fields():
-    """An unknown filter/sort field surfaces the full allowed-field list (read-path 422)."""
+    """An unknown filter/sort field surfaces the allowed-field list (read-path 422)."""
+    # Exact match is intentional: a new field forces a look at the user-facing
+    # message and at whether it should be advertised (see _HIDDEN_MESSAGE_FIELDS).
     expected = (
         "Field made_up_field is not allowed. "
-        "Allowed fields: attributes, deleted_at, display_name, ended_at, "
-        "exception, expire_at, id, input_refs, inputs, op_name, otel, output, "
-        "output_refs, parent_id, project_id, started_at, storage_size_bytes, "
-        "summary, thread_id, total_storage_size_bytes, trace_id, turn_id, "
-        "wb_run_id, wb_run_step, wb_run_step_end, wb_user_id. "
+        "Allowed fields: attributes, display_name, ended_at, exception, id, "
+        "input_refs, inputs, op_name, otel, output, output_refs, parent_id, "
+        "started_at, storage_size_bytes, summary, thread_id, "
+        "total_storage_size_bytes, trace_id, turn_id, wb_run_id, wb_run_step, "
+        "wb_run_step_end, wb_user_id. "
         "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
         "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
     )
@@ -3299,6 +3301,25 @@ def test_invalid_field_message_lists_allowed_fields():
     with pytest.raises(InvalidFieldError) as exc_info:
         cq.as_sql(ParamBuilder())
     assert str(exc_info.value) == expected
+
+
+def test_advertised_fields_and_prefixes_all_resolve():
+    """Truthfulness: every field/prefix the 422 advertises must actually resolve."""
+    prefix_examples = {
+        "annotation_queue_items.*": "annotation_queue_items.queue_id",
+        "attributes.*": "attributes.x",
+        "feedback.*": "feedback.[my_type].payload.value",
+        "inputs.*": "inputs.x",
+        "output.*": "output.x",
+        "summary.*": "summary.x",
+        "summary.weave.*": "summary.weave.latency",
+    }
+    _, _, rest = _invalid_field_message("nope").partition("Allowed fields: ")
+    fields_csv, _, prefixes_csv = rest.partition(". Allowed dynamic prefixes: ")
+    for field in fields_csv.split(", "):
+        get_field_by_name(field)
+    for prefix in prefixes_csv.rstrip(".").split(", "):
+        get_field_by_name(prefix_examples[prefix])
 
 
 def test_thread_id_filter_eq():
