@@ -220,6 +220,22 @@ npm i
 npm run test
 ```
 
+### TypeScript SDK integration patterns (sdks/node)
+
+- Integrations live in `sdks/node/src/integrations/`.
+- Agent-framework integrations either write calls directly with
+  `client.saveCallStart` / `saveCallEnd` (the openai-agents default,
+  `openai-agents/weave-tracing-processor.ts`) or emit GenAI-semconv OTel
+  spans to the Weave agents endpoint (`/agents/otel/v1/traces`) via
+  `getWeaveTracer` (`googleAdk.ts`, `piCodingAgent.ts`, openai-agents under
+  `WEAVE_USE_OTEL_V2`) — never by wrapping framework functions in `op()`.
+- Framework types are duck-typed locally (e.g. `googleAdk.types.ts`) so the
+  SDK has no runtime dependency on the framework package. Keep these types
+  free of index signatures or the real framework types stop being assignable.
+- `@google/adk`'s CJS dist `require()`s the ESM-only `lodash-es` (legal under
+  Node >= 22 `require(esm)`, fatal under jest); the default jest project maps
+  `^lodash-es$` → `lodash`.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
