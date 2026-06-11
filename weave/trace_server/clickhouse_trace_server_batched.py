@@ -573,6 +573,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return f"{table}{ch_settings.LOCAL_TABLE_SUFFIX}"
         return table
 
+    def _mutation_cluster_name(self) -> str | None:
+        """`ON CLUSTER` target for a mutation: set only in distributed mode (replicated tables self-replicate via Keeper)."""
+        if self.use_distributed_mode:
+            return self.clickhouse_cluster_name
+        return None
+
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
     ) -> dict[str, str]:
@@ -6309,7 +6315,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prepared = query.prepare(
             database_type="clickhouse",
             table_name=self._mutation_table_name(LLM_TOKEN_PRICES_TABLE.name),
-            cluster_name=self.clickhouse_cluster_name,
+            cluster_name=self._mutation_cluster_name(),
         )
         self._command(
             prepared.sql,
@@ -6396,7 +6402,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prepared = query.prepare(
             database_type="clickhouse",
             table_name=self._mutation_table_name(TABLE_FEEDBACK.name),
-            cluster_name=self.clickhouse_cluster_name,
+            cluster_name=self._mutation_cluster_name(),
         )
         self._command(
             prepared.sql,

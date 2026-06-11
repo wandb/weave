@@ -208,9 +208,10 @@ def test_calls_complete_table_resolution_by_mode(
     [
         # Cloud mode: no cluster, plain table.
         (False, None, ""),
-        # Replicated mode: cluster set, but NOT distributed -> no _local.
-        (False, CLUSTER, f" ON CLUSTER {CLUSTER}"),
-        # Distributed mode: DELETE must hit <table>_local on the cluster.
+        # Replicated mode: cluster set, but tables self-replicate the mutation via
+        # Keeper -> no ON CLUSTER and no _local.
+        (False, CLUSTER, ""),
+        # Distributed mode: DELETE must hit <table>_local ON CLUSTER to fan across shards.
         (True, CLUSTER, f" ON CLUSTER {CLUSTER}"),
     ],
     ids=["cloud", "replicated", "distributed"],
@@ -218,19 +219,17 @@ def test_calls_complete_table_resolution_by_mode(
 def test_purge_delete_honors_caller_table_and_cluster(
     use_distributed: bool, cluster_name: str | None, on_cluster: str
 ) -> None:
-    """feedback/cost purge DELETE routes to the _local table + ON CLUSTER in distributed mode (WB-35378).
-
-    Drives table resolution through the same env wiring the batched server uses
-    (_mutation_table_name + clickhouse_cluster_name), so the distributed _local
-    routing -- the thing that was broken -- is asserted, not just the cloud path.
-    """
+    """feedback/cost purge DELETE gets `_local` + ON CLUSTER only in distributed mode (WB-35378)."""
     env_vars = {"WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES": str(use_distributed).lower()}
     if cluster_name:
         env_vars["WF_CLICKHOUSE_REPLICATED_CLUSTER"] = cluster_name
 
     with patch.dict("os.environ", env_vars, clear=False):
-        suffix = "_local" if wf_env.wf_clickhouse_use_distributed_tables() else ""
-        resolved_cluster = wf_env.wf_clickhouse_replicated_cluster()
+        distributed = wf_env.wf_clickhouse_use_distributed_tables()
+        suffix = "_local" if distributed else ""
+        mutation_cluster = (
+            wf_env.wf_clickhouse_replicated_cluster() if distributed else None
+        )
 
         feedback = (
             TABLE_FEEDBACK.purge()
@@ -244,7 +243,7 @@ def test_purge_delete_honors_caller_table_and_cluster(
                 database_type="clickhouse",
                 param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
                 table_name=f"feedback{suffix}",
-                cluster_name=resolved_cluster,
+                cluster_name=mutation_cluster,
             )
         )
         assert feedback.sql == (
@@ -271,7 +270,7 @@ def test_purge_delete_honors_caller_table_and_cluster(
                 database_type="clickhouse",
                 param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
                 table_name=f"llm_token_prices{suffix}",
-                cluster_name=resolved_cluster,
+                cluster_name=mutation_cluster,
             )
         )
         assert cost.sql == (
