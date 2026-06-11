@@ -230,3 +230,6 @@ RENAME-MERGE HAZARD (the big lesson of this restack): rebasing the consolidation
 
 ## Addendum 2 (round 4 follow-through)
 The mirror carries llm_structured_model after all at this level (their original interface commit left the scorer on the server path; the pruned design needs the client copy so the scorer/serialize special-case and every client-driving test build ONE class). All client-side constructors of LLMStructuredCompletionModel now import the mirror copy -- the earlier mixed imports (registry/server path in library_cases, test_evaluation_ref_get, test_llm_as_a_judge_scorer) produced cross-copy pydantic model_type and cast failures. The conformance gate plus the serialization golden suite are the canaries.
+
+## Addendum 3
+Reverted the mirror llm_structured copy: the guard PR's meta-test enforces the mirror as a PURE import leaf (AST-checked), which the fused class violates. At this level the judge scorer, serialize's single special case, and the client tests keep building the SERVER-path class (one class everywhere client-side; C1-baselined in the guard); the llm-structured PR later introduces weave/model's runnable + the pure schema mirror, exactly as originally designed.
