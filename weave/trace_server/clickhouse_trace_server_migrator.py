@@ -1069,12 +1069,16 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 )
                 return
 
-            # Skip INSERT commands (backfill not supported in distributed mode)
+            # Run INSERT ... VALUES seeds (the Distributed engine fans rows to
+            # shards); skip INSERT ... SELECT backfills, which need per-shard handling.
             if SQLPatterns.INSERT_STMT.search(command_for_match):
-                logger.warning(
-                    "Skipping INSERT command (not supported in distributed mode): %s...",
-                    command[:_COMMAND_PREVIEW_LENGTH],
-                )
+                if SQLPatterns.INSERT_SELECT_STMT.search(command_for_match):
+                    logger.warning(
+                        "Skipping INSERT ... SELECT backfill (not supported in distributed mode): %s...",
+                        command[:_COMMAND_PREVIEW_LENGTH],
+                    )
+                    return
+                self._run_distributed_insert(command)
                 return
 
             # Handle RENAME TABLE (local rename + drop/recreate distributed table)
@@ -1284,6 +1288,10 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             local_command, target_db=self.ch_client.database
         )
         self._run_ddl_with_retry(local_command)
+
+    def _run_distributed_insert(self, command: str) -> None:
+        """Run an INSERT ... VALUES seed against the distributed table synchronously."""
+        self.ch_client.command(command, settings={"distributed_foreground_insert": 1})
 
     def _execute_distributed_rename(self, command: str) -> None:
         """Handle RENAME TABLE in distributed mode.
@@ -1629,6 +1637,9 @@ class SQLPatterns:
     MODIFY_QUERY: Pattern = re.compile(r"\bMODIFY\s+QUERY\b", re.IGNORECASE)
     MATERIALIZE: Pattern = re.compile(r"\bMATERIALIZE\b", re.IGNORECASE)
     INSERT_STMT: Pattern = re.compile(r"\bINSERT\s+INTO\b", re.IGNORECASE)
+    INSERT_SELECT_STMT: Pattern = re.compile(
+        r"\bINSERT\s+INTO\b.*\bSELECT\b", re.IGNORECASE | re.DOTALL
+    )
     LOCAL_ONLY_OPS: Pattern = re.compile(
         r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b|\b(MODIFY|REMOVE)\s+TTL\b",
         re.IGNORECASE,
