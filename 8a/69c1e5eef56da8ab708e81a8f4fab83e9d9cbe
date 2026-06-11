@@ -1,0 +1,61 @@
+## Conversation
+This stack is round 2 of the in-memory fake trace server. Round 1 (PRs
+#7145-#7152 v3) replicated the SQLite trace server. The user then said:
+'It seems like a lot of this stack tries to replicate the sqlite trace
+server, when in reality it should probably replicate the clickhouse trace
+server. Please update the stack accordingly.' Everything here is the
+ClickHouse re-target: the fake now replicates ClickHouse (the production
+backend) at the interface level, client_is_sqlite(client) is False for the
+fake, and a new client_is_clickhouse(client) predicate gates tests that
+assert ClickHouse *internals* (SQL, table routing/residence, batching,
+bucket file storage, raw server._query access).
+
+## Verification protocol (applies to the whole stack)
+ClickHouse baselines: tests/trace_server 1336 passed/2 skipped/1 failed
+(test_skip_clickhouse_client, pre-existing); tests/trace 1679/26/1
+(test_flask_server, pre-existing env). Fake converged runs on this exact
+tree: tests/trace_server 1240 passed/105 skipped/0 failed; tests/trace
+1665 passed/42 skipped/1 failed (same flask test). Every extra fake skip
+was audited with -rs: all are explicit ClickHouse-only gates (the
+internals listed above) plus 26 environment skips identical on both
+backends. The CH-internals skip total in tests/trace is exactly the gate
+flips in the wiring commit. Secondary shards (flow/compat/utils/
+wandb_interface/session/shared/object) pass identically to sqlite
+(2 pre-existing env failures: test_evaluation_invalid_model_name_*,
+test_from_obj_unwraps_nested_weave_object — fail the same on sqlite,
+backend-independent).
+
+## This commit (stage 4/10: feedback/costs + ORM evaluation)
+Feedback and costs evaluate queries through an ORM-equivalent layer
+mirroring what CH runs these tables through: _orm_field_value applies
+JSON_VALUE-with-complex semantics plus a default 'string' cast,
+mapContains existence, _OrmDatetimeLiteral normalizes datetime literals,
+$contains with a numeric needle raises
+clickhouse_connect.driver.exceptions.DatabaseError('Illegal type Int64|
+Float64 of argument of function position') exactly like the driver.
+feedback_aggregate is the newest method: master commit 5e73a213b4 (PR
+#7043) added the endpoint mid-stack-rebuild, so the fake mirrors
+build_feedback_aggregate_query row-at-a-time: WHERE (project, created_at
+in [after_ms, before_ms), feedback_type prefix-any, monitor/scorer
+object-id match where the id is ref.split('/')[-1].split(':')[0] and a
+trailing '*' opts into prefix, span_agent_names IN, span_types via
+weave_ref's second-to-last path segment, tags hasAny, rating bounds
+require mapContains '_rating_'), GROUP BY epoch-aligned
+toStartOfInterval bucket (int(ts // s) * s) plus group_by dims
+(scorer_id derived from runnable_ref), sumMap-style tag/rating tallies,
+scored_count = rows with any tag or rating, ORDER BY bucket (bucketed)
+or group dims, and — critical CH behavior — a query with NO grouping
+keys returns exactly ONE global rollup row even over zero rows.
+
+## Errors & Mistakes
+- test_feedback_aggregate_filter_matching_functional reaches into
+  server._query with built SQL — CH-internals; its gate was
+  client_is_sqlite-skip, which the fake (not sqlite) fell through, dying
+  with AttributeError '_query'. Flipped to client_is_clickhouse skip (a
+  sanctioned backend-hack edit). Behavior coverage for those filters on
+  the fake comes from test_feedback_aggregate itself.
+
+## Hints for Future Agents
+- scorer_tags/scorer_ratings may be stored as None; treat as empty.
+- span_status_code defaults to 'UNSET' via FeedbackCreateReq, so
+  group-by span_status_code matches CH without column-default logic.
