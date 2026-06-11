@@ -36,7 +36,6 @@ def setup_tests():
     agents.set_trace_processors([WeaveTracingProcessor()])
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -99,7 +98,6 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
 @pytest.mark.skip(
     reason="This test works, but the order of requests to OpenAI can be mixed up (by the Agent framework).  This causes the test to fail more than reasonable in CI."
 )
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )

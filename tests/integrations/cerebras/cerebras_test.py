@@ -19,7 +19,6 @@ def patch_cerebras() -> Generator[None, None, None]:
     patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("CEREBRAS_API_KEY", "DUMMY_API_KEY")
@@ -53,7 +52,6 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     assert output.usage.total_tokens == model_usage["total_tokens"]
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_cerebras_async(client: weave.trace.weave_client.WeaveClient) -> None:

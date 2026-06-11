@@ -116,7 +116,6 @@ def main():
     asyncio.run(run_client())
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -165,7 +164,6 @@ def test_fastmcp_client(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )

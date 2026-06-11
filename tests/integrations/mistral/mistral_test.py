@@ -17,7 +17,6 @@ def patch_mistral() -> Generator[None, None, None]:
     patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
@@ -79,7 +78,6 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     assert output.usage.total_tokens == model_usage["total_tokens"] == 416
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_mistral_quickstart_async(
@@ -136,7 +134,6 @@ Each of these cheeses offers a unique taste and texture, so the "best" one is a 
     assert output.usage.total_tokens == model_usage["total_tokens"] == 373
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_mistral_quickstart_with_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -194,7 +191,6 @@ Each of these cheeses offers a unique taste and texture, so the "best" one depen
     assert output.usage.total_tokens == model_usage["total_tokens"] == 360
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_mistral_quickstart_with_stream_async(

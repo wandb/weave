@@ -49,7 +49,6 @@ def patch_llamaindex() -> Generator[None, None, None]:
     openai_patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -117,7 +116,6 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
     assert call_2.output["usage"]["total_tokens"] == 206
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -181,7 +179,6 @@ async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
     assert call_2.output["usage"]["total_tokens"] == 222
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -259,7 +256,6 @@ def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
     assert call_3.output["usage"]["total_tokens"] == 171
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -331,7 +327,6 @@ async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None
     assert call_3.output["usage"]["total_tokens"] == 203
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -413,7 +408,6 @@ def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
     assert call_2.output["usage"]["total_tokens"] == 39
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -496,7 +490,6 @@ async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
     assert call_2.output["usage"]["total_tokens"] == 39
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -604,7 +597,6 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
     assert call_3.output["usage"]["total_tokens"] == 39
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -714,7 +706,6 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
     assert call_3.output["usage"]["total_tokens"] == 39
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -785,7 +776,6 @@ def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
     assert "artist" in tools[0]["function"]["parameters"]["properties"]
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -830,7 +820,6 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
     assert len(flattened_calls) == 4
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     # before_record_request=filter_body,

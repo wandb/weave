@@ -66,7 +66,6 @@ def assert_correct_calls_for_chain_invoke(
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -102,7 +101,6 @@ def test_simple_chain_invoke(
     assert "gpt-4o-mini-2024-07-18" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -130,7 +128,6 @@ def test_simple_chain_invoke_no_client(client) -> None:
     _ = llm_chain.invoke({"number": 2})
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -154,7 +151,6 @@ async def test_simple_chain_ainvoke(
     assert_correct_calls_for_chain_invoke(calls)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -178,7 +174,6 @@ def test_simple_chain_stream(
     assert_correct_calls_for_chain_invoke(calls)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -224,7 +219,6 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -249,7 +243,6 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
     assert_correct_calls_for_chain_batch(calls)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -295,7 +288,6 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -412,7 +404,6 @@ def fix_chroma_ci() -> Generator[None, None, None]:
         sys.modules["sqlite3"] = old
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -492,7 +483,6 @@ def assert_correct_calls_for_agent_with_tool(calls: list[Call]) -> None:
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -607,7 +597,6 @@ def assert_correct_calls_for_agent_with_function_call(calls: list[Call]) -> None
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -699,7 +688,6 @@ def test_agent_run_with_function_call(
     assert_correct_calls_for_agent_with_function_call(calls)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -726,7 +714,6 @@ def test_weave_attributes_in_call(client: WeaveClient) -> None:
     assert "lc_name" in call_attrs
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     before_record_request=filter_body,
@@ -769,7 +756,6 @@ def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
     assert "gemini-2.5-pro-preview-05-06" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -800,7 +786,6 @@ def test_langchain_google_genai_usage(client: WeaveClient) -> None:
     assert "gemini-1.5-pro-002" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -831,7 +816,6 @@ def test_langchain_google_chat_genai_usage(client: WeaveClient) -> None:
     assert "gemini-1.5-pro-002" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -866,7 +850,6 @@ def test_langchain_anthropic_usage(client: WeaveClient) -> None:
     assert "claude-opus-4-20250514" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -901,7 +884,6 @@ def test_langchain_cohere_usage(client: WeaveClient) -> None:
     assert "command-r" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,

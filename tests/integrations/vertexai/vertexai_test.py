@@ -7,7 +7,6 @@ from weave.integrations.integration_utilities import op_name_from_ref
     reason="This test depends on a non-deterministic external service provider"
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 def test_content_generation(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -35,7 +34,6 @@ def test_content_generation(client):
     reason="This test depends on a non-deterministic external service provider"
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 def test_content_generation_stream(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -64,7 +62,6 @@ def test_content_generation_stream(client):
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 async def test_content_generation_async(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -93,7 +90,6 @@ async def test_content_generation_async(client):
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 async def test_content_generation_async_stream(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -129,7 +125,6 @@ async def test_content_generation_async_stream(client):
     reason="This test depends on a non-deterministic external service provider"
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 def test_chat_session(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel
@@ -159,7 +154,6 @@ def test_chat_session(client):
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 async def test_chat_session_async(client):
     import vertexai
     from vertexai.generative_models import GenerativeModel

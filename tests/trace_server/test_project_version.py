@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.trace.util import client_is_sqlite
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
@@ -102,9 +101,6 @@ def test_version_resolution_by_table_contents(
     log_collector,
 ):
     """Test routing resolution for different project data residency states."""
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
     # manually set this to auto so we can test the switching
@@ -143,9 +139,6 @@ def test_version_resolution_by_table_contents(
 
 
 def test_caching_behavior(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
     resolver._mode = CallsStorageServerMode.AUTO
@@ -174,9 +167,6 @@ def test_caching_behavior(client, trace_server):
 
 
 def test_mode_off_and_force_legacy(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
 
@@ -202,9 +192,6 @@ def test_mode_off_and_force_legacy(client, trace_server):
 
 
 def test_clickhouse_provider_directly(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
     project_id = make_project_id("provider_direct")
     insert_call(ch_server.ch_client, "calls_merged", project_id)
@@ -216,9 +203,6 @@ def test_clickhouse_provider_directly(client, trace_server):
 
 def test_resolver_as_trace_server_member(client, trace_server):
     """Test that the resolver is properly integrated as a trace server member."""
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
 
     # Test that the resolver is lazily initialized

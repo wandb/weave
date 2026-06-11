@@ -21,7 +21,6 @@ def patch_groq() -> Generator[None, None, None]:
     patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -69,7 +68,6 @@ def test_groq_quickstart(
     assert output.choices[0].message.content == "The capital of India is New Delhi."
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -130,7 +128,6 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
     )
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -208,7 +205,6 @@ In summary, fast language models have revolutionized the field of NLP, enabling 
     )
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -278,7 +274,6 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
     )
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )

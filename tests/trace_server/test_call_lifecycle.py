@@ -3,7 +3,6 @@ import uuid
 
 import pytest
 
-from tests.trace.util import client_is_sqlite
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
@@ -95,9 +94,6 @@ def test_call_end_started_at_anchors_sortable_datetime(
     cannot drop a long-running call merely because `any()` picked the end-row
     contribution -- the buggy path repro'd in #6932.
     """
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only: sortable_datetime is a calls_merged column")
-
     ch_client = client.server._next_trace_server.ch_client
     project_id = client.project_id
     call_id = str(uuid.uuid4())

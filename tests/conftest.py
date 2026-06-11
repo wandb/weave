@@ -465,7 +465,7 @@ def create_client(
     # Keeping off for now until it is the default behavior.
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     caching_server = CachingMiddlewareTraceServer.from_env(server)
-    # ensure_project_exists=False because local backends (SQLite) don't
+    # ensure_project_exists=False because in-process backends don't
     # implement ServiceInterface — project creation is a remote-only concern.
     # In tests we assume the project already exists.
     client = TestOnlyFlushingWeaveClient(
@@ -510,7 +510,7 @@ def _teardown_test_client(
        fixture handles full teardown.
 
     The server may already be partially torn down by the time we get here
-    (sqlite file removed, HTTP connection closed, etc). Teardown shouldn't
+    (HTTP connection closed, etc). Teardown shouldn't
     be allowed to flip a green test red, so we swallow whatever close()
     raises.
     """

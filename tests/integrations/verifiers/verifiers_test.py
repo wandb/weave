@@ -27,7 +27,6 @@ def patch_verifiers() -> None:
         patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allow_playback_repeats=True,
