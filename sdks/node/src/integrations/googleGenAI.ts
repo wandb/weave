@@ -11,6 +11,14 @@ const GOOGLE_GENAI_INTEGRATION = libraryIntegration('google_genai', {
 const weaveGeminiModelHint = Symbol.for('_weave_gemini_model_hint');
 const weaveGeminiModelsWrapped = Symbol.for('_weave_gemini_models_wrapped');
 
+// Marker found in the `x-goog-api-client` header of GoogleGenAI clients that
+// the Google ADK (`@google/adk`) constructs internally (its `trackingHeaders`).
+// Those clients are excluded from wrapping: the ADK integration (WeaveAdkPlugin)
+// already records each model call as a `chat` agent span with usage, so
+// wrapping here would double-count tokens and emit orphan root traces.
+const ADK_INTERNAL_CLIENT_HEADER = 'x-goog-api-client';
+const ADK_INTERNAL_CLIENT_MARKER = 'google-adk/';
+
 type GeminiUsageMetadata = {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
@@ -245,12 +253,33 @@ export function wrapGoogleGenAI<T extends GoogleGenAIAPI>(googleGenAI: T): T {
   return googleGenAI;
 }
 
+/** True for clients constructed by `@google/adk` internally (see marker above). */
+function isAdkInternalClientOptions(options: any): boolean {
+  const headers = options?.httpOptions?.headers;
+  if (headers == null || typeof headers !== 'object') {
+    return false;
+  }
+  for (const [key, value] of Object.entries(headers)) {
+    if (
+      key.toLowerCase() === ADK_INTERNAL_CLIENT_HEADER &&
+      typeof value === 'string' &&
+      value.includes(ADK_INTERNAL_CLIENT_MARKER)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function commonProxy(exports: any) {
   const OriginalGoogleGenAIClass = exports.GoogleGenAI;
 
   return new Proxy(OriginalGoogleGenAIClass, {
     construct(target, args, newTarget) {
       const instance = Reflect.construct(target, args, newTarget);
+      if (isAdkInternalClientOptions(args[0])) {
+        return instance;
+      }
       return wrapGoogleGenAI(instance);
     },
   });
