@@ -31,7 +31,7 @@ from collections.abc import Callable, KeysView, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from typing_extensions import Self
 
 from weave.shared.trace_server_interface_util import (
@@ -64,7 +64,7 @@ from weave.trace_server.calls_query_builder.utils import (
     trace_id_index_expr,
 )
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import MULTI_VALUE_FEEDBACK_TYPES
 from weave.trace_server.interface.query import (
@@ -1956,9 +1956,11 @@ def get_field_by_name(name: str) -> CallsMergedField:
     return ALLOWED_CALL_FIELDS[name]
 
 
-# Dotted prefixes get_field_by_name accepts beyond ALLOWED_CALL_FIELDS. The
-# dynamic-field prefixes are derived from ALLOWED_CALL_FIELDS so they can't
-# drift as `*_dump` dynamic fields are added or removed.
+# Field references get_field_by_name accepts beyond exact ALLOWED_CALL_FIELDS
+# keys, used only to build the user-facing error message. The `*_dump` prefixes
+# are derived so they can't drift; the special entries must be kept in sync by
+# hand with the explicit branches in get_field_by_name above
+# (`annotation_queue_items.queue_id` is an exact ref, not a prefix).
 _DUMP_SUFFIX = "_dump"
 _SPECIAL_DYNAMIC_FIELD_PREFIXES = (
     "feedback.*",
@@ -1995,15 +1997,26 @@ def validate_monitor_query_fields(
     if raw_query is None:
         return
     cleaned = _strip_weave_object_keys(raw_query)
-    validate_query_field_names(tsi_query.Query.model_validate(cleaned))
+    try:
+        query = tsi_query.Query.model_validate(cleaned)
+    except ValidationError:
+        # Not a recognizable query (e.g. a user object that happens to share
+        # the Monitor class name); leave the write untouched.
+        return
+    validate_query_compiles(query)
 
 
-def validate_query_field_names(query: tsi_query.Query) -> None:
-    """Validate every field reference in `query` against the allowed call fields."""
+def validate_query_compiles(query: tsi_query.Query) -> None:
+    """Validate that `query` references only allowed call fields and is well-formed."""
     try:
         process_query_to_conditions(query, ParamBuilder(), "calls_merged")
     except InvalidFieldError as e:
         raise InvalidFieldError(_invalid_field_message(str(e))) from e
+    except (ValueError, TypeError) as e:
+        raise InvalidRequest(f"Invalid query: {e}") from e
+
+
+_WEAVE_BOOKKEEPING_KEYS = frozenset({"_type", "_class_name", "_bases"})
 
 
 def _strip_weave_object_keys(value: object) -> object:
@@ -2012,7 +2025,7 @@ def _strip_weave_object_keys(value: object) -> object:
         return {
             k: _strip_weave_object_keys(v)
             for k, v in value.items()
-            if not k.startswith("_")
+            if k not in _WEAVE_BOOKKEEPING_KEYS
         }
     if isinstance(value, list):
         return [_strip_weave_object_keys(v) for v in value]
@@ -2021,7 +2034,9 @@ def _strip_weave_object_keys(value: object) -> object:
 
 def _invalid_field_message(reason: str) -> str:
     """Append the allowed field list and dynamic prefixes to a field rejection."""
-    allowed = ", ".join(sorted(ALLOWED_CALL_FIELDS))
+    allowed = ", ".join(
+        sorted(k for k in ALLOWED_CALL_FIELDS if not k.endswith(_DUMP_SUFFIX))
+    )
     prefixes = ", ".join(ALLOWED_DYNAMIC_FIELD_PREFIXES)
     return (
         f"{reason}. Allowed fields: {allowed}. "

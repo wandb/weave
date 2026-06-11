@@ -24,10 +24,15 @@ from weave.trace.serialization.serialize import to_json
 from weave.trace.weave_client import WeaveClient, map_to_refs
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
+    _DUMP_SUFFIX,
     ALLOWED_CALL_FIELDS,
     ALLOWED_DYNAMIC_FIELD_PREFIXES,
 )
-from weave.trace_server.errors import InvalidFieldError, ObjectNameTypeCollision
+from weave.trace_server.errors import (
+    InvalidFieldError,
+    InvalidRequest,
+    ObjectNameTypeCollision,
+)
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyNestedBaseModel,
 )
@@ -1185,17 +1190,28 @@ def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
     with pytest.raises(InvalidFieldError) as exc_info:
         _create_monitor(client, "bad-monitor", bad_query)
 
+    allowed = ", ".join(
+        sorted(k for k in ALLOWED_CALL_FIELDS if not k.endswith(_DUMP_SUFFIX))
+    )
     expected_message = (
         "Field operation_name is not allowed. "
-        f"Allowed fields: {', '.join(sorted(ALLOWED_CALL_FIELDS))}. "
+        f"Allowed fields: {allowed}. "
         f"Allowed dynamic field prefixes: {', '.join(ALLOWED_DYNAMIC_FIELD_PREFIXES)}"
     )
     assert str(exc_info.value) == expected_message
+    assert _DUMP_SUFFIX not in str(exc_info.value)
 
-    # Nothing was stored for the rejected monitor.
+    # A structurally invalid query (empty $and) is a bad request, not a field error.
+    with pytest.raises(InvalidRequest):
+        _create_monitor(client, "empty-and-monitor", {"$expr": {"$and": []}})
+
+    # Neither rejected monitor was stored.
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
-            {"project_id": client.project_id, "filter": {"object_ids": ["bad-monitor"]}}
+            {
+                "project_id": client.project_id,
+                "filter": {"object_ids": ["bad-monitor", "empty-and-monitor"]},
+            }
         )
     )
     assert objs_res.objs == []
@@ -1224,6 +1240,23 @@ def test_monitor_create_accepts_valid_query_fields(client: WeaveClient):
     _create_monitor(client, "dynamic-monitor", dynamic_query)
     _create_monitor(client, "no-query-monitor", None)
 
+    # A Monitor-classed object whose `query` is not a recognizable query shape is
+    # left untouched (we only validate queries we understand), never 500'd.
+    monitor = weave.Monitor(name="opaque-monitor", scorers=[], query=None)
+    opaque_val = to_json(map_to_refs(monitor), client.project_id, client)
+    opaque_val["query"] = "not-a-query"
+    client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": "opaque-monitor",
+                    "val": opaque_val,
+                }
+            }
+        )
+    )
+
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
@@ -1233,6 +1266,7 @@ def test_monitor_create_accepts_valid_query_fields(client: WeaveClient):
                         "valid-monitor",
                         "dynamic-monitor",
                         "no-query-monitor",
+                        "opaque-monitor",
                     ]
                 },
             }
@@ -1242,4 +1276,5 @@ def test_monitor_create_accepts_valid_query_fields(client: WeaveClient):
         "valid-monitor",
         "dynamic-monitor",
         "no-query-monitor",
+        "opaque-monitor",
     }
