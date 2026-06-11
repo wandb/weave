@@ -1,0 +1,67 @@
+## Conversation
+Slice 3/4 of the REFRAMED Google ADK stack (each PR standalone + tested +
+docs). This slice adds what slice 1 deliberately left out: invoke_agent
+synthesis. See slice 1 note (andrew/google-adk-01-plugin-core) for reframe
+context; the original research notes live on the old andrew/adk-ts-01-plugin
+commit de553f7b46.
+
+## Actions
+Built by restore-then-trim: restored googleAdk.ts/types/tests from the old
+stack final (andrew/adk-ts-03-tests), re-applied the \0-escape fix for the
+syntheticQueueKey separator (the old blob has a literal NUL byte), then
+removed ONLY the auto-instrumentation parts (module-hook section, its
+imports globalSingleton/addCJS+ESMInstrumentation/AdkRunnerLike, the
+ADK_VERSION_RANGE/ADK_CJS_SUBPATH consts, the Automatic-usage header block,
+AdkPluginManager/AdkRunnerLike types, the auto-registration test and its
+commonPatchGoogleADK import). Diff vs slice 1 therefore reads as pure
+hierarchy: state fields (rootAgent/agentCalls/agentCallOrder/openToolKeys),
+findAgentInTree, ensureAgentCall + innermostOpenToolCall, agent callbacks
+implemented, reparenting, finishInvocation agent loop, test tightening.
+AGENTS.md gotchas bullet gains the agent-callback-gap sentence (final
+wording).
+
+## Errors & Mistakes
+The first excision of the auto-registration test left a stray blank line
+before the describe close (`    });\n\n  });`); fixed so slice 4 restores
+the file to the exact old-stack content without whitespace noise.
+
+## Dead Ends
+None in this slice.
+
+## Hints for Future Agents
+- The single-agent test's parenting assertions were intentionally
+  RE-TIGHTENED here from slice 1's flat expectations (parent = root) to the
+  hierarchy (parent = invoke_agent). That is a deliberate behavior change in
+  the stack, not assertion weakening.
+- ensureAgentCall's MAX_AGENT_ANCESTRY_DEPTH guards parentAgent cycles;
+  out-of-tree fallback order is innermost open tool call, then root.
+
+## Codebase Discoveries
+None new (see prior slices).
+
+## Open Questions
+None.
+
+---
+
+# ADDENDUM: transport reworked to the agents OTel endpoint (2026-06-10)
+
+User directive: ADK runs must log to the AGENTS OTel endpoint
+(/agents/otel/v1/traces) so they appear in the Weave Agents view — the
+original calls transport (saveCallStart/End) only fed the Traces page. The
+stack was rebuilt in place (same branch names/positions) with the plugin
+emitting GenAI-semconv OTel spans through getWeaveTracer (shared provider,
+src/genai/provider.ts) — same pipeline as piCodingAgent and the
+openai-agents WeaveOtelTracingProcessor, same conventions as the Python
+google_adk integration (weave/integrations/google_adk: extractors mirrored
+incl. ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS gate, GOOGLE_GENAI_USE_VERTEXAI
+provider naming, parts-model messages, tool definitions). Calls-era
+versions of these slices: 91e4f038ee^..4fde323b1c history (notes on
+c059413134 / ac1e328342 / d1cab0e03e / 4fde323b1c).
+
+Key mechanics: spans parented via otelTrace.setSpan contexts; plugin
+beforeExit hook registers BEFORE the provider's (listeners fire in
+registration order — dangling spans must end before the provider flush);
+tests inject InMemorySpanExporter via settings.genai.spanProcessor +
+clearWeaveTracerProvider between tests; semconv.ts gained
+gen_ai.agent.description/id + gen_ai.tool.definitions.
