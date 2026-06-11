@@ -16,6 +16,14 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from weave_server_sdk.models import (
+    CallStartReq,
+    ObjCreateReq,
+    ObjSchemaForInsert,
+    StartedCallSchemaForInsert,
+    TableCreateReq,
+    TableSchemaForInsert,
+)
 
 import weave
 from weave.durability.wal_client_id import compute_client_id
@@ -32,7 +40,7 @@ from weave.durability.wal_sender import (
 from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace import weave_client
 from weave.trace.settings import UserSettings, override_settings
-from weave.trace_server_bindings import models as tsi
+from weave.trace_server_bindings.models import FileCreateReq
 
 
 def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
@@ -370,8 +378,8 @@ class TestWALManagerLifecycle:
 
         mgr.write(
             "obj_create",
-            tsi.ObjCreateReq(
-                obj=tsi.ObjSchemaForInsert(
+            ObjCreateReq(
+                obj=ObjSchemaForInsert(
                     project_id="test-entity/test-project",
                     object_id="test_obj",
                     val={"hello": "world"},
@@ -438,8 +446,8 @@ class TestTraceServerHandlers:
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
 
-        req = tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
+        req = ObjCreateReq(
+            obj=ObjSchemaForInsert(
                 project_id="e/p",
                 object_id="test",
                 val={"x": 1},
@@ -450,7 +458,7 @@ class TestTraceServerHandlers:
 
         mock_server.obj_create.assert_called_once()
         call_arg = mock_server.obj_create.call_args[0][0]
-        assert isinstance(call_arg, tsi.ObjCreateReq)
+        assert isinstance(call_arg, ObjCreateReq)
         assert call_arg.obj.object_id == "test"
 
     def test_handler_calls_table_create(self):
@@ -458,8 +466,8 @@ class TestTraceServerHandlers:
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
 
-        req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
+        req = TableCreateReq(
+            table=TableSchemaForInsert(
                 project_id="e/p",
                 rows=[{"val": {"x": 1}, "digest": "abc123"}],
             )
@@ -486,7 +494,7 @@ class TestTraceServerHandlers:
         # WAL today (model_dump(mode="json") rejects non-utf8 bytes at write
         # time, so non-utf8 content never appears in a replayed record).
         original_content = "small file body — including non-ascii: café 🎉".encode()
-        req = tsi.FileCreateReq(
+        req = FileCreateReq(
             project_id="e/p",
             name="note.txt",
             content=original_content,
@@ -497,7 +505,7 @@ class TestTraceServerHandlers:
 
         mock_server.file_create.assert_called_once()
         call_arg = mock_server.file_create.call_args[0][0]
-        assert isinstance(call_arg, tsi.FileCreateReq)
+        assert isinstance(call_arg, FileCreateReq)
         assert call_arg.content == original_content
 
     def test_call_start_roundtrips_through_handler(self):
@@ -511,8 +519,8 @@ class TestTraceServerHandlers:
         handlers = TraceServerHandlers(mock_server).as_dict()
 
         started = datetime.datetime.now(datetime.timezone.utc)
-        req = tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
+        req = CallStartReq(
+            start=StartedCallSchemaForInsert(
                 project_id="e/p",
                 op_name="predict",
                 trace_id="t1",
@@ -526,7 +534,7 @@ class TestTraceServerHandlers:
 
         mock_server.call_start.assert_called_once()
         call_arg = mock_server.call_start.call_args[0][0]
-        assert isinstance(call_arg, tsi.CallStartReq)
+        assert isinstance(call_arg, CallStartReq)
         assert call_arg.start.op_name == "predict"
         assert call_arg.start.started_at == started
         assert call_arg.start.attributes == {"k": "v"}

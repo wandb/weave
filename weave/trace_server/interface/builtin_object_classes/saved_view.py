@@ -1,8 +1,11 @@
 from typing import Literal
 
 from pydantic import BaseModel, Field
-from weave_server_sdk import models as tsi
-from weave_server_sdk.models import SortBy
+from weave_server_sdk.models import (
+    CallsFilter,
+    Query,
+    SortBy,
+)
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
@@ -74,9 +77,9 @@ class DynamicLeaderboardConfig(BaseModel):
 
 
 class SavedViewDefinition(BaseModel):
-    filter: tsi.CallsFilter | None = Field(default=None)
+    filter: CallsFilter | None = Field(default=None)
 
-    query: tsi.Query | None = Field(default=None)
+    query: Query | None = Field(default=None)
 
     # cols is the current UI column visibility config that
     # doesn't allow specifying column order - prefer use of

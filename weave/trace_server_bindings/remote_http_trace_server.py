@@ -43,6 +43,147 @@ import httpx
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
 from weave_server_sdk import WeaveTrace
+from weave_server_sdk.models import (
+    AliasesListRes,
+    AnnotationQueueAddCallsBody,
+    AnnotationQueueAddCallsRes,
+    AnnotationQueueCreateReq,
+    AnnotationQueueCreateRes,
+    AnnotationQueueDeleteRes,
+    AnnotationQueueItemsQueryBody,
+    AnnotationQueueItemsQueryRes,
+    AnnotationQueueReadRes,
+    AnnotationQueueSchema,
+    AnnotationQueuesQueryReq,
+    AnnotationQueuesStatsReq,
+    AnnotationQueuesStatsRes,
+    AnnotationQueueUpdateBody,
+    AnnotationQueueUpdateRes,
+    CallCreateBatchReq,
+    CallCreateBatchRes,
+    CallEndReq,
+    CallEndRes,
+    CallReadReq,
+    CallReadRes,
+    CallSchema,
+    CallsDeleteReq,
+    CallsDeleteRes,
+    CallsQueryReq,
+    CallsQueryStatsReq,
+    CallsQueryStatsRes,
+    CallsScoreReq,
+    CallsScoreRes,
+    CallStartReq,
+    CallStartRes,
+    CallsUsageReq,
+    CallsUsageRes,
+    CallUpdateReq,
+    CallUpdateRes,
+    CostCreateReq,
+    CostCreateRes,
+    CostPurgeReq,
+    CostPurgeRes,
+    CostQueryReq,
+    CostQueryRes,
+    DatasetCreateBody,
+    DatasetCreateRes,
+    DatasetDeleteRes,
+    DatasetReadRes,
+    EndedCallSchemaForInsert,
+    EvaluateModelReq,
+    EvaluateModelRes,
+    EvaluationCreateBody,
+    EvaluationCreateRes,
+    EvaluationDeleteRes,
+    EvaluationReadRes,
+    EvaluationRunCreateBody,
+    EvaluationRunCreateRes,
+    EvaluationRunDeleteRes,
+    EvaluationRunFinishBody,
+    EvaluationRunFinishRes,
+    EvaluationRunReadRes,
+    EvaluationStatusReq,
+    EvaluationStatusRes,
+    FeedbackCreateBatchReq,
+    FeedbackCreateBatchRes,
+    FeedbackCreateReq,
+    FeedbackCreateRes,
+    FeedbackPayloadSchemaReq,
+    FeedbackPayloadSchemaRes,
+    FeedbackPurgeReq,
+    FeedbackPurgeRes,
+    FeedbackQueryReq,
+    FeedbackQueryRes,
+    FeedbackReplaceReq,
+    FeedbackReplaceRes,
+    FeedbackStatsReq,
+    FeedbackStatsRes,
+    FileContentReadReq,
+    FileCreateRes,
+    FilesStatsReq,
+    FilesStatsRes,
+    ImageGenerationCreateReq,
+    ImageGenerationCreateRes,
+    ModelCreateBody,
+    ModelCreateRes,
+    ModelDeleteRes,
+    ModelReadRes,
+    ObjAddTagsRes,
+    ObjCreateReq,
+    ObjCreateRes,
+    ObjDeleteReq,
+    ObjDeleteRes,
+    ObjQueryReq,
+    ObjQueryRes,
+    ObjReadReq,
+    ObjReadRes,
+    ObjRemoveAliasesBody,
+    ObjRemoveAliasesRes,
+    ObjRemoveTagsRes,
+    ObjSetAliasesBody,
+    ObjSetAliasesRes,
+    ObjTagsBody,
+    OpCreateBody,
+    OpCreateRes,
+    OpDeleteRes,
+    OpReadRes,
+    PredictionCreateBody,
+    PredictionCreateRes,
+    PredictionDeleteRes,
+    PredictionFinishRes,
+    PredictionReadRes,
+    ProjectsInfoReq,
+    ProjectsInfoRes,
+    RefsReadBatchReq,
+    RefsReadBatchRes,
+    ScoreCreateBody,
+    ScoreCreateRes,
+    ScoreDeleteRes,
+    ScorerCreateBody,
+    ScorerCreateRes,
+    ScorerDeleteRes,
+    ScoreReadRes,
+    ScorerReadRes,
+    ServerInfoRes,
+    StartedCallSchemaForInsert,
+    TableCreateFromDigestsReq,
+    TableCreateFromDigestsRes,
+    TableCreateReq,
+    TableCreateRes,
+    TableQueryReq,
+    TableQueryRes,
+    TableQueryStatsBatchReq,
+    TableQueryStatsBatchRes,
+    TableQueryStatsReq,
+    TableQueryStatsRes,
+    TableRowSchema,
+    TableUpdateReq,
+    TableUpdateRes,
+    TagsListRes,
+    ThreadsQueryReq,
+    TraceUsageReq,
+    TraceUsageRes,
+)
 
 from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.settings import (
@@ -52,7 +193,6 @@ from weave.trace.settings import (
     should_use_calls_complete,
 )
 from weave.trace_server.ids import generate_id
-from weave.trace_server_bindings import models as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -65,11 +205,78 @@ from weave.trace_server_bindings.http_utils import (
     process_batch_with_retry,
 )
 from weave.trace_server_bindings.models import (
+    AliasesListReq,
+    AnnotationQueueAddCallsReq,
+    AnnotationQueueDeleteReq,
+    AnnotationQueueItemsQueryReq,
+    AnnotationQueueReadReq,
+    AnnotationQueueUpdateReq,
     Batch,
+    CallEndV2Req,
+    CallEndV2Res,
+    CallsQueryRes,
+    CallStartV2Req,
+    CallStartV2Res,
+    CallsUpsertCompleteReq,
+    CallsUpsertCompleteRes,
     CompleteBatchItem,
+    CompletionsCreateReq,
+    CompletionsCreateRes,
+    DatasetCreateReq,
+    DatasetDeleteReq,
+    DatasetListReq,
+    DatasetReadReq,
     EndBatchItem,
+    EnsureProjectExistsRes,
     EntityProjectInfo,
+    EvaluationCreateReq,
+    EvaluationDeleteReq,
+    EvaluationListReq,
+    EvaluationReadReq,
+    EvaluationRunCreateReq,
+    EvaluationRunDeleteReq,
+    EvaluationRunFinishReq,
+    EvaluationRunListReq,
+    EvaluationRunReadReq,
+    FeedbackAggregateReq,
+    FeedbackAggregateRes,
+    FileContentReadRes,
+    FileCreateReq,
+    ModelCreateReq,
+    ModelDeleteReq,
+    ModelListReq,
+    ModelReadReq,
+    ObjAddTagsReq,
+    ObjRemoveAliasesReq,
+    ObjRemoveTagsReq,
+    ObjSetAliasesReq,
+    OpCreateReq,
+    OpDeleteReq,
+    OpListReq,
+    OpReadReq,
+    PredictionCreateReq,
+    PredictionDeleteReq,
+    PredictionFinishReq,
+    PredictionListReq,
+    PredictionReadReq,
+    ProjectStatsReq,
+    ProjectStatsRes,
+    ProjectTTLSettingsReadReq,
+    ProjectTTLSettingsReadRes,
+    ProjectTTLSettingsUpdateReq,
+    ProjectTTLSettingsUpdateRes,
+    RescoreReq,
+    ScoreCreateReq,
+    ScoreDeleteReq,
+    ScoreListReq,
+    ScorerCreateReq,
+    ScorerDeleteReq,
+    ScoreReadReq,
+    ScorerListReq,
+    ScorerReadReq,
     StartBatchItem,
+    TagsListReq,
+    ThreadSchema,
 )
 from weave.utils.http_requests import CLIENT_LIMITS, log_request, log_response
 from weave.utils.project_id import from_project_id
@@ -204,10 +411,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     def ensure_project_exists(
         self, entity: str, project: str
-    ) -> tsi.EnsureProjectExistsRes:
+    ) -> EnsureProjectExistsRes:
         # TODO: This should happen in the wandb backend, not here, and it's slow
         # (hundreds of ms)
-        return tsi.EnsureProjectExistsRes.model_validate(
+        return EnsureProjectExistsRes.model_validate(
             project_creator.ensure_project_exists(entity, project)
         )
 
@@ -429,10 +636,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 log_dropped_call_batch([item], e)
 
     @with_retry
-    def _send_call_start_v2(self, start: tsi.StartedCallSchemaForInsert) -> None:
+    def _send_call_start_v2(self, start: StartedCallSchemaForInsert) -> None:
         """Send a single call start to the v2 endpoint."""
         entity, project = from_project_id(start.project_id)
-        req = tsi.CallStartV2Req(start=start)
+        req = CallStartV2Req(start=start)
         self._http.post(
             CALL_START_V2_PATH.format(entity=entity, project=project),
             content=req.model_dump_json().encode("utf-8"),
@@ -440,10 +647,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @with_retry
-    def _send_call_end_v2(self, end: tsi.EndedCallSchemaForInsert) -> None:
+    def _send_call_end_v2(self, end: EndedCallSchemaForInsert) -> None:
         """Send a single call end to the v2 endpoint."""
         entity, project = from_project_id(end.project_id)
-        req = tsi.CallEndV2Req(end=end)
+        req = CallEndV2Req(end=end)
         self._http.post(
             CALL_END_V2_PATH.format(entity=entity, project=project),
             content=req.model_dump_json().encode("utf-8"),
@@ -501,7 +708,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
         def encode_batch(batch: list[CompleteBatchItem]) -> bytes:
             api_batch = [item.req for item in batch]
-            req = tsi.CallsUpsertCompleteReq(batch=api_batch)
+            req = CallsUpsertCompleteReq(batch=api_batch)
             return req.model_dump_json().encode("utf-8")
 
         process_batch_with_retry(
@@ -539,7 +746,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _flush_feedback(
         self,
-        batch: list[tsi.FeedbackCreateReq],
+        batch: list[FeedbackCreateReq],
     ) -> None:
         """Process a batch of feedback, splitting if necessary and sending to the server.
 
@@ -551,11 +758,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: tsi.FeedbackCreateReq) -> str:
+        def get_item_id(item: FeedbackCreateReq) -> str:
             return f"{item.id}"
 
-        def encode_batch(batch: list[tsi.FeedbackCreateReq]) -> bytes:
-            batch_req = tsi.FeedbackCreateBatchReq(batch=batch)
+        def encode_batch(batch: list[FeedbackCreateReq]) -> bytes:
+            batch_req = FeedbackCreateBatchReq(batch=batch)
             data = batch_req.model_dump_json()
             return data.encode("utf-8")
 
@@ -575,7 +782,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     # Fall back to individual feedback creation calls. The
                     # single-create endpoint doesn't accept an id, so strip it.
                     for item in batch:
-                        item_copy = tsi.FeedbackCreateReq.model_validate(
+                        item_copy = FeedbackCreateReq.model_validate(
                             item.model_dump(exclude={"id"}, exclude_none=True)
                         )
                         try:
@@ -583,7 +790,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                                 "POST",
                                 FEEDBACK_CREATE_PATH,
                                 req=item_copy,
-                                res_type=tsi.FeedbackCreateRes,
+                                res_type=FeedbackCreateRes,
                             )
                         except Exception as individual_error:
                             logger.warning(
@@ -615,12 +822,12 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     # ---- service ------------------------------------------------------------
 
     @with_retry
-    def server_info(self) -> tsi.ServerInfoRes:
+    def server_info(self) -> ServerInfoRes:
         return self._sdk.services.server_info()
 
     @validate_call
     @with_retry
-    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+    def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]:
         return self._sdk.service.create_projects_info(req)
 
     def otel_export(self, req: Any) -> Any:
@@ -630,7 +837,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     # ---- Call API -------------------------------------------------------------
 
     @validate_call
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+    def call_start(self, req: CallStartReq) -> CallStartRes:
         if self.should_batch:
             assert self.call_processor is not None
 
@@ -639,129 +846,127 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     "CallStartReq must have id and trace_id when batching."
                 )
             self.call_processor.enqueue_start(StartBatchItem(req=req))
-            return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
+            return CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
         return self._call_sdk(self._sdk.calls.start, req)
 
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+    def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes:
         return self._call_sdk(self._sdk.calls.upsert_batch, req)
 
     @validate_call
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    def call_end(self, req: CallEndReq) -> CallEndRes:
         if self.should_batch:
             assert self.call_processor is not None
 
             self.call_processor.enqueue([EndBatchItem(req=req)])
-            return tsi.CallEndRes()
+            return CallEndRes()
         return self._call_sdk(self._sdk.calls.end, req)
 
     @validate_call
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+    def call_read(self, req: CallReadReq) -> CallReadRes:
         return self._call_sdk(self._sdk.calls.read, req)
 
     @validate_call
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         # This previously called the deprecated /calls/query endpoint.
-        return tsi.CallsQueryRes(calls=list(self.calls_query_stream(req)))
+        return CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
     @validate_call
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]:
         return self._raw_stream(
-            "POST", CALLS_STREAM_QUERY_PATH, req=req, res_type=tsi.CallSchema
+            "POST", CALLS_STREAM_QUERY_PATH, req=req, res_type=CallSchema
         )
 
     @validate_call
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
         return self._call_sdk(self._sdk.calls.query_stats, req)
 
     @validate_call
-    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+    def trace_usage(self, req: TraceUsageReq) -> TraceUsageRes:
         # SDK 0.0.1: calls.create_usage for /trace/usage is shadowed by the
         # /calls/usage overload of the same generated name.
         return self._raw_request(
-            "POST", TRACE_USAGE_PATH, req=req, res_type=tsi.TraceUsageRes
+            "POST", TRACE_USAGE_PATH, req=req, res_type=TraceUsageRes
         )
 
     @validate_call
-    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+    def calls_usage(self, req: CallsUsageReq) -> CallsUsageRes:
         return self._call_sdk(self._sdk.calls.create_usage, req)
 
     @validate_call
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
         return self._call_sdk(self._sdk.calls.delete, req)
 
     @validate_call
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
         return self._call_sdk(self._sdk.calls.update, req)
 
     # ---- Obj API --------------------------------------------------------------
 
     @validate_call
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
         return self._call_sdk(self._sdk.objects.create, req)
 
     @validate_call
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
         return self._call_sdk(self._sdk.objects.read, req)
 
     @validate_call
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
         return self._call_sdk(self._sdk.objects.query, req)
 
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes:
         return self._call_sdk(self._sdk.objects.delete, req)
 
-    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+    def obj_add_tags(self, req: ObjAddTagsReq) -> ObjAddTagsRes:
         # SDK 0.0.1: objects.tags for add-tags is shadowed by the /tags list
         # overload of the same generated name.
-        body = tsi.ObjTagsBody(project_id=req.project_id, tags=req.tags)
+        body = ObjTagsBody(project_id=req.project_id, tags=req.tags)
         return self._raw_request(
             "PUT",
             OBJ_ADD_TAGS_PATH.format(object_id=req.object_id, digest=req.digest),
             req=body,
-            res_type=tsi.ObjAddTagsRes,
+            res_type=ObjAddTagsRes,
         )
 
-    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+    def obj_remove_tags(self, req: ObjRemoveTagsReq) -> ObjRemoveTagsRes:
         # SDK 0.0.1: objects.create_remove for remove-tags is shadowed by the
         # remove-aliases overload of the same generated name.
-        body = tsi.ObjTagsBody(project_id=req.project_id, tags=req.tags)
+        body = ObjTagsBody(project_id=req.project_id, tags=req.tags)
         return self._raw_request(
             "POST",
             OBJ_REMOVE_TAGS_PATH.format(object_id=req.object_id, digest=req.digest),
             req=body,
-            res_type=tsi.ObjRemoveTagsRes,
+            res_type=ObjRemoveTagsRes,
         )
 
-    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
-        body = tsi.ObjSetAliasesBody(
+    def obj_set_aliases(self, req: ObjSetAliasesReq) -> ObjSetAliasesRes:
+        body = ObjSetAliasesBody(
             project_id=req.project_id, digest=req.digest, aliases=req.aliases
         )
         return self._call_sdk(
             self._sdk.objects.update_aliases, body, object_id=req.object_id
         )
 
-    def obj_remove_aliases(
-        self, req: tsi.ObjRemoveAliasesReq
-    ) -> tsi.ObjRemoveAliasesRes:
-        body = tsi.ObjRemoveAliasesBody(project_id=req.project_id, aliases=req.aliases)
+    def obj_remove_aliases(self, req: ObjRemoveAliasesReq) -> ObjRemoveAliasesRes:
+        body = ObjRemoveAliasesBody(project_id=req.project_id, aliases=req.aliases)
         return self._call_sdk(
             self._sdk.objects.create_remove, body, object_id=req.object_id
         )
 
-    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+    def tags_list(self, req: TagsListReq) -> TagsListRes:
         return self._call_sdk(self._sdk.objects.tags, project_id=req.project_id)
 
-    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+    def aliases_list(self, req: AliasesListReq) -> AliasesListRes:
         return self._call_sdk(self._sdk.objects.list_aliases, project_id=req.project_id)
 
     # ---- Table API ------------------------------------------------------------
 
     @validate_call
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+    def table_create(self, req: TableCreateReq) -> TableCreateRes:
         return self._call_sdk(self._sdk.tables.create, req)
 
     @validate_call
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+    def table_update(self, req: TableUpdateReq) -> TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
         due to the property that table updates can be decomposed into a series of
         updates.
@@ -769,13 +974,13 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit and len(req.updates) > 1:
             split_ndx = len(req.updates) // 2
-            first_half_req = tsi.TableUpdateReq(
+            first_half_req = TableUpdateReq(
                 project_id=req.project_id,
                 base_digest=req.base_digest,
                 updates=req.updates[:split_ndx],
             )
             first_half_res = self.table_update(first_half_req)
-            second_half_req = tsi.TableUpdateReq(
+            second_half_req = TableUpdateReq(
                 project_id=req.project_id,
                 base_digest=first_half_res.digest,
                 updates=req.updates[split_ndx:],
@@ -784,38 +989,36 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             all_digests = (
                 first_half_res.updated_row_digests + second_half_res.updated_row_digests
             )
-            return tsi.TableUpdateRes(
+            return TableUpdateRes(
                 digest=second_half_res.digest, updated_row_digests=all_digests
             )
         else:
             return self._call_sdk(self._sdk.tables.update, req)
 
     @validate_call
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+    def table_query(self, req: TableQueryReq) -> TableQueryRes:
         return self._call_sdk(self._sdk.tables.query, req)
 
     @validate_call
-    def table_query_stream(
-        self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
+    def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]:
         # Need to manually iterate over this until the stream endpoint is built and shipped.
         res = self.table_query(req)
         yield from res.rows
 
     @validate_call
-    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+    def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes:
         return self._call_sdk(self._sdk.tables.query_stats, req)
 
     @validate_call
     def table_create_from_digests(
-        self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateFromDigestsRes:
+        self, req: TableCreateFromDigestsReq
+    ) -> TableCreateFromDigestsRes:
         """Create a table by specifying row digests instead of actual rows."""
         return self._call_sdk(self._sdk.tables.create_create_from_digests, req)
 
     def unretried_table_create_from_digests(
-        self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateFromDigestsRes:
+        self, req: TableCreateFromDigestsReq
+    ) -> TableCreateFromDigestsRes:
         """Single-attempt variant used by the client's endpoint-availability
         probe: a missing endpoint (404) must fail fast, and a flaky probe must
         not stall table saves behind retries.
@@ -824,18 +1027,18 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def table_query_stats_batch(
-        self, req: tsi.TableQueryStatsBatchReq
-    ) -> tsi.TableQueryStatsBatchRes:
+        self, req: TableQueryStatsBatchReq
+    ) -> TableQueryStatsBatchRes:
         return self._call_sdk(self._sdk.tables.create_query_stats_batch, req)
 
     @validate_call
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
         return self._call_sdk(self._sdk.refs.read_batch, req)
 
     # ---- File API -------------------------------------------------------------
 
     @with_retry
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    def file_create(self, req: FileCreateReq) -> FileCreateRes:
         # SDK 0.0.1: files.create lost its multipart body in generation; post
         # the multipart form directly.
         data: dict[str, str] = {"project_id": req.project_id}
@@ -846,10 +1049,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             data=data,
             files={"file": (req.name, req.content)},
         )
-        return tsi.FileCreateRes.model_validate(r.json())
+        return FileCreateRes.model_validate(r.json())
 
     @with_retry
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
         # Raw to keep the response streamed to a buffer rather than the SDK's
         # whole-body bytes return.
         r = self._open_stream("POST", FILE_CONTENT_PATH, req=req)
@@ -860,15 +1063,15 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 bytes_buffer.write(chunk)
         finally:
             r.close()
-        return tsi.FileContentReadRes(content=bytes_buffer.getvalue())
+        return FileContentReadRes(content=bytes_buffer.getvalue())
 
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+    def files_stats(self, req: FilesStatsReq) -> FilesStatsRes:
         return self._call_sdk(self._sdk.files.query_stats, req)
 
     # ---- Feedback API -----------------------------------------------------------
 
     @validate_call
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes:
         if self.should_batch:
             assert self.feedback_processor is not None
 
@@ -876,7 +1079,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             req.id = feedback_id
 
             self.feedback_processor.enqueue([req])
-            return tsi.FeedbackCreateRes(
+            return FeedbackCreateRes(
                 id=feedback_id,
                 # technically incorrect, this can be off by a few seconds
                 created_at=datetime.datetime.now(ZoneInfo("UTC")),
@@ -890,95 +1093,91 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 "POST",
                 FEEDBACK_CREATE_PATH,
                 req=req,
-                res_type=tsi.FeedbackCreateRes,
+                res_type=FeedbackCreateRes,
             )
 
     def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
+        self, req: FeedbackCreateBatchReq
+    ) -> FeedbackCreateBatchRes:
         # Note: the SDK method is named `create` for /feedback/batch/create
         # (duplicate-name shadowing in 0.0.1; the batch overload won).
         return self._call_sdk(self._sdk.feedback.create, req)
 
     @validate_call
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes:
         return self._call_sdk(self._sdk.feedback.query, req)
 
     @validate_call
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
         return self._call_sdk(self._sdk.feedback.purge, req)
 
     @validate_call
-    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+    def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes:
         return self._call_sdk(self._sdk.feedback.replace, req)
 
     @validate_call
-    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+    def feedback_stats(self, req: FeedbackStatsReq) -> FeedbackStatsRes:
         return self._call_sdk(self._sdk.feedback.create_stats, req)
 
     @validate_call
     def feedback_payload_schema(
-        self, req: tsi.FeedbackPayloadSchemaReq
-    ) -> tsi.FeedbackPayloadSchemaRes:
+        self, req: FeedbackPayloadSchemaReq
+    ) -> FeedbackPayloadSchemaRes:
         return self._call_sdk(self._sdk.feedback.create_payload_schema, req)
 
     # ---- Cost API ---------------------------------------------------------------
 
     @validate_call
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+    def cost_query(self, req: CostQueryReq) -> CostQueryRes:
         return self._call_sdk(self._sdk.costs.query, req)
 
     @validate_call
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+    def cost_create(self, req: CostCreateReq) -> CostCreateRes:
         return self._call_sdk(self._sdk.costs.create, req)
 
     @validate_call
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+    def cost_purge(self, req: CostPurgeReq) -> CostPurgeRes:
         return self._call_sdk(self._sdk.costs.purge, req)
 
     # ---- Execution APIs ---------------------------------------------------------
 
-    def completions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
+    def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes:
         # Excluded from the OpenAPI spec (include_in_schema=False).
         return self._raw_request(
-            "POST", COMPLETIONS_CREATE_PATH, req=req, res_type=tsi.CompletionsCreateRes
+            "POST", COMPLETIONS_CREATE_PATH, req=req, res_type=CompletionsCreateRes
         )
 
     def completions_create_stream(
-        self, req: tsi.CompletionsCreateReq
+        self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
         # For remote servers, streaming is not implemented
         # Fall back to non-streaming completion
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
-    def image_create(
-        self, req: tsi.ImageGenerationCreateReq
-    ) -> tsi.ImageGenerationCreateRes:
+    def image_create(self, req: ImageGenerationCreateReq) -> ImageGenerationCreateRes:
         return self._call_sdk(self._sdk.images.create, req)
 
     # ---- Annotation Queue API -----------------------------------------------------
 
     def annotation_queue_create(
-        self, req: tsi.AnnotationQueueCreateReq
-    ) -> tsi.AnnotationQueueCreateRes:
+        self, req: AnnotationQueueCreateReq
+    ) -> AnnotationQueueCreateRes:
         return self._call_sdk(self._sdk.annotation_queues.create_annotation_queues, req)
 
     def annotation_queues_query_stream(
-        self, req: tsi.AnnotationQueuesQueryReq
-    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        self, req: AnnotationQueuesQueryReq
+    ) -> Iterator[AnnotationQueueSchema]:
         return self._raw_stream(
             "POST",
             ANNOTATION_QUEUES_QUERY_PATH,
             req=req,
-            res_type=tsi.AnnotationQueueSchema,
+            res_type=AnnotationQueueSchema,
         )
 
     def annotation_queue_read(
-        self, req: tsi.AnnotationQueueReadReq
-    ) -> tsi.AnnotationQueueReadRes:
+        self, req: AnnotationQueueReadReq
+    ) -> AnnotationQueueReadRes:
         return self._call_sdk(
             self._sdk.annotation_queues.list_annotation_queues,
             queue_id=req.queue_id,
@@ -986,8 +1185,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queue_delete(
-        self, req: tsi.AnnotationQueueDeleteReq
-    ) -> tsi.AnnotationQueueDeleteRes:
+        self, req: AnnotationQueueDeleteReq
+    ) -> AnnotationQueueDeleteRes:
         return self._call_sdk(
             self._sdk.annotation_queues.delete_annotation_queues,
             queue_id=req.queue_id,
@@ -995,10 +1194,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queue_update(
-        self, req: tsi.AnnotationQueueUpdateReq
-    ) -> tsi.AnnotationQueueUpdateRes:
+        self, req: AnnotationQueueUpdateReq
+    ) -> AnnotationQueueUpdateRes:
         # Body type excludes queue_id from the request body (it's in the URL path)
-        body = tsi.AnnotationQueueUpdateBody.model_validate(
+        body = AnnotationQueueUpdateBody.model_validate(
             req.model_dump(exclude={"queue_id"})
         )
         return self._call_sdk(
@@ -1008,10 +1207,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queue_add_calls(
-        self, req: tsi.AnnotationQueueAddCallsReq
-    ) -> tsi.AnnotationQueueAddCallsRes:
+        self, req: AnnotationQueueAddCallsReq
+    ) -> AnnotationQueueAddCallsRes:
         # Body type excludes queue_id from the request body (it's in the URL path)
-        body = tsi.AnnotationQueueAddCallsBody.model_validate(
+        body = AnnotationQueueAddCallsBody.model_validate(
             req.model_dump(exclude={"queue_id"})
         )
         return self._call_sdk(
@@ -1019,10 +1218,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queue_items_query(
-        self, req: tsi.AnnotationQueueItemsQueryReq
-    ) -> tsi.AnnotationQueueItemsQueryRes:
+        self, req: AnnotationQueueItemsQueryReq
+    ) -> AnnotationQueueItemsQueryRes:
         # Body type excludes queue_id from the request body (it's in the URL path)
-        body = tsi.AnnotationQueueItemsQueryBody.model_validate(
+        body = AnnotationQueueItemsQueryBody.model_validate(
             req.model_dump(exclude={"queue_id"}, by_alias=True)
         )
         return self._call_sdk(
@@ -1030,71 +1229,65 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queues_stats(
-        self, req: tsi.AnnotationQueuesStatsReq
-    ) -> tsi.AnnotationQueuesStatsRes:
+        self, req: AnnotationQueuesStatsReq
+    ) -> AnnotationQueuesStatsRes:
         return self._call_sdk(self._sdk.annotation_queues.create_stats, req)
 
     # ---- Server-side execution (not supported remotely) ----------------------------
 
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+    def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes:
         raise NotImplementedError("evaluate_model is not implemented")
 
-    def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
+    def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes:
         raise NotImplementedError("evaluation_status is not implemented")
 
-    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+    def calls_score(self, req: CallsScoreReq) -> CallsScoreRes:
         raise NotImplementedError("calls_score is not implemented")
 
     @validate_call
-    def feedback_aggregate(
-        self, req: tsi.FeedbackAggregateReq
-    ) -> tsi.FeedbackAggregateRes:
+    def feedback_aggregate(self, req: FeedbackAggregateReq) -> FeedbackAggregateRes:
         """Query the feedback table for aggregate scores over time."""
         # Not yet present in the published SDK.
         return self._raw_request(
-            "POST", FEEDBACK_AGGREGATE_PATH, req=req, res_type=tsi.FeedbackAggregateRes
+            "POST", FEEDBACK_AGGREGATE_PATH, req=req, res_type=FeedbackAggregateRes
         )
 
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+    def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes:
         # Excluded from the OpenAPI spec (include_in_schema=False).
         return self._raw_request(
-            "POST", PROJECT_STATS_PATH, req=req, res_type=tsi.ProjectStatsRes
+            "POST", PROJECT_STATS_PATH, req=req, res_type=ProjectStatsRes
         )
 
     def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReadReq
-    ) -> tsi.ProjectTTLSettingsReadRes:
+        self, req: ProjectTTLSettingsReadReq
+    ) -> ProjectTTLSettingsReadRes:
         # Excluded from the OpenAPI spec (include_in_schema=False).
         return self._raw_request(
             "POST",
             PROJECT_TTL_SETTINGS_READ_PATH,
             req=req,
-            res_type=tsi.ProjectTTLSettingsReadRes,
+            res_type=ProjectTTLSettingsReadRes,
         )
 
     def project_ttl_settings_update(
-        self, req: tsi.ProjectTTLSettingsUpdateReq
-    ) -> tsi.ProjectTTLSettingsUpdateRes:
+        self, req: ProjectTTLSettingsUpdateReq
+    ) -> ProjectTTLSettingsUpdateRes:
         # Excluded from the OpenAPI spec (include_in_schema=False).
         return self._raw_request(
             "POST",
             PROJECT_TTL_SETTINGS_UPDATE_PATH,
             req=req,
-            res_type=tsi.ProjectTTLSettingsUpdateRes,
+            res_type=ProjectTTLSettingsUpdateRes,
         )
 
-    def threads_query_stream(
-        self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]:
+    def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]:
         # Raw stream: the published SDK buffers jsonl, and it has no thread
         # row model.
         return self._raw_stream(
-            "POST", THREADS_STREAM_QUERY_PATH, req=req, res_type=tsi.ThreadSchema
+            "POST", THREADS_STREAM_QUERY_PATH, req=req, res_type=ThreadSchema
         )
 
-    def rescore(self, req: tsi.RescoreReq) -> Any:
+    def rescore(self, req: RescoreReq) -> Any:
         raise NotImplementedError("rescore is not implemented")
 
     # ---- V2 object APIs --------------------------------------------------------
@@ -1132,11 +1325,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return params
 
     @validate_call
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        return self._v2_create(req, tsi.OpCreateBody, self._sdk.v2_ops.create)
+    def op_create(self, req: OpCreateReq) -> OpCreateRes:
+        return self._v2_create(req, OpCreateBody, self._sdk.v2_ops.create)
 
     @validate_call
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+    def op_read(self, req: OpReadReq) -> OpReadRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_ops.read,
@@ -1147,13 +1340,13 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpReadRes]:
+    def op_list(self, req: OpListReq) -> Iterator[OpReadRes]:
         return self._v2_list_stream(
-            req.project_id, tsi.OpReadRes, "ops", self._v2_list_params(req)
+            req.project_id, OpReadRes, "ops", self._v2_list_params(req)
         )
 
     @validate_call
-    def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
+    def op_delete(self, req: OpDeleteReq) -> OpDeleteRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_ops.delete,
@@ -1164,11 +1357,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
-        return self._v2_create(req, tsi.DatasetCreateBody, self._sdk.v2_datasets.create)
+    def dataset_create(self, req: DatasetCreateReq) -> DatasetCreateRes:
+        return self._v2_create(req, DatasetCreateBody, self._sdk.v2_datasets.create)
 
     @validate_call
-    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
+    def dataset_read(self, req: DatasetReadReq) -> DatasetReadRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_datasets.read,
@@ -1179,16 +1372,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def dataset_list(self, req: tsi.DatasetListReq) -> Iterator[tsi.DatasetReadRes]:
+    def dataset_list(self, req: DatasetListReq) -> Iterator[DatasetReadRes]:
         return self._v2_list_stream(
             req.project_id,
-            tsi.DatasetReadRes,
+            DatasetReadRes,
             "datasets",
             self._v2_list_params(req),
         )
 
     @validate_call
-    def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
+    def dataset_delete(self, req: DatasetDeleteReq) -> DatasetDeleteRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_datasets.delete,
@@ -1199,11 +1392,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
-        return self._v2_create(req, tsi.ScorerCreateBody, self._sdk.v2_scorers.create)
+    def scorer_create(self, req: ScorerCreateReq) -> ScorerCreateRes:
+        return self._v2_create(req, ScorerCreateBody, self._sdk.v2_scorers.create)
 
     @validate_call
-    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
+    def scorer_read(self, req: ScorerReadReq) -> ScorerReadRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_scorers.read,
@@ -1214,16 +1407,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
+    def scorer_list(self, req: ScorerListReq) -> Iterator[ScorerReadRes]:
         return self._v2_list_stream(
             req.project_id,
-            tsi.ScorerReadRes,
+            ScorerReadRes,
             "scorers",
             self._v2_list_params(req),
         )
 
     @validate_call
-    def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
+    def scorer_delete(self, req: ScorerDeleteReq) -> ScorerDeleteRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_scorers.delete,
@@ -1234,15 +1427,13 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def evaluation_create(
-        self, req: tsi.EvaluationCreateReq
-    ) -> tsi.EvaluationCreateRes:
+    def evaluation_create(self, req: EvaluationCreateReq) -> EvaluationCreateRes:
         return self._v2_create(
-            req, tsi.EvaluationCreateBody, self._sdk.v2_evaluations.create
+            req, EvaluationCreateBody, self._sdk.v2_evaluations.create
         )
 
     @validate_call
-    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
+    def evaluation_read(self, req: EvaluationReadReq) -> EvaluationReadRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_evaluations.read,
@@ -1253,20 +1444,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def evaluation_list(
-        self, req: tsi.EvaluationListReq
-    ) -> Iterator[tsi.EvaluationReadRes]:
+    def evaluation_list(self, req: EvaluationListReq) -> Iterator[EvaluationReadRes]:
         return self._v2_list_stream(
             req.project_id,
-            tsi.EvaluationReadRes,
+            EvaluationReadRes,
             "evaluations",
             self._v2_list_params(req),
         )
 
     @validate_call
-    def evaluation_delete(
-        self, req: tsi.EvaluationDeleteReq
-    ) -> tsi.EvaluationDeleteRes:
+    def evaluation_delete(self, req: EvaluationDeleteReq) -> EvaluationDeleteRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_evaluations.delete,
@@ -1277,11 +1464,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
-        return self._v2_create(req, tsi.ModelCreateBody, self._sdk.v2_models.create)
+    def model_create(self, req: ModelCreateReq) -> ModelCreateRes:
+        return self._v2_create(req, ModelCreateBody, self._sdk.v2_models.create)
 
     @validate_call
-    def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
+    def model_read(self, req: ModelReadReq) -> ModelReadRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_models.read,
@@ -1292,16 +1479,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def model_list(self, req: tsi.ModelListReq) -> Iterator[tsi.ModelReadRes]:
+    def model_list(self, req: ModelListReq) -> Iterator[ModelReadRes]:
         return self._v2_list_stream(
             req.project_id,
-            tsi.ModelReadRes,
+            ModelReadRes,
             "models",
             self._v2_list_params(req),
         )
 
     @validate_call
-    def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
+    def model_delete(self, req: ModelDeleteReq) -> ModelDeleteRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_models.delete,
@@ -1313,18 +1500,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def evaluation_run_create(
-        self, req: tsi.EvaluationRunCreateReq
-    ) -> tsi.EvaluationRunCreateRes:
+        self, req: EvaluationRunCreateReq
+    ) -> EvaluationRunCreateRes:
         return self._v2_create(
             req,
-            tsi.EvaluationRunCreateBody,
+            EvaluationRunCreateBody,
             self._sdk.v2_evaluation_runs.create,
         )
 
     @validate_call
-    def evaluation_run_read(
-        self, req: tsi.EvaluationRunReadReq
-    ) -> tsi.EvaluationRunReadRes:
+    def evaluation_run_read(self, req: EvaluationRunReadReq) -> EvaluationRunReadRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_evaluation_runs.read,
@@ -1335,8 +1520,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def evaluation_run_list(
-        self, req: tsi.EvaluationRunListReq
-    ) -> Iterator[tsi.EvaluationRunReadRes]:
+        self, req: EvaluationRunListReq
+    ) -> Iterator[EvaluationRunReadRes]:
         # Raw: the SDK's generated list signature renames the filter params
         # (evaluations vs evaluation_refs), so use the wire format directly.
         params = self._v2_list_params(req)
@@ -1348,13 +1533,13 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             if req.filter.evaluation_run_ids:
                 params["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
         return self._v2_list_stream(
-            req.project_id, tsi.EvaluationRunReadRes, "evaluation_runs", params
+            req.project_id, EvaluationRunReadRes, "evaluation_runs", params
         )
 
     @validate_call
     def evaluation_run_delete(
-        self, req: tsi.EvaluationRunDeleteReq
-    ) -> tsi.EvaluationRunDeleteRes:
+        self, req: EvaluationRunDeleteReq
+    ) -> EvaluationRunDeleteRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_evaluation_runs.delete,
@@ -1365,10 +1550,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def evaluation_run_finish(
-        self, req: tsi.EvaluationRunFinishReq
-    ) -> tsi.EvaluationRunFinishRes:
+        self, req: EvaluationRunFinishReq
+    ) -> EvaluationRunFinishRes:
         entity, project = from_project_id(req.project_id)
-        body = tsi.EvaluationRunFinishBody.model_validate(
+        body = EvaluationRunFinishBody.model_validate(
             req.model_dump(exclude={"project_id", "evaluation_run_id"})
         )
         return self._call_sdk(
@@ -1380,15 +1565,13 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def prediction_create(
-        self, req: tsi.PredictionCreateReq
-    ) -> tsi.PredictionCreateRes:
+    def prediction_create(self, req: PredictionCreateReq) -> PredictionCreateRes:
         return self._v2_create(
-            req, tsi.PredictionCreateBody, self._sdk.v2_predictions.create
+            req, PredictionCreateBody, self._sdk.v2_predictions.create
         )
 
     @validate_call
-    def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
+    def prediction_read(self, req: PredictionReadReq) -> PredictionReadRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_predictions.read,
@@ -1398,20 +1581,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def prediction_list(
-        self, req: tsi.PredictionListReq
-    ) -> Iterator[tsi.PredictionReadRes]:
+    def prediction_list(self, req: PredictionListReq) -> Iterator[PredictionReadRes]:
         params = self._v2_list_params(req)
         if req.evaluation_run_id is not None:
             params["evaluation_run_id"] = req.evaluation_run_id
         return self._v2_list_stream(
-            req.project_id, tsi.PredictionReadRes, "predictions", params
+            req.project_id, PredictionReadRes, "predictions", params
         )
 
     @validate_call
-    def prediction_delete(
-        self, req: tsi.PredictionDeleteReq
-    ) -> tsi.PredictionDeleteRes:
+    def prediction_delete(self, req: PredictionDeleteReq) -> PredictionDeleteRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_predictions.delete,
@@ -1421,9 +1600,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def prediction_finish(
-        self, req: tsi.PredictionFinishReq
-    ) -> tsi.PredictionFinishRes:
+    def prediction_finish(self, req: PredictionFinishReq) -> PredictionFinishRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_predictions.finish,
@@ -1433,11 +1610,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
-        return self._v2_create(req, tsi.ScoreCreateBody, self._sdk.v2_scores.create)
+    def score_create(self, req: ScoreCreateReq) -> ScoreCreateRes:
+        return self._v2_create(req, ScoreCreateBody, self._sdk.v2_scores.create)
 
     @validate_call
-    def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
+    def score_read(self, req: ScoreReadReq) -> ScoreReadRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_scores.read,
@@ -1447,14 +1624,14 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
-    def score_list(self, req: tsi.ScoreListReq) -> Iterator[tsi.ScoreReadRes]:
+    def score_list(self, req: ScoreListReq) -> Iterator[ScoreReadRes]:
         params = self._v2_list_params(req)
         if req.evaluation_run_id is not None:
             params["evaluation_run_id"] = req.evaluation_run_id
-        return self._v2_list_stream(req.project_id, tsi.ScoreReadRes, "scores", params)
+        return self._v2_list_stream(req.project_id, ScoreReadRes, "scores", params)
 
     @validate_call
-    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
+    def score_delete(self, req: ScoreDeleteReq) -> ScoreDeleteRes:
         entity, project = from_project_id(req.project_id)
         return self._call_sdk(
             self._sdk.v2_scores.delete,
@@ -1465,16 +1642,14 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     # ---- Calls V2 API ---------------------------------------------------------------
 
-    def calls_complete(
-        self, req: tsi.CallsUpsertCompleteReq
-    ) -> tsi.CallsUpsertCompleteRes:
+    def calls_complete(self, req: CallsUpsertCompleteReq) -> CallsUpsertCompleteRes:
         """Batch complete calls endpoint (v2).
 
         This endpoint is used when use_calls_complete is enabled to send
         complete calls (with both start and end information) in batches.
         """
         if not req.batch:
-            return tsi.CallsUpsertCompleteRes()
+            return CallsUpsertCompleteRes()
 
         first_item = req.batch[0]
         entity, project = from_project_id(first_item.project_id)
@@ -1483,10 +1658,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             "POST",
             CALLS_COMPLETE_PATH.format(entity=entity, project=project),
             req=req,
-            res_type=tsi.CallsUpsertCompleteRes,
+            res_type=CallsUpsertCompleteRes,
         )
 
-    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+    def call_start_v2(self, req: CallStartV2Req) -> CallStartV2Res:
         """Single call start endpoint (v2).
 
         This endpoint is used for eager ops that need their start visible immediately.
@@ -1497,10 +1672,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             "POST",
             CALL_START_V2_PATH.format(entity=entity, project=project),
             req=req,
-            res_type=tsi.CallStartV2Res,
+            res_type=CallStartV2Res,
         )
 
-    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+    def call_end_v2(self, req: CallEndV2Req) -> CallEndV2Res:
         """Single call end endpoint (v2).
 
         This endpoint is used for eager ops that need their end sent separately.
@@ -1511,5 +1686,5 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             "POST",
             CALL_END_V2_PATH.format(entity=entity, project=project),
             req=req,
-            res_type=tsi.CallEndV2Res,
+            res_type=CallEndV2Res,
         )

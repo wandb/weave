@@ -1,7 +1,7 @@
 import datetime
 
 import pytest
-from weave_server_sdk import models as tsi
+from weave_server_sdk.models import Query
 
 import weave
 from weave.flow.saved_view import (
@@ -35,12 +35,12 @@ def test_query_to_filters_none():
 
 
 def test_query_to_filters_one_filter():
-    query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
+    query = Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
     assert query_to_filters(query) == [
         Filter(field="rank", operator="(number): =", value=1)
     ]
 
-    query = tsi.Query(
+    query = Query(
         **{
             "$expr": {
                 "$gt": [
@@ -54,7 +54,7 @@ def test_query_to_filters_one_filter():
         Filter(field="completion_token_cost", operator="(number): >", value=25)
     ]
 
-    query = tsi.Query(
+    query = Query(
         **{
             "$expr": {
                 "$eq": [{"$getField": "inputs.model"}, {"$literal": "gpt-4o-mini"}]
@@ -67,7 +67,7 @@ def test_query_to_filters_one_filter():
 
 
 def test_query_to_filters_multiple_filters():
-    query = tsi.Query(
+    query = Query(
         **{
             "$expr": {
                 "$and": [
@@ -149,7 +149,7 @@ def test_filter_manipulation():
     view = weave.SavedView("traces", "My saved view")
 
     view.add_filter("inputs.model", "equals", "gpt-3.5-turbo")
-    assert view.base.definition.query == tsi.Query(
+    assert view.base.definition.query == Query(
         **{
             "$expr": {
                 "$and": [

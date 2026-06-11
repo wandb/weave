@@ -11,8 +11,7 @@ from typing import Any, Literal
 
 from pydantic import PrivateAttr
 from typing_extensions import Self
-from weave_server_sdk import models as tsi
-from weave_server_sdk.models import CallsFilter
+from weave_server_sdk.models import CallsFilter, GenAISpanRef
 
 from weave.dataset.dataset import Dataset
 from weave.flow import util
@@ -84,7 +83,7 @@ def _active_eval_prediction_context(call: Call | None) -> Iterator[None]:
 
 def _attach_genai_span_ref_to_call_summary(
     call: Call,
-    genai_span_ref: tsi.GenAISpanRef,
+    genai_span_ref: GenAISpanRef,
 ) -> None:
     """Append a GenAISpanRef into call.summary so eval results can find it.
 

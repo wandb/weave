@@ -16,235 +16,28 @@ import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-from weave_server_sdk import models as tsi
-
-# TEMPORARY migration aid: re-export the generated SDK models so binding-layer
-# files can keep referencing every model (SDK and gap alike) through one
-# `tsi`-aliased namespace, keeping this PR's diffs minimal. The follow-up PR
-# removes the alias and this re-export in favor of direct imports. Explicit
-# (not a star import) so the SDK module's own imports cannot shadow names here.
-from weave_server_sdk.models import (  # noqa: F401
-    AggregationType,
-    AliasesListRes,
-    AndOperation,
+from weave_server_sdk.models import (
     AnnotationQueueAddCallsBody,
-    AnnotationQueueAddCallsRes,
-    AnnotationQueueCreateReq,
-    AnnotationQueueCreateRes,
-    AnnotationQueueDeleteRes,
-    AnnotationQueueItemProgressUpdateBody,
-    AnnotationQueueItemSchema,
-    AnnotationQueueItemsFilter,
     AnnotationQueueItemsQueryBody,
-    AnnotationQueueItemsQueryRes,
-    AnnotationQueueReadRes,
-    AnnotationQueueSchema,
-    AnnotationQueuesQueryReq,
-    AnnotationQueuesStatsReq,
-    AnnotationQueuesStatsRes,
-    AnnotationQueueStatsSchema,
     AnnotationQueueUpdateBody,
-    AnnotationQueueUpdateRes,
-    AnnotatorQueueItemsProgressUpdateRes,
-    Body_file_create_file_create_post,
-    CallBatchEndMode,
-    CallBatchStartMode,
-    CallCreateBatchReq,
-    CallCreateBatchRes,
     CallEndReq,
-    CallEndRes,
-    CallMetricSpec,
-    CallReadReq,
-    CallReadRes,
     CallSchema,
-    CallsDeleteReq,
-    CallsDeleteRes,
-    CallsFilter,
-    CallsQueryReq,
-    CallsQueryStatsReq,
-    CallsQueryStatsRes,
-    CallsScoreReq,
-    CallsScoreRes,
     CallStartReq,
-    CallStartRes,
-    CallStatsReq,
-    CallStatsRes,
-    CallsUsageReq,
-    CallsUsageRes,
-    CallUpdateReq,
-    CallUpdateRes,
-    ContainsOperation,
-    ContainsSpec,
-    ConvertOperation,
-    ConvertSpec,
-    CostCreateInput,
-    CostCreateReq,
-    CostCreateRes,
-    CostPurgeReq,
-    CostPurgeRes,
-    CostQueryOutput,
-    CostQueryReq,
-    CostQueryRes,
-    CreateAndLinkPayload,
-    CreateAndLinkTarget,
-    CreateAndLinkWeaveAssetRes,
-    Datacenter,
     DatasetCreateBody,
-    DatasetCreateRes,
-    DatasetDeleteRes,
-    DatasetReadRes,
     EndedCallSchemaForInsert,
-    EqOperation,
-    EvalResultsEvaluationSummary,
-    EvalResultsFilter,
-    EvalResultsQueryBody,
-    EvalResultsQueryRes,
-    EvalResultsRow,
-    EvalResultsRowEvaluation,
-    EvalResultsScorerStats,
-    EvalResultsSortBy,
-    EvalResultsSummaryRes,
-    EvalResultsTrial,
-    EvaluateModelReq,
-    EvaluateModelRes,
     EvaluationCreateBody,
-    EvaluationCreateRes,
-    EvaluationDeleteRes,
-    EvaluationReadRes,
     EvaluationRunCreateBody,
-    EvaluationRunCreateRes,
-    EvaluationRunDeleteRes,
     EvaluationRunFinishBody,
-    EvaluationRunFinishRes,
-    EvaluationRunReadRes,
-    EvaluationStatusComplete,
-    EvaluationStatusFailed,
-    EvaluationStatusNotFound,
-    EvaluationStatusReq,
-    EvaluationStatusRes,
-    EvaluationStatusRunning,
-    FeedbackCreateBatchReq,
-    FeedbackCreateBatchRes,
-    FeedbackCreateReq,
-    FeedbackCreateRes,
-    FeedbackMetricSpec,
-    FeedbackPayloadPath,
-    FeedbackPayloadSchemaReq,
-    FeedbackPayloadSchemaRes,
-    FeedbackPurgeReq,
-    FeedbackPurgeRes,
-    FeedbackQueryReq,
-    FeedbackQueryRes,
-    FeedbackReplaceReq,
-    FeedbackReplaceRes,
-    FeedbackStatsReq,
-    FeedbackStatsRes,
-    FileContentReadReq,
-    FileCreateRes,
-    FilesStatsReq,
-    FilesStatsRes,
-    GenAISpanRef,
-    Geolocation,
-    GeolocationRes,
-    GetFieldOperator,
-    GteOperation,
-    GtOperation,
-    HTTPValidationError,
-    ImageGenerationCreateReq,
-    ImageGenerationCreateRes,
-    ImageGenerationRequestInputs,
-    InOperation,
-    LiteralOperation,
-    LLMAggregatedUsage,
-    LLMUsageSchema,
-    LteOperation,
-    LtOperation,
     ModelCreateBody,
-    ModelCreateRes,
-    ModelDeleteRes,
-    ModelReadRes,
-    NotOperation,
-    NvidiaHardwareOption,
-    NvidiaHardwareRes,
-    NvidiaServerlessPricing,
-    ObjAddTagsRes,
-    ObjCreateReq,
-    ObjCreateRes,
-    ObjDeleteReq,
-    ObjDeleteRes,
-    ObjectVersionFilter,
-    ObjQueryReq,
-    ObjQueryRes,
-    ObjReadReq,
-    ObjReadRes,
     ObjRemoveAliasesBody,
-    ObjRemoveAliasesRes,
-    ObjRemoveTagsRes,
-    ObjSchema,
-    ObjSchemaForInsert,
     ObjSetAliasesBody,
-    ObjSetAliasesRes,
     ObjTagsBody,
     OpCreateBody,
-    OpCreateRes,
-    OpDeleteRes,
-    OpReadRes,
-    OrOperation,
     PredictionCreateBody,
-    PredictionCreateRes,
-    PredictionDeleteRes,
-    PredictionFinishRes,
-    PredictionReadRes,
-    Pricing,
-    ProjectsInfoReq,
-    ProjectsInfoRes,
-    Query,
-    RefsReadBatchReq,
-    RefsReadBatchRes,
-    RouterOpenRouterModel,
-    RouterOpenRouterModelsRes,
     ScoreCreateBody,
-    ScoreCreateRes,
-    ScoreDeleteRes,
     ScorerCreateBody,
-    ScorerCreateRes,
-    ScorerDeleteRes,
-    ScoreReadRes,
-    ScorerReadRes,
-    ServerInfoRes,
-    SortBy,
     StartedCallSchemaForInsert,
     SummaryInsertMap,
-    TableAppendSpec,
-    TableAppendSpecPayload,
-    TableCreateFromDigestsReq,
-    TableCreateFromDigestsRes,
-    TableCreateReq,
-    TableCreateRes,
-    TableInsertSpec,
-    TableInsertSpecPayload,
-    TablePopSpec,
-    TablePopSpecPayload,
-    TableQueryReq,
-    TableQueryRes,
-    TableQueryStatsBatchReq,
-    TableQueryStatsBatchRes,
-    TableQueryStatsReq,
-    TableQueryStatsRes,
-    TableRowFilter,
-    TableRowSchema,
-    TableSchemaForInsert,
-    TableStatsRow,
-    TableUpdateReq,
-    TableUpdateRes,
-    TagsListRes,
-    ThreadsQueryFilter,
-    ThreadsQueryReq,
-    TraceStatus,
-    TraceUsageReq,
-    TraceUsageRes,
-    UsageMetricSpec,
-    ValidationError,
 )
 
 
@@ -273,7 +66,7 @@ class CompletedCallSchemaForInsert(BaseModel):
     otel_dump: dict[str, Any] | None = None
     exception: str | None = None
     output: Any | None = None
-    summary: tsi.SummaryInsertMap | None = None
+    summary: SummaryInsertMap | None = None
     wb_user_id: str | None = None
     wb_run_id: str | None = None
     wb_run_step: int | None = None
@@ -293,7 +86,7 @@ class CallsUpsertCompleteRes(BaseModel):
 class CallStartV2Req(BaseModel):
     """Request body for the eager v2 call-start endpoint (absent from the SDK)."""
 
-    start: tsi.StartedCallSchemaForInsert
+    start: StartedCallSchemaForInsert
 
 
 class CallStartV2Res(BaseModel):
@@ -308,7 +101,7 @@ class CallEndV2Req(BaseModel):
     EndedCallSchemaForInsert (the published model does not declare it yet).
     """
 
-    end: tsi.EndedCallSchemaForInsert
+    end: EndedCallSchemaForInsert
 
 
 class CallEndV2Res(BaseModel):
@@ -318,7 +111,7 @@ class CallEndV2Res(BaseModel):
 class CallsQueryRes(BaseModel):
     """Aggregate calls-query response (the SDK only exposes the stream form)."""
 
-    calls: list[tsi.CallSchema]
+    calls: list[CallSchema]
 
 
 class CompletionsCreateRequestInputs(BaseModel):
@@ -432,21 +225,21 @@ class EnsureProjectExistsRes(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class ObjAddTagsReq(tsi.ObjTagsBody):
+class ObjAddTagsReq(ObjTagsBody):
     object_id: str
     digest: str
 
 
-class ObjRemoveTagsReq(tsi.ObjTagsBody):
+class ObjRemoveTagsReq(ObjTagsBody):
     object_id: str
     digest: str
 
 
-class ObjSetAliasesReq(tsi.ObjSetAliasesBody):
+class ObjSetAliasesReq(ObjSetAliasesBody):
     object_id: str
 
 
-class ObjRemoveAliasesReq(tsi.ObjRemoveAliasesBody):
+class ObjRemoveAliasesReq(ObjRemoveAliasesBody):
     object_id: str
 
 
@@ -468,26 +261,26 @@ class AnnotationQueueDeleteReq(BaseModel):
     project_id: str
 
 
-class AnnotationQueueUpdateReq(tsi.AnnotationQueueUpdateBody):
+class AnnotationQueueUpdateReq(AnnotationQueueUpdateBody):
     queue_id: str
 
 
-class AnnotationQueueAddCallsReq(tsi.AnnotationQueueAddCallsBody):
+class AnnotationQueueAddCallsReq(AnnotationQueueAddCallsBody):
     queue_id: str
 
 
-class AnnotationQueueItemsQueryReq(tsi.AnnotationQueueItemsQueryBody):
+class AnnotationQueueItemsQueryReq(AnnotationQueueItemsQueryBody):
     queue_id: str
 
 
 class StartBatchItem(BaseModel):
     mode: str = "start"
-    req: tsi.CallStartReq
+    req: CallStartReq
 
 
 class EndBatchItem(BaseModel):
     mode: str = "end"
-    req: tsi.CallEndReq
+    req: CallEndReq
 
 
 class CompleteBatchItem(BaseModel):
@@ -631,7 +424,7 @@ class _V2DeleteReq(_V2ReqMixin):
     digests: list[str] | None = None
 
 
-class OpCreateReq(tsi.OpCreateBody, _V2ReqMixin):
+class OpCreateReq(OpCreateBody, _V2ReqMixin):
     pass
 
 
@@ -647,7 +440,7 @@ class OpDeleteReq(_V2DeleteReq):
     pass
 
 
-class DatasetCreateReq(tsi.DatasetCreateBody, _V2ReqMixin):
+class DatasetCreateReq(DatasetCreateBody, _V2ReqMixin):
     pass
 
 
@@ -663,7 +456,7 @@ class DatasetDeleteReq(_V2DeleteReq):
     pass
 
 
-class ScorerCreateReq(tsi.ScorerCreateBody, _V2ReqMixin):
+class ScorerCreateReq(ScorerCreateBody, _V2ReqMixin):
     pass
 
 
@@ -679,7 +472,7 @@ class ScorerDeleteReq(_V2DeleteReq):
     pass
 
 
-class EvaluationCreateReq(tsi.EvaluationCreateBody, _V2ReqMixin):
+class EvaluationCreateReq(EvaluationCreateBody, _V2ReqMixin):
     pass
 
 
@@ -695,7 +488,7 @@ class EvaluationDeleteReq(_V2DeleteReq):
     pass
 
 
-class ModelCreateReq(tsi.ModelCreateBody, _V2ReqMixin):
+class ModelCreateReq(ModelCreateBody, _V2ReqMixin):
     pass
 
 
@@ -717,7 +510,7 @@ class EvaluationRunFilter(BaseModel):
     evaluation_run_ids: list[str] | None = None
 
 
-class EvaluationRunCreateReq(tsi.EvaluationRunCreateBody, _V2ReqMixin):
+class EvaluationRunCreateReq(EvaluationRunCreateBody, _V2ReqMixin):
     pass
 
 
@@ -737,11 +530,11 @@ class EvaluationRunDeleteReq(_V2ReqMixin):
     evaluation_run_ids: list[str]
 
 
-class EvaluationRunFinishReq(tsi.EvaluationRunFinishBody, _V2ReqMixin):
+class EvaluationRunFinishReq(EvaluationRunFinishBody, _V2ReqMixin):
     evaluation_run_id: str
 
 
-class PredictionCreateReq(tsi.PredictionCreateBody, _V2ReqMixin):
+class PredictionCreateReq(PredictionCreateBody, _V2ReqMixin):
     pass
 
 
@@ -761,7 +554,7 @@ class PredictionFinishReq(_V2ReqMixin):
     prediction_id: str
 
 
-class ScoreCreateReq(tsi.ScoreCreateBody, _V2ReqMixin):
+class ScoreCreateReq(ScoreCreateBody, _V2ReqMixin):
     pass
 
 
