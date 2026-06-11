@@ -908,7 +908,6 @@ class AgentChatMessage(BaseModel):
     type: AgentChatMessageType
     span_id: str | None = None
     agent_name: str | None = None
-    # Denormalized from the message's span so reaction feedback can carry them.
     agent_version: str | None = None
     status_code: str | None = None
     started_at: datetime.datetime | None = None
