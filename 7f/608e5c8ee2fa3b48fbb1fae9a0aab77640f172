@@ -1,0 +1,82 @@
+## Restructure addendum (2026-06-10, feedback round)
+This guard formerly sat at the BOTTOM of the stack (second commit of PR 1,
+14ee582b22) and its baselines were written against pre-consolidation module
+paths -- forcing a 42-entry rename pass in the old PR 2 and a restructure in
+the old PR 3 (~160 lines of pyproject churn the user flagged as reviewer
+noise). It now lands right after the merged structural PR, so the
+[tool.importlinter] section is written once against final paths and later
+PRs only delete entries. Content here == the dab8b857de state of these six
+files (pyproject.toml linter section + import-linter dev dep, uv.lock,
+.pre-commit-config.yaml lint-imports hook, AGENTS.md boundary section,
+docs/TRACE_SERVER_DECOUPLING.md, tests/trace_server/test_import_contract.py)
+with three deltas:
+- corpus-location text now points at the per-side fixture copies
+  (tests/trace_server/conformance/fixtures/ + tests/conformance/fixtures/)
+  instead of a shared repo-root conformance/ dir (user requirement: fixtures
+  are never shared between client and server);
+- the decoupling doc's PR table reflects the new order (1 init, 2 merged
+  interface consolidation+mirror, 3 guard, 4 dissolve-shared, 5 llm split,
+  6 small lifts, 7 content, 8 declare);
+- contract count language: four contracts incl. the interface layer's
+  born-empty list (formerly added by the mirror PR).
+At this commit: lint-imports 4 kept / 0 broken; 8 meta-tests pass.
+FLOW_TO_SERVER AST baseline is born EMPTY here (the mirror PR below already
+repointed flow's imports); under the old order it carried 4 entries burned
+later. Original PR 1 note follows (its 'Actions' describe the old
+bottom-of-stack position).
+
+=============== ORIGINAL NOTE: 14ee582b22 (guard) ===============
+## Conversation
+Round 3 of the ts-split stack (PR 1, commit 2/2): the guard, rebuilt under the
+user's 5 rules (see commit 1/2 note + .context/ts-split-round3-design.md).
+Key reframing vs round 2: the end state is a PURE-CONTRACT interface mirror
+(client subset, byte-identical) + PER-SIDE implementations gated by a frozen
+JSONL conformance corpus (conformance/, future home core repo) -- NOT a
+whole-tree mirror carrying impl twins.
+
+## Actions
+- Adopted round-2 guard content (9de41b773f), then:
+  - pyproject C1: dropped weave.flow from source_modules (flow is
+    grimp-invisible without __init__.py; import-linter ERRORS on missing
+    SOURCE modules) and removed the 8 flow->trace_server ignore entries.
+  - pyproject C2: removed the kafka_events -> weave.flow.monitor entry --
+    EMPIRICALLY VERIFIED import-linter errors "No matches for ignored import"
+    because grimp cannot resolve targets under a namespace package. Left
+    weave.flow in C2/C3 forbidden lists (nonexistent FORBIDDEN modules are
+    tolerated -- round-2 finding -- and it self-arms if flow ever gains an
+    __init__.py).
+  - test_import_contract.py: + NAMESPACE_PACKAGE_ALLOWLIST={weave/flow};
+    + test_flow_stays_a_namespace_package (rule 2 enforced forever);
+    + AST flow checks both directions with burn-down baselines
+    (FLOW_TO_SERVER_BASELINE: annotation_spec/leaderboard/monitor/saved_view,
+    burned by PR 3; SERVER_TO_FLOW_BASELINE: agents/kafka_events.py, burned
+    by PR 6).
+  - Rewrote the importlinter header, AGENTS.md boundary section, and
+    docs/TRACE_SERVER_DECOUPLING.md for the round-3 architecture (subset
+    mirror, per-side impl table, corpus freeze discipline, flow freeze,
+    8-PR stack table).
+- Verified: lint-imports 3 kept / 0 broken; 7 meta-tests pass; ruff clean.
+
+## Errors & Mistakes
+- None beyond the kafka-entry discovery above (expected, planned for).
+
+## Dead Ends
+- Considered keeping flow in C1 via a stub __init__.py -- rejected, rule 2 is
+  absolute. AST checks are the compensating control.
+
+## Hints for Future Agents
+- The flow AST tests are the ONLY guard on flow edges; do not remove them
+  while weave/flow exists. When flow is deleted, remove the allowlist,
+  baselines, and AST tests (test_flow_stays_a_namespace_package says so).
+- "Entries may be PATH-RENAMED, never added" -- PR 2 renames C1/C2 entry paths
+  when contract modules move into trace_server/interface/.
+- ROOT_IMPORT_BASELINE (llm_structured_model.py, evaluate_model_worker.py)
+  burns in PR 5 (split + worker move, merged so no transient state exists).
+
+## Codebase Discoveries
+- import-linter tolerates nonexistent forbidden modules but errors on
+  nonexistent source modules AND on unmatched ignore entries -- the burn-down
+  is self-enforcing in both directions.
+
+## Open Questions
+None.
