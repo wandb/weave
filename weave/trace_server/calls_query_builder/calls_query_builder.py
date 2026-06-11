@@ -3197,10 +3197,11 @@ def _optimized_unfiltered_storage_query(
     table_name = config.table_name
     project_id_slot = param_slot(param_builder.add_param(project_id), "String")
 
+    # project_id in PREWHERE mirrors the filtered/JOIN path's read shape.
     if read_table == ReadTable.CALLS_MERGED:
         # Concurrent start/end/delete rows per id -> inclusion-exclusion count.
         count_expr = _unfiltered_calls_merged_count_expr(table_name)
-        where_clause = f"WHERE {table_name}.project_id = {project_id_slot}"
+        where_clause = f"PREWHERE {table_name}.project_id = {project_id_slot}"
     elif read_table == ReadTable.CALLS_COMPLETE:
         # One row per call: count non-deleted rows directly.
         not_deleted = get_field_by_name("deleted_at").null_check_sql(
@@ -3208,7 +3209,8 @@ def _optimized_unfiltered_storage_query(
         )
         count_expr = "count()"
         where_clause = (
-            f"WHERE {table_name}.project_id = {project_id_slot} AND {not_deleted}"
+            f"PREWHERE {table_name}.project_id = {project_id_slot}\n"
+            f"    WHERE {not_deleted}"
         )
     else:
         raise ValueError(f"Invalid read table: {read_table}")

@@ -4228,8 +4228,8 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
                            FROM calls_complete_stats
                            WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
         FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-          AND calls_complete.deleted_at = {pb_1:DateTime64(3)}
+        PREWHERE calls_complete.project_id = {pb_0:String}
+        WHERE calls_complete.deleted_at = {pb_1:DateTime64(3)}
         """,
         {
             "pb_0": "project",
@@ -4384,7 +4384,7 @@ def test_stats_query_calls_merged_unfiltered_storage_uses_flat_sum() -> None:
                            FROM calls_merged_stats
                            WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
+        PREWHERE calls_merged.project_id = {pb_0:String}
         """,
         {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
