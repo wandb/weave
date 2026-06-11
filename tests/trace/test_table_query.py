@@ -1,3 +1,4 @@
+import copy
 import random
 from collections.abc import Iterator
 
@@ -483,3 +484,44 @@ def test_table_query_stats_with_storage_size(client: WeaveClient):
 
     assert stats_res.tables[0].count == len(data)
     assert stats_res.tables[0].storage_size_bytes > 0
+
+
+def test_table_create_does_not_mutate_caller_rows(client: WeaveClient):
+    """table_create shares the caller's rows yet still converts embedded refs."""
+    project_id = client.project_id
+    nested_ref = f"weave:///{project_id}/object/my_obj:abc123"
+    list_ref = f"weave:///{project_id}/op/my_op:def456"
+    rows = [
+        {"idx": 0, "meta": {"ref": nested_ref}, "tags": ["plain", list_ref]},
+        {"idx": 1, "meta": {"ref": None}, "tags": ["no-refs-here"]},
+    ]
+    req = tsi.TableCreateReq(
+        table=tsi.TableSchemaForInsert(rows=rows, project_id=project_id),
+    )
+    rows_snapshot = copy.deepcopy(req.table.rows)
+    caller_rows = req.table.rows
+    caller_row_ids = [id(r) for r in caller_rows]
+
+    res = client.server.table_create(req)
+
+    # The converter is copy-on-write; the caller's rows must be untouched.
+    assert req.table.rows == rows_snapshot
+    assert req.table.rows is caller_rows
+    # No deep copy: the caller's row objects keep their identity (the old
+    # model_copy(deep=True) would have replaced every row).
+    assert [id(r) for r in req.table.rows] == caller_row_ids
+    # project_id rewrite happened on our copy, not the caller's table.
+    assert req.table.project_id == project_id
+
+    # Stored rows round-trip: int refs convert back to the original external
+    # refs, and the digest is stable across an identical re-create.
+    query_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=project_id, digest=res.digest)
+    )
+    assert [r.val for r in query_res.rows] == rows
+    assert query_res.rows[0].val["meta"]["ref"] == nested_ref
+    assert query_res.rows[0].val["tags"][1] == list_ref
+
+    res2 = client.server.table_create(req)
+    assert res2.digest == res.digest
+    assert res2.row_digests == res.row_digests

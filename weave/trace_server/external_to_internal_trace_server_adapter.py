@@ -464,10 +464,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._internal_trace_server.aliases_list(req)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        req = req.model_copy(deep=True)
-        req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
+        # Shallow-copy the wrapper + table (not the rows): the ref converter is
+        # copy-on-write, so the caller's rows stay unmutated without a deep copy.
+        internal_project_id = self._idc.ext_to_int_project_id(req.table.project_id)
+        table = req.table.model_copy(update={"project_id": internal_project_id})
+        req = req.model_copy(update={"table": table})
         return self._ref_apply(
-            self._internal_trace_server.table_create, req, req.table.project_id
+            self._internal_trace_server.table_create, req, internal_project_id
         )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
