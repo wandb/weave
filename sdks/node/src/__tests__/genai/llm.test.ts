@@ -313,21 +313,6 @@ describe('LLM (via Turn.startLLM)', () => {
       expect(llmSpan.attributes['gen_ai.output.type']).toBe('text');
     });
 
-    it('setAttribute is a no-op after end() and warns', () => {
-      const turn = Turn.create({});
-      const llm = turn.startLLM({model: 'gpt-4o'});
-      llm.end();
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      llm.setAttribute('weave.too_late', 'x');
-      turn.end();
-      expect(warn).toHaveBeenCalled();
-      warn.mockRestore();
-
-      const spans = getExporter().getFinishedSpans();
-      const llmSpan = findSpan(spans, 'chat');
-      expect(llmSpan.attributes['weave.too_late']).toBeUndefined();
-    });
-
     it('accumulators called after end() warn and do not mutate state', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -344,16 +329,17 @@ describe('LLM (via Turn.startLLM)', () => {
       });
       llm.attachMediaUrl('https://example.com/x', {modality: 'image'});
       llm.record({inputMessages: [{role: 'user', content: 'after end'}]});
+      llm.setAttribute('weave.too_late', 'x');
 
-      // One warning per method (warnOnce dedupes per key process-wide; each
-      // method uses a distinct key).
-      expect(warnSpy).toHaveBeenCalledTimes(5);
+      // One warning per method.
+      expect(warnSpy).toHaveBeenCalledTimes(6);
       for (const method of [
         'output',
         'think',
         'attachMedia',
         'attachMediaUrl',
         'record',
+        'setAttribute',
       ]) {
         expect(warnSpy).toHaveBeenCalledWith(
           expect.stringContaining(`LLM.${method}() called after end()`)
@@ -367,6 +353,11 @@ describe('LLM (via Turn.startLLM)', () => {
 
       turn.end();
       warnSpy.mockRestore();
+
+      // The dropped setAttribute never reached the span either.
+      const spans = getExporter().getFinishedSpans();
+      const llmSpan = findSpan(spans, 'chat');
+      expect(llmSpan.attributes['weave.too_late']).toBeUndefined();
     });
   });
 });

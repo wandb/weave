@@ -121,13 +121,11 @@ export class LLM {
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
+    // `startTime` undefined → OTel stamps the current time, mirroring how
+    // `end()` passes `endTime` straight through to `span.end()`.
     const span = tracer.startSpan(
       'chat',
-      {
-        kind: SpanKind.CLIENT,
-        attributes,
-        ...(opts.startTime !== undefined ? {startTime: opts.startTime} : {}),
-      },
+      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       opts.parentContext
     );
     const llm = new LLM(
