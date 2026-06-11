@@ -7,6 +7,12 @@ from copy import deepcopy
 from typing import Any, Literal, SupportsIndex, cast
 
 from pydantic import BaseModel
+from weave_server_sdk.models import (
+    ObjReadReq,
+    TableQueryReq,
+    TableQueryStatsReq,
+    TableRowFilter,
+)
 
 from weave.shared.errors import ObjectDeletedError
 from weave.trace import box
@@ -26,13 +32,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
-from weave.trace_server.trace_server_interface import (
-    ObjReadReq,
-    TableQueryReq,
-    TableQueryStatsReq,
-    TableRowFilter,
-    TraceServerInterface,
-)
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import retry_on_not_found
 from weave.utils.iterators import ThreadSafeLazyList
 from weave.utils.project_id import to_project_id
@@ -116,7 +116,7 @@ class Traceable:
     mutations: list[Mutation] | None = None
     root: "Traceable"
     parent: "Traceable | None" = None
-    server: TraceServerInterface
+    server: TraceServerClientInterface
     _is_dirty: bool = False
 
     def _mark_dirty(self) -> None:
@@ -186,7 +186,7 @@ def attribute_access_result(
     val_attr_val: Any,
     attr_name: str,
     *,
-    server: TraceServerInterface | None,
+    server: TraceServerClientInterface | None,
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
@@ -222,7 +222,7 @@ class WeaveObject(Traceable):  # noqa: PLW1641
         self,
         val: Any,
         ref: RefWithExtra | None,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         root: Traceable | None,
         parent: Traceable | None = None,
     ) -> None:
@@ -301,7 +301,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
 
     def __init__(
         self,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         table_ref: TableRef | None = None,
         ref: RefWithExtra | None = None,
         filter: TableRowFilter | None = None,
@@ -616,7 +616,7 @@ class WeaveList(Traceable, list):  # noqa: PLW1641
     def __init__(
         self,
         *args: Any,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         ref: RefWithExtra | None = None,
         root: Traceable | None = None,
         parent: Traceable | None = None,
@@ -695,7 +695,7 @@ class WeaveDict(Traceable, dict):  # noqa: PLW1641
     def __init__(
         self,
         *args: Any,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         ref: RefWithExtra | None = None,
         root: Traceable | None = None,
         parent: Traceable | None = None,
@@ -779,7 +779,7 @@ class WeaveDict(Traceable, dict):  # noqa: PLW1641
 def make_trace_obj(
     val: Any,
     new_ref: RefWithExtra | None,  # Can this actually be None?
-    server: TraceServerInterface,
+    server: TraceServerClientInterface,
     root: Traceable | None,
     parent: Any = None,
 ) -> Any:

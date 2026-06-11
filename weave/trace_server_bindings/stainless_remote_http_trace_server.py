@@ -1,9 +1,9 @@
 """Remote trace server binding backed by the generated ``weave-server-sdk``.
 
-This is a drop-in replacement for ``RemoteHTTPTraceServer``. It speaks the same
-tsi-typed ``TraceServerClientInterface`` surface, but delegates HTTP transport
-and request/response typing to the ``weave_server_sdk`` package (generated from
-the trace server's OpenAPI spec — the source of truth for the API shape).
+The binding speaks ``weave_server_sdk.models`` end to end — requests and
+responses are the SDK's generated types (the OpenAPI spec is the source of
+truth), plus a few gap models from ``weave.trace_server_bindings.models`` for
+surface the published SDK does not yet express.
 
 Design notes:
 
@@ -12,24 +12,27 @@ Design notes:
   ``http_timeout()`` honored) is injected into the SDK so every request —
   SDK-routed or raw — shares one connection pool, auth, and event hooks.
 - A response event hook routes every non-2xx response through
-  ``handle_response_error`` *before* the SDK sees it, so callers observe the
-  exact same ``httpx.HTTPStatusError`` / ``CallsCompleteModeRequired``
-  semantics as ``RemoteHTTPTraceServer`` (retry predicates, 413 batch
-  splitting, and calls_complete auto-upgrade all key off these).
+  ``handle_response_error`` *before* the SDK sees it, so callers observe
+  ``httpx.HTTPStatusError`` / ``CallsCompleteModeRequired`` (retry predicates,
+  413 batch splitting, and calls_complete auto-upgrade all key off these).
 - A request event hook injects the dynamic ``X-Weave-Retry-Id`` header at send
   time so every retry attempt carries the current retry id.
 - Endpoints the SDK cannot reach go through ``_raw_request``/``_raw_stream``
   with an explicit reason. Two categories:
   1. Endpoints excluded from the OpenAPI spec (``include_in_schema=False`` on
-     the server): calls_complete v2, eager v2 call start/end, completions,
-     project stats, TTL settings.
+     the server): calls_complete v2, eager v2 call start/end, completions.
   2. weave-server-sdk 0.0.1 codegen bugs (duplicate method names where the
      last definition wins, lost multipart body): single feedback create, obj
      tag add/remove, /trace/usage, file create. Remove these hatches when a
      fixed SDK ships.
-- Streaming endpoints (``*_stream`` and the v2 jsonl list endpoints) use
-  ``_raw_stream`` because the published SDK buffers jsonl responses into
-  memory; the raw path preserves line-by-line streaming.
+- Streaming endpoints (``*_stream``) use ``_raw_stream`` because the published
+  SDK buffers jsonl responses into memory; the raw path preserves line-by-line
+  streaming.
+- APIs with no in-client callers are not wrapped here. In particular the v2
+  object APIs (ops/datasets/scorers/evaluations/models/evaluation runs/
+  predictions/scores) are reachable directly through the generated SDK client
+  (``server._sdk.v2_ops`` etc.) — the generated binding IS the supported
+  surface for them.
 """
 
 from __future__ import annotations
@@ -37,13 +40,12 @@ from __future__ import annotations
 import datetime
 import io
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 import httpx
-from pydantic import BaseModel, Field, validate_call
-from pydantic.json_schema import SkipJsonSchema
+from pydantic import BaseModel, validate_call
 from typing_extensions import Self
 from weave_server_sdk import WeaveTrace
 from weave_server_sdk import models as sdk_models
@@ -56,8 +58,6 @@ from weave.trace.settings import (
     should_enable_disk_fallback,
     should_use_calls_complete,
 )
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -70,11 +70,31 @@ from weave.trace_server_bindings.http_utils import (
     process_batch_with_retry,
 )
 from weave.trace_server_bindings.models import (
+    AliasesListReq,
+    AnnotationQueueAddCallsReq,
+    AnnotationQueueDeleteReq,
+    AnnotationQueueItemsQueryReq,
+    AnnotationQueueReadReq,
+    AnnotationQueueUpdateReq,
     Batch,
+    CallEndV2Req,
+    CallsCompleteReq,
+    CallsQueryRes,
+    CallStartV2Req,
     CompleteBatchItem,
+    CompletionsCreateReq,
+    CompletionsCreateRes,
     EndBatchItem,
+    EnsureProjectExistsRes,
     EntityProjectInfo,
+    FileContentReadRes,
+    FileCreateReq,
+    ObjAddTagsReq,
+    ObjRemoveAliasesReq,
+    ObjRemoveTagsReq,
+    ObjSetAliasesReq,
     StartBatchItem,
+    TagsListReq,
 )
 from weave.utils.http_requests import CLIENT_LIMITS, log_request, log_response
 from weave.utils.project_id import from_project_id
@@ -91,10 +111,6 @@ CALLS_COMPLETE_PATH = "/v2/{entity}/{project}/calls/complete"
 CALL_START_V2_PATH = "/v2/{entity}/{project}/call/start"
 CALL_END_V2_PATH = "/v2/{entity}/{project}/call/end"
 COMPLETIONS_CREATE_PATH = "/completions/create"
-PROJECT_STATS_PATH = "/project/stats"
-PROJECT_TTL_SETTINGS_READ_PATH = "/project/ttl_settings/read"
-PROJECT_TTL_SETTINGS_UPDATE_PATH = "/project/ttl_settings/update"
-FEEDBACK_AGGREGATE_PATH = "/feedback/aggregate"
 
 # Endpoints reached via _raw_request because weave-server-sdk 0.0.1 cannot call
 # them (duplicate generated method names where the last definition wins, or a
@@ -110,13 +126,12 @@ FILE_CONTENT_PATH = "/files/content"
 # Streaming endpoints; the published SDK buffers jsonl bodies, so these are
 # reached via _raw_stream to preserve line-by-line streaming.
 CALLS_STREAM_QUERY_PATH = "/calls/stream_query"
-THREADS_STREAM_QUERY_PATH = "/threads/stream_query"
 ANNOTATION_QUEUES_QUERY_PATH = "/annotation_queues/query"
 CALL_UPSERT_BATCH_PATH = "/call/upsert_batch"
 
 
 class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
-    """SDK-backed drop-in replacement for ``RemoteHTTPTraceServer``."""
+    """The weave-server-sdk-backed remote trace server binding."""
 
     trace_server_url: str
 
@@ -194,13 +209,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             request.headers["X-Weave-Retry-Id"] = retry_id
 
     def _raise_for_status(self, response: httpx.Response) -> None:
-        """Surface error responses with RemoteHTTPTraceServer's exception
-        semantics (httpx response hook).
+        """Surface error responses as httpx errors (httpx response hook).
 
         Raising here means the SDK's own exception types never surface: retry
         predicates, 413 batch splitting, and client code keep seeing
-        ``httpx.HTTPStatusError`` / ``CallsCompleteModeRequired`` exactly as
-        before.
+        ``httpx.HTTPStatusError`` / ``CallsCompleteModeRequired``.
         """
         if response.status_code >= 400:
             # Event hooks fire before the body is read; load it so
@@ -210,10 +223,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def ensure_project_exists(
         self, entity: str, project: str
-    ) -> tsi.EnsureProjectExistsRes:
+    ) -> EnsureProjectExistsRes:
         # TODO: This should happen in the wandb backend, not here, and it's slow
         # (hundreds of ms)
-        return tsi.EnsureProjectExistsRes.model_validate(
+        return EnsureProjectExistsRes.model_validate(
             project_creator.ensure_project_exists(entity, project)
         )
 
@@ -226,39 +239,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._http.auth = auth
 
     # ---- request helpers ----------------------------------------------------
-
-    @with_retry
-    def _via_sdk(
-        self,
-        req: BaseModel,
-        sdk_req_type: type[BaseModel],
-        sdk_method: Callable[..., Any],
-        res_type: type[TRes],
-        **path_args: Any,
-    ) -> TRes:
-        """Round-trip a tsi request through the typed SDK binding.
-
-        ``by_alias`` is required since query models have Mongo-style properties
-        aliased to start with ``$``.
-        """
-        body = sdk_req_type.model_validate(req.model_dump(by_alias=True))
-        sdk_res = sdk_method(body, **path_args)
-        if sdk_res is None:
-            return res_type()
-        return res_type.model_validate(sdk_res.model_dump(by_alias=True))
-
-    @with_retry
-    def _via_sdk_no_body(
-        self,
-        sdk_method: Callable[..., Any],
-        res_type: type[TRes],
-        **call_args: Any,
-    ) -> TRes:
-        """Call an SDK binding that takes only path/query arguments."""
-        sdk_res = sdk_method(**call_args)
-        if sdk_res is None:
-            return res_type()
-        return res_type.model_validate(sdk_res.model_dump(by_alias=True))
 
     @with_retry
     def _raw_request(
@@ -318,8 +298,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     ) -> httpx.Response:
         """Open a streaming response; retries cover connection/headers only.
 
-        Mid-stream failures are not retried, matching RemoteHTTPTraceServer.
-        The caller owns the returned response and must close() it.
+        Mid-stream failures are not retried. The caller owns the returned
+        response and must close() it.
         """
         request = self._http.build_request(
             method,
@@ -331,6 +311,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             params=params,
         )
         return self._http.send(request, stream=True)
+
+    @with_retry
+    def _call_sdk(self, sdk_method: Any, *args: Any, **kwargs: Any) -> Any:
+        """Invoke a typed SDK binding with the standard retry policy."""
+        return sdk_method(*args, **kwargs)
 
     # ---- batching -----------------------------------------------------------
 
@@ -463,10 +448,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 log_dropped_call_batch([item], e)
 
     @with_retry
-    def _send_call_start_v2(self, start: tsi.StartedCallSchemaForInsert) -> None:
+    def _send_call_start_v2(self, start: sdk_models.StartedCallSchemaForInsert) -> None:
         """Send a single call start to the v2 endpoint."""
         entity, project = from_project_id(start.project_id)
-        req = tsi.CallStartV2Req(start=start)
+        req = CallStartV2Req(start=start)
         self._http.post(
             CALL_START_V2_PATH.format(entity=entity, project=project),
             content=req.model_dump_json().encode("utf-8"),
@@ -474,10 +459,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @with_retry
-    def _send_call_end_v2(self, end: tsi.EndedCallSchemaForInsertWithStartedAt) -> None:
+    def _send_call_end_v2(self, end: sdk_models.EndedCallSchemaForInsert) -> None:
         """Send a single call end to the v2 endpoint."""
         entity, project = from_project_id(end.project_id)
-        req = tsi.CallEndV2Req(end=end)
+        req = CallEndV2Req(end=end)
         self._http.post(
             CALL_END_V2_PATH.format(entity=entity, project=project),
             content=req.model_dump_json().encode("utf-8"),
@@ -535,7 +520,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         def encode_batch(batch: list[CompleteBatchItem]) -> bytes:
             api_batch = [item.req for item in batch]
-            req = tsi.CallsUpsertCompleteReq(batch=api_batch)
+            req = CallsCompleteReq(batch=api_batch)
             return req.model_dump_json().encode("utf-8")
 
         process_batch_with_retry(
@@ -553,7 +538,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def get_call_processor(self) -> AsyncBatchProcessor | CallBatchProcessor | None:
-        """Custom method not defined on the formal TraceServerInterface to expose
+        """Custom method not defined on the formal client interface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
         return self.call_processor
@@ -573,7 +558,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _flush_feedback(
         self,
-        batch: list[tsi.FeedbackCreateReq],
+        batch: list[sdk_models.FeedbackCreateReq],
     ) -> None:
         """Process a batch of feedback, splitting if necessary and sending to the server.
 
@@ -585,11 +570,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: tsi.FeedbackCreateReq) -> str:
+        def get_item_id(item: sdk_models.FeedbackCreateReq) -> str:
             return f"{item.id}"
 
-        def encode_batch(batch: list[tsi.FeedbackCreateReq]) -> bytes:
-            batch_req = tsi.FeedbackCreateBatchReq(batch=batch)
+        def encode_batch(batch: list[sdk_models.FeedbackCreateReq]) -> bytes:
+            batch_req = sdk_models.FeedbackCreateBatchReq(batch=batch)
             data = batch_req.model_dump_json()
             return data.encode("utf-8")
 
@@ -606,22 +591,18 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                         e,
                     )
 
-                    # Feedback endpoint doesn't support id, created_at, so we need to strip them
-                    class FeedbackCreateReqStripped(tsi.FeedbackCreateReq):
-                        id: SkipJsonSchema[str] = Field(exclude=True)
-                        created_at: SkipJsonSchema[datetime.datetime | None] = Field(
-                            exclude=True, default=None
-                        )
-
-                    # Fall back to individual feedback creation calls
+                    # Fall back to individual feedback creation calls. The
+                    # single-create endpoint doesn't accept an id, so strip it.
                     for item in batch:
-                        item_copy = FeedbackCreateReqStripped(**item.model_dump())
+                        item_copy = sdk_models.FeedbackCreateReq.model_validate(
+                            item.model_dump(exclude={"id"}, exclude_none=True)
+                        )
                         try:
                             self._raw_request(
                                 "POST",
                                 FEEDBACK_CREATE_PATH,
                                 req=item_copy,
-                                res_type=tsi.FeedbackCreateRes,
+                                res_type=sdk_models.FeedbackCreateRes,
                             )
                         except Exception as individual_error:
                             logger.warning(
@@ -645,7 +626,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def get_feedback_processor(self) -> AsyncBatchProcessor | None:
-        """Custom method not defined on the formal TraceServerInterface to expose
+        """Custom method not defined on the formal client interface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
         """
         return self.feedback_processor
@@ -653,25 +634,24 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     # ---- service ------------------------------------------------------------
 
     @with_retry
-    def server_info(self) -> ServerInfoRes:
-        res = self._sdk.services.server_info()
-        return ServerInfoRes.model_validate(res.model_dump())
+    def server_info(self) -> sdk_models.ServerInfoRes:
+        return self._sdk.services.server_info()
 
     @validate_call
     @with_retry
-    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
-        body = sdk_models.ProjectsInfoReq.model_validate(req.model_dump())
-        res = self._sdk.service.create_projects_info(body)
-        return [tsi.ProjectsInfoRes.model_validate(item.model_dump()) for item in res]
+    def projects_info(
+        self, req: sdk_models.ProjectsInfoReq
+    ) -> list[sdk_models.ProjectsInfoRes]:
+        return self._sdk.service.create_projects_info(req)
 
-    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+    def otel_export(self, req: Any) -> Any:
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
     # ---- Call API -------------------------------------------------------------
 
     @validate_call
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+    def call_start(self, req: sdk_models.CallStartReq) -> sdk_models.CallStartRes:
         if self.should_batch:
             assert self.call_processor is not None
 
@@ -680,111 +660,84 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                     "CallStartReq must have id and trace_id when batching."
                 )
             self.call_processor.enqueue_start(StartBatchItem(req=req))
-            return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
-        return self._via_sdk(
-            req, sdk_models.CallStartReq, self._sdk.calls.start, tsi.CallStartRes
-        )
+            return sdk_models.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
+        return self._call_sdk(self._sdk.calls.start, req)
 
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        return self._via_sdk(
-            req,
-            sdk_models.CallCreateBatchReq,
-            self._sdk.calls.upsert_batch,
-            tsi.CallCreateBatchRes,
-        )
+    def call_start_batch(
+        self, req: sdk_models.CallCreateBatchReq
+    ) -> sdk_models.CallCreateBatchRes:
+        return self._call_sdk(self._sdk.calls.upsert_batch, req)
 
     @validate_call
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    def call_end(self, req: sdk_models.CallEndReq) -> sdk_models.CallEndRes:
         if self.should_batch:
             assert self.call_processor is not None
 
             self.call_processor.enqueue([EndBatchItem(req=req)])
-            return tsi.CallEndRes()
-        return self._via_sdk(
-            req, sdk_models.CallEndReq, self._sdk.calls.end, tsi.CallEndRes
-        )
+            return sdk_models.CallEndRes()
+        return self._call_sdk(self._sdk.calls.end, req)
 
     @validate_call
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        return self._via_sdk(
-            req, sdk_models.CallReadReq, self._sdk.calls.read, tsi.CallReadRes
-        )
+    def call_read(self, req: sdk_models.CallReadReq) -> sdk_models.CallReadRes:
+        return self._call_sdk(self._sdk.calls.read, req)
 
     @validate_call
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+    def calls_query(self, req: sdk_models.CallsQueryReq) -> CallsQueryRes:
         # This previously called the deprecated /calls/query endpoint.
-        return tsi.CallsQueryRes(calls=list(self.calls_query_stream(req)))
+        return CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
     @validate_call
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(
+        self, req: sdk_models.CallsQueryReq
+    ) -> Iterator[sdk_models.CallSchema]:
         return self._raw_stream(
-            "POST", CALLS_STREAM_QUERY_PATH, req=req, res_type=tsi.CallSchema
+            "POST", CALLS_STREAM_QUERY_PATH, req=req, res_type=sdk_models.CallSchema
         )
 
     @validate_call
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        return self._via_sdk(
-            req,
-            sdk_models.CallsQueryStatsReq,
-            self._sdk.calls.query_stats,
-            tsi.CallsQueryStatsRes,
-        )
+    def calls_query_stats(
+        self, req: sdk_models.CallsQueryStatsReq
+    ) -> sdk_models.CallsQueryStatsRes:
+        return self._call_sdk(self._sdk.calls.query_stats, req)
 
     @validate_call
-    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+    def trace_usage(self, req: sdk_models.TraceUsageReq) -> sdk_models.TraceUsageRes:
         # SDK 0.0.1: calls.create_usage for /trace/usage is shadowed by the
         # /calls/usage overload of the same generated name.
         return self._raw_request(
-            "POST", TRACE_USAGE_PATH, req=req, res_type=tsi.TraceUsageRes
+            "POST", TRACE_USAGE_PATH, req=req, res_type=sdk_models.TraceUsageRes
         )
 
     @validate_call
-    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
-        return self._via_sdk(
-            req,
-            sdk_models.CallsUsageReq,
-            self._sdk.calls.create_usage,
-            tsi.CallsUsageRes,
-        )
+    def calls_usage(self, req: sdk_models.CallsUsageReq) -> sdk_models.CallsUsageRes:
+        return self._call_sdk(self._sdk.calls.create_usage, req)
 
     @validate_call
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        return self._via_sdk(
-            req, sdk_models.CallsDeleteReq, self._sdk.calls.delete, tsi.CallsDeleteRes
-        )
+    def calls_delete(self, req: sdk_models.CallsDeleteReq) -> sdk_models.CallsDeleteRes:
+        return self._call_sdk(self._sdk.calls.delete, req)
 
     @validate_call
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        return self._via_sdk(
-            req, sdk_models.CallUpdateReq, self._sdk.calls.update, tsi.CallUpdateRes
-        )
+    def call_update(self, req: sdk_models.CallUpdateReq) -> sdk_models.CallUpdateRes:
+        return self._call_sdk(self._sdk.calls.update, req)
 
     # ---- Obj API --------------------------------------------------------------
 
     @validate_call
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        return self._via_sdk(
-            req, sdk_models.ObjCreateReq, self._sdk.objects.create, tsi.ObjCreateRes
-        )
+    def obj_create(self, req: sdk_models.ObjCreateReq) -> sdk_models.ObjCreateRes:
+        return self._call_sdk(self._sdk.objects.create, req)
 
     @validate_call
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        return self._via_sdk(
-            req, sdk_models.ObjReadReq, self._sdk.objects.read, tsi.ObjReadRes
-        )
+    def obj_read(self, req: sdk_models.ObjReadReq) -> sdk_models.ObjReadRes:
+        return self._call_sdk(self._sdk.objects.read, req)
 
     @validate_call
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        return self._via_sdk(
-            req, sdk_models.ObjQueryReq, self._sdk.objects.query, tsi.ObjQueryRes
-        )
+    def objs_query(self, req: sdk_models.ObjQueryReq) -> sdk_models.ObjQueryRes:
+        return self._call_sdk(self._sdk.objects.query, req)
 
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        return self._via_sdk(
-            req, sdk_models.ObjDeleteReq, self._sdk.objects.delete, tsi.ObjDeleteRes
-        )
+    def obj_delete(self, req: sdk_models.ObjDeleteReq) -> sdk_models.ObjDeleteRes:
+        return self._call_sdk(self._sdk.objects.delete, req)
 
-    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+    def obj_add_tags(self, req: ObjAddTagsReq) -> sdk_models.ObjAddTagsRes:
         # SDK 0.0.1: objects.tags for add-tags is shadowed by the /tags list
         # overload of the same generated name.
         body = sdk_models.ObjTagsBody(project_id=req.project_id, tags=req.tags)
@@ -792,10 +745,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             "PUT",
             OBJ_ADD_TAGS_PATH.format(object_id=req.object_id, digest=req.digest),
             req=body,
-            res_type=tsi.ObjAddTagsRes,
+            res_type=sdk_models.ObjAddTagsRes,
         )
 
-    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+    def obj_remove_tags(self, req: ObjRemoveTagsReq) -> sdk_models.ObjRemoveTagsRes:
         # SDK 0.0.1: objects.create_remove for remove-tags is shadowed by the
         # remove-aliases overload of the same generated name.
         body = sdk_models.ObjTagsBody(project_id=req.project_id, tags=req.tags)
@@ -803,56 +756,41 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             "POST",
             OBJ_REMOVE_TAGS_PATH.format(object_id=req.object_id, digest=req.digest),
             req=body,
-            res_type=tsi.ObjRemoveTagsRes,
+            res_type=sdk_models.ObjRemoveTagsRes,
         )
 
-    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+    def obj_set_aliases(self, req: ObjSetAliasesReq) -> sdk_models.ObjSetAliasesRes:
         body = sdk_models.ObjSetAliasesBody(
             project_id=req.project_id, digest=req.digest, aliases=req.aliases
         )
-        res = self._via_sdk_no_body(
-            self._sdk.objects.update_aliases,
-            tsi.ObjSetAliasesRes,
-            body=body,
-            object_id=req.object_id,
+        return self._call_sdk(
+            self._sdk.objects.update_aliases, body, object_id=req.object_id
         )
-        return res
 
     def obj_remove_aliases(
-        self, req: tsi.ObjRemoveAliasesReq
-    ) -> tsi.ObjRemoveAliasesRes:
+        self, req: ObjRemoveAliasesReq
+    ) -> sdk_models.ObjRemoveAliasesRes:
         body = sdk_models.ObjRemoveAliasesBody(
             project_id=req.project_id, aliases=req.aliases
         )
-        return self._via_sdk_no_body(
-            self._sdk.objects.create_remove,
-            tsi.ObjRemoveAliasesRes,
-            body=body,
-            object_id=req.object_id,
+        return self._call_sdk(
+            self._sdk.objects.create_remove, body, object_id=req.object_id
         )
 
-    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
-        return self._via_sdk_no_body(
-            self._sdk.objects.tags, tsi.TagsListRes, project_id=req.project_id
-        )
+    def tags_list(self, req: TagsListReq) -> sdk_models.TagsListRes:
+        return self._call_sdk(self._sdk.objects.tags, project_id=req.project_id)
 
-    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
-        return self._via_sdk_no_body(
-            self._sdk.objects.list_aliases,
-            tsi.AliasesListRes,
-            project_id=req.project_id,
-        )
+    def aliases_list(self, req: AliasesListReq) -> sdk_models.AliasesListRes:
+        return self._call_sdk(self._sdk.objects.list_aliases, project_id=req.project_id)
 
     # ---- Table API ------------------------------------------------------------
 
     @validate_call
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        return self._via_sdk(
-            req, sdk_models.TableCreateReq, self._sdk.tables.create, tsi.TableCreateRes
-        )
+    def table_create(self, req: sdk_models.TableCreateReq) -> sdk_models.TableCreateRes:
+        return self._call_sdk(self._sdk.tables.create, req)
 
     @validate_call
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+    def table_update(self, req: sdk_models.TableUpdateReq) -> sdk_models.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
         due to the property that table updates can be decomposed into a series of
         updates.
@@ -860,13 +798,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit and len(req.updates) > 1:
             split_ndx = len(req.updates) // 2
-            first_half_req = tsi.TableUpdateReq(
+            first_half_req = sdk_models.TableUpdateReq(
                 project_id=req.project_id,
                 base_digest=req.base_digest,
                 updates=req.updates[:split_ndx],
             )
             first_half_res = self.table_update(first_half_req)
-            second_half_req = tsi.TableUpdateReq(
+            second_half_req = sdk_models.TableUpdateReq(
                 project_id=req.project_id,
                 base_digest=first_half_res.digest,
                 updates=req.updates[split_ndx:],
@@ -875,91 +813,62 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             all_digests = (
                 first_half_res.updated_row_digests + second_half_res.updated_row_digests
             )
-            return tsi.TableUpdateRes(
+            return sdk_models.TableUpdateRes(
                 digest=second_half_res.digest, updated_row_digests=all_digests
             )
         else:
-            return self._via_sdk(
-                req,
-                sdk_models.TableUpdateReq,
-                self._sdk.tables.update,
-                tsi.TableUpdateRes,
-            )
+            return self._call_sdk(self._sdk.tables.update, req)
 
     @validate_call
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        return self._via_sdk(
-            req, sdk_models.TableQueryReq, self._sdk.tables.query, tsi.TableQueryRes
-        )
+    def table_query(self, req: sdk_models.TableQueryReq) -> sdk_models.TableQueryRes:
+        return self._call_sdk(self._sdk.tables.query, req)
 
     @validate_call
     def table_query_stream(
-        self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
+        self, req: sdk_models.TableQueryReq
+    ) -> Iterator[sdk_models.TableRowSchema]:
         # Need to manually iterate over this until the stream endpoint is built and shipped.
         res = self.table_query(req)
         yield from res.rows
 
     @validate_call
-    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
-        return self._via_sdk(
-            req,
-            sdk_models.TableQueryStatsReq,
-            self._sdk.tables.query_stats,
-            tsi.TableQueryStatsRes,
-        )
+    def table_query_stats(
+        self, req: sdk_models.TableQueryStatsReq
+    ) -> sdk_models.TableQueryStatsRes:
+        return self._call_sdk(self._sdk.tables.query_stats, req)
 
     @validate_call
     def table_create_from_digests(
-        self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateFromDigestsRes:
+        self, req: sdk_models.TableCreateFromDigestsReq
+    ) -> sdk_models.TableCreateFromDigestsRes:
         """Create a table by specifying row digests instead of actual rows."""
-        return self._via_sdk(
-            req,
-            sdk_models.TableCreateFromDigestsReq,
-            self._sdk.tables.create_create_from_digests,
-            tsi.TableCreateFromDigestsRes,
-        )
+        return self._call_sdk(self._sdk.tables.create_create_from_digests, req)
 
     def unretried_table_create_from_digests(
-        self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateFromDigestsRes:
+        self, req: sdk_models.TableCreateFromDigestsReq
+    ) -> sdk_models.TableCreateFromDigestsRes:
         """Single-attempt variant used by the client's endpoint-availability
         probe: a missing endpoint (404) must fail fast, and a flaky probe must
         not stall table saves behind retries.
         """
-        return self._via_sdk.__wrapped__(  # type: ignore[attr-defined]
-            self,
-            req,
-            sdk_models.TableCreateFromDigestsReq,
-            self._sdk.tables.create_create_from_digests,
-            tsi.TableCreateFromDigestsRes,
-        )
+        return self._sdk.tables.create_create_from_digests(req)
 
     @validate_call
     def table_query_stats_batch(
-        self, req: tsi.TableQueryStatsReq
-    ) -> tsi.TableQueryStatsRes:
-        return self._via_sdk(
-            req,
-            sdk_models.TableQueryStatsBatchReq,
-            self._sdk.tables.create_query_stats_batch,
-            tsi.TableQueryStatsBatchRes,
-        )
+        self, req: sdk_models.TableQueryStatsBatchReq
+    ) -> sdk_models.TableQueryStatsBatchRes:
+        return self._call_sdk(self._sdk.tables.create_query_stats_batch, req)
 
     @validate_call
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        return self._via_sdk(
-            req,
-            sdk_models.RefsReadBatchReq,
-            self._sdk.refs.read_batch,
-            tsi.RefsReadBatchRes,
-        )
+    def refs_read_batch(
+        self, req: sdk_models.RefsReadBatchReq
+    ) -> sdk_models.RefsReadBatchRes:
+        return self._call_sdk(self._sdk.refs.read_batch, req)
 
     # ---- File API -------------------------------------------------------------
 
     @with_retry
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    def file_create(self, req: FileCreateReq) -> sdk_models.FileCreateRes:
         # SDK 0.0.1: files.create lost its multipart body in generation; post
         # the multipart form directly.
         data: dict[str, str] = {"project_id": req.project_id}
@@ -970,10 +879,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             data=data,
             files={"file": (req.name, req.content)},
         )
-        return tsi.FileCreateRes.model_validate(r.json())
+        return sdk_models.FileCreateRes.model_validate(r.json())
 
     @with_retry
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+    def file_content_read(
+        self, req: sdk_models.FileContentReadReq
+    ) -> FileContentReadRes:
         # Raw to keep the response streamed to a buffer rather than the SDK's
         # whole-body bytes return.
         r = self._open_stream("POST", FILE_CONTENT_PATH, req=req)
@@ -984,20 +895,17 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 bytes_buffer.write(chunk)
         finally:
             r.close()
-        return tsi.FileContentReadRes(content=bytes_buffer.getvalue())
+        return FileContentReadRes(content=bytes_buffer.getvalue())
 
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
-        return self._via_sdk(
-            req,
-            sdk_models.FilesStatsReq,
-            self._sdk.files.query_stats,
-            tsi.FilesStatsRes,
-        )
+    def files_stats(self, req: sdk_models.FilesStatsReq) -> sdk_models.FilesStatsRes:
+        return self._call_sdk(self._sdk.files.query_stats, req)
 
     # ---- Feedback API -----------------------------------------------------------
 
     @validate_call
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+    def feedback_create(
+        self, req: sdk_models.FeedbackCreateReq
+    ) -> sdk_models.FeedbackCreateRes:
         if self.should_batch:
             assert self.feedback_processor is not None
 
@@ -1005,7 +913,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req.id = feedback_id
 
             self.feedback_processor.enqueue([req])
-            return tsi.FeedbackCreateRes(
+            return sdk_models.FeedbackCreateRes(
                 id=feedback_id,
                 # technically incorrect, this can be off by a few seconds
                 created_at=datetime.datetime.now(ZoneInfo("UTC")),
@@ -1016,110 +924,73 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             # SDK 0.0.1: feedback.create for single create is shadowed by the
             # batch-create overload of the same generated name.
             return self._raw_request(
-                "POST", FEEDBACK_CREATE_PATH, req=req, res_type=tsi.FeedbackCreateRes
+                "POST",
+                FEEDBACK_CREATE_PATH,
+                req=req,
+                res_type=sdk_models.FeedbackCreateRes,
             )
 
     def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
+        self, req: sdk_models.FeedbackCreateBatchReq
+    ) -> sdk_models.FeedbackCreateBatchRes:
         # Note: the SDK method is named `create` for /feedback/batch/create
         # (duplicate-name shadowing in 0.0.1; the batch overload won).
-        return self._via_sdk(
-            req,
-            sdk_models.FeedbackCreateBatchReq,
-            self._sdk.feedback.create,
-            tsi.FeedbackCreateBatchRes,
-        )
+        return self._call_sdk(self._sdk.feedback.create, req)
 
     @validate_call
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        return self._via_sdk(
-            req,
-            sdk_models.FeedbackQueryReq,
-            self._sdk.feedback.query,
-            tsi.FeedbackQueryRes,
-        )
+    def feedback_query(
+        self, req: sdk_models.FeedbackQueryReq
+    ) -> sdk_models.FeedbackQueryRes:
+        return self._call_sdk(self._sdk.feedback.query, req)
 
     @validate_call
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        return self._via_sdk(
-            req,
-            sdk_models.FeedbackPurgeReq,
-            self._sdk.feedback.purge,
-            tsi.FeedbackPurgeRes,
-        )
+    def feedback_purge(
+        self, req: sdk_models.FeedbackPurgeReq
+    ) -> sdk_models.FeedbackPurgeRes:
+        return self._call_sdk(self._sdk.feedback.purge, req)
 
     @validate_call
-    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
-        return self._via_sdk(
-            req,
-            sdk_models.FeedbackReplaceReq,
-            self._sdk.feedback.replace,
-            tsi.FeedbackReplaceRes,
-        )
+    def feedback_replace(
+        self, req: sdk_models.FeedbackReplaceReq
+    ) -> sdk_models.FeedbackReplaceRes:
+        return self._call_sdk(self._sdk.feedback.replace, req)
 
     @validate_call
-    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
-        return self._via_sdk(
-            req,
-            sdk_models.FeedbackStatsReq,
-            self._sdk.feedback.create_stats,
-            tsi.FeedbackStatsRes,
-        )
-
-    @validate_call
-    def feedback_aggregate(
-        self, req: tsi.FeedbackAggregateReq
-    ) -> tsi.FeedbackAggregateRes:
-        """Query the feedback table for aggregate scores over time."""
-        # Not yet present in the published SDK.
-        return self._raw_request(
-            "POST", FEEDBACK_AGGREGATE_PATH, req=req, res_type=tsi.FeedbackAggregateRes
-        )
+    def feedback_stats(
+        self, req: sdk_models.FeedbackStatsReq
+    ) -> sdk_models.FeedbackStatsRes:
+        return self._call_sdk(self._sdk.feedback.create_stats, req)
 
     @validate_call
     def feedback_payload_schema(
-        self, req: tsi.FeedbackPayloadSchemaReq
-    ) -> tsi.FeedbackPayloadSchemaRes:
-        return self._via_sdk(
-            req,
-            sdk_models.FeedbackPayloadSchemaReq,
-            self._sdk.feedback.create_payload_schema,
-            tsi.FeedbackPayloadSchemaRes,
-        )
+        self, req: sdk_models.FeedbackPayloadSchemaReq
+    ) -> sdk_models.FeedbackPayloadSchemaRes:
+        return self._call_sdk(self._sdk.feedback.create_payload_schema, req)
 
     # ---- Cost API ---------------------------------------------------------------
 
     @validate_call
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        return self._via_sdk(
-            req, sdk_models.CostQueryReq, self._sdk.costs.query, tsi.CostQueryRes
-        )
+    def cost_query(self, req: sdk_models.CostQueryReq) -> sdk_models.CostQueryRes:
+        return self._call_sdk(self._sdk.costs.query, req)
 
     @validate_call
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        return self._via_sdk(
-            req, sdk_models.CostCreateReq, self._sdk.costs.create, tsi.CostCreateRes
-        )
+    def cost_create(self, req: sdk_models.CostCreateReq) -> sdk_models.CostCreateRes:
+        return self._call_sdk(self._sdk.costs.create, req)
 
     @validate_call
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        return self._via_sdk(
-            req, sdk_models.CostPurgeReq, self._sdk.costs.purge, tsi.CostPurgeRes
-        )
+    def cost_purge(self, req: sdk_models.CostPurgeReq) -> sdk_models.CostPurgeRes:
+        return self._call_sdk(self._sdk.costs.purge, req)
 
     # ---- Execution APIs ---------------------------------------------------------
 
-    def completions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
+    def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes:
         # Excluded from the OpenAPI spec (include_in_schema=False).
         return self._raw_request(
-            "POST", COMPLETIONS_CREATE_PATH, req=req, res_type=tsi.CompletionsCreateRes
+            "POST", COMPLETIONS_CREATE_PATH, req=req, res_type=CompletionsCreateRes
         )
 
     def completions_create_stream(
-        self, req: tsi.CompletionsCreateReq
+        self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
         # For remote servers, streaming is not implemented
         # Fall back to non-streaming completion
@@ -1127,661 +998,96 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
     def image_create(
-        self, req: tsi.ImageGenerationCreateReq
-    ) -> tsi.ImageGenerationCreateRes:
-        return self._via_sdk(
-            req,
-            sdk_models.ImageGenerationCreateReq,
-            self._sdk.images.create,
-            tsi.ImageGenerationCreateRes,
-        )
-
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        # Excluded from the OpenAPI spec (include_in_schema=False).
-        return self._raw_request(
-            "POST", PROJECT_STATS_PATH, req=req, res_type=tsi.ProjectStatsRes
-        )
-
-    def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReadReq
-    ) -> tsi.ProjectTTLSettingsReadRes:
-        # Excluded from the OpenAPI spec (include_in_schema=False).
-        return self._raw_request(
-            "POST",
-            PROJECT_TTL_SETTINGS_READ_PATH,
-            req=req,
-            res_type=tsi.ProjectTTLSettingsReadRes,
-        )
-
-    def project_ttl_settings_update(
-        self, req: tsi.ProjectTTLSettingsUpdateReq
-    ) -> tsi.ProjectTTLSettingsUpdateRes:
-        # Excluded from the OpenAPI spec (include_in_schema=False).
-        return self._raw_request(
-            "POST",
-            PROJECT_TTL_SETTINGS_UPDATE_PATH,
-            req=req,
-            res_type=tsi.ProjectTTLSettingsUpdateRes,
-        )
-
-    def threads_query_stream(
-        self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]:
-        return self._raw_stream(
-            "POST", THREADS_STREAM_QUERY_PATH, req=req, res_type=tsi.ThreadSchema
-        )
+        self, req: sdk_models.ImageGenerationCreateReq
+    ) -> sdk_models.ImageGenerationCreateRes:
+        return self._call_sdk(self._sdk.images.create, req)
 
     # ---- Annotation Queue API -----------------------------------------------------
 
     def annotation_queue_create(
-        self, req: tsi.AnnotationQueueCreateReq
-    ) -> tsi.AnnotationQueueCreateRes:
-        return self._via_sdk(
-            req,
-            sdk_models.AnnotationQueueCreateReq,
-            self._sdk.annotation_queues.create_annotation_queues,
-            tsi.AnnotationQueueCreateRes,
-        )
+        self, req: sdk_models.AnnotationQueueCreateReq
+    ) -> sdk_models.AnnotationQueueCreateRes:
+        return self._call_sdk(self._sdk.annotation_queues.create_annotation_queues, req)
 
     def annotation_queues_query_stream(
-        self, req: tsi.AnnotationQueuesQueryReq
-    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        self, req: sdk_models.AnnotationQueuesQueryReq
+    ) -> Iterator[sdk_models.AnnotationQueueSchema]:
         return self._raw_stream(
             "POST",
             ANNOTATION_QUEUES_QUERY_PATH,
             req=req,
-            res_type=tsi.AnnotationQueueSchema,
+            res_type=sdk_models.AnnotationQueueSchema,
         )
 
     def annotation_queue_read(
-        self, req: tsi.AnnotationQueueReadReq
-    ) -> tsi.AnnotationQueueReadRes:
-        return self._via_sdk_no_body(
+        self, req: AnnotationQueueReadReq
+    ) -> sdk_models.AnnotationQueueReadRes:
+        return self._call_sdk(
             self._sdk.annotation_queues.list_annotation_queues,
-            tsi.AnnotationQueueReadRes,
             queue_id=req.queue_id,
             project_id=req.project_id,
         )
 
     def annotation_queue_delete(
-        self, req: tsi.AnnotationQueueDeleteReq
-    ) -> tsi.AnnotationQueueDeleteRes:
-        return self._via_sdk_no_body(
+        self, req: AnnotationQueueDeleteReq
+    ) -> sdk_models.AnnotationQueueDeleteRes:
+        return self._call_sdk(
             self._sdk.annotation_queues.delete_annotation_queues,
-            tsi.AnnotationQueueDeleteRes,
             queue_id=req.queue_id,
             project_id=req.project_id,
         )
 
     def annotation_queue_update(
-        self, req: tsi.AnnotationQueueUpdateReq
-    ) -> tsi.AnnotationQueueUpdateRes:
+        self, req: AnnotationQueueUpdateReq
+    ) -> sdk_models.AnnotationQueueUpdateRes:
         # Body type excludes queue_id from the request body (it's in the URL path)
-        body = sdk_models.AnnotationQueueUpdateBody(
-            project_id=req.project_id,
-            name=req.name,
-            description=req.description,
-            scorer_refs=req.scorer_refs,
+        body = sdk_models.AnnotationQueueUpdateBody.model_validate(
+            req.model_dump(exclude={"queue_id"})
         )
-        return self._via_sdk_no_body(
+        return self._call_sdk(
             self._sdk.annotation_queues.update_annotation_queues,
-            tsi.AnnotationQueueUpdateRes,
-            body=body,
+            body,
             queue_id=req.queue_id,
         )
 
     def annotation_queue_add_calls(
-        self, req: tsi.AnnotationQueueAddCallsReq
-    ) -> tsi.AnnotationQueueAddCallsRes:
+        self, req: AnnotationQueueAddCallsReq
+    ) -> sdk_models.AnnotationQueueAddCallsRes:
         # Body type excludes queue_id from the request body (it's in the URL path)
-        body = sdk_models.AnnotationQueueAddCallsBody(
-            project_id=req.project_id,
-            call_ids=req.call_ids,
-            display_fields=req.display_fields,
+        body = sdk_models.AnnotationQueueAddCallsBody.model_validate(
+            req.model_dump(exclude={"queue_id"})
         )
-        return self._via_sdk_no_body(
-            self._sdk.annotation_queues.create_items,
-            tsi.AnnotationQueueAddCallsRes,
-            body=body,
-            queue_id=req.queue_id,
+        return self._call_sdk(
+            self._sdk.annotation_queues.create_items, body, queue_id=req.queue_id
         )
 
     def annotation_queue_items_query(
-        self, req: tsi.AnnotationQueueItemsQueryReq
-    ) -> tsi.AnnotationQueueItemsQueryRes:
+        self, req: AnnotationQueueItemsQueryReq
+    ) -> sdk_models.AnnotationQueueItemsQueryRes:
         # Body type excludes queue_id from the request body (it's in the URL path)
         body = sdk_models.AnnotationQueueItemsQueryBody.model_validate(
             req.model_dump(exclude={"queue_id"}, by_alias=True)
         )
-        return self._via_sdk_no_body(
-            self._sdk.annotation_queues.query,
-            tsi.AnnotationQueueItemsQueryRes,
-            body=body,
-            queue_id=req.queue_id,
+        return self._call_sdk(
+            self._sdk.annotation_queues.query, body, queue_id=req.queue_id
         )
 
     def annotation_queues_stats(
-        self, req: tsi.AnnotationQueuesStatsReq
-    ) -> tsi.AnnotationQueuesStatsRes:
-        return self._via_sdk(
-            req,
-            sdk_models.AnnotationQueuesStatsReq,
-            self._sdk.annotation_queues.create_stats,
-            tsi.AnnotationQueuesStatsRes,
-        )
-
-    def annotator_queue_items_progress_update(
-        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
-    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
-        # Body type excludes queue_id, item_id, and wb_user_id from the request
-        # body (queue_id and item_id are in the URL path, wb_user_id is set
-        # server-side from auth)
-        body = sdk_models.AnnotationQueueItemProgressUpdateBody(
-            project_id=req.project_id,
-            annotation_state=req.annotation_state,
-        )
-        return self._via_sdk_no_body(
-            self._sdk.annotation_queues.create_progress,
-            tsi.AnnotatorQueueItemsProgressUpdateRes,
-            body=body,
-            queue_id=req.queue_id,
-            item_id=req.item_id,
-        )
+        self, req: sdk_models.AnnotationQueuesStatsReq
+    ) -> sdk_models.AnnotationQueuesStatsRes:
+        return self._call_sdk(self._sdk.annotation_queues.create_stats, req)
 
     # ---- Server-side execution (not supported remotely) ----------------------------
 
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+    def evaluate_model(
+        self, req: sdk_models.EvaluateModelReq
+    ) -> sdk_models.EvaluateModelRes:
         raise NotImplementedError("evaluate_model is not implemented")
 
     def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
+        self, req: sdk_models.EvaluationStatusReq
+    ) -> sdk_models.EvaluationStatusRes:
         raise NotImplementedError("evaluation_status is not implemented")
 
-    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
-        raise NotImplementedError("rescore is not implemented")
-
-    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+    def calls_score(self, req: sdk_models.CallsScoreReq) -> sdk_models.CallsScoreRes:
         raise NotImplementedError("calls_score is not implemented")
-
-    # ---- V2 APIs --------------------------------------------------------------
-
-    def _v2_body_create(
-        self,
-        req: BaseModel,
-        body_type: type[BaseModel],
-        sdk_method: Callable[..., Any],
-        res_type: type[TRes],
-    ) -> TRes:
-        """Create via a v2 endpoint: project_id moves to the path; the rest is body."""
-        entity, project = from_project_id(req.project_id)  # type: ignore[attr-defined]
-        body = body_type.model_validate(req.model_dump(exclude={"project_id"}))
-        return self._via_sdk_no_body(
-            sdk_method, res_type, body=body, entity=entity, project=project
-        )
-
-    def _v2_list_stream(
-        self,
-        req: BaseModel,
-        res_type: type[TRes],
-        kind: str,
-        params: dict[str, Any],
-    ) -> Iterator[TRes]:
-        """Stream a v2 jsonl list endpoint (the SDK buffers jsonl responses)."""
-        entity, project = from_project_id(req.project_id)  # type: ignore[attr-defined]
-        url = f"/v2/{entity}/{project}/{kind}"
-        return self._raw_stream("GET", url, params=params, res_type=res_type)
-
-    @validate_call
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        return self._v2_body_create(
-            req, sdk_models.OpCreateBody, self._sdk.v2_ops.create, tsi.OpCreateRes
-        )
-
-    @validate_call
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_ops.read,
-            tsi.OpReadRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-
-    @validate_call
-    def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpReadRes]:
-        params: dict[str, Any] = {}
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        # `eager` is missing from the SDK's generated v2_ops.list signature.
-        if req.eager:
-            params["eager"] = "true"
-        return self._v2_list_stream(req, tsi.OpReadRes, "ops", params)
-
-    @validate_call
-    def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_ops.delete,
-            tsi.OpDeleteRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-
-    @validate_call
-    def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
-        return self._v2_body_create(
-            req,
-            sdk_models.DatasetCreateBody,
-            self._sdk.v2_datasets.create,
-            tsi.DatasetCreateRes,
-        )
-
-    @validate_call
-    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_datasets.read,
-            tsi.DatasetReadRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-
-    @validate_call
-    def dataset_list(self, req: tsi.DatasetListReq) -> Iterator[tsi.DatasetReadRes]:
-        params: dict[str, Any] = {}
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        return self._v2_list_stream(req, tsi.DatasetReadRes, "datasets", params)
-
-    @validate_call
-    def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_datasets.delete,
-            tsi.DatasetDeleteRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-
-    @validate_call
-    def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
-        return self._v2_body_create(
-            req,
-            sdk_models.ScorerCreateBody,
-            self._sdk.v2_scorers.create,
-            tsi.ScorerCreateRes,
-        )
-
-    @validate_call
-    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_scorers.read,
-            tsi.ScorerReadRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-
-    @validate_call
-    def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
-        params: dict[str, Any] = {}
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        return self._v2_list_stream(req, tsi.ScorerReadRes, "scorers", params)
-
-    @validate_call
-    def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_scorers.delete,
-            tsi.ScorerDeleteRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-
-    @validate_call
-    def evaluation_create(
-        self, req: tsi.EvaluationCreateReq
-    ) -> tsi.EvaluationCreateRes:
-        return self._v2_body_create(
-            req,
-            sdk_models.EvaluationCreateBody,
-            self._sdk.v2_evaluations.create,
-            tsi.EvaluationCreateRes,
-        )
-
-    @validate_call
-    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_evaluations.read,
-            tsi.EvaluationReadRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-
-    @validate_call
-    def evaluation_list(
-        self, req: tsi.EvaluationListReq
-    ) -> Iterator[tsi.EvaluationReadRes]:
-        params: dict[str, Any] = {}
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        return self._v2_list_stream(req, tsi.EvaluationReadRes, "evaluations", params)
-
-    @validate_call
-    def evaluation_delete(
-        self, req: tsi.EvaluationDeleteReq
-    ) -> tsi.EvaluationDeleteRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_evaluations.delete,
-            tsi.EvaluationDeleteRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-
-    # ---- Model V2 API -----------------------------------------------------------
-
-    @validate_call
-    def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
-        return self._v2_body_create(
-            req,
-            sdk_models.ModelCreateBody,
-            self._sdk.v2_models.create,
-            tsi.ModelCreateRes,
-        )
-
-    @validate_call
-    def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_models.read,
-            tsi.ModelReadRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-
-    @validate_call
-    def model_list(self, req: tsi.ModelListReq) -> Iterator[tsi.ModelReadRes]:
-        params: dict[str, Any] = {}
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        return self._v2_list_stream(req, tsi.ModelReadRes, "models", params)
-
-    @validate_call
-    def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_models.delete,
-            tsi.ModelDeleteRes,
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-
-    # ---- Evaluation Run V2 API ----------------------------------------------------
-
-    @validate_call
-    def evaluation_run_create(
-        self, req: tsi.EvaluationRunCreateReq
-    ) -> tsi.EvaluationRunCreateRes:
-        return self._v2_body_create(
-            req,
-            sdk_models.EvaluationRunCreateBody,
-            self._sdk.v2_evaluation_runs.create,
-            tsi.EvaluationRunCreateRes,
-        )
-
-    @validate_call
-    def evaluation_run_read(
-        self, req: tsi.EvaluationRunReadReq
-    ) -> tsi.EvaluationRunReadRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_evaluation_runs.read,
-            tsi.EvaluationRunReadRes,
-            entity=entity,
-            project=project,
-            evaluation_run_id=req.evaluation_run_id,
-        )
-
-    @validate_call
-    def evaluation_run_list(
-        self, req: tsi.EvaluationRunListReq
-    ) -> Iterator[tsi.EvaluationRunReadRes]:
-        # Raw: the SDK's generated list signature renames the filter params
-        # (evaluations vs evaluation_refs), so use the wire format directly.
-        params: dict[str, Any] = {}
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        if req.filter:
-            if req.filter.evaluations:
-                params["evaluation_refs"] = ",".join(req.filter.evaluations)
-            if req.filter.models:
-                params["model_refs"] = ",".join(req.filter.models)
-            if req.filter.evaluation_run_ids:
-                params["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
-        return self._v2_list_stream(
-            req, tsi.EvaluationRunReadRes, "evaluation_runs", params
-        )
-
-    @validate_call
-    def evaluation_run_delete(
-        self, req: tsi.EvaluationRunDeleteReq
-    ) -> tsi.EvaluationRunDeleteRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_evaluation_runs.delete,
-            tsi.EvaluationRunDeleteRes,
-            entity=entity,
-            project=project,
-            evaluation_run_ids=req.evaluation_run_ids,
-        )
-
-    @validate_call
-    def evaluation_run_finish(
-        self, req: tsi.EvaluationRunFinishReq
-    ) -> tsi.EvaluationRunFinishRes:
-        entity, project = from_project_id(req.project_id)
-        body = sdk_models.EvaluationRunFinishBody.model_validate(
-            req.model_dump(exclude={"project_id", "evaluation_run_id"})
-        )
-        return self._via_sdk_no_body(
-            self._sdk.v2_evaluation_runs.finish,
-            tsi.EvaluationRunFinishRes,
-            body=body,
-            entity=entity,
-            project=project,
-            evaluation_run_id=req.evaluation_run_id,
-        )
-
-    # ---- Prediction V2 API ----------------------------------------------------------
-
-    @validate_call
-    def prediction_create(
-        self, req: tsi.PredictionCreateReq
-    ) -> tsi.PredictionCreateRes:
-        return self._v2_body_create(
-            req,
-            sdk_models.PredictionCreateBody,
-            self._sdk.v2_predictions.create,
-            tsi.PredictionCreateRes,
-        )
-
-    @validate_call
-    def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_predictions.read,
-            tsi.PredictionReadRes,
-            entity=entity,
-            project=project,
-            prediction_id=req.prediction_id,
-        )
-
-    @validate_call
-    def prediction_list(
-        self, req: tsi.PredictionListReq
-    ) -> Iterator[tsi.PredictionReadRes]:
-        params: dict[str, Any] = {}
-        if req.evaluation_run_id is not None:
-            params["evaluation_run_id"] = req.evaluation_run_id
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        return self._v2_list_stream(req, tsi.PredictionReadRes, "predictions", params)
-
-    @validate_call
-    def prediction_delete(
-        self, req: tsi.PredictionDeleteReq
-    ) -> tsi.PredictionDeleteRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_predictions.delete,
-            tsi.PredictionDeleteRes,
-            entity=entity,
-            project=project,
-            prediction_ids=req.prediction_ids,
-        )
-
-    @validate_call
-    def prediction_finish(
-        self, req: tsi.PredictionFinishReq
-    ) -> tsi.PredictionFinishRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_predictions.finish,
-            tsi.PredictionFinishRes,
-            entity=entity,
-            project=project,
-            prediction_id=req.prediction_id,
-        )
-
-    # ---- Score V2 API ---------------------------------------------------------------
-
-    @validate_call
-    def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
-        return self._v2_body_create(
-            req,
-            sdk_models.ScoreCreateBody,
-            self._sdk.v2_scores.create,
-            tsi.ScoreCreateRes,
-        )
-
-    @validate_call
-    def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_scores.read,
-            tsi.ScoreReadRes,
-            entity=entity,
-            project=project,
-            score_id=req.score_id,
-        )
-
-    @validate_call
-    def score_list(self, req: tsi.ScoreListReq) -> Iterator[tsi.ScoreReadRes]:
-        params: dict[str, Any] = {}
-        if req.evaluation_run_id is not None:
-            params["evaluation_run_id"] = req.evaluation_run_id
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        return self._v2_list_stream(req, tsi.ScoreReadRes, "scores", params)
-
-    @validate_call
-    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
-        entity, project = from_project_id(req.project_id)
-        return self._via_sdk_no_body(
-            self._sdk.v2_scores.delete,
-            tsi.ScoreDeleteRes,
-            entity=entity,
-            project=project,
-            score_ids=req.score_ids,
-        )
-
-    # ---- Calls V2 API ---------------------------------------------------------------
-
-    def calls_complete(
-        self, req: tsi.CallsUpsertCompleteReq
-    ) -> tsi.CallsUpsertCompleteRes:
-        """Batch complete calls endpoint (v2).
-
-        This endpoint is used when use_calls_complete is enabled to send
-        complete calls (with both start and end information) in batches.
-        """
-        if not req.batch:
-            return tsi.CallsUpsertCompleteRes()
-
-        first_item = req.batch[0]
-        entity, project = from_project_id(first_item.project_id)
-        # Excluded from the OpenAPI spec (include_in_schema=False).
-        return self._raw_request(
-            "POST",
-            CALLS_COMPLETE_PATH.format(entity=entity, project=project),
-            req=req,
-            res_type=tsi.CallsUpsertCompleteRes,
-        )
-
-    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
-        """Single call start endpoint (v2).
-
-        This endpoint is used for eager ops that need their start visible immediately.
-        """
-        entity, project = from_project_id(req.start.project_id)
-        # Excluded from the OpenAPI spec (include_in_schema=False).
-        return self._raw_request(
-            "POST",
-            CALL_START_V2_PATH.format(entity=entity, project=project),
-            req=req,
-            res_type=tsi.CallStartV2Res,
-        )
-
-    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
-        """Single call end endpoint (v2).
-
-        This endpoint is used for eager ops that need their end sent separately.
-        """
-        entity, project = from_project_id(req.end.project_id)
-        # Excluded from the OpenAPI spec (include_in_schema=False).
-        return self._raw_request(
-            "POST",
-            CALL_END_V2_PATH.format(entity=entity, project=project),
-            req=req,
-            res_type=tsi.CallEndV2Res,
-        )

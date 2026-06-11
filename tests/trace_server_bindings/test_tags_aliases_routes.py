@@ -11,9 +11,10 @@ import json
 
 import httpx
 import pytest
+from weave_server_sdk import models as sdk_models
 
 from tests.trace_server_bindings.conftest import SpyTransport
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import models as bindings_models
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -42,7 +43,7 @@ def server(transport):
 class TestObjAddTags:
     def test_sends_correct_request(self, server, transport):
         server.obj_add_tags(
-            tsi.ObjAddTagsReq(
+            bindings_models.ObjAddTagsReq(
                 project_id="entity/project",
                 object_id="my-obj",
                 digest="abc123",
@@ -65,7 +66,7 @@ class TestObjAddTags:
 class TestObjRemoveTags:
     def test_sends_correct_request(self, server, transport):
         server.obj_remove_tags(
-            tsi.ObjRemoveTagsReq(
+            bindings_models.ObjRemoveTagsReq(
                 project_id="entity/project",
                 object_id="my-obj",
                 digest="abc123",
@@ -87,7 +88,7 @@ class TestObjRemoveTags:
 class TestObjSetAliases:
     def test_sends_correct_request(self, server, transport):
         server.obj_set_aliases(
-            tsi.ObjSetAliasesReq(
+            bindings_models.ObjSetAliasesReq(
                 project_id="entity/project",
                 object_id="my-obj",
                 digest="abc123",
@@ -109,7 +110,7 @@ class TestObjSetAliases:
 class TestObjRemoveAliases:
     def test_sends_correct_request(self, server, transport):
         server.obj_remove_aliases(
-            tsi.ObjRemoveAliasesReq(
+            bindings_models.ObjRemoveAliasesReq(
                 project_id="entity/project",
                 object_id="my-obj",
                 aliases=["staging"],
@@ -129,13 +130,15 @@ class TestObjRemoveAliases:
 class TestTagsList:
     def test_sends_get_with_project_id_param(self, server, transport):
         transport.queue.append(httpx.Response(200, json={"tags": ["prod", "staging"]}))
-        result = server.tags_list(tsi.TagsListReq(project_id="entity/project"))
+        result = server.tags_list(
+            bindings_models.TagsListReq(project_id="entity/project")
+        )
 
         request = transport.requests[0]
         assert request.method == "GET"
         assert request.url.path == "/tags"
         assert request.url.params["project_id"] == "entity/project"
-        assert isinstance(result, tsi.TagsListRes)
+        assert isinstance(result, sdk_models.TagsListRes)
         assert result.tags == ["prod", "staging"]
 
 
@@ -144,11 +147,13 @@ class TestAliasesList:
         transport.queue.append(
             httpx.Response(200, json={"aliases": ["deploy", "staging"]})
         )
-        result = server.aliases_list(tsi.AliasesListReq(project_id="entity/project"))
+        result = server.aliases_list(
+            bindings_models.AliasesListReq(project_id="entity/project")
+        )
 
         request = transport.requests[0]
         assert request.method == "GET"
         assert request.url.path == "/aliases"
         assert request.url.params["project_id"] == "entity/project"
-        assert isinstance(result, tsi.AliasesListRes)
+        assert isinstance(result, sdk_models.AliasesListRes)
         assert result.aliases == ["deploy", "staging"]

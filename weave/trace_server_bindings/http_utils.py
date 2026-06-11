@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import httpx
 import tenacity
 from typing_extensions import ParamSpec
+from weave_server_sdk import models as sdk_models
 
 from weave.shared.errors import NotFoundError, ObjectDeletedError
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils.retry import _is_retryable_exception, with_retry
 
@@ -67,7 +67,7 @@ def log_dropped_call_batch(
 
 
 def log_dropped_feedback_batch(
-    batch: list[tsi.FeedbackCreateReq], e: Exception
+    batch: list[sdk_models.FeedbackCreateReq], e: Exception
 ) -> None:
     """Log details about a dropped feedback batch for debugging purposes."""
     logger.error("Error sending batch of %s feedback events to server", len(batch))

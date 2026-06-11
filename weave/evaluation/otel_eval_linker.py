@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
+from weave_server_sdk import models as tsi
 
 from weave.evaluation.eval import (
     _attach_genai_span_ref_to_call_summary,
@@ -26,7 +27,6 @@ from weave.evaluation.eval import (
     _find_current_predict_and_score_call,
 )
 from weave.shared import constants
-from weave.trace_server import trace_server_interface as tsi
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context

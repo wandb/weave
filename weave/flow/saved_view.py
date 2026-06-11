@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypeAlias, TypedDict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from typing_extensions import Self
+from weave_server_sdk import models as tsi
+from weave_server_sdk import models as tsi_query
+from weave_server_sdk.models import SortBy
 
 from weave.shared.builtin_object_classes.saved_view import Column, Pin
 from weave.shared.builtin_object_classes.saved_view import (
@@ -14,6 +17,7 @@ from weave.trace import urls
 from weave.trace.api import publish as weave_publish
 from weave.trace.api import ref as weave_ref
 from weave.trace.call import CallsIter
+from weave.trace.casting import cast_to_query
 from weave.trace.context import weave_client_context
 from weave.trace.display import display
 from weave.trace.display.grid import Grid
@@ -21,9 +25,37 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.common_interface import SortBy
-from weave.trace_server.interface import query as tsi_query
+
+TRACE_STATUS_SUCCESS: tsi.TraceStatus = "success"
+TRACE_STATUS_ERROR: tsi.TraceStatus = "error"
+TRACE_STATUS_RUNNING: tsi.TraceStatus = "running"
+
+# The tsi query module exported an `Operand` union alias; the generated SDK
+# inlines the union instead, so spell it out here.
+OperandType: TypeAlias = (
+    tsi_query.LiteralOperation
+    | tsi_query.GetFieldOperator
+    | tsi_query.ConvertOperation
+    | tsi_query.AndOperation
+    | tsi_query.OrOperation
+    | tsi_query.NotOperation
+    | tsi_query.EqOperation
+    | tsi_query.GtOperation
+    | tsi_query.GteOperation
+    | tsi_query.InOperation
+    | tsi_query.ContainsOperation
+)
+
+# The generated query models type operand lists as list[Any], leaving leaf
+# operands as raw dicts after validation; parse them on access.
+_OPERAND_ADAPTER: TypeAdapter[Any] = TypeAdapter(OperandType)
+
+
+def _parse_operand(item: Any) -> Any:
+    if isinstance(item, dict):
+        return _OPERAND_ADAPTER.validate_python(item)
+    return item
+
 
 KNOWN_COLUMNS = [
     "id",
@@ -292,17 +324,17 @@ def filters_to_query(filters: Filters | None) -> tsi.Query | None:
 
 
 def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
-    first = operand.eq_[0]
-    second = operand.eq_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
+    first = _parse_operand(operand.eq[0])
+    second = _parse_operand(operand.eq[1])
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert.to in {
         "double",
         "int",
     }:
-        first = first.convert_.input
+        first = _parse_operand(first.convert.input)
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation
     ):
-        value = second.literal_
+        value = second.literal
         if isinstance(value, str):
             if value == "":
                 operator = "(any): isEmpty"
@@ -313,46 +345,46 @@ def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
             operator = "(number): ="
         else:
             raise QueryTranslationException(f"Could not parse {operand}")
-        field = first.get_field_
+        field = first.get_field
         return Filter(field=field, operator=operator, value=value)
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
 def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
-    input = operand.contains_.input
-    substr = operand.contains_.substr
-    case_insensitive = operand.contains_.case_insensitive
+    input = _parse_operand(operand.contains.input)
+    substr = _parse_operand(operand.contains.substr)
+    case_insensitive = operand.contains.case_insensitive
     # TODO: Handle case_insensitive correctly
     if isinstance(input, tsi_query.GetFieldOperator) and isinstance(
         substr, tsi_query.LiteralOperation
     ):
-        value = substr.literal_
+        value = substr.literal
         if isinstance(value, str):
             operator = "(string): contains"
         else:
             raise QueryTranslationException(f"Could not parse {operand}")
-        field = input.get_field_
+        field = input.get_field
         return Filter(field=field, operator=operator, value=value)
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
 def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
-    first = operand.gt_[0]
-    second = operand.gt_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
+    first = _parse_operand(operand.gt[0])
+    second = _parse_operand(operand.gt[1])
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert.to in {
         "double",
         "int",
     }:
-        first = first.convert_.input
+        first = _parse_operand(first.convert.input)
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation
     ):
-        value = second.literal_
+        value = second.literal
         if isinstance(value, (int, float)):
             operator = "(number): >"
         else:
             raise QueryTranslationException(f"Could not parse {operand}")
-        field = first.get_field_
+        field = first.get_field
         if field == "started_at":
             operator = "(date): after"
             value = datetime.fromtimestamp(value).isoformat()
@@ -361,27 +393,28 @@ def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
 
 
 def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
-    first = operand.gte_[0]
-    second = operand.gte_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
+    first = _parse_operand(operand.gte[0])
+    second = _parse_operand(operand.gte[1])
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert.to in {
         "double",
         "int",
     }:
-        first = first.convert_.input
+        first = _parse_operand(first.convert.input)
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation
     ):
-        value = second.literal_
+        value = second.literal
         if isinstance(value, (int, float)):
             operator = "(number): >="
         else:
             raise QueryTranslationException(f"Could not parse {operand}")
-        field = first.get_field_
+        field = first.get_field
         return Filter(field=field, operator=operator, value=value)
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
-def operand_to_filter(operand: tsi_query.Operand) -> Filter:
+def operand_to_filter(operand: OperandType) -> Filter:
+    operand = _parse_operand(operand)
     if isinstance(operand, tsi_query.EqOperation):
         return operand_to_filter_eq(operand)
     if isinstance(operand, tsi_query.ContainsOperation):
@@ -391,7 +424,7 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
     if isinstance(operand, tsi_query.GteOperation):
         return operand_to_filter_gte(operand)
     if isinstance(operand, tsi_query.NotOperation):
-        filter = operand_to_filter(operand.not_[0])
+        filter = operand_to_filter(_parse_operand(operand.not_[0]))
         if filter.operator == "(number): >=":
             filter.operator = "(number): <"
         elif filter.operator == "(number): >":
@@ -432,15 +465,17 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
     """Convert Saved View Query to Filters representation."""
     if query is None:
         return None
+    query = cast_to_query(query)
 
-    if isinstance(query.expr_, tsi_query.AndOperation):
-        operands = query.expr_.and_
+    expr = _parse_operand(query.expr)
+    if isinstance(expr, tsi_query.AndOperation):
+        operands = expr.and_
         if not operands:
             return None
         return [operand_to_filter(o) for o in operands]
 
     if isinstance(
-        query.expr_,
+        expr,
         (
             tsi_query.EqOperation,
             tsi_query.GtOperation,
@@ -449,7 +484,7 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
             tsi_query.ContainsOperation,
         ),
     ):
-        return [operand_to_filter(query.expr_)]
+        return [operand_to_filter(expr)]
 
     raise QueryTranslationException(f"Could not parse {query}")
 
@@ -475,11 +510,12 @@ def get_object_path(obj: WeaveObject, path: str | ObjectPath) -> Any:
 
 
 def render_status(value: Any) -> str:
-    if value == tsi.TraceStatus.SUCCESS:
+    # tsi.TraceStatus is a Literal type, so compare against its string values.
+    if value == TRACE_STATUS_SUCCESS:
         return "✅"
-    elif value == tsi.TraceStatus.ERROR:
+    elif value == TRACE_STATUS_ERROR:
         return "❌"
-    elif value == tsi.TraceStatus.RUNNING:
+    elif value == TRACE_STATUS_RUNNING:
         return "⏳"
     return value
 

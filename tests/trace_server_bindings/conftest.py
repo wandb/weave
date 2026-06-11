@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 import tenacity
+from weave_server_sdk import models as tsi
 
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.ids import generate_id
+from weave.shared.ids import generate_id
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )

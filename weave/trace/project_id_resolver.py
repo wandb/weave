@@ -14,10 +14,10 @@ from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any
 
 from httpx import HTTPStatusError as HTTPError
+from weave_server_sdk.models import ProjectsInfoReq
 
 from weave.shared.errors import DigestMismatchError
 from weave.trace.settings import should_enable_client_side_digests
-from weave.trace_server.trace_server_interface import ProjectsInfoReq
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.client_interface import TraceServerClientInterface

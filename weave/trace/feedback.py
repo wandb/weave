@@ -6,6 +6,9 @@ import json
 from collections.abc import Iterable, Iterator
 from typing import Any
 
+from weave_server_sdk import models as tsi
+from weave_server_sdk.models import Query
+
 from weave.trace import util
 from weave.trace.context import weave_client_context
 from weave.trace.display import display
@@ -13,18 +16,17 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.display.rich.refs import Refs
 from weave.trace.refs import ObjectRef, Ref
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.query import Query
+from weave.trace_server_bindings.models import Feedback
 from weave.utils.project_id import to_project_id
 
 
-class Feedbacks(AbstractRichContainer[tsi.Feedback]):
+class Feedbacks(AbstractRichContainer[Feedback]):
     """A collection of Feedback objects with utilities."""
 
     show_refs: bool
 
     def __init__(
-        self, show_refs: bool, feedbacks: Iterable[tsi.Feedback] | None = None
+        self, show_refs: bool, feedbacks: Iterable[Feedback] | None = None
     ) -> None:
         super().__init__("Feedback", feedbacks)
         self.show_refs = show_refs
@@ -43,7 +45,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
         table.add_column("ID", overflow="fold")
         table.add_column("Creator")
 
-    def _item_to_row(self, item: tsi.Feedback) -> list:
+    def _item_to_row(self, item: Feedback) -> list:
         feedback = item
 
         type_ = feedback.feedback_type
@@ -114,10 +116,10 @@ class FeedbackQuery:
 
         self.feedbacks = None
 
-    def __iter__(self) -> Iterator[tsi.Feedback]:
+    def __iter__(self) -> Iterator[Feedback]:
         yield from self.execute()
 
-    def __getitem__(self, index: int) -> tsi.Feedback:
+    def __getitem__(self, index: int) -> Feedback:
         return self.execute()[index]
 
     def __len__(self) -> int:
@@ -140,7 +142,7 @@ class FeedbackQuery:
         response = self.client.server.feedback_query(req)
         # Response is dicts because API allows user to specify fields, but we don't
         # expose that in this Python API.
-        return Feedbacks(self.show_refs, (tsi.Feedback(**r) for r in response.result))
+        return Feedbacks(self.show_refs, (Feedback(**r) for r in response.result))
 
     def execute(self) -> Feedbacks:
         if self.feedbacks is not None:

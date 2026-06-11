@@ -6,11 +6,12 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+from weave_server_sdk import models as tsi
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
+    CompletedCallSchemaForInsert,
     EndBatchItem,
     StartBatchItem,
 )
@@ -92,7 +93,7 @@ def _make_complete_item(
     """
     started_at = datetime.datetime.now(datetime.timezone.utc)
     ended_at = started_at + datetime.timedelta(seconds=1)
-    complete = tsi.CompletedCallSchemaForInsert(
+    complete = CompletedCallSchemaForInsert(
         project_id=project_id,
         id=call_id,
         trace_id=trace_id,

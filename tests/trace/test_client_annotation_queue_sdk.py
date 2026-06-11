@@ -3,12 +3,12 @@
 import datetime
 
 import pytest
+from weave_server_sdk.models import AnnotationQueueItemsFilter, SortBy
 
 from tests.trace.util import client_is_sqlite
+from weave.shared.errors import NotFoundError
 from weave.trace.call import Call
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.trace_server.errors import NotFoundError
 from weave.trace_server.trace_server_interface import (
     AnnotationQueueAddCallsRes,
     AnnotationQueueCreateRes,

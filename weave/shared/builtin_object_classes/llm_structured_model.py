@@ -8,7 +8,7 @@ from weave.prompt.prompt import format_message_with_template_vars
 from weave.shared.builtin_object_classes import base_object_def
 from weave.trace import vals
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server_bindings.models import (
     CompletionsCreateReq,
     CompletionsCreateRequestInputs,
 )

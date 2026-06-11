@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from weave_server_sdk import models as tsi
 
 import weave
 from weave.durability.wal_client_id import compute_client_id
@@ -32,7 +33,7 @@ from weave.durability.wal_sender import (
 from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace import weave_client
 from weave.trace.settings import UserSettings, override_settings
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.models import FileCreateReq
 
 
 def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
@@ -119,6 +120,7 @@ class TestWALClientWrites:
                     "val": {"model": "gpt-4", "temp": 0.7},
                     "builtin_object_class": None,
                     "expected_digest": None,
+                    "set_base_object_class": None,
                     "wb_user_id": None,
                 }
             },
@@ -398,6 +400,7 @@ class TestWALManagerLifecycle:
                     "val": {"hello": "world"},
                     "builtin_object_class": None,
                     "expected_digest": None,
+                    "set_base_object_class": None,
                     "wb_user_id": None,
                 }
             },
@@ -484,7 +487,7 @@ class TestTraceServerHandlers:
         # WAL today (model_dump(mode="json") rejects non-utf8 bytes at write
         # time, so non-utf8 content never appears in a replayed record).
         original_content = "small file body — including non-ascii: café 🎉".encode()
-        req = tsi.FileCreateReq(
+        req = FileCreateReq(
             project_id="e/p",
             name="note.txt",
             content=original_content,
@@ -495,7 +498,7 @@ class TestTraceServerHandlers:
 
         mock_server.file_create.assert_called_once()
         call_arg = mock_server.file_create.call_args[0][0]
-        assert isinstance(call_arg, tsi.FileCreateReq)
+        assert isinstance(call_arg, FileCreateReq)
         assert call_arg.content == original_content
 
     def test_call_start_roundtrips_through_handler(self):

@@ -19,6 +19,7 @@ import httpx
 import pytest
 import tenacity
 from pydantic import ValidationError
+from weave_server_sdk import models as tsi
 
 from tests.trace_server_bindings.conftest import (
     SpyTransport,
@@ -27,7 +28,6 @@ from tests.trace_server_bindings.conftest import (
     generate_start,
 )
 from weave.trace.display.term import configure_logger
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.http_utils import (
@@ -35,8 +35,11 @@ from weave.trace_server_bindings.http_utils import (
     CallsCompleteModeRequired,
 )
 from weave.trace_server_bindings.models import (
+    CallsCompleteReq,
     CompleteBatchItem,
+    CompletedCallSchemaForInsert,
     EndBatchItem,
+    FileCreateReq,
     StartBatchItem,
 )
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
@@ -247,7 +250,7 @@ def test_calls_complete_batch_endpoint_and_payload(monkeypatch):
     transport = SpyTransport()
     server = make_server(transport, should_batch=True)
 
-    complete = tsi.CompletedCallSchemaForInsert(
+    complete = CompletedCallSchemaForInsert(
         project_id="entity/project",
         id="call-id",
         trace_id="trace-id",
@@ -268,7 +271,7 @@ def test_calls_complete_batch_endpoint_and_payload(monkeypatch):
 
     assert transport.urls == [f"{BASE_URL}/v2/entity/project/calls/complete"]
     payload = json.loads(transport.requests[0].content)
-    expected = tsi.CallsUpsertCompleteReq(batch=[complete]).model_dump(mode="json")
+    expected = CallsCompleteReq(batch=[complete]).model_dump(mode="json")
     assert payload == expected
 
 
@@ -280,12 +283,14 @@ def test_eager_calls_use_v2_start_end_endpoints():
     start = generate_start(id="call-id", project_id="entity/project")
     ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
     started_at = ended_at - datetime.timedelta(seconds=1)
-    end = tsi.EndedCallSchemaForInsertWithStartedAt(
+    # started_at rides as an extra field (the published SDK model doesn't
+    # declare it yet).
+    end = tsi.EndedCallSchemaForInsert(
         project_id="entity/project",
         id="call-id",
         ended_at=ended_at,
         started_at=started_at,
-        summary={"result": "Test summary"},
+        summary={},
     )
 
     try:
@@ -305,7 +310,7 @@ def test_eager_calls_use_v2_start_end_endpoints():
         payload_started_at = datetime.datetime.fromisoformat(
             end_payload["end"]["started_at"].replace("Z", "+00:00")
         )
-        assert payload_started_at == end.started_at
+        assert payload_started_at == started_at
         assert end_payload["end"]["id"] == "call-id"
     finally:
         shutdown(server)
@@ -433,13 +438,13 @@ def test_post_timeout(monkeypatch, log_collector):
         call_start_ok_response(call_id),
     )
     new_server = make_server(transport2, should_batch=False)
-    fast_retried_via_sdk = fast_retry(
+    fast_retried_call_sdk = fast_retry(
         MethodType(
-            new_server._via_sdk.__wrapped__,  # type: ignore[attr-defined]
+            new_server._call_sdk.__wrapped__,  # type: ignore[attr-defined]
             new_server,
         )
     )
-    new_server._via_sdk = fast_retried_via_sdk
+    new_server._call_sdk = fast_retried_call_sdk
 
     response = new_server.call_start(tsi.CallStartReq(start=generate_start(call_id)))
     assert response.id == call_id
@@ -533,9 +538,7 @@ def test_file_create_sends_multipart():
     server = make_server(transport)
 
     res = server.file_create(
-        tsi.FileCreateReq(
-            project_id="entity/project", name="file.txt", content=b"hello"
-        )
+        FileCreateReq(project_id="entity/project", name="file.txt", content=b"hello")
     )
 
     assert res.digest == "digest-1"

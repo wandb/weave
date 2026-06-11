@@ -43,6 +43,7 @@ from typing import Any
 
 from pydantic import BaseModel
 from typing_extensions import Self
+from weave_server_sdk import models as tsi
 
 from weave.durability.wal import (
     WALConsumer,
@@ -56,8 +57,8 @@ from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
 from weave.telemetry.trace_sentry import log_error
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.models import FileCreateReq
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -298,7 +299,7 @@ _RECORD_TYPE_TO_REQ: dict[str, type[BaseModel]] = {
     "call_end": tsi.CallEndReq,
     "obj_create": tsi.ObjCreateReq,
     "table_create": tsi.TableCreateReq,
-    "file_create": tsi.FileCreateReq,
+    "file_create": FileCreateReq,
 }
 
 
