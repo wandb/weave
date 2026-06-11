@@ -27,7 +27,6 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 from weave.wandb_interface.context import get_wandb_api_context
 
@@ -328,6 +327,12 @@ def init_weave_get_server(
     api_key: str | None = None,
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
+    # Imported lazily so `import weave` does not pay for weave_server_sdk's
+    # model definitions until a client is actually initialized.
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        RemoteHTTPTraceServer,
+    )
+
     res = RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))

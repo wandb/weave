@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
@@ -597,11 +598,12 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
 
 @pytest.fixture
 def network_proxy_client(client, monkeypatch):
-    """This fixture is used to test the `RemoteHTTPTraceServer` class. There is
-    almost no logic in this class, other than a little batching, so we typically
-    skip it for simplicity. However, we can use this fixture to test such logic.
-    It initializes a mini FastAPI app that proxies requests from the
-    `RemoteHTTPTraceServer` to the underlying `client.server` object.
+    """This fixture is used to test the `RemoteHTTPTraceServer` class.
+    There is almost no logic in this class, other than a little batching, so we
+    typically skip it for simplicity. However, we can use this fixture to test
+    such logic. It initializes a mini FastAPI app and routes the server's HTTP
+    transport into it, proxying requests to the underlying `client.server`
+    object.
 
     We probably will want to flesh this out more in the future, but this is a
     starting point.
@@ -707,12 +709,25 @@ def network_proxy_client(client, monkeypatch):
 
     with TestClient(app) as c:
 
-        def post(url, data=None, json=None, **kwargs):
-            kwargs.pop("stream", None)
-            return c.post(url, data=data, json=json, **kwargs)
+        class TestClientTransport(httpx.BaseTransport):
+            """Routes the server's httpx requests into the FastAPI TestClient."""
 
-        orig_post = weave.utils.http_requests.post
-        weave.utils.http_requests.post = post
+            def handle_request(self, request: httpx.Request) -> httpx.Response:
+                request.read()
+                resp = c.request(
+                    request.method,
+                    request.url.path,
+                    params=request.url.params,
+                    content=request.content,
+                    headers={
+                        k: v
+                        for k, v in request.headers.items()
+                        if k.lower() not in {"host", "content-length"}
+                    },
+                )
+                return httpx.Response(
+                    resp.status_code, headers=resp.headers, content=resp.content
+                )
 
         def make_fast_async_batch_processor(*args, **kwargs):
             kwargs.setdefault("min_batch_interval", 0)
@@ -733,13 +748,14 @@ def network_proxy_client(client, monkeypatch):
             make_fast_call_batch_processor,
         )
 
+        # Absolute base URL required for httpx cookie handling; the transport
+        # routes by path, so the host is never dialed.
         remote_client = RemoteHTTPTraceServer(
-            trace_server_url="",
+            trace_server_url="http://testserver",
             should_batch=True,
+            transport=TestClientTransport(),
         )
         yield (client, remote_client, records)
-
-        weave.utils.http_requests.post = orig_post
 
 
 @pytest.fixture(autouse=True)

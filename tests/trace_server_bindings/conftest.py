@@ -2,6 +2,7 @@ import datetime
 from types import MethodType
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 import tenacity
 
@@ -60,23 +61,59 @@ def generate_call_start_end_pair(
 
 
 # =============================================================================
+# HTTP transport spy
+# =============================================================================
+
+
+class SpyTransport(httpx.BaseTransport):
+    """httpx transport that records requests and replays queued responses.
+
+    Queue items may be ``httpx.Response`` objects or exceptions to raise.
+    When the queue is empty, returns ``default_response`` (200 ``{}`` unless
+    overridden).
+    """
+
+    def __init__(
+        self,
+        *items: httpx.Response | Exception,
+        default_response: httpx.Response | None = None,
+    ) -> None:
+        self.queue: list[httpx.Response | Exception] = list(items)
+        self.requests: list[httpx.Request] = []
+        self.default_response = default_response
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        request.read()
+        self.requests.append(request)
+        if self.queue:
+            item = self.queue.pop(0)
+            if isinstance(item, Exception):
+                raise item
+            return item
+        if self.default_response is not None:
+            return self.default_response
+        return httpx.Response(200, json={})
+
+    @property
+    def urls(self) -> list[str]:
+        return [str(r.url) for r in self.requests]
+
+
+# =============================================================================
 # Fixtures
 # =============================================================================
 
 
 @pytest.fixture
-def success_response():
-    """Common fixture for mocking a successful HTTP response."""
-    response = MagicMock()
-    response.status_code = 200
-    response.json.return_value = {"id": "test_id", "trace_id": "test_trace_id"}
-    return response
+def server_class():
+    """The remote trace server implementation under test."""
+    return RemoteHTTPTraceServer
 
 
 @pytest.fixture
-def server(request):
-    """Common server fixture configured by the indirect parameter."""
-    server_ = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+def server(request, server_class):
+    """Common server fixture parametrized by batching/retry behavior."""
+    server_ = server_class("http://example.com", should_batch=True)
 
     if request.param == "normal":
         server_._send_batch_to_server = MagicMock()

@@ -147,7 +147,8 @@ def _is_debug_http_enabled() -> bool:
     return os.environ.get("WEAVE_DEBUG_HTTP") == "1"
 
 
-def _log_request(request: Request) -> None:
+def log_request(request: Request) -> None:
+    """Httpx request hook: pretty-print the request when WEAVE_DEBUG_HTTP=1."""
     if not _is_debug_http_enabled():
         return
 
@@ -156,7 +157,8 @@ def _log_request(request: Request) -> None:
     pprint_request(request)
 
 
-def _log_response(response: Response) -> None:
+def log_response(response: Response) -> None:
+    """Httpx response hook: pretty-print the response when WEAVE_DEBUG_HTTP=1."""
     if not _is_debug_http_enabled():
         return
 
@@ -183,7 +185,7 @@ def _build_client(verify: bool, timeout: float) -> httpx.Client:
     return httpx.Client(
         # Use HTTPX's default transport so env proxy handling (including
         # NO_PROXY) works natively.
-        event_hooks={"request": [_log_request], "response": [_log_response]},
+        event_hooks={"request": [log_request], "response": [log_response]},
         timeout=timeout,
         limits=CLIENT_LIMITS,
         verify=verify,

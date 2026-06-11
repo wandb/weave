@@ -2489,11 +2489,8 @@ class WeaveClient:
                 if hasattr(server, "_next_trace_server"):
                     server = server._next_trace_server
 
-                assert hasattr(server, "_post_request_executor")
-                assert hasattr(server._post_request_executor, "__wrapped__")
-                return server._post_request_executor.__wrapped__(
-                    server, "/table/create_from_digests", req
-                )
+                assert hasattr(server, "unretried_table_create_from_digests")
+                return server.unretried_table_create_from_digests(req)
 
             use_parallel_chunks = check_endpoint_exists(
                 test_func, test_req, "table_create_from_digests"
