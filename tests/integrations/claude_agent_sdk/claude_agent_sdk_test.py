@@ -42,7 +42,6 @@ def patch_claude_agent_sdk() -> Generator[None, None, None]:
 # =====================================================================
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_simple_text_query(
     client: weave.trace.weave_client.WeaveClient,
@@ -106,7 +105,6 @@ async def test_simple_text_query(
 # =====================================================================
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_tool_use_query(
     client: weave.trace.weave_client.WeaveClient,
@@ -153,7 +151,6 @@ async def test_tool_use_query(
 # =====================================================================
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_multi_tool_query(
     client: weave.trace.weave_client.WeaveClient,
@@ -196,7 +193,6 @@ async def test_multi_tool_query(
 # =====================================================================
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_thinking_query(
     client: weave.trace.weave_client.WeaveClient,
@@ -236,7 +232,6 @@ async def test_thinking_query(
 # =====================================================================
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_error_query(
     client: weave.trace.weave_client.WeaveClient,
@@ -269,7 +264,6 @@ async def test_error_query(
 # =====================================================================
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_multi_turn_client(
     client: weave.trace.weave_client.WeaveClient,
@@ -321,7 +315,6 @@ async def test_multi_turn_client(
 # =====================================================================
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_messages_pass_through(
     client: weave.trace.weave_client.WeaveClient,
@@ -352,7 +345,6 @@ async def test_messages_pass_through(
 # =====================================================================
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_usage_summary(
     client: weave.trace.weave_client.WeaveClient,

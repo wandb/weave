@@ -129,7 +129,6 @@ def get_flow_with_router_or():
     return support_flow
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -273,7 +272,6 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -316,7 +314,6 @@ def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -348,7 +345,6 @@ async def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -395,7 +391,6 @@ async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) ->
     assert len(outputs) == 2
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )

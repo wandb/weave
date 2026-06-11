@@ -49,7 +49,7 @@ class TestFileCreateExpectedDigest:
 
     def test_correct_expected_digest(self, client) -> None:
         """file_create with correct expected_digest succeeds."""
-        from weave.trace_server.sqlite_trace_server import compute_file_digest
+        from weave.shared.digest import compute_file_digest
 
         content = b"hello world"
         digest = compute_file_digest(content)

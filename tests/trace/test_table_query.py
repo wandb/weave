@@ -1,11 +1,6 @@
 import random
 from collections.abc import Iterator
 
-import pytest
-
-from tests.trace.util import (
-    client_is_sqlite,
-)
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -468,9 +463,6 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
 
 
 def test_table_query_stats_with_storage_size(client: WeaveClient):
-    if client_is_sqlite(client):
-        pytest.skip("SQLite does not support storage size")
-
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
     stats_res = client.server.table_query_stats_batch(

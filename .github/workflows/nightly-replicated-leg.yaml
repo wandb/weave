@@ -192,7 +192,12 @@ jobs:
           WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES: ${{ inputs.use_distributed }}
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           # --timeout=300: per-test cap so a single hung test fails with a
           # thread-stack dump instead of stalling the whole job. Thread method
@@ -200,7 +205,7 @@ jobs:
           # workers. 300s is well above any clean-cluster setup (~50s observed)
           # but tight enough that a wedged ClickHouse query fails fast.
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client" \
+            -m "trace_server" \
             --timeout=300 --timeout-method=thread
       - name: Run nox (No marker filters for integration-only shards)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'

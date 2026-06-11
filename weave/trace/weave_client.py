@@ -2164,7 +2164,7 @@ class WeaveClient:
         Raises the original exception if it is NOT a digest mismatch
         (e.g. an HTTPError with a non-409 status code).
         """
-        # DigestMismatchError: raised directly by local servers (SQLite, ClickHouse).
+        # DigestMismatchError: raised directly by in-process servers (ClickHouse).
         is_local_mismatch = isinstance(e, DigestMismatchError)
         # HTTPError 409: raised by RemoteHTTPTraceServer when the remote
         # server returns HTTP 409 Conflict for a digest mismatch.
