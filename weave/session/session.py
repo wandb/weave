@@ -187,6 +187,77 @@ class _SpanBase(BaseModel):
         self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
         self._otel_span.record_exception(exc_val)
 
+    def _recording_span(self, operation: str, key: str | list[str]) -> _OTelSpan | None:
+        """Return the OTel span if it's recording, else ``None``.
+
+        Logs a warning naming the caller-facing fix when not recording.
+        Silent when OTel isn't installed or Weave is disabled — both are
+        intentional configs. Returning the span (instead of a bool) lets
+        mypy narrow it through the caller's ``if`` guard.
+        """
+        if not _OTEL_AVAILABLE or should_disable_weave():
+            return None
+        key_repr = (
+            "{" + ", ".join(map(repr, key)) + "}"
+            if isinstance(key, list)
+            else repr(key)
+        )
+        if self._otel_span is None:
+            logger.warning(
+                "%s(%s) ignored: span not started. Use `with` for live "
+                "tracing, or log_turn() for batch ingest.",
+                operation,
+                key_repr,
+            )
+            return None
+        if not self._otel_span.is_recording():
+            logger.warning(
+                "%s(%s) ignored: span already ended. Set attributes before "
+                "exiting `with` or calling .end().",
+                operation,
+                key_repr,
+            )
+            return None
+        return self._otel_span
+
+    def set_attributes(self, attributes: dict[str, Any]) -> Self:
+        """Stamp arbitrary OTel attributes on this span.
+
+        Pass a dict whether you have one key or many — single-key callers
+        use ``span.set_attributes({"weave.tag": "value"})``. Mirrors OTel's
+        ``Span.set_attributes``.
+
+        Must be called between span start and span end — i.e. inside a
+        ``with`` block. Outside that window the call is a no-op and logs
+        a warning. For batch ingest, populate the object's declared fields
+        directly and pass it to ``log_turn`` / ``log_session``.
+        """
+        if span := self._recording_span("set_attributes", list(attributes)):
+            span.set_attributes(attributes)
+        return self
+
+    def add_event(
+        self,
+        name: str,
+        attributes: dict[str, Any] | None = None,
+        timestamp: datetime | None = None,
+    ) -> Self:
+        """Record an OTel span event at a point in time within this span.
+
+        Use for marker / lifecycle data — permission prompts (e.g.
+        ``weave.permission_request``), lifecycle transitions (e.g.
+        ``spawned`` / ``streaming`` / ``finished``), or any custom
+        milestone that happens at a point in time within the span's
+        lifetime (vs an attribute, which is a property of the span as a
+        whole).
+
+        Must be called between span start and span end (inside ``with``).
+        Outside that window the call is a no-op and logs a warning.
+        """
+        if span := self._recording_span("add_event", name):
+            span.add_event(name, attributes=attributes, timestamp=_to_ns(timestamp))
+        return self
+
 
 def _publish_media_content(
     *,
