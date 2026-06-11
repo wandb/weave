@@ -30,7 +30,7 @@ from weave.trace_server.environment import (
 CALL_ENDED_TOPIC = "weave.call_ended"
 SCORE_CALLS_TOPIC = "weave.score_calls"
 
-DEFAULT_MAX_BUFFER_SIZE = 10000
+DEFAULT_MAX_BUFFER_SIZE = 100000
 # Fraction of `max_buffer_size` at which a "buffer pressure" warning is logged.
 BUFFER_WARN_THRESHOLD = 0.5
 
