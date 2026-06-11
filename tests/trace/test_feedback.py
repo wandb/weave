@@ -578,6 +578,10 @@ def test_agent_user_feedback(client: WeaveClient) -> None:
             feedback_type=feedback_type,
             payload={"emoji": "👍", "scorer_tags": ["👍"]},
             scorer_tags=["👍"],
+            # Denormalized agent metadata the UI attaches for dashboard filtering.
+            span_agent_name="support-bot",
+            span_agent_version="1.2.0",
+            span_status_code="OK",
         )
     )
     assert create_res.id is not None
@@ -592,6 +596,9 @@ def test_agent_user_feedback(client: WeaveClient) -> None:
     assert row["runnable_ref"] is None
     assert row["trigger_ref"] is None
     assert row["scorer_ratings"] == {}
+    assert row["span_agent_name"] == "support-bot"
+    assert row["span_agent_version"] == "1.2.0"
+    assert row["span_status_code"] == "OK"
 
 
 def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
