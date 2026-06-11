@@ -1,5 +1,4 @@
 import {
-  type AttributeValue,
   type Attributes,
   type Span,
   SpanKind,
@@ -83,11 +82,12 @@ export class Tool {
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
   }
 
-  /** Set a single attribute on the Tool span. Warns and no-ops after `end()`.
-   *  Mirrors OTel `Span.setAttribute`. */
-  setAttribute(key: string, value: AttributeValue): this {
-    if (this._warnIfEnded('setAttribute')) return this;
-    this.span.setAttribute(key, value);
+  /** Stamp arbitrary attributes on the Tool span. Pass an object whether you
+   *  have one key or many. Warns and no-ops after `end()`. Mirrors OTel
+   *  `Span.setAttributes` and the Python SDK's `set_attributes`. */
+  setAttributes(attributes: Attributes): this {
+    if (this._warnIfEnded('setAttributes')) return this;
+    this.span.setAttributes(attributes);
     return this;
   }
 
