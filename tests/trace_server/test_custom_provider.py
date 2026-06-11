@@ -1,3 +1,4 @@
+import contextlib
 import os
 import uuid
 from datetime import datetime
@@ -171,6 +172,24 @@ def setup_test_environment(mock_secret_fetcher=None):
     return mock_secret_fetcher, token
 
 
+@contextlib.contextmanager
+def patch_server_obj_read(mock_obj_read):
+    """Patch obj_read on both backend classes so provider/model objects come
+    from the mock regardless of which trace server the client fixture uses.
+    """
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
+        ) as ch_read,
+        patch(
+            "weave.trace_server.in_memory_trace_server.InMemoryTraceServer.obj_read"
+        ) as mem_read,
+    ):
+        ch_read.side_effect = mock_obj_read
+        mem_read.side_effect = mock_obj_read
+        yield
+
+
 def create_mock_obj_read(
     provider_obj: tsi.ObjSchema, provider_model_obj: tsi.ObjSchema
 ):
@@ -303,10 +322,7 @@ def test_custom_provider_completions_create(client):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
+            with patch_server_obj_read(mock_obj_read):
                 with patch("litellm.completion") as mock_completion:
                     mock_completion.return_value = ModelResponse.model_validate(
                         mock_response
@@ -406,10 +422,7 @@ def test_custom_provider_ollama_model(client):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
+            with patch_server_obj_read(mock_obj_read):
                 with patch("litellm.completion") as mock_completion:
                     mock_completion.return_value = ModelResponse.model_validate(
                         mock_response
@@ -485,10 +498,7 @@ def test_custom_provider_trailing_slash_normalization(client):
     with override_settings(disabled=True):
         mock_secret_fetcher, token = setup_test_environment()
         try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
+            with patch_server_obj_read(mock_obj_read):
                 with patch("litellm.completion") as mock_completion:
                     mock_completion.return_value = ModelResponse.model_validate(
                         mock_response
@@ -575,10 +585,7 @@ def test_error_handling_custom_provider(client):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
+            with patch_server_obj_read(mock_obj_read):
                 res = client.server.completions_create(
                     tsi.CompletionsCreateReq.model_validate(
                         {

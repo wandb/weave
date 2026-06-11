@@ -8,10 +8,13 @@ These tests verify the queue filtering functionality added to calls_query_builde
 
 import datetime
 
+import pytest
+
 import weave
-from tests.trace.server_utils import TEST_ENTITY
+from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 
 
 def test_filter_calls_by_queue_inner_join_behavior(client):
@@ -309,6 +312,12 @@ def test_filter_calls_by_queue_with_calls_complete_table(trace_server):
     4. Query by queue_id - should automatically use calls_complete table
     5. Verify INNER JOIN correctly filters results
     """
+    try:
+        find_server_layer(trace_server, InMemoryTraceServer)
+    except TypeError:
+        pass
+    else:
+        pytest.skip("ClickHouse-only test")
     project_id = f"{TEST_ENTITY}/test_queue_calls_complete"
 
     # Step 1: Seed project with calls_complete data to establish residence

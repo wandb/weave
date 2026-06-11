@@ -14,12 +14,16 @@ def make_project_id(prefix: str) -> str:
     return base64.b64encode(raw.encode()).decode()
 
 
-def force_optimize(ch_client: CHClient, table: str) -> None:
+def force_optimize(ch_client: CHClient | None, table: str) -> None:
     """OPTIMIZE `table` for test merge-consistency, distributed-mode aware.
 
     OPTIMIZE is not supported on Distributed engines; in distributed mode we
     target the underlying `_local` ReplicatedMergeTree on the cluster.
+    No-op when there is no ClickHouse client (e.g. the in-memory fake
+    backend, which has no merge consistency to force).
     """
+    if ch_client is None:
+        return
     if wf_env.wf_clickhouse_use_distributed_tables():
         cluster = wf_env.wf_clickhouse_replicated_cluster()
         ch_client.command(f"OPTIMIZE TABLE {table}_local ON CLUSTER {cluster} FINAL")

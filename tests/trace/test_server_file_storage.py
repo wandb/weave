@@ -15,6 +15,7 @@ from azure.core.exceptions import ResourceExistsError
 from google.api_core import exceptions
 from moto import mock_aws
 
+from tests.trace.util import client_is_clickhouse
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings
@@ -48,6 +49,8 @@ def run_storage_test(client: WeaveClient):
         assert file.content == TEST_CONTENT
         return res
 
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: bucket file storage machinery")
     return _run_test
 
 
@@ -142,6 +145,9 @@ class TestS3Storage:
             d3 = _run_single_test()
             assert d1 == d2 == d3
 
+        if not client_is_clickhouse(client):
+            pytest.skip("ClickHouse-only: bucket file storage machinery")
+
         _run_test()
 
 
@@ -171,6 +177,9 @@ class TestGCSStorage:
         This verifies the if_generation_match=0 conditional write works correctly
         to prevent GCS rate limiting when multiple pods write the same object.
         """
+        if not client_is_clickhouse(client):
+            pytest.skip("ClickHouse-only: bucket file storage machinery")
+
         upload_count = 0
         blob_data = {}
 
@@ -312,6 +321,9 @@ class TestAzureStorage:
         be a no-op, not an overwrite. Otherwise any project with write scope
         can substitute content at a known URI.
         """
+        if not client_is_clickhouse(client):
+            pytest.skip("ClickHouse-only: bucket file storage machinery")
+
         blob_data: dict[str, bytes] = {}
         upload_calls: list[dict] = []
 
@@ -384,6 +396,8 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
     """Test that the system supports variable length chunks.
     We don't actually want to change this often, but we need to make sure it works.
     """
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: bucket file storage machinery")
 
     def create_and_read_file(content: bytes):
         res = client.server.file_create(
@@ -426,6 +440,9 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
 @pytest.mark.disable_logging_error_check
 def test_file_storage_retry_limit(client: WeaveClient):
     """Test that file storage operations retry exactly 3 times on storage failures."""
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: bucket file storage machinery")
+
     attempt_count = 0
 
     def mock_upload_fail(*args, **kwargs):
@@ -510,6 +527,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
     collapses to one upload, and every stored object lands under the
     expected project prefix.
     """
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: bucket file storage machinery")
+
     gcs.state.delay = 0.1
     # 4 unique blobs + 2 duplicates of the first => 4 GCS uploads after dedup.
     payload_size = 50_000
@@ -568,6 +588,9 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     server's read path -- it must reassemble bit-for-bit from CH chunks for
     both single-chunk and multi-chunk payloads.
     """
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: bucket file storage machinery")
+
     server = client.server
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
 

@@ -7,6 +7,24 @@ import re
 import time
 from contextlib import contextmanager
 
+from tests.trace.server_utils import find_server_layer
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+
+
+def client_is_clickhouse(client):
+    """True only for a real ClickHouse backend (NOT the in-memory fake).
+
+    The in-memory fake replicates ClickHouse at the interface level, so
+    behavioral tests run on it unmodified. Use this predicate to gate tests
+    that assert ClickHouse *internals* (raw SQL, table routing, batching,
+    bucket file storage), which the fake does not reproduce.
+    """
+    try:
+        find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
+        return False
+    return True
+
 
 class AnyStrMatcher:  # noqa: PLW1641
     """Matches any string."""

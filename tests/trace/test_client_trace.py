@@ -26,6 +26,7 @@ from tests.trace.util import (
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
+    client_is_clickhouse,
     get_info_loglines,
 )
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
@@ -3739,6 +3740,10 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
 
 
 def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
+    if not client_is_clickhouse(client):
+        # Stripping is triggered by patching ClickHouse's _insert_call_batch
+        # to raise InsertTooLarge; only meaningful on a real ClickHouse server.
+        return
 
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
     max_size = 10 * 1024
@@ -4224,11 +4229,16 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
     assert calls[0].output["a"]["b"]["c"] == {"d": 1}
     assert calls[0].output["a"]["b"]["c"]["d"] == 1
 
-    # now make sure we don't make duplicate selects
-    select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[0]
-    assert (
-        select_query["query"].count("any(calls_merged.output_dump) AS output_dump") == 1
-    )
+    # now make sure we don't make duplicate selects (the in-memory fake
+    # builds no SQL, so there is no query log to inspect there)
+    if client_is_clickhouse(client):
+        select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[
+            0
+        ]
+        assert (
+            select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
+            == 1
+        )
 
 
 def test_calls_stream_heavy_condition_aggregation_parts(client):
@@ -5060,6 +5070,8 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
 
 
 def test_project_stats_clickhouse(client, clickhouse_client):
+    if not client_is_clickhouse(client):
+        pytest.skip("Requires raw ClickHouse stats-table inserts")
 
     project_id = get_client_project_id(client)
     internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)

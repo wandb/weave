@@ -18,6 +18,7 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
+from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 
 
 class CallsFixture(NamedTuple):
@@ -2055,6 +2056,12 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     4. Verify items are correctly added with proper display_data
     5. Query items back to confirm correct data population
     """
+    try:
+        find_server_layer(trace_server, InMemoryTraceServer)
+    except TypeError:
+        pass
+    else:
+        pytest.skip("ClickHouse-only test")
     project_id = f"{TEST_ENTITY}/test_queue_add_calls_complete"
 
     # Step 1: Seed project with calls_complete data

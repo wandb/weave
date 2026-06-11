@@ -12,6 +12,7 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
+from tests.trace.util import client_is_clickhouse
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
@@ -34,6 +35,9 @@ def force_merge_calls(client: weave_client.WeaveClient):
     ClickHouse merges ReplacingMergeTree rows asynchronously. In tests, we write
     and immediately query, so rows may not be merged yet. This forces a merge.
     """
+    if not client_is_clickhouse(client):
+        # Only a real ClickHouse backend has async merges to force.
+        return
     ch_client = client.server._next_trace_server.ch_client
     force_optimize_calls_merged(ch_client)
 

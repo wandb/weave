@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.trace.util import client_is_clickhouse
 from weave.shared.digest import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
@@ -238,6 +239,8 @@ def _internal_wb_user_id() -> str:
 
 def test_obj_batch_same_object_id_different_hash(trace_server, client):
     """Two versions for same object_id with different digests."""
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: insert batching")
     server = trace_server._internal_trace_server
     pid = _internal_pid()
     wb_user_id = _internal_wb_user_id()
@@ -267,6 +270,8 @@ def test_obj_batch_same_object_id_different_hash(trace_server, client):
 
 def test_obj_batch_same_hash_different_object_ids(trace_server, client):
     """Same digest payload uploaded under different object_ids yields distinct objects."""
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: insert batching")
     server = trace_server._internal_trace_server
     pid = _internal_pid()
     wb_user_id = _internal_wb_user_id()
@@ -292,6 +297,8 @@ def test_obj_batch_same_hash_different_object_ids(trace_server, client):
 def test_obj_batch_identical_same_id_same_hash_deduplicates(trace_server, client):
     """Duplicate rows (same object_id and digest) are represented once in metadata view."""
     server = trace_server._internal_trace_server
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: insert batching")
     pid = _internal_pid()
     wb_user_id = _internal_wb_user_id()
     obj_id = "dup_obj"
@@ -314,6 +321,8 @@ def test_obj_batch_identical_same_id_same_hash_deduplicates(trace_server, client
 
 def test_obj_batch_four_versions_and_read_path(trace_server, client):
     """Batch upload 4 versions and verify reads over all and latest work."""
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: insert batching")
     server = trace_server._internal_trace_server
     pid = _internal_pid()
     wb_user_id = _internal_wb_user_id()
@@ -350,6 +359,8 @@ def test_obj_batch_four_versions_and_read_path(trace_server, client):
 
 def test_obj_batch_delete_version_preserves_indices(trace_server, client):
     """Delete one version and ensure indices remain intact and deletion is reflected."""
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: insert batching")
     server = trace_server._internal_trace_server
     pid = _internal_pid()
     wb_user_id = _internal_wb_user_id()
@@ -406,6 +417,8 @@ def test_str_digest_is_key_order_independent():
 
 def test_obj_batch_different_key_order_deduplicates(trace_server, client):
     """Objects with identical values but different key ordering share the same digest."""
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: insert batching")
     server = trace_server._internal_trace_server
     pid = _internal_pid()
     wb_user_id = _internal_wb_user_id()
@@ -508,6 +521,8 @@ def test_call_start_batch_invalid_trace_id_returns_400():
 
 def test_obj_batch_mixed_projects_errors(trace_server, client):
     """Uploading objects to different projects in one batch should error."""
+    if not client_is_clickhouse(client):
+        pytest.skip("ClickHouse-only: insert batching")
     server = trace_server._internal_trace_server
     pid1 = _internal_pid()
     wb_user_id = _internal_wb_user_id()

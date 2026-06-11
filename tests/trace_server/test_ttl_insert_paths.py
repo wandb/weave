@@ -50,7 +50,8 @@ def _clear_ttl_cache():
 @pytest.fixture
 def internal_server(trace_server):
     server = trace_server._internal_trace_server
-    assert isinstance(server, ClickHouseTraceServer)
+    if not isinstance(server, ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only: raw expire_at table reads + routing modes")
     server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return server
 

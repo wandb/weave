@@ -4,6 +4,7 @@ import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
+from tests.trace.util import client_is_clickhouse
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -1316,6 +1317,10 @@ def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> N
     object-id filters match the id exactly (a trailing '*' opts into prefix), and
     span_types matches the ref's span-type segment, not an arbitrary substring.
     """
+    if not client_is_clickhouse(client):
+        pytest.skip(
+            "ClickHouse-only: executes the built SQL directly via server._query"
+        )
     project_id = client.project_id
     now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
     after_ms = now_ms - 3_600_000

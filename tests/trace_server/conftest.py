@@ -22,6 +22,7 @@ from weave.trace_server import (
 )
 from weave.trace_server import environment as wf_env
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
@@ -46,13 +47,19 @@ def pytest_addoption(parser):
             "--trace-server",
             action="store",
             default="clickhouse",
-            help="Specify the backend to use: clickhouse",
+            help="Specify the backend to use: clickhouse or fake (in-memory)",
         )
         parser.addoption(
             "--ch",
             "--clickhouse",
             action="store_true",
             help="Use clickhouse server (shorthand for --trace-server=clickhouse)",
+        )
+        parser.addoption(
+            "--fk",
+            "--fake",
+            action="store_true",
+            help="Use the in-memory fake server (shorthand for --trace-server=fake)",
         )
         parser.addoption(
             "--clickhouse-process",
@@ -87,6 +94,8 @@ def pytest_collection_modifyitems(config, items):
 def get_trace_server_flag(request):
     if request.config.getoption("--clickhouse"):
         return "clickhouse"
+    if request.config.getoption("--fake"):
+        return "fake"
     return request.config.getoption("--trace-server")
 
 
@@ -185,7 +194,7 @@ def _ch_session_server(
     `prod`/`http` escape hatches), so dependents can skip instead of
     spinning up a server that won't be used.
     """
-    trace_server_flag = request.config.getoption("--trace-server", default="clickhouse")
+    trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag != "clickhouse":
         yield None
         return
@@ -314,6 +323,24 @@ def get_ch_trace_server(
     return ch_trace_server_inner
 
 
+@pytest.fixture
+def get_fake_trace_server(
+    request,
+) -> Callable[[], UserInjectingExternalTraceServer]:
+    def fake_trace_server_inner() -> UserInjectingExternalTraceServer:
+        id_converter = DummyIdConverter()
+        fake_server = InMemoryTraceServer(
+            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
+                id_converter=id_converter
+            ),
+        )
+        return externalize_trace_server(
+            fake_server, TEST_ENTITY, id_converter=id_converter
+        )
+
+    return fake_trace_server_inner
+
+
 class LocalSecretFetcher:
     def fetch(self, secret_name: str) -> dict:
         return {"secrets": {secret_name: os.getenv(secret_name)}}
@@ -327,23 +354,30 @@ def local_secret_fetcher():
 
 @pytest.fixture
 def trace_server(
-    request, local_secret_fetcher, get_ch_trace_server
+    request, local_secret_fetcher, get_ch_trace_server, get_fake_trace_server
 ) -> UserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
         return get_ch_trace_server()
+    elif trace_server_flag == "fake":
+        return get_fake_trace_server()
     raise ValueError(f"Invalid trace server: {trace_server_flag}")
 
 
 @pytest.fixture
 def ch_server(trace_server):
-    """Extract the ClickHouseTraceServer from the test fixture."""
+    """Extract the ClickHouseTraceServer from the test fixture, or skip."""
     server = trace_server._internal_trace_server
-    assert isinstance(server, ClickHouseTraceServer)
+    if not isinstance(server, ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only test")
     return server
 
 
 @pytest.fixture
 def internal_server(client):
-    """Return the underlying ClickHouse server from the middleware chain."""
+    """Return the underlying fake or ClickHouse server from the middleware chain."""
+    try:
+        return find_server_layer(client.server, InMemoryTraceServer)
+    except TypeError:
+        pass
     return find_server_layer(client.server, ClickHouseTraceServer)

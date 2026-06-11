@@ -12,6 +12,7 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
     NotFoundError,
@@ -43,6 +44,8 @@ def clickhouse_trace_server(trace_server):
         >>> internal = clickhouse_trace_server
     """
     internal_server = trace_server._internal_trace_server
+    if not isinstance(internal_server, ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only test")
     internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return internal_server
 

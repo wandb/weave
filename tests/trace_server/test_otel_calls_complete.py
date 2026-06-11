@@ -35,6 +35,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import CallsCompleteModeRequired
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import CallsStorageServerMode
@@ -48,6 +49,8 @@ from weave.trace_server.project_version.types import CallsStorageServerMode
 def clickhouse_trace_server(trace_server):
     """Get internal ClickHouse server with AUTO routing mode enabled."""
     internal_server = trace_server._internal_trace_server
+    if not isinstance(internal_server, ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only test")
     internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return internal_server
 
