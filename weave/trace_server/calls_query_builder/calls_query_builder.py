@@ -27,7 +27,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import Callable, KeysView, Sequence
+from collections.abc import Callable, Collection, KeysView, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
@@ -920,7 +920,7 @@ class CallsQuery(BaseModel):
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
         if field in DISALLOWED_FILTERING_FIELDS:
-            raise ValueError(f"Field {field} is not allowed in ORDER BY")
+            raise InvalidFieldError(_disallowed_filter_message(field))
         direction = direction.upper()
         if direction not in {"ASC", "DESC"}:
             raise ValueError(f"Direction {direction} is not allowed")
@@ -1951,21 +1951,29 @@ def get_field_by_name(name: str) -> CallsMergedField:
 
 
 def _invalid_field_message(name: str) -> str:
-    """Build an actionable `field not allowed` message listing valid fields."""
-    dotted_prefixes = tuple(
-        f"{field_name.removesuffix('_dump')}.*"
-        for field_name, field in ALLOWED_CALL_FIELDS.items()
-        if isinstance(field, CallsMergedDynamicField)
-    )
-    allowed = ", ".join(
-        sorted(name.removesuffix("_dump") for name in ALLOWED_CALL_FIELDS)
-    )
-    prefixes = ", ".join(sorted(ALLOWED_DYNAMIC_FIELD_PREFIXES + dotted_prefixes))
+    """`field not allowed` message for an unrecognized field."""
+    return f"Field {name} is not allowed. {_allowed_fields_clause(ALLOWED_CALL_FIELDS)}"
+
+
+def _disallowed_filter_message(name: str) -> str:
+    """`field not filterable/sortable` message for a recognized-but-blocked field."""
+    filterable = ALLOWED_CALL_FIELDS.keys() - DISALLOWED_FILTERING_FIELDS
     return (
-        f"Field {name} is not allowed. "
-        f"Allowed fields: {allowed}. "
-        f"Allowed dynamic prefixes: {prefixes}."
+        f"Field {name} cannot be used for filtering or sorting. "
+        f"{_allowed_fields_clause(filterable)}"
     )
+
+
+def _allowed_fields_clause(field_names: Collection[str]) -> str:
+    """Render `Allowed fields: ...` + `Allowed dynamic prefixes: ...` for a field set."""
+    dotted_prefixes = tuple(
+        f"{name.removesuffix('_dump')}.*"
+        for name in field_names
+        if isinstance(ALLOWED_CALL_FIELDS[name], CallsMergedDynamicField)
+    )
+    allowed = ", ".join(sorted(name.removesuffix("_dump") for name in field_names))
+    prefixes = ", ".join(sorted(ALLOWED_DYNAMIC_FIELD_PREFIXES + dotted_prefixes))
+    return f"Allowed fields: {allowed}. Allowed dynamic prefixes: {prefixes}."
 
 
 def _field_as_sql_maybe_agg(
@@ -2187,7 +2195,7 @@ def process_query_to_conditions(
             if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
                 return None
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(_invalid_field_message(operand.get_field_))
+                raise InvalidFieldError(_disallowed_filter_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
             if isinstance(structured_field, CallsMergedDynamicField):
@@ -2338,7 +2346,7 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(_invalid_field_message(operand.get_field_))
+                raise InvalidFieldError(_disallowed_filter_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
 

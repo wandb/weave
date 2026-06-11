@@ -3229,17 +3229,28 @@ def test_filter_length_validation():
 
 
 def test_disallowed_fields():
+    # the message lists filterable fields and never the rejected field itself
+    clause = (
+        "Allowed fields: attributes, deleted_at, display_name, ended_at, "
+        "exception, expire_at, id, input_refs, inputs, op_name, otel, output, "
+        "output_refs, parent_id, project_id, started_at, summary, thread_id, "
+        "trace_id, turn_id, wb_run_id, wb_run_step, wb_run_step_end, wb_user_id. "
+        "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
+        "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
+    )
     cq = CallsQuery(project_id="test/project")
-    # allowed order field
-    cq.add_order("id", "ASC")
-    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
-        cq.add_order("storage_size_bytes", "ASC")
-    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
-        cq.add_order("total_storage_size_bytes", "DESC")
-    # with bogus direction
-    with pytest.raises(ValueError, match="not allowed"):
-        cq.add_order("storage_size_bytes", "ASCDESC")
-    # now try filtering with disallowed; the message lists the allowed fields
+    cq.add_order("id", "ASC")  # allowed order field
+    for field in ("storage_size_bytes", "total_storage_size_bytes"):
+        with pytest.raises(InvalidFieldError) as exc_info:
+            cq.add_order(field, "ASC")
+        assert (
+            str(exc_info.value)
+            == f"Field {field} cannot be used for filtering or sorting. {clause}"
+        )
+    # bogus direction on an allowed field is a separate ValueError
+    with pytest.raises(ValueError, match="Direction ASCDESC is not allowed"):
+        cq.add_order("id", "ASCDESC")
+    # filtering on a disallowed field surfaces the same actionable message
     for op_key, op_cls, field in (
         ("$gt", tsi_query.GtOperation, "storage_size_bytes"),
         ("$gte", tsi_query.GteOperation, "total_storage_size_bytes"),
@@ -3253,11 +3264,14 @@ def test_disallowed_fields():
         )
         with pytest.raises(InvalidFieldError) as exc_info:
             cq.as_sql(ParamBuilder())
-        assert str(exc_info.value) == _invalid_field_message(field)
+        assert (
+            str(exc_info.value)
+            == f"Field {field} cannot be used for filtering or sorting. {clause}"
+        )
 
 
 def test_invalid_field_message_lists_allowed_fields():
-    """An unknown filter/sort field surfaces the full allowed-field list (read-path 403)."""
+    """An unknown filter/sort field surfaces the full allowed-field list (read-path 422)."""
     expected = (
         "Field made_up_field is not allowed. "
         "Allowed fields: attributes, deleted_at, display_name, ended_at, "
