@@ -29,6 +29,7 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.object.obj import Object
+from weave.shared import constants
 from weave.trace.call import Call, CallsIter
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
@@ -40,7 +41,6 @@ from weave.trace.refs import ObjectRef
 from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
-from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id

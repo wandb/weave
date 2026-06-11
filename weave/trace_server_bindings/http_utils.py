@@ -7,8 +7,8 @@ import httpx
 import tenacity
 from typing_extensions import ParamSpec
 
+from weave.shared.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils.retry import _is_retryable_exception, with_retry
 

@@ -15,10 +15,10 @@ from weave.chat.types.chat_completion import ChatCompletion
 from weave.chat.types.chat_completion_stream_options_param import (
     ChatCompletionStreamOptionsParam,
 )
+from weave.shared.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
 from weave.trace.env import weave_trace_server_url
 from weave.trace.op import op
 from weave.trace.settings import http_timeout
-from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
 from weave.utils.project_id import to_project_id
 from weave.wandb_interface.context import get_wandb_api_context
 

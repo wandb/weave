@@ -4,9 +4,9 @@ from collections.abc import Iterable
 from concurrent.futures import Future
 from typing import Any
 
+from weave.shared.constants import MAX_OP_NAME_LENGTH
 from weave.trace.call import Call, CallsIter
 from weave.trace.refs import OpRef
-from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 
 
 def make_pythonic_function_name(name: str) -> str:

@@ -1,0 +1,364 @@
+"""Helpers for converting trace refs with copy-on-write traversal.
+
+Trace request payloads pass through this module on every call_start /
+call_end so external `weave:///...` refs can be rewritten to internal
+`weave-trace-internal:///...` form (and vice versa). The naive recursion
+that used to live here cloned every container on every request, which
+dominated the hot path under load even when no refs were present.
+
+The traversal here is copy-on-write: subtrees that contain no rewrites
+return the original object, and a parent only allocates a new container
+once one of its children has actually changed. For ref-free payloads
+zero new objects are allocated.
+
+Pydantic models with nested dataclasses inside `Any` fields fall back to
+the legacy `model_dump` / `model_validate` round-trip, since Pydantic
+does not round-trip dataclasses safely through getattr / setattr.
+"""
+
+import dataclasses
+from collections.abc import Callable
+from typing import Any, NamedTuple, TypeVar, cast
+
+from pydantic import BaseModel
+
+from weave.shared import refs_internal as ri
+from weave.shared.errors import InvalidExternalRef
+
+A = TypeVar("A")
+B = TypeVar("B")
+
+weave_prefix = ri.WEAVE_SCHEME + ":///"
+weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
+
+
+class InvalidInternalRef(ValueError):
+    pass
+
+
+def replace_external_weave_ref(
+    ref_str: str,
+    convert_ext_to_int_project_id: Callable[[str], str],
+    cache: dict[str, str] | None = None,
+) -> str:
+    """Convert a single `weave:///entity/project/tail` ref to internal form.
+
+    Pass a shared `cache` dict to amortize ext→int project lookups across
+    repeated calls. Raises ``ValueError`` if the input does not start with
+    the external scheme prefix, and ``InvalidExternalRef`` if the tail does
+    not parse as ``entity/project/...``.
+    """
+    if not ref_str.startswith(weave_prefix):
+        raise ValueError(f"Invalid URI: {ref_str}")
+    rest = ref_str[len(weave_prefix) :]
+    parts = rest.split("/", 2)
+    if len(parts) != 3:
+        raise InvalidExternalRef(f"Invalid URI: {ref_str}")
+    entity, project, tail = parts
+    project_key = f"{entity}/{project}"
+    if cache is None:
+        internal_project_id = convert_ext_to_int_project_id(project_key)
+    else:
+        if project_key not in cache:
+            cache[project_key] = convert_ext_to_int_project_id(project_key)
+        internal_project_id = cache[project_key]
+    return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
+
+
+def universal_ext_to_int_ref_converter(
+    obj: A,
+    convert_ext_to_int_project_id: Callable[[str], str],
+    verify_internal_project_id: Callable[[str], bool] | None = None,
+) -> A:
+    """Takes any object and recursively replaces all external references with
+    internal references. The external references are expected to be in the
+    format of `weave:///entity/project/...` and the internal references are
+    expected to be in the format of `weave-trace-internal:///project_id/...`.
+
+    Args:
+        obj: The object to convert.
+        convert_ext_to_int_project_id: A function that takes an external
+            project ID and returns the internal project ID.
+        verify_internal_project_id: Optional callback that returns True if
+            the given internal project_id should be accepted. Callers
+            typically build this to accept the request's own project_id
+            (fast set check) and fall back to an access check for
+            cross-project refs.
+
+    Returns:
+        The object with all external references replaced with internal
+        references.
+    """
+    ext_to_int_project_cache: dict[str, str] = {}
+
+    def replace_ref(ref_str: str) -> str:
+        return replace_external_weave_ref(
+            ref_str, convert_ext_to_int_project_id, ext_to_int_project_cache
+        )
+
+    def mapper(obj: B) -> B:
+        if isinstance(obj, str):
+            if obj.startswith(weave_prefix):
+                result = replace_ref(obj)
+                return cast(B, result)
+            elif obj.startswith(weave_internal_prefix):
+                # Internal refs are only accepted when the verify callback
+                # confirms the project_id is valid. Without this check, a
+                # malicious client could embed refs to arbitrary private
+                # projects.
+                rest = obj[len(weave_internal_prefix) :]
+                parts = rest.split("/", 2)
+                if len(parts) < 2:
+                    raise InvalidExternalRef(
+                        "Invalid internal ref format: missing project_id or kind."
+                    )
+                ref_project_id = parts[0]
+                if (
+                    verify_internal_project_id is not None
+                    and verify_internal_project_id(ref_project_id)
+                ):
+                    return obj
+                raise InvalidExternalRef("Encountered unexpected internal ref format.")
+        return obj
+
+    return _map_values(obj, mapper)
+
+
+C = TypeVar("C")
+D = TypeVar("D")
+
+
+def universal_int_to_ext_ref_converter(
+    obj: C,
+    convert_int_to_ext_project_id: Callable[[str], str | None],
+) -> C:
+    """Takes any object and recursively replaces all internal references with
+    external references. The internal references are expected to be in the
+    format of `weave-trace-internal:///project_id/...` and the external references are
+    expected to be in the format of `weave:///entity/project/...`.
+
+    Args:
+        obj: The object to convert.
+        convert_int_to_ext_project_id: A function that takes an internal
+            project ID and returns the external project ID.
+
+    Returns:
+        The object with all internal references replaced with external
+        references.
+    """
+    int_to_ext_project_cache: dict[str, str | None] = {}
+
+    def replace_ref(ref_str: str) -> str:
+        if not ref_str.startswith(weave_internal_prefix):
+            raise ValueError(f"Invalid URI: {ref_str}")
+        rest = ref_str[len(weave_internal_prefix) :]
+        parts = rest.split("/", 1)
+        if len(parts) != 2:
+            raise InvalidInternalRef(f"Invalid URI: {ref_str}")
+        project_id, tail = parts
+        if project_id not in int_to_ext_project_cache:
+            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
+                project_id
+            )
+        external_project_id = int_to_ext_project_cache[project_id]
+        if not external_project_id:
+            return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
+        return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
+
+    def mapper(obj: D) -> D:
+        if isinstance(obj, str):
+            if obj.startswith(weave_internal_prefix):
+                return cast(D, replace_ref(obj))
+            elif obj.startswith(weave_prefix):
+                # It is important to raise here as this would be the result of
+                # incorrectly storing an external ref at the database layer,
+                # rather than an internal ref. There is a possibility in the
+                # future that a programming error leads to this situation, in
+                # which case reading this object would consistently fail. We
+                # might want to instead return a private ref in this case.
+                raise InvalidInternalRef("Encountered unexpected ref format.")
+        return obj
+
+    return _map_values(obj, mapper)
+
+
+E = TypeVar("E")
+
+
+class _MapResult(NamedTuple):
+    """Outcome of a single copy-on-write traversal step.
+
+    value:           the (possibly new) value at this node.
+    changed:         True if this subtree was rewritten; ancestors must clone.
+    fast_path_safe:  False once we have seen a nested dataclass inside an
+                     `Any` field. Models containing one have to fall back to
+                     the legacy model_dump / model_validate path because
+                     Pydantic does not round-trip dataclasses through
+                     getattr / setattr.
+    """
+
+    value: Any
+    changed: bool
+    fast_path_safe: bool
+
+
+def _map_values(obj: E, func: Callable[[E], E]) -> E:
+    """Apply `func` to every scalar in `obj`, reusing untouched subtrees."""
+    return cast(E, _walk(obj, cast(Callable[[Any], Any], func)).value)
+
+
+def _walk(obj: Any, func: Callable[[Any], Any]) -> _MapResult:
+    """Recursive copy-on-write dispatcher; one container kind per arm."""
+    if isinstance(obj, BaseModel):
+        return _walk_model(obj, func)
+    if isinstance(obj, dict):
+        return _walk_mapping(obj, func)
+    if isinstance(obj, list):
+        return _walk_sequence(obj, func, rebuild=list)
+    if isinstance(obj, tuple):
+        return _walk_sequence(obj, func, rebuild=tuple)
+    if isinstance(obj, set):
+        return _walk_set(obj, func)
+
+    # Scalar leaf: ask the mapper for a replacement. Dataclasses are leaves
+    # too, but trip the fast-path flag so any ancestor model knows to
+    # round-trip via model_dump.
+    new_obj = func(obj)
+    if new_obj is not obj:
+        return _MapResult(new_obj, True, True)
+    return _MapResult(obj, False, not dataclasses.is_dataclass(obj))
+
+
+def _walk_mapping(obj: dict, func: Callable[[Any], Any]) -> _MapResult:
+    # Allocate a copy only on the first changed child, then write through it.
+    clone: dict | None = None
+    fast_path_safe = True
+    for key, value in obj.items():
+        result = _walk(value, func)
+        if result.changed:
+            if clone is None:
+                clone = dict(obj)
+            clone[key] = result.value
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+    if clone is None:
+        return _MapResult(obj, False, fast_path_safe)
+    return _MapResult(clone, True, fast_path_safe)
+
+
+def _walk_sequence(
+    obj: Any,
+    func: Callable[[Any], Any],
+    rebuild: Callable[[list[Any]], Any],
+) -> _MapResult:
+    # Lists and tuples share an identical walk; only the final constructor
+    # differs (`list` returns the buffer, `tuple` freezes it).
+    clone: list[Any] | None = None
+    fast_path_safe = True
+    for index, value in enumerate(obj):
+        result = _walk(value, func)
+        if result.changed:
+            if clone is None:
+                clone = list(obj)
+            clone[index] = result.value
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+    if clone is None:
+        return _MapResult(obj, False, fast_path_safe)
+    return _MapResult(rebuild(clone), True, fast_path_safe)
+
+
+def _walk_set(obj: set, func: Callable[[Any], Any]) -> _MapResult:
+    # Sets have no useful index to write through, so we collect into a list
+    # and rebuild only when something changed.
+    values: list[Any] = []
+    changed = False
+    fast_path_safe = True
+    for value in obj:
+        result = _walk(value, func)
+        values.append(result.value)
+        changed = changed or result.changed
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+    if not changed:
+        return _MapResult(obj, False, fast_path_safe)
+    return _MapResult(set(values), True, fast_path_safe)
+
+
+def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
+    """Walk a pydantic model with copy-on-write semantics.
+
+    Three outcomes, in order:
+      1. A subtree tripped `fast_path_safe=False` (nested dataclass that
+         getattr/setattr can't round-trip cleanly) -> fall back to the
+         legacy model_dump / _walk / model_validate path.
+      2. Nothing changed -> return obj as-is, with one revalidation pass
+         so `model_construct`-bypassed instances still get the same
+         shape the legacy round-trip would have produced.
+      3. Something changed -> apply updates and revalidate.
+    """
+    updates, fast_path_safe = _collect_model_updates(obj, func)
+
+    if not fast_path_safe:
+        return _MapResult(_model_via_roundtrip(obj, func), True, True)
+    if not updates:
+        return _MapResult(obj.__class__.model_validate(obj), False, True)
+    return _MapResult(_apply_model_updates(obj, updates), True, True)
+
+
+def _collect_model_updates(
+    obj: BaseModel, func: Callable[[Any], Any]
+) -> tuple[dict[str, Any], bool]:
+    """Walk every declared field + every extra; collect what changed.
+
+    `model_fields` covers declared fields. `model_extra` covers anything
+    stashed by `extra='allow'` and is None for other models (so that
+    loop is a no-op in the common case). Both sets of keys are merged
+    into `updates` because setattr / model_copy(update=...) accept extra
+    keys for `extra='allow'` models.
+    """
+    updates: dict[str, Any] = {}
+    fast_path_safe = True
+
+    for field_name, field_info in obj.__class__.model_fields.items():
+        if field_info.exclude is True:
+            continue
+        result = _walk(getattr(obj, field_name), func)
+        if result.changed:
+            updates[field_name] = result.value
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+
+    for extra_name, extra_value in (obj.model_extra or {}).items():
+        result = _walk(extra_value, func)
+        if result.changed:
+            updates[extra_name] = result.value
+        fast_path_safe = fast_path_safe and result.fast_path_safe
+
+    return updates, fast_path_safe
+
+
+def _apply_model_updates(obj: BaseModel, updates: dict[str, Any]) -> BaseModel:
+    """Apply `updates` to `obj`. Frozen models get a copy; others mutate.
+
+    Mutating in place preserves the outer model's identity so callers
+    that hold the reference see the rewrite without an extra allocation.
+    Either branch ends with model_validate so any pre-validation bypass
+    via model_construct still gets the shape the legacy round-trip would
+    have produced.
+    """
+    if obj.__class__.model_config.get("frozen"):
+        updated = obj.model_copy(update=updates)
+        return updated.__class__.model_validate(updated)
+
+    for field_name, new_value in updates.items():
+        setattr(obj, field_name, new_value)
+    return obj.__class__.model_validate(obj)
+
+
+def _model_via_roundtrip(obj: BaseModel, func: Callable[[Any], Any]) -> BaseModel:
+    """Fallback used when a model contains a nested dataclass.
+
+    `by_alias=True` is required: query models have Mongo-style aliased
+    fields (e.g. `$gt`) whose internal property names cannot round-trip
+    without it.
+    """
+    orig = obj.model_dump(by_alias=True)
+    walked = _walk(orig, func)
+    return obj.model_validate(walked.value)
