@@ -1,0 +1,68 @@
+## Conversation
+User asked to split stack-bottom PR #7177 ("rebuild RemoteHTTPTraceServer on
+weave-server-sdk") into two PRs: (1) removing
+stainless_remote_http_trace_server, (2) replacing functionality inside
+remote_http_trace_server. This commit is PR (1), inserted below #7177; the
+existing #7177 branch keeps the rebuild only.
+
+## Actions
+- Partitioned `git diff master d34b793bdb` file by file. Pure PR-1 files
+  (taken verbatim from d34b793bdb because PR A's change to them was 100%
+  stainless-decoupling): settings.py, api.py, tests/trace_server/conftest.py,
+  noxfile.py, .github/workflows/test.yaml, AGENTS.md,
+  tests/trace_server_bindings/test_trace_server_bindings.py. Pure PR-2 files
+  (untouched here): remote_http_trace_server.py, tests/conftest.py,
+  weave/utils/http_requests.py + its test, test_tags_aliases_routes.py,
+  uv.lock.
+- Hand-built intermediates: weave_init.py (drop should_use_stainless_server
+  import + the stainless branch, KEEP master's top-level RemoteHTTPTraceServer
+  import — the lazy import with its weave_server_sdk rationale belongs to the
+  rebuild PR); tests/trace_server_bindings/conftest.py (drop server_class
+  fixture + pytest_ignore_collect; server fixture constructs
+  RemoteHTTPTraceServer directly); pyproject.toml (drop commented stainless
+  dep group + BOTH remote_only/stainless_only markers).
+- git rm stainless module + test_http_behavior_stainless.py; git mv
+  test_http_behavior_remote.py -> test_http_behavior.py (content unchanged,
+  rename shows as R100).
+- Also fixed strays PR A had missed: the remote_only/stainless_only markers
+  (still referenced the deleted flag) and the weave_client.py:3072 docstring
+  "(RemoteHTTPTraceServer, StainlessRemoteHTTPTraceServer)" ->
+  "(RemoteHTTPTraceServer)".
+
+## Errors & Mistakes
+- First Edit calls on weave_init.py failed with "File has been modified since
+  read" — the file had been read pre-branch-switch (PR-A content), and the
+  checkout changed it to master content. Re-read after switching, then edit.
+- `echo ===` in zsh tried to execute `===` (equals-expansion) — quote it.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- test_trace_server_bindings.py at this commit == its state at the rebuild
+  PR; the unconditional `server.call_processor._dropped_item_count = 0` is
+  valid for the OLD requests-era binding too (the attribute exists on both
+  master processors: async_batch_processor.py:89, call_batch_processor.py:334)
+  and on a fresh fixture it is a no-op reset to an already-0 value.
+- The old binding (still shipped by this PR) uses httpx via
+  weave.utils.http_requests — that is why the surviving exception arm in
+  test_requeue_after_max_retries is httpx.ConnectError; the requests arm
+  belonged to the OLD git-pinned stainless SDK generation.
+- pytest_ignore_collect could not simply lose its stainless branch: with the
+  flag gone the whole hook is dead (no _stainless/_remote files remain), so
+  it is deleted, not trimmed.
+- uv.lock is intentionally untouched: the removed dep group was commented
+  out, markers are pytest config — nothing changes resolution.
+
+## Codebase Discoveries
+- The stainless feature was already unusable from a clean install on master:
+  pyproject's stainless group was commented out, so
+  WEAVE_USE_STAINLESS_SERVER=true would ImportError at
+  init_weave_get_server unless the user manually installed the git SDK.
+- Commit 801dbac8af (stack PR #7178) REGRESSED two weave_client.py comments
+  from RemoteHTTPTraceServer back to StainlessRemoteHTTPTraceServer (lines
+  439/2203 at that commit) — cherry-source artifact from the old stack; fixed
+  during the restack that follows this commit.
+
+## Open Questions
+None.
