@@ -158,3 +158,18 @@ workspace was created for exactly this task.
   PR body.
 - huggingface cassettes need re-recording for huggingface_hub's
   ?expand=inferenceProviderMapping (pre-existing, no CI shard runs it).
+
+## Rebase addendum (2026-06-10, 4915b96ff0 -> b8135fe354)
+Rebased onto origin/master picking up #7043 (aggregate feedback endpoint) and
+#7131. Conflicts: (1) sqlite_trace_server.py modify/delete — upstream added a
+NotImplementedError stub for feedback_aggregate; resolved by keeping the
+deletion. (2) test_feedback.py import block — kept upstream's DummyIdConverter
+import, dropped client_is_sqlite. Beyond markers: upstream's new tests
+reintroduced two client_is_sqlite guards (test_feedback_aggregate asserted
+sqlite raises NotImplementedError then returned early; a query-builder test
+skipped on sqlite) — stripped both as part of the resolution, so
+test_feedback_aggregate now exercises the real CH path everywhere. Verified
+post-rebase on ClickHouse: 8 aggregate tests + full test_feedback.py (28
+passed); repo-wide sqlite audit still shows only the chromadb toolchain files.
+Note: notes.rewriteRef is set in this repo, so rebase auto-copies notes — no
+manual notes copy needed after restacks (gt modify may still orphan them).
