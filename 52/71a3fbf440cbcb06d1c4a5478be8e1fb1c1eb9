@@ -1,0 +1,62 @@
+## Conversation
+This stack is round 2 of the in-memory fake trace server. Round 1 (PRs
+#7145-#7152 v3) replicated the SQLite trace server. The user then said:
+'It seems like a lot of this stack tries to replicate the sqlite trace
+server, when in reality it should probably replicate the clickhouse trace
+server. Please update the stack accordingly.' Everything here is the
+ClickHouse re-target: the fake now replicates ClickHouse (the production
+backend) at the interface level, client_is_sqlite(client) is False for the
+fake, and a new client_is_clickhouse(client) predicate gates tests that
+assert ClickHouse *internals* (SQL, table routing/residence, batching,
+bucket file storage, raw server._query access).
+
+## Verification protocol (applies to the whole stack)
+ClickHouse baselines: tests/trace_server 1336 passed/2 skipped/1 failed
+(test_skip_clickhouse_client, pre-existing); tests/trace 1679/26/1
+(test_flask_server, pre-existing env). Fake converged runs on this exact
+tree: tests/trace_server 1240 passed/105 skipped/0 failed; tests/trace
+1665 passed/42 skipped/1 failed (same flask test). Every extra fake skip
+was audited with -rs: all are explicit ClickHouse-only gates (the
+internals listed above) plus 26 environment skips identical on both
+backends. The CH-internals skip total in tests/trace is exactly the gate
+flips in the wiring commit. Secondary shards (flow/compat/utils/
+wandb_interface/session/shared/object) pass identically to sqlite
+(2 pre-existing env failures: test_evaluation_invalid_model_name_*,
+test_from_obj_unwraps_nested_weave_object — fail the same on sqlite,
+backend-independent).
+
+## This commit (stage 10/10: test-suite wiring)
+- tests/trace_server/conftest.py: --trace-server=fake + --fk/--fake
+  shorthand; fake grouped with sqlite for process-management purposes
+  only (no docker/CH process needed).
+- tests/trace/util.py: client_is_sqlite back to SqliteTraceServer-only
+  (round 1 had counted the fake as sqlite — reverted as part of the CH
+  re-target); NEW client_is_clickhouse(client) for gating CH-internals
+  assertions.
+- Gate flips (sanctioned backend hacks -> client_is_clickhouse):
+  test_client_trace.py (large_keys stripping, dupe_select branch,
+  project_stats_clickhouse, stats-table raw inserts),
+  test_server_file_storage.py (all bucket-storage gates),
+  test_call_stats.py force_merge_calls, test_project_version.py,
+  test_clickhouse_batching.py, test_call_lifecycle.py,
+  test_calls_complete.py / test_otel_calls_complete.py (table
+  residence), test_custom_provider.py (obj_read patch both backends),
+  test_feedback.py functional SQL test, annotation-queue direct-DB
+  tests, test_queue_filtering.py, test_rescore_evaluation.py,
+  test_trace_server_conftest.py, test_ttl_insert_paths.py (fake
+  branches assert datetime expire_at).
+- tests/trace_server/helpers.py force_optimize no-ops on None ch_client.
+- AGENTS.md documents the fake as replicating ClickHouse and the gating
+  rule.
+
+## Errors & Mistakes
+- During the round-1 stack rebuild an old AGENTS.md was restored over
+  master's newer section; caught by reviewing the diff, fixed with git
+  checkout master -- AGENTS.md + re-applying only the fake-backend
+  edits. This round the rebuild script copies the verified snapshot
+  wholesale and the tree is cmp-verified file-by-file against it.
+
+## Open Questions
+- The full agent-observability query surface (AgentQueryHandler) is
+  CH-only; if those APIs stabilize, the fake needs a real
+  agent_spans_query superset.
