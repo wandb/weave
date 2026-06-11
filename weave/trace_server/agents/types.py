@@ -962,7 +962,6 @@ class AgentTraceChatRes(BaseModel):
 
     trace_id: str
     root_span_name: str | None = None
-    # Root span's agent metadata, so a turn-level reaction can carry them.
     agent_name: str | None = None
     agent_version: str | None = None
     status_code: str | None = None
