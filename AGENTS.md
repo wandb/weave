@@ -94,6 +94,21 @@ Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
   ClickHouse backend. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
 
+### VCR + ClickHouse isolation (integration tests)
+
+- Integration tests replay provider traffic from VCR cassettes while the weave
+  client concurrently talks to ClickHouse over localhost HTTP. vcrpy is not
+  safe for that concurrency out of the box: its urllib3 passthrough wraps real
+  sends in `force_reset()`, which briefly unpatches httpx/httpcore globally and
+  lets provider calls escape an active cassette to the live API (seen as real
+  OpenAI 429s in CI). `tests/integrations/conftest.py` carries two autouse
+  fixtures that prevent this — read their docstrings before touching VCR
+  config, and keep `tests/integrations/langchain/test_vcr_isolation.py` green.
+- Corollary: a real provider 4xx during a `record_mode="none"` cassette means
+  VCR's patches were absent at request time (an isolation bug), not that the
+  cassette failed to match — matching failures raise
+  `CannotOverwriteExistingCassetteException` instead.
+
 ### Key Test Shards
 
 Focus on these primary test shards:
