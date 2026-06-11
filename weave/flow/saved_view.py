@@ -154,11 +154,9 @@ OPERATOR_MAP = {
 
 VALUELESS_OPERATORS = {"(any): isEmpty", "(any): isNotEmpty"}
 
-# We return a real float from the backend! do not convert to double!
-# When option clicking latency, because we are generating this field
-# manually on the backend, it is actually a float, not a string stored
-# in json, so we need to omit the conversion params from the filter
-FIELDS_NO_FLOAT_CONVERT = {"summary.weave.latency_ms"}
+# Real typed columns (a backend float, a DateTime64), not JSON strings, so they
+# skip the `to: double` cast. toFloat64OrNull on started_at is rejected by ClickHouse.
+FIELDS_NO_FLOAT_CONVERT = {"summary.weave.latency_ms", "started_at"}
 
 
 def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:

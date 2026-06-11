@@ -6,6 +6,7 @@ import weave
 from weave.flow.saved_view import (
     Filter,
     Filters,
+    filter_to_clause,
     filters_to_query,
     query_to_filters,
     to_seconds,
@@ -122,6 +123,27 @@ def test_roundtrip_operators():
         query = filters_to_query(filters)
         filters2 = query_to_filters(query)
         assert filters == filters2
+
+
+def test_number_filter_skips_float_convert_for_typed_columns():
+    """Typed columns (started_at, latency_ms) skip the `$convert` to double; JSON fields keep it."""
+    assert filter_to_clause(
+        Filter(field="started_at", operator="(number): >=", value=1777593600)
+    ) == {"$gte": [{"$getField": "started_at"}, {"$literal": 1777593600.0}]}
+    assert filter_to_clause(
+        Filter(field="started_at", operator="(number): <=", value=1778889599)
+    ) == {"$not": [{"$gt": [{"$getField": "started_at"}, {"$literal": 1778889599.0}]}]}
+    assert filter_to_clause(
+        Filter(field="summary.weave.latency_ms", operator="(number): >", value=100)
+    ) == {"$gt": [{"$getField": "summary.weave.latency_ms"}, {"$literal": 100.0}]}
+    assert filter_to_clause(
+        Filter(field="inputs.score", operator="(number): >", value=5)
+    ) == {
+        "$gt": [
+            {"$convert": {"input": {"$getField": "inputs.score"}, "to": "double"}},
+            {"$literal": 5.0},
+        ]
+    }
 
 
 def test_filter_op_without_client():
