@@ -181,7 +181,7 @@ describe('OpenAI Integration', () => {
     const rawCreate = mockOpenAI.chat.completions.create;
     mockOpenAI.chat.completions.create = (params: any) => {
       const shim = rawCreate(params);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
       const {_thenUnwrap: _removed, ...rest} = shim;
       return rest;
     };
@@ -495,7 +495,6 @@ describe('OpenAI Integration', () => {
 
     let caught: unknown;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _chunk of stream) {
         // consume; the error fires after the first chunk
       }
