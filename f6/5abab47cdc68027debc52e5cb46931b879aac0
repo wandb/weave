@@ -80,6 +80,3 @@ whole-tree mirror carrying impl twins.
 
 ## Open Questions
 None.
-
-## Addendum 3
-Reverted the mirror llm_structured copy: the guard PR's meta-test enforces the mirror as a PURE import leaf (AST-checked), which the fused class violates. At this level the judge scorer, serialize's single special case, and the client tests keep building the SERVER-path class (one class everywhere client-side; C1-baselined in the guard); the llm-structured PR later introduces weave/model's runnable + the pure schema mirror, exactly as originally designed.
