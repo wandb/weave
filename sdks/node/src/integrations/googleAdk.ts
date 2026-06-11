@@ -9,7 +9,21 @@
  * start of the run. The agent callbacks are still implemented, so nesting
  * improves automatically if a later ADK version starts calling them.
  *
- * Usage:
+ * Automatic usage: CJS apps should `require('weave')` before `@google/adk`;
+ * ESM apps should preload Weave so the import hook is active before static
+ * ADK imports run:
+ * ```bash
+ * node --import=weave/instrument app.mjs
+ * ```
+ * ```typescript
+ * import * as weave from 'weave';
+ * import {InMemoryRunner} from '@google/adk';
+ *
+ * await weave.init('my-project');
+ * const runner = new InMemoryRunner(myAgent); // auto-traced
+ * ```
+ *
+ * Explicit usage (no module hooks, e.g. bundlers):
  * ```typescript
  * import {init, WeaveAdkPlugin} from 'weave';
  * import {InMemorySessionService, LlmAgent, Runner} from '@google/adk';
@@ -111,7 +125,20 @@ import {
   ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../genai/semconv';
+import {globalSingleton} from '../utils/globalSingleton';
 import {warnOnce} from '../utils/warnOnce';
+import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+
+/** The slice of ADK's `PluginManager` used for idempotent registration. */
+interface AdkPluginManager {
+  getPlugin(name: string): unknown;
+  registerPlugin(plugin: unknown): void;
+}
+
+/** The slice of ADK's `Runner` the instrumentation hook needs. */
+interface AdkRunnerLike {
+  pluginManager?: AdkPluginManager;
+}
 
 /** Name the plugin registers under in ADK's PluginManager (must be unique). */
 export const WEAVE_ADK_PLUGIN_NAME = 'weave';
@@ -148,6 +175,12 @@ const ADK_TO_GENAI_ROLE: Record<string, string> = {
   user: 'user',
   model: 'assistant',
 };
+
+// Tested version range. Every patched surface is typeof-guarded, so minor
+// bumps that keep the plugin API intact keep working.
+const ADK_VERSION_RANGE = '>= 1.0.0';
+// `@google/adk` is `"type": "module"`; its `require` condition resolves here.
+const ADK_CJS_SUBPATH = 'dist/cjs/index.js';
 
 const WARN_KEY_PLUGIN_ERROR = 'weave-adk-plugin-error';
 
@@ -1235,4 +1268,99 @@ function errorTypeOf(error: Error): string {
 
 function errorMessageOf(error: Error): string {
   return error.message;
+}
+
+// ---------------------------------------------------------------------------
+// Automatic instrumentation
+// ---------------------------------------------------------------------------
+
+// Shared across CJS/ESM module copies so both loaders see one plugin
+// instance and one patch state.
+const adkInstrumentationHolder = globalSingleton<{
+  plugin: WeaveAdkPlugin | null;
+}>('_weave_adk_instrumentation', () => ({plugin: null}));
+
+const weaveAdkRunnerPatched = Symbol.for('_weave_adk_runner_patched');
+
+function getSharedPlugin(): WeaveAdkPlugin {
+  if (!adkInstrumentationHolder.plugin) {
+    adkInstrumentationHolder.plugin = new WeaveAdkPlugin();
+  }
+  return adkInstrumentationHolder.plugin;
+}
+
+/** Registers the shared plugin on a runner's PluginManager, idempotently. */
+function ensurePluginRegistered(runner: AdkRunnerLike): void {
+  try {
+    const pluginManager = runner?.pluginManager;
+    if (
+      !pluginManager ||
+      typeof pluginManager.getPlugin !== 'function' ||
+      typeof pluginManager.registerPlugin !== 'function'
+    ) {
+      return;
+    }
+    if (pluginManager.getPlugin(WEAVE_ADK_PLUGIN_NAME)) {
+      return;
+    }
+    pluginManager.registerPlugin(getSharedPlugin());
+  } catch {
+    // Never let instrumentation break a user run.
+  }
+}
+
+/**
+ * Patches `Runner.prototype.runAsync` / `runEphemeral` so every runner
+ * (including subclasses) self-registers the Weave plugin on first use,
+ * before ADK reads the plugin list.
+ */
+function patchRunnerClass(RunnerClass: any): void {
+  const proto = RunnerClass?.prototype;
+  if (!proto || proto[weaveAdkRunnerPatched]) {
+    return;
+  }
+  for (const method of ['runAsync', 'runEphemeral']) {
+    const original = proto[method];
+    if (typeof original !== 'function') {
+      continue;
+    }
+    proto[method] = function (this: AdkRunnerLike, ...args: unknown[]) {
+      ensurePluginRegistered(this);
+      return original.apply(this, args);
+    };
+  }
+  Object.defineProperty(proto, weaveAdkRunnerPatched, {
+    value: true,
+    enumerable: false,
+    configurable: true,
+  });
+}
+
+/** Module-load hook shared by the CJS and ESM paths. */
+export function commonPatchGoogleADK(exports: any) {
+  try {
+    if (exports?.Runner) {
+      patchRunnerClass(exports.Runner);
+    }
+  } catch (error) {
+    warnOnce(
+      WARN_KEY_PLUGIN_ERROR,
+      `Weave: failed to instrument @google/adk: ${error}`
+    );
+  }
+  return exports;
+}
+
+export function instrumentGoogleADK() {
+  addCJSInstrumentation({
+    moduleName: '@google/adk',
+    subPath: ADK_CJS_SUBPATH,
+    version: ADK_VERSION_RANGE,
+    hook: commonPatchGoogleADK,
+  });
+  addESMInstrumentation({
+    moduleName: '@google/adk',
+    version: ADK_VERSION_RANGE,
+    hook: commonPatchGoogleADK,
+  });
 }
