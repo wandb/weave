@@ -2,6 +2,7 @@ import {type Span, SpanKind, SpanStatusCode} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
+import {SpanBase} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
@@ -32,14 +33,14 @@ export interface SubAgentInit {
  *   sub.end();
  * }
  */
-export class SubAgent {
-  private _ended = false;
-
+export class SubAgent extends SpanBase {
   private constructor(
-    private readonly span: Span,
+    span: Span,
     public readonly name: string,
     public readonly model: string
-  ) {}
+  ) {
+    super(span);
+  }
 
   static create(opts: SubAgentInit & ChildSpanContext): SubAgent {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
