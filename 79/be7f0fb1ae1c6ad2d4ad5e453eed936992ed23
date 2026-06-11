@@ -35,3 +35,8 @@ None new.
 
 ## Open Questions
 None.
+
+## Addendum (stack split, 2026-06-11)
+Re-cut during the #7177 split; same three micro-fixes as the parent commit
+(markers, weave_init annotation, weave_client comment names). See parent
+notes for details.
