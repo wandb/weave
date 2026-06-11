@@ -1939,8 +1939,31 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
                 return field
-            raise InvalidFieldError(f"Field {name} is not allowed")
+            raise InvalidFieldError(_invalid_field_message(name))
     return ALLOWED_CALL_FIELDS[name]
+
+
+ALLOWED_DYNAMIC_FIELD_PREFIXES = (
+    "feedback.*",
+    "annotation_queue_items.*",
+    "summary.weave.*",
+)
+
+
+def _invalid_field_message(name: str) -> str:
+    """Build an actionable `field not allowed` message listing valid fields."""
+    dotted_prefixes = tuple(
+        f"{field_name[: -len('_dump')]}.*"
+        for field_name, field in ALLOWED_CALL_FIELDS.items()
+        if isinstance(field, CallsMergedDynamicField)
+    )
+    allowed = ", ".join(sorted(ALLOWED_CALL_FIELDS))
+    prefixes = ", ".join(sorted(ALLOWED_DYNAMIC_FIELD_PREFIXES + dotted_prefixes))
+    return (
+        f"Field {name} is not allowed. "
+        f"Allowed fields: {allowed}. "
+        f"Allowed dynamic prefixes: {prefixes}."
+    )
 
 
 def _field_as_sql_maybe_agg(
@@ -2162,7 +2185,7 @@ def process_query_to_conditions(
             if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
                 return None
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+                raise InvalidFieldError(_invalid_field_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
             if isinstance(structured_field, CallsMergedDynamicField):
@@ -2313,7 +2336,7 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+                raise InvalidFieldError(_invalid_field_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
 

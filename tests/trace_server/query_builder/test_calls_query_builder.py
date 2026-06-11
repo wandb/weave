@@ -12,12 +12,14 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
     ParamBuilder,
     QueryBuilderDynamicField,
+    _invalid_field_message,
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
+    get_field_by_name,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -3237,66 +3239,52 @@ def test_disallowed_fields():
     # with bogus direction
     with pytest.raises(ValueError, match="not allowed"):
         cq.add_order("storage_size_bytes", "ASCDESC")
-    # now try filtering with disallowed
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GtOperation.model_validate(
-            {
-                "$gt": [
-                    {"$getField": "storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
+    # now try filtering with disallowed; the message lists the allowed fields
+    for op_key, op_cls, field in (
+        ("$gt", tsi_query.GtOperation, "storage_size_bytes"),
+        ("$gte", tsi_query.GteOperation, "total_storage_size_bytes"),
+        ("$lt", tsi_query.LtOperation, "storage_size_bytes"),
+        ("$lte", tsi_query.LteOperation, "total_storage_size_bytes"),
+    ):
+        cq = CallsQuery(project_id="test/project")  # reset
+        cq.add_field("id")
+        cq.add_condition(
+            op_cls.model_validate({op_key: [{"$getField": field}, {"$literal": 1}]})
         )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
+        with pytest.raises(InvalidFieldError) as exc_info:
+            cq.as_sql(ParamBuilder())
+        assert str(exc_info.value) == _invalid_field_message(field)
 
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GteOperation.model_validate(
-            {
-                "$gte": [
-                    {"$getField": "total_storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
 
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.LtOperation.model_validate(
-            {
-                "$lt": [
-                    {"$getField": "storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
+def test_invalid_field_message_lists_allowed_fields():
+    """An unknown filter/sort field surfaces the full allowed-field list (read-path 403)."""
+    expected = (
+        "Field made_up_field is not allowed. "
+        "Allowed fields: attributes_dump, deleted_at, display_name, ended_at, "
+        "exception, expire_at, id, input_refs, inputs_dump, op_name, otel_dump, "
+        "output_dump, output_refs, parent_id, project_id, started_at, "
+        "storage_size_bytes, summary_dump, thread_id, total_storage_size_bytes, "
+        "trace_id, turn_id, wb_run_id, wb_run_step, wb_run_step_end, wb_user_id. "
+        "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
+        "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
     )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
+    assert _invalid_field_message("made_up_field") == expected
 
-    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(InvalidFieldError) as exc_info:
+        get_field_by_name("made_up_field")
+    assert str(exc_info.value) == expected
+
+    # filtering on an unknown field surfaces the same actionable message
+    cq = CallsQuery(project_id="test/project")
     cq.add_field("id")
     cq.add_condition(
-        tsi_query.LteOperation.model_validate(
-            {
-                "$lte": [
-                    {"$getField": "total_storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "made_up_field"}, {"$literal": 1}]}
         )
     )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
+    with pytest.raises(InvalidFieldError) as exc_info:
         cq.as_sql(ParamBuilder())
+    assert str(exc_info.value) == expected
 
 
 def test_thread_id_filter_eq():
