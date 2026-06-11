@@ -1,0 +1,61 @@
+## Restructure addendum (2026-06-10, feedback round)
+Re-authored from 001e15b935 on the feedback-round stack (guard repositioned
+after the merged structural PR; per-side conformance layout). Doc deltas vs
+the original: intro notes the guard's new position; the corpus section,
+enforcement bullets, PR table (rows 1-4), and cutover list describe the
+per-side fixture copies under tests/trace_server/conformance/ +
+tests/conformance/ instead of a shared repo-root conformance/ dir. pyproject
+header keeps the per-side corpus location through the maintain-zero flip.
+Original note follows.
+
+## Conversation
+Round 3 ts-split PR 8 (final): declare strict zero; flip burn-down ->
+maintain-zero. The user's 5 rules are fully satisfied across the stack:
+(1) nothing was ever added to a shared dir -- weave/shared is dissolved into
+per-side implementations gated by the JSONL conformance corpus (future home:
+core repo, git-referenced); (2) nothing was added to weave/flow -- not even
+__init__.py; flow is frozen with two-direction AST guards; (3) zero transient
+state -- ignore lists only ever shrank or path-renamed, every PR
+independently green; (4) shuffles are their own PRs (the one deliberate
+exception, split+worker-move, is justified inline in PR 5); (5) the interface
+trees are pure contract -- impl lives per side in precise homes.
+
+## Actions
+- pyproject/AGENTS/doc framing flipped to maintain-zero; PR table marked
+  landed.
+- Stack surgery follows this commit: branch refs reset to the round-3 chain,
+  andrew/ts-split-eval-worker deleted (merged into PR 5), gt parent metadata
+  retracked for the new order, notes attached per commit.
+
+## Errors & Mistakes
+None in this commit.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- THE INVARIANTS: (1) ignore lists stay EMPTY; (2) client interface tree is a
+  byte-identical SUBSET of the server's (identity gate); (3) corpus rows are
+  append-only -- never edit an expected value; (4) per-side behavior changes
+  touch both sides + corpus in one PR; (5) weave/flow gains nothing, ever,
+  and must NOT gain __init__.py; (6) weave/shared stays deleted; (7) every
+  other weave/ package keeps its __init__.py (grimp blindness).
+- Round-3 verification was SQLite + local ClickHouse (docker) for the suites
+  touched per level; full CI sweep on submit.
+- Remaining work: the doc's cutover checklist; the deferred client-fixture
+  backend decision blocks only the final removal PR.
+
+## Codebase Discoveries
+- Two latent round-2 bugs were found and fixed by round-3's
+  test-against-real-behavior approach: the evaluation-status twin-class
+  comparison (ClickHouse-only test never run locally in round 2) and the
+  content encoding rule (requests ISO-8859-1 vs the client's actual httpx
+  utf-8 fallback).
+
+## Open Questions
+- Cutover timing/coordination with core (submodule bump; core repoints to
+  weave.trace_server.interface.* and weave.eval_worker.*; conformance/ moves
+  to core and gets git-referenced here).
+
+## Addendum (round 4 restack)
+The strict-zero declaration is softened to 'achieved up to ONE documented entry': round 4 removed builtin object classes from the client (staging PR), so the mirror carries no registry and the client digest twin (weave.trace.object_class_util) keeps a lazy import of the SERVER contract registry for digest parity. The entry is grandfathered in pyproject's C1 list with a burn-down story (builtin-schema codegen follow-up). Updated in the same breath: pyproject's Maintain-zero banner, docs/TRACE_SERVER_DECOUPLING.md (intro, enforcement bullet, bridge rules), AGENTS.md maintain-zero rule. C2's ignore list normalized from [\n] to [].
