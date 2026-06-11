@@ -160,3 +160,14 @@ export interface AdkEvent {
   errorCode?: string;
   errorMessage?: string;
 }
+
+/** The slice of ADK's `PluginManager` used for idempotent registration. */
+export interface AdkPluginManager {
+  getPlugin(name: string): unknown;
+  registerPlugin(plugin: unknown): void;
+}
+
+/** The slice of ADK's `Runner` the instrumentation hook needs. */
+export interface AdkRunnerLike {
+  pluginManager?: AdkPluginManager;
+}

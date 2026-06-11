@@ -27,7 +27,10 @@ import {
 
 import * as weave from '../..';
 import {clearWeaveTracerProvider} from '../../genai/provider';
-import {WeaveAdkPlugin} from '../../integrations/googleAdk';
+import {
+  commonPatchGoogleADK,
+  WeaveAdkPlugin,
+} from '../../integrations/googleAdk';
 import {commonPatchGoogleGenAI} from '../../integrations/googleGenAI';
 import {Settings} from '../../settings';
 import {initWithCustomTraceServer} from '../clientMock';
@@ -453,6 +456,38 @@ describe('Google ADK integration', () => {
       expect(chatSpan.attributes['gen_ai.output.messages']).toContain(
         'served from cache'
       );
+    });
+
+    test('auto-registers the plugin when the module hook has run', async () => {
+      // Jest's module registry bypasses Module.prototype.require, so the
+      // CJS loader hook never fires here; apply the hook function directly.
+      // The real loader path is covered by host-app/e2e runs.
+      commonPatchGoogleADK(require('@google/adk'));
+
+      const agent = new LlmAgent({
+        name: 'auto_agent',
+        description: 'auto instrumented',
+        model: new ScriptedLlm(TEST_MODEL, [[textResponse('hello')]]),
+      });
+      // No plugins passed — the patched Runner.prototype.runAsync
+      // self-registers the shared Weave plugin.
+      const runner = new InMemoryRunner({agent, appName: 'weave-adk-test'});
+      const session = await runner.sessionService.createSession({
+        appName: 'weave-adk-test',
+        userId: 'user-1',
+      });
+
+      await runToCompletion(runner, {
+        userId: 'user-1',
+        sessionId: session.id,
+        newMessage: userMessage('hi'),
+      });
+
+      expect(runner.pluginManager.getPlugin('weave')).toBeDefined();
+
+      const spans = exporter.getFinishedSpans();
+      expect(byOperation(spans, 'invoke_agent').length).toBeGreaterThan(0);
+      expect(byOperation(spans, 'chat')).toHaveLength(1);
     });
   });
 
