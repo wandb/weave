@@ -24,6 +24,7 @@ import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import lru_cache
+from operator import attrgetter
 from pathlib import Path
 from typing import Any, cast
 
@@ -38,10 +39,15 @@ from weave.shared.digest import (
     compute_table_digest,
 )
 from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
     extract_refs_from_values,
+    split_exact_and_wildcard_values,
+    wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server import usage_utils
+from weave.trace_server.call_stats_helpers import validate_call_stats_range
 from weave.trace_server.calls_query_builder.stats_query_base import (
     GRANULARITY_1H,
     auto_select_granularity_seconds,
@@ -58,6 +64,7 @@ from weave.trace_server.clickhouse_trace_server_settings import (
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
+    InvalidFieldError,
     InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
@@ -75,6 +82,9 @@ from weave.trace_server.feedback import (
 from weave.trace_server.feedback_payload_schema import discover_payload_schema
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.interface.feedback_types import (
+    MULTI_VALUE_FEEDBACK_TYPES,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import Table, split_escaped_field_path
@@ -86,8 +96,15 @@ from weave.trace_server.token_costs import (
 )
 from weave.trace_server.trace_server_common import (
     apply_tags_and_synth_latest_in_place,
+    assert_parameter_length_less_than_max,
     digest_is_content_hash,
     digest_is_version_like,
+    empty_str_to_none,
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    make_derived_summary_fields,
+    make_feedback_query_req,
+    set_nested_key,
 )
 from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
@@ -108,12 +125,82 @@ _DEFAULT_COSTS_FILE = str(
     Path(__file__).parent / "migrations" / "006_seed_costs.up.sql"
 )
 
+# Top-level calls columns (mirrors ALLOWED_CALL_FIELDS in the ClickHouse
+# query builder, with the *_dump suffixes normalized away).
+_CALLS_PLAIN_COLUMNS = frozenset(
+    {
+        "id",
+        "project_id",
+        "trace_id",
+        "parent_id",
+        "thread_id",
+        "turn_id",
+        "op_name",
+        "display_name",
+        "started_at",
+        "ended_at",
+        "exception",
+        "wb_user_id",
+        "wb_run_id",
+        "wb_run_step",
+        "wb_run_step_end",
+        "deleted_at",
+        "expire_at",
+        "input_refs",
+        "output_refs",
+    }
+)
+
+# Mirrors DISALLOWED_FILTERING_FIELDS / DATETIME_COLUMN_FIELDS in the
+# ClickHouse calls query builder.
+_DISALLOWED_FILTERING_FIELDS = frozenset(
+    {"storage_size_bytes", "total_storage_size_bytes"}
+)
+_DATETIME_COLUMN_FIELDS = frozenset(
+    {"started_at", "ended_at", "deleted_at", "expire_at"}
+)
+# Summary fields with computed handlers (anything else under summary.weave.
+# raises InvalidFieldError, mirroring SUMMARY_FIELD_HANDLERS).
+_SUMMARY_FIELD_HANDLERS = frozenset({"status", "latency_ms", "trace_name"})
+
+
+def _compile_call_column(column: str) -> Any:
+    """Per-record getter for a plain calls column; unknown columns raise
+    InvalidFieldError like the ClickHouse query builder.
+    """
+    if column not in _CALLS_PLAIN_COLUMNS:
+        raise InvalidFieldError(f"Field {column} is not allowed")
+    return attrgetter(column)
+
 
 def _ensure_tz(dt: datetime.datetime) -> datetime.datetime:
     """Coerce a datetime to tz-aware UTC (naive datetimes are UTC wall time)."""
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(datetime.timezone.utc)
+
+
+def _maybe_datetime_literal(value: Any) -> datetime.datetime | None:
+    """Literal normalization for DateTime64 column comparisons.
+
+    Mirrors _maybe_convert_datetime_operands: numeric unix timestamps and
+    parseable date(time) strings convert; everything else returns None.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.datetime.fromtimestamp(float(value), tz=datetime.timezone.utc)
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        if s.endswith(("Z", "z")):
+            s = s[:-1] + "+00:00"
+        try:
+            return _ensure_tz(datetime.datetime.fromisoformat(s))
+        except ValueError:
+            return None
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +311,30 @@ def _ch_json_value(parsed: Any, path_parts: list[str] | None) -> str:
     if isinstance(val, float) and val.is_integer() and not math.isinf(val):
         return str(int(val))
     return str(val)
+
+
+def _ch_json_exists(parsed: Any, path_parts: list[str] | None) -> bool:
+    """Mirror the builder's exists cast:
+    NOT (JSONType(...) = 'Null' OR JSONType(...) IS NULL) — i.e. the path
+    exists AND its value is not JSON null.
+    """
+    val = parsed
+    for part in path_parts or []:
+        if isinstance(val, dict):
+            if part not in val:
+                return False
+            val = val[part]
+        elif isinstance(val, list):
+            try:
+                idx = int(part)
+            except ValueError:
+                return False
+            if idx < 0 or idx >= len(val):
+                return False
+            val = val[idx]
+        else:
+            return False
+    return val is not None
 
 
 _CH_INT64_RE = re.compile(r"^[+-]?\d+$")
@@ -575,6 +686,34 @@ def _load_default_cost_definitions() -> tuple[dict[str, Any], ...]:
     return tuple(default_rows)
 
 
+def _apply_aggregations(
+    bucket: dict[str, Any],
+    metric: str,
+    values: list[float] | list[int],
+    aggregations: list[tsi.AggregationType],
+    percentiles: list[float] | None = None,
+) -> None:
+    """Apply aggregation functions and percentiles to a list of values, writing results into bucket."""
+    for agg in aggregations:
+        if agg == tsi.AggregationType.SUM:
+            bucket[f"sum_{metric}"] = sum(values)
+        elif agg == tsi.AggregationType.AVG:
+            bucket[f"avg_{metric}"] = sum(values) / len(values) if values else 0
+        elif agg == tsi.AggregationType.MIN:
+            bucket[f"min_{metric}"] = min(values) if values else 0
+        elif agg == tsi.AggregationType.MAX:
+            bucket[f"max_{metric}"] = max(values) if values else 0
+        elif agg == tsi.AggregationType.COUNT:
+            bucket[f"count_{metric}"] = len(values)
+    if percentiles:
+        sorted_vals = sorted(values)
+        n = len(sorted_vals)
+        for p in percentiles:
+            idx = int(p / 100 * (n - 1))
+            idx = max(0, min(idx, n - 1))
+            bucket[f"p{int(p)}_{metric}"] = sorted_vals[idx]
+
+
 # Agent-monitor scores land under this scorer_ratings key; the feedback
 # aggregate rating filter targets it (mirrors feedback_agg_query_builder).
 _FEEDBACK_RATING_KEY = "_rating_"
@@ -652,6 +791,18 @@ def _feedback_aggregate_matches(
         if req.rating_max is not None and not (rating <= req.rating_max):
             return False
     return True
+
+
+def _interpolated_quantile(durations: list[float], level: float) -> float | None:
+    """Interpolated quantile over a sorted list (ClickHouse `quantile()`)."""
+    if not durations:
+        return None
+    k = level * (len(durations) - 1)
+    f = int(k)
+    c = f + 1
+    if c >= len(durations):
+        return durations[-1]
+    return durations[f] + (k - f) * (durations[c] - durations[f])
 
 
 @dataclass(slots=True)
@@ -1228,6 +1379,1117 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
 
             if call_costs:
                 weave_summary["costs"] = call_costs
+
+    # ------------------------------------------------------------------
+    # Calls query engine
+    # ------------------------------------------------------------------
+
+    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                limit=1,
+                filter=tsi.CallsFilter(call_ids=[req.id]),
+                include_costs=req.include_costs,
+                include_storage_size=req.include_storage_size,
+                include_total_storage_size=req.include_total_storage_size,
+            )
+        ).calls
+        return tsi.CallReadRes(call=calls[0] if calls else None)
+
+    def _feedback_rows_for_call(
+        self, project_id: str, call_id: str, feedback_type: str | None
+    ) -> list[dict[str, Any]]:
+        """Feedback rows attached to a call ref, in insertion (rowid) order."""
+        call_ref = ri.InternalCallRef(project_id=project_id, id=call_id).uri
+        with self.lock:
+            rows = [row for row in self._feedback if row["weave_ref"] == call_ref]
+        if feedback_type is not None:
+            rows = [row for row in rows if row["feedback_type"] == feedback_type]
+        return rows
+
+    def _compile_feedback_field(self, field_path: str) -> Any:
+        """Compile a `feedback.[type].…` field into a per-record evaluator,
+        mirroring CallsMergedFeedbackPayloadField in the ClickHouse builder:
+        anyIf over the call's feedback rows, then JSON_VALUE extraction —
+        a String expression where "no feedback" reads as ''.
+        """
+        path = field_path[len("feedback.") :]
+        match = re.match(r"^\[(.+?)\]\.(.+)$", path)
+        if not match:
+            raise InvalidFieldError(f"Invalid feedback field path: {field_path}")
+        feedback_type, rest = match.groups()
+
+        parts = rest.split(".")
+        if parts[0] == "payload":
+            db_column = "payload"
+            extra_parts = parts[1:]
+        elif parts[0] in {"runnable_ref", "trigger_ref"}:
+            db_column = parts[0]
+            extra_parts = []
+        else:
+            raise InvalidFieldError(f"Invalid feedback field path: {field_path}")
+
+        def extract(row: dict[str, Any]) -> str:
+            raw = row.get(db_column)
+            if db_column == "payload":
+                if extra_parts:
+                    return _ch_json_value(raw, extra_parts)
+                return "" if raw is None else _minify_json(raw)
+            return raw if isinstance(raw, str) else ""
+
+        if feedback_type == "*":
+
+            def evaluate_any(rec: _CallRec) -> str:
+                # anyIf(extracted, extracted != ''): first non-empty value
+                # across all feedback rows; '' when none.
+                for row in self._feedback_rows_for_call(rec.project_id, rec.id, None):
+                    value = extract(row)
+                    if value != "":
+                        return value
+                return ""
+
+            return evaluate_any
+
+        def evaluate(rec: _CallRec) -> str:
+            rows = self._feedback_rows_for_call(rec.project_id, rec.id, feedback_type)
+            if not rows:
+                return ""
+            return extract(rows[0])
+
+        return evaluate
+
+    def _feedback_values_array(self, rec: _CallRec, field_path: str) -> list[str]:
+        """Mirror as_array_sql: groupArrayIf of extracted values for a
+        multi-value feedback type (non-empty extracted values only when an
+        extra path is present).
+        """
+        path = field_path[len("feedback.") :]
+        match = re.match(r"^\[(.+?)\]\.(.+)$", path)
+        if not match:
+            raise InvalidFieldError(f"Invalid feedback field path: {field_path}")
+        feedback_type, rest = match.groups()
+        parts = rest.split(".")
+        extra_parts = parts[1:] if parts[0] == "payload" else []
+        rows = self._feedback_rows_for_call(rec.project_id, rec.id, feedback_type)
+        values: list[str] = []
+        for row in rows:
+            payload = row.get("payload")
+            if extra_parts:
+                value = _ch_json_value(payload, extra_parts)
+                if value != "":
+                    values.append(value)
+            else:
+                values.append("" if payload is None else _minify_json(payload))
+        return values
+
+    def _compile_calls_field(self, field_path: str, cast_to: str | None = None) -> Any:
+        """Compile a calls field reference into a per-record evaluator,
+        mirroring get_field_by_name + the field classes' as_sql in the
+        ClickHouse calls query builder.
+        """
+        if field_path.startswith("summary.weave."):
+            summary_field = field_path[len("summary.weave.") :]
+            if summary_field not in _SUMMARY_FIELD_HANDLERS:
+                supported = ", ".join(sorted(_SUMMARY_FIELD_HANDLERS))
+                raise InvalidFieldError(
+                    f"Summary field '{summary_field}' is not allowed. "
+                    f"Supported fields are: {supported}"
+                )
+            if summary_field == "status":
+                return self._status_case
+            if summary_field == "latency_ms":
+                return self._latency_ms
+            return self._trace_name_case
+        for col_name in ("inputs", "output", "attributes", "summary"):
+            if field_path == col_name or field_path.startswith(col_name + "."):
+                json_path = (
+                    split_escaped_field_path(field_path[len(col_name) + 1 :])
+                    if field_path != col_name
+                    else []
+                )
+                if cast_to == "exists":
+
+                    def evaluate_exists(
+                        rec: _CallRec,
+                        _col_name: str = col_name,
+                        _json_path: list[str] = json_path,
+                    ) -> bool:
+                        return _ch_json_exists(getattr(rec, _col_name), _json_path)
+
+                    return evaluate_exists
+
+                def evaluate(
+                    rec: _CallRec,
+                    _col_name: str = col_name,
+                    _json_path: list[str] = json_path,
+                    _cast_to: str | None = cast_to,
+                ) -> Any:
+                    value = _ch_json_value(getattr(rec, _col_name), _json_path)
+                    return _ch_cast_json_value(value, _cast_to)
+
+                return evaluate
+
+        # Plain column access. Casts are not applied to static columns in
+        # filters (mirroring process_operand); storage-size fields are
+        # filterable nowhere.
+        if field_path in _DISALLOWED_FILTERING_FIELDS:
+            raise InvalidFieldError(f"Field {field_path} is not allowed")
+        return _compile_call_column(field_path)
+
+    def _latency_ms(self, rec: _CallRec) -> int | None:
+        # CH: toUnixTimestamp64Milli(ended) - toUnixTimestamp64Milli(started);
+        # NULL while the call is still running.
+        if rec.ended_at is None:
+            return None
+        started_ms = int(rec.started_at.timestamp() * 1000)
+        ended_ms = int(rec.ended_at.timestamp() * 1000)
+        return ended_ms - started_ms
+
+    def _status_case(self, rec: _CallRec) -> str:
+        # ClickHouse handler order: error, then descendant_error, then
+        # running, then success.
+        if rec.exception is not None:
+            return "error"
+        error_count = _ch_cast_json_value(
+            _ch_json_value(rec.summary, ["status_counts", "error"]), "int"
+        )
+        if (error_count or 0) > 0:
+            return "descendant_error"
+        if rec.ended_at is None:
+            return "running"
+        return "success"
+
+    def _trace_name_case(self, rec: _CallRec) -> Any:
+        if rec.display_name is not None and rec.display_name != "":
+            return rec.display_name
+        op_name = rec.op_name
+        if op_name is not None and op_name.startswith(
+            ri.WEAVE_INTERNAL_SCHEME + ":///"
+        ):
+            last_segment = op_name.rsplit("/", 1)[-1]
+            colon_idx = last_segment.find(":")
+            if colon_idx == -1:
+                # The SQL substring expression yields an empty string when no
+                # colon is present.
+                return ""
+            return last_segment[:colon_idx]
+        return op_name
+
+    def _live_queue_ids_for_call(self, rec: _CallRec) -> set[str]:
+        """Queue ids with a live annotation_queue_items row for this call
+        (the INNER JOIN the ClickHouse builder adds for queue filters).
+        """
+        return {
+            item["queue_id"]
+            for item in self._annotation_queue_items.values()
+            if item["project_id"] == rec.project_id
+            and item["call_id"] == rec.id
+            and item["deleted_at"] is None
+        }
+
+    def _compile_calls_query(
+        self, query: tsi.Query, expand_columns: list[str] | None = None
+    ) -> Any:
+        """Compile the mongo-style query into a per-record predicate,
+        mirroring process_query_to_conditions in the ClickHouse calls query
+        builder. Compilation walks the AST once; evaluation is a closure
+        call per record.
+        """
+
+        def is_multi_value_feedback(operand: tsi_query.Operand) -> bool:
+            if not isinstance(operand, tsi_query.GetFieldOperator):
+                return False
+            return any(
+                f"feedback.[{ft}]" in operand.get_field_
+                for ft in MULTI_VALUE_FEEDBACK_TYPES
+            )
+
+        def queue_field_name(operand: tsi_query.Operand) -> str | None:
+            if not isinstance(operand, tsi_query.GetFieldOperator):
+                return None
+            name = operand.get_field_
+            if not name.startswith("annotation_queue_items."):
+                return None
+            field_name = name[len("annotation_queue_items.") :]
+            if field_name != "queue_id":
+                raise InvalidFieldError(
+                    f"Invalid annotation_queue_items field: {field_name}"
+                )
+            return field_name
+
+        def datetime_field_name(operand: tsi_query.Operand) -> str | None:
+            if (
+                isinstance(operand, tsi_query.GetFieldOperator)
+                and operand.get_field_ in _DATETIME_COLUMN_FIELDS
+            ):
+                return operand.get_field_
+            return None
+
+        def compile_operation(operation: tsi_query.Operation) -> Any:
+            if isinstance(operation, tsi_query.AndOperation):
+                if len(operation.and_) == 0:
+                    raise ValueError("Empty AND operation")
+                elif len(operation.and_) == 1:
+                    return compile_operand(operation.and_[0])
+                and_parts = [compile_operand(op) for op in operation.and_]
+                return lambda rec: all(_truthy(part(rec)) for part in and_parts)
+            elif isinstance(operation, tsi_query.OrOperation):
+                if len(operation.or_) == 0:
+                    raise ValueError("Empty OR operation")
+                elif len(operation.or_) == 1:
+                    return compile_operand(operation.or_[0])
+                or_parts = [compile_operand(op) for op in operation.or_]
+                return lambda rec: any(_truthy(part(rec)) for part in or_parts)
+            elif isinstance(operation, tsi_query.NotOperation):
+                inner = compile_operand(operation.not_[0])
+
+                def evaluate_not(rec: _CallRec) -> Any:
+                    value = inner(rec)
+                    if value is None:
+                        return None
+                    return not _truthy(value)
+
+                return evaluate_not
+            elif isinstance(operation, tsi_query.EqOperation):
+                lhs_op, rhs_op = operation.eq_
+                # Queue membership: rendered as an INNER JOIN by ClickHouse.
+                queue_lhs = queue_field_name(lhs_op)
+                if queue_lhs is not None:
+                    rhs_fn = compile_operand(rhs_op)
+                    return lambda rec: rhs_fn(rec) in self._live_queue_ids_for_call(rec)
+                if is_multi_value_feedback(lhs_op):
+                    field_path = lhs_op.get_field_
+                    if (
+                        isinstance(rhs_op, tsi_query.LiteralOperation)
+                        and rhs_op.literal_ is None
+                    ):
+                        return lambda rec: (
+                            len(self._feedback_values_array(rec, field_path)) == 0
+                        )
+                    rhs_fn = compile_operand(rhs_op)
+                    return lambda rec: (
+                        rhs_fn(rec) in self._feedback_values_array(rec, field_path)
+                    )
+                if (
+                    isinstance(rhs_op, tsi_query.LiteralOperation)
+                    and rhs_op.literal_ is None
+                ):
+                    lhs_fn = compile_operand(lhs_op)
+                    return lambda rec: lhs_fn(rec) is None
+                return compile_binary(lhs_op, rhs_op, "eq")
+            elif isinstance(operation, tsi_query.GtOperation):
+                return compile_binary(operation.gt_[0], operation.gt_[1], "gt")
+            elif isinstance(operation, tsi_query.LtOperation):
+                return compile_binary(operation.lt_[0], operation.lt_[1], "lt")
+            elif isinstance(operation, tsi_query.GteOperation):
+                return compile_binary(operation.gte_[0], operation.gte_[1], "gte")
+            elif isinstance(operation, tsi_query.LteOperation):
+                return compile_binary(operation.lte_[0], operation.lte_[1], "lte")
+            elif isinstance(operation, tsi_query.InOperation):
+                in_cast = tsi_query.infer_shared_literal_filter_cast(operation.in_[1])
+                lhs_fn = compile_get_field_with_inferred_cast(operation.in_[0], in_cast)
+                if lhs_fn is None:
+                    lhs_fn = compile_operand(operation.in_[0])
+                elems = [compile_operand(op) for op in operation.in_[1]]
+
+                def evaluate_in(rec: _CallRec) -> Any:
+                    lhs_part = lhs_fn(rec)
+                    if lhs_part is None:
+                        return None
+                    for elem_fn in elems:
+                        if _truthy(_ch_compare(lhs_part, elem_fn(rec), "eq")):
+                            return True
+                    return False
+
+                return evaluate_in
+            elif isinstance(operation, tsi_query.ContainsOperation):
+                case_insensitive = bool(operation.contains_.case_insensitive)
+                if is_multi_value_feedback(operation.contains_.input):
+                    field_path = operation.contains_.input.get_field_
+                    substr_fn = compile_operand(operation.contains_.substr)
+
+                    def evaluate_array_contains(rec: _CallRec) -> bool:
+                        needle = substr_fn(rec)
+                        return any(
+                            _ch_position(value, needle, case_insensitive)
+                            for value in self._feedback_values_array(rec, field_path)
+                        )
+
+                    return evaluate_array_contains
+                input_fn = compile_operand(operation.contains_.input)
+                substr_fn = compile_operand(operation.contains_.substr)
+                return lambda rec: _ch_position(
+                    input_fn(rec), substr_fn(rec), case_insensitive
+                )
+            else:
+                raise TypeError(f"Unknown operation type: {operation}")
+
+        def compile_binary(
+            lhs: tsi_query.Operand,
+            rhs: tsi_query.Operand,
+            op: str,
+        ) -> Any:
+            # DateTime64 column comparisons: normalize the literal side.
+            lhs_dt = datetime_field_name(lhs)
+            rhs_dt = datetime_field_name(rhs)
+            converted_literal: datetime.datetime | None = None
+            literal_side = None
+            if lhs_dt or rhs_dt:
+                for side, operand in (("lhs", lhs), ("rhs", rhs)):
+                    if isinstance(operand, tsi_query.LiteralOperation):
+                        parsed = _maybe_datetime_literal(operand.literal_)
+                        if parsed is not None:
+                            converted_literal = parsed
+                            literal_side = side
+            lhs_cast = tsi_query.infer_literal_filter_cast(rhs)
+            rhs_cast = tsi_query.infer_literal_filter_cast(lhs)
+            if literal_side is not None:
+                lhs_cast = rhs_cast = None
+            lhs_fn = compile_get_field_with_inferred_cast(lhs, lhs_cast)
+            if lhs_fn is None:
+                lhs_fn = compile_operand(lhs)
+            rhs_fn = compile_get_field_with_inferred_cast(rhs, rhs_cast)
+            if rhs_fn is None:
+                rhs_fn = compile_operand(rhs)
+            if literal_side == "lhs":
+                lhs_fn = lambda rec, _v=converted_literal: _v
+            elif literal_side == "rhs":
+                rhs_fn = lambda rec, _v=converted_literal: _v
+
+            def evaluate_binary(rec: _CallRec) -> Any:
+                return _ch_compare(lhs_fn(rec), rhs_fn(rec), op)
+
+            return evaluate_binary
+
+        def compile_get_field_with_inferred_cast(
+            operand: tsi_query.Operand,
+            cast_to: tsi_query.CastTo | None,
+        ) -> Any:
+            """Mirror process_json_field_operand_with_inferred_cast: only
+            dynamic JSON fields and single-value feedback fields take the
+            inferred cast.
+            """
+            if cast_to is None or not isinstance(operand, tsi_query.GetFieldOperator):
+                return None
+            field_name = operand.get_field_
+            if field_name in _DISALLOWED_FILTERING_FIELDS:
+                raise InvalidFieldError(f"Field {field_name} is not allowed")
+            if has_expand_prefix(field_name):
+                return self._compile_expanded_field(
+                    field_name, expand_columns or [], cast_to
+                )
+            if field_name.startswith("feedback."):
+                if field_name.startswith("feedback.[*]") or is_multi_value_feedback(
+                    operand
+                ):
+                    return None
+                inner = self._compile_feedback_field(field_name)
+                return lambda rec: _ch_cast_json_value(inner(rec), cast_to)
+            if field_name.startswith("summary.weave."):
+                return None
+            for col_name in ("inputs", "output", "attributes", "summary"):
+                if field_name == col_name or field_name.startswith(col_name + "."):
+                    return self._compile_calls_field(field_name, cast_to)
+            return None
+
+        def has_expand_prefix(field_name: str) -> bool:
+            return bool(expand_columns) and any(
+                field_name == col or field_name.startswith(col + ".")
+                for col in expand_columns
+            )
+
+        def compile_operand(operand: tsi_query.Operand) -> Any:
+            if isinstance(operand, tsi_query.LiteralOperation):
+                literal = operand.literal_
+                if not (
+                    literal is None or isinstance(literal, (str, int, float, bool))
+                ):
+                    raise ValueError(f"Unknown value type: {literal}")
+                return lambda rec, _value=literal: _value
+            elif isinstance(operand, tsi_query.GetFieldOperator):
+                field_name = operand.get_field_
+                if field_name in _DISALLOWED_FILTERING_FIELDS:
+                    raise InvalidFieldError(f"Field {field_name} is not allowed")
+                if has_expand_prefix(field_name):
+                    return self._compile_expanded_field(
+                        field_name, expand_columns or [], None
+                    )
+                if field_name.startswith("feedback."):
+                    return self._compile_feedback_field(field_name)
+                if field_name.startswith("annotation_queue_items."):
+                    queue_field_name(operand)  # validates the subfield
+                    return lambda rec: next(
+                        iter(self._live_queue_ids_for_call(rec)), None
+                    )
+                return self._compile_calls_field(field_name, None)
+            elif isinstance(operand, tsi_query.ConvertOperation):
+                inner = compile_operand(operand.convert_.input)
+                convert_to = operand.convert_.to
+                if convert_to == "exists":
+                    return lambda rec: inner(rec) is not None
+                return lambda rec: _ch_cast_json_value(
+                    inner(rec)
+                    if isinstance(inner(rec), str)
+                    else _to_ch_string(inner(rec)),
+                    convert_to,
+                )
+            elif isinstance(
+                operand,
+                (
+                    tsi_query.AndOperation,
+                    tsi_query.OrOperation,
+                    tsi_query.NotOperation,
+                    tsi_query.EqOperation,
+                    tsi_query.GtOperation,
+                    tsi_query.LtOperation,
+                    tsi_query.GteOperation,
+                    tsi_query.LteOperation,
+                    tsi_query.InOperation,
+                    tsi_query.ContainsOperation,
+                ),
+            ):
+                return compile_operation(operand)
+            else:
+                raise TypeError(f"Unknown operand type: {operand}")
+
+        return compile_operation(query.expr_)
+
+    @staticmethod
+    def _validate_calls_filter(filter: tsi.CallsFilter) -> None:
+        """Parameter-length validation the backends perform while building
+        SQL — it must fire even when no rows exist.
+        """
+        if filter.op_names:
+            assert_parameter_length_less_than_max("op_names", len(filter.op_names))
+        if filter.input_refs:
+            assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
+        if filter.output_refs:
+            assert_parameter_length_less_than_max(
+                "output_refs", len(filter.output_refs)
+            )
+        if filter.parent_ids:
+            assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
+        if filter.trace_ids:
+            assert_parameter_length_less_than_max("trace_ids", len(filter.trace_ids))
+        if filter.call_ids:
+            assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
+        if filter.thread_ids is not None:
+            assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
+        if filter.turn_ids is not None:
+            assert_parameter_length_less_than_max("turn_ids", len(filter.turn_ids))
+
+    def _calls_filter_matches(self, rec: _CallRec, filter: tsi.CallsFilter) -> bool:
+        if filter.op_names:
+            non_wildcarded_names: list[str] = []
+            wildcarded_names: list[str] = []
+            for name in filter.op_names:
+                if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                    wildcarded_names.append(name)
+                else:
+                    non_wildcarded_names.append(name)
+            matched = rec.op_name in non_wildcarded_names
+            if not matched:
+                for name in wildcarded_names:
+                    # ClickHouse renders the wildcard as LIKE 'name:%'.
+                    prefix = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":"
+                    if rec.op_name is not None and rec.op_name.startswith(prefix):
+                        matched = True
+                        break
+            if not matched:
+                return False
+
+        if filter.input_refs and not self._refs_filter_matches(
+            rec.input_refs, filter.input_refs
+        ):
+            return False
+        if filter.output_refs and not self._refs_filter_matches(
+            rec.output_refs, filter.output_refs
+        ):
+            return False
+        if filter.parent_ids and rec.parent_id not in filter.parent_ids:
+            return False
+        if filter.trace_ids and rec.trace_id not in filter.trace_ids:
+            return False
+        if filter.call_ids and rec.id not in filter.call_ids:
+            return False
+        if filter.trace_roots_only and rec.parent_id is not None:
+            return False
+        if filter.wb_run_ids and rec.wb_run_id not in filter.wb_run_ids:
+            return False
+        if filter.wb_user_ids and rec.wb_user_id not in filter.wb_user_ids:
+            return False
+        if filter.thread_ids is not None and rec.thread_id not in filter.thread_ids:
+            return False
+        if filter.turn_ids is not None and rec.turn_id not in filter.turn_ids:
+            return False
+        return True
+
+    @staticmethod
+    def _refs_filter_matches(stored_refs: list[str], filter_refs: list[str]) -> bool:
+        exact_refs, wildcard_refs = split_exact_and_wildcard_values(filter_refs)
+        for ref in exact_refs:
+            if ref in stored_refs:
+                return True
+        for ref in wildcard_refs:
+            prefix = wildcard_version_value_to_ref_prefix(ref)
+            if any(stored.startswith(prefix) for stored in stored_refs):
+                return True
+        return False
+
+    def _compile_calls_sort_field(
+        self,
+        sort_field: str,
+        direction: str,
+        expand_columns: list[str] | None = None,
+    ) -> list[tuple[Any, str]]:
+        """Compile an ORDER BY term into [(evaluator, direction)] terms,
+        mirroring OrderField.as_sql: dynamic (JSON/feedback) fields sort by
+        existence DESC, then the float cast, then the string cast.
+        """
+        if expand_columns and any(
+            sort_field == col or sort_field.startswith(col + ".")
+            for col in expand_columns
+        ):
+            exists_fn = self._compile_expanded_field(
+                sort_field, expand_columns, "exists"
+            )
+            value_fn = self._compile_expanded_field(sort_field, expand_columns, None)
+            return [
+                (lambda rec: 1 if exists_fn(rec) else 0, "desc"),
+                (lambda rec: _to_float64_or_null(value_fn(rec)), direction),
+                (value_fn, direction),
+            ]
+        is_dynamic = any(
+            sort_field == col or sort_field.startswith(col + ".")
+            for col in ("inputs", "output", "attributes", "summary")
+        ) and not sort_field.startswith("summary.weave.")
+        if sort_field.startswith("feedback."):
+            exists_fn_inner = self._compile_feedback_field(sort_field)
+
+            def feedback_exists(rec: _CallRec) -> int:
+                return 1 if exists_fn_inner(rec) != "" else 0
+
+            value_fn = self._compile_feedback_field(sort_field)
+            return [
+                (feedback_exists, "desc"),
+                (lambda rec: _to_float64_or_null(value_fn(rec)), direction),
+                (value_fn, direction),
+            ]
+        if is_dynamic:
+            exists_fn = self._compile_calls_field(sort_field, "exists")
+            value_fn = self._compile_calls_field(sort_field, None)
+            return [
+                (lambda rec: 1 if exists_fn(rec) else 0, "desc"),
+                (lambda rec: _to_float64_or_null(value_fn(rec)), direction),
+                (value_fn, direction),
+            ]
+        return [(self._compile_calls_field(sort_field, None), direction)]
+
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        with self.lock:
+            records = [
+                rec
+                for rec in self._calls.values()
+                if rec.deleted_at is None
+                and rec.project_id == req.project_id
+                and rec.op_name is not None
+                and rec.started_at is not None
+            ]
+            # Snapshot for total-storage aggregation before filtering (the
+            # backend subquery aggregates over all calls in the project).
+            all_records = (
+                list(self._calls.values()) if req.include_total_storage_size else None
+            )
+
+        if req.filter:
+            self._validate_calls_filter(req.filter)
+            records = [
+                rec for rec in records if self._calls_filter_matches(rec, req.filter)
+            ]
+
+        if req.query:
+            predicate = self._compile_calls_query(req.query, req.expand_columns)
+            records = [rec for rec in records if _truthy(predicate(rec))]
+
+        # Column selection (interface behavior shared by the backends).
+        required_columns = ["id", "trace_id", "project_id", "op_name", "started_at"]
+        select_columns = [
+            key
+            for key in tsi.CallSchema.model_fields.keys()
+            if key
+            not in {"storage_size_bytes", "total_storage_size_bytes", "wb_username"}
+        ]
+        if req.columns:
+            simple_columns = []
+            for column in req.columns:
+                top_level_column = column.split(".")[0]
+                if (
+                    top_level_column.endswith("_dump")
+                    and top_level_column[:-5] in select_columns
+                ):
+                    top_level_column = top_level_column[:-5]
+                if top_level_column not in simple_columns:
+                    simple_columns.append(top_level_column)
+            if req.include_usernames and "wb_user_id" not in simple_columns:
+                simple_columns.append("wb_user_id")
+            if req.include_costs and "summary" not in simple_columns:
+                simple_columns.append("summary")
+            if "summary" in simple_columns or req.include_costs:
+                for column in ["ended_at", "exception", "display_name"]:
+                    if column not in simple_columns:
+                        simple_columns.append(column)
+
+            select_columns = [x for x in simple_columns if x in select_columns]
+            select_columns += [
+                rcol for rcol in required_columns if rcol not in select_columns
+            ]
+
+        # Sorting, including the implicit id tiebreaker the backends append.
+        if req.sort_by is None:
+            order_by: list[tuple[str, str]] | None = [
+                ("started_at", "asc"),
+                ("id", "asc"),
+            ]
+        elif len(req.sort_by) == 0:
+            order_by = None
+        else:
+            order_by = [(s.field, s.direction) for s in req.sort_by]
+            if not any(field_name == "id" for field_name, _ in order_by):
+                last_sort = req.sort_by[-1]
+                if last_sort.field == "started_at":
+                    order_by.append(("id", last_sort.direction))
+                else:
+                    order_by.append(("id", "desc"))
+
+        if order_by is not None:
+            for _, direction in order_by:
+                assert direction in {
+                    "ASC",
+                    "DESC",
+                    "asc",
+                    "desc",
+                }, f"Invalid order_by direction: {direction}"
+            compiled_terms = [
+                term
+                for field_name, direction in order_by
+                for term in self._compile_calls_sort_field(
+                    field_name, direction, req.expand_columns
+                )
+            ]
+            records = _ch_sorted_by_terms(
+                records,
+                compiled_terms,
+                lambda rec, term_fn: term_fn(rec),
+            )
+
+        # LIMIT/OFFSET (falsy limits mean unlimited).
+        offset = req.offset if req.offset and req.offset > 0 else 0
+        if offset:
+            records = records[offset:]
+        if req.limit and req.limit > 0:
+            records = records[: req.limit]
+
+        total_storage_by_trace: dict[str | None, int] = {}
+        if req.include_total_storage_size and all_records is not None:
+            for rec in all_records:
+                total_storage_by_trace[rec.trace_id] = total_storage_by_trace.get(
+                    rec.trace_id, 0
+                ) + (
+                    (rec.attributes_len or 0)
+                    + (rec.inputs_len or 0)
+                    + (rec.output_len or 0)
+                    + (rec.summary_len or 0)
+                )
+
+        calls = []
+        for rec in records:
+            call_dict: dict[str, Any] = {}
+            for col in select_columns:
+                if col in {"attributes", "inputs", "output", "summary"}:
+                    call_dict[col] = _json_deep_copy(getattr(rec, col))
+                else:
+                    call_dict[col] = getattr(rec, col)
+
+            if req.include_storage_size:
+                call_dict["storage_size_bytes"] = (
+                    rec.storage_size_bytes
+                    if rec.storage_size_bytes is not None
+                    else (
+                        (rec.attributes_len or 0)
+                        + (rec.inputs_len or 0)
+                        + (rec.output_len or 0)
+                        + (rec.summary_len or 0)
+                    )
+                )
+            if req.include_total_storage_size:
+                call_dict["total_storage_size_bytes"] = (
+                    total_storage_by_trace.get(rec.trace_id)
+                    if rec.parent_id is None
+                    else None
+                )
+
+            # Ref expansion over the json fields.
+            if req.expand_columns:
+                for json_field in ["attributes", "summary", "inputs", "output"]:
+                    if call_dict.get(json_field):
+                        call_dict[json_field] = self._expand_refs(
+                            {json_field: call_dict[json_field]}, req.expand_columns
+                        )[json_field]
+
+            # For backwards/future compatibility: inject otel_dump into
+            # attributes if present.
+            if rec.otel_dump:
+                if "attributes" not in call_dict:
+                    call_dict["attributes"] = {}
+                call_dict["attributes"]["otel_span"] = _json_deep_copy(rec.otel_dump)
+
+            if "display_name" in call_dict:
+                call_dict["display_name"] = empty_str_to_none(call_dict["display_name"])
+
+            call_dict["summary"] = make_derived_summary_fields(
+                summary=call_dict.get("summary") or {},
+                op_name=call_dict["op_name"],
+                started_at=call_dict["started_at"],
+                ended_at=call_dict.get("ended_at"),
+                exception=call_dict.get("exception"),
+                display_name=call_dict.get("display_name"),
+            )
+
+            raw_expire_at = call_dict.get("expire_at")
+            if raw_expire_at is not None:
+                call_dict["expire_at"] = (
+                    None
+                    if _ensure_tz(raw_expire_at) == EXPIRE_AT_NEVER
+                    else raw_expire_at
+                )
+
+            for col, mfield in tsi.CallSchema.model_fields.items():
+                if mfield.is_required() and col not in call_dict:
+                    if isinstance(mfield.annotation, str):
+                        call_dict[col] = ""
+                    elif isinstance(
+                        mfield.annotation, (datetime.datetime, datetime.date)
+                    ):
+                        raise ValueError(f"Field '{col}' is required for selection")
+                    else:
+                        call_dict[col] = {}
+            calls.append(call_dict)
+
+        if req.include_costs and calls:
+            self._apply_costs_to_calls(calls, req.project_id)
+
+        if req.include_feedback:
+            feedback_query_req = make_feedback_query_req(req.project_id, calls)
+            feedback = self.feedback_query(feedback_query_req)
+            hydrate_calls_with_feedback(calls, feedback)
+
+        return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
+
+    def _expand_refs(
+        self, data: dict[str, Any], expand_columns: list[str]
+    ) -> dict[str, Any]:
+        """Recursively expand refs in the data. Only expand refs if requested in the
+        expand_columns list. expand_columns must be sorted by depth, shallowest first.
+        """
+        cols = sorted(expand_columns, key=lambda x: x.count("."))
+        for col in cols:
+            val = data.get(col)
+            if not val:
+                val = get_nested_key(data, col)
+                if not val:
+                    continue
+
+            if not ri.any_will_be_interpreted_as_ref_str(val):
+                continue
+
+            if not isinstance(ri.parse_internal_uri(val), ri.InternalObjectRef):
+                continue
+
+            derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
+            set_nested_key(data, col, derefed_val)
+            ref_col = f"{col}._ref"
+            set_nested_key(data, ref_col, val)
+
+        return data
+
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        return iter(self.calls_query(req).calls)
+
+    def _calls_query_stream_for_eval_subtree(
+        self,
+        project_id: str,
+        eval_root_ids: list[str],
+        include_children: bool = True,
+    ) -> Iterator[tsi.CallSchema]:
+        columns = [
+            "id",
+            "parent_id",
+            "op_name",
+            "attributes",
+            "inputs",
+            "output",
+            "summary",
+            "started_at",
+            "ended_at",
+        ]
+        eval_root_children = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(parent_ids=eval_root_ids),
+                    columns=columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+            )
+        )
+        yield from eval_root_children
+        if include_children:
+            eval_root_children_ids = [c.id for c in eval_root_children]
+            if eval_root_children_ids:
+                yield from self.calls_query_stream(
+                    tsi.CallsQueryReq(
+                        project_id=project_id,
+                        filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
+                        columns=columns,
+                        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    )
+                )
+
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        if req.limit is not None and req.limit < 1:
+            raise ValueError("Limit must be a positive integer")
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                limit=req.limit,
+                include_total_storage_size=req.include_total_storage_size,
+            )
+        ).calls
+        count = len(calls)
+        return tsi.CallsQueryStatsRes(
+            count=count,
+            has_more=req.limit is not None and count >= req.limit,
+            total_storage_size_bytes=sum(
+                call.total_storage_size_bytes
+                for call in calls
+                if call.total_storage_size_bytes is not None
+            ),
+        )
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        validate_call_stats_range(req.start, end)
+
+        granularity = req.granularity or int((end - req.start).total_seconds())
+        if granularity <= 0:
+            granularity = 1
+
+        calls = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=req.filter,
+                )
+            )
+        )
+
+        calls = [
+            c
+            for c in calls
+            if c.started_at is not None
+            and c.started_at >= req.start
+            and c.started_at < end
+        ]
+
+        token_keys_map: dict[str, list[str]] = {
+            "input_tokens": ["prompt_tokens", "input_tokens"],
+            "output_tokens": ["completion_tokens", "output_tokens"],
+            "total_tokens": ["total_tokens"],
+        }
+
+        def _bucket_ts(started_at: datetime.datetime) -> str:
+            offset = int((started_at - req.start).total_seconds())
+            bucket_idx = offset // granularity
+            return (
+                req.start + datetime.timedelta(seconds=bucket_idx * granularity)
+            ).isoformat()
+
+        usage_buckets: list[dict[str, Any]] = []
+        if req.usage_metrics:
+            raw: dict[
+                tuple[str, str], dict[str, list[int]]
+            ] = {}  # (ts, model) -> metric -> values
+
+            for call in calls:
+                if not call.summary or not isinstance(call.summary, dict):
+                    continue
+                usage = call.summary.get("usage")
+                if not isinstance(usage, dict):
+                    continue
+                ts = _bucket_ts(call.started_at)
+                for model, model_usage in usage.items():
+                    if not isinstance(model_usage, dict):
+                        continue
+                    key = (ts, model)
+                    if key not in raw:
+                        raw[key] = {}
+                    for spec in req.usage_metrics:
+                        token_keys = token_keys_map.get(spec.metric, [])
+                        val = 0
+                        for k in token_keys:
+                            raw_val = model_usage.get(k)
+                            if isinstance(raw_val, (int, float, str)):
+                                val += int(raw_val)
+                        raw[key].setdefault(spec.metric, []).append(val)
+
+            for (ts, model), metrics in sorted(raw.items()):
+                bucket: dict[str, Any] = {"timestamp": ts, "model": model}
+                for spec in req.usage_metrics:
+                    values = metrics.get(spec.metric, [])
+                    if not values:
+                        continue
+                    _apply_aggregations(
+                        bucket, spec.metric, values, spec.aggregations, spec.percentiles
+                    )
+                usage_buckets.append(bucket)
+
+        call_buckets: list[dict[str, Any]] = []
+        if req.call_metrics:
+            bucket_data: dict[str, dict[str, list[Any]]] = {}
+
+            for call in calls:
+                ts = _bucket_ts(call.started_at)
+                if ts not in bucket_data:
+                    bucket_data[ts] = {}
+                for cm_spec in req.call_metrics:
+                    if cm_spec.metric == "latency_ms":
+                        if call.ended_at and call.started_at:
+                            ms = (
+                                call.ended_at - call.started_at
+                            ).total_seconds() * 1000
+                            bucket_data[ts].setdefault("latency_ms", []).append(ms)
+                    elif cm_spec.metric == "call_count":
+                        bucket_data[ts].setdefault("call_count", []).append(1)
+                    elif cm_spec.metric == "error_count":
+                        bucket_data[ts].setdefault("error_count", []).append(
+                            1 if call.exception else 0
+                        )
+
+            for ts, metrics in sorted(bucket_data.items()):
+                bucket = {"timestamp": ts}
+                for cm_spec in req.call_metrics:
+                    values = metrics.get(cm_spec.metric, [])
+                    if not values:
+                        continue
+                    _apply_aggregations(
+                        bucket,
+                        cm_spec.metric,
+                        values,
+                        cm_spec.aggregations,
+                        cm_spec.percentiles,
+                    )
+                call_buckets.append(bucket)
+
+        return tsi.CallStatsRes(
+            start=req.start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone or "UTC",
+            usage_buckets=usage_buckets,
+            call_buckets=call_buckets,
+        )
+
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        unfinished_call_ids: set[str] = set()
+        for call in calls:
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=dict(call.summary) if call.summary else None,
+                )
+            )
+            if call.ended_at is None:
+                unfinished_call_ids.add(call.id)
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, req.include_costs
+        )
+
+        return tsi.TraceUsageRes(
+            call_usage=aggregated_usage,
+            unfinished_call_ids=sorted(unfinished_call_ids),
+        )
+
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        if not req.call_ids:
+            return tsi.CallsUsageRes(call_usage={}, unfinished_call_ids=[])
+
+        root_calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(call_ids=req.call_ids),
+                columns=["trace_id"],
+                limit=len(req.call_ids),
+            )
+        )
+        trace_ids = {call.trace_id for call in root_calls}
+        if not trace_ids:
+            root_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {
+                call_id: {} for call_id in req.call_ids
+            }
+            return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
+
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        unfinished_call_ids: set[str] = set()
+        for call in calls:
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=dict(call.summary) if call.summary else None,
+                )
+            )
+            if call.ended_at is None:
+                unfinished_call_ids.add(call.id)
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, req.include_costs
+        )
+
+        root_usage = {
+            call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
+        }
+
+        return tsi.CallsUsageRes(
+            call_usage=root_usage,
+            unfinished_call_ids=sorted(unfinished_call_ids),
+        )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
@@ -2078,6 +3340,69 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 raise ValueError(f"Unknown ref type: {extra[extra_index]}")
         return val
 
+    def _resolve_ref_str_for_filter(self, value: Any) -> Any:
+        """Best-effort ref dereference for expand_columns filtering/sorting.
+
+        Mirrors the ObjectRef CTE joins: unresolvable refs simply produce no
+        joined value (None) rather than erroring.
+        """
+        if not isinstance(value, str) or not ri.string_will_be_interpreted_as_ref(
+            value
+        ):
+            return None
+        try:
+            parsed = ri.parse_internal_uri(value)
+        except Exception:
+            return None
+        if not isinstance(parsed, ri.InternalObjectRef):
+            return None
+        try:
+            return self._read_internal_obj_ref(parsed)
+        except (NotFoundError, KeyError, IndexError, ValueError, TypeError):
+            return None
+
+    def _compile_expanded_field(
+        self,
+        field_path: str,
+        expand_columns: list[str],
+        cast_to: str | None,
+    ) -> Any:
+        """Evaluator for a field whose path traverses refs named in
+        expand_columns (mirrors the ObjectRefQueryProcessor CTE joins).
+        """
+        ordered = sorted(
+            (
+                col
+                for col in expand_columns
+                if field_path.startswith(col + ".") or field_path == col
+            ),
+            key=lambda col: col.count("."),
+        )
+
+        def evaluate(rec: _CallRec) -> Any:
+            doc: Any = {
+                "inputs": rec.inputs,
+                "output": rec.output,
+                "attributes": rec.attributes,
+                "summary": rec.summary,
+            }
+            consumed = ""
+            for col in ordered:
+                rel = col[len(consumed) :].lstrip(".")
+                ref_value, _ = _json_extract(doc, split_escaped_field_path(rel))
+                resolved = self._resolve_ref_str_for_filter(ref_value)
+                if resolved is None:
+                    return False if cast_to == "exists" else None
+                doc = resolved
+                consumed = col
+            remainder = field_path[len(consumed) :].lstrip(".")
+            parts = split_escaped_field_path(remainder) if remainder else []
+            if cast_to == "exists":
+                return _ch_json_exists(doc, parts)
+            return _ch_cast_json_value(_ch_json_value(doc, parts), cast_to)
+
+        return evaluate
+
     # ------------------------------------------------------------------
     # Files
     # ------------------------------------------------------------------
@@ -2668,6 +3993,57 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             )
         return tsi.OTelExportRes()
 
+    # ------------------------------------------------------------------
+    # Project stats / TTL settings
+    # ------------------------------------------------------------------
+
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        def _default_true(val: bool | None) -> bool:
+            return True if val is None else val
+
+        include_trace = _default_true(req.include_trace_storage_size)
+        include_objects = _default_true(req.include_object_storage_size)
+        include_tables = _default_true(req.include_table_storage_size)
+        include_files = _default_true(req.include_file_storage_size)
+        if not any((include_trace, include_objects, include_tables, include_files)):
+            raise ValueError(
+                "At least one of include_trace_storage_size, "
+                "include_objects_storage_size, include_tables_storage_size, or "
+                "include_files_storage_size must be True"
+            )
+
+        kwargs: dict[str, int] = {}
+        with self.lock:
+            if include_trace:
+                kwargs["trace_storage_size_bytes"] = sum(
+                    (rec.attributes_len or 0)
+                    + (rec.inputs_len or 0)
+                    + (rec.output_len or 0)
+                    + (rec.summary_len or 0)
+                    + (rec.otel_dump_len or 0)
+                    for rec in self._calls.values()
+                    if rec.project_id == req.project_id
+                )
+            if include_objects:
+                kwargs["objects_storage_size_bytes"] = sum(
+                    rec.val_dump_len
+                    for rec in self._objs.values()
+                    if rec.project_id == req.project_id
+                )
+            if include_tables:
+                kwargs["tables_storage_size_bytes"] = sum(
+                    rec.val_dump_len
+                    for rec in self._table_rows.values()
+                    if rec.project_id == req.project_id
+                )
+            if include_files:
+                kwargs["files_storage_size_bytes"] = sum(
+                    len(content)
+                    for (project_id, _digest), content in self._files.items()
+                    if project_id == req.project_id
+                )
+        return tsi.ProjectStatsRes(**kwargs)
+
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReadReq
     ) -> tsi.ProjectTTLSettingsReadRes:
@@ -2701,6 +4077,133 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             )
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
+
+    # ------------------------------------------------------------------
+    # Threads
+    # ------------------------------------------------------------------
+
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        """Stream threads with aggregated statistics, mirroring
+        make_threads_query: aggregates over turn calls (id == turn_id) with
+        argMin/argMax turn ids and interpolated turn-duration quantiles.
+        """
+        after_datetime = None
+        before_datetime = None
+        thread_ids = None
+        if req.filter is not None:
+            after_datetime = req.filter.after_datetime
+            before_datetime = req.filter.before_datetime
+            thread_ids = req.filter.thread_ids
+
+        with self.lock:
+            turn_calls = [
+                rec
+                for rec in self._calls.values()
+                if rec.project_id == req.project_id and rec.id == rec.turn_id
+            ]
+
+        if after_datetime is not None:
+            after_dt = _ensure_tz(after_datetime)
+            turn_calls = [rec for rec in turn_calls if rec.started_at > after_dt]
+        if before_datetime is not None:
+            before_dt = _ensure_tz(before_datetime)
+            turn_calls = [rec for rec in turn_calls if rec.started_at < before_dt]
+
+        if thread_ids is not None and len(thread_ids) > 0:
+            turn_calls = [rec for rec in turn_calls if rec.thread_id in thread_ids]
+        else:
+            turn_calls = [
+                rec
+                for rec in turn_calls
+                if rec.thread_id is not None and rec.thread_id != ""
+            ]
+
+        grouped: dict[str | None, list[_CallRec]] = {}
+        for rec in turn_calls:
+            grouped.setdefault(rec.thread_id, []).append(rec)
+
+        threads: list[dict[str, Any]] = []
+        for thread_id, recs in grouped.items():
+            start_time = min(rec.started_at for rec in recs)
+            ended = [rec for rec in recs if rec.ended_at is not None]
+            last_updated = max(rec.ended_at for rec in ended) if ended else None
+            first_turn_id = min(recs, key=lambda r: r.started_at).id
+            last_turn_id = (
+                max(ended, key=lambda r: r.ended_at).id if ended else recs[0].id
+            )
+            durations = sorted(
+                (rec.ended_at - rec.started_at).total_seconds() * 1000.0
+                for rec in ended
+            )
+            threads.append(
+                {
+                    "thread_id": thread_id,
+                    "turn_count": len(recs),
+                    "start_time": start_time,
+                    "last_updated": last_updated,
+                    "first_turn_id": first_turn_id,
+                    "last_turn_id": last_turn_id,
+                    "p50_turn_duration_ms": _interpolated_quantile(durations, 0.5),
+                    "p99_turn_duration_ms": _interpolated_quantile(durations, 0.99),
+                }
+            )
+
+        valid_sort_fields = {
+            "thread_id",
+            "turn_count",
+            "start_time",
+            "last_updated",
+            "p50_turn_duration_ms",
+            "p99_turn_duration_ms",
+        }
+        if req.sort_by:
+            sort_terms = []
+            for sort in req.sort_by:
+                if sort.field not in valid_sort_fields:
+                    raise ValueError(
+                        f"Unsupported sort field: {sort.field}. Supported fields: {list(valid_sort_fields)}"
+                    )
+                sort_terms.append((sort.field, sort.direction))
+        else:
+            sort_terms = [("last_updated", "desc")]
+
+        threads = _ch_sorted_by_terms(threads, sort_terms, lambda row, term: row[term])
+
+        if req.offset is not None and req.offset > 0:
+            threads = threads[req.offset :]
+        if req.limit is not None and req.limit >= 0:
+            threads = threads[: req.limit]
+
+        for thread in threads:
+            start_time = thread["start_time"]
+            last_updated = thread["last_updated"]
+            if start_time is None or last_updated is None:
+                # Mirrors the ClickHouse stream: skip threads without valid
+                # timestamps.
+                continue
+
+            yield tsi.ThreadSchema(
+                thread_id=thread["thread_id"],
+                turn_count=thread["turn_count"],
+                start_time=_ensure_tz(start_time),
+                last_updated=_ensure_tz(last_updated),
+                first_turn_id=thread["first_turn_id"],
+                last_turn_id=thread["last_turn_id"],
+                p50_turn_duration_ms=thread["p50_turn_duration_ms"],
+                p99_turn_duration_ms=thread["p99_turn_duration_ms"],
+            )
+
+    # ------------------------------------------------------------------
+    # Annotation queues (mirrors the ClickHouse implementation: one mutable
+    # record per id, soft-deleted via deleted_at tombstones)
+    # ------------------------------------------------------------------
+
+    _QUEUE_SORT_FIELDS = frozenset({"id", "name", "created_at", "updated_at"})
+    _QUEUE_ITEM_SORT_FIELDS = frozenset(
+        {"call_started_at", "call_op_name", "created_at", "updated_at"}
+    )
 
 
 # ---------------------------------------------------------------------------
