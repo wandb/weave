@@ -1,0 +1,73 @@
+## Conversation
+PR2 of the SDK-uptake stack (plan: .context/sdk-uptake-plan.md). User goal:
+remove RemoteHTTPTraceServer in favor of the weave-server-sdk-backed binding
+as default. PR1 (parent commit) rewrote the stainless binding at parity; this
+commit flips the default and deletes the old implementation.
+
+## Actions
+- weave_init.init_weave_get_server: unconditional StainlessRemoteHTTPTraceServer
+  (lazy import kept deliberately — weave_server_sdk model definitions are a
+  measurable import cost and import weave cold-start is a known hotspot).
+- settings.py: removed use_stainless_server field + UserSettings entry +
+  should_use_stainless_server(); api.py docstring entry removed.
+- Deleted weave/trace_server_bindings/remote_http_trace_server.py and
+  tests/trace_server_bindings/test_http_behavior_remote.py (its
+  calls_complete/eager coverage was ported to the stainless flavor in PR1).
+- tests/trace_server_bindings/conftest.py: single-impl server_class fixture;
+  removed pytest_ignore_collect suffix filtering; SpyTransport moved here and
+  shared by test files. test_http_behavior_stainless.py renamed to
+  test_http_behavior.py. test_tags_aliases_routes.py rewritten via SpyTransport.
+- tests/trace_server/conftest.py: removed --remote-http-trace-server flag and
+  get_remote_http_trace_server_flag (no callers).
+- tests/conftest.py: network_proxy_client now builds a TestClientTransport
+  (httpx.BaseTransport routing into the FastAPI TestClient) injected via the
+  binding's transport kwarg; processors patched in the stainless module;
+  create_client legacy "http" branch switched.
+- wal_sender.py switched to StainlessRemoteHTTPTraceServer (same Any cast).
+- weave_client.py: endpoint probe now calls
+  server.unretried_table_create_from_digests (new explicit single-attempt
+  method on the binding) instead of poking _post_request_executor.__wrapped__.
+- noxfile: stainless shard removed; test.yaml matrices drop "stainless"
+  (added by PR1 — net effect across the stack: one bindings shard).
+
+## Errors & Mistakes
+- network_proxy tests failed first with ValueError "unknown url type:
+  '/table/create'": I constructed the binding with trace_server_url="" so
+  request URLs were relative, which breaks httpx cookie extraction
+  (Cookies._CookieCompatRequest requires absolute URLs). Fix: base URL
+  http://testserver; the injected transport routes by path and never dials.
+- test_table_partitioning[True] then failed with 0 table_create_from_digests
+  calls: the chunking probe silently degraded because the
+  _post_request_executor internal no longer exists; check_endpoint_exists
+  treats ANY exception (incl. AssertionError) as "endpoint missing". This
+  failure mode is SILENT in prod (falls back to incremental upload) — worth
+  remembering when touching probe code.
+
+## Dead Ends
+- Tried FastAPI TestClient directly as the SDK http_client (TestClient IS an
+  httpx.Client) — but the binding builds its own client with hooks, and
+  swapping the whole client loses the event hooks; the transport seam is the
+  better-scoped injection point.
+
+## Hints for Future Agents
+- Pre-existing failures under `--trace-server=fake -p no:randomly` when run
+  standalone (verified identical on parent commit): test_flask_server,
+  test_evaluation_invalid_model_name_fixable/not_fixable (eval_imperative),
+  test_from_obj_unwraps_nested_weave_object. NOT related to this stack.
+- The binding's transport kwarg is the sanctioned test seam; tests should not
+  monkeypatch weave.utils.http_requests for the remote binding anymore.
+- check_endpoint_exists caches positive results in a global _ENDPOINT_CACHE
+  keyed by "table_create_from_digests"; tests discard that key for
+  determinism.
+
+## Codebase Discoveries
+- starlette's TestClient is an httpx.Client subclass; an httpx.BaseTransport
+  adapter (TestClientTransport) cleanly bridges a sync httpx client into an
+  ASGI app without anyio portals.
+- get_trace_server_flag never returns "http"/"prod" (legacy dev-only
+  branches in create_client; kept but switched to the new class).
+
+## Open Questions
+- StainlessRemoteHTTPTraceServer name kept; consider renaming at the end of
+  the stack if desired (user said remove RemoteHTTPTraceServer, so reusing
+  that name felt wrong).
