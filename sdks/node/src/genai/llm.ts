@@ -9,6 +9,7 @@ import {
 import type {ChildSpanContext} from './common';
 import {_getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
+import {SpanBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
@@ -68,7 +69,7 @@ export interface LLMRecordOpts {
  *   llm.end();
  * }
  */
-export class LLM {
+export class LLM extends SpanBase {
   /** Mutable data populated between `create()` and `end()`. */
 
   /**
@@ -89,15 +90,15 @@ export class LLM {
    */
   reasoning?: Reasoning;
 
-  private _ended = false;
-
   private constructor(
-    private readonly span: Span,
+    span: Span,
     private readonly context: Context,
     private readonly conversationId: string,
     public readonly model: string,
     public readonly providerName: string
-  ) {}
+  ) {
+    super(span);
+  }
 
   static create(opts: LLMInit & ChildSpanContext): LLM {
     const state = _getGenaiState();

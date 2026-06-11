@@ -1,18 +1,16 @@
 import {
-  type AttributeValue,
-  type Attributes,
   type Context,
   ROOT_CONTEXT,
   type Span,
   SpanKind,
   SpanStatusCode,
-  type TimeInput,
   trace,
 } from '@opentelemetry/api';
 
 import {_getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
+import {SpanBase} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
@@ -50,16 +48,16 @@ export interface TurnInit {
  *   turn.end();
  * }
  */
-export class Turn {
-  private _ended = false;
-
+export class Turn extends SpanBase {
   private constructor(
-    private readonly span: Span,
+    span: Span,
     private readonly context: Context,
     private readonly conversationId: string,
     public readonly agentName: string,
     public readonly model: string
-  ) {}
+  ) {
+    super(span);
+  }
 
   static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
     const state = _getGenaiState();
@@ -125,34 +123,6 @@ export class Turn {
       parentContext: this.context,
       conversationId: this.conversationId,
     });
-  }
-
-  /**
-   * Set a single attribute on the Turn span. Useful for stamping running
-   * totals (e.g. cumulative cost, token usage) or other metadata that becomes
-   * known mid-turn. No-op after `end()`. Mirrors OTel `Span.setAttribute`.
-   *
-   * @example
-   * turn.setAttribute('gen_ai.usage.input_tokens', totalInputTokens);
-   */
-  setAttribute(key: string, value: AttributeValue): this {
-    if (this._ended) return this;
-    this.span.setAttribute(key, value);
-    return this;
-  }
-
-  /**
-   * Add a named event to the Turn span. Useful for marking non-span moments
-   * such as context compaction, tool-loop detection, or guardrail trips.
-   * No-op after `end()`. Mirrors OTel `Span.addEvent`.
-   *
-   * @example
-   * turn.addEvent('context_compacted', {removedMessages: 12});
-   */
-  addEvent(name: string, attributes?: Attributes, startTime?: TimeInput): this {
-    if (this._ended) return this;
-    this.span.addEvent(name, attributes, startTime);
-    return this;
   }
 
   /** Close the Turn span. Idempotent. Pass `error` to mark it as failed. */
