@@ -159,6 +159,9 @@ REMOTE_SCORER_VALIDATE_HOSTS_ENV = "WF_SCORING_WORKER_REMOTE_SCORER_VALIDATE_HOS
 REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV = (
     "WF_SCORING_WORKER_REMOTE_SCORER_ALLOW_INSECURE_HTTP"
 )
+REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV = (
+    "WF_SCORING_WORKER_REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA"
+)
 
 
 def wf_scoring_worker_remote_scorer_enabled() -> bool:
@@ -220,6 +223,19 @@ def wf_scoring_worker_remote_scorer_allow_insecure_http() -> bool:
     """
     return (
         os.environ.get(REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV, "false").lower() == "true"
+    )
+
+
+def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
+    """Whether remote scorer results must match the structured scorer schema.
+
+    Defaults to true to nudge new RemoteScorer users onto the typed scorer
+    result shape. Set to ``false`` only for controlled compatibility testing or
+    emergency operational bypasses.
+    """
+    return (
+        os.environ.get(REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV, "true").lower()
+        != "false"
     )
 
 
