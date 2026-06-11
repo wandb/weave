@@ -112,14 +112,23 @@ def test_preserves_full_refs_and_agent_spans(weave_active):
     assert stored.op_names == [full_ref, "weave.genai.turn_ended"]
 
 
-def test_health_fields_default_none_and_roundtrip():
-    """Health fields default to None and persist set values through model_validate."""
-    monitor = Monitor(name="test_monitor", scorers=[], op_names=[])
-    assert monitor.status is None
-    assert monitor.last_error is None
-    assert monitor.last_error_at is None
-
+def test_health_fields(weave_active):
+    """Health fields default to None, accept the ok/error literals, reject others, and survive a publish round-trip."""
     error_at = datetime(2026, 6, 11, 12, 0, 0, tzinfo=timezone.utc)
+
+    default = Monitor(name="test_monitor", scorers=[], op_names=[])
+    assert (default.status, default.last_error, default.last_error_at) == (
+        None,
+        None,
+        None,
+    )
+    stored_default = publish(default).get()
+    assert (
+        stored_default.status,
+        stored_default.last_error,
+        stored_default.last_error_at,
+    ) == (None, None, None)
+
     monitor = Monitor(
         name="test_monitor",
         scorers=[],
@@ -128,43 +137,20 @@ def test_health_fields_default_none_and_roundtrip():
         last_error="scorer raised TimeoutError",
         last_error_at=error_at,
     )
-    assert monitor.status == "error"
-    assert monitor.last_error == "scorer raised TimeoutError"
-    assert monitor.last_error_at == error_at
-
-    revalidated = Monitor.model_validate(monitor.model_dump())
-    assert revalidated.status == "error"
-    assert revalidated.last_error == "scorer raised TimeoutError"
-    assert revalidated.last_error_at == error_at
-
-
-def test_health_fields_reject_invalid_status():
-    """Status only accepts the ok/error literals."""
-    with pytest.raises(ValidationError):
-        Monitor(name="test_monitor", scorers=[], op_names=[], status="degraded")
-
-
-def test_health_fields_publish_roundtrip(weave_active):
-    """Health fields survive a publish/get round-trip; defaults stay None."""
-    error_at = datetime(2026, 6, 11, 12, 0, 0, tzinfo=timezone.utc)
-    monitor = Monitor(
-        name="test_monitor",
-        scorers=[],
-        op_names=[],
-        status="error",
-        last_error="scorer raised TimeoutError",
-        last_error_at=error_at,
+    assert (monitor.status, monitor.last_error, monitor.last_error_at) == (
+        "error",
+        "scorer raised TimeoutError",
+        error_at,
     )
     stored = publish(monitor).get()
-    assert stored.status == "error"
-    assert stored.last_error == "scorer raised TimeoutError"
-    assert stored.last_error_at == error_at
+    assert (stored.status, stored.last_error, stored.last_error_at) == (
+        "error",
+        "scorer raised TimeoutError",
+        error_at,
+    )
 
-    default_monitor = Monitor(name="test_monitor", scorers=[], op_names=[])
-    stored_default = publish(default_monitor).get()
-    assert stored_default.status is None
-    assert stored_default.last_error is None
-    assert stored_default.last_error_at is None
+    with pytest.raises(ValidationError):
+        Monitor(name="test_monitor", scorers=[], op_names=[], status="degraded")
 
 
 def test_rejects_ambiguous_slashed_op_name(weave_active):
