@@ -1,0 +1,48 @@
+## What this slice does
+Closes the "agent OTel" gap (originally documented in AGENTS.md as not-yet-covered).
+These two integrations don't call create_call — they emit OTel GenAI spans that the
+trace server ingests via the agent path. OTel set_attribute only accepts scalars,
+so nested dicts are illegal; they use IntegrationMetadata.as_otel_attributes()
+(flattened: integration.name, integration.version, integration.meta.<k>). The trace
+server unflattens dotted keys back into a nested integration dict on ingest
+(helpers.unflatten_key_values); "integration" is not a semconv KNOWN_KEY so it lands
+in the custom_attrs overflow columns — no server schema change required.
+
+## Injection points
+- openai_agents/otel_processor.py: on_span_start is the universal chokepoint (every
+  span passes through it). Reuses OPENAI_AGENTS_INTEGRATION from the sibling
+  openai_agents.py (slice 3) via the existing import, calling _set_attrs (which
+  already skips None/empty).
+- claude_agent_sdk/otel_integration.py: no single chokepoint; the flattened attrs
+  (_INTEGRATION_OTEL_ATTRS, computed once at module load) are .update()'d into the
+  chat_attrs, tool attrs, and turn attrs dicts before they're written to spans.
+
+## Decisions
+- Session SDK (weave/session/) intentionally NOT stamped: it's a generic API where
+  the user is the integrator; there's no library to attribute. If direct-use
+  provenance is ever wanted, add an optional integration arg to start_session/etc.
+- First-classing integration.* as queryable semconv columns in
+  trace_server/agents/{semconv,schema}.py was considered and deferred — custom_attrs
+  storage is sufficient for tracking and avoids a ClickHouse migration.
+
+## Testing
+Couldn't import these modules in the base env (need the `agents` and
+`claude_agent_sdk` libs). Validated via ruff + ast.parse + manual review. The
+as_otel_attributes flattening itself is unit-tested in slice 1.
+
+## Depends on
+Slice 1 (as_otel_attributes) and slice 3 (OPENAI_AGENTS_INTEGRATION in openai_agents.py).
+
+## Follow-up: google_adk added
+Reviewer asked if the Google ADK integration was missing from the OTel slice — it
+was. google_adk is the third agent-OTel integration: it doesn't create spans of
+its own; it patches ADK's trace_* tracing functions (trace_agent_invocation,
+trace_tool_call, _set_common_generate_content_attributes, trace_inference_result)
+to enrich the OTel spans ADK emits (which ride the TracerProvider weave.init()
+configures). Added _INTEGRATION_OTEL_ATTRS = library_integration("google_adk",
+distribution_name="google-adk").as_otel_attributes() and a _set_integration_attrs
+helper, called in each of the 4 wrappers alongside the existing
+gen_ai.provider.name set — so invoke_agent / execute_tool / generate_content spans
+all carry integration.* provenance. (My original pattern-grep missed it because it
+uses neither weave.op/op_settings nor create_call — only span.set_attribute.)
+ruff + ast clean; google-adk lib not installed locally so not runtime-tested.
