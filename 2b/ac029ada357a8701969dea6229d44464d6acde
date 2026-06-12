@@ -57,3 +57,31 @@ and asAttributes() is typed to return it. The computed [INTEGRATION_ATTRIBUTE_KE
 key resolves to the literal 'integration' (the const is `as const`), so the return
 satisfies the interface — confirmed by typecheck:cjs/esm. prettier + jest green.
 Commit amended (SHA changed); note re-attached.
+
+## Restack relocation (2026-06-12)
+
+This commit was restacked onto an updated `master`. Between the original base
+(`cbc186845b`) and the new base, master refactored the OpenAI-Agents TS
+integration: `WeaveTracingProcessor` was extracted out of
+`sdks/node/src/integrations/openai.agent.ts` (791 -> 234 lines, now a thin
+registration wrapper) into
+`sdks/node/src/integrations/openai-agents/weave-tracing-processor.ts`.
+
+The only rebase conflict was in `openai.agent.ts`. Resolution:
+- `openai.agent.ts` -> took the new (refactored) base verbatim; it no longer
+  builds any attribute objects, so there is nothing to stamp there.
+- The integration-metadata stamping this commit originally added to
+  `openai.agent.ts` was RELOCATED into `openai-agents/weave-tracing-processor.ts`
+  (import `{asAttributes, libraryIntegration}` from `../integrationMetadata`,
+  the module-level `OPENAI_AGENTS_INTEGRATION = libraryIntegration('openai_agents',
+  {packageName: '@openai/agents'})` const, and `...asAttributes(OPENAI_AGENTS_INTEGRATION)`
+  spread into the two attribute objects: the `onTraceStart` agent-trace
+  attributes and the span attributes). Intent and scope are unchanged from the
+  original two hunks.
+
+## Hint for future agents
+The refactor also introduced `openai-agents/weave-otel-tracing-processor.ts`
+(the OTel-v2 path, used when `shouldUseOtelV2()`). This commit does NOT stamp
+that processor because it post-dates the original change. If the openai_agents
+integration should carry `attributes.integration` under OTel v2, that file needs
+the same stamping as a follow-up.
