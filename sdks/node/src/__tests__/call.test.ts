@@ -1,5 +1,5 @@
 import * as weave from 'weave';
-import {op, Op} from 'weave';
+import {op, type Op} from 'weave';
 
 const mockOpName = 'weave://test-project-id/op/test-op';
 const mockCallId = 'test-call-id';

@@ -5,9 +5,9 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {setGlobalClient} from '../../clientApi';
-import {Api as TraceServerApi} from '../../generated/traceServerApi';
+import {type Api as TraceServerApi} from '../../generated/traceServerApi';
 import {Settings, type SettingsInit} from '../../settings';
-import {WandbServerApi} from '../../wandb/wandbServerApi';
+import {type WandbServerApi} from '../../wandb/wandbServerApi';
 import {WeaveClient} from '../../weaveClient';
 import state from 'weave/state';
 

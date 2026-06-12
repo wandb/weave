@@ -1,7 +1,7 @@
-import {Call, InternalCall} from './call';
+import {type Call, InternalCall} from './call';
 import {getGlobalClient} from './clientApi';
 import {TRACE_CALL_EMOJI} from './constants';
-import {Op, OpOptions, OpRef, CallMethod} from './opType';
+import {type Op, type OpOptions, type OpRef, type CallMethod} from './opType';
 import {getGlobalDomain} from './urls';
 import {warnOnce} from './utils/warnOnce';
 

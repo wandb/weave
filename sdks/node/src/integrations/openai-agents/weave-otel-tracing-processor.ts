@@ -1,5 +1,5 @@
 import {
-  Attributes,
+  type Attributes,
   type Context as OtelContext,
   type Span as OtelSpan,
   SpanStatusCode,
