@@ -234,7 +234,9 @@ def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
     emergency operational bypasses.
     """
     return (
-        os.environ.get(REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV, "true").lower()
+        os.environ.get(
+            REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV, "true"
+        ).lower()
         != "false"
     )
 
