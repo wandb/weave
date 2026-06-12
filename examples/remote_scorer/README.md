@@ -40,9 +40,7 @@ The endpoint must return HTTP 200 with a JSON object. The required top-level
 contract fields are:
 
 - `schema_version`: required integer; must be `1`.
-- `result`: required structured scorer output. By default, Weave requires this
-  to match the scorer result schema so feedback can be stored in typed scorer
-  columns.
+- `result`: required structured scorer output.
 
 The simplest structured result is one score object:
 
@@ -65,9 +63,26 @@ For example:
 ```
 
 Non-200 responses are treated as scorer failures by Weave. The `result` value is
-the scorer output that Weave records as feedback. Weave also accepts multiple
-structured score objects as either a bare list, for example
-`[{"value": "short"}, {"value": 0.32}]`, or under a `scores` key.
+the scorer output that Weave records as feedback. If your scorer returns multiple
+scores, provide a list of score objects:
+
+```json
+{
+  "schema_version": 1,
+  "result": [
+    {
+      "value": "concise",
+      "reason": "The response is brief and focused.",
+      "confidence": 0.9
+    },
+    {
+      "value": 0.82,
+      "reason": "The response directly answers the request.",
+      "confidence": 0.8
+    }
+  ]
+}
+```
 
 ## Auth
 
