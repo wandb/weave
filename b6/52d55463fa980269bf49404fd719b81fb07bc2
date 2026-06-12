@@ -1,0 +1,87 @@
+## Conversation
+User invoked /fix-github-issue 3423 with: "Dont post to GH, just talk to me here.
+Use a stack of PRs if it's helpful using gt." Issue #3423 (reporter pokey):
+"@weave.op decorator destroys type information" — after @weave.op, VSCode/pyright
+stops validating arguments and arg autocomplete breaks; the function shows as a bare
+`Op`. A commenter noted PR #4305 ("Don't destroy type information...") merged but the
+issue persisted.
+
+This is PR1 of a 2-PR gt stack: PR1 = the fix + regression test (self-contained,
+test self-skips where mypy is absent). PR2 = adds mypy to the test dep group so the
+test becomes a real CI gate.
+
+## Root cause
+`weave/trace/op_protocol.py`'s `Op(Protocol[P, R]).__call__` had TWO overloads:
+    @overload
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...   # typed
+    @overload
+    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...         # catch-all
+Type checkers evaluate overloads in order; when a call doesn't match the typed first
+overload (wrong type, missing/extra arg) they SILENTLY fall through to the catch-all,
+which accepts anything and returns Any -> no error. PR #4305 had added the typed
+overload (so the RETURN type R was preserved and that part of #4305 worked) but the
+catch-all kept ARGUMENT checking disabled. That is the residual bug the commenter saw.
+
+## The fix
+Delete the catch-all overload, leaving a single typed `__call__`. `overload` is still
+used by `__get__`; `Any` still used elsewhere — no unused imports.
+
+## Actions / investigation
+- Read op.py (the `op()` decorator: returns `Op[P, R]`, wrapper carries P.args/P.kwargs)
+  and op_protocol.py (the Protocol).
+- git-archaeology: catch-all introduced when the protocol moved to its own file
+  (a086f1b09b); the generic `Op[P,R]` + typed overload came from PR #4305 (45bae73fc8).
+  No git notes on either (predate the convention). #4305's test only checked runtime
+  `inspect.signature`/`get_type_hints` — which is exactly why the static-checking
+  regression was never caught.
+- Built an isolated pyright harness (.context/, gitignored) and a minimal Protocol
+  repro to confirm behavior.
+
+## Errors & Mistakes (the big one)
+- MAJOR early confusion: removing the catch-all and running `uvx pyright .context/repro.py`
+  showed 0 errors -> I briefly concluded the catch-all wasn't the cause. WRONG. The repo's
+  [tool.pyright] config sets `reportCallIssue = false` and `reportArgumentType = false`
+  and excludes tests/. So pyright-from-repo-root SUPPRESSES exactly the errors I was
+  testing for. Once I ran pyright with an isolated `typeCheckingMode: basic` config, the
+  truth appeared: removing the catch-all DOES restore arg checking. Sanity-check your
+  checker config before trusting "0 errors".
+- pyright `--project`/`-p` is REQUIRED for it to apply a config's extraPaths; passing a
+  bare file path resolves no imports and reports nothing (another "0 errors" red herring).
+
+## Verification
+- Isolated pyright (basic mode) + mypy both: missing arg -> reportCallIssue/[call-arg];
+  wrong type -> reportArgumentType/[arg-type]; return type preserved; .call/.calls,
+  attribute access, bare/untyped Op (P defaults to ...), dynamic op(*args,**kwargs)
+  unpacking, and Callable[...,Any] compat all still pass.
+- No internal regressions: pyright over all of weave/ = 254 errors before AND after
+  (0 new). mypy (repo config) over weave/flow+scorers+trace = 84 before AND after (empty
+  diff).
+- Runtime: 145+ op tests pass (test_op_decorator_behaviour, _call_method, _coroutines,
+  _generators, _return_forms, _versioning, _accumulator, _argument_forms, anonymous_ops).
+
+## Regression test design (tests/trace/test_op_static_typing.py)
+- Shells out to a type checker on a generated snippet and asserts the bad calls are
+  flagged. Chose mypy over pyright: pure-Python, deterministic, no node binary to
+  download, already a repo pre-commit tool. (pyright needs node + a network download ->
+  flaky in CI.)
+- Uses `--follow-imports=silent` so mypy resolves weave's real `Op` type but suppresses
+  diagnostics inside weave. Isolated mypy.ini + `--cache-dir` into tmp so nothing leaks
+  into the repo.
+- SELF-VALIDATES: a plain (non-op) bad call must be flagged; if not, the harness is
+  misconfigured and the test SKIPS rather than false-failing. Also skips if mypy can't
+  launch (offline / shard without it).
+- Verified it FAILS with the catch-all restored and PASSES without it, on both mypy 2.1.0
+  and the locked 1.20.2.
+- Consulted Codex (per CLAUDE.md dependency rule): endorsed removing the catch-all as
+  correct+complete and endorsed making it a real CI gate (mypy dep), kept narrow+documented.
+
+## Hints for Future Agents
+- Don't "simplify" `__call__` back to a catch-all or `Callable[..., Any]` — that silently
+  disables arg checking for every op. The single typed signature is load-bearing.
+- If you must let an op be called with arbitrary args, widen at the call site
+  (annotate `Op[..., Any]` / bare `Op` / `Callable[..., Any]`), not the protocol globally.
+- The new test is skip-safe by design; it only becomes a CI gate once mypy is a test dep
+  (PR2 of this stack).
+
+## Open Questions
+- None blocking. The fix benefits pyright/pylance (what the reporter uses) and mypy alike.
