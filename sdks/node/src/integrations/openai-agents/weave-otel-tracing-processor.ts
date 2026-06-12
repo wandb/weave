@@ -395,7 +395,10 @@ function customAttrs(spanData: CustomSpanData): Attributes {
   return out;
 }
 
-function attrsForSpan(span: Span<SpanData>, conversationId: string): Attributes {
+function attrsForSpan(
+  span: Span<SpanData>,
+  conversationId: string
+): Attributes {
   switch (span.spanData.type) {
     case 'agent':
       return invokeAgentAttrs(span.spanData, conversationId);
