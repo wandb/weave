@@ -2261,7 +2261,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     WHEN digest = (
                         SELECT digest FROM objects
                         WHERE project_id = ? AND object_id = ? AND deleted_at IS NULL
-                        ORDER BY created_at DESC, digest DESC
+                        -- tie-break on version_index (publish order), not digest,
+                        -- so a coarse-clock created_at tie still picks the latest.
+                        ORDER BY created_at DESC, version_index DESC
                         LIMIT 1
                     ) THEN 1
                     ELSE 0
@@ -2796,18 +2798,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Compute feedback stats using SQLite + Python aggregation."""
         return sqlite_feedback_stats(self, req)
 
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        # Relies on ClickHouse-only aggregates (sumMap over Array/Map columns,
+        # toStartOfInterval bucketing). Not ported to SQLite.
+        raise NotImplementedError(
+            "feedback_aggregate is not implemented for SQLite trace server"
+        )
+
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
     ) -> tsi.FeedbackPayloadSchemaRes:
         """Discover feedback payload schema from SQLite samples."""
         return sqlite_feedback_payload_schema(self, req)
-
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        raise NotImplementedError(
-            "actions_execute_batch is not implemented for SQLite trace server"
-        )
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)

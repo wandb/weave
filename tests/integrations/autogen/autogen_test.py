@@ -26,7 +26,6 @@ def patch_autogen() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_simple_client_create(
@@ -63,7 +62,6 @@ async def test_simple_client_create(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check(reason="This test is expected to fail")
@@ -108,7 +106,6 @@ async def test_simple_client_create_with_exception(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_simple_client_create_stream(
@@ -148,7 +145,6 @@ async def test_simple_client_create_stream(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_simple_cached_client_create(
@@ -205,7 +201,6 @@ async def test_simple_cached_client_create(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_simple_cached_client_create_stream(
@@ -257,7 +252,6 @@ async def test_simple_cached_client_create_stream(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_agentchat_run_with_tool(
@@ -340,7 +334,6 @@ async def test_agentchat_run_with_tool(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_agentchat_run_stream_with_tool(
@@ -414,7 +407,6 @@ async def test_agentchat_run_stream_with_tool(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_agentchat_group_chat(
@@ -693,7 +685,6 @@ async def test_agentchat_group_chat(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_agent_with_memory(
@@ -814,7 +805,6 @@ async def test_agent_with_memory(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_workflows_singlethreaded_runtime(

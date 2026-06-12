@@ -405,6 +405,27 @@ class TestPythonSpans:
         assert array_value[0] == "value1"
         assert array_value[1] == "value2"
 
+    def test_span_from_proto_parent_id_normalization(self):
+        """Test that empty and all-zero parent_span_id values normalize to None."""
+        # All-zero parent_span_id is the OTel invalid-id sentinel; must mean no parent.
+        pb_span = create_test_span()
+        pb_span.parent_span_id = b"\x00" * 8
+        assert PySpan.from_proto(pb_span).parent_id is None, (
+            "all-zero parent_span_id should yield parent_id=None"
+        )
+
+        pb_span = create_test_span()
+        pb_span.parent_span_id = b""
+        assert PySpan.from_proto(pb_span).parent_id is None, (
+            "empty parent_span_id should yield parent_id=None"
+        )
+
+        pb_span = create_test_span()
+        pb_span.parent_span_id = bytes.fromhex("0123456789abcdef")
+        assert PySpan.from_proto(pb_span).parent_id == "0123456789abcdef", (
+            "real parent_span_id should hex-encode to parent_id"
+        )
+
     def test_span_to_call(self):
         """Test converting a Python Span to Weave Calls."""
         pb_span = create_test_span()

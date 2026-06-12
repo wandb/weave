@@ -131,7 +131,6 @@ def _by_name(spans: list[Any], prefix: str) -> list[Any]:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_agents_quickstart_otel(
     client: WeaveClient, setup_tests, otel_spans: InMemorySpanExporter

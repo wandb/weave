@@ -12,14 +12,8 @@ def detone_shortcode(shortcode: str) -> str:
 
 def detone_emojis(string: str) -> str:
     """Remove any skin tone modifiers from the emojis in a string."""
-    detoned = ""
-    # Not sure why mypy can't find analyze in emoji, but it's there
-    for token in emoji.analyze(string, non_emoji=True):  # type: ignore
-        if isinstance(token.value, str):
-            detoned += token.value
-        else:
-            emoji_match = token.value
-            shortcode = emoji.demojize(emoji_match.emoji)
-            detoned_shortcode = detone_shortcode(shortcode)
-            detoned += emoji.emojize(detoned_shortcode)
-    return detoned
+
+    def detone(matched: str, _data: dict[str, str]) -> str:
+        return emoji.emojize(detone_shortcode(emoji.demojize(matched)))
+
+    return emoji.replace_emoji(string, replace=detone)

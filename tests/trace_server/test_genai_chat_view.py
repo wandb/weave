@@ -5,6 +5,7 @@ end-to-end against ClickHouse; these tests pin the pure projection rules.
 """
 
 import datetime
+import json
 
 import pytest
 
@@ -69,6 +70,26 @@ def _span(
         or datetime.datetime(2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc),
         **kwargs,
     )
+
+
+def _parts(*parts: dict) -> str:
+    """Serialize message parts the way ingestion stores multimodal content.
+
+    `genai_extraction._normalize_single_message` JSON-dumps a message's parts
+    array into the `content` field, so a multimodal message arrives here as a
+    JSON string starting with "[".
+    """
+    return json.dumps(list(parts))
+
+
+def _text_part(text: str) -> dict:
+    return {"type": "text", "content": text}
+
+
+def _uri_part(
+    uri: str, *, mime_type: str = "audio/wav", modality: str = "audio"
+) -> dict:
+    return {"type": "uri", "mime_type": mime_type, "modality": modality, "uri": uri}
 
 
 def _user_payload(message: AgentChatMessage) -> AgentChatUserMessage:
@@ -505,6 +526,128 @@ def test_system_message_not_used_as_user_prompt_fallback() -> None:
     )
 
     assert [m.type for m in messages] == ["assistant_message"]
+
+
+def test_input_media_attaches_to_user_message_not_assistant() -> None:
+    """Regression: media supplied with the user prompt renders on the user
+    bubble, not the assistant.
+
+    Mirrors the session SDK shape — `attach_media` records media on the
+    LLM/chat span as a `uri` part on the user input message (external form)
+    and, separately, in the span-level `content_refs` (internal,
+    int<->ext-convertible form). The user text comes from the enclosing
+    invoke_agent span. The ref *value* surfaced is the internal `content_refs`
+    one (so the response's int->ext adapter can round-trip it); its *direction*
+    comes from the input part, matched by digest. So the audio lands on the
+    user message and the assistant stays clean.
+    """
+    audio_internal = "weave-trace-internal:///PID/object/Content:AUDIODIGEST"
+    audio_external = "weave:///e/p/object/Content:AUDIODIGEST"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="audio-agent",
+            input_messages=[
+                {"role": "user", "content": _parts(_text_part("Describe the audio."))}
+            ],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("Describe the audio."), _uri_part(audio_external)
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("Chiptune music."))}
+            ],
+            # Round-trippable internal-form ref; same object digest as the part.
+            content_refs=[audio_internal],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+    assistant = next(m for m in messages if m.type == "assistant_message")
+
+    # Value is the internal (convertible) ref; direction is from the input part.
+    assert _user_payload(user).content_refs == [audio_internal]
+    assert _assistant_payload(assistant).content_refs == []
+
+
+def test_output_media_attaches_to_assistant_message() -> None:
+    """Model-generated media is a part on the output message and renders on
+    the assistant bubble (mirror image of the input case).
+    """
+    image_internal = "weave-trace-internal:///PID/object/Content:GENIMG"
+    image_external = "weave:///e/p/object/Content:GENIMG"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-gen",
+            input_messages=[
+                {"role": "user", "content": _parts(_text_part("Draw a cat."))}
+            ],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_messages=[
+                {"role": "user", "content": _parts(_text_part("Draw a cat."))}
+            ],
+            output_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(
+                        _text_part("Here you go."),
+                        _uri_part(
+                            image_external, mime_type="image/png", modality="image"
+                        ),
+                    ),
+                }
+            ],
+            content_refs=[image_internal],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+    assistant = next(m for m in messages if m.type == "assistant_message")
+
+    assert _user_payload(user).content_refs == []
+    assert _assistant_payload(assistant).content_refs == [image_internal]
+
+
+def test_content_ref_without_inline_part_is_not_attached() -> None:
+    """A `content_refs` entry with no matching inline message part has no
+    direction signal, so it attaches to neither bubble — only refs anchored to
+    an input/output part are surfaced (documents the deliberate pre-GA break
+    away from the undirected flat list).
+    """
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="bot",
+            input_messages=[{"role": "user", "content": "hello"}],
+            output_messages=[{"role": "assistant", "content": "hi"}],
+            content_refs=["weave-trace-internal:///PID/object/Content:ORPHAN"],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+    assistant = next(m for m in messages if m.type == "assistant_message")
+    assert _user_payload(user).content_refs == []
+    assert _assistant_payload(assistant).content_refs == []
 
 
 def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:

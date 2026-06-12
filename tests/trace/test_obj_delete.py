@@ -178,6 +178,43 @@ def test_delete_and_recreate_object(client: WeaveClient):
     assert objs[0].val == {"i": 2}
 
 
+def _latest_objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:
+    objs = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id], latest_only=True),
+        )
+    )
+    return objs.objs
+
+
+@pytest.mark.parametrize("republish_val", [{"i": 1}, {"i": 99}])
+def test_republish_after_deleting_all_versions(
+    client: WeaveClient, republish_val: dict[str, int]
+):
+    # Repro for #6298: publish, delete every version, re-publish, then the
+    # re-published object must be visible (including via latest_only, which
+    # backs the Datasets tab). republish_val == {"i": 1} re-publishes the
+    # identical digest that was just tombstoned (the original report).
+    v0 = weave.publish({"i": 1}, name="obj_1")
+    v1 = weave.publish({"i": 2}, name="obj_1")
+    assert _obj_delete(client, "obj_1", None) == 2
+    assert _objs_query(client, "obj_1") == []
+
+    v2 = weave.publish(republish_val, name="obj_1")
+
+    objs = _objs_query(client, "obj_1")
+    assert len(objs) == 1
+    assert objs[0].digest == v2.digest
+    assert objs[0].val == republish_val
+    assert objs[0].is_latest == 1
+
+    latest = _latest_objs_query(client, "obj_1")
+    assert len(latest) == 1
+    assert latest[0].digest == v2.digest
+    assert latest[0].val == republish_val
+
+
 def test_read_deleted_object(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -348,3 +385,41 @@ def test_delete_object_versions_api(client: WeaveClient):
 
     objs = _objs_query(client, "obj_multi_delete")
     assert len(objs) == 0
+
+
+def _datasets_query(client: WeaveClient, latest_only: bool) -> list[tsi.ObjSchema]:
+    objs = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(
+                base_object_classes=["Dataset"], latest_only=latest_only
+            ),
+        )
+    )
+    return objs.objs
+
+
+def test_republish_dataset_after_deleting_all_versions(client: WeaveClient):
+    # Repro for #6298: the Datasets tab queries by base_object_class +
+    # latest_only. After deleting every version and re-publishing the
+    # identical first version (same digest as the tombstoned row), the
+    # dataset must reappear in both the full and latest_only listings.
+    r0 = weave.publish(weave.Dataset(name="my_ds", rows=[{"a": 1}, {"a": 2}]))
+    weave.publish(weave.Dataset(name="my_ds", rows=[{"a": 3}]))
+    assert len(_datasets_query(client, latest_only=False)) == 2
+
+    _obj_delete(client, "my_ds", None)
+    assert _datasets_query(client, latest_only=False) == []
+
+    r2 = weave.publish(weave.Dataset(name="my_ds", rows=[{"a": 1}, {"a": 2}]))
+    assert r2.digest == r0.digest
+
+    latest = _datasets_query(client, latest_only=True)
+    assert len(latest) == 1
+    assert latest[0].object_id == "my_ds"
+    assert latest[0].digest == r2.digest
+    assert latest[0].is_latest == 1
+
+    all_versions = _datasets_query(client, latest_only=False)
+    assert len(all_versions) == 1
+    assert all_versions[0].digest == r2.digest

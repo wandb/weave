@@ -69,7 +69,6 @@ def assert_correct_calls_for_chain_invoke(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_simple_chain_invoke(
@@ -106,7 +105,6 @@ def test_simple_chain_invoke(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_simple_chain_invoke_no_client(client) -> None:
@@ -135,7 +133,6 @@ def test_simple_chain_invoke_no_client(client) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
@@ -160,7 +157,6 @@ async def test_simple_chain_ainvoke(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_simple_chain_stream(
@@ -185,7 +181,6 @@ def test_simple_chain_stream(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
@@ -232,7 +227,6 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.skipif(
@@ -258,7 +252,6 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
@@ -305,7 +298,6 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.skipif(
@@ -423,7 +415,6 @@ def fix_chroma_ci() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
@@ -504,7 +495,6 @@ def assert_correct_calls_for_agent_with_tool(calls: list[Call]) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_agent_run_with_tools(
@@ -620,7 +610,6 @@ def assert_correct_calls_for_agent_with_function_call(calls: list[Call]) -> None
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_agent_run_with_function_call(
@@ -713,7 +702,6 @@ def test_agent_run_with_function_call(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_weave_attributes_in_call(client: WeaveClient) -> None:
@@ -741,7 +729,6 @@ def test_weave_attributes_in_call(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "*.googleapis.com"],
     before_record_request=filter_body,
     match_on=["method", "scheme", "path", "query"],
 )
@@ -785,7 +772,6 @@ def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
     match_on=["method", "scheme", "path", "query"],
 )
@@ -817,7 +803,6 @@ def test_langchain_google_genai_usage(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
     match_on=["method", "scheme", "path", "query"],
 )
@@ -849,7 +834,6 @@ def test_langchain_google_chat_genai_usage(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_langchain_anthropic_usage(client: WeaveClient) -> None:
@@ -885,7 +869,6 @@ def test_langchain_anthropic_usage(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_langchain_cohere_usage(client: WeaveClient) -> None:
@@ -921,7 +904,6 @@ def test_langchain_cohere_usage(client: WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_langchain_litellm_usage(client: WeaveClient) -> None:

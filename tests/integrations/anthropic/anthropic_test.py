@@ -26,7 +26,6 @@ def patch_anthropic() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic(
     client: weave.trace.weave_client.WeaveClient,
@@ -64,7 +63,6 @@ def test_anthropic(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -111,7 +109,6 @@ def test_anthropic_stream(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_async_anthropic(
@@ -153,7 +150,6 @@ async def test_async_anthropic(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_async_anthropic_stream(
@@ -204,7 +200,6 @@ async def test_async_anthropic_stream(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_tools_calling(
     client: weave.trace.weave_client.WeaveClient,
@@ -264,7 +259,6 @@ def test_tools_calling(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_messages_stream_ctx_manager(
     client: weave.trace.weave_client.WeaveClient,
@@ -311,7 +305,6 @@ def test_anthropic_messages_stream_ctx_manager(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_async_anthropic_messages_stream_ctx_manager(
@@ -361,7 +354,6 @@ async def test_async_anthropic_messages_stream_ctx_manager(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_messages_stream_get_final_message(
     client: weave.trace.weave_client.WeaveClient,
@@ -404,7 +396,6 @@ def test_anthropic_messages_stream_get_final_message(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_async_anthropic_messages_stream_get_final_message(
@@ -450,7 +441,6 @@ async def test_async_anthropic_messages_stream_get_final_message(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_messages_stream_ctx_manager_text(
     client: weave.trace.weave_client.WeaveClient,
@@ -496,7 +486,6 @@ def test_anthropic_messages_stream_ctx_manager_text(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_async_anthropic_messages_stream_ctx_manager_text(
@@ -545,7 +534,6 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_beta_anthropic(
     client: weave.trace.weave_client.WeaveClient,
@@ -583,7 +571,6 @@ def test_beta_anthropic(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_beta_anthropic_parse(
     client: weave.trace.weave_client.WeaveClient,
@@ -629,7 +616,6 @@ def test_beta_anthropic_parse(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_beta_anthropic_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -676,7 +662,6 @@ def test_beta_anthropic_stream(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_beta_async_anthropic(
@@ -718,7 +703,6 @@ async def test_beta_async_anthropic(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_beta_async_anthropic_stream(

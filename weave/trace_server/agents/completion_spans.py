@@ -1,6 +1,6 @@
-"""Build agent spans from playground completion requests.
+"""Build agent spans from completion requests.
 
-The playground calls LLMs via the ``completions_create`` /
+The playground and signals call LLMs via the ``completions_create`` /
 ``completions_create_stream`` endpoints.  This module converts the
 request + response data into ``AgentSpanCHInsertable`` rows so they
 appear in the agents data model alongside SDK-produced traces.
@@ -24,6 +24,12 @@ from weave.trace_server.ttl_settings import compute_expire_at
 logger = logging.getLogger(__name__)
 
 PLAYGROUND_AGENT_NAME = "Weave Chat Playground"
+SIGNALS_AGENT_NAME = "Weave Signals"
+
+_SOURCE_TO_AGENT_NAME: dict[str | None, str] = {
+    "playground": PLAYGROUND_AGENT_NAME,
+    "signals": SIGNALS_AGENT_NAME,
+}
 
 
 def build_completion_span(
@@ -42,6 +48,7 @@ def build_completion_span(
     wb_user_id: str,
     retention_days: int,
     error: str | None = None,
+    source: str | None = None,
 ) -> AgentSpanCHInsertable:
     """Construct an ``AgentSpanCHInsertable`` from playground completion data.
 
@@ -53,6 +60,9 @@ def build_completion_span(
     response:
         The LiteLLM response dict.  ``None`` for open streaming spans.
     """
+    agent_name = _SOURCE_TO_AGENT_NAME.get(source, PLAYGROUND_AGENT_NAME)
+    weave_source = source or "playground"
+
     input_messages = _normalize_input_messages(request_inputs.messages)
     system_instructions = _extract_system_instructions(request_inputs.messages)
     output_messages: list[NormalizedMessage] = []
@@ -121,8 +131,8 @@ def build_completion_span(
         project_id=project_id,
         trace_id=trace_id,
         span_id=span_id,
-        agent_name=PLAYGROUND_AGENT_NAME,
-        span_name=PLAYGROUND_AGENT_NAME,
+        agent_name=agent_name,
+        span_name=agent_name,
         span_kind="CLIENT",
         started_at=started_at,
         ended_at=ended_at,
@@ -154,7 +164,7 @@ def build_completion_span(
         input_messages=input_messages,
         output_messages=output_messages,
         system_instructions=system_instructions,
-        custom_attrs_string={"weave.source": "playground"},
+        custom_attrs_string={"weave.source": weave_source},
         raw_span_dump=json.dumps(raw_dump, default=str),
         wb_user_id=wb_user_id or "",
         expire_at=expire_at,

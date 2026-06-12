@@ -6,7 +6,7 @@ interface (API) representations and their ClickHouse storage formats.
 
 import json
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any
 
 from weave.shared.trace_server_interface_util import extract_refs_from_values
 from weave.trace_server import ch_sentinel_values
@@ -392,7 +392,7 @@ def ch_table_stats_to_table_stats_schema(
     # Unpack the row with a default for the third value if it doesn't exist
     row_tuple = tuple(ch_table_stats_row)
     digest, count = row_tuple[:2]
-    storage_size_bytes = row_tuple[2] if len(row_tuple) > 2 else cast(Any, None)
+    storage_size_bytes = row_tuple[2] if len(row_tuple) > 2 else None
 
     return tsi.TableStatsRow(
         count=count,

@@ -53,9 +53,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_litellm_quickstart(
     client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
@@ -94,9 +92,7 @@ def test_litellm_quickstart(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_litellm_quickstart_async(
     client: weave.trace.weave_client.WeaveClient, patch_litellm: None
@@ -137,9 +133,7 @@ async def test_litellm_quickstart_async(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_litellm_quickstart_stream(
     client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
@@ -186,9 +180,7 @@ def test_litellm_quickstart_stream(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_litellm_quickstart_stream_async(
     client: weave.trace.weave_client.WeaveClient, patch_litellm: None
@@ -237,7 +229,6 @@ async def test_litellm_quickstart_stream_async(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_model_predict(weave_active, patch_litellm: None) -> None:
     class TranslatorModel(weave.Model):

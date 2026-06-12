@@ -23,7 +23,6 @@ def patch_cohere() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_cohere(
     client: weave.trace.weave_client.WeaveClient,
@@ -77,7 +76,6 @@ def test_cohere(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_cohere_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -137,7 +135,6 @@ def test_cohere_stream(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 async def test_cohere_async(
     client: weave.trace.weave_client.WeaveClient,
@@ -192,7 +189,6 @@ async def test_cohere_async(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 async def test_cohere_async_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -250,7 +246,6 @@ async def test_cohere_async_stream(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_cohere_v2(
     client: weave.trace.weave_client.WeaveClient,
@@ -298,7 +293,6 @@ def test_cohere_v2(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 async def test_cohere_async_v2(
     client: weave.trace.weave_client.WeaveClient,
@@ -345,7 +339,6 @@ async def test_cohere_async_v2(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_cohere_stream_v2(
     client: weave.trace.weave_client.WeaveClient,
@@ -396,7 +389,6 @@ def test_cohere_stream_v2(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 async def test_cohere_async_stream_v2(
     client: weave.trace.weave_client.WeaveClient,

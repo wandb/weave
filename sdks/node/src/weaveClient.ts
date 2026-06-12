@@ -952,11 +952,10 @@ export class WeaveClient {
     op.__savedRef = (async () => {
       const resolvedObjId = objId || getOpName(op);
       const opFn = getOpWrappedFunction(op);
-      const formattedOpFn = await maybeFormatCode(opFn.toString());
       const saveValue = await this.serializedFileBlob(
         'Op',
         'obj.py',
-        new Blob([formattedOpFn])
+        new Blob([opFn.toString()])
       );
       const response = await this.traceServerApi.obj.objCreateObjCreatePost({
         obj: {
@@ -1242,17 +1241,6 @@ function processSummary(
   }
 
   return mergedSummary;
-}
-
-async function maybeFormatCode(code: string) {
-  return code;
-  //   try {
-  //     const prettier = await import('prettier');
-  //     return prettier.format(code, { parser: 'babel' });
-  //   } catch (error) {
-  //     // prettier not available or formatting failed, just use the original string
-  //     return code;
-  //   }
 }
 
 function objectNameToId(name: string): string {

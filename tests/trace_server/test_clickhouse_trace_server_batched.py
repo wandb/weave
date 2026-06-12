@@ -1339,10 +1339,17 @@ def server_with_mock_kafka():
     mock_ch_client.command.return_value = None
     mock_ch_client.insert.return_value = MagicMock()
 
-    # Mock query to return empty project (resolves to CALLS_MERGED write target)
-    mock_query_result = MagicMock()
-    mock_query_result.result_rows = [(None, None)]
-    mock_ch_client.query.return_value = mock_query_result
+    # Empty residence (resolves v2 writes to calls_complete); the calls_complete
+    # end path then reads the stored started_at, so return one for that query.
+    def _query_side_effect(query, *args, **kwargs):
+        result = MagicMock()
+        if "started_at" in query:
+            result.result_rows = [(dt.datetime.now(dt.timezone.utc),)]
+        else:
+            result.result_rows = [(None, None)]
+        return result
+
+    mock_ch_client.query.side_effect = _query_side_effect
 
     mock_producer = MagicMock()
 
