@@ -1,0 +1,88 @@
+## Conversation
+User invoked /fix-github-issue 5421. Issue title: "Anthropic (Bedrock): when
+model outputs both tool and text, only text is captured." Reporter (ChuckJonas)
+says it only happens with streaming. User instructions: don't post to GH, talk
+in the terminal; use a gt stack of PRs if helpful.
+
+## Root cause
+weave/integrations/anthropic/anthropic_sdk.py: anthropic_accumulator() folds
+raw streaming events (create(stream=True) and beta.messages.create) into a
+Message. The old code ONLY handled text: it checked
+`isinstance(value, RawContentBlockDeltaEvent) and hasattr(value.delta, "text")`
+and appended/extended a TextBlock. It NEVER handled:
+  - content_block_start (where tool_use blocks are announced), so the ToolUseBlock
+    was never added to acc.content;
+  - input_json_delta deltas (which carry the tool arguments as partial JSON).
+Result: streamed tool calls silently dropped from the trace output.
+(Note: non-streaming create()/parse() are unaffected — should_use_accumulator()
+only returns True when inputs["stream"] is truthy, and the full Message already
+contains tool_use blocks.)
+
+## Fix
+Rewrote anthropic_accumulator to mirror the SDK's own accumulate_event logic
+(anthropic.lib.streaming._messages.accumulate_event), but kept it self-contained
+because reusing the SDK fn would need beta/regular dispatch and the beta variant
+requires request_headers/output_format we don't have.
+  - content_block_start -> acc.content.append(value.content_block.model_copy(deep=True))
+    (copy so we never mutate the caller's event objects; deep to be safe).
+  - content_block_delta -> _accumulate_content_block_delta(): address the block by
+    value.index (matches SDK). text_delta extends the text block; input_json_delta
+    concatenates partial_json into a transient buffer on the block and re-parses it
+    into block.input via json.loads (tolerant: returns None while still partial).
+  - message_start / message_delta usage + stop_reason handling left UNCHANGED
+    (Chesterton's fence: the input_tokens += message.usage.input_tokens behavior is
+    load-bearing for existing token-count assertions).
+isinstance checks use module-level tuple constants spanning stable + beta types
+(_CONTENT_BLOCK_START_EVENTS, _TEXT_DELTAS, _TEXT_BLOCKS, _TOOL_USE_BLOCKS, ...).
+Verified pyright/ty/mypy all narrow correctly on the tuple-variable isinstance.
+
+## Why json.loads, not jiter
+The SDK uses jiter.from_json(partial_mode=True). I used plain json.loads with a
+try/except (returns None on incomplete). The concatenation of all input_json_delta
+fragments is always valid JSON by the last delta, so the FINAL persisted output is
+correct; intermediate snapshots just show {} until complete. Dependency-free,
+smallest change. jiter IS available (anthropic dep) if richer intermediate parsing
+is ever wanted.
+
+## CRITICAL gotcha: accumulator must never raise
+op.py (_build_iterator_from_accumulator_for_op, ~line 862) wraps the accumulator
+call in `try/except StopIteration` ONLY. Any OTHER exception propagates to the
+outer handler which finishes the call with the exception AND RE-RAISES into the
+user's `for event in stream` loop — i.e. a buggy accumulator breaks the user's
+app. Hence all the defensive guards (bounds-checked index, getattr on the
+transient buffer, tolerant JSON parse, fallback TextBlock if content_block_start
+was missing).
+
+## Transient buffer doesn't leak
+_TOOL_INPUT_BUF_ATTR ("_weave_tool_input_json") is set via setattr on the block.
+Verified it is NOT a declared pydantic field, so model_dump()/to_dict() exclude
+it. weave serializes anthropic Message/blocks via to_dict()/model_dump()
+(serialize.py _encode_custom_obj / _encode_try_to_dict), confirmed it never
+appears in the serialized trace.
+
+## Testing
+Added tests/integrations/anthropic/anthropic_test.py::test_anthropic_stream_tools_calling
+with a HAND-CRAFTED cassette
+(cassettes/anthropic_test/test_anthropic_stream_tools_calling.yaml) generated via
+a python yaml.dump script. The SSE body models a real Anthropic stream with a text
+block (index 0) AND a tool_use block (index 1: get_weather, input
+{"location":"San Francisco, CA"}), stop_reason tool_use. ids/tokens modeled on the
+existing non-streaming test_tools_calling.yaml. VCR default matches method+URI
+(not body) and conftest ignore_localhost means the sqlite client needs no
+cassette. Test drives the public client (stream=True, tools=[...]) and asserts the
+traced output.content has BOTH blocks.
+Ran: anthropic + bedrock suites on sqlite -> 26 passed. ruff check/format clean.
+ty clean. pyright/mypy: only 2 PRE-EXISTING errors in the untouched
+anthropic_stream_accumulator (acc = "" at old lines 137/140) — confirmed present
+on origin/master; they only surface when anthropic is installed (CI's mypy hook
+doesn't install it), so master CI is green and unaffected.
+
+## Dead ends
+- Considered reusing anthropic.lib.streaming._messages.accumulate_event directly:
+  rejected because beta has a separate accumulate_event needing request_headers +
+  output_format we don't have, forcing awkward dispatch.
+- Considered jiter partial parsing: deferred (json.loads is enough for correct
+  final output; smaller change).
+
+## Open questions
+None. Bedrock half of the same issue is the next commit on this branch.
