@@ -1,0 +1,47 @@
+## Conversation
+User invoked /fix-github-issue 3423 with: "Dont post to GH, just talk to me here.
+Use a stack of PRs if it's helpful using gt." Issue #3423: "@weave.op decorator
+destroys type information" — VSCode/pyright stops checking args and autocomplete
+breaks after decorating with @weave.op.
+
+This is PR2 of a 2-PR gt stack:
+- PR1 (andrew/fix-issue-3423): the actual fix in op_protocol.py + the regression test.
+- PR2 (this, andrew/fix-issue-3423-mypy-gate): adds mypy to the `test` dep group so
+  the regression test runs as a real CI gate instead of self-skipping.
+
+## Why this is a separate PR
+The regression test (tests/trace/test_op_static_typing.py, added in PR1) shells out
+to a type checker and self-skips when one is absent. Without mypy in the test deps it
+SKIPS in CI (no gate). Adding mypy turns it into a real gate but touches pyproject +
+uv.lock (a dependency decision with broader blast radius), so it is isolated here. PR1
+can land alone if maintainers don't want the dep; the test still runs locally / wherever
+mypy exists.
+
+## Actions
+- Added `mypy>=1.11,<2; python_version < '3.14'` to dependency-groups.test in pyproject.toml.
+- Ran `uv lock`; verified the lock change is purely additive.
+
+## Errors & Mistakes
+- FIRST lock attempt used unconstrained `mypy>=1.11` -> resolved mypy 2.1.0 and produced
+  92 REMOVED lines in uv.lock: all `python_full_version >= '3.14'` resolution-markers got
+  re-forked. A no-op `uv lock` on the original tree was 0/0, proving the churn came from
+  adding mypy, not uv-version drift.
+- Pinning `<2` (mypy 1.20.2) still churned the same 92 3.14-marker lines (librt is pulled
+  in on 1.x too).
+- FIX: constrain to `python_version < '3.14'`. Tests run on 3.10-3.13 (3.12 primary); 3.14
+  is not a target. Result: 0 removed, 151 added (just the mypy/librt/pathspec package
+  blocks + hashes). No existing package versions change.
+
+## Hints for Future Agents
+- mypy resolved to 1.20.2 here; the pre-commit hook pins v1.19.1. Both are 1.x and emit the
+  same `[call-arg]`/`[arg-type]` error codes the test asserts on, so the floor is loose.
+- The `moto==5.1.17 does not have an extra named bedrock` warning during `uv lock` is
+  PRE-EXISTING and unrelated to this change.
+- Cold-cache run of the test is ~13s (mypy parses weave under follow_imports=silent).
+- Local `master` is stale (2 behind origin/master) and lives in a sibling worktree, so gt
+  shows "3 commits" for the stack base — cosmetic. The real PR diff vs origin/master is
+  clean (PR1 = 1 commit, PR2 = 1 commit).
+
+## Open Questions
+- Whether maintainers prefer mypy pinned exactly to the pre-commit version (1.19.1). Left a
+  loose 1.x floor since the asserted error codes are version-stable.
