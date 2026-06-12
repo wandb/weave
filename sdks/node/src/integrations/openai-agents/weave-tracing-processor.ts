@@ -16,6 +16,12 @@ import {
 } from '../openai.agent';
 import {CallStack} from '../../weaveClient';
 
+type OpenAIAgentsContext = {
+  spanId: string | null;
+  spanParentId: string | null;
+  traceId: string | null;
+};
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -500,17 +506,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
   }
 }
 
-/**
- * Attempts to recover the Weave call stack from the current OpenAI Agents trace/span context.
- * Returns a CallStack with the current agent call as parent, or null if not in an agent context.
- *
- * This handles the AsyncLocalStorage isolation issue where OpenAI Agents' ALSO.run() creates
- * a new context that doesn't share Weave's stack. We work around this by looking up the
- * parent call from a global registry keyed by the OpenAI Agents trace/span ID.
- *
- * @returns CallStack with parent set to the current agent call, or null if not available
- */
-export function getCallStackFromOpenAIAgents(): any | null {
+function getCurrentOpenAIAgentsContext(): OpenAIAgentsContext | null {
   const currentTrace = getCurrentTrace();
   const currentSpan = getCurrentSpan();
 
@@ -541,6 +537,32 @@ export function getCallStackFromOpenAIAgents(): any | null {
     return null;
   }
 
+  return {
+    spanId,
+    spanParentId,
+    traceId,
+  };
+}
+
+/**
+ * Attempts to recover the Weave call stack from the current OpenAI Agents trace/span context.
+ * Returns a CallStack with the current agent call as parent, or null if not in an agent context.
+ *
+ * This handles the AsyncLocalStorage isolation issue where OpenAI Agents' ALSO.run() creates
+ * a new context that doesn't share Weave's stack. We work around this by looking up the
+ * parent call from a global registry keyed by the OpenAI Agents trace/span ID.
+ *
+ * @returns CallStack with parent set to the current agent call, or null if not available
+ */
+export function getCallStackFromOpenAIAgents(): any | null {
+  const ctx = getCurrentOpenAIAgentsContext();
+
+  if (!ctx) {
+    return null;
+  }
+
+  const {spanId, spanParentId, traceId} = ctx;
+
   // Look up Weave call data with fallback chain:
   // 1. Try current span ID first (most specific)
   // 2. Fall back to parent span ID (if current span not tracked not tracking is delayed)
@@ -562,4 +584,9 @@ export function getCallStackFromOpenAIAgents(): any | null {
   }
 
   return null;
+}
+
+export function isInOpenAIAgentsContext(): boolean {
+  const ctx = getCurrentOpenAIAgentsContext();
+  return !!ctx;
 }
