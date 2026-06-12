@@ -1,0 +1,76 @@
+## Conversation
+Second commit for issue #5421 (see the anthropic commit's note for full context).
+The issue title says "Anthropic (Bedrock)". The reporter's illustrative captured
+output had `content` as a STRING, snake_case `stop_reason`, and a `latency_ms`
+field — that shape is produced ONLY by bedrock_stream_accumulator (the Anthropic
+accumulator never adds latency_ms), so the Bedrock converse_stream path is
+squarely in scope alongside the Anthropic SDK path.
+
+## Root cause
+weave/integrations/bedrock/bedrock_sdk.py: bedrock_stream_accumulator built
+acc["content"] as a flat string via `acc["content"] += value["contentBlockDelta"]
+["delta"]["text"]`. Two bugs:
+  1. A string can't represent a tool call, so tool_use was dropped.
+  2. On a tool-use delta, delta == {"toolUse": {"input": "<partial json>"}} has no
+     "text" key -> KeyError. op.py only catches StopIteration around the accumulator
+     (see anthropic note), so this KeyError re-raises into the user's stream loop and
+     breaks iteration. So this path was worse than Anthropic's silent drop.
+
+## Fix (design confirmed via Codex consult)
+Asked Codex (CLAUDE.md requires consult on data-shape/schema forks): keep content
+as a string + add a tool_uses field (back-compat, hybrid Weave-only schema) vs
+switch content to a list of Converse-shaped blocks. Codex recommended the list:
+the accumulator should reconstruct the model's actual output message, and a list
+unifies streaming with the non-streaming Converse `output.message.content`
+(`[{"text":...},{"toolUse":{...}}]`). A Weave-only hybrid splits the message across
+two fields and burdens every consumer.
+Implemented:
+  - acc["content"] is now a list[dict].
+  - contentBlockStart with start.toolUse -> append {"toolUse": {toolUseId, name,
+    "input": ""}} at contentBlockIndex.
+  - contentBlockDelta text -> get/create {"text": ""} at index, append text.
+  - contentBlockDelta toolUse -> append delta.toolUse.input (raw JSON str) to the
+    block's input buffer.
+  - contentBlockStop -> _finalize_converse_tool_input parses the JSON string into a
+    dict (empty -> {}; unparseable -> kept verbatim, never dropped).
+  - messageStart/messageStop/metadata (role, stop_reason, usage, latency_ms)
+    unchanged.
+Helpers: _converse_block_index (defensive int coercion), _get_or_create_converse_block
+(append in contiguous index order, pad gaps with {} rather than raise),
+_parse_converse_tool_input, _finalize_converse_tool_input. Indices in ConverseStream
+are contiguous/ascending so list position == contentBlockIndex.
+
+## BREAKING change + test update
+This changes the traced output shape for converse_stream from `content: str` to
+`content: list`. Only one consumer read it as a string: the existing
+test_bedrock_converse_stream asserted `"To list all text files" in output["content"]`
+(substring on a str). Updated it to scan text blocks
+(`any("..." in block.get("text","") for block in content)`) — preserves the test's
+intent (text is captured) while adapting the mechanism (tests-only-tighten rule).
+Cost/usage summary (bedrock_on_finish_converse) reads output["usage"] only, so it is
+unaffected by the content reshape. Grepped: no other consumer of the stream content
+string (the other ["content"] hits are non-streaming converse/invoke/guardrail, which
+already use list/dict shapes).
+
+## Testing
+Bedrock tests use moto + a mock _make_api_call returning a MockStream (no VCR).
+Added MOCK_STREAM_TOOL_EVENTS (text block index 0 + tool_use get_weather index 1,
+input streamed as two JSON fragments '{"location":' + ' "San Francisco, CA"}'),
+mock_converse_stream_tool_make_api_call, and test_bedrock_converse_stream_tool_use.
+The test asserts the stream consumes without raising (regression for the KeyError),
+that content has both the text block and the toolUse block with input parsed to
+{"location": "San Francisco, CA"}, stop_reason tool_use, and usage 410/60/470.
+Verified the accumulator directly on synthesized streams: text-only ->
+[{"text":...}] (no regression), text+tool, and empty-input tool -> input {}.
+Ran anthropic+bedrock suites on sqlite: 26 passed. ruff/ty clean; pyright/mypy show
+only the pre-existing anthropic_stream_accumulator errors (unrelated).
+
+## Hints for future agents
+- These tests carry @pytest.mark.skip_clickhouse_client, so they run on sqlite only;
+  --trace-server=clickhouse just skips them.
+- ConverseStream tool input arrives as a JSON *string* fragment stream
+  (ToolUseBlockDelta.input), unlike Anthropic's input_json_delta.partial_json — same
+  idea, different wire key.
+
+## Open questions
+None.
