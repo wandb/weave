@@ -2,17 +2,18 @@
 
 import logging
 
-import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ProjectDataResidence
+from weave.trace_server.tracing import traced
+from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
 
 
-@ddtrace.tracer.wrap(name="clickhouse_project_version.get_project_data_residence")
+@traced(name="clickhouse_project_version.get_project_data_residence")
 def get_project_data_residence(
     project_id: str, ch_client: CHClient
 ) -> ProjectDataResidence:
@@ -43,9 +44,11 @@ def get_project_data_residence(
         has_complete = row[0]
         has_merged = row[1]
 
-        root_span = ddtrace.tracer.current_root_span()
-        if root_span:
-            root_span.set_tags({"has_complete": has_complete, "has_merged": has_merged})
+        root_span = trace.get_current_span()
+        if root_span.is_recording():
+            root_span.set_attributes(
+                {"has_complete": has_complete, "has_merged": has_merged}
+            )
 
         if has_complete and has_merged:
             return ProjectDataResidence.BOTH

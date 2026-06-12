@@ -18,13 +18,13 @@ import datetime
 import logging
 import threading
 
-import ddtrace
 import redis
 from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.redis_client import get_redis_client
+from weave.trace_server.tracing import _tracer, traced  # noqa: PLC2701
 
 logger = logging.getLogger(__name__)
 
@@ -66,18 +66,18 @@ def get_project_retention_days(
         set_current_span_dd_tags({"ttl.cache_hit": "L1"})
         return cached
 
-    with ddtrace.tracer.trace("ttl_settings.get_project_retention_days") as span:
+    with _tracer.start_as_current_span("ttl_settings.get_project_retention_days") as span:
         redis_client = get_redis_client()
         if redis_client is not None:
             redis_val = _l2_get(redis_client, project_id)
             if redis_val is not None:
                 _l1_set(project_id, redis_val)
-                span.set_tag("ttl.cache_hit", "L2")
+                span.set_attribute("ttl.cache_hit", "L2")
                 return redis_val
 
         retention_days = _query_clickhouse(ch_client, project_id)
-        span.set_tag("ttl.cache_hit", "clickhouse")
-        span.set_tag("ttl.retention_days", retention_days)
+        span.set_attribute("ttl.cache_hit", "clickhouse")
+        span.set_attribute("ttl.retention_days", retention_days)
 
         if redis_client is not None:
             _l2_set(redis_client, project_id, retention_days)
@@ -179,7 +179,7 @@ def _l2_delete(redis_client: redis.Redis, project_id: str) -> None:
         logger.exception("Redis L2 cache delete failed for project %s", project_id)
 
 
-@ddtrace.tracer.wrap(name="ttl_settings.query_clickhouse")
+@traced(name="ttl_settings.query_clickhouse")
 def _query_clickhouse(ch_client: CHClient, project_id: str) -> int:
     """Query ClickHouse for the latest retention_days via argMax.
 

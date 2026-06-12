@@ -12,7 +12,6 @@ from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any, TypeVar, cast
 
-import ddtrace
 import sqlparse
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
@@ -23,6 +22,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import InsertTooLarge
 from weave.trace_server.kafka import KafkaProducer
+from weave.trace_server.tracing import traced
 
 logger = logging.getLogger(__name__)
 
@@ -380,7 +380,7 @@ def maybe_enqueue_minimal_call_end(
 # ---------------------------------------------------------------------------
 
 
-@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
+@traced(name="clickhouse_trace_server_batched.find_call_descendants")
 def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
