@@ -65,3 +65,32 @@ Reviewer (Conductor local comment) noted the module docstring's literal
 attributes:{integration:{...}} shape diagram duplicated the IntegrationInfo /
 IntegrationAttributes TypedDicts. Trimmed the docstring to a concise pointer to
 those types plus the attach guidance. Doc-only; ruff clean, tests unaffected.
+
+## Amendment (lint fix folded in)
+
+`as_attributes()` originally returned the `IntegrationAttributes` TypedDict.
+That broke CI Python lint (mypy + pyright) across the descendant PRs in this
+stack:
+
+- `op(attributes=...)` and `Op.attributes` are typed `dict[str, Any] | None`,
+  and a TypedDict is NOT assignable to `dict[str, Any]` (mutable/invariant), so
+  `weave.op(attributes=X.as_attributes())` in op-based integrations (bedrock x5,
+  notdiamond x2) failed with `call-overload`.
+- llamaindex (callbacks PR) stamps a `"weave"` key onto the returned dict, which
+  a closed TypedDict rejects (`typeddict-unknown-key` / pyright
+  reportGeneralTypeIssues).
+
+Fix: `as_attributes()` now returns `dict[str, Any]`, constructed via the
+`IntegrationAttributes`/`IntegrationInfo` TypedDicts (so field/key safety is kept
+at construction) and handed out through a single `cast(dict[str, Any], ...)`.
+The cast is a runtime no-op, so it avoids the extra dict copy a `{**...}` spread
+at every call site would incur, and all call sites stay in their natural
+`attributes=X.as_attributes()` form. Folded into this base commit so every
+descendant PR inherits the corrected return type after `gt restack`.
+
+Verified with the pinned hooks (ty/pyright/mypy/ruff via prek) — all pass — and
+the as_attributes unit tests (value equality + fresh-copy mutation) still pass
+since runtime behavior is unchanged.
+
+Note migration: `gt modify`'s rebase orphaned the descendant commits' notes onto
+their old SHAs; they were re-attached with `git notes copy <old> <new>`.
