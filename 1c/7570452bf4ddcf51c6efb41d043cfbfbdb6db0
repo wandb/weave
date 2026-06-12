@@ -1,0 +1,104 @@
+## Conversation
+User invoked /fix-github-issue 5158. Issue: "Adding Weave causes CrewAI
+'kickoff' to hang." Repro: weave.init() + crewai Crew.kickoff() hangs
+indefinitely (crewai.Crew.kickoff logged pending forever); removing
+weave.init() completes in seconds. Maintainer (jamie-rasmussen) comment:
+"something in crewai 0.140 (or possibly its litellm dependency) seems to
+have introduced an infinite loop during our input serialization. A
+possible short term workaround is to use crewai==0.134.0."
+User constraints: don't post to GitHub (terminal only), stack via gt if
+helpful.
+
+## Actions
+- gh issue view 5158 to read the report + comment.
+- Read weave/integrations/crewai/crewai_sdk.py + crewai_utils.py: kickoff
+  is patched with crew_kickoff_postprocess_inputs (self -> model_dump,
+  inputs -> dictify); Agent.execute_task / Task.execute_sync use
+  crewai_postprocess_inputs -> safe_serialize_crewai_object -> dictify(obj)
+  for non-Agent/Task objects. EXCLUDE_AGENT_ATTRS={'crew':True} and
+  EXCLUDE_TASK_ATTRS={'agent':True} exist specifically to break
+  Agent<->Crew / Task<->Agent cycles in the special-cased path — strong
+  evidence CrewAI graphs are cyclic.
+- Read weave/trace/serialization/serialize.py dictify(). Found the
+  `to_dict` branch recursed as dictify(v, maxdepth, depth+1) WITHOUT the
+  `seen` set, while every other branch (list/dict/sequence/attr) threads
+  it. Cycle detection (`id(obj) in seen`) is defeated across to_dict.
+- Confirmed main to_json path uses use_dictify=False (weave_client.py
+  1068/1248), so the loop is in the integration's own dictify() calls, not
+  the encoder ladder.
+- git archaeology: dictify introduced in a8e49007db (#2680). From day one
+  the to_dict branch dropped `seen`, BUT dictify was only ever called via
+  fallback_encode(obj) -> dictify(obj, maxdepth=DEFAULT_MAX_DICTIFY_DEPTH)
+  (=10), so the depth cap masked the hole. Refactor #3784 replaced
+  fallback_encode with the _encode_dictify ladder entry which calls
+  dictify(obj) with the default maxdepth=0 (unlimited); crewai integration
+  likewise calls dictify(obj)/dictify(v) with maxdepth=0. DEFAULT_MAX_DICTIFY_DEPTH
+  is now entirely dead code (grep confirms only the definition remains).
+- Reproduced 3 ways against the REAL weave dictify: (1) 2-node cycle
+  through to_dict -> RecursionError, caught by the branch's
+  `except Exception: raise ValueError('to_dict failed')` so users see a
+  fast ValueError, NOT a hang; (2) self-reference -> same; (3) diamond DAG
+  of shared to_dict nodes -> exponential re-traversal, the actual "hang"
+  (N=20 didn't finish in 20s). KEY INSIGHT: a tight cycle alone does NOT
+  reproduce the hang symptom (it errors fast); the real-world hang is the
+  EXPONENTIAL blowup from re-expanding shared sub-objects, because `seen`
+  is reset at every to_dict boundary.
+
+## Fix
+Thread `seen` through the to_dict branch in both copies of dictify:
+weave/trace/serialization/serialize.py:354 and the duplicated
+weave/integrations/dspy/dspy_utils.py:195 (identical latent bug). `seen`
+is a GLOBAL visited set (never popped), so after the fix each distinct
+object is expanded exactly once; cycles short-circuit to stringify and
+shared sub-objects stringify on 2nd encounter -> O(n) instead of O(2^n).
+This makes to_dict consistent with the other branches. After fix: cycle
+N=2 ok, self-ref ok, diamond N=60 = 0.005s.
+
+Deliberately did NOT change the default maxdepth (0 -> 10) or revive
+DEFAULT_MAX_DICTIFY_DEPTH: the `seen` fix fully resolves the infinite
+loop/blowup, and changing the default would truncate deep-but-finite
+structures for every dictify caller (crewai/dspy/smolagents/vertexai/
+gemini/huggingface) — broad blast radius + cassette/snapshot regression
+risk for no additional bug-fix value. Kept the change minimal.
+
+## Tests
+tests/trace/test_serialize.py: added test_dictify_circular_reference,
+test_dictify_self_reference, test_dictify_shared_reference_traversed_once.
+The shared-ref test counts to_dict() calls and asserts the shared child is
+expanded exactly once (deterministic guard against exponential regression;
+no timing/flake). VERIFIED all three FAIL on buggy code (re-introduced the
+bug via script, ran, restored) and PASS with the fix. Full
+test_serialize.py + test_serialize_encoders.py = 112 passed. ruff
+check/format clean.
+
+## Errors & Mistakes
+- First real-weave repro raised ValueError('to_dict failed') not a visible
+  hang — initially looked like it contradicted "hangs indefinitely". Root
+  cause: tight cycles hit RecursionError (caught->ValueError) fast; the
+  hang is the exponential-DAG case. Built a separate diamond-DAG repro to
+  confirm the true hang mechanism. Both are fixed by the same one-liner.
+- Wrong test path guess (tests/trace/test_attributes.py) — file doesn't
+  exist; attribute tests live in test_weave_client.py.
+
+## Hints for Future Agents
+- crewai/dspy are NOT installed in the base test env (separate nox
+  shards). The regression tests intentionally live in the generic
+  tests/trace/test_serialize.py against dictify directly — no heavy
+  crewai+litellm+bedrock stack needed.
+- There are TWO copies of dictify (serialize.py + dspy_utils.py). The
+  duplication is a smell; if you touch one, check the other. De-duplicating
+  was out of scope for this bug fix.
+- `seen` is global-visited (never popped), not path-based. It collapses
+  shared (non-cyclic) sub-objects to stringify on 2nd encounter. That's
+  intended/pre-existing behavior in the other branches; the fix just makes
+  to_dict match.
+- Conductor+gt quirk: local `master` is stale (sibling worktree), so
+  `gt track` reported "2 commits". Against origin/master the branch is
+  exactly 1 commit; the PR base is correct. Branch tracked onto master.
+
+## Open Questions
+- DEFAULT_MAX_DICTIFY_DEPTH (=10) is dead code. Left in place. Could be
+  removed or re-wired as a defense-in-depth depth cap in a separate change.
+- Did not run the actual crewai integration shard (crewai not installed);
+  relied on the generic dictify repro + unit tests. If CI has a crewai
+  shard, worth confirming test_crewai_simple_crew still passes there.
