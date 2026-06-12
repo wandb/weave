@@ -659,6 +659,18 @@ class SubAgent(_SpanBase):
     # so they nest under this SubAgent even if the ambient OTel context has
     # since drifted (e.g. caller never entered ``with sub:`` or exited it
     # before creating the child).
+    #
+    # Scoped to SubAgent (not Turn) on purpose. The drift-prone pattern —
+    # build a child handle, then enter it *outside* the ``with`` block (queue
+    # worker, callback, parallel sub-agent fan-out) — is a sub-agent concern:
+    # fanning work out to other execution contexts is what sub-agents are for,
+    # and OTel's ambient context is thread-local, so it's empty/stale by the
+    # time that dispatched child runs. A Turn is the trace root and is
+    # effectively always used within its own ``with`` block, so its children
+    # pick up the correct ambient context at ``__enter__``. The mechanism
+    # lives on ``_SpanBase`` (via ``_parent_otel_context``), so if a Turn ever
+    # needs to hand a child to out-of-block code, lift this capture and
+    # ``_thread_otel_context`` onto Turn too — no base-class change required.
     _own_otel_context: _OTelContext | None = PrivateAttr(default=None)
 
     def _thread_otel_context(self, child: _SpanBase) -> None:
@@ -804,6 +816,13 @@ class Turn(_SpanBase):
         self.messages.append(Message(role="user", content=content))
         return self
 
+    # These factories deliberately do NOT pin children to an explicitly
+    # captured context the way ``SubAgent.llm/tool/subagent`` do; children
+    # rely on ambient OTel context. A Turn is the trace root and is
+    # effectively always used inside its own ``with`` block, so ambient is
+    # correct at the child's ``__enter__``. See ``SubAgent._own_otel_context``
+    # for the out-of-block dispatch case that motivates explicit capture and
+    # for when it would be worth lifting that mechanism up to Turn.
     def llm(
         self,
         *,
