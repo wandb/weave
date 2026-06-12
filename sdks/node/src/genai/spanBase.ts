@@ -1,4 +1,33 @@
-import type {Attributes, Span, TimeInput} from '@opentelemetry/api';
+import {
+  type Attributes,
+  type Span,
+  SpanStatusCode,
+  type TimeInput,
+} from '@opentelemetry/api';
+
+/**
+ * Init fields shared by every emitter's `create()` factory.
+ *
+ * `startTime` backdates the span's start — used when reconstructing spans
+ * from post-hoc data (e.g. replaying a transcript), where the real
+ * wall-clock window is only known once the call has finished. Undefined →
+ * OTel stamps the current time, so the field is purely additive.
+ */
+export interface SpanInitBase {
+  startTime?: TimeInput;
+}
+
+/**
+ * Options shared by every emitter's `end()`.
+ *
+ * `error` marks the span failed (records the exception + ERROR status).
+ * `endTime` backdates the close so a replayed span carries an accurate
+ * duration. Undefined `endTime` → OTel stamps the current time.
+ */
+export interface SpanEndOptions {
+  error?: Error;
+  endTime?: TimeInput;
+}
 
 /**
  * Shared base for the four GenAI span wrappers (`Tool`, `LLM`, `SubAgent`,
@@ -8,7 +37,10 @@ import type {Attributes, Span, TimeInput} from '@opentelemetry/api';
  *
  * Mirrors the Python SDK's `_SpanBase` mixin (wandb/weave#7131): rather than
  * re-declaring `setAttributes`/`addEvent` on each class, the implementation
- * lives here once and covers all four uniformly.
+ * lives here once and covers all four uniformly. The same single-source rule
+ * covers post-hoc times: `SpanInitBase.startTime` flows into each
+ * `tracer.startSpan` call, and `_closeSpan` applies `SpanEndOptions.endTime`
+ * — both pass straight through to OTel.
  *
  * Mutating after `end()` warns and no-ops — the span is closed, so further
  * mutation can no longer reach the trace. All mutators return `this` for
@@ -45,6 +77,24 @@ export abstract class SpanBase {
     if (this._warnIfEnded('addEvent')) return this;
     this.span.addEvent(name, attributes, startTime);
     return this;
+  }
+
+  /**
+   * Record an optional error, then close the span — backdating the close when
+   * `endTime` is given. Subclasses call this as the final step of their own
+   * `end()`, after flushing their span-specific data. Centralizes the
+   * error-status + `span.end()` tail that is otherwise identical across all
+   * four emitters.
+   */
+  protected _closeSpan(opts?: SpanEndOptions): void {
+    if (opts?.error) {
+      this.span.recordException(opts.error);
+      this.span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: opts.error.message,
+      });
+    }
+    this.span.end(opts?.endTime);
   }
 
   /**

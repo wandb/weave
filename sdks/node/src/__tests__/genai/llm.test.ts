@@ -16,6 +16,7 @@ import {
 import {Turn} from '../../genai/turn';
 
 import {
+  expectSpanTimesToMatch,
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
@@ -276,7 +277,7 @@ describe('LLM (via Turn.startLLM)', () => {
       turn.end();
     });
 
-    it('LLMInit.startTime backdates the span start time', () => {
+    it('startTime/endTime backdate the chat span window', () => {
       const turn = Turn.create({});
       const startedAt = new Date('2026-01-01T00:00:00Z');
       const endedAt = new Date('2026-01-01T00:00:05Z');
@@ -284,15 +285,8 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end({endTime: endedAt});
       turn.end();
 
-      const spans = getExporter().getFinishedSpans();
-      const llmSpan = findSpan(spans, 'chat');
-      const MS_PER_SECOND = 1000;
-      expect(llmSpan.startTime[0]).toBe(
-        Math.floor(startedAt.getTime() / MS_PER_SECOND)
-      );
-      expect(llmSpan.endTime[0]).toBe(
-        Math.floor(endedAt.getTime() / MS_PER_SECOND)
-      );
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
     });
 
     it('setAttributes records attributes on the chat span; warns + no-op after end()', () => {

@@ -1,16 +1,9 @@
-import {
-  type Context,
-  type Span,
-  SpanKind,
-  SpanStatusCode,
-  type TimeInput,
-  trace,
-} from '@opentelemetry/api';
+import {type Context, type Span, SpanKind, trace} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {_getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
-import {SpanBase} from './spanBase';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
@@ -29,11 +22,9 @@ import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
 import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
 
-export interface LLMInit {
+export interface LLMInit extends SpanInitBase {
   model: string;
   providerName?: string;
-  /** Backdate the span's start time. Used when reconstructing chat spans from post-hoc data (e.g. transcript replay). */
-  startTime?: TimeInput;
 }
 
 /** Discriminated union for `LLM.attachMedia`: pick one of content / uri / fileId. */
@@ -121,8 +112,6 @@ export class LLM extends SpanBase {
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
-    // `startTime` undefined → OTel stamps the current time, mirroring how
-    // `end()` passes `endTime` straight through to `span.end()`.
     const span = tracer.startSpan(
       'chat',
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
@@ -246,7 +235,7 @@ export class LLM extends SpanBase {
   // ---------------------------------------------------------------------------
 
   /** Flush accumulated state and close the span. Idempotent. Pass `error` to mark failed; pass `endTime` to backdate the close. */
-  end(opts?: {error?: Error; endTime?: TimeInput}): void {
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
@@ -299,14 +288,7 @@ export class LLM extends SpanBase {
       );
     }
 
-    if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
-    }
-    this.span.end(opts?.endTime);
+    this._closeSpan(opts);
     const state = _getGenaiState();
     if (state.llm === this) {
       state.llm = null;

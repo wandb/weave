@@ -4,14 +4,13 @@ import {
   ROOT_CONTEXT,
   type Span,
   SpanKind,
-  SpanStatusCode,
   trace,
 } from '@opentelemetry/api';
 
 import {_getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
-import {SpanBase} from './spanBase';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
@@ -22,7 +21,7 @@ import {
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
 
-export interface TurnInit {
+export interface TurnInit extends SpanInitBase {
   agentName?: string;
   model?: string;
 }
@@ -85,7 +84,7 @@ export class Turn extends SpanBase {
     // library's active context.
     const span = tracer.startSpan(
       'invoke_agent',
-      {kind: SpanKind.CLIENT, attributes},
+      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       ROOT_CONTEXT
     );
     const turn = new Turn(
@@ -136,20 +135,16 @@ export class Turn extends SpanBase {
     return this.setAttributes({[key]: value});
   }
 
-  /** Close the Turn span. Idempotent. Pass `error` to mark it as failed. */
-  end(opts?: {error?: Error}): void {
+  /**
+   * Close the Turn span. Idempotent. Pass `error` to mark it as failed; pass
+   * `endTime` to backdate the close.
+   */
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
     this._ended = true;
-    if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
-    }
-    this.span.end();
+    this._closeSpan(opts);
     const state = _getGenaiState();
     if (state.turn === this) {
       state.turn = null;
