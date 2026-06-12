@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+from typing import Any
 from unittest import mock
 from unittest.mock import patch
 
@@ -13,10 +14,13 @@ from tests.trace_server.completions_util import with_simple_mock_litellm_complet
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.custom_objs import UnsafeDeserializationError
 from weave.trace.weave_client import WeaveClient, generate_id
+from weave.trace_server import constants
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
+    CallSchema,
     CallsDeleteReq,
     CallsQueryReq,
     CallStartReq,
@@ -795,6 +799,62 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
     for call in refs_read_batch_calls:
         # only resolve refs for the paginated slice, not all rows
         assert len(call.refs) <= 2
+
+
+def _pas_call(call_id: str, project_id: str, scores: Any) -> CallSchema:
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    return CallSchema(
+        id=call_id,
+        project_id=project_id,
+        trace_id="trace-1",
+        parent_id="eval-1",
+        op_name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+        started_at=now,
+        ended_at=now,
+        attributes={},
+        inputs={"example": {"x": 1}, "model": "model://agent"},
+        output={"output": "result", "scores": scores},
+        summary={},
+    )
+
+
+def test_resolve_eval_score_refs_internal_only(client):
+    """Only internal-scheme score refs are routed to resolution; external/inline are untouched.
+
+    A real internal ref cannot be resolved in this harness (refs_read_batch needs an
+    entity/project id, parse_internal_uri needs a slash-free one), so this asserts the
+    detection/guard contract end-to-end: an internal ref degrades to {} without crashing,
+    while external refs and inline dicts pass through unchanged.
+    """
+    internal_ref = "weave-trace-internal:///pid/object/Scores:abc123/key/scores"
+    external_ref = "weave:///entity/project/object/Scores:abc123/key/scores"
+    inline = {"already": {"true_fraction": 0.5}}
+    calls = [
+        _pas_call("c-int", client.project_id, internal_ref),
+        _pas_call("c-ext", client.project_id, external_ref),
+        _pas_call("c-inline", client.project_id, inline),
+    ]
+
+    warnings = eval_helpers.resolve_eval_score_refs(client.server, calls)
+
+    assert isinstance(
+        warnings, list
+    )  # internal ref unresolvable here -> graceful, no raise
+    assert calls[0].output["scores"] == internal_ref  # left in place
+    assert (
+        calls[1].output["scores"] == external_ref
+    )  # external never treated as resolvable
+    assert calls[2].output["scores"] == inline  # inline dict untouched
+
+    rows = eval_helpers.build_eval_rows(
+        calls,
+        ["eval-1"],
+        {"c-int": "r1", "c-ext": "r2", "c-inline": "r3"},
+        include_raw_data_rows=False,
+        include_predict_and_score_children=False,
+    )
+    trial_scores = {r.row_digest: r.evaluations[0].trials[0].scores for r in rows}
+    assert trial_scores == {"r1": {}, "r2": {}, "r3": inline}
 
 
 def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_server):

@@ -335,7 +335,8 @@ def _build_trial(
         if isinstance(predict_and_score_call.output, dict)
         else {}
     )
-    scores = output.get("scores", {})
+    raw_scores = output.get("scores", {})
+    scores = raw_scores if isinstance(raw_scores, dict) else {}
     trial_children = child_by_parent.get(predict_and_score_call.id, [])
     model_ref = (
         predict_and_score_call.inputs.get("model")
@@ -542,6 +543,53 @@ def resolve_eval_row_refs(
     return []
 
 
+@ddtrace.tracer.wrap(name="eval_results_helpers.resolve_eval_score_refs")
+def resolve_eval_score_refs(
+    server: tsi.TraceServerInterface,
+    calls: list[tsi.CallSchema],
+) -> list[str]:
+    """Inline ref-extracted `output.scores` values in-place via refs_read_batch.
+
+    When the SDK ref-extracts the scores dict, the call output stores an internal
+    ref string for that key; resolve it so trials get a dict, not a ref.
+
+    Returns:
+        list[str]: Warnings if resolution failed (e.g. refs_read_batch error).
+    """
+    pending: list[tuple[dict[str, Any], str]] = []
+    for call in calls:
+        output = call.output
+        if not isinstance(output, dict):
+            continue
+        scores = output.get("scores")
+        if not isinstance(scores, str) or not scores.startswith(
+            f"{ri.WEAVE_INTERNAL_SCHEME}:///"
+        ):
+            continue
+        try:
+            parsed = ri.parse_internal_uri(scores)
+        except ri.InvalidInternalRef:
+            continue
+        if not isinstance(parsed, ri.InternalObjectRef):
+            continue
+        pending.append((output, scores))
+    if not pending:
+        return []
+    try:
+        refs_res = server.refs_read_batch(
+            tsi.RefsReadBatchReq(refs=[ref for _, ref in pending])
+        )
+    except Exception:
+        logger.warning("Failed to resolve eval score refs", exc_info=True)
+        return [
+            "Failed to resolve eval score refs; scores may be missing for some rows"
+        ]
+    for (output, _), val in zip(pending, refs_res.vals, strict=False):
+        if isinstance(val, dict):
+            output["scores"] = val
+    return []
+
+
 @ddtrace.tracer.wrap(name="eval_results_helpers.eval_results_grouped_rows")
 def eval_results_grouped_rows(
     req: tsi.EvalResultsQueryReq,
@@ -640,11 +688,11 @@ def eval_results_query(
         limit=None,
         offset=0,
     )
+    warnings: list[str] = resolve_eval_score_refs(server, all_calls)
     all_rows, _ = eval_results_grouped_rows(all_rows_req, eval_root_ids, all_calls)
 
     rows: list[tsi.EvalResultsRow] = []
     total_rows = 0
-    warnings: list[str] = []
     if req.include_rows:
         rows, total_rows = apply_row_selection(
             all_rows,
@@ -654,7 +702,7 @@ def eval_results_query(
             req.limit,
         )
         if req.include_raw_data_rows and req.resolve_row_refs:
-            warnings = resolve_eval_row_refs(server, rows, req.project_id)
+            warnings.extend(resolve_eval_row_refs(server, rows, req.project_id))
 
     summary: tsi.EvalResultsSummaryRes | None = None
     if req.include_summary:
