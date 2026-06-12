@@ -179,6 +179,7 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     ObjectNameTypeCollision,
+    RefObjectsNotFoundError,
     RequestTooLarge,
     handle_clickhouse_query_error,
 )
@@ -5810,8 +5811,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 objs = self._select_objs_query(object_query_builder)
                 found_digests = {obj.digest for obj in objs}
                 if len(ref_digests) != len(found_digests):
-                    raise NotFoundError(
-                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
+                    missing_digests = sorted(ref_digests - found_digests)
+                    raise RefObjectsNotFoundError(
+                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}",
+                        missing_digests,
                     )
                 # filter out deleted objects
                 valid_objects = [obj for obj in objs if obj.deleted_at is None]
