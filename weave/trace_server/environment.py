@@ -66,6 +66,15 @@ def wf_enable_agent_scoring() -> bool:
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
 
 
+def wf_enable_agent_alerting() -> bool:
+    """Whether the alert worker consumes turn-ended events for spans alerts.
+
+    Gates the same OTel-ingest emit as agent scoring so spans alerting works
+    even when scoring is off. Also requires `wf_enable_online_eval`.
+    """
+    return os.environ.get("WEAVE_ENABLE_AGENT_ALERTING", "false").lower() == "true"
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(
