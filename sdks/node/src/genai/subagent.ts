@@ -1,12 +1,14 @@
 import {type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
+import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 
 export interface SubAgentInit extends SpanInitBase {
@@ -41,6 +43,7 @@ export class SubAgent extends SpanBase {
   }
 
   static create(opts: SubAgentInit & ChildSpanContext): SubAgent {
+    const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
       [ATTR_GEN_AI_AGENT_NAME]: opts.name,
@@ -51,12 +54,10 @@ export class SubAgent extends SpanBase {
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
-    const span = this._startSpan(
+    const span = tracer.startSpan(
       'invoke_agent',
-      SpanKind.CLIENT,
-      attributes,
-      opts.parentContext,
-      opts.startTime
+      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
+      opts.parentContext
     );
     return new SubAgent(span, opts.name, opts.model ?? '');
   }

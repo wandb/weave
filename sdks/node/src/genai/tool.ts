@@ -1,6 +1,7 @@
 import {type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
+import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
@@ -9,6 +10,7 @@ import {
   ATTR_GEN_AI_TOOL_CALL_ID,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
+  WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 
 export interface ToolInit extends SpanInitBase {
@@ -53,6 +55,7 @@ export class Tool extends SpanBase {
   }
 
   static create(opts: ToolInit & ChildSpanContext): Tool {
+    const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
       [ATTR_GEN_AI_TOOL_NAME]: opts.name,
@@ -66,12 +69,10 @@ export class Tool extends SpanBase {
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
-    const span = this._startSpan(
+    const span = tracer.startSpan(
       'execute_tool',
-      SpanKind.INTERNAL,
-      attributes,
-      opts.parentContext,
-      opts.startTime
+      {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
+      opts.parentContext
     );
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
   }

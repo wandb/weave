@@ -1,14 +1,9 @@
 import {
   type Attributes,
-  type Context,
   type Span,
-  type SpanKind,
   SpanStatusCode,
   type TimeInput,
 } from '@opentelemetry/api';
-
-import {getWeaveTracer} from './provider';
-import {WEAVE_GENAI_TRACER_NAME} from './semconv';
 
 /**
  * Init fields shared by every emitter's `create()` factory.
@@ -42,12 +37,11 @@ export interface SpanEndOptions {
  *
  * Mirrors the Python SDK's `_SpanBase` mixin (wandb/weave#7131): rather than
  * re-declaring `setAttributes`/`addEvent` on each class, the implementation
- * lives here once and covers all four uniformly. The same single-source rule
- * covers the span lifecycle and post-hoc times — `_startSpan`/`_closeSpan`
- * are the TS counterparts of Python `_SpanBase._start_otel_span` /
- * `_end_otel_span`: `_startSpan` opens the span (applying
- * `SpanInitBase.startTime`) and `_closeSpan` ends it (applying
- * `SpanEndOptions.endTime`), both passing the time straight through to OTel.
+ * lives here once and covers all four uniformly. Post-hoc times follow the
+ * same single-source rule: `SpanInitBase.startTime` is forwarded by each
+ * `create()` into `tracer.startSpan`, and `_closeSpan` applies
+ * `SpanEndOptions.endTime` at close (the TS counterpart of Python
+ * `_SpanBase._end_otel_span`) — both pass the time straight through to OTel.
  *
  * Mutating after `end()` warns and no-ops — the span is closed, so further
  * mutation can no longer reach the trace. All mutators return `this` for
@@ -57,28 +51,6 @@ export abstract class SpanBase {
   protected _ended = false;
 
   protected constructor(protected readonly span: Span) {}
-
-  /**
-   * Open a GenAI span on the shared Weave tracer, applying the optional
-   * post-hoc `startTime`. Called by each subclass's static `create()` factory
-   * with its own span name / kind / attributes / parent context — the only
-   * parts that genuinely differ per emitter. Centralizes tracer acquisition
-   * and the `startTime` plumbing so no emitter can forget either; the
-   * lifecycle counterpart is `_closeSpan`.
-   */
-  protected static _startSpan(
-    name: string,
-    kind: SpanKind,
-    attributes: Attributes,
-    context: Context,
-    startTime?: TimeInput
-  ): Span {
-    return getWeaveTracer(WEAVE_GENAI_TRACER_NAME).startSpan(
-      name,
-      {kind, attributes, startTime},
-      context
-    );
-  }
 
   /**
    * Set multiple attributes on the span at once. Warns and no-ops after
