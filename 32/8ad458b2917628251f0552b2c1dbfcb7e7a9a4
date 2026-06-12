@@ -37,3 +37,39 @@ ruff clean.
 ## Depends on
 Slice 1 (integration_metadata). openai_agents.py here defines OPENAI_AGENTS_INTEGRATION
 which slice 4's otel_processor reuses — keep slice 3 below slice 4.
+
+## Test coverage added (follow-up: "callbacks integrations need tests too")
+
+The original commit stamped 8 callback/tracer integrations but added no tests.
+Added shape-confirming attributes["integration"] asserts (name / truthy version /
+meta.package_name) to the 6 purely-callback integrations:
+
+- langchain (langchain-core), llamaindex (llama-index-core), openai_agents
+  (openai-agents), verdict (verdict), claude_agent_sdk (claude_agent_sdk):
+  robust style in each one's existing call test — filter fetched calls to
+  name==<vendor> first, because these agent/tracer traces ALSO contain
+  sub-integration calls (e.g. openai) that carry their own integration block.
+- openai_realtime (openai): test_state_exporter.py drives a DummyWeaveClient fake
+  whose create_call() discarded the attributes kwarg, so the stamped block was not
+  observable. Enhanced the fake to record what create_call receives
+  (self.created_attributes) and asserted the block in
+  test_response_without_conversation_id_has_no_thread_id. VERIFIED locally - passes.
+
+dspy and gepa also have callback paths (dspy_callback.py, gepa_callback.py) but
+stamp the SAME name ("dspy"/"gepa") as their op-based counterparts, so the
+name-based asserts added in the op-based commit (dspy_test.py / gepa_test.py)
+already cover them; not duplicated here.
+
+## Verification status
+- openai_realtime: run locally -> PASS.
+- langchain, llamaindex, openai_agents, verdict, claude_agent_sdk: libs not
+  installed in the dev env; tests are sharded per-integration
+  (tests/integrations/<shard>/ + --extra <shard>), so these run only in their CI
+  shards. NOT run locally.
+- Heads-up: test_state_exporter.py::test_response_calls_have_thread_id_set_to_conversation_id
+  FAILS locally on the PRISTINE file too (pre-existing timing/version-sensitive
+  flake, unrelated to this change) - that is why the new assert was placed in the
+  sibling passing test, not that one.
+
+ruff check + ruff format clean on all 6 touched test files. Robust helpers use
+plain (non-underscore) names per enforced RUF052.
