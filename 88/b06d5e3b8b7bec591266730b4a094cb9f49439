@@ -81,3 +81,25 @@ cerebras->cerebras-cloud-sdk, bedrock->boto3, vertexai->google-cloud-aiplatform)
 ruff check + ruff format clean on all 21 touched test files. RUF052 (accessed
 `_`-prefixed locals) IS enforced; robust helpers use plain names (stamped /
 <vendor>_meta).
+
+## Amendment (CI fix: smolagents test_hf_api_model)
+
+CI surfaced AttributeError: 'WeaveDict' object has no attribute 'content' at
+tests/integrations/smolagents/test_smolagents.py::test_hf_api_model (all py
+versions + Windows) on this PR and everything upstack; #7099 (base) was green
+because it doesn't carry the smolagents test change.
+
+Bisected: the SDK change (with_integration_metadata on smolagents) is NOT the
+cause — removing the new metadata-assertion block makes the test pass. Root
+cause is the block iterating the lazy CallsIter (`for c in calls`) BEFORE
+`calls[0].output.content`: consuming/iterating the iterator first changes how
+calls[0].output later materializes (object -> WeaveDict), so attribute access
+(.content) then fails. Pre-existing weave lazy-loading quirk, exposed by the
+added block's access order.
+
+Fix: `calls = list(client.get_calls())` — materialize once so iteration order no
+longer affects deserialization. All assertions preserved (no weakening); whole
+smolagents suite (6 tests) green locally against the cassette (smolagents 1.18.0,
+sqlite). Note: other op-based "robust style" metadata blocks (autogen, crewai,
+dspy, etc.) passed in CI — only smolagents read .output via attribute access
+after the block, so only it tripped the quirk.
