@@ -59,7 +59,12 @@ export type {
   TurnInit,
   Usage,
 } from './genai';
-export {weaveAudio, weaveImage, type WeaveAudio, type WeaveImage} from './media';
+export {
+  weaveAudio,
+  weaveImage,
+  type WeaveAudio,
+  type WeaveImage,
+} from './media';
 export {op} from './op';
 export * from './types';
 export {WeaveObject, ObjectRef} from './weaveObject';
