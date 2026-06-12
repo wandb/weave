@@ -109,3 +109,34 @@ All 5 edited test files PASS jest locally (mocks / in-memory exporters, no netwo
 no creds). A negative control (wrong expected value -> test fails) confirmed the
 asserts are load-bearing. prettier clean. eslint NOT run (offline: npx eslint pulls
 from the network and there's no local binary) — but ts-jest typechecks on each run.
+
+## Amendment (PR #7103 review — @drtangible)
+
+Addressed TS-SDK review comments (Python side unchanged):
+- Removed `applyIntegrationMetadata` + its 2 unit tests: no production caller in
+  TS (only self-tested). Python keeps `apply_integration_metadata` (used by the
+  langchain callback) — intentional cross-SDK divergence per the reviewer + user.
+- `interface` -> `type` for `IntegrationMetadata` and `IntegrationAttributes`
+  (reviewer style pref). Both stay exported: `declaration: true` needs
+  `IntegrationAttributes` as `asAttributes`' return type (else TS4053), and the
+  test imports `IntegrationMetadata`.
+- `INTEGRATION_ATTRIBUTE_KEY`: dropped `export` (used only in-file) and `as const`
+  (a `const` string literal is already a literal type; the computed key still
+  satisfies the type — confirmed by typecheck:cjs/esm).
+- Aliased `import {packageVersion as weavePackageVersion}` to disambiguate from
+  `libraryIntegration`'s `packageVersion` option.
+- Tightened anthropic.test.ts: dropped optional-chaining guards, assert the whole
+  `integration` block. `version` matched via `expect.any(String)` because
+  packageVersion is rewritten on every release (a pinned snapshot would break
+  each bump) — chosen over the reviewer's `toMatchInlineSnapshot` suggestion for
+  that reason.
+- KEPT `integration.version` (reviewer asked if it duplicates
+  `weave.client_version`): they answer different provenance questions
+  (emitting-SDK vs integration-code version), only coincidentally equal for
+  first-party integrations, and Python carries it too (trace server reconstructs
+  one shape from both SDKs).
+
+Verified: TS prettier-check (CI gate) clean, typecheck:cjs+esm clean, 15/15 jest
+(anthropic + integrationMetadata) green; Python prek pre-push (ty/pyright/mypy/
+ruff/typos) green. Pre-existing/out-of-scope: 4 eslint consistent-type-imports
+errors in untouched files (eslint is not a CI gate); these were not changed.
