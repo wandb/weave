@@ -15,7 +15,6 @@ from typing import Any, NamedTuple, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
-import ddtrace
 from cachetools import TTLCache
 from clickhouse_connect import common as ch_common
 from clickhouse_connect.driver.client import Client as CHClient
@@ -164,7 +163,6 @@ from weave.trace_server.constants import (
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
 from weave.trace_server.datadog import (
-    generator_trace,
     record_db_insert,
     set_current_span_dd_tags,
     set_root_span_dd_tags,
@@ -317,6 +315,7 @@ from weave.trace_server.ttl_settings import (
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelDispatcher,
 )
+from weave.trace_server.tracing import traced, traced_generator
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -643,7 +642,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @tag_db_insert_path("otel_export")
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
+    @traced(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
         calls, rejected_spans, error_messages = self._otel_proto_to_calls(req)
@@ -740,9 +739,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         return tsi.OTelExportRes()
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.otel_export.proto_to_calls"
-    )
+    @traced(name="clickhouse_trace_server_batched.otel_export.proto_to_calls")
     def _otel_proto_to_calls(
         self, req: tsi.OTelExportReq
     ) -> tuple[
@@ -799,7 +796,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         set_current_span_dd_tags({"call_count": len(calls)})
         return calls, rejected_spans, error_messages
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export.build_rows")
+    @traced(name="clickhouse_trace_server_batched.otel_export.build_rows")
     def _otel_build_rows(
         self,
         calls: list[
@@ -833,7 +830,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         set_current_span_dd_tags({"row_count": len(rows)})
         return rows
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
+    @traced(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
         producer = self.kafka_producer
         if producer is not None:
@@ -1110,9 +1107,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallEndV2Res()
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._update_call_end_in_calls_complete"
-    )
+    @traced(name="clickhouse_trace_server_batched._update_call_end_in_calls_complete")
     def _update_call_end_in_calls_complete(
         self, end_call: tsi.EndedCallSchemaForInsert
     ) -> None:
@@ -1204,7 +1199,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stats")
+    @traced(name="clickhouse_trace_server_batched.calls_query_stats")
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
@@ -1416,7 +1411,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Discover feedback payload schema from sample rows."""
         return feedback_payload_schema_handler(self, req)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.trace_usage")
+    @traced(name="clickhouse_trace_server_batched.trace_usage")
     def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
         """Compute per-call usage for a trace, with descendant rollup.
 
@@ -1456,7 +1451,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             unfinished_call_ids=sorted(unfinished_call_ids),
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_usage")
+    @traced(name="clickhouse_trace_server_batched.calls_usage")
     def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
         """Compute aggregated usage for multiple root calls.
 
@@ -1520,7 +1515,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             unfinished_call_ids=sorted(unfinished_call_ids),
         )
 
-    @generator_trace("clickhouse_trace_server_batched.calls_query_stream")
+    @traced_generator(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         read_table = self.table_routing_resolver.resolve_read_table(
@@ -1672,7 +1667,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if hasattr(raw_res, "close"):
                 raw_res.close()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
+    @traced(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
         self, project_id: str, calls: list[dict[str, Any]]
     ) -> None:
@@ -1706,7 +1701,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 refs_to_resolve[i, col] = ref
         return refs_to_resolve
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._expand_call_refs")
+    @traced(name="clickhouse_trace_server_batched._expand_call_refs")
     def _expand_call_refs(
         self,
         project_id: str,
@@ -1754,7 +1749,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         val["_ref"] = ref.uri
                     set_nested_key(calls[i], col, val)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
+    @traced(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > ch_settings.MAX_DELETE_CALLS_COUNT:
@@ -1825,7 +1820,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._delete_calls_complete")
+    @traced(name="clickhouse_trace_server_batched._delete_calls_complete")
     def _delete_calls_complete(self, project_id: str, call_ids: list[str]) -> None:
         pb = ParamBuilder()
         project_id_param = pb.add_param(project_id)
@@ -1852,7 +1847,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             f"One of [{', '.join(valid_update_fields)}] is required for call update"
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.call_update")
+    @traced(name="clickhouse_trace_server_batched.call_update")
     @tag_db_insert_path("call_update")
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
@@ -1876,7 +1871,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallUpdateRes()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._update_calls_complete")
+    @traced(name="clickhouse_trace_server_batched._update_calls_complete")
     def _update_calls_complete(
         self, project_id: str, call_id: str, display_name: str
     ) -> None:
@@ -1899,7 +1894,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
+    @traced(name="clickhouse_trace_server_batched.obj_create")
     @tag_db_insert_path("obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         # Partial-failure semantics: ClickHouse cannot atomically write
@@ -1995,7 +1990,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 existing_base_object_classes=mismatched,
             )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
+    @traced(name="clickhouse_trace_server_batched.create_obj_batch")
     @tag_db_insert_path("obj_create_batch")
     def obj_create_batch(
         self, batch: list[tsi.ObjSchemaForInsert]
@@ -2124,7 +2119,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._enrich_objs_with_tags_and_aliases(req.project_id, [obj_schema])
         return tsi.ObjReadRes(obj=obj_schema)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.objs_query")
+    @traced(name="clickhouse_trace_server_batched.objs_query")
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         if req.filter:
@@ -2397,7 +2392,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         aliases = [row[0] for row in query_result.result_rows]
         return tsi.AliasesListRes(aliases=aliases)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._get_tags_for_objects")
+    @traced(name="clickhouse_trace_server_batched._get_tags_for_objects")
     def _get_tags_for_objects(
         self,
         project_id: str,
@@ -2416,9 +2411,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             result.setdefault(key, []).append(row[2])
         return result
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._get_aliases_for_objects"
-    )
+    @traced(name="clickhouse_trace_server_batched._get_aliases_for_objects")
     def _get_aliases_for_objects(
         self,
         project_id: str,
@@ -2437,7 +2430,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             result.setdefault(key, []).append(row[2])
         return result
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._maybe_resolve_alias")
+    @traced(name="clickhouse_trace_server_batched._maybe_resolve_alias")
     def _maybe_resolve_alias(
         self,
         project_id: str,
@@ -2675,7 +2668,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             offset=req.offset,
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._table_query_stream")
+    @traced_generator(name="clickhouse_trace_server_batched._table_query_stream")
     def _table_query_stream(
         self,
         project_id: str,
@@ -2830,9 +2823,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             **dict(zip(columns, query_result.result_rows[0], strict=False))
         )
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.project_ttl_settings_read"
-    )
+    @traced(name="clickhouse_trace_server_batched.project_ttl_settings_read")
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReadReq
     ) -> tsi.ProjectTTLSettingsReadRes:
@@ -2842,9 +2833,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @tag_db_insert_path("project_ttl_settings_update")
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.project_ttl_settings_update"
-    )
+    @traced(name="clickhouse_trace_server_batched.project_ttl_settings_update")
     def project_ttl_settings_update(
         self, req: tsi.ProjectTTLSettingsUpdateReq
     ) -> tsi.ProjectTTLSettingsUpdateRes:
@@ -2942,7 +2931,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
     # Annotation Queue API
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_create")
+    @traced(name="clickhouse_trace_server_batched.annotation_queue_create")
     def annotation_queue_create(
         self, req: tsi.AnnotationQueueCreateReq
     ) -> tsi.AnnotationQueueCreateRes:
@@ -2972,9 +2961,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueCreateRes(id=queue_id)
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.annotation_queues_query_stream"
-    )
+    @traced_generator(name="clickhouse_trace_server_batched.annotation_queues_query_stream")
     def annotation_queues_query_stream(
         self, req: tsi.AnnotationQueuesQueryReq
     ) -> Iterator[tsi.AnnotationQueueSchema]:
@@ -3027,7 +3014,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 deleted_at=deleted_at_with_tz,
             )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_read")
+    @traced(name="clickhouse_trace_server_batched.annotation_queue_read")
     def annotation_queue_read(
         self, req: tsi.AnnotationQueueReadReq
     ) -> tsi.AnnotationQueueReadRes:
@@ -3061,7 +3048,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueReadRes(queue=queue)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_update")
+    @traced(name="clickhouse_trace_server_batched.annotation_queue_update")
     def annotation_queue_update(
         self, req: tsi.AnnotationQueueUpdateReq
     ) -> tsi.AnnotationQueueUpdateRes:
@@ -3158,7 +3145,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueUpdateRes(queue=queue)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_delete")
+    @traced(name="clickhouse_trace_server_batched.annotation_queue_delete")
     def annotation_queue_delete(
         self, req: tsi.AnnotationQueueDeleteReq
     ) -> tsi.AnnotationQueueDeleteRes:
@@ -3215,9 +3202,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.AnnotationQueueDeleteRes(queue=queue)
 
     @tag_db_insert_path("annotation_queue_add_calls")
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.annotation_queue_add_calls"
-    )
+    @traced(name="clickhouse_trace_server_batched.annotation_queue_add_calls")
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
@@ -3312,9 +3297,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             added_count=len(calls_data), duplicates=len(existing_call_ids)
         )
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.annotation_queue_items_query"
-    )
+    @traced(name="clickhouse_trace_server_batched.annotation_queue_items_query")
     def annotation_queue_items_query(
         self, req: tsi.AnnotationQueueItemsQueryReq
     ) -> tsi.AnnotationQueueItemsQueryRes:
@@ -3360,7 +3343,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueItemsQueryRes(items=items)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queues_stats")
+    @traced(name="clickhouse_trace_server_batched.annotation_queues_stats")
     def annotation_queues_stats(
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
@@ -3434,9 +3417,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         raise ValueError(f"Failed to fetch queue item '{item_id}'")
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.annotator_queue_items_progress_update"
-    )
+    @traced(name="clickhouse_trace_server_batched.annotator_queue_items_progress_update")
     def annotator_queue_items_progress_update(
         self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
     ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
@@ -5637,7 +5618,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return _do_read()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._obj_read_with_retry")
+    @traced(name="clickhouse_trace_server_batched._obj_read_with_retry")
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_attempts: int = 2
     ) -> tsi.ObjReadRes:
@@ -5646,9 +5627,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             lambda: self.obj_read(req), max_attempts=max_attempts
         )
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._file_content_read_with_retry"
-    )
+    @traced(name="clickhouse_trace_server_batched._file_content_read_with_retry")
     def _file_content_read_with_retry(
         self, req: tsi.FileContentReadReq, max_attempts: int = 2
     ) -> tsi.FileContentReadRes:
@@ -5657,7 +5636,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             lambda: self._file_content_read_once(req), max_attempts=max_attempts
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
+    @traced(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(
         self,
         parsed_refs: ObjRefListType,
@@ -5686,9 +5665,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Return the final data payload
         return [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._refs_read_batch_within_project"
-    )
+    @traced(name="clickhouse_trace_server_batched._refs_read_batch_within_project")
     def _refs_read_batch_within_project(
         self,
         project_id_scope: str,
@@ -5966,12 +5943,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
+    @traced(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
         self._insert_file_chunks(file_chunks_for(req, digest))
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
+    @traced(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
@@ -6003,7 +5980,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ]
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_file_chunks")
+    @traced(name="clickhouse_trace_server_batched._flush_file_chunks")
     def _flush_file_chunks(self) -> None:
         if not self._flush_immediately:
             raise ValueError("File chunks must be flushed immediately")
@@ -6140,7 +6117,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         set_root_span_dd_tags({"read_bytes": len(bytes)})
         return tsi.FileContentReadRes(content=bytes)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_read_bucket")
+    @traced(name="clickhouse_trace_server_batched._file_read_bucket")
     def _file_read_bucket(self, file_storage_uri: FileStorageURI) -> bytes:
         set_root_span_dd_tags({"storage_provider": "bucket"})
         client = self.file_storage_client
@@ -6277,7 +6254,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return format_feedback_to_res(row)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.feedback_create_batch")
+    @traced(name="clickhouse_trace_server_batched.feedback_create_batch")
     @tag_db_insert_path("feedback_create_batch")
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
@@ -7024,7 +7001,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         migrator.apply_migrations(self._database)
 
-    @generator_trace("clickhouse_trace_server_batched._query_stream")
+    @traced_generator(name="clickhouse_trace_server_batched._query_stream")
     def _query_stream(
         self,
         query: str,
@@ -7073,7 +7050,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # always raises, optionally with custom error class
             handle_clickhouse_query_error(e)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query")
+    @traced(name="clickhouse_trace_server_batched._query")
     def _query(
         self,
         query: str,
@@ -7121,7 +7098,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return res
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._command")
+    @traced(name="clickhouse_trace_server_batched._command")
     def _command(
         self,
         command: str,
@@ -7170,7 +7147,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert")
+    @traced(name="clickhouse_trace_server_batched._insert")
     def _insert(
         self,
         table: str,
@@ -7246,7 +7223,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
+    @traced(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
             self._insert_call_batch(self._call_batch)
@@ -7330,7 +7307,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             do_sync_insert=do_sync_insert,
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls_complete")
+    @traced(name="clickhouse_trace_server_batched._flush_calls_complete")
     def _flush_calls_complete(self) -> None:
         """Flush the calls_complete batch to the database."""
         if not self._calls_complete_batch:
@@ -7345,7 +7322,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._calls_complete_batch = []
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
+    @traced(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """Iterate through the batch and replace large JSON values with placeholders.
 
