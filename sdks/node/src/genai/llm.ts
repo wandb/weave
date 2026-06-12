@@ -2,7 +2,6 @@ import {type Context, type Span, SpanKind, trace} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {_getGenaiState} from './context';
-import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
@@ -16,7 +15,6 @@ import {
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
-  WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
@@ -101,7 +99,6 @@ export class LLM extends SpanBase {
         'An LLM is already active in this async chain. End it before starting a new one.'
       );
     }
-    const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
       [ATTR_GEN_AI_REQUEST_MODEL]: opts.model,
@@ -112,10 +109,12 @@ export class LLM extends SpanBase {
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
-    const span = tracer.startSpan(
+    const span = this._startSpan(
       'chat',
-      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
-      opts.parentContext
+      SpanKind.CLIENT,
+      attributes,
+      opts.parentContext,
+      opts.startTime
     );
     const llm = new LLM(
       span,

@@ -9,14 +9,12 @@ import {
 
 import {_getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
-import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
-  WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
@@ -66,7 +64,6 @@ export class Turn extends SpanBase {
         'A Turn is already active in this async chain. End it before starting a new one.'
       );
     }
-    const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Record<string, string> = {
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
     };
@@ -82,10 +79,12 @@ export class Turn extends SpanBase {
     // Pass ROOT_CONTEXT explicitly so Turn is always a root span — never
     // accidentally inherits a parent from some other OTel-instrumented
     // library's active context.
-    const span = tracer.startSpan(
+    const span = this._startSpan(
       'invoke_agent',
-      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
-      ROOT_CONTEXT
+      SpanKind.CLIENT,
+      attributes,
+      ROOT_CONTEXT,
+      opts.startTime
     );
     const turn = new Turn(
       span,
