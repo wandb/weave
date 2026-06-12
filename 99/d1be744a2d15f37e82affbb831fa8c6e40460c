@@ -1,0 +1,46 @@
+## What this slice does
+Stamps attributes.integration on the op-wrapping ("settings.op_settings") family.
+Each integration's get_<vendor>_patcher now derives its base via
+with_integration_metadata(settings.op_settings, <VENDOR>_INTEGRATION); every op
+built from that base via model_copy inherits the metadata. One module-level
+constant + one base-line change per file. Bedrock is special (it calls weave.op
+directly, not via OpSettings), so each of its 5 op sites gets
+attributes=BEDROCK_INTEGRATION.as_attributes().
+
+## Distribution names (meta.package_version source)
+Passed distribution_name where the PyPI name differs from the integration name:
+mistral->mistralai, cerebras->cerebras-cloud-sdk, google_genai->google-genai,
+vertexai->google-cloud-aiplatform, huggingface->huggingface-hub,
+langchain_nvidia_ai_endpoints->langchain-nvidia-ai-endpoints,
+autogen->autogen-agentchat, bedrock->boto3. Others default to the integration name.
+resolve_package_version is guarded (missing package -> version omitted, never raises).
+
+## How it was built
+Family A edits were fanned out to parallel subagents with a strict 3-part recipe
+(import, module constant, route base through with_integration_metadata); diffs were
+reviewed centrally. verifiers kept its `base: OpSettings` annotation; autogen kept
+its `base_settings` name + indentation; google_genai has no patcher global so the
+constant sits after imports.
+
+## Testing
+- tests/integrations/openai/openai_test.py::test_openai_async_quickstart tightened
+  to assert call.attributes.integration == {name: "openai", version: <sdk>,
+  meta.package_name: "openai"} on a real (cassette) patched call. Passes on sqlite.
+- Verified the openai patcher's ops all carry the integration block (probe).
+- 24 installed integration modules import cleanly; 6 skipped only because their
+  underlying lib isn't installed (metadata degrades gracefully). ruff clean.
+
+## Depends on
+Slice 1 (integration_metadata module + op-level attributes). Self-consistent:
+integrations reference integration_metadata which is present in the parent commit.
+
+## Follow-up: notdiamond custom_router
+Audit (reviewer asked to check for missing integrations) found notdiamond/
+custom_router.py exposes two public @weave.op helpers — train_router and
+evaluate_router — that call the NotDiamond client but weren't stamped (they use
+the bare @weave.op decorator, not the settings.op_settings path). Added
+NOTDIAMOND_INTEGRATION = library_integration("notdiamond") and attributes=
+NOTDIAMOND_INTEGRATION.as_attributes() on both decorators. Left the 3 inner
+_DummyEvalModel.predict ops unstamped on purpose: they're eval scaffolding over
+precomputed dataframes, not notdiamond calls. ruff + ast clean; notdiamond lib
+not installed locally so not runtime-tested.
