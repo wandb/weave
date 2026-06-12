@@ -1,0 +1,74 @@
+## Conversation
+User invoked `/fix-github-issue 5479` in a Conductor workspace. Constraints:
+"Don't post to GH, just talk to me here. Use a stack of PRs if it's helpful
+using gt." Issue #5479: weave autopatches litellm.completion/acompletion but
+NOT litellm.responses/aresponses (the OpenAI Responses API path, used for
+gpt-5 streaming), so those calls show no Weave link / create no call.
+
+## What this commit does
+Adds SymbolPatchers for `responses` and `aresponses` at the top-level `litellm`
+package, plus `litellm_responses_accumulator`. Parametrized `make_wrapper` to
+take the accumulator (completion paths pass `litellm_accumulator`; responses
+paths pass `litellm_responses_accumulator`). Reuses `litellm_on_finish_post_processor`
+and `should_use_accumulator` for both.
+
+## Key investigation findings (litellm 1.80.0, openai 1.109.1)
+- litellm's Responses API uses its OWN types in `litellm.types.llms.openai`
+  (ResponsesAPIResponse, ResponsesAPIStreamingResponse union, lifecycle events),
+  NOT the OpenAI SDK's Response/ResponseStreamEvent.
+- Lifecycle events (ResponseCreated/InProgress/Completed/Failed/Incomplete) each
+  carry a fully-formed `.response`. Delta events (OutputTextDelta etc.) do not.
+  Accumulator strategy: track `value.response` from lifecycle events, ignore
+  deltas. Terminal completed event holds full output + usage. Mirrors weave's
+  OpenAI Responses accumulator (openai_sdk.py responses_accumulator section 1).
+- `aresponses` internally calls the bare name `responses` resolved in
+  `litellm.main`'s namespace — a DIFFERENT object than the top-level
+  `litellm.responses` attribute we patch. So patching at the package level does
+  NOT double-count (verified: existing completion tests assert len(calls)==2,
+  proving acompletion's inner completion call is likewise unpatched).
+- litellm.responses uses its own BaseLLMHTTPHandler (raw httpx), NOT the openai
+  SDK. So the openai patcher does NOT catch a nested call → each responses call
+  = exactly 1 weave call (unlike completion, which routes through the openai SDK).
+- Streaming iterators: SyncResponsesAPIStreamingIterator (Iterator) and
+  ResponsesAPIStreamingIterator (AsyncIterator) — both detected by
+  _add_accumulator's isinstance(output, (Iterator, Generator, AsyncIterator)).
+- Usage summary: weave_client extracts usage when output dict has model+usage.
+  ResponsesAPIResponse.model_dump() yields both → usage flows to summary.
+
+## Cassette saga (the hard part)
+- The OPENAI_API_KEY in the env is INVALID (401 "Incorrect API key provided:
+  sk-9z8TN...py3g"), so live recording failed. Default VCR match_on is
+  method+uri only (body not matched), each test gets its own cassette.
+- First tried reusing the OpenAI integration's real /v1/responses cassettes
+  verbatim. Non-streaming worked. Streaming FAILED: litellm 1.80.0's
+  ContentPartDonePartOutputText REQUIRES a `logprobs` field that the March-2025
+  OpenAI cassette predates → pydantic ValidationError mid-stream (litellm's own
+  parser, surfaced via the accumulator's on_error). This is litellm's data
+  contract, not a weave bug — a real user on old data would hit it too.
+- Final approach: authored clean, minimal, COHERENT SSE cassettes ("Write a
+  one-sentence bedtime story about a unicorn." -> short story), validating every
+  event through litellm's own `OpenAIResponsesAPIConfig.get_event_model_class(type)(**dict)`
+  BEFORE writing. Non-streaming = plain JSON Response; streaming = validated SSE.
+
+## Edge case -> base commit
+A stream abandoned before response.completed leaves the accumulator on an
+in_progress response with usage=None. model_dump() -> {model, usage: None, ...}.
+weave_client's summary code did {**None} -> TypeError, leaving the call RUNNING
+(corrupted trace). Fixed in the parent commit (andrew/tolerate-null-usage); see
+its note. Consulted Codex (threadId 019ebd12...): Option A (fix core asymmetry)
+as base PR, this feature stacked on top.
+
+## Tests / lint
+4 new tests in litellm_test.py (responses/aresponses x stream/non-stream); all 9
+litellm tests pass on sqlite. ruff clean, mypy clean on litellm.py. The litellm
+tests carry the pre-existing @pytest.mark.skip_clickhouse_client (VCR can't reach
+CH in non-recording mode), so sqlite-only is correct here.
+
+## Open questions / notes for future agents
+- Did NOT add Option B (responses-specific exclude_none post-processor mirroring
+  openai). Codex said optional hygiene; the base-commit core guard makes it
+  unnecessary. Output for a partial stream includes null fields (plain dump) but
+  no longer crashes.
+- gt stack base shows "3 commits" because local `master` (caddd08eda) is 2 behind
+  origin/master (4d57658750, == this branch's base). Cosmetic; `gt sync` fixes.
+- NOT pushed (user said don't post to GH; push needs explicit go-ahead).
