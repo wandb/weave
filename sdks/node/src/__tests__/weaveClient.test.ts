@@ -3,7 +3,7 @@ import {type Api as TraceServerApi} from '../generated/traceServerApi';
 import {StringPrompt} from '../prompt';
 import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
 import {type WandbServerApi} from '../wandb/wandbServerApi';
-import {WeaveClient} from '../weaveClient';
+import {createWeaveClient, WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
 
 // Mock the TraceServerApi and WandbServerApi
@@ -46,11 +46,10 @@ describe('WeaveClient', () => {
       },
     } as any;
     mockWandbServerApi = {} as any;
-    client = new WeaveClient(
-      mockTraceServerApi,
-      mockWandbServerApi,
-      'test-project'
-    );
+    client = createWeaveClient({
+      traceServerApi: mockTraceServerApi,
+      projectId: 'test-project',
+    });
   });
 
   describe('getCalls', () => {
@@ -198,11 +197,10 @@ describe('WeaveClient', () => {
         },
       } as any;
       mockWandbServerApi = {} as any;
-      client = new WeaveClient(
-        mockTraceServerApi,
-        mockWandbServerApi,
-        'test-project'
-      );
+      client = createWeaveClient({
+        traceServerApi: mockTraceServerApi,
+        projectId: 'test-project',
+      });
       // Speed up tests by reducing batch interval
       (client as any).BATCH_INTERVAL = 10;
     });
@@ -372,11 +370,10 @@ describe('WeaveClient', () => {
         request: jest.fn(),
       } as any;
       mockWandbServerApi = {} as any;
-      client = new WeaveClient(
-        mockTraceServerApi,
-        mockWandbServerApi,
-        'current-entity/current-project'
-      );
+      client = createWeaveClient({
+        traceServerApi: mockTraceServerApi,
+        projectId: 'current-entity/current-project',
+      });
       mockTransport = jest
         .spyOn(registryLinkBindings, 'linkAssetToRegistry')
         .mockResolvedValue({version_index: 0});
@@ -474,11 +471,10 @@ describe('WeaveClient', () => {
     });
 
     it('rejects projectId without entity scope', async () => {
-      const unscopedClient = new WeaveClient(
-        mockTraceServerApi,
-        mockWandbServerApi,
-        'project-only'
-      );
+      const unscopedClient = createWeaveClient({
+        traceServerApi: mockTraceServerApi,
+        projectId: 'project-only',
+      });
       const promptRef = new ObjectRef(
         'source-entity/source-project',
         'my-prompt',
