@@ -5,12 +5,11 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {setGlobalClient} from '../../clientApi';
-import {DEFAULT_STATE_SYMBOL_NAME} from '../../genai/context';
-import {Api as TraceServerApi} from '../../generated/traceServerApi';
-import {PROVIDER_HOLDER_SYMBOL_NAME} from '../../genai/provider';
+import {type Api as TraceServerApi} from '../../generated/traceServerApi';
 import {Settings, type SettingsInit} from '../../settings';
-import {WandbServerApi} from '../../wandb/wandbServerApi';
+import {type WandbServerApi} from '../../wandb/wandbServerApi';
 import {WeaveClient} from '../../weaveClient';
+import state from 'weave/state';
 
 export const TEST_BASE_URL = 'http://localhost:8080';
 export const TEST_PROJECT = 'test-entity/test-project';
@@ -40,26 +39,16 @@ export function clearGlobalClient(): void {
 
 // Reach into the global singleton's holder directly to reset its state.
 export function resetProviderSingleton(): void {
-  const holder = (globalThis as Record<symbol, unknown>)[
-    Symbol.for(PROVIDER_HOLDER_SYMBOL_NAME)
-  ] as {provider: unknown; beforeExitRegistered: boolean} | undefined;
-  if (holder) {
-    holder.provider = null;
-    holder.beforeExitRegistered = false;
-  }
+  state.genAi.provider = null;
+  state.genAi.providerRegistered = false;
 }
 
 // Reach into the GenAI default-state singleton and null out its slots so each
 // test body starts clean even when prior tests in the same worker mutated it.
 export function resetGenaiDefaultState(): void {
-  const state = (globalThis as Record<symbol, unknown>)[
-    Symbol.for(DEFAULT_STATE_SYMBOL_NAME)
-  ] as {session: unknown; turn: unknown; llm: unknown} | undefined;
-  if (state) {
-    state.session = null;
-    state.turn = null;
-    state.llm = null;
-  }
+  state.genAi.defaultState.session = null;
+  state.genAi.defaultState.turn = null;
+  state.genAi.defaultState.llm = null;
 }
 
 /**

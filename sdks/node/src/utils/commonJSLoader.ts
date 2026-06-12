@@ -3,8 +3,8 @@ import path from 'path';
 import semifies from 'semifies';
 
 import instrumentations, {
-  CacheEntry,
-  CJSInstrumentation,
+  type CacheEntry,
+  type CJSInstrumentation,
 } from '../integrations/instrumentations';
 import {requirePackageJson} from './npmModuleUtils';
 

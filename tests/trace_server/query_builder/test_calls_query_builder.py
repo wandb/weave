@@ -4213,7 +4213,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
 
 
 def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
-    """Stats query on calls_complete with total_storage_size should be flat with JOIN."""
+    """Unfiltered calls_complete storage stats: flat count() + flat stats sum, no JOIN."""
     req = tsi.CallsQueryStatsReq(
         project_id="project",
         include_total_storage_size=True,
@@ -4223,27 +4223,17 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         """
         SELECT count() AS count,
                toUInt8(0) AS has_more,
-               sum(coalesce(CASE
-                   WHEN calls_complete.parent_id = {pb_2:String}
-                        THEN rolled_up_cms.total_storage_size_bytes
-                   ELSE NULL
-               END, 0)) AS total_storage_size_bytes
+               coalesce(
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0))
+                           FROM calls_complete_stats
+                           WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
         FROM calls_complete
-        LEFT JOIN (
-            SELECT trace_id,
-                   sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-            FROM calls_complete_stats
-            WHERE project_id = {pb_1:String}
-            GROUP BY trace_id
-        ) AS rolled_up_cms ON calls_complete.trace_id = rolled_up_cms.trace_id
-        PREWHERE calls_complete.project_id = {pb_1:String}
-        WHERE 1
-          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+        PREWHERE calls_complete.project_id = {pb_0:String}
+        WHERE calls_complete.deleted_at = {pb_1:DateTime64(3)}
         """,
         {
-            "pb_0": SENTINEL_EPOCH,
-            "pb_1": "project",
-            "pb_2": "",
+            "pb_0": "project",
+            "pb_1": SENTINEL_EPOCH,
         },
         read_table=ReadTable.CALLS_COMPLETE,
     )
@@ -4370,6 +4360,31 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
             SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_unfiltered_storage_uses_flat_sum() -> None:
+    """Unfiltered storage stats avoid the per-id GROUP BY + calls_merged_stats JOIN."""
+    req = tsi.CallsQueryStatsReq(project_id="project", include_total_storage_size=True)
+    pb = ParamBuilder("pb")
+    _query, columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    assert settings == {}
+    assert list(columns) == ["count", "has_more", "total_storage_size_bytes"]
+    assert_stats_sql(
+        req,
+        """
+        SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+               toUInt8(0) AS has_more,
+               coalesce(
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0))
+                           FROM calls_merged_stats
+                           WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_0:String}
         """,
         {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,

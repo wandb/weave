@@ -1,8 +1,8 @@
 import {ReadableStream} from 'stream/web';
-import {Api as TraceServerApi} from '../generated/traceServerApi';
+import {type Api as TraceServerApi} from '../generated/traceServerApi';
 import {StringPrompt} from '../prompt';
 import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
-import {WandbServerApi} from '../wandb/wandbServerApi';
+import {type WandbServerApi} from '../wandb/wandbServerApi';
 import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
 

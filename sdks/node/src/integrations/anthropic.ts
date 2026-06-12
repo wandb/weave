@@ -1,6 +1,6 @@
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {op} from '../op';
-import {OpOptions, StreamReducer} from '../opType';
+import {type OpOptions, type StreamReducer} from '../opType';
 
 type Message = {
   id: string;

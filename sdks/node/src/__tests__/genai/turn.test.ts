@@ -52,7 +52,44 @@ describe('Turn', () => {
   });
 });
 
-describe('Turn.setAttribute', () => {
+describe('Turn.setAttributes', () => {
+  setupGenAITestEnvironment();
+  const getExporter = setupExporterPerTest();
+
+  it('writes multiple attributes to the underlying span', () => {
+    const turn = Turn.create({});
+    turn.setAttributes({'weave.cost.usd': 0.42, 'weave.tag': 'enterprise'});
+    turn.end();
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.attributes['weave.cost.usd']).toBe(0.42);
+    expect(span.attributes['weave.tag']).toBe('enterprise');
+  });
+
+  it('returns this for chaining', () => {
+    const turn = Turn.create({});
+    expect(turn.setAttributes({k: 'v'})).toBe(turn);
+    turn.end();
+  });
+
+  it('warns and is a no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const turn = Turn.create({});
+    turn.end();
+    turn.setAttributes({'after.end': 'x'});
+    const spans = getExporter().getFinishedSpans();
+    expect(
+      findSpan(spans, 'invoke_agent').attributes['after.end']
+    ).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Turn.setAttributes() called after end()')
+    );
+    warnSpy.mockRestore();
+  });
+});
+
+// Deprecated singular alias, retained Turn-only for back-compat (delegates to
+// setAttributes). The other emitters never shipped a singular form.
+describe('Turn.setAttribute (deprecated alias)', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
@@ -72,7 +109,8 @@ describe('Turn.setAttribute', () => {
     turn.end();
   });
 
-  it('is a no-op after end()', () => {
+  it('warns and is a no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     turn.end();
     turn.setAttribute('after.end', 'x');
@@ -80,6 +118,11 @@ describe('Turn.setAttribute', () => {
     expect(
       findSpan(spans, 'invoke_agent').attributes['after.end']
     ).toBeUndefined();
+    // Alias delegates to setAttributes, so the warning names setAttributes.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Turn.setAttributes() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 });
 
@@ -108,7 +151,8 @@ describe('Turn.addEvent', () => {
     ).toBeDefined();
   });
 
-  it('is a no-op after end()', () => {
+  it('warns and is a no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     turn.end();
     turn.addEvent('after.end');
@@ -116,5 +160,9 @@ describe('Turn.addEvent', () => {
     expect(
       findSpan(spans, 'invoke_agent').events.find(e => e.name === 'after.end')
     ).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Turn.addEvent() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 });
