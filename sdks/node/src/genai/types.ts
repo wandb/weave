@@ -2,7 +2,13 @@
  * Public data types for the Weave GenAI session SDK.
  */
 
-export type Role = 'user' | 'assistant' | 'system' | 'tool';
+export type Role =
+  | 'user'
+  | 'assistant'
+  | 'system'
+  | 'tool'
+  | 'developer'
+  | 'function';
 
 export type Modality = 'image' | 'audio' | 'video' | 'document';
 
