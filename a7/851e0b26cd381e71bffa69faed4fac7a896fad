@@ -44,3 +44,40 @@ NOTDIAMOND_INTEGRATION.as_attributes() on both decorators. Left the 3 inner
 _DummyEvalModel.predict ops unstamped on purpose: they're eval scaffolding over
 precomputed dataframes, not notdiamond calls. ruff + ast clean; notdiamond lib
 not installed locally so not runtime-tested.
+
+## Test coverage added (follow-up to reviewer "missing tests")
+
+The original commit only asserted the integration block on openai. Added
+shape-confirming `attributes["integration"]` assertions to one existing
+cassette/call test per op-based integration:
+
+- Specific-call style (assert on the integration's call directly): anthropic,
+  cerebras, cohere, groq, litellm, mistral, google_genai, vertexai, huggingface,
+  instructor, bedrock.
+- Robust style (filter fetched calls to name==<vendor> before asserting): autogen,
+  crewai, dspy, smolagents, langchain_nvidia, fastmcp, gepa, verifiers,
+  notdiamond/tracing. These agent-framework tests ALSO capture sub-integration
+  calls (litellm/openai/huggingface) that carry their OWN integration block, so a
+  naive all()-over-all-stamped-calls would fail — must filter to the vendor first.
+- notdiamond/custom_router: asserts the module-level train_router/evaluate_router
+  @weave.op helpers' public `.attributes["integration"]` directly (no call needed).
+
+Each assert checks: name == <vendor>, truthy version (= weave SDK version),
+meta.package_name == <distribution name> (e.g. mistral->mistralai,
+cerebras->cerebras-cloud-sdk, bedrock->boto3, vertexai->google-cloud-aiplatform).
+
+## Verification status
+- Ran locally (libs in dev env): litellm, bedrock -> PASS.
+- huggingface: assert is correct but could NOT run locally — pre-existing
+  huggingface_hub/cassette version drift (lib issues an extra
+  GET /api/models/...?expand=inferenceProviderMapping not in the cassette). Runs
+  in the huggingface CI shard with the pinned version.
+- All other integrations' libs are not installed locally; tests are sharded
+  per-integration (noxfile: tests/integrations/<shard>/ + --extra <shard>), so
+  each assert runs in its own CI shard. NOT run locally.
+- vertexai: its call-fetching tests are @pytest.mark.skip (non-deterministic
+  provider; predates this change) so the assert is present but inert until unskipped.
+
+ruff check + ruff format clean on all 21 touched test files. RUF052 (accessed
+`_`-prefixed locals) IS enforced; robust helpers use plain names (stamped /
+<vendor>_meta).
