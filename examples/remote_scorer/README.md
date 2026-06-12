@@ -55,8 +55,8 @@ For example:
 {
   "schema_version": 1,
   "result": {
-    "value": 0.32,
-    "reason": "Message length is 32 characters.",
+    "value": 1.0,
+    "reason": "Message is 32 characters; concise messages score best.",
     "confidence": 1.0
   }
 }

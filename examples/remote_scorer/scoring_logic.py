@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 REMOTE_SCORER_SCHEMA_VERSION = 1
+CONCISE_MESSAGE_LENGTH = 120
+TOO_LONG_MESSAGE_LENGTH = 500
 
 
 def score_remote_call(request_body: dict[str, Any]) -> dict[str, Any]:
@@ -26,10 +28,20 @@ def score_remote_call(request_body: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(message, str):
         message = ""
     message_length = len(message)
-    rating = min(message_length / 100, 1.0)
+    if message_length <= CONCISE_MESSAGE_LENGTH:
+        rating = 1.0
+    elif message_length >= TOO_LONG_MESSAGE_LENGTH:
+        rating = 0.0
+    else:
+        rating = 1 - (
+            (message_length - CONCISE_MESSAGE_LENGTH)
+            / (TOO_LONG_MESSAGE_LENGTH - CONCISE_MESSAGE_LENGTH)
+        )
 
     return {
         "value": round(rating, 2),
-        "reason": f"Message length is {message_length} characters.",
+        "reason": (
+            f"Message is {message_length} characters; concise messages score best."
+        ),
         "confidence": 1.0,
     }
