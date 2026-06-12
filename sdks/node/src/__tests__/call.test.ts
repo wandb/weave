@@ -1,5 +1,6 @@
 import * as weave from 'weave';
 import {op, type Op} from 'weave';
+import {WeaveClient} from '../weaveClient';
 
 const mockOpName = 'weave://test-project-id/op/test-op';
 const mockCallId = 'test-call-id';
@@ -7,7 +8,7 @@ const mockProjectId = 'test-project-id';
 
 jest.mock('weave/clientApi', () => ({
   getGlobalClient: jest.fn(() => {
-    const weaveClient = new weave.WeaveClient(
+    const weaveClient = new WeaveClient(
       null as any,
       null as any,
       mockProjectId
@@ -22,7 +23,7 @@ jest.mock('weave/clientApi', () => ({
         newStack: [],
       }),
       createCall: (...args: any) => {
-        return weave.WeaveClient.prototype.createCall.apply(weaveClient, args);
+        return WeaveClient.prototype.createCall.apply(weaveClient, args);
       },
       startCall: (...args: any[]) => {
         return Promise.resolve();

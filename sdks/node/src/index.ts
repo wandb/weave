@@ -66,9 +66,16 @@ export {
   type WeaveImage,
 } from './media';
 export {op} from './op';
-export * from './types';
+export type {Op, OpDecorator} from './opType';
+/**
+ * @deprecated Create clients via `weave.init()` — direct construction is
+ * not part of the supported public API and the runtime export will be
+ * removed in a future release.
+ */
+export {WeaveClient} from "./weaveClient";
 export {WeaveObject, ObjectRef} from './weaveObject';
 export {MessagesPrompt, StringPrompt} from './prompt';
+
 // CJS-only side-effect: install the `require()` patcher so CJS hosts
 // auto-instrument supported modules. ESM hosts use the loader hook in
 // `./esm/instrument.mjs` instead, registered via `--import=weave/instrument`.

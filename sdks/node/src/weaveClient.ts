@@ -187,6 +187,11 @@ export class WeaveClient {
   private errorCount = 0;
   private readonly MAX_ERRORS = 10;
 
+  /**
+   * @deprecated Create clients via `weave.init()` — direct construction is
+   * not part of the supported public API and the runtime export will be
+   * removed in a future release.
+   */
   constructor(
     public traceServerApi: TraceServerApi<any>,
     private wandbServerApi: WandbServerApi,
