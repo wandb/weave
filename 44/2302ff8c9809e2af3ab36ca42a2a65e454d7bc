@@ -85,3 +85,27 @@ The refactor also introduced `openai-agents/weave-otel-tracing-processor.ts`
 that processor because it post-dates the original change. If the openai_agents
 integration should carry `attributes.integration` under OTel v2, that file needs
 the same stamping as a follow-up.
+
+## Test coverage added (follow-up: "same for the ts integrations")
+
+The commit already shipped integrationMetadata.test.ts (builder unit tests) + an
+anthropic.test.ts assert. Added shape asserts for the remaining 5 TS integrations,
+all VERIFIED locally with jest (pass):
+
+- openai (integrationOpenAI.test.ts) and googleGenAI (googleGenAI.test.ts):
+  calls[0].attributes.integration.{name, meta.package_name} -> openai/openai,
+  google_genai/@google/genai.
+- openai_agents (openaiAgent.test.ts) and openai_agents_realtime
+  (openaiAgent.realtime.test.ts): multi-call traces (nested openai calls carry their
+  OWN block), so filter calls by attributes.integration.name and assert package_name
+  (@openai/agents, @openai/agents-realtime).
+- pi_coding_agent (piCodingAgent.test.ts): emits OTel SPANS via asOtelAttributes
+  (NOT weave Calls via asAttributes), so its assert reads the flattened dotted keys
+  span.attributes['integration.name'] / ['integration.meta.package_name']
+  (pi_coding_agent / @pi-dev/coding-agent).
+
+## Verification status
+All 5 edited test files PASS jest locally (mocks / in-memory exporters, no network /
+no creds). A negative control (wrong expected value -> test fails) confirmed the
+asserts are load-bearing. prettier clean. eslint NOT run (offline: npx eslint pulls
+from the network and there's no local binary) — but ts-jest typechecks on each run.
