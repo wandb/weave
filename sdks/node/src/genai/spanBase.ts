@@ -43,9 +43,11 @@ export interface SpanEndOptions {
  * Mirrors the Python SDK's `_SpanBase` mixin (wandb/weave#7131): rather than
  * re-declaring `setAttributes`/`addEvent` on each class, the implementation
  * lives here once and covers all four uniformly. The same single-source rule
- * covers the span lifecycle and post-hoc times: `_startSpan` opens the span
- * (applying `SpanInitBase.startTime`) and `_closeSpan` ends it (applying
- * `SpanEndOptions.endTime`) — both pass the time straight through to OTel.
+ * covers the span lifecycle and post-hoc times — `_startSpan`/`_closeSpan`
+ * are the TS counterparts of Python `_SpanBase._start_otel_span` /
+ * `_end_otel_span`: `_startSpan` opens the span (applying
+ * `SpanInitBase.startTime`) and `_closeSpan` ends it (applying
+ * `SpanEndOptions.endTime`), both passing the time straight through to OTel.
  *
  * Mutating after `end()` warns and no-ops — the span is closed, so further
  * mutation can no longer reach the trace. All mutators return `this` for
