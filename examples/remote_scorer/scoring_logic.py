@@ -6,10 +6,11 @@ from typing import Any
 
 REMOTE_SCORER_SCHEMA_VERSION = 1
 CONCISE_MESSAGE_LENGTH = 120
+MIN_USEFUL_DETAIL_LENGTH = 80
 TOO_LONG_MESSAGE_LENGTH = 500
 
 
-def score_remote_call(request_body: dict[str, Any]) -> dict[str, Any]:
+def score_remote_call(request_body: dict[str, Any]) -> list[dict[str, Any]]:
     """Score one Weave remote scorer request.
 
     Replace this function with your real policy, model, or business logic. It is
@@ -28,20 +29,46 @@ def score_remote_call(request_body: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(message, str):
         message = ""
     message_length = len(message)
-    if message_length <= CONCISE_MESSAGE_LENGTH:
-        rating = 1.0
+
+    if message_length < MIN_USEFUL_DETAIL_LENGTH:
+        conciseness_rating = 1.0
+        detail_rating = message_length / MIN_USEFUL_DETAIL_LENGTH
+        length_tag = "too-short"
+    elif message_length <= CONCISE_MESSAGE_LENGTH:
+        conciseness_rating = 1.0
+        detail_rating = 1.0
+        length_tag = "concise"
     elif message_length >= TOO_LONG_MESSAGE_LENGTH:
-        rating = 0.0
+        conciseness_rating = 0.0
+        detail_rating = 1.0
+        length_tag = "too-long"
     else:
-        rating = 1 - (
+        conciseness_rating = 1 - (
             (message_length - CONCISE_MESSAGE_LENGTH)
             / (TOO_LONG_MESSAGE_LENGTH - CONCISE_MESSAGE_LENGTH)
         )
+        detail_rating = 1.0
+        length_tag = "verbose"
 
-    return {
-        "value": round(rating, 2),
-        "reason": (
-            f"Message is {message_length} characters; concise messages score best."
-        ),
-        "confidence": 1.0,
-    }
+    return [
+        {
+            "value": round(conciseness_rating, 2),
+            "reason": (
+                f"Message is {message_length} characters; concise messages score best."
+            ),
+            "confidence": 1.0,
+        },
+        {
+            "value": round(detail_rating, 2),
+            "reason": (
+                f"Minimum useful detail is {MIN_USEFUL_DETAIL_LENGTH} characters; "
+                f"message is {message_length} characters."
+            ),
+            "confidence": 0.9,
+        },
+        {
+            "value": length_tag,
+            "reason": f"Message length category is {length_tag}.",
+            "confidence": 0.9,
+        },
+    ]

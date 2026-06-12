@@ -49,40 +49,46 @@ The simplest structured result is one score object:
 - `reason`: optional string explaining the score.
 - `confidence`: optional numeric confidence from `0.0` to `1.0`.
 
-For example:
+For a single-score response:
 
 ```json
 {
   "schema_version": 1,
   "result": {
     "value": 1.0,
-    "reason": "Message is 32 characters; concise messages score best.",
-    "confidence": 1.0
+    "reason": "The response is clear and concise.",
+    "confidence": 0.9
   }
 }
 ```
 
-Non-200 responses are treated as scorer failures by Weave. The `result` value is
-the scorer output that Weave records as feedback. If your scorer returns multiple
-scores, provide a list of score objects:
+This sample returns two numeric ratings and one tag:
 
 ```json
 {
   "schema_version": 1,
   "result": [
     {
-      "value": "concise",
-      "reason": "The response is brief and focused.",
+      "value": 1.0,
+      "reason": "Message is 32 characters; concise messages score best.",
+      "confidence": 1.0
+    },
+    {
+      "value": 0.4,
+      "reason": "Minimum useful detail is 80 characters; message is 32 characters.",
       "confidence": 0.9
     },
     {
-      "value": 0.82,
-      "reason": "The response directly answers the request.",
-      "confidence": 0.8
+      "value": "too-short",
+      "reason": "Message length category is too-short.",
+      "confidence": 0.9
     }
   ]
 }
 ```
+
+Non-200 responses are treated as scorer failures by Weave. The `result` value is
+the scorer output that Weave records as feedback.
 
 ## Auth
 
