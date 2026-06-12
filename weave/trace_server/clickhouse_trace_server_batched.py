@@ -5813,7 +5813,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 if len(ref_digests) != len(found_digests):
                     missing_digests = sorted(ref_digests - found_digests)
                     raise RefObjectsNotFoundError(
-                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}",
+                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {missing_digests}",
                         missing_digests,
                     )
                 # filter out deleted objects
