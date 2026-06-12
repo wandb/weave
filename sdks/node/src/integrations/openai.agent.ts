@@ -14,7 +14,7 @@
 import type OpenAIAgents from '@openai/agents';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {globalSingleton} from '../utils/globalSingleton';
-import type {TracingProcessor} from '@openai/agents';
+import type {SpanData, TracingProcessor} from '@openai/agents';
 import {shouldUseOtelV2} from '../settings';
 import {WeaveOtelTracingProcessor} from './openai-agents/weave-otel-tracing-processor';
 import {WeaveTracingProcessor} from './openai-agents/weave-tracing-processor';
@@ -76,7 +76,7 @@ export function getCurrentTrace(): OpenAIAgents.Trace | null {
  * Get the current OpenAI Agents span, if available.
  * Returns null when not inside an agent run or when @openai/agents is not instrumented.
  */
-export function getCurrentSpan(): OpenAIAgents.Span<any> | null {
+export function getCurrentSpan(): OpenAIAgents.Span<SpanData> | null {
   return _agentContextProvider.getCurrentSpan?.() ?? null;
 }
 

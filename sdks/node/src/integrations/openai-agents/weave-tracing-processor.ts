@@ -6,6 +6,7 @@ import type {
   CustomSpanData,
   Trace,
   TracingProcessor,
+  SpanData,
 } from '@openai/agents';
 import {topologicalSortChildrenFirst} from '../../utils/topologicalSort';
 import {
@@ -22,7 +23,7 @@ import {CallStack} from '../../weaveClient';
 /**
  * Determine the appropriate call type for a given OpenAI Agent span
  */
-function getCallType(span: Span<any>): string {
+function getCallType(span: Span<SpanData>): string {
   return span.spanData.type || 'task';
 }
 
@@ -32,7 +33,7 @@ function getCallType(span: Span<any>): string {
  * Note: several types are not explicitly supported and fall back to 'agent'
  * see: https://openai.github.io/openai-agents-js/openai/agents/type-aliases/spandata/
  */
-function getCallKind(span: Span<any>): string {
+function getCallKind(span: Span<SpanData>): string {
   const spanType = span.spanData.type;
   switch (spanType) {
     case 'agent':
@@ -56,7 +57,7 @@ function getCallKind(span: Span<any>): string {
 /**
  * Determine the name for a given OpenAI Agent span
  */
-function getCallName(span: Span<any>): string {
+function getCallName(span: Span<SpanData>): string {
   const spanData = span.spanData as any;
   if (spanData.name) {
     return spanData.name;
@@ -72,7 +73,7 @@ function getCallName(span: Span<any>): string {
 /**
  * Extract log data from different span types
  */
-function extractSpanData(span: Span<any>): {
+function extractSpanData(span: Span<SpanData>): {
   inputs: Record<string, any>;
   output: any;
   metadata: Record<string, any>;
@@ -277,7 +278,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
   /**
    * Helper method to get the parent call ID for a span
    */
-  private getParentCallId(span: Span<any>): string | null {
+  private getParentCallId(span: Span<SpanData>): string | null {
     // If span has a parent span, use that
     if (span.parentId) {
       const parentSpanCall = this.spanCalls.get(span.parentId);
@@ -294,7 +295,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
   /**
    * Helper method to get the trace ID for a span
    */
-  private getTraceId(span: Span<any>): string | null {
+  private getTraceId(span: Span<SpanData>): string | null {
     // Get trace ID from the trace call
     const traceCall = this.traceCalls.get(span.traceId);
     return traceCall ? traceCall.traceId : null;
@@ -303,7 +304,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
   /**
    * Called when a span starts
    */
-  async onSpanStart(span: Span<any>): Promise<void> {
+  async onSpanStart(span: Span<SpanData>): Promise<void> {
     const client = getGlobalClient();
     if (!client) {
       return;
@@ -373,7 +374,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
   /**
    * Called when a span ends
    */
-  async onSpanEnd(span: Span<any>): Promise<void> {
+  async onSpanEnd(span: Span<SpanData>): Promise<void> {
     const client = getGlobalClient();
     if (!client) {
       return;
