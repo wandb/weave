@@ -15,6 +15,7 @@ Two things are exercised here:
 
 from __future__ import annotations
 
+import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from weave.session.session import (
@@ -61,15 +62,17 @@ class TestSubagentMethodExists:
         assert isinstance(nested, SubAgent)
         assert nested.name == "inner"
 
-    def test_inherits_model_when_not_specified(self) -> None:
+    @pytest.mark.parametrize(
+        ("child_model", "expected"),
+        [
+            ("", "gpt-4o"),  # unspecified -> inherits the parent's model
+            ("gpt-4o-mini", "gpt-4o-mini"),  # explicit model overrides inherited
+        ],
+    )
+    def test_model_inheritance(self, child_model: str, expected: str) -> None:
         outer = SubAgent(name="outer", model="gpt-4o")
-        inner = outer.subagent(name="inner")
-        assert inner.model == "gpt-4o"
-
-    def test_explicit_model_overrides_inherited(self) -> None:
-        outer = SubAgent(name="outer", model="gpt-4o")
-        inner = outer.subagent(name="inner", model="gpt-4o-mini")
-        assert inner.model == "gpt-4o-mini"
+        inner = outer.subagent(name="inner", model=child_model)
+        assert inner.model == expected
 
 
 # ---------------------------------------------------------------------------
@@ -207,23 +210,21 @@ class TestBackwardsCompatible:
         when entered — Turn here. This is the regression guard for callers that
         construct LLMs directly without going through a SubAgent.
         """
-        with Session(session_id="s"), Turn(agent_name="bot") as turn:
+        with Session(session_id="s"), Turn(agent_name="bot"):
             with LLM(model="gpt-4o"):
                 pass
         spans = otel_spans.get_finished_spans()
         turn_span = _by_prefix(spans, "invoke_agent bot")
         llm_span = _by_prefix(spans, "chat")
         assert llm_span.parent.span_id == turn_span.context.span_id
-        _ = turn  # silence "unused"
 
     def test_standalone_tool_uses_ambient_when_no_parent_context(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
-        with Session(session_id="s"), Turn(agent_name="bot") as turn:
+        with Session(session_id="s"), Turn(agent_name="bot"):
             with Tool(name="f"):
                 pass
         spans = otel_spans.get_finished_spans()
         turn_span = _by_prefix(spans, "invoke_agent bot")
         tool_span = _by_prefix(spans, "execute_tool")
         assert tool_span.parent.span_id == turn_span.context.span_id
-        _ = turn

@@ -61,6 +61,7 @@ except ImportError:
     _OTEL_AVAILABLE = False
 
 if TYPE_CHECKING:
+    from opentelemetry.context import Context as _OTelContext
     from opentelemetry.context import Token as _OTelToken
     from opentelemetry.trace import Span as _OTelSpan
 
@@ -133,7 +134,7 @@ class _SpanBase(BaseModel):
     # Explicit OTel parent context, set by ``SubAgent.llm/tool/subagent`` on
     # children it creates so they nest under the SubAgent's span regardless of
     # what's on the ambient OTel context stack at ``__enter__`` time.
-    _parent_otel_context: Any = PrivateAttr(default=None)
+    _parent_otel_context: _OTelContext | None = PrivateAttr(default=None)
 
     def _start_otel_span(
         self,
@@ -658,7 +659,17 @@ class SubAgent(_SpanBase):
     # so they nest under this SubAgent even if the ambient OTel context has
     # since drifted (e.g. caller never entered ``with sub:`` or exited it
     # before creating the child).
-    _own_otel_context: Any = PrivateAttr(default=None)
+    _own_otel_context: _OTelContext | None = PrivateAttr(default=None)
+
+    def _thread_otel_context(self, child: _SpanBase) -> None:
+        """Pin ``child``'s OTel parent to this SubAgent's span.
+
+        No-op until this SubAgent has been entered (``_own_otel_context`` is
+        set at ``__enter__``); children created before then fall back to the
+        ambient OTel context, matching the bare ``LLM()`` / ``Tool()`` path.
+        """
+        if self._own_otel_context is not None:
+            child._parent_otel_context = self._own_otel_context
 
     def llm(
         self,
@@ -679,8 +690,7 @@ class SubAgent(_SpanBase):
             provider_name=provider_name,
             system_instructions=system_instructions or [],
         )
-        if self._own_otel_context is not None:
-            llm._parent_otel_context = self._own_otel_context
+        self._thread_otel_context(llm)
         llm._token = _current_llm.set(llm)
         return llm
 
@@ -691,11 +701,10 @@ class SubAgent(_SpanBase):
         has been entered.
         """
         tool = Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
-        if self._own_otel_context is not None:
-            tool._parent_otel_context = self._own_otel_context
+        self._thread_otel_context(tool)
         return tool
 
-    def subagent(self, *, name: str = "", model: str = "") -> SubAgent:
+    def subagent(self, *, name: str, model: str = "") -> SubAgent:
         """Start a nested sub-agent under this one.
 
         Pins the nested SubAgent's OTel parent to this SubAgent's span when
@@ -703,8 +712,7 @@ class SubAgent(_SpanBase):
         TypeScript ``startSubagent`` factory on SubAgent.
         """
         sub = SubAgent(name=name, model=model or self.model)
-        if self._own_otel_context is not None:
-            sub._parent_otel_context = self._own_otel_context
+        self._thread_otel_context(sub)
         return sub
 
     def _build_attrs(self, *, session_id: str, session_name: str) -> dict[str, Any]:
