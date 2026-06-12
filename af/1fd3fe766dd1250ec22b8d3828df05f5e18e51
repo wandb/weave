@@ -46,3 +46,37 @@ gen_ai.provider.name set — so invoke_agent / execute_tool / generate_content s
 all carry integration.* provenance. (My original pattern-grep missed it because it
 uses neither weave.op/op_settings nor create_call — only span.set_attribute.)
 ruff + ast clean; google-adk lib not installed locally so not runtime-tested.
+
+## Test coverage added (follow-up: "same for the otel integrations")
+
+Stamped 3 agent-OTel integrations; the original commit added NO tests and (per its
+own Testing note) couldn't import the libs, so the otel tests were never run.
+Added flattened-key asserts (integration.name / integration.version /
+integration.meta.package_name -- OTel spans store dotted scalar keys):
+
+- openai_agents (openai_agents_otel_test.py::test_openai_agents_quickstart_otel) and
+  google_adk (test_google_adk.py::TestAdkRunnerE2E::test_emits_all_otel_attributes):
+  ADD-only robust asserts -- collect finished spans, require >=1 carrying
+  integration.name, assert name + meta.package_name (openai_agents -> openai-agents;
+  google_adk -> google-adk).
+
+- claude_agent_sdk (claude_agent_sdk_otel_test.py::test_simple_text_query_otel):
+  *** ALSO A BUG FIX ***. The commit .update()'s _INTEGRATION_OTEL_ATTRS into the
+  chat / tool / turn attr dicts, but this test asserts the FULL attribute dict with
+  EXACT equality (assert get_attrs(agent_span) == {...} and the same for chat_span).
+  Adding integration.* keys BREAKS both exact-equality assertions. The author never
+  caught it (couldn't run claude_agent_sdk locally). Fix: a
+  check_integration_and_strip() helper pops + asserts the 3 integration.* keys and
+  returns the remainder, so the exact-shape assertions stay focused on GenAI semconv
+  keys AND the provenance is now asserted. Only test_simple_text_query_otel used
+  full-dict exact-equality on stamped spans; the other claude otel tests use
+  individual-key checks and were unaffected.
+
+## Verification status
+NONE run in the dev env (agents / claude_agent_sdk / google-adk libs not installed;
+tests sharded per-integration). The claude fix is logically sound -- as_otel_attributes
+emits exactly integration.name / integration.version / integration.meta.package_name,
+and strip-by-"integration." prefix captures exactly those -- but is CI-verified only.
+Run the claude_agent_sdk / openai_agents / google_adk shards to confirm.
+
+ruff check + format clean on all 3 touched test files.
