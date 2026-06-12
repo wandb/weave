@@ -91,6 +91,24 @@ export function findSpan(spans: ReadableSpan[], name: string): ReadableSpan {
 }
 
 /**
+ * Assert that a span's exported start/end times match the given dates to
+ * second precision. OTel records times as HrTime `[seconds, nanos]`, so we
+ * compare the seconds component. Used to verify that post-hoc
+ * `startTime`/`endTime` backdating flows through to the exported span.
+ */
+export function expectSpanTimesToMatch(
+  span: ReadableSpan,
+  startedAt: Date,
+  endedAt: Date
+): void {
+  const MS_PER_SECOND = 1000;
+  expect(span.startTime[0]).toBe(
+    Math.floor(startedAt.getTime() / MS_PER_SECOND)
+  );
+  expect(span.endTime[0]).toBe(Math.floor(endedAt.getTime() / MS_PER_SECOND));
+}
+
+/**
  * Per-test setup that installs a fresh `InMemorySpanExporter` + fake client.
  * Returns a getter so tests can read `getExporter().getFinishedSpans()` after
  * spans are ended.

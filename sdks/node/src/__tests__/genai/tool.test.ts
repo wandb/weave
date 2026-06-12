@@ -11,6 +11,7 @@ import {
 import {Turn} from '../../genai/turn';
 
 import {
+  expectSpanTimesToMatch,
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
@@ -108,5 +109,17 @@ describe('Tool', () => {
       expect.stringContaining('Tool.addEvent() called after end()')
     );
     warnSpy.mockRestore();
+  });
+
+  it('startTime/endTime backdate the execute_tool span window', () => {
+    const startedAt = new Date('2026-01-01T00:00:00Z');
+    const endedAt = new Date('2026-01-01T00:00:05Z');
+    const turn = Turn.create({});
+    const tool = turn.startTool({name: 'get_weather', startTime: startedAt});
+    tool.end({endTime: endedAt});
+    turn.end();
+
+    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    expectSpanTimesToMatch(toolSpan, startedAt, endedAt);
   });
 });

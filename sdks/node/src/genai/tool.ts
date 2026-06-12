@@ -1,8 +1,8 @@
-import {type Span, SpanKind, SpanStatusCode} from '@opentelemetry/api';
+import {type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
-import {SpanBase} from './spanBase';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
@@ -13,7 +13,7 @@ import {
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 
-export interface ToolInit {
+export interface ToolInit extends SpanInitBase {
   name: string;
   args?: string;
   toolCallId?: string;
@@ -71,17 +71,17 @@ export class Tool extends SpanBase {
     }
     const span = tracer.startSpan(
       'execute_tool',
-      {kind: SpanKind.INTERNAL, attributes},
+      {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
       opts.parentContext
     );
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
   }
 
   /**
-   * Flush `result` to the span and close it. Idempotent. Pass `error` to
-   * mark the span as failed.
+   * Flush `result` to the span and close it. Idempotent. Pass `error` to mark
+   * the span as failed; pass `endTime` to backdate the close.
    */
-  end(opts?: {error?: Error}): void {
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
@@ -89,13 +89,6 @@ export class Tool extends SpanBase {
     if (this.result !== undefined) {
       this.span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, this.result);
     }
-    if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
-    }
-    this.span.end();
+    this._closeSpan(opts);
   }
 }

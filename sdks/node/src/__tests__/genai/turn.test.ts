@@ -9,6 +9,7 @@ import {
 import {Turn} from '../../genai/turn';
 
 import {
+  expectSpanTimesToMatch,
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
@@ -164,5 +165,15 @@ describe('Turn.addEvent', () => {
       expect.stringContaining('Turn.addEvent() called after end()')
     );
     warnSpy.mockRestore();
+  });
+
+  it('startTime/endTime backdate the invoke_agent span window', () => {
+    const startedAt = new Date('2026-01-01T00:00:00Z');
+    const endedAt = new Date('2026-01-01T00:00:05Z');
+    const turn = Turn.create({startTime: startedAt});
+    turn.end({endTime: endedAt});
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expectSpanTimesToMatch(span, startedAt, endedAt);
   });
 });
