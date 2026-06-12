@@ -6,7 +6,6 @@ from typing import Any
 
 REMOTE_SCORER_SCHEMA_VERSION = 1
 CONCISE_MESSAGE_LENGTH = 120
-MIN_USEFUL_DETAIL_LENGTH = 80
 TOO_LONG_MESSAGE_LENGTH = 500
 
 
@@ -30,24 +29,17 @@ def score_remote_call(request_body: dict[str, Any]) -> list[dict[str, Any]]:
         message = ""
     message_length = len(message)
 
-    if message_length < MIN_USEFUL_DETAIL_LENGTH:
+    if message_length <= CONCISE_MESSAGE_LENGTH:
         conciseness_rating = 1.0
-        detail_rating = message_length / MIN_USEFUL_DETAIL_LENGTH
-        length_tag = "too-short"
-    elif message_length <= CONCISE_MESSAGE_LENGTH:
-        conciseness_rating = 1.0
-        detail_rating = 1.0
         length_tag = "concise"
     elif message_length >= TOO_LONG_MESSAGE_LENGTH:
         conciseness_rating = 0.0
-        detail_rating = 1.0
         length_tag = "too-long"
     else:
         conciseness_rating = 1 - (
             (message_length - CONCISE_MESSAGE_LENGTH)
             / (TOO_LONG_MESSAGE_LENGTH - CONCISE_MESSAGE_LENGTH)
         )
-        detail_rating = 1.0
         length_tag = "verbose"
 
     return [
@@ -57,14 +49,6 @@ def score_remote_call(request_body: dict[str, Any]) -> list[dict[str, Any]]:
                 f"Message is {message_length} characters; concise messages score best."
             ),
             "confidence": 1.0,
-        },
-        {
-            "value": round(detail_rating, 2),
-            "reason": (
-                f"Minimum useful detail is {MIN_USEFUL_DETAIL_LENGTH} characters; "
-                f"message is {message_length} characters."
-            ),
-            "confidence": 0.9,
         },
         {
             "value": length_tag,

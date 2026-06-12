@@ -62,7 +62,7 @@ For a single-score response:
 }
 ```
 
-This sample returns two numeric ratings and one tag:
+This sample returns one numeric rating and one tag:
 
 ```json
 {
@@ -74,13 +74,8 @@ This sample returns two numeric ratings and one tag:
       "confidence": 1.0
     },
     {
-      "value": 0.4,
-      "reason": "Minimum useful detail is 80 characters; message is 32 characters.",
-      "confidence": 0.9
-    },
-    {
-      "value": "too-short",
-      "reason": "Message length category is too-short.",
+      "value": "concise",
+      "reason": "Message length category is concise.",
       "confidence": 0.9
     }
   ]
