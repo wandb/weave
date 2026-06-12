@@ -32,7 +32,7 @@ import {getGlobalClient} from '../clientApi';
 import {uuidv7} from 'uuidv7';
 import type {RealtimeSession} from '@openai/agents-realtime';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {globalSingleton} from '../utils/globalSingleton';
+import state from '../state';
 
 // ============================================================================
 // Helpers
@@ -701,15 +701,6 @@ export class WeaveRealtimeTracingAdapter {
 // Public API
 // ============================================================================
 
-// Internal state shared across CJS/ESM module boundaries via globalThis.
-// Without this, a dual-package hazard (same module loaded as both CJS and ESM
-// in one process) would give each copy its own `patched` flag and could
-// double-patch the `RealtimeSession` class.
-const _openaiAgentsRealtimeState = globalSingleton<{patched: boolean}>(
-  '_weave_openai_agents_realtime_state',
-  () => ({patched: false})
-);
-
 function patchRealtimeSessionCommon(realtimeExports: any): void {
   const OriginalSession = realtimeExports?.RealtimeSession;
   if (!OriginalSession) return;
@@ -758,8 +749,8 @@ function patchRealtimeSessionCommon(realtimeExports: any): void {
 }
 
 function patchRealtimeExports(exports: any) {
-  if (!_openaiAgentsRealtimeState.patched) {
-    _openaiAgentsRealtimeState.patched = true;
+  if (!state.integrations.openaiAgentsRealtime.patched) {
+    state.integrations.openaiAgentsRealtime.patched = true;
     patchRealtimeSessionCommon(exports);
   }
   return exports;
@@ -806,7 +797,7 @@ export function instrumentOpenAIRealtimeAgent(): void {
  * ```
  */
 export async function patchRealtimeSession(): Promise<boolean> {
-  if (_openaiAgentsRealtimeState.patched) return true;
+  if (state.integrations.openaiAgentsRealtime.patched) return true;
 
   // Dynamic `import()` (not `require()`) so this compiles cleanly to both CJS
   // and ESM output; `require` does not exist in ESM.
@@ -827,8 +818,8 @@ export async function patchRealtimeSession(): Promise<boolean> {
   // Re-check: the dynamic import itself may trigger the ESM hook, which runs
   // patchRealtimeSessionCommon. Without this guard we would double-wrap
   // RealtimeSession.prototype.sendAudio.
-  if (_openaiAgentsRealtimeState.patched) return true;
-  _openaiAgentsRealtimeState.patched = true;
+  if (state.integrations.openaiAgentsRealtime.patched) return true;
+  state.integrations.openaiAgentsRealtime.patched = true;
   patchRealtimeSessionCommon(realtimeExports);
   return true;
 }
