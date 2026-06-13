@@ -3069,7 +3069,7 @@ def sanitize_object_name(name: str) -> str:
 def _get_call_processor(server: Any) -> Any:
     """Get the call processor from a server, traversing through middleware wrappers.
 
-    Most production clients (RemoteHTTPTraceServer, StainlessRemoteHTTPTraceServer)
+    Most production clients (RemoteHTTPTraceServer)
     use batching and have a call_processor. This traverses through middleware like
     CachingMiddlewareTraceServer to find it.
 
