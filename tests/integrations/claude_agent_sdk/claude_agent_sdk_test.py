@@ -68,6 +68,15 @@ async def test_simple_text_query(
 
     # Verify weave calls
     calls = list(client.get_calls())
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    claude_agent_sdk_meta = [i for i in stamped if i["name"] == "claude_agent_sdk"]
+    assert claude_agent_sdk_meta, "expected >=1 call to carry claude_agent_sdk metadata"
+    assert all(
+        i["meta"]["package_name"] == "claude_agent_sdk" for i in claude_agent_sdk_meta
+    )
     assert len(calls) == 1
 
     root_call = calls[0]

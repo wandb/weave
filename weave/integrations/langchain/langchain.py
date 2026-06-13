@@ -40,6 +40,10 @@ from pydantic import BaseModel
 from pydantic.v1.json import pydantic_encoder
 
 from weave.flow.util import warn_once
+from weave.integrations.integration_metadata import (
+    apply_integration_metadata,
+    library_integration,
+)
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
@@ -65,6 +69,10 @@ from collections.abc import Generator
 from typing import Any, cast
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
+
+LANGCHAIN_INTEGRATION = library_integration(
+    "langchain", distribution_name="langchain-core"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +278,8 @@ if not import_failed:
             # Add kind to weave attributes if applicable
             if kind:
                 call_attrs.setdefault("weave", {})["kind"] = kind
+
+            apply_integration_metadata(call_attrs, LANGCHAIN_INTEGRATION)
 
             call = self.wc.create_call(
                 # Make sure to add the run name once the UI issue is figured out

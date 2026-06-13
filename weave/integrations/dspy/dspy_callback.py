@@ -9,8 +9,11 @@ from weave.integrations.dspy.dspy_utils import (
     dspy_postprocess_outputs,
     get_op_name_for_callback,
 )
+from weave.integrations.integration_metadata import library_integration
 from weave.trace.call import Call
 from weave.trace.context import weave_client_context
+
+DSPY_INTEGRATION = library_integration("dspy")
 
 import_failed = False
 
@@ -44,6 +47,7 @@ if not import_failed:
             self._call_map[call_id] = gc.create_call(
                 op_name,
                 inputs=dspy_postprocess_inputs(inputs),
+                attributes=DSPY_INTEGRATION.as_attributes(),
                 display_name=op_name,
             )
 
@@ -84,6 +88,7 @@ if not import_failed:
             self._call_map[call_id] = gc.create_call(
                 op_name,
                 inputs=dspy_postprocess_inputs(inputs),
+                attributes=DSPY_INTEGRATION.as_attributes(),
                 display_name=op_name,
             )
 
@@ -123,6 +128,7 @@ if not import_failed:
             self._call_map[call_id] = gc.create_call(
                 op_name,
                 inputs=dspy_postprocess_inputs(inputs),
+                attributes=DSPY_INTEGRATION.as_attributes(),
                 display_name=op_name,
             )
 
