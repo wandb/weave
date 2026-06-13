@@ -1,0 +1,65 @@
+## Conversation
+User asked "in our tests, why do we need wandb service?". I traced it to the
+`Start wandb service` step (W&B `local-testcontainer`) that test.yaml + the
+nightly workflows start next to ClickHouse. User then said "try removing the
+wandb service and see if the tests pass" and, after the experiment came back
+green, "ok get rid of it" followed by "put this up as draft".
+
+## Actions
+- Mapped the wandb-service usage: `.github/workflows/{test,nightly-tests,
+  nightly-replicated-leg}.yaml` each had an `Authenticate to Google Cloud`
+  (WIF) step feeding a `docker login` + `docker run ... local-testcontainer`
+  `Start wandb service` step, plus `WB_SERVER_HOST: http://localhost` env and
+  an `id-token: write` permission.
+- Built a py3.12 venv (uv), ran core trace shards locally against the existing
+  ClickHouse container with CI-like env and NO wandb container:
+    trace (-m trace_server): 956 passed / 20 skipped / 2 env flakes
+    flow  (-m trace_server): 61 passed / 320 skipped / 0 failed
+    trace_server_bindings:   55 passed
+    trace_server (+shared):  1341 passed / 1 skipped
+- Root-caused the 2 trace flakes: test_sync_eval_parallelism (assert <8s under
+  16-worker load; passes solo) and test_flask_server (hardcodes port 6789;
+  netstat showed another process LISTENing — werkzeug EADDRINUSE -> sys.exit).
+  Six flow failures appeared only when running the FULL flow dir unmarked; all
+  six are deselected by CI's `-m trace_server` and have no wandb code path
+  (missing client fixture -> local WeaveInitError; one uses MagicMock server).
+- Removed the wandb service + orphaned scaffolding from all 3 workflows
+  (102 line deletions). Validated: python yaml.safe_load OK x3; actionlint has
+  zero structural errors (only pre-existing shellcheck notes in untouched run
+  blocks).
+
+## Errors & Mistakes
+- First combined background run used `PY=\"uv run ... pytest\"; \$PY tests/...`.
+  zsh does NOT word-split unquoted parameter expansions, so \$PY was treated as
+  one command name -> `command not found` (exit 127), nothing ran. Fixed by
+  writing the command out explicitly per shard.
+- Tried to edit MEMORY.md before Read-ing it in this session -> \"File has not
+  been read yet\". Read then edited.
+
+## Dead Ends
+- None substantive. Considered using `gt` (Graphite is configured, gt 1.8.6),
+  but this is a single standalone PR off master (HEAD == origin/master), not a
+  stack, and the Conductor+gt note-orphaning gotcha (see memory
+  project_conductor_gt_stack_off_master) argues against it. Used git/gh.
+
+## Hints for Future Agents
+- `WB_SERVER_HOST` is NOT read by the weave Python client (it resolves the W&B
+  host from `WANDB_BASE_URL`). It was inert in these jobs.
+- nox forwards only a fixed env allowlist to the trace shards (noxfile ~L148);
+  `WANDB_API_KEY` is intentionally absent except for `scorers` (W&B Artifacts).
+- ch-image.sh pulls ClickHouse from GHCR via GITHUB_TOKEN; it never needed the
+  GCP/WIF auth. That auth step existed ONLY for the wandb image docker login.
+- Codecov uses CODECOV_TOKEN, not OIDC, so removing `id-token: write` is safe.
+- NOT validated locally: integration provider shards (openai/anthropic/...)
+  and `scorers`. They SHOULD be fine (integrations = ClickHouse + VCR; scorers
+  = prod Artifacts on api.wandb.ai, not the local container) but the real
+  confirmation is this PR's full CI matrix. Watch those shards on the draft.
+
+## Codebase Discoveries
+- The `client` fixture (tests/conftest.py) + UserInjectingExternalTraceServer/
+  DummyIdConverter (tests/trace_server/conftest.py) fully bypass the W&B
+  control plane; the wandb container was vestigial for the core shards.
+
+## Open Questions
+- Is the wandb container load-bearing for ANY currently-enabled shard? Local
+  evidence says no for the core four; the draft PR's CI answers it for the rest.
