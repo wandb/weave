@@ -59,6 +59,11 @@ def test_groq_quickstart(
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "groq"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "groq"
     output = call.output
     assert output.id == chat_completion.id
     assert output.model == chat_completion.model

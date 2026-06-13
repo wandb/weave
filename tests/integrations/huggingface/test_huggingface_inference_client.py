@@ -29,6 +29,11 @@ def test_huggingface_chat_completion(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "huggingface"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "huggingface-hub"
     assert (
         op_name_from_ref(call.op_name)
         == "huggingface_hub.InferenceClient.chat_completion"
@@ -69,6 +74,11 @@ def test_huggingface_chat_completion_stream(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "huggingface"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "huggingface-hub"
     assert (
         op_name_from_ref(call.op_name)
         == "huggingface_hub.InferenceClient.chat_completion"

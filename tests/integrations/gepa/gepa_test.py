@@ -223,6 +223,13 @@ def test_gepa_optimize_does_not_double_inject_callback(client: WeaveClient) -> N
     )
     # Still emits traces even with a user-supplied callback.
     calls = list(client.get_calls())
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    gepa_meta = [i for i in stamped if i["name"] == "gepa"]
+    assert gepa_meta, "expected >=1 call to carry gepa metadata"
+    assert all(i["meta"]["package_name"] == "gepa" for i in gepa_meta)
     assert calls, "expected at least the top-level gepa.optimize call"
 
 

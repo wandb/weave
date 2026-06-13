@@ -28,6 +28,18 @@ def test_chatnvidia_quickstart(client: weave.trace.weave_client.WeaveClient) -> 
     assert len(calls) == 2
     call = calls[1]
 
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    # The langchain integration also logs a call, which carries its own metadata,
+    # so filter to the nvidia-stamped calls before asserting their shape.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    nvidia = [i for i in stamped if i["name"] == "langchain_nvidia_ai_endpoints"]
+    assert nvidia, "expected >=1 call to carry langchain_nvidia_ai_endpoints metadata"
+    assert all(
+        i["meta"]["package_name"] == "langchain-nvidia-ai-endpoints" for i in nvidia
+    )
+
     assert response.content is not None
 
     assert (

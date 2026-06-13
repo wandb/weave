@@ -69,6 +69,11 @@ def test_instructor_openai(
     call = calls[0]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "Instructor.create"
+    # Integration-tracking metadata is stamped on the integration's patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "instructor"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "instructor"
     output = call.output
     assert output.person_name == "John"
     assert output.age == 20

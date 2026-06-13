@@ -5,6 +5,10 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
@@ -14,6 +18,8 @@ if TYPE_CHECKING:
     from litellm.utils import ModelResponse
 
 _litellm_patcher: MultiPatcher | None = None
+
+LITELLM_INTEGRATION = library_integration("litellm")
 
 
 # This accumulator is nearly identical to the mistral accumulator, just with different types.
@@ -120,7 +126,7 @@ def get_litellm_patcher(
     if _litellm_patcher is not None:
         return _litellm_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, LITELLM_INTEGRATION)
 
     completion_settings = base.model_copy(
         update={

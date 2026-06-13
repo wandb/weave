@@ -65,6 +65,15 @@ def preference_id():
         return None
 
 
+def test_custom_router_ops_carry_integration_metadata() -> None:
+    """The module-level train/evaluate ops expose integration provenance on `.attributes`."""
+    for fn in (train_router, evaluate_router):
+        integration = fn.attributes["integration"]
+        assert integration["name"] == "notdiamond"
+        assert integration["version"]  # weave SDK version
+        assert integration["meta"]["package_name"] == "notdiamond"
+
+
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"], decode_compressed_response=True)
 @pytest.mark.skipif(

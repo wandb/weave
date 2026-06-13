@@ -113,6 +113,13 @@ def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> No
 
     # Validate that the expected weave ops were traced
     calls = list(client.get_calls())
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    verifiers_meta = [i for i in stamped if i["name"] == "verifiers"]
+    assert verifiers_meta, "expected >=1 call to carry verifiers metadata"
+    assert all(i["meta"]["package_name"] == "verifiers" for i in verifiers_meta)
     flattened = flatten_calls(calls)
     assert len(flattened) == 43
 

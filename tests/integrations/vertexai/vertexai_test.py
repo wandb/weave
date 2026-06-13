@@ -21,6 +21,11 @@ def test_content_generation(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "vertexai"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "google-cloud-aiplatform"
 
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "vertexai.GenerativeModel.generate_content"
