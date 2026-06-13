@@ -7,7 +7,6 @@ from dataclasses import dataclass
 import pytest
 
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import client_is_sqlite
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     UserInjectingExternalTraceServer,
@@ -26,7 +25,6 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
 
@@ -48,19 +46,13 @@ def pytest_addoption(parser):
             "--trace-server",
             action="store",
             default="clickhouse",
-            help="Specify the backend to use: sqlite or clickhouse",
+            help="Specify the backend to use: clickhouse",
         )
         parser.addoption(
             "--ch",
             "--clickhouse",
             action="store_true",
             help="Use clickhouse server (shorthand for --trace-server=clickhouse)",
-        )
-        parser.addoption(
-            "--sq",
-            "--sqlite",
-            action="store_true",
-            help="Use sqlite server (shorthand for --trace-server=sqlite)",
         )
         parser.addoption(
             "--clickhouse-process",
@@ -95,19 +87,7 @@ def pytest_collection_modifyitems(config, items):
 def get_trace_server_flag(request):
     if request.config.getoption("--clickhouse"):
         return "clickhouse"
-    if request.config.getoption("--sqlite"):
-        return "sqlite"
-    weave_server_flag = request.config.getoption("--trace-server")
-
-    # When running with `-m "not trace_server"` (e.g. trace_no_server shard),
-    # tests that still need a server (via client fixture) should use sqlite
-    # since we're not testing the server itself.
-    if weave_server_flag == "clickhouse":
-        markexpr = request.config.getoption("-m", default=None)
-        if markexpr and "not trace_server" in markexpr:
-            return "sqlite"
-
-    return weave_server_flag
+    return request.config.getoption("--trace-server")
 
 
 def get_remote_http_trace_server_flag(request):
@@ -204,13 +184,12 @@ def _ch_session_server(
 ) -> ClickHouseSessionState | None:
     """Session-scoped ClickHouse server: created once, migrated once.
 
-    Returns None if ClickHouse is not the selected backend, so that
-    function-scoped fixtures can fall through to the old path if needed.
+    Returns None if ClickHouse is not the selected backend (e.g. the
+    `prod`/`http` escape hatches), so dependents can skip instead of
+    spinning up a server that won't be used.
     """
-    # Only set up if we'll actually use clickhouse
     trace_server_flag = request.config.getoption("--trace-server", default="clickhouse")
-    use_sqlite = request.config.getoption("--sqlite", default=False)
-    if use_sqlite or trace_server_flag == "sqlite":
+    if trace_server_flag != "clickhouse":
         yield None
         return
 
@@ -338,53 +317,6 @@ def get_ch_trace_server(
     return ch_trace_server_inner
 
 
-@pytest.fixture
-def get_sqlite_trace_server(
-    request,
-) -> Callable[[], UserInjectingExternalTraceServer]:
-    servers_to_cleanup: list[SqliteTraceServer] = []
-
-    def sqlite_trace_server_inner() -> UserInjectingExternalTraceServer:
-        id_converter = DummyIdConverter()
-        # Use worker-specific database for pytest-xdist isolation
-        # Each worker gets its own isolated database
-        db_suffix = _get_worker_db_suffix(request)
-        if db_suffix:
-            # Use worker-specific in-memory database name for parallel execution
-            db_path = f"file::memory:?cache=shared&name=test{db_suffix}"
-        else:
-            # Single worker or sequential execution - use default shared memory
-            db_path = "file::memory:?cache=shared"
-        sqlite_server = SqliteTraceServer(
-            db_path,
-            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
-                id_converter=id_converter
-            ),
-        )
-        # Track server for cleanup
-        servers_to_cleanup.append(sqlite_server)
-
-        sqlite_server.drop_tables()
-        sqlite_server.setup_tables()
-        return externalize_trace_server(
-            sqlite_server, TEST_ENTITY, id_converter=id_converter
-        )
-
-    yield sqlite_trace_server_inner
-
-    # Cleanup after all tests using this fixture complete
-    for sqlite_server in servers_to_cleanup:
-        try:
-            # Drop tables to ensure clean shutdown
-            sqlite_server.drop_tables()
-        except Exception:
-            pass  # Best effort cleanup
-        try:
-            sqlite_server.close()
-        except Exception:
-            pass  # Best effort cleanup
-
-
 class LocalSecretFetcher:
     def fetch(self, secret_name: str) -> dict:
         return {"secrets": {secret_name: os.getenv(secret_name)}}
@@ -398,39 +330,23 @@ def local_secret_fetcher():
 
 @pytest.fixture
 def trace_server(
-    request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
+    request, local_secret_fetcher, get_ch_trace_server
 ) -> UserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
         return get_ch_trace_server()
-    elif trace_server_flag == "sqlite":
-        return get_sqlite_trace_server()
-    else:
-        # Once we split the trace server and client code, we can raise here.
-        # For now, just return the sqlite trace server so we don't break existing tests.
-        # raise ValueError(f"Invalid trace server: {trace_server_flag}")
-        return get_sqlite_trace_server()
+    raise ValueError(f"Invalid trace server: {trace_server_flag}")
 
 
 @pytest.fixture
 def ch_server(trace_server):
-    """Extract ClickHouseTraceServer from the test fixture, or skip."""
+    """Extract the ClickHouseTraceServer from the test fixture."""
     server = trace_server._internal_trace_server
-    if not isinstance(server, ClickHouseTraceServer):
-        pytest.skip("ClickHouse-only test")
+    assert isinstance(server, ClickHouseTraceServer)
     return server
 
 
 @pytest.fixture
 def internal_server(client):
-    """Return the underlying SQLite or ClickHouse server from the middleware chain."""
-    if client_is_sqlite(client):
-        return find_server_layer(client.server, SqliteTraceServer)
+    """Return the underlying ClickHouse server from the middleware chain."""
     return find_server_layer(client.server, ClickHouseTraceServer)
-
-
-@pytest.fixture
-def require_clickhouse(request):
-    """Skip the test unless running with --trace-server=clickhouse."""
-    if get_trace_server_flag(request) != "clickhouse":
-        pytest.skip("ClickHouse-only test")

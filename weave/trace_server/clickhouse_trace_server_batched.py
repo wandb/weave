@@ -6248,9 +6248,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             costs.append((cost_id, llm_id))
 
-            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
-                database_type="clickhouse"
-            )
+            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare()
             self._insert(
                 LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
             )
@@ -6284,10 +6282,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.where(query_with_pricing_level)
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
-        prepared = query.prepare(database_type="clickhouse")
+        prepared = query.prepare()
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
-            query_result.result_rows, prepared.fields, database_type="clickhouse"
+            query_result.result_rows, prepared.fields
         )
         return tsi.CostQueryRes(results=results)
 
@@ -6315,7 +6313,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         query = LLM_TOKEN_PRICES_TABLE.purge()
         query = query.where(query_with_pricing_level)
-        prepared = query.prepare(database_type="clickhouse")
+        prepared = query.prepare()
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.CostPurgeRes()
 
@@ -6326,7 +6324,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
-        prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
+        prepared = TABLE_FEEDBACK.insert(row).prepare()
         self._insert(
             TABLE_FEEDBACK.name,
             prepared.data,
@@ -6362,7 +6360,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             insert_query = TABLE_FEEDBACK.insert()
             for row in rows_to_insert:
                 insert_query.row(row)
-            prepared = insert_query.prepare(database_type="clickhouse")
+            prepared = insert_query.prepare()
             self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
 
         return tsi.FeedbackCreateBatchRes(res=results)
@@ -6374,10 +6372,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.where(req.query)
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
-        prepared = query.prepare(database_type="clickhouse")
+        prepared = query.prepare()
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
-            query_result.result_rows, prepared.fields, database_type="clickhouse"
+            query_result.result_rows, prepared.fields
         )
         # Make `created_at` tz-aware (otherwise the client will assume local time)
         for row in result:
@@ -6394,7 +6392,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = TABLE_FEEDBACK.purge()
         query = query.project_id(req.project_id)
         query = query.where(req.query)
-        prepared = query.prepare(database_type="clickhouse")
+        prepared = query.prepare()
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 

@@ -91,7 +91,7 @@ class ProjectIdResolver:
                 ProjectsInfoReq(project_ids=[ext_project_id])
             )
         except AttributeError:
-            # Endpoint doesn't exist (e.g. bare SQLite) — disable entirely.
+            # Endpoint doesn't exist on this server — disable entirely.
             logger.debug(
                 "projects_info not available, disabling resolver",
             )

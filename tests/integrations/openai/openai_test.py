@@ -100,7 +100,6 @@ def test_maybe_unwrap_api_response_returns_value_when_parse_fails(
     assert maybe_unwrap_api_response(raw_response) is raw_response
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_async_quickstart(
@@ -152,7 +151,6 @@ async def test_openai_async_quickstart(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
@@ -205,7 +203,6 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
     assert chunk.usage is None
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_async_stream_quickstart(
@@ -257,7 +254,6 @@ async def test_openai_async_stream_quickstart(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_stream_usage_quickstart(
     client: weave.trace.weave_client.WeaveClient,
@@ -295,7 +291,6 @@ def test_openai_stream_usage_quickstart(
     assert usage["prompt_tokens"] == 11
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
@@ -377,7 +372,6 @@ def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> N
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_function_call_async(
@@ -461,7 +455,6 @@ async def test_openai_function_call_async(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_function_call_async_stream(
@@ -549,7 +542,6 @@ async def test_openai_function_call_async_stream(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
@@ -633,7 +625,6 @@ def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_tool_call_async(
@@ -718,7 +709,6 @@ async def test_openai_tool_call_async(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_tool_call_async_stream(
@@ -819,7 +809,6 @@ async def test_openai_tool_call_async_stream(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_openai_as_context_manager(
     client: weave.trace.weave_client.WeaveClient,
@@ -869,7 +858,6 @@ def test_openai_as_context_manager(
     assert chunk.usage is None
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_as_context_manager_async(
@@ -922,7 +910,6 @@ async def test_openai_as_context_manager_async(
     assert chunk.usage is None
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -957,7 +944,6 @@ def test_openai_moderation_patching(
     assert inputs["input"] == "...text to classify goes here..."
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_async_moderation_patching(
@@ -991,7 +977,6 @@ async def test_openai_async_moderation_patching(
     assert inputs["input"] == "...text to classify goes here..."
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -1026,7 +1011,6 @@ def test_openai_embeddings_patching(
     assert inputs["input"] == "embed this"
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_openai_async_embeddings_patching(
@@ -1063,7 +1047,6 @@ async def test_openai_async_embeddings_patching(
 ### Responses API
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -1105,7 +1088,6 @@ def test_openai_responses_quickstart(client: WeaveClient) -> None:
     assert inputs["input"] == "Write a one-sentence bedtime story about a unicorn."
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -1149,7 +1131,6 @@ def test_openai_responses_quickstart_stream(client: WeaveClient) -> None:
     assert inputs["input"] == "Write a one-sentence bedtime story about a unicorn."
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -1192,7 +1173,6 @@ async def test_openai_responses_quickstart_async(client: WeaveClient) -> None:
     assert inputs["input"] == "Write a one-sentence bedtime story about a unicorn."
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -1238,7 +1218,6 @@ async def test_openai_responses_quickstart_async_stream(client: WeaveClient) -> 
     assert inputs["input"] == "Write a one-sentence bedtime story about a unicorn."
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -1292,7 +1271,6 @@ def test_openai_responses_tool_calling(client: WeaveClient) -> None:
     assert inputs["tools"][0]["type"] == "web_search_preview"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -1348,7 +1326,6 @@ def test_openai_responses_tool_calling_stream(client: WeaveClient) -> None:
     assert inputs["tools"][0]["type"] == "web_search_preview"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -1404,7 +1381,6 @@ async def test_openai_responses_tool_calling_async(client: WeaveClient) -> None:
     assert inputs["tools"][0]["type"] == "web_search_preview"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )

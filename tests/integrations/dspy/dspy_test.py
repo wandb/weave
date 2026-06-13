@@ -86,7 +86,6 @@ def accuracy_metric(answer, model_output, trace=None):
     return answer["answer"].lower() == predicted_answer
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -139,7 +138,6 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -187,7 +185,6 @@ def test_dspy_predict_module(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -243,7 +240,6 @@ def test_dspy_cot(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -304,7 +300,6 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -374,7 +369,6 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     assert output["output"]["Average Metric"] > 0.3
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -433,7 +427,6 @@ def test_dspy_evaluate_with_pydantic_prediction(client: WeaveClient) -> None:
     assert 0.0 <= output["output"]["Average Metric"] <= 1.0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -471,7 +464,6 @@ def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -509,7 +501,6 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",

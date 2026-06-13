@@ -235,8 +235,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox uv
-      - name: Run nox (Sqlite Trace Server)
-        if: matrix.nox-shard != 'trace_calls_complete_only'
+      - name: Run nox (Clickhouse Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -254,20 +253,7 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server" \
-            --trace-server=sqlite
-      - name: Run nox (Clickhouse Trace Server)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
+            -m "trace_server"
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -540,118 +526,16 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  windows_trace_tests:
-    name: Windows Trace nox tests
-    timeout-minutes: 25
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        python-version-major: ["3"]
-        python-version-minor: [
-            "10",
-            "11",
-            "13",
-            #
-          ]
-        nox-shard: [
-            "trace",
-            "flow",
-            "trace_server",
-            "trace_server_bindings",
-            "anthropic",
-            "bedrock",
-            "cerebras",
-            "cohere",
-            "crewai",
-            "dspy",
-            "groq",
-            "google_genai",
-            "instructor",
-            "langchain",
-            "litellm",
-            "llamaindex",
-            "mistral",
-            "notdiamond",
-            "openai",
-            "verifiers_test",
-            "vertexai",
-            "pandas_test",
-            "fastmcp",
-            "smolagents",
-            # "stainless",
-            "autogen_tests",
-          ]
-        # Shards that don't support certain Python versions. Excluding here
-        # (vs. skipping inside noxfile) avoids spinning up a runner just to
-        # emit an empty coverage.xml that Codecov then rejects.
-        exclude:
-          - python-version-minor: "10"
-            nox-shard: "notdiamond"
-          - python-version-minor: "10"
-            nox-shard: "verifiers_test"
-          - python-version-minor: "13"
-            nox-shard: "cohere"
-          - python-version-minor: "13"
-            nox-shard: "notdiamond"
-          - python-version-minor: "13"
-            nox-shard: "verifiers_test"
-      fail-fast: false
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Set up uv (cached)
-        uses: astral-sh/setup-uv@v7
-        with:
-          version: "0.11.19"
-          enable-cache: true
-          cache-local-path: ${{ runner.temp }}\uv-cache
-          cache-dependency-glob: "**/pyproject.toml"
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install nox
-      - name: Run nox (Sqlite Trace Server)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
-          # Tests use VCR recordings so real keys aren't needed
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
-          DD_TRACE_ENABLED: false
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "trace_server" --trace-server=sqlite
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.xml
-          flags: windows-trace-tests
-          name: windows-trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   windows-trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
     needs:
-      - windows_trace_tests
       - windows_trace_no_server
 
     runs-on: ubuntu-latest
 
     steps:
-      - name: Passes if all windows_trace_tests and windows_trace_no_server jobs succeeded
+      - name: Passes if all windows_trace_no_server jobs succeeded
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}

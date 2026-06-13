@@ -45,7 +45,6 @@ def patch_instructor() -> Generator[None, None, None]:
     openai_patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -91,7 +90,6 @@ def test_instructor_openai(
     assert output_arguments["age"] == 20
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -129,7 +127,6 @@ def test_instructor_openai_with_completion(
     assert output_arguments["age"] == 20
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -174,7 +171,6 @@ async def test_instructor_openai_async(
     assert output_arguments["age"] == 20
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -231,7 +227,6 @@ def test_instructor_iterable(
     assert output_arguments["tasks"][1]["age"] == 30
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -279,7 +274,6 @@ def test_instructor_iterable_sync_stream(
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -334,7 +328,6 @@ async def test_instructor_iterable_async_stream(
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -403,7 +396,6 @@ list of speakers.
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )

@@ -74,7 +74,6 @@ def test_custom_router_ops_carry_integration_metadata() -> None:
         assert integration["meta"]["package_name"] == "notdiamond"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"], decode_compressed_response=True)
 @pytest.mark.skipif(
     sys.platform == "win32",
@@ -104,7 +103,6 @@ def test_train_router(
     assert preference_id is not None
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_evaluate_router(
     client: WeaveClient, model_datasets: dict[str, weave.Table], preference_id: str

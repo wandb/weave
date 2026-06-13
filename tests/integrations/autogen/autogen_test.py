@@ -23,7 +23,6 @@ def patch_autogen() -> Generator[None, None, None]:
     openai_patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -68,7 +67,6 @@ async def test_simple_client_create(
     assert summary["usage"][model_name]["total_tokens"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -112,7 +110,6 @@ async def test_simple_client_create_with_exception(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -151,7 +148,6 @@ async def test_simple_client_create_stream(
     assert summary["usage"][model_name]["total_tokens"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -207,7 +203,6 @@ async def test_simple_cached_client_create(
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -258,7 +253,6 @@ async def test_simple_cached_client_create_stream(
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -340,7 +334,6 @@ async def test_agentchat_run_with_tool(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -413,7 +406,6 @@ async def test_agentchat_run_stream_with_tool(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -691,7 +683,6 @@ async def test_agentchat_group_chat(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -811,7 +802,6 @@ async def test_agent_with_memory(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )

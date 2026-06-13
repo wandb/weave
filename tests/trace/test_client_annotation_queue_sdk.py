@@ -4,7 +4,6 @@ import datetime
 
 import pytest
 
-from tests.trace.util import client_is_sqlite
 from weave.trace.call import Call
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
@@ -205,9 +204,6 @@ def _create_finished_calls(client, count: int) -> list[Call]:
 
 
 def test_annotation_queue_sdk_lifecycle(client):
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     scorer_refs = ["weave:///entity/project/scorer/sdk_test:abc123"]
 
     queue_id = client.create_annotation_queue(

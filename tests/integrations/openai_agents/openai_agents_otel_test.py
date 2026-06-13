@@ -128,7 +128,6 @@ def _by_name(spans: list[Any], prefix: str) -> list[Any]:
     return [s for s in spans if s.name.startswith(prefix)]
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )

@@ -41,7 +41,6 @@ def patch_smolagents() -> Generator[None, None, None]:
     openai_sdk._openai_patcher = None
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path", "query"],
@@ -90,7 +89,6 @@ def test_hf_api_model(client):
     assert "paris" in call.output.choices[0].message.content.lower()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
@@ -122,7 +120,6 @@ def test_openai_server_model(client):
     assert "paris" in call.output["choices"][0]["message"]["content"].lower()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
@@ -150,7 +147,6 @@ def test_tool_calling_agent_search(client):
     assert str(call.output) == answer
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
@@ -187,7 +183,6 @@ def test_tool_calling_agent_weather(client):
     assert op_name_from_ref(call.op_name) == "smolagents.ToolCallingAgent.run"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
@@ -216,7 +211,6 @@ def test_code_agent_search(client):
     assert str(call.output) == answer
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
