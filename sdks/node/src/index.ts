@@ -31,6 +31,7 @@ export {
   getCurrentLLM,
   getCurrentSession,
   getCurrentTurn,
+  getWeaveTracer,
   runIsolated,
   startLLM,
   startSession,
