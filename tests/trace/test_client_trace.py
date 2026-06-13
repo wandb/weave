@@ -32,6 +32,7 @@ from tests.trace.util import (
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
+from tests.trace_server.helpers import force_optimize
 from weave import Thread, ThreadPoolExecutor
 from weave.shared.refs_internal import extra_value_quoter
 from weave.shared.trace_server_interface_util import (
@@ -4462,9 +4463,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with storage size
     calls = list(
@@ -4503,9 +4502,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4558,9 +4555,7 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4706,12 +4701,8 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
     if not client_is_sqlite(client):
-        clickhouse_client.command(
-            "OPTIMIZE TABLE calls_merged FINAL",
-        )
-        clickhouse_client.command(
-            "OPTIMIZE TABLE calls_merged_stats FINAL",
-        )
+        force_optimize(clickhouse_client, "calls_merged")
+        force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
@@ -4927,6 +4918,74 @@ def test_calls_query_stats_with_limit(client):
     assert result.total_storage_size_bytes is not None
 
 
+def test_calls_query_stats_unfiltered_storage_counts_deleted_bytes(
+    client, clickhouse_client
+):
+    """Unfiltered storage stats: count drops soft-deleted, storage keeps their bytes."""
+    if clickhouse_client is None:
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def child(x: dict):
+        return x
+
+    @weave.op
+    def parent(x: dict):
+        return child(x)
+
+    for _ in range(3):
+        parent({"data": "x" * 2000})
+
+    project_id = get_client_project_id(client)
+
+    def optimize():
+        # Optimize both residences' tables so the test is deterministic under
+        # the calls_merged and calls_complete (WEAVE_USE_CALLS_COMPLETE) shards.
+        for table in (
+            "calls_merged",
+            "calls_merged_stats",
+            "calls_complete",
+            "calls_complete_stats",
+        ):
+            force_optimize(clickhouse_client, table)
+
+    optimize()
+
+    def stats():
+        res = client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id=project_id, include_total_storage_size=True
+            )
+        )
+        return res.count, res.total_storage_size_bytes
+
+    count_before, storage_before = stats()
+    assert count_before == 6
+    assert storage_before > 0
+
+    roots = [c for c in client.get_calls() if c.parent_id is None]
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[roots[0].id])
+    )
+    optimize()
+
+    count_after, storage_after = stats()
+    assert count_after == 4
+    assert storage_after == storage_before
+
+    # Divergence: a filter routes through the GROUP BY + JOIN path, which DOES
+    # exclude the soft-deleted trace's bytes (unlike the unfiltered flat sum).
+    live_op_names = sorted({c.op_name for c in client.get_calls()})
+    filtered = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=project_id,
+            include_total_storage_size=True,
+            filter=tsi.CallsFilter(op_names=live_op_names),
+        )
+    )
+    assert filtered.total_storage_size_bytes < storage_before
+
+
 def test_calls_query_stats_started_at_window_excludes_deletes(client):
     """A started_at lower-bound count must match across backends and exclude
     soft-deleted calls and orphaned call-ends. On ClickHouse this exercises the
@@ -5108,9 +5167,7 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     result = client.server.calls_query_stats(

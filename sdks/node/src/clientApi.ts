@@ -1,13 +1,13 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
-import {makeSettings, SettingsInit} from './settings';
+import {makeSettings, type SettingsInit} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
 import {createFetchWithRetry} from './utils/retry';
 import {getWandbConfigs} from './wandb/settings';
 import {WandbServerApi} from './wandb/wandbServerApi';
-import {CallStackEntry, WeaveClient} from './weaveClient';
+import {type CallStackEntry, WeaveClient} from './weaveClient';
 import {globalSingleton} from './utils/globalSingleton';
 
 // Held behind a globalThis-backed container so that a dual-package-hazard load

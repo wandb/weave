@@ -1,6 +1,6 @@
-import {Call} from './call';
+import {type Call} from './call';
 import {getGlobalDomain} from './urls';
-import {WeaveObject} from './weaveObject';
+import {type WeaveObject} from './weaveObject';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 
@@ -97,10 +97,6 @@ export function getOpWrappedFunction<T extends (...args: any[]) => any>(
 
 export function getOpName(opValue: Op<any>): string {
   return opValue.__name;
-}
-
-export function getOpParameterNames(opValue: Op<any>): ParameterNamesOption {
-  return opValue.__parameterNames;
 }
 
 export class OpRef {

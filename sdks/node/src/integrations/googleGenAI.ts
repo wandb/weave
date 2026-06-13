@@ -1,5 +1,5 @@
 import {op} from '../op';
-import {OpOptions, StreamReducer} from '../opType';
+import {type OpOptions, type StreamReducer} from '../opType';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 
 const weaveGeminiModelHint = Symbol.for('_weave_gemini_model_hint');

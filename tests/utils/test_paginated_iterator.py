@@ -1,3 +1,5 @@
+import gc
+import weakref
 from collections.abc import Iterator
 
 import pytest
@@ -36,3 +38,53 @@ def test_paginated_iterator_iter_remains_restartable() -> None:
     assert next(paginated) == 0
     assert list(paginated) == [0, 1, 2, 3, 4]
     assert list(paginated) == [0, 1, 2, 3, 4]
+
+
+def test_paginated_iterator_limit_bounds_index_and_slice_consistently() -> None:
+    paginated = PaginatedIterator(_fetch_numbers, page_size=2, limit=3)
+
+    assert paginated[2] == 2
+    with pytest.raises(IndexError):
+        paginated[3]
+
+    # Indexing, slicing, and iteration all agree on the limit boundary.
+    assert paginated[0:10] == [0, 1, 2]
+    assert paginated[:] == [0, 1, 2]
+    assert list(paginated) == [0, 1, 2]
+
+
+def test_paginated_iterator_reuses_fetched_pages_within_instance() -> None:
+    fetch_offsets: list[int] = []
+
+    def fetch(offset: int, limit: int) -> list[int]:
+        fetch_offsets.append(offset)
+        return list(range(100))[offset : offset + limit]
+
+    paginated = PaginatedIterator(fetch, page_size=10)
+
+    # Two reads within the same page hit the source exactly once.
+    assert paginated[0] == 0
+    assert paginated[9] == 9
+    assert fetch_offsets == [0]
+
+    # A read in a different page triggers exactly one more fetch.
+    assert paginated[10] == 10
+    assert fetch_offsets == [0, 10]
+
+
+def test_paginated_iterator_released_when_unreferenced() -> None:
+    # Regression: a method-level functools.lru_cache keys on `self` and lives
+    # for the process lifetime, pinning every iterator (and its fetched pages)
+    # in memory. The per-instance cache must let the iterator be garbage
+    # collected once the caller drops it.
+    def fetch(offset: int, limit: int) -> list[int]:
+        return list(range(100))[offset : offset + limit]
+
+    paginated = PaginatedIterator(fetch, page_size=10)
+    assert paginated[0] == 0  # populate the page cache
+
+    ref = weakref.ref(paginated)
+    del paginated
+    gc.collect()
+
+    assert ref() is None

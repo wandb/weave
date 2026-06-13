@@ -191,7 +191,9 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
             return None
         return result
     elif isinstance(val, BaseModel):
-        return auto_summarize([x.model_dump() for x in data])
+        return auto_summarize(
+            [x.model_dump() if isinstance(x, BaseModel) else x for x in data]
+        )
     return None
 
 

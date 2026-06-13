@@ -1,12 +1,16 @@
 import {weaveImage} from '../media';
 import {op} from '../op';
-import {OpOptions} from '../opType';
+import {type OpOptions} from '../opType';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {getGlobalClient} from '../clientApi';
 import {InternalCall} from '../call';
-import {WeaveClient} from '../weaveClient';
+import {type WeaveClient} from '../weaveClient';
 import {warnOnce} from '../utils/warnOnce';
-import {getCallStackFromOpenAIAgents} from './openai-agents/weave-tracing-processor';
+import {
+  getCallStackFromOpenAIAgents,
+  isInOpenAIAgentsContext,
+} from './openai-agents/weave-tracing-processor';
+import {shouldUseOtelV2} from '../settings';
 
 /**
  * Wraps a function to run with OpenAI Agents call stack if available.
@@ -24,6 +28,10 @@ function runWithOpenAIAgentsContext<T>(fn: () => T): T {
     }
   }
   return fn();
+}
+
+function shouldSkipTracingInAgentContext(): boolean {
+  return shouldUseOtelV2() && isInOpenAIAgentsContext();
 }
 
 // exported just for testing
@@ -112,6 +120,9 @@ export function wrapOpenAIChatCompletionsCreate(
   ) {
     const client = getGlobalClient();
     if (!client) return originalCreate(...args);
+    if (shouldSkipTracingInAgentContext()) {
+      return originalCreate(...args);
+    }
 
     const [originalParams]: any[] = args;
     // Streaming needs include_usage so the reducer sees token counts.
@@ -179,11 +190,14 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
 
   // Wrap with OpenAI Agents context if available
   return function wrappedWithAgents(...args: Parameters<typeof wrapped>) {
+    if (shouldSkipTracingInAgentContext()) {
+      return originalGenerate(...args);
+    }
     return runWithOpenAIAgentsContext(() => weaveOp(...args));
   };
 }
 
-import {StreamReducer} from '../opType';
+import {type StreamReducer} from '../opType';
 
 export type Response = {
   id: string;
@@ -295,10 +309,7 @@ interface ResultState {
   _outputStaging?: Array<string>;
 }
 
-export const openAIStreamAPIstreamReducer: StreamReducer<
-  StreamChunk,
-  ResultState
-> = {
+const openAIStreamAPIstreamReducer: StreamReducer<StreamChunk, ResultState> = {
   initialStateFn: () => ({
     responses: [],
     _outputStaging: [],
@@ -427,7 +438,7 @@ export const openAIStreamAPIstreamReducer: StreamReducer<
   },
 };
 
-export function summarizer(result: any) {
+function summarizer(result: any) {
   // Non-streaming mode
   if (result.usage != null && result.model != null) {
     return {
@@ -463,7 +474,7 @@ export function summarizer(result: any) {
   return {};
 }
 
-export function wrapOpenAIResponsesCreate(originalCreate: any) {
+function wrapOpenAIResponsesCreate(originalCreate: any) {
   const opRef = {
     __isOp: true as const,
     __name: 'create',
@@ -476,6 +487,9 @@ export function wrapOpenAIResponsesCreate(originalCreate: any) {
   ) {
     const client = getGlobalClient();
     if (!client) return originalCreate(...args);
+    if (shouldSkipTracingInAgentContext()) {
+      return originalCreate.apply(this, args);
+    }
 
     return runWithOpenAIAgentsContext(() =>
       traceOpenAICall({
