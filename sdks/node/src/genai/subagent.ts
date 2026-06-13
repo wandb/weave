@@ -1,6 +1,7 @@
-import {type Span, SpanKind} from '@opentelemetry/api';
+import {type Context, type Span, SpanKind, trace} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
+import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
@@ -10,6 +11,7 @@ import {
   ATTR_GEN_AI_REQUEST_MODEL,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
+import {Tool, type ToolInit} from './tool';
 
 export interface SubAgentInit extends SpanInitBase {
   name: string;
@@ -22,13 +24,18 @@ export interface SubAgentInit extends SpanInitBase {
  * `invoke_agent` span tagged with the sub-agent's name and (optionally)
  * its model.
  *
- * Created by `weave.startSubagent()` (or `turn.startAgent()`, or
- * `llm.startAgent()`) and terminated with `end()`.
+ * Created by `weave.startSubagent()` (or `turn.startSubagent()`, or
+ * `llm.startSubagent()`) and terminated with `end()`. Children (LLM, Tool,
+ * SubAgent) attach via the `startLLM`, `startTool`, `startSubagent` methods,
+ * so a sub-agent's own model calls and tools nest under its `invoke_agent`
+ * span rather than flattening onto the parent Turn.
  *
  * @example
  * const sub = weave.startSubagent({name: 'researcher', model: 'gpt-4o'});
  * try {
+ *   const llm = sub.startLLM({model: 'gpt-4o', providerName: 'openai'});
  *   // ... orchestrate the sub-agent's LLM/Tool calls ...
+ *   llm.end();
  * } finally {
  *   sub.end();
  * }
@@ -36,6 +43,8 @@ export interface SubAgentInit extends SpanInitBase {
 export class SubAgent extends SpanBase {
   private constructor(
     span: Span,
+    private readonly context: Context,
+    private readonly conversationId: string,
     public readonly name: string,
     public readonly model: string
   ) {
@@ -59,7 +68,40 @@ export class SubAgent extends SpanBase {
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       opts.parentContext
     );
-    return new SubAgent(span, opts.name, opts.model ?? '');
+    return new SubAgent(
+      span,
+      trace.setSpan(opts.parentContext, span),
+      opts.conversationId ?? '',
+      opts.name,
+      opts.model ?? ''
+    );
+  }
+
+  /** Start a child LLM span nested under this SubAgent. */
+  startLLM(opts: LLMInit): LLM {
+    return LLM.create({
+      ...opts,
+      parentContext: this.context,
+      conversationId: this.conversationId,
+    });
+  }
+
+  /** Start a child Tool span nested under this SubAgent. */
+  startTool(opts: ToolInit): Tool {
+    return Tool.create({
+      ...opts,
+      parentContext: this.context,
+      conversationId: this.conversationId,
+    });
+  }
+
+  /** Start a nested SubAgent span under this SubAgent. */
+  startSubagent(opts: SubAgentInit): SubAgent {
+    return SubAgent.create({
+      ...opts,
+      parentContext: this.context,
+      conversationId: this.conversationId,
+    });
   }
 
   /**
