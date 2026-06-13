@@ -9,11 +9,15 @@ from typing import TYPE_CHECKING, Any
 import boto3
 
 import weave
+from weave.integrations.integration_metadata import library_integration
 from weave.trace.call import Call
 from weave.trace.op import _add_accumulator, _IteratorWrapper
 
 if TYPE_CHECKING:
     from botocore.client import BaseClient
+
+# Bedrock is accessed through the AWS SDK (boto3); track its version in meta.
+BEDROCK_INTEGRATION = library_integration("bedrock", distribution_name="boto3")
 
 
 def bedrock_on_finish_converse(
@@ -298,6 +302,7 @@ def _patch_converse(bedrock_client: "BaseClient") -> None:
         name="BedrockRuntime.converse",
         postprocess_inputs=postprocess_inputs_converse,
         kind="llm",
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
     )
     op._set_on_finish_handler(bedrock_on_finish_converse)
     bedrock_client.converse = op
@@ -310,6 +315,7 @@ def _patch_invoke(bedrock_client: "BaseClient") -> None:
         postprocess_inputs=postprocess_inputs_invoke,
         postprocess_output=postprocess_output_invoke,
         kind="llm",
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
     )
     op._set_on_finish_handler(bedrock_on_finish_invoke)
     bedrock_client.invoke_model = op
@@ -320,6 +326,7 @@ def _patch_apply_guardrail(bedrock_client: "BaseClient") -> None:
         bedrock_client.apply_guardrail,
         name="BedrockRuntime.apply_guardrail",
         postprocess_inputs=postprocess_inputs_apply_guardrail,
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
     )
     bedrock_client.apply_guardrail = op
 
@@ -331,6 +338,7 @@ def _patch_invoke_agent(bedrock_agent_client: "BaseClient") -> None:
         name="BedrockAgentRuntime.invoke_agent",
         postprocess_inputs=postprocess_inputs_invoke_agent,
         postprocess_output=postprocess_output_invoke_agent,
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
     )
     op._set_on_finish_handler(bedrock_agent_on_finish_invoke_agent)
     bedrock_agent_client.invoke_agent = op
@@ -383,7 +391,11 @@ def create_stream_wrapper(
     name: str,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(postprocess_inputs=postprocess_inputs_converse, kind="llm")(fn)
+        op = weave.op(
+            postprocess_inputs=postprocess_inputs_converse,
+            kind="llm",
+            attributes=BEDROCK_INTEGRATION.as_attributes(),
+        )(fn)
         op.name = name  # type: ignore
         op._set_on_finish_handler(bedrock_on_finish_converse)
 

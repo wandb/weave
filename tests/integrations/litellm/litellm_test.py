@@ -73,6 +73,11 @@ def test_litellm_quickstart(
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "litellm"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "litellm"
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -113,6 +118,11 @@ async def test_litellm_quickstart_async(
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "litellm"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "litellm"
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"

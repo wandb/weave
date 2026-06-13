@@ -12,6 +12,10 @@ from google.cloud.aiplatform_v1beta1.types import (
 from vertexai.generative_models import GenerationResponse
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.call import Call
@@ -23,6 +27,9 @@ if TYPE_CHECKING:
 
 
 _vertexai_patcher: MultiPatcher | None = None
+VERTEXAI_INTEGRATION = library_integration(
+    "vertexai", distribution_name="google-cloud-aiplatform"
+)
 
 
 def vertexai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -160,7 +167,7 @@ def get_vertexai_patcher(
     if _vertexai_patcher is not None:
         return _vertexai_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, VERTEXAI_INTEGRATION)
 
     generate_content_settings = base.model_copy(
         update={

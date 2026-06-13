@@ -62,6 +62,11 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     call = calls[0]
 
     assert call.exception is None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "mistral"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "mistralai"
     assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp

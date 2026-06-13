@@ -49,6 +49,11 @@ def test_content_generation_sync(client):
 
     call = next(iter(client.get_calls()))
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "google_genai"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "google-genai"
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.Models.generate_content"
     assert call.output is not None

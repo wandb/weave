@@ -8,10 +8,15 @@ from typing import Any
 
 import weave
 from weave.integrations.gepa.gepa_callback import WeaveGEPACallback
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 _gepa_patcher: MultiPatcher | None = None
+GEPA_INTEGRATION = library_integration("gepa")
 
 
 def _fn_accepts_callbacks(fn: Callable) -> bool:
@@ -133,7 +138,7 @@ def get_gepa_patcher(
     if _gepa_patcher is not None:
         return _gepa_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, GEPA_INTEGRATION)
     optimize_settings = base.model_copy(update={"name": base.name or "gepa.optimize"})
     optimize_anything_settings = base.model_copy(
         update={"name": base.name or "gepa.optimize_anything"}

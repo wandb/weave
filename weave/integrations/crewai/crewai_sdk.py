@@ -24,11 +24,16 @@ from weave.integrations.crewai.crewai_utils import (
     default_call_display_name_execute_sync,
     default_call_display_name_execute_task,
 )
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.serialization.serialize import dictify
 
 _crewai_patcher: MultiPatcher | None = None
+CREWAI_INTEGRATION = library_integration("crewai")
 
 
 def crewai_wrapper(settings: OpSettings) -> Callable:
@@ -86,7 +91,7 @@ def get_crewai_patcher(
     if _crewai_patcher is not None:
         return _crewai_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, CREWAI_INTEGRATION)
 
     # Create settings for different Crew methods
     crew_methods = [

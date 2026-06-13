@@ -4,6 +4,10 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
@@ -16,6 +20,9 @@ if TYPE_CHECKING:
     )
 
 _huggingface_patcher: MultiPatcher | None = None
+HUGGINGFACE_INTEGRATION = library_integration(
+    "huggingface", distribution_name="huggingface-hub"
+)
 
 
 def huggingface_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -129,7 +136,7 @@ def get_huggingface_patcher(
     if _huggingface_patcher is not None:
         return _huggingface_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, HUGGINGFACE_INTEGRATION)
     patchers = []
 
     chat_completion_settings = base.model_copy(

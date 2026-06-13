@@ -8,11 +8,16 @@ from notdiamond import NotDiamond
 
 import weave
 from weave.evaluation.eval import EvaluationResults
+from weave.integrations.integration_metadata import library_integration
 from weave.utils.iterators import first
+
+# Integration provenance stamped onto the calls these helper ops produce.
+NOTDIAMOND_INTEGRATION = library_integration("notdiamond")
 
 
 @weave.op(
     name="notdiamond.custom_router.train_router",
+    attributes=NOTDIAMOND_INTEGRATION.as_attributes(),
 )
 def train_router(
     model_evals: dict[weave.Model | str, EvaluationResults],
@@ -61,6 +66,7 @@ def train_router(
 
 @weave.op(
     name="notdiamond.custom_router.evaluate_router",
+    attributes=NOTDIAMOND_INTEGRATION.as_attributes(),
 )
 def evaluate_router(
     model_datasets: dict[weave.Model | str, weave.Dataset],

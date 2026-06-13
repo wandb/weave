@@ -13,6 +13,10 @@ except ImportError:
     import_failed = True
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
@@ -20,6 +24,9 @@ from weave.trace.op import _add_accumulator
 from weave.trace.op_protocol import Op, ProcessedInputs
 
 _lc_nvidia_patcher: MultiPatcher | None = None
+LANGCHAIN_NVIDIA_INTEGRATION = library_integration(
+    "langchain_nvidia_ai_endpoints", distribution_name="langchain-nvidia-ai-endpoints"
+)
 
 
 # NVIDIA-specific accumulator for parsing the objects of streaming interactions
@@ -181,7 +188,7 @@ def get_nvidia_ai_patcher(
     if _lc_nvidia_patcher is not None:
         return _lc_nvidia_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, LANGCHAIN_NVIDIA_INTEGRATION)
 
     generate_settings: OpSettings = base.model_copy(
         update={

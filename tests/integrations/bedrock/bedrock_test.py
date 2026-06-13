@@ -326,6 +326,12 @@ def test_bedrock_converse(
     assert call.exception is None
     assert call.ended_at is not None
 
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "bedrock"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "boto3"
+
     # Inspect the captured output if desired
     output = call.output
 

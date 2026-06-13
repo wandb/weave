@@ -124,6 +124,13 @@ def test_fastmcp_client(client: WeaveClient) -> None:
     main()
 
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    fastmcp_meta = [i for i in stamped if i["name"] == "fastmcp"]
+    assert fastmcp_meta, "expected >=1 call to carry fastmcp metadata"
+    assert all(i["meta"]["package_name"] == "fastmcp" for i in fastmcp_meta)
     assert len(calls) == 3
 
     flattened_calls = flatten_calls(calls)
