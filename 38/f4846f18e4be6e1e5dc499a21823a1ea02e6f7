@@ -1,0 +1,127 @@
+## Conversation
+User: "The langchain tests are failing: https://github.com/wandb/weave/pull/7153
+This is likely because it's trying to hit the real API instead of using our
+mocks. Please fix it. You will know you are successful when that shard passes."
+Later: "keep going" (mid-investigation) and "keep going" again. PR #7153 is
+b8135fe (chore(weave): remove the sqlite trace server) on branch
+andrew/remove-sqlite-trace-server. User's hypothesis (real API instead of
+mocks) was correct in symptom; root cause was subtler than a missing cassette.
+
+## Actions
+1. gh pr view 7153 -> failing checks: "Trace nox tests (3,10,langchain)" and
+   "(3,13,langchain)"; 3.11 PASSED. Pulled --log-failed: both failed on
+   tests/integrations/langchain/langchain_test.py::test_agent_run_with_function_call
+   with openai.RateLimitError 429 insufficient_quota. Traceback showed the call
+   going through weave/integrations/openai/openai_sdk.py:447 ->
+   openai/_base_client.py -> real api.openai.com. So a real request escaped VCR.
+2. git diff origin/master...HEAD: the branch's ONLY commit removed
+   @pytest.mark.skip_clickhouse_client from all langchain tests (and deleted
+   tests/trace/util.py client_is_sqlite + sqlite server). PR #7097 (merged to
+   master, by Griffin) had already replaced per-test allowed_hosts= with a
+   global vcr_config fixture {ignore_localhost: True, ignore_hosts:
+   [api.wandb.ai]} in tests/integrations/conftest.py.
+3. Confirmed cassette test_agent_run_with_function_call.yaml has a valid
+   recorded 200 streaming response (not a recorded 429). So the 429 is a live
+   call, not a replayed one.
+4. Ran the single test locally (macOS, real .nox env, dummy OPENAI key) ->
+   PASSED. Ran full shard locally with -m trace_server -> 20 passed. Could NOT
+   repro on macOS. Versions identical to CI (vcrpy 8.1.1, httpx 0.28.1,
+   httpcore 1.0.9, openai 1.109.1).
+5. Reproduced by emulating CI: docker python:3.10 + socat
+   127.0.0.1:8123->host.docker.internal:8123 to reach the host ClickHouse
+   container, env mirrored from .github/workflows/test.yaml. linux/arm64 first
+   run got CannotOverwriteExistingCassetteException because I'd set
+   WF_CLICKHOUSE_HOST=host.docker.internal (non-localhost) so CH requests were
+   NOT ignored and VCR tried to match them against the OpenAI cassette - that
+   error is itself the smoking gun that CH traffic flows through VCR. Switched
+   to --platform linux/amd64 (true x86 emulation, slower, GH-runner-like) +
+   socat so CH host == localhost. Repro'd the real-API escape ~1/3 of runs:
+   sometimes 429/401 RateLimit/Auth on a random langchain test, sometimes a
+   clickhouse_insert_error teardown failure on test_langchain_google_vertexai_usage.
+6. Instrumented the installed vcrpy in the amd64 .nox env (script wrote VCRDBG
+   lines to a file to dodge pytest capture): logged _vcr_request decisions in
+   httpcore_stubs.py, PATCH-BUILD in patch.py, cassette ENTER/EXIT, and
+   force_reset enter/exit. Looped the shard until a failure was captured with
+   full trace. The failing test's cassette showed ENTER then EXIT with ZERO REQ
+   lines -> the provider call never reached the httpcore stub at all -> total
+   bypass. Confirms httpcore was unpatched when the call happened.
+7. Read vcr/stubs/__init__.py: VCRConnection.send/connect/__init__ all wrap the
+   real send in `with force_reset():`. vcr/patch.py force_reset() ->
+   reset_patchers() yields mock.patch.object restoring httpcore.ConnectionPool
+   .handle_request (and AsyncConnectionPool) to the import-time originals. So
+   every ignored-localhost CH request opens a global httpcore-unpatch window.
+   Read clickhouse_connect/driver/httputil.py + httpclient.py for how pool
+   managers/connection classes are built (get_pool_manager, _default_pool_manager,
+   default_pool_manager, pool_classes_by_scheme).
+
+## Fix
+tests/integrations/conftest.py, two session autouse fixtures:
+- clickhouse_traffic_bypasses_vcr: subclasses urllib3 HTTP(S)ConnectionPool
+  with ConnectionCls pinned to the import-time real connection classes
+  (shadows vcr's base-class ConnectionCls patch), sets
+  manager.pool_classes_by_scheme on every clickhouse-connect pool manager
+  (the module singleton + any from get_pool_manager, patched on BOTH httputil
+  and httpclient since httpclient binds the name at import), and clears() so
+  pre-existing pools rebuild immune. Result: CH traffic never enters VCR.
+- httpcore_stays_patched_during_vcr_passthrough: monkeypatches
+  vcr.patch.reset_patchers to drop the httpcore ConnectionPool/AsyncConnectionPool
+  entries (matched via patcher.getter()). httpcore stubs don't use force_reset
+  for their own passthrough, so removing them from the reset set is safe and
+  closes the unpatch window for any residual urllib3 passthrough.
+tests/integrations/langchain/test_vcr_isolation.py: two vcr-marked tests that
+make no HTTP calls, only assert patch state under an active cassette. Both fail
+deterministically with the conftest fix stashed (verified by stash/pop on amd64).
+AGENTS.md: added "VCR + ClickHouse isolation" subsection.
+
+## Errors & Mistakes
+- First instrumentation script (instrument_vcr2.py) inserted a helper def at
+  the wrong indent inside patch.py -> IndentationError that ddtrace's import
+  hook surfaced as an ERROR at fixture setup for every test. Rewrote as
+  instrument_vcr3.py: module-level helper inserted before the class, only
+  correctly-indented _vcrdbg() calls inline, with a py_compile+ast.parse check.
+  Had to force-reinstall vcrpy each time to start from pristine source.
+- Initial host.docker.internal CH host produced a different (but related)
+  error that briefly looked like the bug; recognized it as the match-attempt
+  variant and switched to socat+localhost to get the true ignore_localhost path.
+- arm64 emulation rarely repro'd; amd64 (--platform linux/amd64) repro'd
+  reliably. Timing-sensitive: fast machines almost never hit it.
+
+## Dead Ends
+- Considered re-recording the cassette: wrong - cassette was valid, problem was
+  the patch state, not the recording.
+- Considered re-adding skip_clickhouse_client / deselecting tests: rejected,
+  that just hides the tests; the whole point of removing sqlite was to run them
+  on ClickHouse. The marker is deselection-only now anyway.
+- Considered setting record_mode or block_network per test: doesn't address the
+  global force_reset unpatch, would be per-test churn.
+
+## Hints for Future Agents
+- A real provider 4xx/429 under record_mode="none" means VCR's patches were
+  ABSENT when the request fired - an isolation/timing bug - NOT a cassette
+  mismatch. Cassette mismatches raise CannotOverwriteExistingCassetteException.
+- vcr.patch._HttpcoreConnectionPool_handle_request is the import-time original;
+  comparing httpcore.ConnectionPool.handle_request against it tells you if a
+  cassette is currently patching httpcore. The regression test relies on this.
+- To repro GH-runner timing locally: docker run --platform linux/amd64
+  python:3.10, socat TCP-LISTEN:8123 -> host CH, mirror test.yaml env, loop the
+  shard. Native arm64/macOS is too fast to repro.
+- These fixtures touch private clickhouse-connect internals (_default_pool_manager,
+  pool_classes_by_scheme) and private vcrpy internals (reset_patchers, patcher
+  .getter()). If clickhouse-connect or vcrpy is upgraded and these tests break,
+  that's the signal to revisit; the regression tests import the private names so
+  a rename fails loudly at collection.
+
+## Codebase Discoveries
+- The trace_server marker is auto-applied in tests/trace_server/conftest.py
+  pytest_collection_modifyitems to any test in a trace_server path OR using the
+  trace_server fixture; the langchain tests get it via the client fixture.
+- weave client flushes traces to CH from background threads (future_executor)
+  during tests, so CH HTTP overlaps provider HTTP in wall-clock time - that
+  overlap is the necessary condition for the race.
+
+## Open Questions
+- Other integration shards (anthropic, openai, etc.) share tests/integrations/
+  conftest.py so they're now protected too, but only langchain was failing in
+  CI. They likely have the same latent race; not separately stress-tested here.
+- Upstreaming to vcrpy (don't unpatch unrelated transports in force_reset) would
+  be the real fix but is out of scope.
