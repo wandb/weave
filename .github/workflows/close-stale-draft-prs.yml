@@ -1,0 +1,49 @@
+name: Close stale draft PRs
+
+# Marks pull requests that have sat in *draft* for too long as stale, then closes
+# them after a grace period. This is intentionally separate from
+# `close-inactive-prs.yml` (which uses actions/stale and triggers on inactivity):
+# actions/stale cannot filter on draft state, and the signal here is *how long a
+# PR has been a draft*, not how long since its last update.
+#
+# Logic lives in scripts/close_stale_draft_prs.py so it is unit-tested and linted
+# like the rest of the codebase (see scripts/test_close_stale_draft_prs.py).
+
+on:
+  schedule:
+    # Daily at 04:00 UTC (staggered from close-inactive-prs.yml at 03:00).
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Log decisions without labeling or closing anything"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  # Needed only to create the stale-draft label if it does not exist yet;
+  # repository label management lives under the issues scope.
+  issues: write
+
+jobs:
+  close-stale-draft-prs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      # Recommended uv setup: https://docs.astral.sh/uv/guides/integration/github/
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sweep stale draft PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          args=(--repo "${{ github.repository }}")
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          uv run scripts/close_stale_draft_prs.py "${args[@]}"
