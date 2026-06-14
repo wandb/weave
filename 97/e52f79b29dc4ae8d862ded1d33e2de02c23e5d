@@ -1,0 +1,100 @@
+## Conversation
+User asked (verbatim): "Write a GH action to automatically tag PRs that are in
+draft for more than a month as stale, and close them automatically."
+
+Then: "Do you have to inline the script or can you just write the script in
+python alongside the workflow?" -> pivoted the implementation from an inline
+actions/github-script (JavaScript-in-YAML) approach to a standalone Python
+script invoked via `uv run`, matching the repo's existing pattern
+(scripts/slack_digest.py + .github/workflows/slack-digest.yml, tldr.yaml).
+
+Then: "Put this up as draft" -> commit + push + draft PR.
+
+## Actions
+- Explored .github/workflows/. Found close-inactive-prs.yml already uses
+  actions/stale@v9 (keys off INACTIVITY via days-before-pr-stale). Key insight:
+  actions/stale CANNOT filter on draft state, so it cannot express "in draft for
+  N days". That justified a custom implementation.
+- First wrote an inline actions/github-script@v7 version, validated with
+  actionlint + node --check + a stubbed JS harness (8/8 logic checks).
+- After the user's Python question, rewrote as scripts/close_stale_draft_prs.py:
+  - PEP 723 inline deps (# /// script ... PyGithub>=2.0 ... ///), installed by
+    `uv run` -- NO pyproject.toml change (same trick slack_digest.py uses).
+  - Separated PURE logic (reduce_events, decide) from GitHub I/O so the core is
+    unit-testable with plain data and zero mocking (per repo testing conventions).
+  - scripts/test_close_stale_draft_prs.py: 13 tests, all passing.
+  - Rewrote the workflow to checkout + setup-uv + `uv run scripts/...`, added a
+    workflow_dispatch `dry_run` boolean input.
+- Verified PyGithub API surface empirically via `uv run --with PyGithub python -c`
+  introspection AND live `gh api` calls before writing code (see Discoveries).
+- Validation: ruff format --check + ruff check (clean), actionlint (clean),
+  13 unit tests pass, and a LIVE read-only --dry-run against wandb/weave.
+
+## Errors & Mistakes
+- ruff D301: module docstring had a `\\` line-continuation in the usage example
+  -> "Use r\"\"\"". Fixed by putting the example command on one line (a raw
+  string would have shown literal `\\`).
+- Left a nonsensical walrus `EventRecord(EVENT := "ready_for_review", ...)` in one
+  test on first draft; removed it.
+- system python3 has no pyyaml; used Ruby's YAML to extract the embedded script
+  for node --check during the earlier inline-JS phase.
+- `github.__version__` does not exist in PyGithub (AttributeError) -- harmless,
+  was only used in a throwaway introspection probe.
+
+## Dead Ends
+- Inline actions/github-script JS version: fully written, validated, then
+  REPLACED by the Python version at the user's request. The git history has only
+  the Python version (the JS was never committed).
+- Considered actions/stale -> rejected (no draft filter).
+- Considered the issues TIMELINE API for draft-age. Live `gh api` showed the
+  timeline for PR #7103 did NOT include ready_for_review, while the issue-EVENTS
+  API (/issues/{n}/events) DID. So we use pr.get_issue_events() (typed IssueEvent
+  with .event/.created_at/.label), not the timeline.
+
+## Hints for Future Agents
+- DRAFT-AGE is computed from the latest `convert_to_draft` event, falling back to
+  created_at. Do NOT simplify to created_at alone: a PR opened normally and later
+  converted to draft has a misleading created_at and would be actioned too early.
+- The label is `stale-draft`, deliberately NOT `stale`/`Stale`. GitHub label names
+  are case-insensitive, so `stale` would collide with the `Stale` label that
+  close-inactive-prs.yml's actions/stale manages. Keep them distinct.
+- TWO-PHASE by design: mark at 30d-in-draft, then CLOSE only after the stale-draft
+  label has aged `close_after_days` (7). Close timing keys off when WE labeled it
+  (a `labeled` event in get_issue_events), NOT off draft-age -- this guarantees a
+  warning window even for PRs that are already ancient on first run.
+- The cheap pre-filter in _process_pr (skip young unlabeled drafts via created_at)
+  is ONLY an optimization to avoid the per-PR events API call; `decide` re-validates
+  everything and is the source of truth.
+- Logging MUST use %-style args, not f-strings (ruff `G` / G004 is selected).
+- scripts/ is NOT covered by pyright (include=[\"weave\"]) or strict mypy
+  (disallow_untyped_defs only for module=\"weave.*\"). ANN rules are NOT selected.
+  D (pydocstyle, google) IS selected but D10x (missing docstrings) is ignored.
+- Run the tests isolated: `uv run --no-project --with pytest pytest
+  scripts/test_close_stale_draft_prs.py -o addopts=\"\"` (clears the repo's
+  addopts=-v; --no-project avoids syncing all of weave).
+- Permissions: contents:read, pull-requests:write, issues:write. issues:write is
+  ONLY for creating the stale-draft label (repo label management is under the
+  issues scope); commenting/labeling/closing PRs is covered by pull-requests:write.
+
+## Codebase Discoveries
+- Live dry-run against wandb/weave: 346 OPEN PRs, of which 112 are drafts >30d old
+  (some ~1000+ days). Enabling this as-is would mark 112 PRs on the first run and
+  close them ~7d later -> real risk of GitHub SECONDARY rate limits on bulk writes
+  (label+comment x112). Flagged to the user; offered a --max-actions-per-run cap
+  (not yet built) and the dry_run input as mitigations.
+- IssueEvent (PyGithub) exposes typed .event/.created_at/.label(.name); the
+  /issues/{n}/events payload for a `labeled` event is
+  {created_at, event:\"labeled\", label:{name}}. `ready_for_review` is present in
+  /events (so `convert_to_draft` is too).
+- pr.draft, pr.labels, pr.created_at come from the get_pulls list payload (no extra
+  call). pr.get_issue_events() is a separate paginated call (only made for
+  candidates that survive the pre-filter).
+- Repo convention for script-backed workflows: PEP 723 inline deps + `uv run
+  scripts/x.py` + GITHUB_TOKEN env (slack_digest.py / slack-digest.yml is the
+  template).
+
+## Open Questions
+- Should the 30d threshold grandfather the existing 112-PR backlog, or use a higher
+  initial threshold (e.g. 90d)? Deferred to user.
+- Should we add --max-actions-per-run to drain the backlog gradually? Offered;
+  awaiting user decision.
