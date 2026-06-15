@@ -1,0 +1,54 @@
+## Conversation
+User: "Please update to close draft after being marked to 1 day. I want to get
+rid of the old PRs ASAP." This follows the draft PR #7212 put up the prior turn
+(which had a 7-day post-stale grace). The user wants the legacy backlog (112
+draft PRs >30d old, found in the dry-run) cleared fast.
+
+## Actions
+- Changed DEFAULT_CLOSE_AFTER_DAYS 7 -> 1 in scripts/close_stale_draft_prs.py.
+- Added a _plural_days(n) helper and used it in stale_comment so the posted
+  comment reads "closed automatically in 1 day" (not the ungrammatical "1 days").
+- Reworded close_comment to drop the hard-coded "{close_after_days}+ days" phrase
+  (was awkward at n=1); it now just states the PR was in draft >30d and marked
+  stale without being taken out of draft.
+- Tests: made the two grace tests (test_decide_closes_after_grace /
+  test_decide_skips_within_grace) use an explicit StaleConfig(close_after_days=3)
+  so they no longer depend on the module default (which was the source of the
+  break when the default changed). Added test_decide_default_grace_* (lock the
+  1-day default behavior) and two stale_comment pluralization tests. 17 pass.
+- Validated: ruff format+check clean; rendered both comments with the default
+  config and eyeballed grammar.
+
+## Errors & Mistakes
+- First version of the two pluralization tests asserted "in **1 day**" / the bold
+  markers in the wrong place. The bold span is **closed automatically in 1 day**,
+  so the closing ** sits right after the day phrase, not around just "1 day". Fixed
+  the assertions to check the phrase "closed automatically in 1 day" plus the
+  absence of "1 days" -- which tests the grammar without coupling to ** placement.
+- Changing the default from 7 to 1 broke test_decide_skips_within_grace, which had
+  used stale_labeled_at=_ago(2): 2 days is no longer within a 1-day grace. This is
+  exactly why the grace tests were refactored to pin their own config.
+
+## Dead Ends
+- Considered amend + force-push to keep the PR a single commit, but chose a
+  follow-up commit instead: avoids force-push (the most safety-flagged push op),
+  preserves the original commit's rich git note, and is normal for an actively
+  iterated draft. Reviewers can squash on merge.
+
+## Hints for Future Agents
+- Grace tests should pin StaleConfig(close_after_days=...) explicitly; do NOT rely
+  on the module default or they break whenever the default is retuned.
+- The close decision keys off time-since-labeled, NOT draft-age, so a 1-day grace
+  means: marked at 30d in draft, then closed on the next daily run ~1 day later.
+- OPERATIONAL: with a 1-day grace the 112-PR backlog now marks on run 1 and closes
+  on run 2 (~24h apart). Secondary-rate-limit risk on bulk writes is higher than
+  with 7 days. A --max-actions-per-run cap was offered but NOT built; the user
+  prioritized speed. The dry_run workflow_dispatch input is still the safe preview.
+
+## Codebase Discoveries
+None new beyond the prior commit's note.
+
+## Open Questions
+- Still no per-run cap. If the first real run hits GitHub secondary rate limits
+  while closing 112 PRs, revisit adding --max-actions-per-run (drain over several
+  daily runs) -- it composes cleanly with the existing decide()/run() split.
