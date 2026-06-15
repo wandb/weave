@@ -8,7 +8,6 @@ from PIL import Image
 
 import weave
 from tests.trace.test_utils import FailingSaveType
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.serialization.custom_objs import (
     KNOWN_TYPES,
     UnsafeDeserializationError,
@@ -80,7 +79,6 @@ def test_inline_custom_obj_needs_load_op(client):
         KNOWN_TYPES.add("rich.markdown.Markdown")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_no_extra_calls_created(client):
     @weave.op
     def make_datetime():

@@ -1192,7 +1192,6 @@ def test_scorers_with_output_and_model_output_raise_error():
         evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_with_custom_name(client):
     dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
@@ -1211,7 +1210,6 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_evaluate_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
@@ -1231,7 +1229,6 @@ def test_get_evaluate_calls(client, make_evals):
     assert call2.inputs["model"].name == "ghi"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_score_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
@@ -1253,7 +1250,6 @@ def test_get_score_calls(client, make_evals):
     assert score_calls2[3].output == 7878
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_scores(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()

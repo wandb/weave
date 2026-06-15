@@ -1,13 +1,9 @@
 """Tests for the log_call function."""
 
-import pytest
-
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.weave_client import WeaveClient
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_basic(client: WeaveClient):
     """Test basic log_call functionality."""
     call = weave.log_call("test", {"a": 1}, 2)
@@ -20,7 +16,6 @@ def test_log_call_basic(client: WeaveClient):
     assert call.exception is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_display_name(client: WeaveClient):
     """Test log_call with a custom display name."""
     call = weave.log_call("test_op", {"x": 5}, 10, display_name="Custom Display Name")
@@ -30,7 +25,6 @@ def test_log_call_with_display_name(client: WeaveClient):
     assert fetched_call.display_name == "Custom Display Name"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_attributes(client: WeaveClient):
     """Test log_call with custom attributes."""
     attrs = {"version": "1.0", "env": "test", "user": "test_user"}
@@ -43,7 +37,6 @@ def test_log_call_with_attributes(client: WeaveClient):
         assert fetched_call.attributes[key] == value
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_exception(client: WeaveClient):
     """Test log_call with an exception."""
     exc = ValueError("Something went wrong")
@@ -56,7 +49,6 @@ def test_log_call_with_exception(client: WeaveClient):
     assert "Something went wrong" in fetched_call.exception
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_nested_with_parent(client: WeaveClient):
     """Test log_call with parent-child relationship."""
     parent_call = weave.log_call("parent_op", {"parent_input": 1}, {"parent_output": 2})
@@ -76,7 +68,6 @@ def test_log_call_nested_with_parent(client: WeaveClient):
     assert parent.parent_id is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_multiple_calls(client: WeaveClient):
     """Test multiple log_call invocations."""
     call1 = weave.log_call("op1", {"a": 1}, 2)
@@ -91,7 +82,6 @@ def test_log_call_multiple_calls(client: WeaveClient):
     assert len(ids) == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_complex_inputs_outputs(client: WeaveClient):
     """Test log_call with complex nested data structures."""
     inputs = {
@@ -112,7 +102,6 @@ def test_log_call_with_complex_inputs_outputs(client: WeaveClient):
     assert fetched_call.output == output
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_empty_inputs(client: WeaveClient):
     """Test log_call with empty inputs dictionary."""
     call = weave.log_call("no_input_op", {}, "result")
@@ -123,7 +112,6 @@ def test_log_call_with_empty_inputs(client: WeaveClient):
     assert fetched_call.output == "result"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_none_output(client: WeaveClient):
     """Test log_call with None as output."""
     call = weave.log_call("none_output_op", {"x": 1}, None)
@@ -133,7 +121,6 @@ def test_log_call_with_none_output(client: WeaveClient):
     assert fetched_call.output is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_callable_display_name(client: WeaveClient):
     """Test log_call with a callable display name."""
 
@@ -153,7 +140,6 @@ def test_log_call_with_callable_display_name(client: WeaveClient):
     assert fetched_call.display_name == "Call-123"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_different_op_names(client: WeaveClient):
     """Test log_call with different operation names."""
     ops = ["op1", "op2", "my_custom_op", "process_data", "analyze"]
@@ -168,7 +154,6 @@ def test_log_call_different_op_names(client: WeaveClient):
     assert op_names == set(ops)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_combined_params(client: WeaveClient):
     """Test log_call with all parameters combined."""
     parent_call = weave.log_call("parent", {}, "parent_result")
@@ -209,7 +194,6 @@ def test_log_call_preserves_call_data(client: WeaveClient):
     assert returned_call.op_name == fetched_call.op_name
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_returns_finished_call(client: WeaveClient):
     """Test that log_call returns a finished call with timestamps."""
     call = weave.log_call("test_op", {"x": 1}, 2)
@@ -225,7 +209,6 @@ def test_log_call_returns_finished_call(client: WeaveClient):
     assert fetched_call.ended_at >= fetched_call.started_at
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_use_stack_false(client: WeaveClient):
     """Test log_call with use_stack=False doesn't add to call stack."""
     # Log a call without adding to stack
