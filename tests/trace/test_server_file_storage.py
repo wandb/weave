@@ -13,11 +13,13 @@ import boto3
 import pytest
 from azure.core.exceptions import ResourceExistsError
 from google.api_core import exceptions
+from google.auth import credentials as ga_credentials
+from google.cloud import storage
 from moto import mock_aws
 
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import clickhouse_trace_server_settings
+from weave.trace_server import clickhouse_trace_server_settings, file_storage
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 # Test Data Constants
@@ -231,6 +233,50 @@ class TestGCSStorage:
                 FileContentReadReq(project_id=client.project_id, digest=res1.digest)
             )
             assert file.content == TEST_CONTENT
+
+
+class _ScopedFakeCredentials(ga_credentials.Credentials, ga_credentials.Scoped):
+    """Service-account-like credentials that require scoping before use."""
+
+    def __init__(self, scopes: list[str] | None = None):
+        super().__init__()
+        self._scopes = scopes
+
+    @property
+    def requires_scopes(self) -> bool:
+        return not self._scopes
+
+    @property
+    def scopes(self) -> list[str] | None:
+        return self._scopes
+
+    def with_scopes(self, scopes, default_scopes=None) -> "_ScopedFakeCredentials":
+        return _ScopedFakeCredentials(scopes=list(scopes))
+
+    def refresh(self, request) -> None:
+        self.token = "fake-token"
+
+
+def test_keepalive_gcs_client_scopes_credentials_for_session():
+    """Regression for #7221: the keep-alive GCS session must carry scoped credentials."""
+    expected_scopes = list(storage.Client.SCOPE)
+
+    unscoped = _ScopedFakeCredentials()
+    assert unscoped.requires_scopes
+    client = file_storage._build_keepalive_gcs_client(unscoped)
+
+    # The session that mints tokens must hold scoped creds, else invalid_scope.
+    assert client._http.credentials.scopes == expected_scopes
+    assert not client._http.credentials.requires_scopes
+    assert isinstance(
+        client._http.get_adapter("https://storage.googleapis.com"),
+        file_storage._KeepAliveHTTPAdapter,
+    )
+
+    # Already-scoped creds (local user creds) pass through, so prod-only repro.
+    prescoped = _ScopedFakeCredentials(scopes=["existing-scope"])
+    passthrough = file_storage._build_keepalive_gcs_client(prescoped)
+    assert passthrough._http.credentials.scopes == ["existing-scope"]
 
 
 class TestAzureStorage:

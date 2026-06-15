@@ -53,6 +53,7 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 from google.api_core import exceptions as gcp_exceptions
 from google.auth import default as google_auth_default
+from google.auth.credentials import with_scopes_if_required
 from google.auth.transport.requests import AuthorizedSession
 from google.cloud import storage
 from google.oauth2.credentials import Credentials as GCPCredentials
@@ -449,12 +450,17 @@ def _build_keepalive_gcs_client(credentials: GCPCredentials | None) -> storage.C
         resolved_credentials, project = google_auth_default()
     else:
         resolved_credentials = credentials
-    session = AuthorizedSession(resolved_credentials)
+    # A custom _http session bypasses storage.Client's built-in credential
+    # scoping, so scope here or service-account token refresh hits invalid_scope.
+    scoped_credentials = with_scopes_if_required(
+        resolved_credentials, list(storage.Client.SCOPE)
+    )
+    session = AuthorizedSession(scoped_credentials)
     adapter = _KeepAliveHTTPAdapter(pool_maxsize=GCS_POOL_MAXSIZE)
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return storage.Client(
-        credentials=resolved_credentials, project=project, _http=session
+        credentials=scoped_credentials, project=project, _http=session
     )
 
 
