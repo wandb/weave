@@ -243,11 +243,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     inMemoryTraceServer = new InMemoryTraceServer();
     exporter = new InMemorySpanExporter();
 
-    initWithCustomTraceServer(
-      testProjectName,
-      inMemoryTraceServer,
-      new Settings(true, {}, {spanProcessor: new SimpleSpanProcessor(exporter)})
-    );
+    initWithCustomTraceServer(testProjectName, inMemoryTraceServer, {
+      genai: {spanProcessor: new SimpleSpanProcessor(exporter)},
+    });
 
     clearWeaveTracerProvider();
     setTraceProcessors([]);

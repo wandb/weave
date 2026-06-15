@@ -35,7 +35,7 @@ jest.mock('weave/clientApi', () => ({
       runWithCallStack: async (stack: any, fn: () => any) => fn(),
       finishCall: () => Promise.resolve(),
       finishCallWithException: () => Promise.resolve(),
-      settings: {shouldPrintCallLink: false},
+      settings: {printCallLink: false},
       waitForBatchProcessing: () => Promise.resolve(),
       processBatch: () => Promise.resolve(),
     });

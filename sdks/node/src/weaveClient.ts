@@ -30,7 +30,7 @@ import {
   getOpWrappedFunction,
   isOp,
 } from './opType';
-import {Settings} from './settings';
+import {makeSettings, Settings} from './settings';
 import {Table, TableRef, TableRowRef} from './table';
 import {linkAssetToRegistry} from './traceServerBindings/linkAssetToRegistry';
 import type {
@@ -191,15 +191,15 @@ export class WeaveClient {
   constructor({
     traceServerApi,
     projectId,
-    settings = new Settings(),
+    settings = {},
   }: {
     traceServerApi: TraceServerApi<any>;
     projectId: string;
-    settings?: Settings;
+    settings?: Partial<Settings>;
   }) {
     this.traceServerApi = traceServerApi;
     this.projectId = projectId;
-    this.settings = settings;
+    this.settings = makeSettings(settings);
   }
 
   private scheduleBatchProcessing() {
@@ -1015,7 +1015,7 @@ export class WeaveClient {
 
     // Merge custom attributes with default weave attributes
     const combinedAttributes = {
-      ...this.settings.attributes,
+      ...this.settings.globalAttributes,
       ...this.getCurrentAttributes(),
       ...(attributes || {}),
     };
