@@ -168,6 +168,7 @@ def test_annotation_queue_mutations_use_caller_provided_local_name() -> None:
     ids=["cloud", "replicated", "distributed"],
 )
 def test_calls_complete_table_resolution_by_mode(
+    monkeypatch: pytest.MonkeyPatch,
     use_distributed: bool,
     cluster_name: str | None,
     expected_table: str,
@@ -180,27 +181,30 @@ def test_calls_complete_table_resolution_by_mode(
     in replicated mode (cluster_name set, distributed=False), the old code produced
     'calls_complete_local ON CLUSTER ...' but calls_complete_local doesn't exist.
     """
-    env_vars = {
-        "WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES": str(use_distributed).lower(),
-    }
+    monkeypatch.setenv(
+        "WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES", str(use_distributed).lower()
+    )
+    # delenv (not just skip-set): replicated CI sets this ambiently, so the
+    # cloud case must clear it to exercise the no-cluster path.
     if cluster_name:
-        env_vars["WF_CLICKHOUSE_REPLICATED_CLUSTER"] = cluster_name
+        monkeypatch.setenv("WF_CLICKHOUSE_REPLICATED_CLUSTER", cluster_name)
+    else:
+        monkeypatch.delenv("WF_CLICKHOUSE_REPLICATED_CLUSTER", raising=False)
 
-    with patch.dict("os.environ", env_vars, clear=False):
-        table_name = (
-            "calls_complete_local"
-            if wf_env.wf_clickhouse_use_distributed_tables()
-            else "calls_complete"
-        )
-        result = _format_table_name_with_cluster(
-            table_name, wf_env.wf_clickhouse_replicated_cluster()
-        )
-        expected = (
-            f"{expected_table} ON CLUSTER {cluster_name}"
-            if expected_on_cluster
-            else expected_table
-        )
-        assert result == expected
+    table_name = (
+        "calls_complete_local"
+        if wf_env.wf_clickhouse_use_distributed_tables()
+        else "calls_complete"
+    )
+    result = _format_table_name_with_cluster(
+        table_name, wf_env.wf_clickhouse_replicated_cluster()
+    )
+    expected = (
+        f"{expected_table} ON CLUSTER {cluster_name}"
+        if expected_on_cluster
+        else expected_table
+    )
+    assert result == expected
 
 
 @pytest.mark.parametrize(
