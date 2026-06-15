@@ -2239,6 +2239,39 @@ def test_storage_size_fields():
     )
 
 
+def test_storage_size_includes_otel_dump_bytes():
+    """Per-call storage_size_bytes must include OTel dump bytes, like project stats do.
+
+    project_query_builder sums the same stats table WITH `+ COALESCE(otel_dump_size_bytes, 0)`,
+    so a call's storage_size_bytes and the project trace_storage_size_bytes (derived from the
+    same rows) disagree for any OTel-ingesting project. This pins the reconciled sum.
+    """
+    cq = CallsQuery(project_id="test/project", include_storage_size=True)
+    cq.add_field("id")
+    cq.add_field("storage_size_bytes")
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id,
+           any(storage_size_tbl.storage_size_bytes) AS storage_size_bytes
+        FROM calls_merged
+        LEFT JOIN
+        (SELECT id,
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0)) AS storage_size_bytes
+        FROM calls_merged_stats
+        WHERE project_id = {pb_0:String}
+        GROUP BY id) AS storage_size_tbl ON calls_merged.id = storage_size_tbl.id
+        PREWHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id,
+                calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {"pb_0": "test/project"},
+    )
+
+
 @pytest.mark.parametrize("with_filter", [False, True])
 def test_total_storage_size(with_filter: bool):
     """Test querying with total storage size.
