@@ -10,6 +10,7 @@ from weave.trace_server.environment import (
     VALID_CALLS_SHARD_KEYS,
     kafka_producer_max_buffer_size,
     wf_clickhouse_calls_shard_key,
+    wf_enable_agent_alerting,
     wf_scoring_worker_check_cancellation,
     wf_scoring_worker_debounced_scoring_max_call_history,
     wf_scoring_worker_debounced_scoring_max_sampling_rate,
@@ -269,3 +270,23 @@ def test_wf_scoring_worker_remote_scorer_allow_insecure_http(monkeypatch):
     assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
     monkeypatch.setenv(key, "1")
     assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_enable_agent_alerting(monkeypatch):
+    """Agent alerting is off by default; only a case-insensitive `true` enables it."""
+    key = "WEAVE_ENABLE_AGENT_ALERTING"
+    monkeypatch.delenv(key, raising=False)
+    assert wf_enable_agent_alerting() is False
+
+    monkeypatch.setenv(key, "true")
+    assert wf_enable_agent_alerting() is True
+    monkeypatch.setenv(key, "True")
+    assert wf_enable_agent_alerting() is True
+
+    monkeypatch.setenv(key, "false")
+    assert wf_enable_agent_alerting() is False
+    monkeypatch.setenv(key, "")
+    assert wf_enable_agent_alerting() is False
+    monkeypatch.setenv(key, "1")
+    assert wf_enable_agent_alerting() is False
