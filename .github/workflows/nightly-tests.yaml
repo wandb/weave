@@ -18,7 +18,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      id-token: write
       packages: write
     runs-on: ubuntu-latest
     env:
@@ -85,36 +84,6 @@ jobs:
           fi
           echo "Running shard: ${{ matrix.shard }}"
           echo "skip=false" >> $GITHUB_OUTPUT
-      - id: auth
-        name: Authenticate to Google Cloud
-        if: steps.filter_shards.outputs.skip != 'true'
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
-        with:
-          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
-          token_format: access_token
-      - name: Start wandb service
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: |
-          set -euo pipefail
-          echo "${{ steps.auth.outputs.access_token }}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
-          docker run --detach --name wandbservice \
-            --env CI=1 \
-            --env WANDB_ENABLE_TEST_CONTAINER=true \
-            --env LOGGING_ENABLED=true \
-            --publish 8080:8080 \
-            --publish 8083:8083 \
-            --publish 9015:9015 \
-            us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-          for _i in {1..30}; do
-            if curl --silent --fail --show-error http://localhost:8080/healthz >/dev/null; then
-              echo "wandb service is healthy"
-              exit 0
-            fi
-            sleep 5
-          done
-          docker logs wandbservice
-          exit 1
       - name: Start ClickHouse
         if: steps.filter_shards.outputs.skip != 'true'
         env:
@@ -174,7 +143,6 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://localhost
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
@@ -193,7 +161,6 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://localhost
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
@@ -208,11 +175,8 @@ jobs:
 
   nightly-tests-replicated-1s3r:
     name: Nightly Tests (replicated 1s3r)
-    # id-token: write must be granted here too; a reusable workflow's
-    # effective permissions are the intersection of caller and callee.
     permissions:
       contents: read
-      id-token: write
     uses: ./.github/workflows/nightly-replicated-leg.yaml
     with:
       topology: "1s3r"
@@ -225,7 +189,6 @@ jobs:
     name: Nightly Tests (replicated 2s2r)
     permissions:
       contents: read
-      id-token: write
     uses: ./.github/workflows/nightly-replicated-leg.yaml
     with:
       topology: "2s2r"
