@@ -250,7 +250,6 @@ def test_op_return_sync_generator_never_iter(client):
     assert res.calls[0].output is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_generator_never_iter(client):
     @weave.op(accumulator=simple_list_accumulator)
@@ -369,7 +368,6 @@ def test_op_return_sync_generator_partial(client):
     assert res.calls[0].output == list(range(9, 4, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_generator_partial(client):
     @weave.op(accumulator=simple_list_accumulator)

@@ -419,7 +419,6 @@ class TestWeaveContent:
             original_data = original_files[row["name"]]
             assert row["content"].data == original_data
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_content_postprocessing(self, weave_active):
         """Test that Content postprocessing works correctly in ops."""
 

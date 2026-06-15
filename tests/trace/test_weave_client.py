@@ -75,7 +75,6 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_create(client):
     res = client.server.table_create(
@@ -98,7 +97,6 @@ def test_table_create(client):
     assert result.rows[2].val["val"] == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_update(client):
     data = [
         {"val": 1},
@@ -207,7 +205,6 @@ def test_save_load(client):
     assert val_table[2] == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_refs(client):
     ref = client.save(weave.Dataset(rows=[{"v": 1}, {"v": 2}]), "my-dataset")
     new_table_rows = []
@@ -252,7 +249,6 @@ def test_dataset_refs(client):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_obj_with_table(client):
     class ObjWithTable(weave.Object):
         table: weave_client.Table
@@ -1172,7 +1168,6 @@ async def test_saved_nested_modellike(client):
     assert await call_model(c, 5) == 4
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_rows_ref(client):
     dataset = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
     saved = client.save(dataset, "my-dataset")
@@ -1296,7 +1291,6 @@ async def test_evaluate(weave_active):
     assert example1_obj.ref.extra[3] != example0_obj.ref.extra[3]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_nested_ref_is_inner(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
@@ -1325,7 +1319,6 @@ def test_obj_dedupe(client):
     assert res[1].version_index == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_query(client):
     @weave.op
     def myop(x):
@@ -1337,7 +1330,6 @@ def test_op_query(client):
     assert len(res) == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_refs_read_batch_noextra(client):
     ref = client._save_object([1, 2, 3], "my-list")
     ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
@@ -1347,7 +1339,6 @@ def test_refs_read_batch_noextra(client):
     assert res.vals[1] == {"a": [3, 4, 5]}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_refs_read_batch_with_extra(client):
     saved = client.save([{"a": 5}, {"a": 6}], "my-list")
     ref1 = saved[0]["a"].ref
@@ -1358,7 +1349,6 @@ def test_refs_read_batch_with_extra(client):
     assert res.vals[1] == {"a": 6}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_refs_read_batch_dataset_rows(client):
     saved = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
     ref1 = saved.rows[0]["a"].ref
@@ -1369,7 +1359,6 @@ def test_refs_read_batch_dataset_rows(client):
     assert res.vals[1] == 6
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_refs_read_batch_multi_project(client):
     client.project = "test111"
     ref = client._save_object([1, 2, 3], "my-list")
@@ -1388,7 +1377,6 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_refs_read_batch_call_ref(client):
     call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
     with pytest.raises(ValueError, match="Call refs not supported"):
@@ -1418,7 +1406,6 @@ def test_large_files(client):
     assert len(res.a) == 10000005
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_file(client):
     f_bytes = b"0" * 10000005
     res = client.server.file_create(
@@ -1588,7 +1575,6 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.timeout(60)
 @pytest.mark.flaky(reruns=3, reruns_delay=2)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
@@ -2310,7 +2296,6 @@ def test_client_attributes_with_call_attributes(client_creator):
         assert call.attributes["env"] == "override"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_flush_progress_bar(client):
     client.set_autoflush(False)
 
@@ -2328,7 +2313,6 @@ def test_flush_progress_bar(client):
     assert client._has_pending_jobs() == False
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_flush_callback(client):
     client.set_autoflush(False)
 
@@ -4123,7 +4107,6 @@ def test_filter_calls_by_ref_wildcard_versions(client):
     assert sorted(call.inputs["ref"]["a"] for call in calls) == [1, 2]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_files_stats(client):
 
     f_bytes = b"0" * 10000005
@@ -4250,7 +4233,6 @@ def test_feedback_batching(network_proxy_client):
         assert feedback.payload["note"] == f"Test feedback {i}"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_parallel_table_uploads_digest_consistency(
@@ -4412,7 +4394,6 @@ def test_parallel_table_uploads_digest_consistency(
     assert saved_table5.table_ref is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_create_from_digests(network_proxy_client):
     """Test that table_create_from_digests works correctly to merge existing row digests."""
     basic_client, remote_client, records = network_proxy_client

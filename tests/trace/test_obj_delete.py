@@ -1,7 +1,6 @@
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -216,7 +215,6 @@ def test_republish_after_deleting_all_versions(
     assert latest[0].val == republish_val
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_read_deleted_object(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -243,7 +241,6 @@ def test_read_deleted_object(client: WeaveClient):
     assert ref_res.vals[0] is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_versions(client: WeaveClient):
     @weave.op
     def my_op(x: int) -> int:
@@ -273,7 +270,6 @@ def test_op_versions(client: WeaveClient):
     assert len(objs3) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_read_deleted_op(client: WeaveClient):
     @weave.op
     def my_op(x: int) -> int:
@@ -323,7 +319,6 @@ def test_delete_all_object_versions_api(client: WeaveClient):
         client.delete_all_object_versions("obj_test_all")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_all_op_versions_api(client: WeaveClient):
     """Test the public API for deleting all versions of an op."""
 
@@ -404,7 +399,6 @@ def _datasets_query(client: WeaveClient, latest_only: bool) -> list[tsi.ObjSchem
     return objs.objs
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_republish_dataset_after_deleting_all_versions(client: WeaveClient):
     # Repro for #6298: the Datasets tab queries by base_object_class +
     # latest_only. After deleting every version and re-publishing the

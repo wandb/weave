@@ -1,14 +1,10 @@
 import dataclasses
 
-import pytest
-
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.weave_client import redact_sensitive_keys
 from weave.utils import sanitize
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_code_capture_redacts_sensitive_values(weave_active):
     api_key = "123"
 

@@ -154,7 +154,6 @@ def do_task(args: dict):
     return get_keys(args)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_executor_basic_lifecycle(client):
     """Happy-path lifecycle on a single runner: execute + pid isolation, reuse,

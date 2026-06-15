@@ -63,7 +63,6 @@ def py_obj():
     return B()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sync_func(weave_active, func):
     assert func(1) == 2
 
@@ -73,7 +72,6 @@ def test_sync_func(weave_active, func):
     assert func2(1) == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sync_func_call(weave_active, func):
     res, call = func.call(1)
     assert isinstance(call, Call)
@@ -91,7 +89,6 @@ def test_sync_func_call(weave_active, func):
     assert res2 == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_async_func(weave_active, afunc):
     assert await afunc(1) == 2
@@ -102,7 +99,6 @@ async def test_async_func(weave_active, afunc):
     assert await afunc2(1) == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_async_func_call(weave_active, afunc):
     res, call = await afunc.call(1)
@@ -121,7 +117,6 @@ async def test_async_func_call(weave_active, afunc):
     assert res2 == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sync_method(weave_active, weave_obj, py_obj):
     assert weave_obj.method(1) == 2
     assert py_obj.method(1) == 2
@@ -131,7 +126,6 @@ def test_sync_method(weave_active, weave_obj, py_obj):
         weave_obj_method2 = weave_obj_method_ref.get()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sync_method_call(weave_active, weave_obj, py_obj):
     res, call = weave_obj.method.call(weave_obj, 1)
     assert isinstance(call, Call)
@@ -156,7 +150,6 @@ def test_sync_method_call(weave_active, weave_obj, py_obj):
         res2, call2 = py_obj.method.call(1)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_async_method(weave_active, weave_obj, py_obj):
     assert await weave_obj.amethod(1) == 2
@@ -167,7 +160,6 @@ async def test_async_method(weave_active, weave_obj, py_obj):
         weave_obj_amethod2 = weave_obj_amethod_ref.get()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_async_method_call(weave_active, weave_obj, py_obj):
     res, call = await weave_obj.amethod.call(weave_obj, 1)
@@ -250,7 +242,6 @@ async def test_async_method_calls(weave_active, weave_obj):
     assert len(calls) == 6
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_gotten_object_method_is_callable(weave_active, weave_obj):
     ref = weave.publish(weave_obj)
@@ -260,7 +251,6 @@ async def test_gotten_object_method_is_callable(weave_active, weave_obj):
     assert await weave_obj.amethod(1) == await weave_obj2.amethod(1) == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_gotten_object_method_is_callable_with_call_func(weave_active, weave_obj):
     ref = weave.publish(weave_obj)

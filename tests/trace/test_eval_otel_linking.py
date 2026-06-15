@@ -135,7 +135,6 @@ async def test_multiple_genai_span_refs_attached_to_eval_call(client, otel_setup
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_metadata_injected_onto_spans(client, otel_setup):
     """Eval context attributes should be injected onto all spans created

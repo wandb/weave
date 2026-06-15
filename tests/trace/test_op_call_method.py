@@ -1,11 +1,7 @@
-import pytest
-
 import weave
 import weave.trace.call
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_call_method(weave_active):
     @weave.op
     def add(a, b):

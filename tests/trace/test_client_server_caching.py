@@ -13,7 +13,6 @@ import pytest
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from tests.trace.server_utils import find_server_layer
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace import weave_client
 from weave.trace_server.service_interface import EnsureProjectExistsRes
 from weave.trace_server.trace_server_interface import (
@@ -90,7 +89,6 @@ def test_weave_client_init_with_caching_middleware():
     mock_server.ensure_project_exists.assert_called_once_with("entity", "project")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_caching(client):
     os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
@@ -244,7 +242,6 @@ def test_server_cache_latency():
         assert added_latency < 0.003
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_file_create_caching(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     file_bytes = b"hello"

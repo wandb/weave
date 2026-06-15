@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from pydantic import ValidationError
 
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import publish
 from weave.prompt.prompt import MessagesPrompt
 from weave.trace import object_record, vals
@@ -656,7 +655,6 @@ def test_cast_to_message():
         cast_to_message(123)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @patch(
     "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
@@ -734,7 +732,6 @@ def test_llm_structured_completion_model_predict_with_prompt(
     assert call_args.inputs.messages == expected_messages
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @patch(
     "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
