@@ -13,6 +13,13 @@ export type Settings = {
    */
   readonly attributes: Record<string, any>;
 
+  /**
+   * Routes OTel-capable integrations through their OTel variant.
+   *
+   * @default `true`
+   */
+  useOTelV2: boolean;
+
   readonly genai: {
     /**
      * How GenAI spans are exported.
@@ -42,15 +49,19 @@ export function makeSettings(settings: Partial<Settings> = {}): Settings {
     settings.printCallLink ??
     true;
 
+  const useOTelV2 =
+    parseEnvVar(process.env.WEAVE_USE_OTEL_V2) ?? settings.useOTelV2 ?? true;
+
   return {
     printCallLink,
+    useOTelV2,
     attributes: settings.attributes ?? {},
     genai: settings.genai ?? {},
   };
 }
 
-export function shouldUseOtelV2(): boolean {
-  return parseEnvVar(process.env.WEAVE_USE_OTEL_V2) ?? false;
+export function defaultSettings(): Settings {
+  return makeSettings();
 }
 
 function parseEnvVar(val: string | undefined): boolean | undefined {

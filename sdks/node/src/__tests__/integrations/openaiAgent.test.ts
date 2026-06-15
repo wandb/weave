@@ -35,6 +35,7 @@ import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
 import state from 'weave/state';
 
 describe('OpenAI Agents Integration', () => {
+  withEnv({WEAVE_USE_OTEL_V2: false});
   withOpenAITracingEnabled();
 
   let inMemoryTraceServer: InMemoryTraceServer;
