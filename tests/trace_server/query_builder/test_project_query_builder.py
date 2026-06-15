@@ -13,6 +13,179 @@ from weave.trace_server.query_builder.project_query_builder import (
     make_project_stats_query,
 )
 
+_TRACE_SUBQUERY_MERGED = """(SELECT sum(
+    COALESCE(attributes_size_bytes, 0) +
+    COALESCE(inputs_size_bytes, 0) +
+    COALESCE(output_size_bytes, 0) +
+    COALESCE(summary_size_bytes, 0) +
+    COALESCE(otel_dump_size_bytes, 0)
+    )
+    FROM calls_merged_stats
+    WHERE project_id = {pb_0: String}
+) AS trace_storage_size_bytes"""
+
+_TRACE_SUBQUERY_COMPLETE = """(SELECT sum(
+    COALESCE(attributes_size_bytes, 0) +
+    COALESCE(inputs_size_bytes, 0) +
+    COALESCE(output_size_bytes, 0) +
+    COALESCE(summary_size_bytes, 0) +
+    COALESCE(otel_size_bytes, 0)
+    )
+    FROM calls_complete_stats
+    WHERE project_id = {pb_0: String}
+) AS trace_storage_size_bytes"""
+
+_OBJECTS_SUBQUERY = """(SELECT sum(size_bytes)
+    FROM object_versions_stats
+    WHERE project_id = {pb_0: String}
+) AS objects_storage_size_bytes"""
+
+_TABLES_SUBQUERY = """(SELECT sum(size_bytes)
+    FROM table_rows_stats
+    WHERE project_id = {pb_0: String}
+) AS tables_storage_size_bytes"""
+
+_FILES_SUBQUERY = """(SELECT sum(size_bytes)
+    FROM files_stats
+    WHERE project_id = {pb_0: String}
+) AS files_storage_size_bytes"""
+
+
+@pytest.mark.parametrize(
+    ("include_kwargs", "read_table", "subquery", "columns"),
+    [
+        (
+            {"include_trace_storage_size": True},
+            ReadTable.CALLS_MERGED,
+            _TRACE_SUBQUERY_MERGED,
+            ["trace_storage_size_bytes"],
+        ),
+        (
+            {"include_trace_storage_size": True},
+            ReadTable.CALLS_COMPLETE,
+            _TRACE_SUBQUERY_COMPLETE,
+            ["trace_storage_size_bytes"],
+        ),
+        (
+            {"include_objects_storage_size": True},
+            ReadTable.CALLS_MERGED,
+            _OBJECTS_SUBQUERY,
+            ["objects_storage_size_bytes"],
+        ),
+        (
+            {"include_tables_storage_size": True},
+            ReadTable.CALLS_MERGED,
+            _TABLES_SUBQUERY,
+            ["tables_storage_size_bytes"],
+        ),
+        (
+            {"include_files_storage_size": True},
+            ReadTable.CALLS_MERGED,
+            _FILES_SUBQUERY,
+            ["files_storage_size_bytes"],
+        ),
+        (
+            {"include_objects_storage_size": True},
+            ReadTable.CALLS_COMPLETE,
+            _OBJECTS_SUBQUERY,
+            ["objects_storage_size_bytes"],
+        ),
+    ],
+)
+def test_single_storage_kind(include_kwargs, read_table, subquery, columns) -> None:
+    """Each storage kind selects its own subquery; non-trace kinds ignore read_table."""
+    pb = ParamBuilder("pb")
+    query, found_columns = make_project_stats_query(
+        project_id="test_project",
+        pb=pb,
+        include_trace_storage_size=include_kwargs.get(
+            "include_trace_storage_size", False
+        ),
+        include_objects_storage_size=include_kwargs.get(
+            "include_objects_storage_size", False
+        ),
+        include_tables_storage_size=include_kwargs.get(
+            "include_tables_storage_size", False
+        ),
+        include_files_storage_size=include_kwargs.get(
+            "include_files_storage_size", False
+        ),
+        read_table=read_table,
+    )
+
+    assert_sql(query, f"\nSELECT {subquery}", pb.get_params(), {"pb_0": "test_project"})
+    assert found_columns == columns
+
+
+@pytest.mark.parametrize(
+    ("read_table", "trace_subquery"),
+    [
+        (ReadTable.CALLS_MERGED, _TRACE_SUBQUERY_MERGED),
+        (ReadTable.CALLS_COMPLETE, _TRACE_SUBQUERY_COMPLETE),
+    ],
+)
+def test_all_storage_sizes(read_table, trace_subquery) -> None:
+    """All four kinds appear in fixed column order; trace subquery varies by read_table."""
+    pb = ParamBuilder("pb")
+    query, columns = make_project_stats_query(
+        project_id="test_project",
+        pb=pb,
+        include_trace_storage_size=True,
+        include_objects_storage_size=True,
+        include_tables_storage_size=True,
+        include_files_storage_size=True,
+        read_table=read_table,
+    )
+
+    expected_sql = (
+        f"\nSELECT {trace_subquery},\n"
+        f"{_OBJECTS_SUBQUERY},\n"
+        f"{_TABLES_SUBQUERY},\n"
+        f"{_FILES_SUBQUERY}"
+    )
+    assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
+    assert columns == [
+        "trace_storage_size_bytes",
+        "objects_storage_size_bytes",
+        "tables_storage_size_bytes",
+        "files_storage_size_bytes",
+    ]
+
+
+def test_raises_when_no_storage_sizes_requested() -> None:
+    """Verify ValueError raised when all include_* params are False."""
+    pb = ParamBuilder("pb")
+    with pytest.raises(ValueError, match="At least one of"):
+        make_project_stats_query(
+            project_id="test_project",
+            pb=pb,
+            include_trace_storage_size=False,
+            include_objects_storage_size=False,
+            include_tables_storage_size=False,
+            include_files_storage_size=False,
+        )
+
+
+def test_parameterization_prevents_sql_injection() -> None:
+    """Verify project_id is parameterized for SQL injection safety."""
+    pb = ParamBuilder("pb")
+    query, columns = make_project_stats_query(
+        project_id="malicious'--project",
+        pb=pb,
+        include_trace_storage_size=True,
+        include_objects_storage_size=False,
+        include_tables_storage_size=False,
+        include_files_storage_size=False,
+    )
+
+    assert "malicious" not in query
+    assert_sql(
+        query,
+        f"\nSELECT {_TRACE_SUBQUERY_MERGED}",
+        pb.get_params(),
+        {"pb_0": "malicious'--project"},
+    )
+
 
 def assert_sql(query: str, expected: str, params: dict, expected_params: dict) -> None:
     """Assert SQL matches expected after normalizing whitespace."""
@@ -25,316 +198,3 @@ def assert_sql(query: str, expected: str, params: dict, expected_params: dict) -
     assert expected_params == params, (
         f"\nExpected params: {expected_params}\n\nGot params: {params}"
     )
-
-
-class TestMakeProjectStatsQuery:
-    """Tests for make_project_stats_query function."""
-
-    def test_trace_storage_only_calls_merged(self) -> None:
-        """Verify SQL when only trace storage is requested with calls_merged (default)."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="test_project",
-            pb=pb,
-            include_trace_storage_size=True,
-            include_objects_storage_size=False,
-            include_tables_storage_size=False,
-            include_files_storage_size=False,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(
-                    COALESCE(attributes_size_bytes, 0) +
-                    COALESCE(inputs_size_bytes, 0) +
-                    COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0) +
-                    COALESCE(otel_dump_size_bytes, 0)
-                    )
-                    FROM calls_merged_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS trace_storage_size_bytes
-        """
-        assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == ["trace_storage_size_bytes"]
-
-    def test_trace_storage_only_calls_complete(self) -> None:
-        """Verify SQL when only trace storage is requested with calls_complete."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="test_project",
-            pb=pb,
-            include_trace_storage_size=True,
-            include_objects_storage_size=False,
-            include_tables_storage_size=False,
-            include_files_storage_size=False,
-            read_table=ReadTable.CALLS_COMPLETE,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(
-                    COALESCE(attributes_size_bytes, 0) +
-                    COALESCE(inputs_size_bytes, 0) +
-                    COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0) +
-                    COALESCE(otel_size_bytes, 0)
-                    )
-                    FROM calls_complete_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS trace_storage_size_bytes
-        """
-        assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == ["trace_storage_size_bytes"]
-
-    def test_objects_storage_only(self) -> None:
-        """Verify SQL when only objects storage is requested."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="test_project",
-            pb=pb,
-            include_trace_storage_size=False,
-            include_objects_storage_size=True,
-            include_tables_storage_size=False,
-            include_files_storage_size=False,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(size_bytes)
-                    FROM object_versions_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS objects_storage_size_bytes
-        """
-        assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == ["objects_storage_size_bytes"]
-
-    def test_tables_storage_only(self) -> None:
-        """Verify SQL when only tables storage is requested."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="test_project",
-            pb=pb,
-            include_trace_storage_size=False,
-            include_objects_storage_size=False,
-            include_tables_storage_size=True,
-            include_files_storage_size=False,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(size_bytes)
-                    FROM table_rows_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS tables_storage_size_bytes
-        """
-        assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == ["tables_storage_size_bytes"]
-
-    def test_files_storage_only(self) -> None:
-        """Verify SQL when only files storage is requested."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="test_project",
-            pb=pb,
-            include_trace_storage_size=False,
-            include_objects_storage_size=False,
-            include_tables_storage_size=False,
-            include_files_storage_size=True,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(size_bytes)
-                    FROM files_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS files_storage_size_bytes
-        """
-        assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == ["files_storage_size_bytes"]
-
-    def test_all_storage_sizes_calls_merged(self) -> None:
-        """Verify SQL when all storage sizes are requested with calls_merged."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="test_project",
-            pb=pb,
-            include_trace_storage_size=True,
-            include_objects_storage_size=True,
-            include_tables_storage_size=True,
-            include_files_storage_size=True,
-            read_table=ReadTable.CALLS_MERGED,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(
-                    COALESCE(attributes_size_bytes, 0) +
-                    COALESCE(inputs_size_bytes, 0) +
-                    COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0) +
-                    COALESCE(otel_dump_size_bytes, 0)
-                    )
-                    FROM calls_merged_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS trace_storage_size_bytes,
-                (SELECT sum(size_bytes)
-                    FROM object_versions_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS objects_storage_size_bytes,
-                (SELECT sum(size_bytes)
-                    FROM table_rows_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS tables_storage_size_bytes,
-                (SELECT sum(size_bytes)
-                    FROM files_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS files_storage_size_bytes
-        """
-        assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == [
-            "trace_storage_size_bytes",
-            "objects_storage_size_bytes",
-            "tables_storage_size_bytes",
-            "files_storage_size_bytes",
-        ]
-
-    def test_all_storage_sizes_calls_complete(self) -> None:
-        """Verify SQL when all storage sizes are requested with calls_complete."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="test_project",
-            pb=pb,
-            include_trace_storage_size=True,
-            include_objects_storage_size=True,
-            include_tables_storage_size=True,
-            include_files_storage_size=True,
-            read_table=ReadTable.CALLS_COMPLETE,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(
-                    COALESCE(attributes_size_bytes, 0) +
-                    COALESCE(inputs_size_bytes, 0) +
-                    COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0) +
-                    COALESCE(otel_size_bytes, 0)
-                    )
-                    FROM calls_complete_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS trace_storage_size_bytes,
-                (SELECT sum(size_bytes)
-                    FROM object_versions_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS objects_storage_size_bytes,
-                (SELECT sum(size_bytes)
-                    FROM table_rows_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS tables_storage_size_bytes,
-                (SELECT sum(size_bytes)
-                    FROM files_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS files_storage_size_bytes
-        """
-        assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == [
-            "trace_storage_size_bytes",
-            "objects_storage_size_bytes",
-            "tables_storage_size_bytes",
-            "files_storage_size_bytes",
-        ]
-
-    def test_raises_when_no_storage_sizes_requested(self) -> None:
-        """Verify ValueError raised when all include_* params are False."""
-        pb = ParamBuilder("pb")
-        with pytest.raises(ValueError, match="At least one of"):
-            make_project_stats_query(
-                project_id="test_project",
-                pb=pb,
-                include_trace_storage_size=False,
-                include_objects_storage_size=False,
-                include_tables_storage_size=False,
-                include_files_storage_size=False,
-            )
-
-    def test_parameterization_prevents_sql_injection(self) -> None:
-        """Verify project_id is parameterized for SQL injection safety."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="malicious'--project",
-            pb=pb,
-            include_trace_storage_size=True,
-            include_objects_storage_size=False,
-            include_tables_storage_size=False,
-            include_files_storage_size=False,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(
-                    COALESCE(attributes_size_bytes, 0) +
-                    COALESCE(inputs_size_bytes, 0) +
-                    COALESCE(output_size_bytes, 0) +
-                    COALESCE(summary_size_bytes, 0) +
-                    COALESCE(otel_dump_size_bytes, 0)
-                    )
-                    FROM calls_merged_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS trace_storage_size_bytes
-        """
-        # Project ID should be parameterized, not directly in query
-        assert "malicious" not in query
-        assert_sql(
-            query, expected_sql, pb.get_params(), {"pb_0": "malicious'--project"}
-        )
-
-    def test_trace_storage_includes_otel_bytes_regression(self) -> None:
-        """trace_storage_size_bytes must sum OTEL bytes for both stats tables.
-
-        Dropping OTEL underreports project storage (the calls_merged_stats column
-        is `otel_dump_size_bytes`, calls_complete_stats is `otel_size_bytes`).
-        """
-        for read_table, expected_otel_col, other_otel_col in [
-            (ReadTable.CALLS_MERGED, "otel_dump_size_bytes", "otel_size_bytes"),
-            (ReadTable.CALLS_COMPLETE, "otel_size_bytes", "otel_dump_size_bytes"),
-        ]:
-            pb = ParamBuilder("pb")
-            query, _ = make_project_stats_query(
-                project_id="test_project",
-                pb=pb,
-                include_trace_storage_size=True,
-                include_objects_storage_size=False,
-                include_tables_storage_size=False,
-                include_files_storage_size=False,
-                read_table=read_table,
-            )
-            assert f"COALESCE({expected_otel_col}, 0)" in query, (
-                f"trace_storage sum missing OTEL bytes for {read_table}"
-            )
-            assert other_otel_col not in query, (
-                f"wrong OTEL column {other_otel_col} used for {read_table}"
-            )
-
-    def test_only_objects_storage_with_calls_complete(self) -> None:
-        """Verify non-trace storage works without including calls stats table."""
-        pb = ParamBuilder("pb")
-        query, columns = make_project_stats_query(
-            project_id="test_project",
-            pb=pb,
-            include_trace_storage_size=False,
-            include_objects_storage_size=True,
-            include_tables_storage_size=False,
-            include_files_storage_size=False,
-            read_table=ReadTable.CALLS_COMPLETE,
-        )
-
-        expected_sql = """
-            SELECT
-                (SELECT sum(size_bytes)
-                    FROM object_versions_stats
-                    WHERE project_id = {pb_0: String}
-                ) AS objects_storage_size_bytes
-        """
-        assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == ["objects_storage_size_bytes"]

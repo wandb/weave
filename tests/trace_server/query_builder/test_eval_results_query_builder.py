@@ -1,3 +1,5 @@
+import pytest
+
 from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
@@ -13,23 +15,32 @@ from weave.trace_server.query_builder.eval_results_query_builder import (
 )
 
 
-def test_cte_chain_calls_merged() -> None:
-    """Full CTE chain for calls_merged with intersection."""
-    pb = ParamBuilder("pb")
-    cte = build_eval_results_cte_chain(
-        project_id="proj-1",
-        eval_root_ids=["eval-1", "eval-2"],
-        sort_by=None,
-        filters=None,
-        require_intersection=True,
-        limit=50,
-        offset=0,
-        pb=pb,
-        read_table="calls_merged",
-    )
-    assert_raw_sql(
-        cte,
-        """
+# Each param keeps its complete expected CTE string + params: merged uses any(...)
+# aggregation + parent-id-NULL OR-branch, complete uses direct columns +
+# deleted_at = SENTINEL_EPOCH, and the sort / multi-filter cases add ROW_NUMBER
+# ordering plus HAVING toFloat64OrNull comparisons.
+@pytest.mark.parametrize(
+    (
+        "read_table",
+        "eval_root_ids",
+        "sort_by",
+        "filters",
+        "require_intersection",
+        "limit",
+        "offset",
+        "expected_sql",
+        "expected_params",
+    ),
+    [
+        pytest.param(
+            "calls_merged",
+            ["eval-1", "eval-2"],
+            None,
+            None,
+            True,
+            50,
+            0,
+            """
             predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
@@ -100,34 +111,24 @@ def test_cte_chain_calls_merged() -> None:
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
-        pb.get_params(),
-        {
-            "pb_0": "proj-1",
-            "pb_1": ["eval-1", "eval-2"],
-            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": 2,
-        },
-    )
-
-
-def test_cte_chain_calls_complete() -> None:
-    """Full CTE chain for calls_complete with offset."""
-    pb = ParamBuilder("pb")
-    cte = build_eval_results_cte_chain(
-        project_id="proj-1",
-        eval_root_ids=["eval-1"],
-        sort_by=None,
-        filters=None,
-        require_intersection=False,
-        limit=25,
-        offset=10,
-        pb=pb,
-        read_table="calls_complete",
-    )
-    assert_raw_sql(
-        cte,
-        """
+            {
+                "pb_0": "proj-1",
+                "pb_1": ["eval-1", "eval-2"],
+                "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+                "pb_4": 2,
+            },
+            id="cte_chain_calls_merged",
+        ),
+        pytest.param(
+            "calls_complete",
+            ["eval-1"],
+            None,
+            None,
+            False,
+            25,
+            10,
+            """
             predict_and_score_calls AS (
                 SELECT calls_complete.id AS call_id,
                     calls_complete.parent_id AS eval_call_id,
@@ -190,79 +191,67 @@ def test_cte_chain_calls_complete() -> None:
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
-        pb.get_params(),
-        {
-            "pb_0": "proj-1",
-            "pb_1": ["eval-1"],
-            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": SENTINEL_EPOCH,
-        },
-    )
-
-
-def test_cte_chain_sort_and_multi_eval_filters() -> None:
-    """Full CTE chain: scoped sort + two per-eval filters + intersection on calls_complete."""
-    pb = ParamBuilder("pb")
-    sort_by = [
-        tsi.EvalResultsSortBy(
-            field="scores.accuracy",
-            direction="desc",
-            evaluation_call_id="eval-1",
-        )
-    ]
-    filters = [
-        tsi.EvalResultsFilter(
-            evaluation_call_id="eval-1",
-            query=Query.model_validate(
-                {
-                    "$expr": {
-                        "$gte": [
-                            {
-                                "$convert": {
-                                    "input": {"$getField": "scores.accuracy"},
-                                    "to": "double",
-                                }
-                            },
-                            {"$literal": 0.5},
-                        ]
-                    }
-                }
-            ),
+            {
+                "pb_0": "proj-1",
+                "pb_1": ["eval-1"],
+                "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+                "pb_4": SENTINEL_EPOCH,
+            },
+            id="cte_chain_calls_complete",
         ),
-        tsi.EvalResultsFilter(
-            evaluation_call_id="eval-2",
-            query=Query.model_validate(
-                {
-                    "$expr": {
-                        "$lte": [
-                            {
-                                "$convert": {
-                                    "input": {"$getField": "scores.accuracy"},
-                                    "to": "double",
-                                }
-                            },
-                            {"$literal": 0.9},
-                        ]
-                    }
-                }
-            ),
-        ),
-    ]
-    cte = build_eval_results_cte_chain(
-        project_id="proj-1",
-        eval_root_ids=["eval-1", "eval-2"],
-        sort_by=sort_by,
-        filters=filters,
-        require_intersection=True,
-        limit=100,
-        offset=50,
-        pb=pb,
-        read_table="calls_complete",
-    )
-    assert_raw_sql(
-        cte,
-        """
+        pytest.param(
+            "calls_complete",
+            ["eval-1", "eval-2"],
+            [
+                tsi.EvalResultsSortBy(
+                    field="scores.accuracy",
+                    direction="desc",
+                    evaluation_call_id="eval-1",
+                )
+            ],
+            [
+                tsi.EvalResultsFilter(
+                    evaluation_call_id="eval-1",
+                    query=Query.model_validate(
+                        {
+                            "$expr": {
+                                "$gte": [
+                                    {
+                                        "$convert": {
+                                            "input": {"$getField": "scores.accuracy"},
+                                            "to": "double",
+                                        }
+                                    },
+                                    {"$literal": 0.5},
+                                ]
+                            }
+                        }
+                    ),
+                ),
+                tsi.EvalResultsFilter(
+                    evaluation_call_id="eval-2",
+                    query=Query.model_validate(
+                        {
+                            "$expr": {
+                                "$lte": [
+                                    {
+                                        "$convert": {
+                                            "input": {"$getField": "scores.accuracy"},
+                                            "to": "double",
+                                        }
+                                    },
+                                    {"$literal": 0.9},
+                                ]
+                            }
+                        }
+                    ),
+                ),
+            ],
+            True,
+            100,
+            50,
+            """
             predict_and_score_calls AS (
                 SELECT calls_complete.id AS call_id,
                     calls_complete.parent_id AS eval_call_id,
@@ -328,71 +317,60 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
-        pb.get_params(),
-        {
-            "pb_0": "proj-1",
-            "pb_1": ["eval-1", "eval-2"],
-            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": SENTINEL_EPOCH,
-            "pb_5": '$."scores"."accuracy"',
-            "pb_6": "eval-1",
-            "pb_7": 2,
-            "pb_8": 0.5,
-            "pb_9": "eval-2",
-            "pb_10": 0.9,
-        },
-    )
-
-
-def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
-    """Red-team for PR #6735: orm.py infers field-side casts from peer
-    literals so feedback / threads / objects don't need an explicit
-    `$convert` to compare a JSON-extracted field against a typed param. The
-    PR promises that any caller of `Select.where(...)` benefits, but
-    `_process_query_to_conditions`'s `GetFieldOperator` branch silently
-    drops the inferred cast when a `field_resolver` is provided. Eval
-    results filtering reaches `_process_query_to_conditions` exactly that
-    way, so a numeric / bool literal without `$convert` should still pick
-    up the typed cast (matching the explicit-`$convert` shape pinned by
-    `test_cte_chain_sort_and_multi_eval_filters`).
-
-    The HAVING clause on `ranked_digests` must wrap the per-eval scores
-    aggregate in `toFloat64OrNull(...)` so the comparison against the
-    `Float64` parameter type-checks in ClickHouse. Without the fix the
-    field comes through as `String` and CH refuses the comparison with
-    `NO_COMMON_TYPE`.
-    """
-    pb = ParamBuilder("pb")
-    filters = [
-        tsi.EvalResultsFilter(
-            evaluation_call_id="eval-1",
-            query=Query.model_validate(
-                {
-                    "$expr": {
-                        "$gte": [
-                            {"$getField": "scores.accuracy"},
-                            {"$literal": 0.5},
-                        ]
-                    }
-                }
-            ),
+            {
+                "pb_0": "proj-1",
+                "pb_1": ["eval-1", "eval-2"],
+                "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+                "pb_4": SENTINEL_EPOCH,
+                "pb_5": '$."scores"."accuracy"',
+                "pb_6": "eval-1",
+                "pb_7": 2,
+                "pb_8": 0.5,
+                "pb_9": "eval-2",
+                "pb_10": 0.9,
+            },
+            id="cte_chain_sort_and_multi_eval_filters",
         ),
-    ]
-    cte = build_eval_results_cte_chain(
-        project_id="proj-1",
-        eval_root_ids=["eval-1"],
-        sort_by=None,
-        filters=filters,
-        require_intersection=False,
-        limit=10,
-        offset=0,
-        pb=pb,
-        read_table="calls_merged",
-    )
-    assert_raw_sql(
-        cte,
-        """
+        # Red-team for PR #6735: orm.py infers field-side casts from peer
+        #     literals so feedback / threads / objects don't need an explicit
+        #     `$convert` to compare a JSON-extracted field against a typed param. The
+        #     PR promises that any caller of `Select.where(...)` benefits, but
+        #     `_process_query_to_conditions`'s `GetFieldOperator` branch silently
+        #     drops the inferred cast when a `field_resolver` is provided. Eval
+        #     results filtering reaches `_process_query_to_conditions` exactly that
+        #     way, so a numeric / bool literal without `$convert` should still pick
+        #     up the typed cast (matching the explicit-`$convert` shape pinned by
+        #     `test_cte_chain_sort_and_multi_eval_filters`).
+        #
+        #     The HAVING clause on `ranked_digests` must wrap the per-eval scores
+        #     aggregate in `toFloat64OrNull(...)` so the comparison against the
+        #     `Float64` parameter type-checks in ClickHouse. Without the fix the
+        #     field comes through as `String` and CH refuses the comparison with
+        #     `NO_COMMON_TYPE`.
+        pytest.param(
+            "calls_merged",
+            ["eval-1"],
+            None,
+            [
+                tsi.EvalResultsFilter(
+                    evaluation_call_id="eval-1",
+                    query=Query.model_validate(
+                        {
+                            "$expr": {
+                                "$gte": [
+                                    {"$getField": "scores.accuracy"},
+                                    {"$literal": 0.5},
+                                ]
+                            }
+                        }
+                    ),
+                ),
+            ],
+            False,
+            10,
+            0,
+            """
             predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
@@ -463,36 +441,54 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
-        pb.get_params(),
-        {
-            "pb_0": "proj-1",
-            "pb_1": ["eval-1"],
-            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": '$."scores"."accuracy"',
-            "pb_5": "eval-1",
-            "pb_6": 0.5,
-        },
-    )
-
-
-def test_full_query_calls_merged() -> None:
-    """Full SQL: lean CTEs + outer SELECT hydrates from calls_merged."""
+            {
+                "pb_0": "proj-1",
+                "pb_1": ["eval-1"],
+                "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+                "pb_4": '$."scores"."accuracy"',
+                "pb_5": "eval-1",
+                "pb_6": 0.5,
+            },
+            id="eval_filter_infers_cast_for_typed_literal_without_convert",
+        ),
+    ],
+)
+def test_cte_chain(
+    read_table: str,
+    eval_root_ids: list[str],
+    sort_by: list[tsi.EvalResultsSortBy] | None,
+    filters: list[tsi.EvalResultsFilter] | None,
+    require_intersection: bool,
+    limit: int,
+    offset: int,
+    expected_sql: str,
+    expected_params: dict,
+) -> None:
     pb = ParamBuilder("pb")
-    sql = build_eval_results_query(
+    cte = build_eval_results_cte_chain(
         project_id="proj-1",
-        eval_root_ids=["eval-1"],
-        sort_by=None,
-        filters=None,
-        require_intersection=False,
-        limit=10,
-        offset=0,
+        eval_root_ids=eval_root_ids,
+        sort_by=sort_by,
+        filters=filters,
+        require_intersection=require_intersection,
+        limit=limit,
+        offset=offset,
         pb=pb,
-        read_table="calls_merged",
+        read_table=read_table,
     )
-    assert_raw_sql(
-        sql,
-        """
+    assert_raw_sql(cte, expected_sql, pb.get_params(), expected_params)
+
+
+# merged vs complete differ only in the page_calls CTE (merged: any(...) + GROUP
+# BY + PREWHERE; complete: direct columns + plain WHERE, no GROUP BY) and the
+# extra project param; the outer SELECT is identical. Both full strings retained.
+@pytest.mark.parametrize(
+    ("read_table", "expected_sql", "expected_params"),
+    [
+        pytest.param(
+            "calls_merged",
+            """
         WITH predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
@@ -598,34 +594,18 @@ def test_full_query_calls_merged() -> None:
         LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
         ORDER BY page_rows.row_order ASC
         """,
-        pb.get_params(),
-        {
-            "pb_0": "proj-1",
-            "pb_1": ["eval-1"],
-            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": "proj-1",
-        },
-    )
-
-
-def test_full_query_calls_complete() -> None:
-    """Full SQL: lean CTEs + page_calls hydration on calls_complete (no GROUP BY)."""
-    pb = ParamBuilder("pb")
-    sql = build_eval_results_query(
-        project_id="proj-1",
-        eval_root_ids=["eval-1"],
-        sort_by=None,
-        filters=None,
-        require_intersection=False,
-        limit=10,
-        offset=0,
-        pb=pb,
-        read_table="calls_complete",
-    )
-    assert_raw_sql(
-        sql,
-        """
+            {
+                "pb_0": "proj-1",
+                "pb_1": ["eval-1"],
+                "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+                "pb_4": "proj-1",
+            },
+            id="full_query_calls_merged",
+        ),
+        pytest.param(
+            "calls_complete",
+            """
         WITH predict_and_score_calls AS (
                 SELECT calls_complete.id AS call_id,
                     calls_complete.parent_id AS eval_call_id,
@@ -723,13 +703,29 @@ def test_full_query_calls_complete() -> None:
         LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
         ORDER BY page_rows.row_order ASC
         """,
-        pb.get_params(),
-        {
-            "pb_0": "proj-1",
-            "pb_1": ["eval-1"],
-            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": SENTINEL_EPOCH,
-            "pb_5": "proj-1",
-        },
+            {
+                "pb_0": "proj-1",
+                "pb_1": ["eval-1"],
+                "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+                "pb_4": SENTINEL_EPOCH,
+                "pb_5": "proj-1",
+            },
+            id="full_query_calls_complete",
+        ),
+    ],
+)
+def test_full_query(read_table: str, expected_sql: str, expected_params: dict) -> None:
+    pb = ParamBuilder("pb")
+    sql = build_eval_results_query(
+        project_id="proj-1",
+        eval_root_ids=["eval-1"],
+        sort_by=None,
+        filters=None,
+        require_intersection=False,
+        limit=10,
+        offset=0,
+        pb=pb,
+        read_table=read_table,
     )
+    assert_raw_sql(sql, expected_sql, pb.get_params(), expected_params)

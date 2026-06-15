@@ -1,3 +1,5 @@
+import pytest
+
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
@@ -8,30 +10,48 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
 
-def test_object_ref_filter_simple() -> None:
+@pytest.mark.parametrize(
+    ("operation", "op_sql"),
+    [
+        (
+            tsi_query.EqOperation.model_validate(
+                {
+                    "$eq": [
+                        {"$getField": "output.model.temperature"},
+                        {"$literal": 1},
+                    ]
+                }
+            ),
+            "=",
+        ),
+        (
+            tsi_query.LtOperation.model_validate(
+                {
+                    "$lt": [
+                        {"$getField": "output.model.temperature"},
+                        {"$literal": 1},
+                    ]
+                }
+            ),
+            "<",
+        ),
+    ],
+)
+def test_object_ref_filter_simple_operator(operation, op_sql) -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {
-                "$eq": [
-                    {"$getField": "output.model.temperature"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
+    cq.add_condition(operation)
     cq.add_order("started_at", "desc")
     cq.set_expand_columns(["output.model"])
     assert_sql(
         cq,
-        """
+        f"""
         WITH obj_filter_0 AS
           (SELECT digest,
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
+           WHERE project_id = {{pb_0:String}}
+             AND JSON_VALUE(val_dump, {{pb_1:String}}) {op_sql} {{pb_2:Int64}}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -41,22 +61,22 @@ def test_object_ref_filter_simple() -> None:
            SELECT digest,
                   digest as ref
            FROM table_rows
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
+           WHERE project_id = {{pb_0:String}}
+             AND JSON_VALUE(val_dump, {{pb_1:String}}) {op_sql} {{pb_2:Int64}}
            GROUP BY project_id,
                     digest),
              filtered_calls AS
           (SELECT calls_merged.id AS id
            FROM calls_merged
-           PREWHERE calls_merged.project_id = {pb_0:String}
+           PREWHERE calls_merged.project_id = {{pb_0:String}}
            WHERE (length(calls_merged.output_refs) > 0
                   OR calls_merged.ended_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') GLOBAL IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {{pb_3:String}}), 'null'), '') GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_0)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {{pb_3:String}}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                       (SELECT ref
                        FROM obj_filter_0)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -64,78 +84,7 @@ def test_object_ref_filter_simple() -> None:
            ORDER BY any(calls_merged.started_at) DESC)
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_0:String}
-        WHERE (calls_merged.id IN filtered_calls)
-        GROUP BY (calls_merged.project_id,
-                  calls_merged.id)
-        ORDER BY any(calls_merged.started_at) DESC
-        """,
-        {
-            "pb_0": "project",
-            "pb_1": '$."temperature"',
-            "pb_2": 1,
-            "pb_3": '$."model"',
-        },
-    )
-
-
-def test_object_ref_filter_lt() -> None:
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.LtOperation.model_validate(
-            {
-                "$lt": [
-                    {"$getField": "output.model.temperature"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
-    cq.add_order("started_at", "desc")
-    cq.set_expand_columns(["output.model"])
-    assert_sql(
-        cq,
-        """
-        WITH obj_filter_0 AS
-          (SELECT digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
-           FROM object_versions
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) < {pb_2:Int64}
-           GROUP BY project_id,
-                    object_id,
-                    digest
-
-           UNION ALL
-
-           SELECT digest,
-                  digest as ref
-           FROM table_rows
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) < {pb_2:Int64}
-           GROUP BY project_id,
-                    digest),
-             filtered_calls AS
-          (SELECT calls_merged.id AS id
-           FROM calls_merged
-           PREWHERE calls_merged.project_id = {pb_0:String}
-           WHERE (length(calls_merged.output_refs) > 0
-                  OR calls_merged.ended_at IS NULL)
-           GROUP BY (calls_merged.project_id,
-                     calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') GLOBAL IN
-                      (SELECT ref
-                       FROM obj_filter_0)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
-                      (SELECT ref
-                       FROM obj_filter_0)))
-                   AND ((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
-           ORDER BY any(calls_merged.started_at) DESC)
-        SELECT calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_0:String}
+        PREWHERE calls_merged.project_id = {{pb_0:String}}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)

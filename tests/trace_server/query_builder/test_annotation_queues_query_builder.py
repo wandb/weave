@@ -1,5 +1,6 @@
 import datetime
 
+import pytest
 import sqlparse
 
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
@@ -11,20 +12,6 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_queue_items_query,
     make_queues_query,
 )
-
-
-def assert_sql(
-    expected_query: str, expected_params: dict, query: str, params: dict
-) -> None:
-    expected_formatted = sqlparse.format(expected_query, reindent=True)
-    found_formatted = sqlparse.format(query, reindent=True)
-
-    assert expected_formatted == found_formatted, (
-        f"\nExpected:\n{expected_formatted}\n\nGot:\n{found_formatted}"
-    )
-    assert expected_params == params, (
-        f"\nExpected params: {expected_params}\n\nGot params: {params}"
-    )
 
 
 def test_make_queues_query_with_name_and_pagination() -> None:
@@ -68,21 +55,18 @@ def test_make_queues_query_with_name_and_pagination() -> None:
     assert_sql(expected_query, expected_params, query, params)
 
 
-def test_make_queue_items_query_with_filter_and_annotation_states() -> None:
-    pb = ParamBuilder("pb")
-    query = make_queue_items_query(
-        project_id="project",
-        queue_id="queue-id",
-        pb=pb,
-        filter=AnnotationQueueItemsFilter(
-            call_id="call-id",
-            annotation_states=["completed"],
-        ),
-        sort_by=[SortBy(field="call_started_at", direction="desc")],
-    )
-    params = pb.get_params()
-
-    expected_query = """
+# make_queue_items_query shares one ~16-column SELECT + LEFT JOIN; cases diverge in
+# the WHERE tail, the optional annotation_state outer wrapper, and the ORDER BY.
+@pytest.mark.parametrize(
+    ("filter", "sort_by", "expected_query", "expected_params"),
+    [
+        # annotation_states wraps the base query in an outer SELECT with an IN filter.
+        pytest.param(
+            AnnotationQueueItemsFilter(
+                call_id="call-id", annotation_states=["completed"]
+            ),
+            [SortBy(field="call_started_at", direction="desc")],
+            """
     SELECT * FROM (
         SELECT
             qi.id,
@@ -114,46 +98,19 @@ def test_make_queue_items_query_with_filter_and_annotation_states() -> None:
     )
     WHERE annotation_state IN {pb_3:Array(String)}
     ORDER BY call_started_at DESC, id ASC
-    """
-
-    expected_params = {
-        "pb_0": "project",
-        "pb_1": "queue-id",
-        "pb_2": "call-id",
-        "pb_3": ["completed"],
-    }
-
-    assert_sql(expected_query, expected_params, query, params)
-
-
-def test_annotation_queue_items_filter_accepts_id_field() -> None:
-    """Requirement: AnnotationQueueItemsFilter must support filtering by queue item ID
-    Interface: AnnotationQueueItemsFilter class constructor
-    Given: An id value "item-123"
-    When: AnnotationQueueItemsFilter is instantiated with id="item-123"
-    Then: filter.id equals "item-123"
-    """
-    filter = AnnotationQueueItemsFilter(id="item-123")
-    assert filter.id == "item-123"
-
-
-def test_make_queue_items_query_with_id_filter() -> None:
-    """Requirement: make_queue_items_query must generate SQL filtering by queue item ID
-    Interface: make_queue_items_query function output (SQL string and params)
-    Given: An AnnotationQueueItemsFilter with id="item-id"
-    When: make_queue_items_query is called with the filter
-    Then: Generated SQL contains qi.id = {param} and params include the id value
-    """
-    pb = ParamBuilder("pb")
-    query = make_queue_items_query(
-        project_id="project",
-        queue_id="queue-id",
-        pb=pb,
-        filter=AnnotationQueueItemsFilter(id="item-id"),
-    )
-    params = pb.get_params()
-
-    expected_query = """
+    """,
+            {
+                "pb_0": "project",
+                "pb_1": "queue-id",
+                "pb_2": "call-id",
+                "pb_3": ["completed"],
+            },
+            id="call_id_and_annotation_states",
+        ),
+        pytest.param(
+            AnnotationQueueItemsFilter(id="item-id"),
+            None,
+            """
     SELECT
         qi.id,
         any(qi.project_id) as project_id,
@@ -182,34 +139,14 @@ def test_make_queue_items_query_with_id_filter() -> None:
         AND qi.id = {pb_2:String}
     GROUP BY qi.id
     ORDER BY created_at ASC, id ASC
-    """
-
-    expected_params = {
-        "pb_0": "project",
-        "pb_1": "queue-id",
-        "pb_2": "item-id",
-    }
-
-    assert_sql(expected_query, expected_params, query, params)
-
-
-def test_make_queue_items_query_with_id_and_call_id_filter() -> None:
-    """Requirement: id filter can be combined with other filters like call_id
-    Interface: make_queue_items_query function output (SQL string and params)
-    Given: An AnnotationQueueItemsFilter with id="item-id" and call_id="call-id"
-    When: make_queue_items_query is called with the filter
-    Then: Generated SQL contains both qi.id and qi.call_id conditions
-    """
-    pb = ParamBuilder("pb")
-    query = make_queue_items_query(
-        project_id="project",
-        queue_id="queue-id",
-        pb=pb,
-        filter=AnnotationQueueItemsFilter(id="item-id", call_id="call-id"),
-    )
-    params = pb.get_params()
-
-    expected_query = """
+    """,
+            {"pb_0": "project", "pb_1": "queue-id", "pb_2": "item-id"},
+            id="id_filter",
+        ),
+        pytest.param(
+            AnnotationQueueItemsFilter(id="item-id", call_id="call-id"),
+            None,
+            """
     SELECT
         qi.id,
         any(qi.project_id) as project_id,
@@ -239,16 +176,43 @@ def test_make_queue_items_query_with_id_and_call_id_filter() -> None:
         AND qi.call_id = {pb_3:String}
     GROUP BY qi.id
     ORDER BY created_at ASC, id ASC
+    """,
+            {
+                "pb_0": "project",
+                "pb_1": "queue-id",
+                "pb_2": "item-id",
+                "pb_3": "call-id",
+            },
+            id="id_and_call_id_filter",
+        ),
+    ],
+)
+def test_make_queue_items_query(
+    filter: AnnotationQueueItemsFilter,
+    sort_by: list[SortBy] | None,
+    expected_query: str,
+    expected_params: dict,
+) -> None:
+    pb = ParamBuilder("pb")
+    query = make_queue_items_query(
+        project_id="project",
+        queue_id="queue-id",
+        pb=pb,
+        filter=filter,
+        sort_by=sort_by,
+    )
+    assert_sql(expected_query, expected_params, query, pb.get_params())
+
+
+def test_annotation_queue_items_filter_accepts_id_field() -> None:
+    """Requirement: AnnotationQueueItemsFilter must support filtering by queue item ID
+    Interface: AnnotationQueueItemsFilter class constructor
+    Given: An id value "item-123"
+    When: AnnotationQueueItemsFilter is instantiated with id="item-123"
+    Then: filter.id equals "item-123"
     """
-
-    expected_params = {
-        "pb_0": "project",
-        "pb_1": "queue-id",
-        "pb_2": "item-id",
-        "pb_3": "call-id",
-    }
-
-    assert_sql(expected_query, expected_params, query, params)
+    filter = AnnotationQueueItemsFilter(id="item-123")
+    assert filter.id == "item-123"
 
 
 def test_make_annotator_progress_state_check_query() -> None:
@@ -347,3 +311,17 @@ def test_make_annotator_progress_insert_query() -> None:
     }
 
     assert_sql(expected_query, expected_params, query, params)
+
+
+def assert_sql(
+    expected_query: str, expected_params: dict, query: str, params: dict
+) -> None:
+    expected_formatted = sqlparse.format(expected_query, reindent=True)
+    found_formatted = sqlparse.format(query, reindent=True)
+
+    assert expected_formatted == found_formatted, (
+        f"\nExpected:\n{expected_formatted}\n\nGot:\n{found_formatted}"
+    )
+    assert expected_params == params, (
+        f"\nExpected params: {expected_params}\n\nGot params: {params}"
+    )
