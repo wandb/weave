@@ -45,7 +45,6 @@ def test_deepcopy_weavelist(client):
     assert id(res) != id(lst)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deepcopy_weavelist_e2e(weave_active):
     lst = [1, 2, 3]
     ref = weave.publish(lst)
@@ -62,7 +61,6 @@ def test_deepcopy_weavedict(client):
     assert id(res) != id(d)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deepcopy_weavedict_e2e(weave_active):
     d = {"a": 1, "b": 2}
     ref = weave.publish(d)
@@ -86,7 +84,6 @@ def test_deepcopy_weaveobject(client, example_class):
     assert id(res) != id(o)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deepcopy_weaveobject_e2e(weave_active, example_class):
     cls, expected_record = example_class
 

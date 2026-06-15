@@ -241,14 +241,12 @@ def test_column_manipulation():
     assert view.base.definition.columns[0].path == ["inputs", "foo"]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_saved_view_create(weave_active):
     view = weave.SavedView("traces", "My saved view").hide_column("feedback").save()
     assert view.label == "My saved view"
     assert isinstance(view.ref, ObjectRef)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_saved_view_load(weave_active):
     saved_view = weave.SavedView("traces", "My saved view")
     saved_view.show_column("attributes.weave.client_version")
@@ -260,7 +258,6 @@ def test_saved_view_load(weave_active):
     assert loaded_view.base.definition.cols["attributes.weave.client_version"] is True
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_saved_view_expand_columns_round_trip(client):
     # A view that filters on `inputs.self.base_model_name` needs `inputs.self`
     # in `expand_columns` for the trace server to join through the ref at query

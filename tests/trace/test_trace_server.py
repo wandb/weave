@@ -8,7 +8,6 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import RefObjectsNotFoundError
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_save_object(client):
     create_res = client.server.obj_create(
         tsi.ObjCreateReq(

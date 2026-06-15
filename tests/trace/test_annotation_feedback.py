@@ -184,7 +184,6 @@ def test_field_schema_with_pydantic_model(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_field_schema_with_pydantic_field(client):
     # Test various field types
     rating_field = Field(ge=1, le=5, description="Rating from 1 to 5")

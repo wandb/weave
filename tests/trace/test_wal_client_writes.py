@@ -324,7 +324,6 @@ class TestWALDisabled:
         """Default client should have _wal=None."""
         assert client._wal is None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_publish_works_without_wal(self, weave_active):
         """publish() should succeed and return a ref when WAL is disabled."""
         ref = weave.publish({"key": "value"}, name="no_wal_obj")
@@ -337,7 +336,6 @@ class TestWALDisabled:
         ref = weave.publish(ds, name="no_wal_ds")
         assert ref is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_flush_works_without_wal(self, client):
         """flush() should not raise when WAL is disabled."""
         weave.publish({"a": 1}, name="flush_obj")
@@ -347,7 +345,6 @@ class TestWALDisabled:
 class TestWALSender:
     """Verify that the in-process sender drains WAL records automatically."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_sender_drains_on_close(self, wal_client_with_sender):
         """After close(), the sender's final drain should consume all records."""
         weave.publish({"k": "v"}, name="sender_obj")
@@ -358,7 +355,6 @@ class TestWALSender:
         remaining = list(wal_dir.glob("*.jsonl"))
         assert len(remaining) == 0
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_sender_drains_table_create(self, wal_client_with_sender):
         """Table-create records should be drained and files cleaned up."""
         ds = weave.Dataset(name="sender_ds", rows=[{"x": 1}])

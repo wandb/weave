@@ -17,7 +17,6 @@ def generate_objects(weave_client: WeaveClient, obj_count: int, version_count: i
             weave.publish({"i": i, "j": j}, name=f"obj_{i}")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objs_query_all(client: WeaveClient):
     generate_objects(client, 10, 10)
 
@@ -29,7 +28,6 @@ def test_objs_query_all(client: WeaveClient):
     assert len(res.objs) == 100
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objs_query_filter_object_ids(client: WeaveClient):
     generate_objects(client, 10, 10)
 
@@ -43,7 +41,6 @@ def test_objs_query_filter_object_ids(client: WeaveClient):
     assert all(obj.object_id in {"obj_0", "obj_1"} for obj in res.objs)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objs_query_filter_is_op(client: WeaveClient):
     generate_objects(client, 10, 10)
 
@@ -61,7 +58,6 @@ def test_objs_query_filter_is_op(client: WeaveClient):
     assert len(res.objs) == 100
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objs_query_filter_latest_only(client: WeaveClient):
     generate_objects(client, 10, 10)
 
@@ -76,7 +72,6 @@ def test_objs_query_filter_latest_only(client: WeaveClient):
     assert all(obj.val["j"] == 9 for obj in res.objs)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
     generate_objects(client, 10, 10)
 
@@ -117,7 +112,6 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
     assert res.objs[2].val["i"] == 7
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
     generate_objects(client, 10, 10)
 
@@ -158,7 +152,6 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
     assert res.objs[2].val["i"] == 7
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objs_query_filter_metadata_only(client: WeaveClient):
     generate_objects(client, 10, 10)
 
@@ -186,7 +179,6 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
         assert obj.val
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objs_query_wb_user_id(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -199,7 +191,6 @@ def test_objs_query_wb_user_id(client: WeaveClient):
     assert all(obj.wb_user_id == correct_id for obj in res)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3)
 def test_objs_query_deleted_interaction(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
@@ -259,7 +250,6 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
     assert len(res.objs) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3)
 def test_objs_query_delete_and_recreate(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
@@ -317,7 +307,6 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
         assert res.objs[i].val["i"] == i + 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3)
 def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")

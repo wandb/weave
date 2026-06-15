@@ -23,7 +23,6 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_llm_structured_completion_model_creation_and_class_assignment(
     client: WeaveClient,
 ):
@@ -116,7 +115,6 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
     assert reconstructed_model.llm_model_id == "gpt-4"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_llm_structured_completion_model_filtering(client: WeaveClient):
     """Test querying LLMStructuredCompletionModel objects by leaf/base object classes."""
     # Create multiple models
@@ -795,7 +793,6 @@ def test_llm_structured_completion_model_prompt_takes_precedence(
     assert call_args.inputs.messages == []
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
     """Test schema validation for LLMStructuredCompletionModel."""
     # Test missing required field
