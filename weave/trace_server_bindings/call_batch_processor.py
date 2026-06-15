@@ -171,24 +171,20 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
     def stop_accepting_new_work_and_flush_queue(self) -> None:
         """Stop accepting work and flush the queue.
 
-        Pending ends whose start was already sent eagerly can never pair into a
-        complete call, so they are sent via the eager v2 endpoint immediately.
-        The remaining non-eager pending work is given up to FLUSH_TIMEOUT_SECONDS
-        to pair before its leftovers are sent eagerly too.
+        Waits up to FLUSH_TIMEOUT_SECONDS for in-flight calls to pair (start
+        meets end). Anything still unpaired is sent via the eager v2
+        start/end endpoints.
         """
-        # Eager ends will never pair (their start went out via the eager path),
-        # so flush them now instead of waiting out the pairing window.
-        self._flush_eager_unpaired_ends()
-
-        # Wait for non-eager pending items to pair (in-flight calls completing).
-        # Don't set stop event yet - processing thread needs to keep running and
-        # ends need to be able to come in and pair with pending starts. Break
-        # early once nothing non-eager remains.
+        # Wait for pending items to pair (in-flight calls completing)
+        # Don't set stop event yet - processing thread needs to keep running
+        # and ends need to be able to come in and pair with pending starts
+        # Break early if all calls are matched (done)
         deadline = time.monotonic() + FLUSH_TIMEOUT_SECONDS
         while time.monotonic() < deadline:
             with self.lock:
-                if self._num_non_eager_pending() == 0:
-                    break
+                pending_count = len(self._pending_starts) + len(self._pending_ends)
+            if pending_count == 0:
+                break
             time.sleep(FLUSH_POLL_INTERVAL_SECONDS)
 
         # Push any remaining unpaired items onto the queue so the processing
@@ -218,6 +214,9 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                     _, end_item = self._pending_ends.popitem()
                     self._queue_item(end_item)
 
+            # Intentionally keep _eager_call_ids: a flush mid-eval must not orphan
+            # the still-pending end of an in-progress eager call (TTL bounds it).
+
         # Shutdown, processing thread will drain queue (including the orphans
         # we just queued) then exit
         self.stop_accepting_work_event.set()
@@ -227,34 +226,6 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         # but we don't drop queue items if they've already been paired.
         self.processing_thread.join()
         self.health_check_thread.join()
-
-    def _num_non_eager_pending(self) -> int:
-        """Count pending items that can still pair into a complete call.
-
-        Pending ends whose start was sent eagerly never pair, so they are
-        excluded; callers must hold self.lock.
-        """
-        eager_pending_ends = sum(
-            1 for call_id in self._pending_ends if call_id in self._eager_call_ids
-        )
-        return len(self._pending_starts) + len(self._pending_ends) - eager_pending_ends
-
-    def _flush_eager_unpaired_ends(self) -> None:
-        """Send pending ends whose start was already sent via the eager path.
-
-        These can never pair into a complete call, so they go straight to the
-        eager v2 endpoint via the queue (respecting batching/pacing).
-        """
-        with self.lock:
-            eager_end_ids = [
-                call_id
-                for call_id in self._pending_ends
-                if call_id in self._eager_call_ids
-            ]
-            for call_id in eager_end_ids:
-                end_item = self._pending_ends.pop(call_id)
-                self._eager_call_ids.pop(call_id, None)
-                self._queue_item(end_item)
 
     def _handle_start(
         self, item: StartBatchItem, *, eager_call_start: bool = False

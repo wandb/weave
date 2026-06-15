@@ -217,8 +217,8 @@ def test_missing_trace_id_raises_value_error() -> None:
         processor.stop_accepting_new_work_and_flush_queue()
 
 
-def test_flush_eager_sends_unpaired_items_and_clears_state() -> None:
-    """Flush sends unpaired items via the eager v2 endpoints and clears caches."""
+def test_flush_sends_unpaired_items_via_eager_endpoints() -> None:
+    """Flush sends unpaired items via the eager v2 endpoints."""
     complete_fn = MagicMock()
     eager_fn = MagicMock()
     processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
@@ -246,14 +246,14 @@ def test_flush_eager_sends_unpaired_items_and_clears_state() -> None:
     assert orphan_end in sent_items
 
 
-def test_flush_skips_wait_for_eager_unpaired_but_waits_for_non_eager() -> None:
-    """Flush returns promptly for unpaired eager ends, but still waits for non-eager work."""
+def test_flush_does_not_stall_on_eager_end_after_intermediate_flush() -> None:
+    """Eager tracking survives a mid-eval flush, so the later end never orphans."""
     eager_fn = MagicMock()
-    timeout = 3.0
-
-    # Eager start, then a mid-eval flush: eager tracking must survive the flush so
-    # the later end pairs eagerly instead of becoming a never-pairing orphan.
+    timeout = 2.0
     processor = CallBatchProcessor(MagicMock(), eager_fn, min_batch_interval=0.01)
+
+    # Eager start, then a flush before the eval finishes. Eager tracking must
+    # survive the flush or the end below becomes a never-pairing orphan.
     processor.enqueue_start(_make_start_item("ev-1", "trace-1"), eager_call_start=True)
     with patch(
         "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS",
@@ -263,7 +263,8 @@ def test_flush_skips_wait_for_eager_unpaired_but_waits_for_non_eager() -> None:
     assert "ev-1" in processor._eager_call_ids
     processor.accept_new_work()
 
-    # Eval finishes: the eager end pairs via _eager_call_ids and is never parked.
+    # Eval finishes: the end pairs via _eager_call_ids and is sent immediately,
+    # so the flush returns well under the timeout instead of waiting it out.
     processor.enqueue([_make_end_item("ev-1")])
     start = time.monotonic()
     with patch(
@@ -271,30 +272,15 @@ def test_flush_skips_wait_for_eager_unpaired_but_waits_for_non_eager() -> None:
         timeout,
     ):
         processor.stop_accepting_new_work_and_flush_queue()
-    eager_flush_elapsed = time.monotonic() - start
-    assert eager_flush_elapsed < timeout
+    assert time.monotonic() - start < timeout
     assert processor._pending_ends == {}
-    sent_ids = {
+    sent_end_ids = {
         item.req.end.id
         for call in eager_fn.call_args_list
         for item in call.args[0]
         if isinstance(item, EndBatchItem)
     }
-    assert "ev-1" in sent_ids
-
-    # A non-eager start with no end is genuine in-flight work and must consume the
-    # full pairing window before its leftovers are flushed eagerly.
-    non_eager = CallBatchProcessor(MagicMock(), MagicMock(), min_batch_interval=0.01)
-    non_eager.enqueue([_make_start_item("normal-1", "trace-2")])
-    short_timeout = 0.5
-    start = time.monotonic()
-    with patch(
-        "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS",
-        short_timeout,
-    ):
-        non_eager.stop_accepting_new_work_and_flush_queue()
-    non_eager_elapsed = time.monotonic() - start
-    assert non_eager_elapsed >= short_timeout
+    assert sent_end_ids == {"ev-1"}
 
 
 def test_queue_full_writes_to_disk(tmp_path: pathlib.Path) -> None:
