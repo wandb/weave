@@ -99,3 +99,45 @@ Arc of the request:
 - The sibling legacy tests/integrations/claude_agent_sdk/claude_agent_sdk_test.py has
   PRE-EXISTING failures (len(calls)==1 vs 2) unrelated to this change (verified by
   stashing and running on a clean tree).
+
+## Review Feedback Rounds (Conductor local comments, post-initial-push)
+Amended into this commit (SHA changed from 601c1026ca). Iterations:
+
+1. "make it generic" (otel_integration.py): the original draft exposed a
+   claude-only `claude_agent_sdk_agent_name`. Reworked into the generic
+   `weave.session.agent_name_override` + resolver used by claude AND openai.
+   (This was the big rework; already reflected in the sections above.)
+
+2. test_agent_context.py "tests a generic feature but uses integration-specific
+   things": rewrote with neutral placeholders. Then "instead of 'fallback', be
+   descriptive — think like a user": settled on `"default_agent_name"` for the
+   default and realistic user labels (`"research_agent"`, `"summarizer_agent"`,
+   `"customer_support_agent"`) for overrides.
+
+3. openai test mock churn — IMPORTANT LESSON. I first answered "does the mock
+   need all these props?" by switching to call the internals `_agent_attrs` /
+   `_otel_span_name` directly via SimpleNamespace. Reviewer pushback: "reaching
+   for the internals is bad form" AND "mock is cleaner, you just don't need all
+   the stuff AROUND it." Final: keep Mock(spec=Span) driving the PUBLIC path
+   (on_span_start/on_span_end -> emitted span), but drop the ceremony — no Trace
+   mock, no on_trace_start/on_trace_end, no `client` fixture. The processor needs
+   NO weave client (grep: zero get_weave_client refs), so pure span-event tests
+   don't need ClickHouse. The span Mock still needs started_at/ended_at/span_id/
+   trace_id/parent_id/span_data/error because the processor READS them
+   (_iso_to_ns(None) is safe, so timing/error = None).
+
+4. resolve_agent_name -> renamed `resolve_agent_name_or_default` (reviewer:
+   "more explicitly written as..."). Also removed the `or ""` from call sites
+   (reviewer: "having to put or '' seems like bad form") by making the resolver
+   accept `str | None` and coalesce to "" internally; added
+   test_none_default_coalesces_to_empty_string. openai call site is now
+   `resolve_agent_name_or_default(sd.name)`.
+
+## Hints for Future Agents (review round)
+- Don't over-correct test-shape feedback by reaching into module internals; the
+  reviewer wants public-interface tests with less ceremony, not internal calls.
+- openai_agents OTel processor tests that only drive on_span_start/on_span_end
+  do NOT need the `client` fixture (no weave client used) -> no ClickHouse.
+- openai-agents lock pin (0.2.0) lacks TaskSpanData/TurnSpanData imported at the
+  top of openai_agents_otel_test.py; need a newer openai-agents (e.g. 0.17.x) to
+  collect that module locally. Unrelated to this change.
