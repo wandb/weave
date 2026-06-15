@@ -60,7 +60,7 @@ logger = logging.getLogger("close_stale_draft_prs")
 
 # --- Configuration defaults -----------------------------------------------------
 DEFAULT_STALE_AFTER_DAYS = 30  # mark a PR stale once it has been a draft this long
-DEFAULT_CLOSE_AFTER_DAYS = 7  # close a stale draft this long after it was marked
+DEFAULT_CLOSE_AFTER_DAYS = 1  # close a stale draft this long after it was marked
 DEFAULT_STALE_LABEL = "stale-draft"
 DEFAULT_EXEMPT_LABELS: tuple[str, ...] = ("do-not-close",)
 STALE_LABEL_COLOR = "ededed"
@@ -155,6 +155,10 @@ def _days_between(earlier: datetime, later: datetime) -> float:
     return (later - earlier).total_seconds() / SECONDS_PER_DAY
 
 
+def _plural_days(count: int) -> str:
+    return f"{count} day" if count == 1 else f"{count} days"
+
+
 def decide(pr: PRSnapshot, cfg: StaleConfig, now: datetime) -> Decision:
     """Decide what to do with one PR. Pure: same inputs -> same Decision."""
     if not pr.is_draft:
@@ -187,9 +191,10 @@ def stale_comment(cfg: StaleConfig) -> str:
         escape += f" or given the `{cfg.exempt_labels[0]}` label"
     return (
         f"This pull request has been in **draft** for more than "
-        f"{cfg.stale_after_days} days, so it has been labeled `{cfg.stale_label}`.\n\n"
-        f"It will be **closed automatically in {cfg.close_after_days} days** unless "
-        f"it is {escape}."
+        f"{_plural_days(cfg.stale_after_days)}, so it has been labeled "
+        f"`{cfg.stale_label}`.\n\n"
+        f"It will be **closed automatically in {_plural_days(cfg.close_after_days)}** "
+        f"unless it is {escape}."
     )
 
 
@@ -197,8 +202,8 @@ def close_comment(cfg: StaleConfig) -> str:
     """Build the comment posted when a stale draft PR is closed."""
     return (
         f"Closing this pull request: it has been in **draft** for over "
-        f"{cfg.stale_after_days} days and labeled `{cfg.stale_label}` for "
-        f"{cfg.close_after_days}+ days without being marked ready.\n\n"
+        f"{_plural_days(cfg.stale_after_days)} and was marked `{cfg.stale_label}` "
+        f"without being taken out of draft.\n\n"
         f"Reopen it any time you're ready to continue -- nothing here is lost."
     )
 

@@ -15,6 +15,7 @@ from close_stale_draft_prs import (
     StaleConfig,
     decide,
     reduce_events,
+    stale_comment,
 )
 
 CFG = StaleConfig()
@@ -110,12 +111,25 @@ def test_decide_skips_exempt_label() -> None:
 
 
 def test_decide_closes_after_grace() -> None:
-    snap = _snap(labels=(CFG.stale_label,), stale_labeled_at=_ago(8))
-    assert decide(snap, CFG, NOW).action is Action.CLOSE
+    cfg = StaleConfig(close_after_days=3)
+    snap = _snap(labels=(cfg.stale_label,), stale_labeled_at=_ago(5))
+    assert decide(snap, cfg, NOW).action is Action.CLOSE
 
 
 def test_decide_skips_within_grace() -> None:
-    snap = _snap(labels=(CFG.stale_label,), stale_labeled_at=_ago(2))
+    cfg = StaleConfig(close_after_days=3)
+    snap = _snap(labels=(cfg.stale_label,), stale_labeled_at=_ago(1))
+    assert decide(snap, cfg, NOW).action is Action.SKIP
+
+
+def test_decide_default_grace_closes_one_day_after_marking() -> None:
+    # The default grace is 1 day: a PR marked ~25h ago should close.
+    snap = _snap(labels=(CFG.stale_label,), stale_labeled_at=_ago(1.05))
+    assert decide(snap, CFG, NOW).action is Action.CLOSE
+
+
+def test_decide_default_grace_skips_under_one_day() -> None:
+    snap = _snap(labels=(CFG.stale_label,), stale_labeled_at=_ago(0.5))
     assert decide(snap, CFG, NOW).action is Action.SKIP
 
 
@@ -127,3 +141,15 @@ def test_decide_closes_stale_label_without_timestamp() -> None:
 def test_decide_exempt_label_beats_stale_label() -> None:
     snap = _snap(labels=(CFG.stale_label, "do-not-close"), stale_labeled_at=_ago(99))
     assert decide(snap, CFG, NOW).action is Action.SKIP
+
+
+def test_stale_comment_pluralizes_single_day() -> None:
+    text = stale_comment(StaleConfig(close_after_days=1))
+    assert "closed automatically in 1 day" in text
+    assert "1 days" not in text
+
+
+def test_stale_comment_pluralizes_multiple_days() -> None:
+    assert "closed automatically in 7 days" in stale_comment(
+        StaleConfig(close_after_days=7)
+    )
