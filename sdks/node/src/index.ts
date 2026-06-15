@@ -72,7 +72,7 @@ export type {Op, OpDecorator} from './opType';
  * not part of the supported public API and the runtime export will be
  * removed in a future release.
  */
-export {WeaveClient} from "./weaveClient";
+export {WeaveClient} from './weaveClient';
 export {WeaveObject, ObjectRef} from './weaveObject';
 export {MessagesPrompt, StringPrompt} from './prompt';
 
