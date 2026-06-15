@@ -53,7 +53,10 @@ def test_invertable_dict_mutations_keep_views_in_sync():
 @pytest.mark.parametrize(
     ("build", "match"),
     [
-        (lambda: InvertableDict({"jpg": "jpeg", "jpe": "jpeg"}), "Duplicate value found: jpeg"),
+        (
+            lambda: InvertableDict({"jpg": "jpeg", "jpe": "jpeg"}),
+            "Duplicate value found: jpeg",
+        ),
         (lambda: _set_duplicate(), "Duplicate value found: 1"),
     ],
     ids=["on-init", "on-set"],
