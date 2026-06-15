@@ -32,7 +32,6 @@ from weave.utils.project_id import from_project_id
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_evaluation_run_create_stores_source_evaluation_run_id(client):
     """source_evaluation_run_id written at create time must survive a read."""
     project_id = client.project_id
@@ -66,7 +65,6 @@ def test_evaluation_run_create_stores_source_evaluation_run_id(client):
     assert read_res.source_evaluation_run_id == source_run.evaluation_run_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_evaluation_run_without_source_has_none(client):
     """evaluation_run_read returns source_evaluation_run_id=None for normal runs."""
     project_id = client.project_id

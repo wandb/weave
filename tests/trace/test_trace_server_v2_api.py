@@ -890,7 +890,6 @@ class MultiVersionModel(weave.Model):
 class TestEvaluationRunsV2API:
     """Tests for Evaluation Runs V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_create(self, client):
         """Test creating an evaluation run via V2 API."""
         project_id = client.project_id
@@ -939,7 +938,6 @@ class EvalRunModel(weave.Model):
         # Verify response
         assert run_res.evaluation_run_id is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_read(self, client):
         """Test reading an evaluation run via V2 API."""
         project_id = client.project_id
@@ -995,7 +993,6 @@ class ReadEvalRunModel(weave.Model):
         assert read_res.evaluation == eval_res.evaluation_ref
         assert read_res.model == model_res.model_ref
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_list(self, client):
         """Test listing evaluation runs via V2 API."""
         project_id = client.project_id
@@ -1053,7 +1050,6 @@ class ListEvalRunModel{i}(weave.Model):
         for run_id in run_ids:
             assert run_id in returned_ids
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_delete(self, client):
         """Test deleting evaluation runs via V2 API."""
         project_id = client.project_id
@@ -1109,7 +1105,6 @@ class DeleteEvalRunModel(weave.Model):
         # Verify deletion
         assert delete_res.num_deleted == 1
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_finish(self, client):
         """Test finishing an evaluation run via V2 API."""
         project_id = client.project_id
