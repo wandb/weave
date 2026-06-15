@@ -9,6 +9,7 @@ from weave.trace_server.agents.types import (
     AgentSpanGroupDistributionSpec,
     AgentSpansQueryReq,
     AgentSpanValueRef,
+    AgentTraceMessagesReq,
 )
 from weave.trace_server.trace_server_interface import FeedbackQueryRes
 
@@ -240,3 +241,33 @@ def test_grouped_rows_hydrate_message_previews() -> None:
     # No renderable text → no preview, so the UI falls back to the conversation id.
     assert empty.first_message is None
     assert empty.last_message is None
+
+
+def test_trace_messages_maps_rows_to_normalized_messages() -> None:
+    result = _FakeQueryResult(
+        column_names=["role", "content", "ordered_at"],
+        result_rows=[
+            ("system", "be helpful", None),
+            ("user", "hi", None),
+            ("assistant", "hello", None),
+        ],
+    )
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def query(sql: str, params: dict[str, Any]) -> _FakeQueryResult:
+        calls.append((sql, params))
+        return result
+
+    handler = AgentQueryHandler(query, lambda req: FeedbackQueryRes(result=[]))
+
+    res = handler.trace_messages(
+        AgentTraceMessagesReq(project_id="p1", trace_id="t1", limit=100)
+    )
+
+    assert [(m.role, m.content) for m in res.messages] == [
+        ("system", "be helpful"),
+        ("user", "hi"),
+        ("assistant", "hello"),
+    ]
+    assert len(calls) == 1
+    assert "t1" in calls[0][1].values()

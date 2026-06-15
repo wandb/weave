@@ -63,6 +63,8 @@ from weave.trace_server.agents.types import (
     AgentsQueryRes,
     AgentTraceChatReq,
     AgentTraceChatRes,
+    AgentTraceMessagesReq,
+    AgentTraceMessagesRes,
     AgentVersionSchema,
     AgentVersionsQueryReq,
     AgentVersionsQueryRes,
@@ -92,6 +94,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
+    make_trace_messages_query,
     safe_float,
     safe_int,
     safe_str,
@@ -468,6 +471,24 @@ class AgentQueryHandler:
         rows = self._run_trace_detail_query(project_id, trace_id)
         return [AgentSpanSchema.model_validate(normalize_span_row(r)) for r in rows]
 
+    def trace_messages(self, req: AgentTraceMessagesReq) -> AgentTraceMessagesRes:
+        """Fetch role-tagged messages for a trace from the ``messages`` table.
+
+        Scoring fallback for root spans with no message content of their own.
+        Rows map directly to ``NormalizedMessage``; ``finish_reason`` is not
+        stored per message row, so it is left empty.
+        """
+        rows = self._run_trace_messages_query(
+            req.project_id, req.trace_id, req.limit
+        )
+        messages = [
+            NormalizedMessage(
+                role=safe_str(r.get("role")), content=safe_str(r.get("content"))
+            )
+            for r in rows
+        ]
+        return AgentTraceMessagesRes(messages=messages)
+
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
         spans = self.trace_detail_spans(req.project_id, req.trace_id)
@@ -602,6 +623,14 @@ class AgentQueryHandler:
         """Build and run the trace detail SQL, returning rows as dicts."""
         pb = ParamBuilder(PARAM_NAMESPACE)
         sql = make_trace_detail_spans_query(pb, project_id, trace_id)
+        return _rows_as_dicts(self._query(sql, pb.get_params()))
+
+    def _run_trace_messages_query(
+        self, project_id: str, trace_id: str, limit: int
+    ) -> list[ClickHouseRow]:
+        """Build and run the trace messages SQL, returning rows as dicts."""
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_trace_messages_query(pb, project_id, trace_id, limit)
         return _rows_as_dicts(self._query(sql, pb.get_params()))
 
 
