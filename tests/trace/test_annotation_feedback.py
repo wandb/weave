@@ -8,7 +8,6 @@ from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
 from weave.trace_server.trace_server_interface import FeedbackCreateReq, ObjQueryReq
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_human_feedback_basic(client):
     # create a human feedback spec
 
@@ -91,7 +90,6 @@ def test_human_feedback_basic(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_field_schema_with_pydantic_model(client):
     # Test using a Pydantic model as field_schema
     class FeedbackModel(BaseModel):

@@ -90,7 +90,6 @@ async def do_quickstart():
     return await evaluation.evaluate(model)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_basic_evaluation(client):
     res = await do_quickstart()
@@ -425,7 +424,6 @@ def with_empty_feedback(obj: Any) -> Any:
     return obj
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_data_topology(client):
     """We support a number of different types of scorers, and we want to ensure that
@@ -803,7 +801,6 @@ async def test_eval_supports_non_op_funcs(weave_active):
     # assert shouldBeModelRef.startswith("weave:///")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_is_robust_to_missing_values(weave_active):
     # At least 1 None
@@ -841,7 +838,6 @@ async def test_eval_is_robust_to_missing_values(weave_active):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_with_complex_types(client):
     client.project = "test_eval_with_complex_types"
@@ -1094,7 +1090,6 @@ async def test_evaluation_with_multiple_column_maps():
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_feedback_is_correctly_linked(client):
     @weave.op
@@ -1135,7 +1130,6 @@ async def test_feedback_is_correctly_linked(client):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     @weave.op
