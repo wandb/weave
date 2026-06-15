@@ -353,6 +353,8 @@ def bedrock_stream_accumulator(
         acc = {
             "role": None,
             "content": "",
+            "reasoning": "",
+            "tool_calls": [],
             "stop_reason": None,
             "usage": {
                 "inputTokens": 0,
@@ -366,9 +368,36 @@ def bedrock_stream_accumulator(
     if "messageStart" in value:
         acc["role"] = value["messageStart"]["role"]
 
-    # Handle 'contentBlockDelta' event
+    # A tool-use block opens with its id and name; the args arrive as deltas.
+    if "contentBlockStart" in value:
+        start = value["contentBlockStart"].get("start", {})
+        if "toolUse" in start:
+            tool_use = start["toolUse"]
+            acc["tool_calls"].append(
+                {
+                    "toolUseId": tool_use.get("toolUseId"),
+                    "name": tool_use.get("name"),
+                    "input": "",
+                }
+            )
+
+    # Converse streams text, tool-use args, and reasoning as distinct delta
+    # shapes. Unknown shapes are ignored so a new delta type cannot break the
+    # caller's stream.
     if "contentBlockDelta" in value:
-        acc["content"] += value["contentBlockDelta"]["delta"]["text"]
+        delta = value["contentBlockDelta"]["delta"]
+        if "text" in delta:
+            acc["content"] += delta["text"]
+        elif "toolUse" in delta:
+            tool_input = delta["toolUse"].get("input", "")
+            if acc["tool_calls"]:
+                acc["tool_calls"][-1]["input"] += tool_input
+            else:
+                acc["tool_calls"].append(
+                    {"toolUseId": None, "name": None, "input": tool_input}
+                )
+        elif "reasoningContent" in delta:
+            acc["reasoning"] += delta["reasoningContent"].get("text", "")
 
     # Handle 'messageStop' event
     if "messageStop" in value:
