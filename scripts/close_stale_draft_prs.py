@@ -21,6 +21,8 @@ Environment variables:
     GITHUB_TOKEN (or GH_TOKEN): GitHub API token (required).
     GITHUB_REPOSITORY: "owner/repo"; used when --repo is omitted (set by Actions).
     GITHUB_STEP_SUMMARY: if set, a markdown summary is appended (set by Actions).
+    DRY_RUN: if truthy ("1"/"true"/"yes"/"on"), behaves like --dry-run. Lets the
+        workflow toggle dry-run via env instead of conditional shell.
 
 Dependencies are declared in the script directive below; ``uv run`` installs them.
 """
@@ -336,6 +338,10 @@ def _write_step_summary(results: list[tuple[int, Decision]], *, dry_run: bool) -
         handle.write("\n".join(lines) + "\n")
 
 
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Mark and close stale draft PRs.")
     parser.add_argument(
@@ -384,15 +390,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.exempt_labels
         else DEFAULT_EXEMPT_LABELS,
     )
+    dry_run = args.dry_run or _env_truthy("DRY_RUN")
     now = datetime.now(timezone.utc)
-    results = run(args.repo, cfg, now, token=token, dry_run=args.dry_run)
+    results = run(args.repo, cfg, now, token=token, dry_run=dry_run)
 
     marked = sum(1 for _, d in results if d.action is Action.MARK_STALE)
     closed = sum(1 for _, d in results if d.action is Action.CLOSE)
-    _write_step_summary(results, dry_run=args.dry_run)
+    _write_step_summary(results, dry_run=dry_run)
     logger.info(
         "%sDone. Scanned %d open PR(s); marked %d, closed %d.",
-        "[dry-run] " if args.dry_run else "",
+        "[dry-run] " if dry_run else "",
         len(results),
         marked,
         closed,

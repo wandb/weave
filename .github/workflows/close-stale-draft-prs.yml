@@ -38,12 +38,10 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
+      # All logic lives in the script; this step only invokes it. GITHUB_REPOSITORY
+      # is set by Actions and the script reads DRY_RUN, so no inline shell is needed.
       - name: Sweep stale draft PRs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          args=(--repo "${{ github.repository }}")
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            args+=(--dry-run)
-          fi
-          uv run scripts/close_stale_draft_prs.py "${args[@]}"
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: uv run scripts/close_stale_draft_prs.py
