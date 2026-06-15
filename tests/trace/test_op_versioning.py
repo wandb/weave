@@ -99,19 +99,17 @@ def test_op_versioning_importfrom(client):
     assert saved_code == EXPECTED_IMPORTFROM_OP_CODE
 
 
-def test_op_versioning_lotsofstuff():
+def test_op_decoration_smoke():
+    """Decorating ops with comprehensions, generators, recursion, and try/except
+    must not raise during AST/closure extraction.
+    """
+
     @weave.op
     def versioned_op_lotsofstuff(a: int) -> float:
         j = [x + 1 for x in range(a)]
         k = (y - 3 for y in j)
         return np.array(k).mean()
 
-
-def test_op_versioning_inline_import():
-    pass
-
-
-def test_op_versioning_inline_func_decl():
     @weave.op
     def versioned_op_inline_func_decl(a: int) -> float:
         def inner_func(x):
@@ -121,6 +119,17 @@ def test_op_versioning_inline_func_decl():
             return inner_func(x - 1) * 2
 
         return inner_func(a)
+
+    @weave.op
+    def versioned_op_exception(a: int) -> float:
+        try:
+            x = 1 / 0
+        except Exception as e:
+            print("E", e)
+            return 9999
+        return x
+
+    assert versioned_op_exception(0) == 9999
 
 
 EXPECTED_CLOSURE_CONTANT_OP_CODE = """import weave
@@ -318,18 +327,6 @@ def test_op_versioning_mixed(client):
     assert saved_code == EXPECTED_MIXED_OP_CODE
     op2 = weave.ref(str(ref)).get()
     assert op2(1) == 102.0
-
-
-def test_op_versioning_exception():
-    # Just ensure this doesn't raise by running it.
-    @weave.op
-    def versioned_op_exception(a: int) -> float:
-        try:
-            x = 1 / 0
-        except Exception as e:
-            print("E", e)
-            return 9999
-        return x
 
 
 def test_op_versioning_2ops(client):
@@ -614,48 +611,17 @@ def test_op_import_from_as(client):
     assert saved_code == EXPECTED_IMPORT_FROM_AS_CODE
 
 
-def save_and_get_code(func: Callable) -> str:
-    artifact = MemTraceFilesArtifact()
-    save_instance(func, artifact, "obj")
-    saved_code = artifact.path_contents["obj.py"]
-    if isinstance(saved_code, bytes):
-        saved_code = saved_code.decode()
-    return saved_code
-
-
 STANDARD_FUNC_CODE = """import weave
 
 @weave.op
 def standard_func(): ...
 """
 
-
-def test_standard_import():
-    """Test that standard import weave works correctly."""
-
-    @weave.op
-    def standard_func(): ...
-
-    code = save_and_get_code(standard_func)
-    assert code == STANDARD_FUNC_CODE
-
-
 ALIASED_FUNC_CODE = """import weave as wv
 
 @wv.op
 def aliased_func(): ...
 """
-
-
-def test_aliased_import_wv():
-    """Test that aliased import (wv) is handled correctly - should preserve the alias."""
-
-    @wv.op
-    def aliased_func(): ...
-
-    code = save_and_get_code(aliased_func)
-    assert code == ALIASED_FUNC_CODE
-
 
 PAREN_FUNC_CODE = """import weave as wv
 
@@ -664,11 +630,31 @@ def paren_func(): ...
 """
 
 
-def test_op_with_parentheses():
-    """Test that @wv.op() with parentheses is normalized to @wv.op - should preserve the alias."""
+def test_op_decorator_import_styles():
+    """`weave.op`, aliased `wv.op`, and `wv.op()` each preserve their decorator form
+    and import alias in the saved source.
+    """
+
+    @weave.op
+    def standard_func(): ...
+
+    assert save_and_get_code(standard_func) == STANDARD_FUNC_CODE
+
+    @wv.op
+    def aliased_func(): ...
+
+    assert save_and_get_code(aliased_func) == ALIASED_FUNC_CODE
 
     @wv.op()
     def paren_func(): ...
 
-    code = save_and_get_code(paren_func)
-    assert code == PAREN_FUNC_CODE
+    assert save_and_get_code(paren_func) == PAREN_FUNC_CODE
+
+
+def save_and_get_code(func: Callable) -> str:
+    artifact = MemTraceFilesArtifact()
+    save_instance(func, artifact, "obj")
+    saved_code = artifact.path_contents["obj.py"]
+    if isinstance(saved_code, bytes):
+        saved_code = saved_code.decode()
+    return saved_code

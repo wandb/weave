@@ -201,45 +201,25 @@ def test_helper_serializes_evaluation_same_way_as_sdk(client: WeaveClient) -> No
     assert helper_val == sdk_val
 
 
-def test_make_safe_name_with_angle_brackets() -> None:
-    """Test that make_safe_name correctly handles angle bracket characters.
+def test_make_safe_name() -> None:
+    r"""make_safe_name strips every character invalid for object names.
 
-    Tests various positions of < and > characters and verifies that ops can be
-    successfully created with the sanitized names.
+    The object name validator only allows [\\w._-] (alphanumeric, underscore,
+    dot, dash). Angle brackets are removed (and ops can be created with the
+    sanitized name); other invalid chars are stripped or mapped to underscores.
     """
-    # Test cases with angle brackets in different positions
-    # All should sanitize to "opname" after removing < and >
-    test_cases = [
-        "<opname",
-        "opname>",
-        "<opname>",
-        "op<name",
-        "op>name",
-        "op<>name",
-    ]
-
-    for test_input in test_cases:
-        # Apply make_safe_name to sanitize the input
+    # Angle brackets in any position sanitize to "opname", and the op builds.
+    for test_input in ("<opname", "opname>", "<opname>", "op<name", "op>name", "op<>name"):
         safe_name = object_creation_utils.make_safe_name(test_input)
 
-        # Create an op with the safe name and verify it succeeds without error
         @weave.op(name=safe_name)
         def test_op(x: int) -> int:
             return x + 1
 
-        # Verify the op was successfully created
         assert test_op.name == "opname", (
             f"Op creation failed for input '{test_input}': got name '{test_op.name}'"
         )
 
-
-def test_make_safe_name_strips_all_invalid_characters() -> None:
-    r"""Test that make_safe_name strips all characters invalid for object names.
-
-    The object name validator only allows [\\w._-] (alphanumeric, underscore,
-    dot, dash). make_safe_name must strip everything else so that downstream
-    validation never rejects a sanitized name.
-    """
     # Characters that previously slipped through and caused InvalidFieldError
     assert object_creation_utils.make_safe_name("prefix:suffix") == "prefixsuffix"
     assert object_creation_utils.make_safe_name("base64data==end") == "base64dataend"

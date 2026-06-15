@@ -122,45 +122,31 @@ def test_then_multiple_futures_duplicate() -> None:
 
 
 @pytest.mark.disable_logging_error_check
-def test_then_with_exception_in_future(log_collector) -> None:
+@pytest.mark.parametrize("fail_in", ["future", "callback"])
+def test_then_propagates_exception_and_logs(log_collector, fail_in) -> None:
+    """A raise in the upstream future or `then` callback propagates and logs once."""
     executor: FutureExecutor = FutureExecutor()
-
-    def failing_task() -> None:
-        raise ValueError("Future exception")
-
-    def process_data(data_list: list[Any]) -> Any:
-        return data_list[0]
-
-    future_data: Future[None] = executor.defer(failing_task)
-    future_result: Future[Any] = executor.then([future_data], process_data)
-
-    with pytest.raises(ValueError, match="Future exception"):
-        future_result.result()
-
-    logs = log_collector.get_error_logs()
-    assert len(logs) == 1
-    assert "ValueError: Future exception" in logs[0].getMessage()
-
-
-@pytest.mark.disable_logging_error_check
-def test_then_with_exception_in_callback(log_collector) -> None:
-    executor: FutureExecutor = FutureExecutor()
+    message = f"{fail_in} exception"
 
     def fetch_data() -> list[int]:
+        if fail_in == "future":
+            raise ValueError(message)
         return [1, 2, 3]
 
-    def failing_process(data_list: list[list[int]]) -> None:
-        raise ValueError("Callback exception")
+    def process_data(data_list: list[Any]) -> Any:
+        if fail_in == "callback":
+            raise ValueError(message)
+        return data_list[0]
 
-    future_data: Future[list[int]] = executor.defer(fetch_data)
-    future_result: Future[None] = executor.then([future_data], failing_process)
+    future_data: Future[Any] = executor.defer(fetch_data)
+    future_result: Future[Any] = executor.then([future_data], process_data)
 
-    with pytest.raises(ValueError, match="Callback exception"):
+    with pytest.raises(ValueError, match=message):
         future_result.result()
 
     logs = log_collector.get_error_logs()
     assert len(logs) == 1
-    assert "ValueError: Callback exception" in logs[0].getMessage()
+    assert f"ValueError: {message}" in logs[0].getMessage()
 
 
 def test_concurrent_execution() -> None:
@@ -381,8 +367,12 @@ def test_flush_drains_work_added_after_snapshot() -> None:
     assert flush_finished.is_set()
 
 
-def test_nested_futures_with_1_max_worker_classic_deadlock_case() -> None:
-    executor: FutureExecutor = FutureExecutor(max_workers=1)
+@pytest.mark.parametrize("max_workers", [1, 0])
+def test_nested_futures_resolve_without_deadlock(max_workers: int) -> None:
+    """Nested defer().result() must not deadlock with 1 worker or 0 (direct exec)."""
+    executor: FutureExecutor = FutureExecutor(max_workers=max_workers)
+    if max_workers == 0:
+        assert executor._executor is None
 
     def inner_0() -> list[int]:
         return [0]
@@ -394,22 +384,6 @@ def test_nested_futures_with_1_max_worker_classic_deadlock_case() -> None:
         return executor.defer(inner_1).result() + [2]
 
     res = executor.defer(inner_2).result()
-    assert res == [0, 1, 2]
-
-
-def test_nested_futures_with_0_max_workers_direct() -> None:
-    executor: FutureExecutor = FutureExecutor(max_workers=0)
-    assert executor._executor is None
-
-    def inner_0() -> list[int]:
-        return [0]
-
-    def inner_1() -> list[int]:
-        return executor.defer(inner_0).result() + [1]
-
-    def inner_2() -> list[int]:
-        return executor.defer(inner_1).result() + [2]
-
-    res = executor.defer(inner_2).result()
-    assert executor._executor is None
+    if max_workers == 0:
+        assert executor._executor is None
     assert res == [0, 1, 2]

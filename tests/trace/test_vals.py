@@ -11,6 +11,8 @@ from weave.trace.refs import ObjectRef
 
 
 def test_dict_refs(client):
+    """Saved dict keeps descended refs; materializing via `dict()` drops the
+    container ref but children still descend from the original."""
     d = client.save({"a": 1, "b": 2}, name="d")
 
     assert d["a"] == 1
@@ -23,25 +25,25 @@ def test_dict_refs(client):
     assert d["b"].ref.is_descended_from(d.ref)
     assert d["b"].ref.extra == (DICT_KEY_EDGE_NAME, "b")
 
-
-def test_dict_iter(client):
     d_orig = client.save({"a": 1, "b": 2, "c": 3}, name="d")
-    d = dict(d_orig)
+    materialized = dict(d_orig)
     with pytest.raises(AttributeError):
-        _ = d.ref
+        _ = materialized.ref
 
-    assert d["a"] == 1
-    assert isinstance(d["a"].ref, ObjectRef)
-    assert d["a"].ref.is_descended_from(d_orig.ref)
-    assert d["a"].ref.extra == (DICT_KEY_EDGE_NAME, "a")
+    assert materialized["a"] == 1
+    assert isinstance(materialized["a"].ref, ObjectRef)
+    assert materialized["a"].ref.is_descended_from(d_orig.ref)
+    assert materialized["a"].ref.extra == (DICT_KEY_EDGE_NAME, "a")
 
-    assert d["b"] == 2
-    assert isinstance(d["b"].ref, ObjectRef)
-    assert d["b"].ref.is_descended_from(d_orig.ref)
-    assert d["b"].ref.extra == (DICT_KEY_EDGE_NAME, "b")
+    assert materialized["b"] == 2
+    assert isinstance(materialized["b"].ref, ObjectRef)
+    assert materialized["b"].ref.is_descended_from(d_orig.ref)
+    assert materialized["b"].ref.extra == (DICT_KEY_EDGE_NAME, "b")
 
 
 def test_list_refs(client):
+    """Saved list keeps descended refs; materializing via `list()` drops the
+    container ref but children still descend from the original."""
     l = client.save([1, 2], name="l")
 
     assert l[0] == 1
@@ -54,20 +56,18 @@ def test_list_refs(client):
     assert l[1].ref.is_descended_from(l.ref)
     assert l[1].ref.extra == (LIST_INDEX_EDGE_NAME, "1")
 
-
-def test_list_iter(client):
     l_orig = client.save([1, 2], name="l")
-    l = list(l_orig)
+    materialized = list(l_orig)
     with pytest.raises(AttributeError):
-        _ = l.ref
+        _ = materialized.ref
 
-    assert l[0] == 1
-    assert l[0].ref.is_descended_from(l_orig.ref)
-    assert isinstance(l[0].ref, ObjectRef)
+    assert materialized[0] == 1
+    assert materialized[0].ref.is_descended_from(l_orig.ref)
+    assert isinstance(materialized[0].ref, ObjectRef)
 
-    assert l[1] == 2
-    assert l[1].ref.is_descended_from(l_orig.ref)
-    assert isinstance(l[1].ref, ObjectRef)
+    assert materialized[1] == 2
+    assert materialized[1].ref.is_descended_from(l_orig.ref)
+    assert isinstance(materialized[1].ref, ObjectRef)
 
 
 def test_row_ref_inside_dict(client):
