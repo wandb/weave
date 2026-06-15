@@ -4581,6 +4581,54 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client):
     assert child_call.total_storage_size_bytes is None
 
 
+def test_total_storage_size_is_project_scoped(client):
+    project_id = get_client_project_id(client)
+    entity, _ = from_project_id(project_id)
+    other_project_id = to_project_id(entity, f"total-storage-other-{uuid.uuid4().hex}")
+    trace_id = str(uuid.uuid4())
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+
+    project_call_id = str(uuid.uuid4())
+    other_project_call_id = str(uuid.uuid4())
+
+    for call_project_id, call_id, payload in (
+        (project_id, project_call_id, "small"),
+        (other_project_id, other_project_call_id, "x" * 1000),
+    ):
+        client.server.calls_complete(
+            tsi.CallsUpsertCompleteReq(
+                batch=[
+                    tsi.CompletedCallSchemaForInsert(
+                        project_id=call_project_id,
+                        id=call_id,
+                        trace_id=trace_id,
+                        op_name="storage_test",
+                        started_at=started_at,
+                        ended_at=started_at + datetime.timedelta(seconds=1),
+                        attributes={},
+                        inputs={"payload": payload},
+                        output=None,
+                        summary={},
+                    )
+                ]
+            )
+        )
+
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(call_ids=[project_call_id]),
+            include_storage_size=True,
+            include_total_storage_size=True,
+        )
+    ).calls
+
+    assert len(calls) == 1
+    assert calls[0].total_storage_size_bytes == calls[0].storage_size_bytes
+
+
 def test_calls_hydrated(client):
     nested = {"hi": {"there": {"foo": "bar"}}}
     nested_ref = weave.publish(nested)

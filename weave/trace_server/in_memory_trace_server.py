@@ -21,9 +21,11 @@ import logging
 import math
 import re
 import threading
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
+from functools import lru_cache
 from operator import attrgetter
+from pathlib import Path
 from typing import Any, cast
 
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
@@ -61,6 +63,7 @@ from weave.trace_server.errors import (
     ObjectNameTypeCollision,
     RequestTooLarge,
 )
+from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import (
     MULTI_VALUE_FEEDBACK_TYPES,
@@ -68,11 +71,21 @@ from weave.trace_server.interface.feedback_types import (
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import split_escaped_field_path
+from weave.trace_server.token_costs import (
+    DEFAULT_PRICING_LEVEL_ID,
+    PRICING_LEVELS,
+)
 from weave.trace_server.trace_server_common import (
     apply_tags_and_synth_latest_in_place,
     assert_parameter_length_less_than_max,
     digest_is_content_hash,
     digest_is_version_like,
+    empty_str_to_none,
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    make_derived_summary_fields,
+    make_feedback_query_req,
+    set_nested_key,
 )
 from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
@@ -88,6 +101,10 @@ logger = logging.getLogger(__name__)
 
 MAX_REFS_BATCH_SIZE = 1000
 MAX_OTEL_ERROR_MESSAGES = 20
+
+_DEFAULT_COSTS_FILE = str(
+    Path(__file__).parent / "migrations" / "006_seed_costs.up.sql"
+)
 
 # Top-level calls columns (mirrors ALLOWED_CALL_FIELDS in the ClickHouse
 # query builder, with the *_dump suffixes normalized away).
@@ -401,6 +418,57 @@ def _ch_position(haystack: Any, needle: Any, case_insensitive: bool) -> bool:
     return needle in haystack
 
 
+def _ch_sorted_by_terms(
+    rows: list[Any],
+    terms: Sequence[tuple[Any, str]],
+    value_fn: Any,
+) -> list[Any]:
+    """Sort rows by (term, direction) pairs with ClickHouse semantics:
+    NULLs order last for both ASC and DESC. Applies stable sorts from the
+    last term to the first.
+    """
+    result = list(rows)
+    for term, direction in reversed(terms):
+        reverse = direction.lower() == "desc"
+
+        def value_of(row: Any, _term: Any = term) -> Any:
+            value = value_fn(row, _term)
+            if isinstance(value, bool):
+                return int(value)
+            if isinstance(value, datetime.datetime):
+                return _ensure_tz(value)
+            return value
+
+        # Two stable passes per term: order non-NULL values by direction,
+        # then float NULLs to the end regardless of direction.
+        result.sort(
+            key=lambda row: _OrderableOrNone(value_of(row)),
+            reverse=reverse,
+        )
+        result.sort(key=lambda row: value_of(row) is None)
+    return result
+
+
+class _OrderableOrNone:
+    """Sort key wrapper: None never orders before or after anything (its
+    final position is decided by the stable NULLs-last pass). Only used as
+    a list.sort key, so only __lt__ is ever invoked.
+    """
+
+    __slots__ = ("value",)
+
+    def __init__(self, value: Any) -> None:
+        self.value = value
+
+    def __lt__(self, other: "_OrderableOrNone") -> bool:
+        if self.value is None or other.value is None:
+            return False
+        try:
+            return self.value < other.value
+        except TypeError:
+            return False
+
+
 def _value_rank(value: Any) -> int:
     # Legacy storage-class ranks (NULL < numeric < text), used by the
     # remaining generic sorters until they move to _ch_sorted_by_terms.
@@ -464,6 +532,100 @@ def _get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
+
+
+def _normalize_datetime_for_costs(
+    value: datetime.datetime | str | None,
+) -> datetime.datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=datetime.timezone.utc)
+    return value.astimezone(datetime.timezone.utc)
+
+
+def _serialize_cost_datetime(value: datetime.datetime) -> str:
+    normalized = _normalize_datetime_for_costs(value)
+    assert normalized is not None
+    return normalized.isoformat()
+
+
+def _safe_int_for_costs(value: Any) -> int:
+    try:
+        return int(value) if value is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _cost_usage_from_summary(
+    summary: dict[str, Any] | None,
+) -> dict[str, dict[str, int]]:
+    usage_map = (summary or {}).get("usage")
+    if not isinstance(usage_map, dict):
+        return {}
+
+    normalized_usage: dict[str, dict[str, int]] = {}
+    for llm_id, usage in usage_map.items():
+        if not isinstance(usage, dict):
+            continue
+        normalized_usage[str(llm_id)] = {
+            "prompt_tokens": _safe_int_for_costs(usage.get("prompt_tokens"))
+            + _safe_int_for_costs(usage.get("input_tokens")),
+            "completion_tokens": _safe_int_for_costs(usage.get("completion_tokens"))
+            + _safe_int_for_costs(usage.get("output_tokens")),
+            "requests": _safe_int_for_costs(usage.get("requests")),
+            # Match ClickHouse: keep total_tokens as-reported rather than deriving it.
+            "total_tokens": _safe_int_for_costs(usage.get("total_tokens")),
+            "cache_read_input_tokens": _safe_int_for_costs(
+                usage.get("cache_read_input_tokens")
+            ),
+            "cache_creation_input_tokens": _safe_int_for_costs(
+                usage.get("cache_creation_input_tokens")
+            ),
+        }
+    return normalized_usage
+
+
+@lru_cache(maxsize=1)
+def _load_default_cost_definitions() -> tuple[dict[str, Any], ...]:
+    with open(_DEFAULT_COSTS_FILE, encoding="utf-8") as f:
+        seed_sql = f.read()
+
+    now = _serialize_cost_datetime(datetime.datetime.now(datetime.timezone.utc))
+    default_rows: list[dict[str, Any]] = []
+    row_pattern = re.compile(
+        r"\(generateUUIDv4\(\), '([^']+)', '([^']+)', '([^']+)', '([^']+)', now\(\), ([^,]+), '([^']+)', ([^,]+), '([^']+)', '([^']+)', now\(\)\)"
+    )
+    for match in row_pattern.finditer(seed_sql):
+        (
+            pricing_level,
+            pricing_level_id,
+            provider_id,
+            llm_id,
+            prompt_token_cost,
+            prompt_token_cost_unit,
+            completion_token_cost,
+            completion_token_cost_unit,
+            created_by,
+        ) = match.groups()
+        default_rows.append(
+            {
+                "pricing_level": pricing_level,
+                "pricing_level_id": pricing_level_id,
+                "provider_id": provider_id,
+                "llm_id": llm_id,
+                "effective_date": now,
+                "prompt_token_cost": float(prompt_token_cost),
+                "completion_token_cost": float(completion_token_cost),
+                "prompt_token_cost_unit": prompt_token_cost_unit,
+                "completion_token_cost_unit": completion_token_cost_unit,
+                "created_by": created_by,
+                "created_at": now,
+            }
+        )
+    return tuple(default_rows)
 
 
 @dataclass(slots=True)
@@ -862,6 +1024,215 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     + len(summary_json)
                 )
         return tsi.CallEndRes()
+
+    # ------------------------------------------------------------------
+    # Cost application (the llm_token_prices join both backends perform)
+    # ------------------------------------------------------------------
+
+    def _ensure_default_costs(self) -> bool:
+        for row in self._llm_token_prices:
+            if (
+                row["pricing_level"] == PRICING_LEVELS["DEFAULT"]
+                and row["pricing_level_id"] == DEFAULT_PRICING_LEVEL_ID
+            ):
+                return False
+
+        for row in _load_default_cost_definitions():
+            self._llm_token_prices.append(
+                {
+                    "id": generate_id(),
+                    "pricing_level": row["pricing_level"],
+                    "pricing_level_id": row["pricing_level_id"],
+                    "provider_id": row["provider_id"],
+                    "llm_id": row["llm_id"],
+                    "effective_date": row["effective_date"],
+                    "prompt_token_cost": row["prompt_token_cost"],
+                    "completion_token_cost": row["completion_token_cost"],
+                    "cache_read_input_token_cost": row.get(
+                        "cache_read_input_token_cost", 0
+                    ),
+                    "cache_creation_input_token_cost": row.get(
+                        "cache_creation_input_token_cost", 0
+                    ),
+                    "prompt_token_cost_unit": row["prompt_token_cost_unit"],
+                    "completion_token_cost_unit": row["completion_token_cost_unit"],
+                    "created_by": row["created_by"],
+                    "created_at": row["created_at"],
+                }
+            )
+        return True
+
+    def _pick_best_cost_row(
+        self,
+        rows: list[dict[str, Any]],
+        started_at: datetime.datetime,
+        project_id: str,
+    ) -> dict[str, Any] | None:
+        if not rows:
+            return None
+
+        def rank_key(row: dict[str, Any]) -> tuple[int, int, float]:
+            effective_date = _normalize_datetime_for_costs(row["effective_date"])
+            assert effective_date is not None
+            is_future = 1 if effective_date > started_at else 0
+            if (
+                row["pricing_level"] == PRICING_LEVELS["PROJECT"]
+                and row["pricing_level_id"] == project_id
+            ):
+                pricing_rank = 0
+            elif (
+                row["pricing_level"] == PRICING_LEVELS["DEFAULT"]
+                and row["pricing_level_id"] == DEFAULT_PRICING_LEVEL_ID
+            ):
+                pricing_rank = 1
+            else:
+                pricing_rank = 2
+            return (is_future, pricing_rank, -effective_date.timestamp())
+
+        return min(rows, key=rank_key)
+
+    def _apply_costs_to_calls(
+        self,
+        calls: list[dict[str, Any]],
+        project_id: str,
+    ) -> None:
+        """Attach per-call LLM cost breakdowns to each call's
+        summary.weave.costs, mirroring the ClickHouse cost-join query.
+        """
+        # ---- Collect each call's token usage and the LLM ids involved ----
+        usage_by_call_id: dict[str, dict[str, dict[str, int]]] = {}
+        llm_ids: set[str] = set()
+
+        for call in calls:
+            summary = call.get("summary")
+            if not isinstance(summary, dict):
+                continue
+            usage_by_model = _cost_usage_from_summary(summary)
+            if not usage_by_model:
+                continue
+            usage_by_call_id[call["id"]] = usage_by_model
+            llm_ids.update(usage_by_model.keys())
+
+        if not llm_ids:
+            return
+
+        # ---- Load the applicable price rows (project overrides, else default) ----
+        with self.lock:
+            self._ensure_default_costs()
+            price_rows = [
+                dict(row)
+                for row in self._llm_token_prices
+                if row["llm_id"] in llm_ids
+                and (
+                    (
+                        row["pricing_level"] == PRICING_LEVELS["PROJECT"]
+                        and row["pricing_level_id"] == project_id
+                    )
+                    or (
+                        row["pricing_level"] == PRICING_LEVELS["DEFAULT"]
+                        and row["pricing_level_id"] == DEFAULT_PRICING_LEVEL_ID
+                    )
+                )
+            ]
+
+        price_rows_by_llm: dict[str, list[dict[str, Any]]] = {}
+        for row in price_rows:
+            price_rows_by_llm.setdefault(str(row["llm_id"]), []).append(row)
+
+        # ---- Compute each call's per-model cost and write summary.weave.costs ----
+        for call in calls:
+            summary = call.get("summary")
+            if not isinstance(summary, dict):
+                continue
+
+            weave_summary = summary.get("weave")
+            if not isinstance(weave_summary, dict):
+                weave_summary = {}
+                summary["weave"] = weave_summary
+            else:
+                weave_summary.pop("costs", None)
+
+            started_at = _normalize_datetime_for_costs(call.get("started_at"))
+            assert started_at is not None
+
+            call_costs: dict[str, dict[str, Any]] = {}
+            for llm_id, usage in usage_by_call_id.get(call["id"], {}).items():
+                best_row = self._pick_best_cost_row(
+                    price_rows_by_llm.get(llm_id, []), started_at, project_id
+                )
+                if best_row is None:
+                    continue
+
+                prompt_cost = float(best_row["prompt_token_cost"] or 0.0)
+                completion_cost = float(best_row["completion_token_cost"] or 0.0)
+                cache_read_cost = float(
+                    best_row.get("cache_read_input_token_cost") or 0.0
+                )
+                cache_creation_cost = float(
+                    best_row.get("cache_creation_input_token_cost") or 0.0
+                )
+                prompt_tokens = usage["prompt_tokens"]
+                completion_tokens = usage["completion_tokens"]
+                cache_read_input_tokens = usage.get("cache_read_input_tokens", 0)
+                cache_creation_input_tokens = usage.get(
+                    "cache_creation_input_tokens", 0
+                )
+
+                call_costs[llm_id] = {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "cache_read_input_tokens": cache_read_input_tokens,
+                    "cache_creation_input_tokens": cache_creation_input_tokens,
+                    "requests": usage["requests"],
+                    "total_tokens": usage["total_tokens"],
+                    # Subtract cached tokens: they are billed at the cache
+                    # rate, not the regular input rate.
+                    "prompt_tokens_total_cost": (
+                        prompt_tokens
+                        - cache_read_input_tokens
+                        - cache_creation_input_tokens
+                    )
+                    * prompt_cost,
+                    "completion_tokens_total_cost": completion_tokens * completion_cost,
+                    "cache_read_input_tokens_total_cost": cache_read_input_tokens
+                    * cache_read_cost,
+                    "cache_creation_input_tokens_total_cost": cache_creation_input_tokens
+                    * cache_creation_cost,
+                    "prompt_token_cost": prompt_cost,
+                    "completion_token_cost": completion_cost,
+                    "cache_read_input_token_cost": cache_read_cost,
+                    "cache_creation_input_token_cost": cache_creation_cost,
+                    "prompt_token_cost_unit": best_row["prompt_token_cost_unit"],
+                    "completion_token_cost_unit": best_row[
+                        "completion_token_cost_unit"
+                    ],
+                    "effective_date": best_row["effective_date"],
+                    "provider_id": best_row["provider_id"],
+                    "pricing_level": best_row["pricing_level"],
+                    "pricing_level_id": best_row["pricing_level_id"],
+                    "created_at": best_row["created_at"],
+                    "created_by": best_row["created_by"],
+                }
+
+            if call_costs:
+                weave_summary["costs"] = call_costs
+
+    # ------------------------------------------------------------------
+    # Calls query engine
+    # ------------------------------------------------------------------
+
+    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                limit=1,
+                filter=tsi.CallsFilter(call_ids=[req.id]),
+                include_costs=req.include_costs,
+                include_storage_size=req.include_storage_size,
+                include_total_storage_size=req.include_total_storage_size,
+            )
+        ).calls
+        return tsi.CallReadRes(call=calls[0] if calls else None)
 
     def _feedback_rows_for_call(
         self, project_id: str, call_id: str, feedback_type: str | None
@@ -1459,6 +1830,249 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 (value_fn, direction),
             ]
         return [(self._compile_calls_field(sort_field, None), direction)]
+
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        """Run a calls query end to end, mirroring the ClickHouse calls query:
+        filter, project columns, sort, paginate, then assemble each row and
+        hydrate costs/feedback.
+        """
+        # ---- Load the project's live calls and apply filter + query predicates ----
+        with self.lock:
+            records = [
+                rec
+                for rec in self._calls.values()
+                if rec.deleted_at is None
+                and rec.project_id == req.project_id
+                and rec.op_name is not None
+                and rec.started_at is not None
+            ]
+            # Snapshot for total-storage aggregation before filtering (the
+            # backend subquery aggregates over all calls in the project).
+            all_records = (
+                [
+                    rec
+                    for rec in self._calls.values()
+                    if rec.project_id == req.project_id and rec.deleted_at is None
+                ]
+                if req.include_total_storage_size
+                else None
+            )
+
+        if req.filter:
+            self._validate_calls_filter(req.filter)
+            records = [
+                rec for rec in records if self._calls_filter_matches(rec, req.filter)
+            ]
+
+        if req.query:
+            predicate = self._compile_calls_query(req.query, req.expand_columns)
+            records = [rec for rec in records if _truthy(predicate(rec))]
+
+        # ---- Resolve which columns to project (interface behavior shared by the backends) ----
+        required_columns = ["id", "trace_id", "project_id", "op_name", "started_at"]
+        select_columns = [
+            key
+            for key in tsi.CallSchema.model_fields.keys()
+            if key
+            not in {"storage_size_bytes", "total_storage_size_bytes", "wb_username"}
+        ]
+        if req.columns:
+            simple_columns = []
+            for column in req.columns:
+                top_level_column = column.split(".")[0]
+                if (
+                    top_level_column.endswith("_dump")
+                    and top_level_column[:-5] in select_columns
+                ):
+                    top_level_column = top_level_column[:-5]
+                if top_level_column not in simple_columns:
+                    simple_columns.append(top_level_column)
+            if req.include_usernames and "wb_user_id" not in simple_columns:
+                simple_columns.append("wb_user_id")
+            if req.include_costs and "summary" not in simple_columns:
+                simple_columns.append("summary")
+            if "summary" in simple_columns or req.include_costs:
+                for column in ["ended_at", "exception", "display_name"]:
+                    if column not in simple_columns:
+                        simple_columns.append(column)
+
+            select_columns = [x for x in simple_columns if x in select_columns]
+            select_columns += [
+                rcol for rcol in required_columns if rcol not in select_columns
+            ]
+
+        # ---- Sort the records, including the implicit id tiebreaker the backends append ----
+        if req.sort_by is None:
+            order_by: list[tuple[str, str]] | None = [
+                ("started_at", "asc"),
+                ("id", "asc"),
+            ]
+        elif len(req.sort_by) == 0:
+            order_by = None
+        else:
+            order_by = [(s.field, s.direction) for s in req.sort_by]
+            if not any(field_name == "id" for field_name, _ in order_by):
+                last_sort = req.sort_by[-1]
+                if last_sort.field == "started_at":
+                    order_by.append(("id", last_sort.direction))
+                else:
+                    order_by.append(("id", "desc"))
+
+        if order_by is not None:
+            for _, direction in order_by:
+                assert direction in {
+                    "ASC",
+                    "DESC",
+                    "asc",
+                    "desc",
+                }, f"Invalid order_by direction: {direction}"
+            compiled_terms = [
+                term
+                for field_name, direction in order_by
+                for term in self._compile_calls_sort_field(
+                    field_name, direction, req.expand_columns
+                )
+            ]
+            records = _ch_sorted_by_terms(
+                records,
+                compiled_terms,
+                lambda rec, term_fn: term_fn(rec),
+            )
+
+        # ---- Apply LIMIT/OFFSET pagination (falsy limits mean unlimited) ----
+        offset = req.offset if req.offset and req.offset > 0 else 0
+        if offset:
+            records = records[offset:]
+        if req.limit and req.limit > 0:
+            records = records[: req.limit]
+
+        # ---- Assemble each output row: project columns, storage, ref expansion, derived summary ----
+        total_storage_by_trace: dict[str | None, int] = {}
+        if req.include_total_storage_size and all_records is not None:
+            for rec in all_records:
+                total_storage_by_trace[rec.trace_id] = total_storage_by_trace.get(
+                    rec.trace_id, 0
+                ) + (
+                    (rec.attributes_len or 0)
+                    + (rec.inputs_len or 0)
+                    + (rec.output_len or 0)
+                    + (rec.summary_len or 0)
+                )
+
+        calls = []
+        for rec in records:
+            call_dict: dict[str, Any] = {}
+            for col in select_columns:
+                if col in {"attributes", "inputs", "output", "summary"}:
+                    call_dict[col] = copy.deepcopy(getattr(rec, col))
+                else:
+                    call_dict[col] = getattr(rec, col)
+
+            if req.include_storage_size:
+                call_dict["storage_size_bytes"] = (
+                    rec.storage_size_bytes
+                    if rec.storage_size_bytes is not None
+                    else (
+                        (rec.attributes_len or 0)
+                        + (rec.inputs_len or 0)
+                        + (rec.output_len or 0)
+                        + (rec.summary_len or 0)
+                    )
+                )
+            if req.include_total_storage_size:
+                call_dict["total_storage_size_bytes"] = (
+                    total_storage_by_trace.get(rec.trace_id)
+                    if rec.parent_id is None
+                    else None
+                )
+
+            # Ref expansion over the json fields.
+            if req.expand_columns:
+                for json_field in ["attributes", "summary", "inputs", "output"]:
+                    if call_dict.get(json_field):
+                        call_dict[json_field] = self._expand_refs(
+                            {json_field: call_dict[json_field]}, req.expand_columns
+                        )[json_field]
+
+            # For backwards/future compatibility: inject otel_dump into
+            # attributes if present.
+            if rec.otel_dump:
+                if "attributes" not in call_dict:
+                    call_dict["attributes"] = {}
+                call_dict["attributes"]["otel_span"] = copy.deepcopy(rec.otel_dump)
+
+            if "display_name" in call_dict:
+                call_dict["display_name"] = empty_str_to_none(call_dict["display_name"])
+
+            call_dict["summary"] = make_derived_summary_fields(
+                summary=call_dict.get("summary") or {},
+                op_name=call_dict["op_name"],
+                started_at=call_dict["started_at"],
+                ended_at=call_dict.get("ended_at"),
+                exception=call_dict.get("exception"),
+                display_name=call_dict.get("display_name"),
+            )
+
+            raw_expire_at = call_dict.get("expire_at")
+            if raw_expire_at is not None:
+                call_dict["expire_at"] = (
+                    None
+                    if _ensure_tz(raw_expire_at) == EXPIRE_AT_NEVER
+                    else raw_expire_at
+                )
+
+            for col, mfield in tsi.CallSchema.model_fields.items():
+                if mfield.is_required() and col not in call_dict:
+                    if isinstance(mfield.annotation, str):
+                        call_dict[col] = ""
+                    elif isinstance(
+                        mfield.annotation, (datetime.datetime, datetime.date)
+                    ):
+                        raise ValueError(f"Field '{col}' is required for selection")
+                    else:
+                        call_dict[col] = {}
+            calls.append(call_dict)
+
+        # ---- Hydrate the assembled rows with costs and feedback when requested ----
+        if req.include_costs and calls:
+            self._apply_costs_to_calls(calls, req.project_id)
+
+        if req.include_feedback:
+            feedback_query_req = make_feedback_query_req(req.project_id, calls)
+            feedback = self.feedback_query(feedback_query_req)
+            hydrate_calls_with_feedback(calls, feedback)
+
+        return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
+
+    def _expand_refs(
+        self, data: dict[str, Any], expand_columns: list[str]
+    ) -> dict[str, Any]:
+        """Recursively expand refs in the data. Only expand refs if requested in the
+        expand_columns list. expand_columns must be sorted by depth, shallowest first.
+        """
+        cols = sorted(expand_columns, key=lambda x: x.count("."))
+        for col in cols:
+            val = data.get(col)
+            if not val:
+                val = get_nested_key(data, col)
+                if not val:
+                    continue
+
+            if not ri.any_will_be_interpreted_as_ref_str(val):
+                continue
+
+            if not isinstance(ri.parse_internal_uri(val), ri.InternalObjectRef):
+                continue
+
+            derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
+            set_nested_key(data, col, derefed_val)
+            ref_col = f"{col}._ref"
+            set_nested_key(data, ref_col, val)
+
+        return data
+
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        return iter(self.calls_query(req).calls)
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
