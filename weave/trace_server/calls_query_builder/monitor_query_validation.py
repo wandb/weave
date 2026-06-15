@@ -29,10 +29,10 @@ def validate_monitor_query_fields(
     query = _monitor_query(val)
     if query is None:
         return
-    validate_calls_query(query)
+    _validate_calls_query(query)
 
 
-def validate_calls_query(query: tsi_query.Query) -> None:
+def _validate_calls_query(query: tsi_query.Query) -> None:
     """Reject a calls query referencing a disallowed field or that is structurally invalid.
 
     Validates by compiling the query to SQL conditions: compilation is what
@@ -95,11 +95,8 @@ def _strip_weave_object_keys(value: object) -> object:
     return value
 
 
-# Field references get_field_by_name accepts beyond exact ALLOWED_CALL_FIELDS
-# keys, used only to build the user-facing error message. The `*_dump` prefixes
-# are derived so they can't drift; the special entries must be kept in sync by
-# hand with the explicit branches in get_field_by_name
-# (`annotation_queue_items.queue_id` is an exact ref, not a prefix).
+# Built only for the error message. `*_dump` prefixes are derived (can't drift);
+# the specials must be hand-synced with get_field_by_name (queue_id is exact, not a prefix).
 _DUMP_SUFFIX = "_dump"
 _SPECIAL_DYNAMIC_FIELD_PREFIXES = (
     "feedback.*",
