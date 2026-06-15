@@ -85,7 +85,9 @@ def test_obj_table_and_file_create_write_records(wal_client):
 
     wal_client._send_table_create([{"x": 1}, {"x": 2}])
     wal_client._flush()
-    table_recs = [r for r in _read_all_wal_records(wal_client) if r["type"] == "table_create"]
+    table_recs = [
+        r for r in _read_all_wal_records(wal_client) if r["type"] == "table_create"
+    ]
     assert len(table_recs) == 1
     assert table_recs[0] == {
         "type": "table_create",
@@ -110,8 +112,7 @@ def test_obj_table_and_file_create_write_records(wal_client):
     image_obj = next(
         r
         for r in img_records
-        if r["type"] == "obj_create"
-        and r["req"]["obj"]["object_id"] == "my_image"
+        if r["type"] == "obj_create" and r["req"]["obj"]["object_id"] == "my_image"
     )
     assert image_obj["req"]["obj"]["val"]["weave_type"] == {"type": "PIL.Image.Image"}
 
@@ -190,21 +191,27 @@ def test_nested_calls(wal_client):
     assert len(call_starts) == 2
     assert len(call_ends) == 2
 
-    outer_start = next(s for s in call_starts if "outer" in s["req"]["start"]["op_name"])
-    inner_start = next(s for s in call_starts if "inner" in s["req"]["start"]["op_name"])
-    assert (
-        inner_start["req"]["start"]["parent_id"] == outer_start["req"]["start"]["id"]
+    outer_start = next(
+        s for s in call_starts if "outer" in s["req"]["start"]["op_name"]
     )
+    inner_start = next(
+        s for s in call_starts if "inner" in s["req"]["start"]["op_name"]
+    )
+    assert inner_start["req"]["start"]["parent_id"] == outer_start["req"]["start"]["id"]
     assert (
         inner_start["req"]["start"]["trace_id"]
         == outer_start["req"]["start"]["trace_id"]
     )
 
     outer_end = next(
-        e for e in call_ends if e["req"]["end"]["id"] == outer_start["req"]["start"]["id"]
+        e
+        for e in call_ends
+        if e["req"]["end"]["id"] == outer_start["req"]["start"]["id"]
     )
     inner_end = next(
-        e for e in call_ends if e["req"]["end"]["id"] == inner_start["req"]["start"]["id"]
+        e
+        for e in call_ends
+        if e["req"]["end"]["id"] == inner_start["req"]["start"]["id"]
     )
     assert inner_end["req"]["end"]["output"] == 10
     assert outer_end["req"]["end"]["output"] == 10
@@ -244,7 +251,9 @@ def test_sender_drains_wal_on_close(wal_client_with_sender, publish_fn):
     if publish_fn == "obj":
         weave.publish({"k": "v"}, name="sender_obj")
     else:
-        weave.publish(weave.Dataset(name="sender_ds", rows=[{"x": 1}]), name="sender_ds")
+        weave.publish(
+            weave.Dataset(name="sender_ds", rows=[{"x": 1}]), name="sender_ds"
+        )
     wal_client_with_sender._flush()
     wal_dir = Path(wal_client_with_sender._wal.wal_dir)
     wal_client_with_sender._wal.close()
@@ -322,7 +331,9 @@ def test_trace_server_handlers_dispatch():
     obj_req = tsi.ObjCreateReq(
         obj=tsi.ObjSchemaForInsert(project_id="e/p", object_id="test", val={"x": 1})
     )
-    handlers["obj_create"]({"type": "obj_create", "req": obj_req.model_dump(mode="json")})
+    handlers["obj_create"](
+        {"type": "obj_create", "req": obj_req.model_dump(mode="json")}
+    )
     mock_server.obj_create.assert_called_once()
     obj_arg = mock_server.obj_create.call_args[0][0]
     assert isinstance(obj_arg, tsi.ObjCreateReq)

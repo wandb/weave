@@ -11,7 +11,8 @@ from weave.trace.serialization.op_type import RefJSONEncoder
 def test_ref_json_encoder_default_hook(object_ref: ObjectRef) -> None:
     """The default() override wraps an ObjectRef in the special token as a
     weave.ref(...).get() call containing its URI, and still raises TypeError for
-    a genuinely non-serializable object."""
+    a genuinely non-serializable object.
+    """
     result = json.dumps(object_ref, cls=RefJSONEncoder)
     assert RefJSONEncoder.SPECIAL_REF_TOKEN in result
     assert "weave.ref(" in result
@@ -25,7 +26,8 @@ def test_ref_json_encoder_default_hook(object_ref: ObjectRef) -> None:
 def test_ref_json_encoder_strip_tokens_pipeline(object_ref: ObjectRef) -> None:
     """After encode-then-strip, refs become bare weave.ref('...').get() calls (not
     quoted strings) wherever they appear: top-level, alongside plain values, multiple
-    refs, nested dicts, and inside lists."""
+    refs, nested dicts, and inside lists.
+    """
     simple = strip_ref_tokens(
         json.dumps({"key": object_ref}, cls=RefJSONEncoder, indent=4)
     )
@@ -75,7 +77,8 @@ def object_ref() -> ObjectRef:
 
 def strip_ref_tokens(json_str: str) -> str:
     """Strip RefJSONEncoder's special ref tokens, as _get_code_deps does, so the
-    quoted weave.ref() wrappers become bare calls."""
+    quoted weave.ref() wrappers become bare calls.
+    """
     token = RefJSONEncoder.SPECIAL_REF_TOKEN
     json_str = json_str.replace(f'"{token}', "")
     json_str = json_str.replace(f'{token}"', "")

@@ -217,7 +217,7 @@ def test_content_from_text_and_as_string():
 
 
 def test_content_metadata_and_kwargs(image_file):
-    """metadata and encoding kwargs are stored, alongside the derived file fields."""
+    """Metadata and encoding kwargs are stored, alongside the derived file fields."""
     metadata = {"test": "value", "author": "test_user"}
     content = Content.from_path(image_file, metadata=metadata)
     assert content.metadata == metadata
@@ -228,10 +228,14 @@ def test_content_metadata_and_kwargs(image_file):
     assert content.encoding == "utf-8"
 
     kw_meta = {"author": "test", "version": "1.0"}
-    bytes_content = Content.from_bytes(b"Test content", extension="txt", metadata=kw_meta)
+    bytes_content = Content.from_bytes(
+        b"Test content", extension="txt", metadata=kw_meta
+    )
     assert bytes_content.metadata == kw_meta
     assert (
-        Content.from_bytes(b"Test content", extension="txt", encoding="latin-1").encoding
+        Content.from_bytes(
+            b"Test content", extension="txt", encoding="latin-1"
+        ).encoding
         == "latin-1"
     )
 

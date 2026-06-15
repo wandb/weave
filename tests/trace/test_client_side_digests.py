@@ -82,8 +82,13 @@ def fast_path(client: WeaveClient):
     "make",
     [
         lambda: {"model": "gpt-4", "temperature": 0.7, "tags": ["a", "b"]},
-        lambda: weave.Dataset(name="bench_ds", rows=[{"x": i, "y": str(i)} for i in range(10)]),
-        lambda: {"config": {"a": 1, "b": [2, 3]}, "metadata": {"nested": {"deep": True}}},
+        lambda: weave.Dataset(
+            name="bench_ds", rows=[{"x": i, "y": str(i)} for i in range(10)]
+        ),
+        lambda: {
+            "config": {"a": 1, "b": [2, 3]},
+            "metadata": {"nested": {"deep": True}},
+        },
         _make_op,
         lambda: {},
         lambda: {
@@ -93,7 +98,10 @@ def fast_path(client: WeaveClient):
         },
         lambda: weave.Dataset(
             name="bench_large_ds",
-            rows=[{"idx": i, "val": f"row_{i}", "data": list(range(i % 10))} for i in range(100)],
+            rows=[
+                {"idx": i, "val": f"row_{i}", "data": list(range(i % 10))}
+                for i in range(100)
+            ],
         ),
         lambda: Image.new("RGB", (16, 16), color=(0, 128, 255)),
     ],
@@ -111,8 +119,12 @@ def fast_path(client: WeaveClient):
 def test_client_server_digest_consistency(
     client: WeaveClient, make: Callable[[], object]
 ) -> None:
-    digest_client = _publish_with_digests(client, make(), "consistency_client", enable=True)
-    digest_server = _publish_with_digests(client, make(), "consistency_server", enable=False)
+    digest_client = _publish_with_digests(
+        client, make(), "consistency_client", enable=True
+    )
+    digest_server = _publish_with_digests(
+        client, make(), "consistency_server", enable=False
+    )
     assert digest_client == digest_server
 
 
@@ -164,7 +176,9 @@ def test_data_correctness_scalar_and_nested_objects(
         name="nested_rt",
     )
     empty = weave.publish({}, name="empty_rt")
-    unicode_ref = weave.publish({"emoji": "\U0001f680", "cjk": "\u4f60\u597d"}, name="unicode_rt")
+    unicode_ref = weave.publish(
+        {"emoji": "\U0001f680", "cjk": "\u4f60\u597d"}, name="unicode_rt"
+    )
     client._flush()
 
     flat_got = flat.get()
@@ -187,7 +201,9 @@ def test_data_correctness_dataset_op_and_image(
     client: WeaveClient, fast_path: None
 ) -> None:
     ds_ref = weave.publish(
-        weave.Dataset(name="round_trip_ds", rows=[{"a": i, "b": i * 2} for i in range(5)])
+        weave.Dataset(
+            name="round_trip_ds", rows=[{"a": i, "b": i * 2} for i in range(5)]
+        )
     )
     op_ref = weave.publish(_make_op(), name="op_rt")
     img_ref = weave.publish(
@@ -324,7 +340,9 @@ def test_cross_project_ref_skips_expected_digest(
     client._flush()
 
     client.project = original_project
-    weave.publish({"cross_ref": inner_ref.uri(), "data": "test"}, name="outer-with-cross-ref")
+    weave.publish(
+        {"cross_ref": inner_ref.uri(), "data": "test"}, name="outer-with-cross-ref"
+    )
     client._flush()
 
     assert len(captured) >= 1

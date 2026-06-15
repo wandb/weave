@@ -153,7 +153,8 @@ def test_log_call_use_stack_false_does_not_set_current(client: WeaveClient):
 
 def test_log_call_use_stack_true_and_default_push_and_pop(client: WeaveClient):
     """use_stack=True (explicit) and the default both push then pop the inner call,
-    leaving the enclosing op current and parenting the inner call under it."""
+    leaving the enclosing op current and parenting the inner call under it.
+    """
 
     @weave.op
     def explicit_op():

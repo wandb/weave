@@ -921,7 +921,8 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
 
 def test_exclude_base_object_classes(client: WeaveClient):
     """exclude_base_object_classes filtering: single, multiple, non-existent,
-    combined-with-include, and inherited-object handling."""
+    combined-with-include, and inherited-object handling.
+    """
     # Objects across both base classes, plus an inherited object whose base
     # class is TestOnlyNestedBaseObject.
     nested_obj1 = base_objects.TestOnlyNestedBaseObject(b=100)

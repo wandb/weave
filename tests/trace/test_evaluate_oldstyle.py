@@ -155,9 +155,7 @@ async def test_score_as_class(weave_active):
         },
     }
 
-    custom_eval = Evaluation(
-        dataset=dataset_rows, scorers=[MyScorerCustomSummarize()]
-    )
+    custom_eval = Evaluation(dataset=dataset_rows, scorers=[MyScorerCustomSummarize()])
     result = await custom_eval.evaluate(model)
     assert result == {
         "model_output": {"mean": 9.5},

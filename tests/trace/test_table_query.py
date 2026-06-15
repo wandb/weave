@@ -29,7 +29,8 @@ def test_table_query_and_stream(client: WeaveClient):
 
 def test_table_query_invalid_and_filter(client: WeaveClient):
     """Invalid table/row digests yield no rows; a row_digests filter returns only the
-    matching rows with their original indices."""
+    matching rows with their original indices.
+    """
     invalid = client.server.table_query(
         tsi.TableQueryReq(project_id=client.project_id, digest="invalid")
     )
@@ -101,7 +102,8 @@ def test_table_query_limit_offset_combined(client: WeaveClient):
 
 def test_table_query_sort_variants(client: WeaveClient):
     """Sorting by a column, a nested column, and multiple criteria all reorder rows
-    and preserve original indices."""
+    and preserve original indices.
+    """
     digest, _, data = generate_table_data(client, 10, 5)
     id_to_index = {d["id"]: i for i, d in enumerate(data)}
 
@@ -154,7 +156,8 @@ def test_table_query_sort_variants(client: WeaveClient):
 def test_table_query_stats_variants(client: WeaveClient):
     """Stats batch reports counts (incl. empty), skips missing digests, optionally
     reports storage size, and the legacy single-digest endpoint reports count=0 for
-    a missing digest instead of erroring."""
+    a missing digest instead of erroring.
+    """
     digest, _, data = generate_table_data(client, 10, 10)
     stats = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(project_id=client.project_id, digests=[digest])
@@ -193,15 +196,14 @@ def test_table_query_stats_variants(client: WeaveClient):
 
 def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     """Tables with duplicated rows return every physical row with distinct original
-    indices, and filtering by a duplicated row digest returns all copies."""
+    indices, and filtering by a duplicated row digest returns all copies.
+    """
     for copy_count in (1, 2, 3):
         res_data = generate_duplication_simple_table_data(client, 10, copy_count)
         total = 10 * copy_count
 
         full = client.server.table_query(
-            tsi.TableQueryReq(
-                project_id=client.project_id, digest=res_data["digest"]
-            )
+            tsi.TableQueryReq(project_id=client.project_id, digest=res_data["digest"])
         )
         stats = client.server.table_query_stats_batch(
             tsi.TableQueryStatsBatchReq(

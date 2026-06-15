@@ -454,7 +454,8 @@ def clean_settings_env(monkeypatch):
 @pytest.mark.usefixtures("clean_settings_env")
 def test_replace_settings_snapshot_semantics():
     """replace_settings installs a full snapshot, resets unmentioned fields, and
-    None/no-args/dict inputs behave as documented."""
+    None/no-args/dict inputs behave as documented.
+    """
     replace_settings(UserSettings(disabled=True, print_call_link=False))
     assert should_disable_weave() is True
     assert should_print_call_link() is False
@@ -529,7 +530,8 @@ def test_override_settings_async_context_does_not_leak():
 @pytest.mark.usefixtures("clean_settings_env")
 def test_env_overlay_precedence_and_immediacy(monkeypatch):
     """Env vars win over the snapshot, take effect immediately on change, and an
-    empty env var falls through to the snapshot value."""
+    empty env var falls through to the snapshot value.
+    """
     replace_settings(UserSettings(disabled=False))
     assert should_disable_weave() is False
     monkeypatch.setenv("WEAVE_DISABLED", "true")
@@ -578,7 +580,8 @@ def test_user_settings_value_is_frozen_and_strict():
 
 def test_settings_overrides_typeddict_matches_user_settings():
     """The _SettingsOverrides TypedDict typing override_settings(**fields) must
-    mirror UserSettings exactly; drift means the types lie to callers."""
+    mirror UserSettings exactly; drift means the types lie to callers.
+    """
     user_settings_hints = typing.get_type_hints(UserSettings)
     overrides_hints = typing.get_type_hints(_SettingsOverrides)
     assert user_settings_hints == overrides_hints, (

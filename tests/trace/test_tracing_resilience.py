@@ -10,7 +10,7 @@ from __future__ import annotations
 import gc
 import weakref
 from collections import Counter
-from typing import Callable
+from collections.abc import Callable
 from unittest.mock import MagicMock
 
 import pytest
@@ -235,25 +235,34 @@ async def test_resilience_to_output_handler_errors_async(weave_active, log_colle
     assert logs[0].msg.startswith("Error capturing call output")
 
 
+def _raising_make_accumulator() -> dict[str, object]:
+    """make_accumulator kwargs whose make_accumulator itself raises."""
+
+    def make_accumulator(*args, **kwargs):
+        raise DummyTestException("FAILURE!")
+
+    return {"make_accumulator": make_accumulator}
+
+
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
-    "build_accumulator, expected_msg",
+    ("build_accumulator", "expected_msg"),
     [
         pytest.param(
-            lambda: _raising_make_accumulator(),
+            _raising_make_accumulator,
             "Error capturing call output",
             id="make-accumulator",
         ),
         pytest.param(
-            lambda: dict(make_accumulator=_accumulator_with_raising_accumulate()),
+            lambda: {"make_accumulator": _accumulator_with_raising_accumulate()},
             "Error capturing value from iterator, call data may be incomplete",
             id="accumulation",
         ),
         pytest.param(
-            lambda: dict(
-                make_accumulator=_empty_accumulator(),
-                should_accumulate=_raising_callback(),
-            ),
+            lambda: {
+                "make_accumulator": _empty_accumulator(),
+                "should_accumulate": _raising_callback(),
+            },
             "Error capturing call output",
             id="should-accumulate",
         ),
@@ -291,23 +300,23 @@ def test_resilience_to_accumulator_errors(
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
-    "build_accumulator, expected_msg",
+    ("build_accumulator", "expected_msg"),
     [
         pytest.param(
-            lambda: _raising_make_accumulator(),
+            _raising_make_accumulator,
             "Error capturing call output",
             id="make-accumulator",
         ),
         pytest.param(
-            lambda: dict(make_accumulator=_accumulator_with_raising_accumulate()),
+            lambda: {"make_accumulator": _accumulator_with_raising_accumulate()},
             "Error capturing async value from iterator, call data may be incomplete",
             id="accumulation",
         ),
         pytest.param(
-            lambda: dict(
-                make_accumulator=_empty_accumulator(),
-                should_accumulate=_raising_callback(),
-            ),
+            lambda: {
+                "make_accumulator": _empty_accumulator(),
+                "should_accumulate": _raising_callback(),
+            },
             "Error capturing call output",
             id="should-accumulate",
         ),
@@ -472,8 +481,12 @@ async def test_resilience_to_accumulator_internal_errors_async(weave_active):
 @pytest.mark.parametrize(
     "op_kwargs",
     [
-        pytest.param({"postprocess_inputs": _bad_postprocess_inputs}, id="postprocess-inputs"),
-        pytest.param({"postprocess_output": _bad_postprocess_output}, id="postprocess-output"),
+        pytest.param(
+            {"postprocess_inputs": _bad_postprocess_inputs}, id="postprocess-inputs"
+        ),
+        pytest.param(
+            {"postprocess_output": _bad_postprocess_output}, id="postprocess-output"
+        ),
         pytest.param({"call_display_name": _bad_display_name}, id="call-display-name"),
     ],
 )
@@ -498,8 +511,12 @@ def test_resilience_to_op_kwarg_callback_errors(weave_active, log_collector, op_
 @pytest.mark.parametrize(
     "op_kwargs",
     [
-        pytest.param({"postprocess_inputs": _bad_postprocess_inputs}, id="postprocess-inputs"),
-        pytest.param({"postprocess_output": _bad_postprocess_output}, id="postprocess-output"),
+        pytest.param(
+            {"postprocess_inputs": _bad_postprocess_inputs}, id="postprocess-inputs"
+        ),
+        pytest.param(
+            {"postprocess_output": _bad_postprocess_output}, id="postprocess-output"
+        ),
         pytest.param({"call_display_name": _bad_display_name}, id="call-display-name"),
     ],
 )
@@ -525,8 +542,12 @@ async def test_resilience_to_op_kwarg_callback_errors_async(
 @pytest.mark.parametrize(
     "set_handler",
     [
-        pytest.param(lambda op: op._set_on_input_handler(_bad_input_handler), id="on-input"),
-        pytest.param(lambda op: op._set_on_finish_handler(_bad_finish_handler), id="on-finish"),
+        pytest.param(
+            lambda op: op._set_on_input_handler(_bad_input_handler), id="on-input"
+        ),
+        pytest.param(
+            lambda op: op._set_on_finish_handler(_bad_finish_handler), id="on-finish"
+        ),
     ],
 )
 def test_resilience_to_handler_errors(weave_active, log_collector, set_handler):
@@ -552,8 +573,12 @@ def test_resilience_to_handler_errors(weave_active, log_collector, set_handler):
 @pytest.mark.parametrize(
     "set_handler",
     [
-        pytest.param(lambda op: op._set_on_input_handler(_bad_input_handler), id="on-input"),
-        pytest.param(lambda op: op._set_on_finish_handler(_bad_finish_handler), id="on-finish"),
+        pytest.param(
+            lambda op: op._set_on_input_handler(_bad_input_handler), id="on-input"
+        ),
+        pytest.param(
+            lambda op: op._set_on_finish_handler(_bad_finish_handler), id="on-finish"
+        ),
     ],
 )
 async def test_resilience_to_handler_errors_async(
@@ -583,7 +608,7 @@ async def test_resilience_to_handler_errors_async(
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
-    "define_op, run_op",
+    ("define_op", "run_op"),
     [
         pytest.param(_define_func_op, lambda op: op(), id="func"),
         pytest.param(_define_gen_op, lambda op: list(op()), id="gen"),
@@ -604,7 +629,7 @@ def test_create_call_leak_restores_call_stack_sync(
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
-    "define_op, is_gen",
+    ("define_op", "is_gen"),
     [
         pytest.param(_define_async_func_op, False, id="async"),
         pytest.param(_define_async_gen_op, True, id="async-gen"),
@@ -691,15 +716,6 @@ def _empty_accumulator() -> Callable[..., object]:
         return accumulate
 
     return make_accumulator
-
-
-def _raising_make_accumulator() -> dict[str, object]:
-    """make_accumulator kwargs whose make_accumulator itself raises."""
-
-    def make_accumulator(*args, **kwargs):
-        raise DummyTestException("FAILURE!")
-
-    return {"make_accumulator": make_accumulator}
 
 
 def _accumulator_with_raising_accumulate() -> Callable[..., object]:

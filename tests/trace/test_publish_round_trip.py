@@ -28,7 +28,8 @@ def test_publish_round_trip_query_object(client) -> None:
 
 def test_publish_round_trip_get_and_unwrap(weave_active) -> None:
     """A register_object nested pydantic model round-trips via .get() as its real
-    type, and a plain nested dict round-trips via .unwrap()."""
+    type, and a plain nested dict round-trips via .unwrap().
+    """
 
     class Inner(BaseModel):
         name: str

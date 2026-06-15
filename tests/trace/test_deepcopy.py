@@ -38,7 +38,7 @@ def example_class():
 
 
 def test_deepcopy_weave_containers(client, example_class):
-    """deepcopy of server-backed WeaveList/WeaveDict/WeaveObject yields equal, distinct copies."""
+    """Deepcopy of server-backed WeaveList/WeaveDict/WeaveObject yields equal, distinct copies."""
     _, expected_record = example_class
 
     lst = WeaveList([1, 2, 3], server=client.server)
@@ -58,7 +58,7 @@ def test_deepcopy_weave_containers(client, example_class):
 
 
 def test_deepcopy_weave_containers_e2e(weave_active, example_class):
-    """deepcopy of published-then-fetched list/dict/object yields equal, distinct copies."""
+    """Deepcopy of published-then-fetched list/dict/object yields equal, distinct copies."""
     cls, expected_record = example_class
 
     lst2 = weave.publish([1, 2, 3]).get()

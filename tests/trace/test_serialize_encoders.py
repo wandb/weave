@@ -118,7 +118,10 @@ def test_encode_object_record_copies_attrs_recurses_and_drops_null_ref() -> None
     }
 
     dropped = _encode_object_record(
-        ObjectRecord({"_class_name": "Foo", "ref": None, "x": 1}), PROJECT_ID, None, False
+        ObjectRecord({"_class_name": "Foo", "ref": None, "x": 1}),
+        PROJECT_ID,
+        None,
+        False,
     )
     assert "ref" not in dropped
     assert dropped == {"_type": "Foo", "_class_name": "Foo", "x": 1}

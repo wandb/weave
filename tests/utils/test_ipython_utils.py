@@ -25,5 +25,5 @@ def test_get_notebook_source(monkeypatch):
     class DummyShell:
         user_ns: ClassVar[dict[str, list[str]]] = {"In": ["", "a = 1", "", "b = 2"]}
 
-    monkeypatch.setattr(ipy, "_lazy_get_ipython", lambda: DummyShell())
+    monkeypatch.setattr(ipy, "_lazy_get_ipython", DummyShell)
     assert ipy.get_notebook_source() == "a = 1\n\nb = 2"

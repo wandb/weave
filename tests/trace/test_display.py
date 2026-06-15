@@ -44,7 +44,7 @@ def test_viewer_selection_auto_explicit_and_env():
 
 
 def test_auto_viewer_falls_back_to_print():
-    """auto viewer survives a rich ImportError, both at construction and in get."""
+    """Auto viewer survives a rich ImportError, both at construction and in get."""
     import builtins
 
     original_import = builtins.__import__

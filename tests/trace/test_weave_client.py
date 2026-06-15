@@ -1314,7 +1314,8 @@ def test_op_query(client):
 
 def test_refs_read_batch(client):
     """refs_read_batch over top-level objects, refs with extra (list/dataset
-    rows), cross-project refs, and the unsupported call-ref error."""
+    rows), cross-project refs, and the unsupported call-ref error.
+    """
     # Top-level object refs.
     ref = client._save_object([1, 2, 3], "my-list")
     ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
@@ -1335,7 +1336,9 @@ def test_refs_read_batch(client):
     # Refs that descend into dataset rows.
     saved_ds = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
     res = client.server.refs_read_batch(
-        RefsReadBatchReq(refs=[saved_ds.rows[0]["a"].ref.uri, saved_ds.rows[1]["a"].ref.uri])
+        RefsReadBatchReq(
+            refs=[saved_ds.rows[0]["a"].ref.uri, saved_ds.rows[1]["a"].ref.uri]
+        )
     )
     assert len(res.vals) == 2
     assert res.vals[0] == 5

@@ -96,11 +96,17 @@ def test_remote_scorer_auth_config_serializes_and_deserializes(
 @pytest.mark.parametrize(
     ("token_endpoint_url", "expected"),
     [
-        ("https://idp.example.com/oauth2/token", "https://idp.example.com/oauth2/token"),
+        (
+            "https://idp.example.com/oauth2/token",
+            "https://idp.example.com/oauth2/token",
+        ),
         ("http://127.0.0.1:8000/token", "http://127.0.0.1:8000/token"),
         ("http://localhost:3000/token", "http://localhost:3000/token"),
         # Leading/trailing whitespace is stripped.
-        ("  https://idp.example.com/oauth2/token\n", "https://idp.example.com/oauth2/token"),
+        (
+            "  https://idp.example.com/oauth2/token\n",
+            "https://idp.example.com/oauth2/token",
+        ),
     ],
 )
 def test_oauth_token_endpoint_url_accepts_http_s_with_host(

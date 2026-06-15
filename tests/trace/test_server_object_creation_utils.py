@@ -209,7 +209,14 @@ def test_make_safe_name() -> None:
     sanitized name); other invalid chars are stripped or mapped to underscores.
     """
     # Angle brackets in any position sanitize to "opname", and the op builds.
-    for test_input in ("<opname", "opname>", "<opname>", "op<name", "op>name", "op<>name"):
+    for test_input in (
+        "<opname",
+        "opname>",
+        "<opname>",
+        "op<name",
+        "op>name",
+        "op<>name",
+    ):
         safe_name = object_creation_utils.make_safe_name(test_input)
 
         @weave.op(name=safe_name)

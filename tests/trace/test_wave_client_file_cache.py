@@ -20,8 +20,10 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 )
 def test_lru_cache_init_max_size(init_size, expected):
     """Default, custom, zero (unlimited), and negative (clamped to 0) max_size."""
-    cache = ThreadSafeLRUCache() if init_size is None else ThreadSafeLRUCache(
-        max_size=init_size
+    cache = (
+        ThreadSafeLRUCache()
+        if init_size is None
+        else ThreadSafeLRUCache(max_size=init_size)
     )
     assert cache.max_size == expected
 
@@ -148,9 +150,7 @@ def test_lru_cache_thread_safety():
             cache.put(key, value)
             assert cache.get(key) == value
 
-    threads = [
-        threading.Thread(target=worker, args=(i,)) for i in range(num_threads)
-    ]
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(num_threads)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -166,8 +166,10 @@ def test_lru_cache_thread_safety():
 def test_send_file_cache_init_and_max_size_property(init_size):
     """Default/custom init plus max_size getter/setter including unlimited."""
     expected = 1000 if init_size is None else init_size
-    cache = WeaveClientSendFileCache() if init_size is None else (
-        WeaveClientSendFileCache(max_size=init_size)
+    cache = (
+        WeaveClientSendFileCache()
+        if init_size is None
+        else (WeaveClientSendFileCache(max_size=init_size))
     )
     assert cache.max_size == expected
     cache.max_size = 200

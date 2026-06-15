@@ -251,7 +251,17 @@ def test_custom_provider_model_classes():
 
 
 @pytest.mark.parametrize(
-    "provider_id_prefix,model_id,model_name_part,base_url,api_key_name,extra_headers,response_model_name,expected_litellm_model,expected_api_base",
+    (
+        "provider_id_prefix",
+        "model_id",
+        "model_name_part",
+        "base_url",
+        "api_key_name",
+        "extra_headers",
+        "response_model_name",
+        "expected_litellm_model",
+        "expected_api_base",
+    ),
     [
         # openai provider with custom extra headers and default base_url.
         (

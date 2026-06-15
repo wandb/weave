@@ -247,7 +247,9 @@ def test_predict_with_template_and_config_override(mock_get_client):
         llm_model_id="claude-3",
         default_params=LLMStructuredCompletionModelDefaultParams(
             messages_template=[
-                Message(role="system", content="You are {assistant_name}, a helpful AI."),
+                Message(
+                    role="system", content="You are {assistant_name}, a helpful AI."
+                ),
                 Message(role="user", content="Hello, my name is {user_name}"),
             ],
             response_format="text",
@@ -277,7 +279,9 @@ def test_predict_with_template_and_config_override(mock_get_client):
     )
     override_model.predict(
         user_input="Test message",
-        config=LLMStructuredCompletionModelDefaultParams(temperature=0.9, max_tokens=200),
+        config=LLMStructuredCompletionModelDefaultParams(
+            temperature=0.9, max_tokens=200
+        ),
     )
     override_args = mock_client.server.completions_create.call_args[1]["req"]
     assert override_args.inputs.temperature == 0.9
@@ -534,13 +538,18 @@ def test_predict_with_prompt_delegates_and_takes_precedence(
     The model no longer resolves prompts itself; it passes the ref through and, when both
     prompt and messages_template are set, prompt wins (messages_template is dropped).
     """
-    mock_client = _mock_client(mock_get_client, entity=client.entity, project=client.project)
+    mock_client = _mock_client(
+        mock_get_client, entity=client.entity, project=client.project
+    )
 
     # Prompt-only model: delegates prompt + template_vars, keeps only user_input messages.
     prompt_ref = publish(
         MessagesPrompt(
             messages=[
-                {"role": "system", "content": "You are {assistant_name}, a helpful AI."},
+                {
+                    "role": "system",
+                    "content": "You are {assistant_name}, a helpful AI.",
+                },
                 {"role": "user", "content": "Hello, my name is {user_name}"},
             ]
         ),
@@ -573,7 +582,9 @@ def test_predict_with_prompt_delegates_and_takes_precedence(
 
     # prompt + messages_template: prompt takes precedence, no user_input -> empty messages.
     precedence_ref = publish(
-        MessagesPrompt(messages=[{"role": "system", "content": "Message from prompt: {var}"}]),
+        MessagesPrompt(
+            messages=[{"role": "system", "content": "Message from prompt: {var}"}]
+        ),
         name="test_precedence_prompt",
     )
     mock_client.server.completions_create.return_value = _completion_res("Response")

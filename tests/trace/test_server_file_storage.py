@@ -40,7 +40,8 @@ def test_aws_storage(run_storage_test, s3):
 
 def test_large_file_migration(s3, client: WeaveClient):
     """Large files read back identically with storage disabled, enabled, then
-    disabled again, yielding a stable digest across the migration."""
+    disabled again, yielding a stable digest across the migration.
+    """
     chunk_size = 100000
     num_chunks = 3
     file_part = b"1234567890"
@@ -89,7 +90,8 @@ def test_gcp_storage(run_storage_test, gcs, client: WeaveClient):
 @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
 def test_gcp_storage_skips_duplicate_write(client: WeaveClient):
     """The if_generation_match=0 conditional write skips a second write of identical
-    content, returning the same digest and remaining readable."""
+    content, returning the same digest and remaining readable.
+    """
     upload_count = 0
     blob_data = {}
 
@@ -150,7 +152,8 @@ def test_azure_storage(run_storage_test, azure_blob):
 @pytest.mark.usefixtures("azure_storage_env")
 def test_azure_storage_does_not_overwrite_existing_blob(client: WeaveClient):
     """Content-addressable storage is write-once: re-uploading at a known digest is a
-    no-op (overwrite=False), so a write-scoped project cannot substitute content."""
+    no-op (overwrite=False), so a write-scoped project cannot substitute content.
+    """
     blob_data: dict[str, bytes] = {}
     upload_calls: list[dict] = []
 
@@ -284,9 +287,7 @@ def test_file_storage_retry_limit(client: WeaveClient):
         mock_blob.upload_from_string.side_effect = mock_upload_fail
 
         with (
-            mock.patch(
-                "google.cloud.storage.Client", return_value=mock_storage_client
-            ),
+            mock.patch("google.cloud.storage.Client", return_value=mock_storage_client),
             mock.patch(
                 "google.oauth2.service_account.Credentials.from_service_account_info"
             ),
@@ -305,7 +306,8 @@ def test_file_storage_retry_limit(client: WeaveClient):
 @pytest.mark.disable_logging_error_check
 def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs):
     """file_create calls inside one call_batch fan out to GCS in parallel, identical
-    content collapses to one upload, and every object lands under the project prefix."""
+    content collapses to one upload, and every object lands under the project prefix.
+    """
     gcs.state.delay = 0.1
     payload_size = 50_000
     payloads = [
@@ -349,7 +351,8 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
 ):
     """When one upload in a batch hits a non-retriable GCS error, that file falls back
     to inline ClickHouse chunks while the others keep bucket URIs; the failed file
-    reassembles bit-for-bit on read for single- and multi-chunk payloads."""
+    reassembles bit-for-bit on read for single- and multi-chunk payloads.
+    """
     server = client.server
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
 

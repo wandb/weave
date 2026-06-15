@@ -50,22 +50,23 @@ def test_invertable_dict_mutations_keep_views_in_sync():
     assert 2 not in inverse
 
 
+def _init_duplicate() -> None:
+    InvertableDict({"jpg": "jpeg", "jpe": "jpeg"})
+
+
+def _set_duplicate() -> None:
+    mapping = InvertableDict({"a": 1})
+    mapping["b"] = 1
+
+
 @pytest.mark.parametrize(
     ("build", "match"),
     [
-        (
-            lambda: InvertableDict({"jpg": "jpeg", "jpe": "jpeg"}),
-            "Duplicate value found: jpeg",
-        ),
-        (lambda: _set_duplicate(), "Duplicate value found: 1"),
+        (_init_duplicate, "Duplicate value found: jpeg"),
+        (_set_duplicate, "Duplicate value found: 1"),
     ],
     ids=["on-init", "on-set"],
 )
 def test_invertable_dict_rejects_duplicate_values(build, match):
     with pytest.raises(ValueError, match=match):
         build()
-
-
-def _set_duplicate() -> None:
-    mapping = InvertableDict({"a": 1})
-    mapping["b"] = 1

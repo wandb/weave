@@ -1452,7 +1452,10 @@ def test_annotator_queue_items_progress_in_progress_to_completed(client):
     ("target_state", "match"),
     [
         ("skipped", "Invalid state transition"),
-        ("in_progress", "Cannot transition to 'in_progress' when a record already exists"),
+        (
+            "in_progress",
+            "Cannot transition to 'in_progress' when a record already exists",
+        ),
     ],
 )
 def test_annotator_queue_items_progress_invalid_transition_from_completed(

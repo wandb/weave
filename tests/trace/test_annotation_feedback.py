@@ -314,7 +314,11 @@ def test_annotation_spec_value_is_valid():
         addresses: list[Address] = Field(min_length=1, max_length=3)
 
     person_spec = AnnotationSpec(name="Person Feedback", field_schema=PersonFeedback)
-    valid_address = {"street": "123 Main St", "city": "Springfield", "zip_code": "12345"}
+    valid_address = {
+        "street": "123 Main St",
+        "city": "Springfield",
+        "zip_code": "12345",
+    }
     assert person_spec.value_is_valid(
         {"name": "John Doe", "age": 30, "addresses": [valid_address]}
     )

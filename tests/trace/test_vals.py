@@ -12,7 +12,8 @@ from weave.trace.refs import ObjectRef
 
 def test_dict_refs(client):
     """Saved dict keeps descended refs; materializing via `dict()` drops the
-    container ref but children still descend from the original."""
+    container ref but children still descend from the original.
+    """
     d = client.save({"a": 1, "b": 2}, name="d")
 
     assert d["a"] == 1
@@ -43,7 +44,8 @@ def test_dict_refs(client):
 
 def test_list_refs(client):
     """Saved list keeps descended refs; materializing via `list()` drops the
-    container ref but children still descend from the original."""
+    container ref but children still descend from the original.
+    """
     l = client.save([1, 2], name="l")
 
     assert l[0] == 1

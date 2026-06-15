@@ -501,7 +501,12 @@ def _concrete_splat_concrete_splat_op():
             _concrete_splats_op,
             [
                 ((1,), {}, {"val": 1, "args": [], "kwargs": {}}, [1, [], {}]),
-                ((1, 2, 3), {}, {"val": 1, "args": [2, 3], "kwargs": {}}, [1, [2, 3], {}]),
+                (
+                    (1, 2, 3),
+                    {},
+                    {"val": 1, "args": [2, 3], "kwargs": {}},
+                    [1, [2, 3], {}],
+                ),
                 (
                     (1,),
                     {"a": 2, "b": 3},
@@ -522,15 +527,30 @@ def _concrete_splat_concrete_splat_op():
             [
                 ((1,), {}, {"val": 1, "args": [], "a": 0}, [1, [], 0]),
                 ((1,), {"a": 2}, {"val": 1, "args": [], "a": 2}, [1, [], 2]),
-                ((1, 2, 3), {"a": 4}, {"val": 1, "args": [2, 3], "a": 4}, [1, [2, 3], 4]),
+                (
+                    (1, 2, 3),
+                    {"a": 4},
+                    {"val": 1, "args": [2, 3], "a": 4},
+                    [1, [2, 3], 4],
+                ),
             ],
         ),
         # | fn(val, *args, a=0, **kwargs)
         (
             _concrete_splat_concrete_splat_op,
             [
-                ((1,), {}, {"val": 1, "args": [], "a": 0, "kwargs": {}}, [1, [], 0, {}]),
-                ((1,), {"a": 2}, {"val": 1, "args": [], "a": 2, "kwargs": {}}, [1, [], 2, {}]),
+                (
+                    (1,),
+                    {},
+                    {"val": 1, "args": [], "a": 0, "kwargs": {}},
+                    [1, [], 0, {}],
+                ),
+                (
+                    (1,),
+                    {"a": 2},
+                    {"val": 1, "args": [], "a": 2, "kwargs": {}},
+                    [1, [], 2, {}],
+                ),
                 (
                     (1, 2, 3),
                     {"a": 4},
@@ -565,9 +585,7 @@ def test_specific_arg_forms(client, op_factory, expected_calls):
     for call_args, call_kwargs, _, _ in expected_calls:
         my_op(*call_args, **call_kwargs)
 
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client.project_id)
-    )
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client.project_id))
 
     for ndx, (_, _, expected_inputs, expected_output) in enumerate(expected_calls):
         assert res.calls[ndx].op_name == my_op.ref.uri
