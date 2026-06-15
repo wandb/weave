@@ -36,8 +36,11 @@ from weave.shared.digest import (
     compute_table_digest,
 )
 from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
     extract_refs_from_values,
+    split_exact_and_wildcard_values,
+    wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
@@ -58,11 +61,16 @@ from weave.trace_server.errors import (
     ObjectNameTypeCollision,
     RequestTooLarge,
 )
+from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.interface.feedback_types import (
+    MULTI_VALUE_FEEDBACK_TYPES,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import split_escaped_field_path
 from weave.trace_server.trace_server_common import (
     apply_tags_and_synth_latest_in_place,
+    assert_parameter_length_less_than_max,
     digest_is_content_hash,
     digest_is_version_like,
 )
@@ -112,6 +120,9 @@ _CALLS_PLAIN_COLUMNS = frozenset(
 _DISALLOWED_FILTERING_FIELDS = frozenset(
     {"storage_size_bytes", "total_storage_size_bytes"}
 )
+_DATETIME_COLUMN_FIELDS = frozenset(
+    {"started_at", "ended_at", "deleted_at", "expire_at"}
+)
 # Summary fields with computed handlers (anything else under summary.weave.
 # raises InvalidFieldError, mirroring SUMMARY_FIELD_HANDLERS).
 _SUMMARY_FIELD_HANDLERS = frozenset({"status", "latency_ms", "trace_name"})
@@ -134,6 +145,29 @@ def _ensure_tz(dt: datetime.datetime) -> datetime.datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(datetime.timezone.utc)
+
+
+def _maybe_datetime_literal(value: Any) -> datetime.datetime | None:
+    """Literal normalization for DateTime64 column comparisons.
+
+    Mirrors _maybe_convert_datetime_operands: numeric unix timestamps and
+    parseable date(time) strings convert; everything else returns None.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.datetime.fromtimestamp(float(value), tz=datetime.timezone.utc)
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        if s.endswith(("Z", "z")):
+            s = s[:-1] + "+00:00"
+        try:
+            return _ensure_tz(datetime.datetime.fromisoformat(s))
+        except ValueError:
+            return None
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +340,67 @@ def _ch_cast_json_value(value: str | None, cast_to: str | None) -> Any:
     raise ValueError(f"Unknown cast: {cast_to}")
 
 
+def _ch_to_string(value: Any) -> str | None:
+    """ClickHouse toString over a scalar."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _ch_compare(lhs: Any, rhs: Any, op: str) -> bool | None:
+    """Typed comparison with NULL propagation (ClickHouse semantics).
+
+    Both sides arrive same-typed (the inferred-cast machinery aligns them);
+    bools coerce to ints, ints/floats interoperate, datetimes compare
+    temporally.
+    """
+    if lhs is None or rhs is None:
+        return None
+    if isinstance(lhs, bool):
+        lhs = int(lhs)
+    if isinstance(rhs, bool):
+        rhs = int(rhs)
+    if isinstance(lhs, datetime.datetime):
+        lhs = _ensure_tz(lhs)
+    if isinstance(rhs, datetime.datetime):
+        rhs = _ensure_tz(rhs)
+    # Cross-type numeric/string comparisons would be a CH type error; the
+    # inferred casts prevent them for valid queries. Treat as no-match.
+    lhs_numeric = isinstance(lhs, (int, float))
+    rhs_numeric = isinstance(rhs, (int, float))
+    if lhs_numeric != rhs_numeric:
+        return None
+    try:
+        if op == "eq":
+            return bool(lhs == rhs)
+        if op == "gt":
+            return bool(lhs > rhs)
+        if op == "gte":
+            return bool(lhs >= rhs)
+        if op == "lt":
+            return bool(lhs < rhs)
+        if op == "lte":
+            return bool(lhs <= rhs)
+    except TypeError:
+        return None
+    raise ValueError(f"Unknown comparison op: {op}")
+
+
+def _ch_position(haystack: Any, needle: Any, case_insensitive: bool) -> bool:
+    """ClickHouse position()/positionCaseInsensitive() > 0 over strings."""
+    if not isinstance(haystack, str) or not isinstance(needle, str):
+        return False
+    if case_insensitive:
+        return needle.lower() in haystack.lower()
+    return needle in haystack
+
+
 def _value_rank(value: Any) -> int:
     # Legacy storage-class ranks (NULL < numeric < text), used by the
     # remaining generic sorters until they move to _ch_sorted_by_terms.
@@ -314,6 +409,11 @@ def _value_rank(value: Any) -> int:
     if isinstance(value, (bool, int, float)):
         return 1
     return 2
+
+
+def _truthy(value: Any) -> bool:
+    """SQL WHERE-clause truthiness: NULL, 0, and false filter out."""
+    return bool(value) if value is not None else False
 
 
 def _sort_key_for_term(value: Any) -> tuple[int, Any]:
@@ -941,6 +1041,424 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 return ""
             return last_segment[:colon_idx]
         return op_name
+
+    def _live_queue_ids_for_call(self, rec: _CallRec) -> set[str]:
+        """Queue ids with a live annotation_queue_items row for this call
+        (the INNER JOIN the ClickHouse builder adds for queue filters).
+        """
+        return {
+            item["queue_id"]
+            for item in self._annotation_queue_items.values()
+            if item["project_id"] == rec.project_id
+            and item["call_id"] == rec.id
+            and item["deleted_at"] is None
+        }
+
+    def _compile_calls_query(
+        self, query: tsi.Query, expand_columns: list[str] | None = None
+    ) -> Any:
+        """Compile the mongo-style query into a per-record predicate,
+        mirroring process_query_to_conditions in the ClickHouse calls query
+        builder. Compilation walks the AST once; evaluation is a closure
+        call per record.
+        """
+
+        def is_multi_value_feedback(operand: tsi_query.Operand) -> bool:
+            if not isinstance(operand, tsi_query.GetFieldOperator):
+                return False
+            return any(
+                f"feedback.[{ft}]" in operand.get_field_
+                for ft in MULTI_VALUE_FEEDBACK_TYPES
+            )
+
+        def queue_field_name(operand: tsi_query.Operand) -> str | None:
+            if not isinstance(operand, tsi_query.GetFieldOperator):
+                return None
+            name = operand.get_field_
+            if not name.startswith("annotation_queue_items."):
+                return None
+            field_name = name[len("annotation_queue_items.") :]
+            if field_name != "queue_id":
+                raise InvalidFieldError(
+                    f"Invalid annotation_queue_items field: {field_name}"
+                )
+            return field_name
+
+        def datetime_field_name(operand: tsi_query.Operand) -> str | None:
+            if (
+                isinstance(operand, tsi_query.GetFieldOperator)
+                and operand.get_field_ in _DATETIME_COLUMN_FIELDS
+            ):
+                return operand.get_field_
+            return None
+
+        def compile_operation(operation: tsi_query.Operation) -> Any:
+            if isinstance(operation, tsi_query.AndOperation):
+                if len(operation.and_) == 0:
+                    raise ValueError("Empty AND operation")
+                elif len(operation.and_) == 1:
+                    return compile_operand(operation.and_[0])
+                and_parts = [compile_operand(op) for op in operation.and_]
+                return lambda rec: all(_truthy(part(rec)) for part in and_parts)
+            elif isinstance(operation, tsi_query.OrOperation):
+                if len(operation.or_) == 0:
+                    raise ValueError("Empty OR operation")
+                elif len(operation.or_) == 1:
+                    return compile_operand(operation.or_[0])
+                or_parts = [compile_operand(op) for op in operation.or_]
+                return lambda rec: any(_truthy(part(rec)) for part in or_parts)
+            elif isinstance(operation, tsi_query.NotOperation):
+                inner = compile_operand(operation.not_[0])
+
+                def evaluate_not(rec: _CallRec) -> Any:
+                    value = inner(rec)
+                    if value is None:
+                        return None
+                    return not _truthy(value)
+
+                return evaluate_not
+            elif isinstance(operation, tsi_query.EqOperation):
+                lhs_op, rhs_op = operation.eq_
+                # Queue membership: rendered as an INNER JOIN by ClickHouse.
+                queue_lhs = queue_field_name(lhs_op)
+                if queue_lhs is not None:
+                    rhs_fn = compile_operand(rhs_op)
+                    return lambda rec: rhs_fn(rec) in self._live_queue_ids_for_call(rec)
+                if is_multi_value_feedback(lhs_op):
+                    field_path = lhs_op.get_field_
+                    if (
+                        isinstance(rhs_op, tsi_query.LiteralOperation)
+                        and rhs_op.literal_ is None
+                    ):
+                        return lambda rec: (
+                            len(self._feedback_values_array(rec, field_path)) == 0
+                        )
+                    rhs_fn = compile_operand(rhs_op)
+                    return lambda rec: (
+                        rhs_fn(rec) in self._feedback_values_array(rec, field_path)
+                    )
+                if (
+                    isinstance(rhs_op, tsi_query.LiteralOperation)
+                    and rhs_op.literal_ is None
+                ):
+                    lhs_fn = compile_operand(lhs_op)
+                    return lambda rec: lhs_fn(rec) is None
+                return compile_binary(lhs_op, rhs_op, "eq")
+            elif isinstance(operation, tsi_query.GtOperation):
+                return compile_binary(operation.gt_[0], operation.gt_[1], "gt")
+            elif isinstance(operation, tsi_query.LtOperation):
+                return compile_binary(operation.lt_[0], operation.lt_[1], "lt")
+            elif isinstance(operation, tsi_query.GteOperation):
+                return compile_binary(operation.gte_[0], operation.gte_[1], "gte")
+            elif isinstance(operation, tsi_query.LteOperation):
+                return compile_binary(operation.lte_[0], operation.lte_[1], "lte")
+            elif isinstance(operation, tsi_query.InOperation):
+                in_cast = tsi_query.infer_shared_literal_filter_cast(operation.in_[1])
+                lhs_fn = compile_get_field_with_inferred_cast(operation.in_[0], in_cast)
+                if lhs_fn is None:
+                    lhs_fn = compile_operand(operation.in_[0])
+                elems = [compile_operand(op) for op in operation.in_[1]]
+
+                def evaluate_in(rec: _CallRec) -> Any:
+                    lhs_part = lhs_fn(rec)
+                    if lhs_part is None:
+                        return None
+                    for elem_fn in elems:
+                        if _truthy(_ch_compare(lhs_part, elem_fn(rec), "eq")):
+                            return True
+                    return False
+
+                return evaluate_in
+            elif isinstance(operation, tsi_query.ContainsOperation):
+                case_insensitive = bool(operation.contains_.case_insensitive)
+                if is_multi_value_feedback(operation.contains_.input):
+                    field_path = operation.contains_.input.get_field_
+                    substr_fn = compile_operand(operation.contains_.substr)
+
+                    def evaluate_array_contains(rec: _CallRec) -> bool:
+                        needle = substr_fn(rec)
+                        return any(
+                            _ch_position(value, needle, case_insensitive)
+                            for value in self._feedback_values_array(rec, field_path)
+                        )
+
+                    return evaluate_array_contains
+                input_fn = compile_operand(operation.contains_.input)
+                substr_fn = compile_operand(operation.contains_.substr)
+                return lambda rec: _ch_position(
+                    input_fn(rec), substr_fn(rec), case_insensitive
+                )
+            else:
+                raise TypeError(f"Unknown operation type: {operation}")
+
+        def compile_binary(
+            lhs: tsi_query.Operand,
+            rhs: tsi_query.Operand,
+            op: str,
+        ) -> Any:
+            # DateTime64 column comparisons: normalize the literal side.
+            lhs_dt = datetime_field_name(lhs)
+            rhs_dt = datetime_field_name(rhs)
+            converted_literal: datetime.datetime | None = None
+            literal_side = None
+            if lhs_dt or rhs_dt:
+                for side, operand in (("lhs", lhs), ("rhs", rhs)):
+                    if isinstance(operand, tsi_query.LiteralOperation):
+                        parsed = _maybe_datetime_literal(operand.literal_)
+                        if parsed is not None:
+                            converted_literal = parsed
+                            literal_side = side
+            lhs_cast = tsi_query.infer_literal_filter_cast(rhs)
+            rhs_cast = tsi_query.infer_literal_filter_cast(lhs)
+            if literal_side is not None:
+                lhs_cast = rhs_cast = None
+            lhs_fn = compile_get_field_with_inferred_cast(lhs, lhs_cast)
+            if lhs_fn is None:
+                lhs_fn = compile_operand(lhs)
+            rhs_fn = compile_get_field_with_inferred_cast(rhs, rhs_cast)
+            if rhs_fn is None:
+                rhs_fn = compile_operand(rhs)
+            if literal_side == "lhs":
+                lhs_fn = lambda rec, _v=converted_literal: _v
+            elif literal_side == "rhs":
+                rhs_fn = lambda rec, _v=converted_literal: _v
+
+            def evaluate_binary(rec: _CallRec) -> Any:
+                return _ch_compare(lhs_fn(rec), rhs_fn(rec), op)
+
+            return evaluate_binary
+
+        def compile_get_field_with_inferred_cast(
+            operand: tsi_query.Operand,
+            cast_to: tsi_query.CastTo | None,
+        ) -> Any:
+            """Mirror process_json_field_operand_with_inferred_cast: only
+            dynamic JSON fields and single-value feedback fields take the
+            inferred cast.
+            """
+            if cast_to is None or not isinstance(operand, tsi_query.GetFieldOperator):
+                return None
+            field_name = operand.get_field_
+            if field_name in _DISALLOWED_FILTERING_FIELDS:
+                raise InvalidFieldError(f"Field {field_name} is not allowed")
+            if has_expand_prefix(field_name):
+                return self._compile_expanded_field(
+                    field_name, expand_columns or [], cast_to
+                )
+            if field_name.startswith("feedback."):
+                if field_name.startswith("feedback.[*]") or is_multi_value_feedback(
+                    operand
+                ):
+                    return None
+                inner = self._compile_feedback_field(field_name)
+                return lambda rec: _ch_cast_json_value(inner(rec), cast_to)
+            if field_name.startswith("summary.weave."):
+                return None
+            for col_name in ("inputs", "output", "attributes", "summary"):
+                if field_name == col_name or field_name.startswith(col_name + "."):
+                    return self._compile_calls_field(field_name, cast_to)
+            return None
+
+        def has_expand_prefix(field_name: str) -> bool:
+            if not expand_columns:
+                return False
+            return any(
+                field_name == col or field_name.startswith(col + ".")
+                for col in expand_columns
+            )
+
+        def compile_operand(operand: tsi_query.Operand) -> Any:
+            """Compile a single query operand into a per-record value getter,
+            dispatching on its AST node type.
+            """
+            if isinstance(operand, tsi_query.LiteralOperation):
+                literal = operand.literal_
+                if not (
+                    literal is None or isinstance(literal, (str, int, float, bool))
+                ):
+                    raise ValueError(f"Unknown value type: {literal}")
+                return lambda rec, _value=literal: _value
+            elif isinstance(operand, tsi_query.GetFieldOperator):
+                field_name = operand.get_field_
+                if field_name in _DISALLOWED_FILTERING_FIELDS:
+                    raise InvalidFieldError(f"Field {field_name} is not allowed")
+                if has_expand_prefix(field_name):
+                    return self._compile_expanded_field(
+                        field_name, expand_columns or [], None
+                    )
+                if field_name.startswith("feedback."):
+                    return self._compile_feedback_field(field_name)
+                if field_name.startswith("annotation_queue_items."):
+                    queue_field_name(operand)  # validates the subfield
+                    return lambda rec: next(
+                        iter(self._live_queue_ids_for_call(rec)), None
+                    )
+                return self._compile_calls_field(field_name, None)
+            elif isinstance(operand, tsi_query.ConvertOperation):
+                inner = compile_operand(operand.convert_.input)
+                convert_to = operand.convert_.to
+                if convert_to == "exists":
+                    return lambda rec: inner(rec) is not None
+                return lambda rec: _ch_cast_json_value(
+                    inner(rec)
+                    if isinstance(inner(rec), str)
+                    else _ch_to_string(inner(rec)),
+                    convert_to,
+                )
+            elif isinstance(
+                operand,
+                (
+                    tsi_query.AndOperation,
+                    tsi_query.OrOperation,
+                    tsi_query.NotOperation,
+                    tsi_query.EqOperation,
+                    tsi_query.GtOperation,
+                    tsi_query.LtOperation,
+                    tsi_query.GteOperation,
+                    tsi_query.LteOperation,
+                    tsi_query.InOperation,
+                    tsi_query.ContainsOperation,
+                ),
+            ):
+                return compile_operation(operand)
+            else:
+                raise TypeError(f"Unknown operand type: {operand}")
+
+        return compile_operation(query.expr_)
+
+    @staticmethod
+    def _validate_calls_filter(filter: tsi.CallsFilter) -> None:
+        """Parameter-length validation the backends perform while building
+        SQL — it must fire even when no rows exist.
+        """
+        if filter.op_names:
+            assert_parameter_length_less_than_max("op_names", len(filter.op_names))
+        if filter.input_refs:
+            assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
+        if filter.output_refs:
+            assert_parameter_length_less_than_max(
+                "output_refs", len(filter.output_refs)
+            )
+        if filter.parent_ids:
+            assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
+        if filter.trace_ids:
+            assert_parameter_length_less_than_max("trace_ids", len(filter.trace_ids))
+        if filter.call_ids:
+            assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
+        if filter.thread_ids is not None:
+            assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
+        if filter.turn_ids is not None:
+            assert_parameter_length_less_than_max("turn_ids", len(filter.turn_ids))
+
+    def _calls_filter_matches(self, rec: _CallRec, filter: tsi.CallsFilter) -> bool:
+        """Return whether a call record satisfies every clause of a CallsFilter,
+        mirroring the WHERE conditions the ClickHouse query builder emits.
+        """
+        if filter.op_names:
+            non_wildcarded_names: list[str] = []
+            wildcarded_names: list[str] = []
+            for name in filter.op_names:
+                if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                    wildcarded_names.append(name)
+                else:
+                    non_wildcarded_names.append(name)
+            matched = rec.op_name in non_wildcarded_names
+            if not matched:
+                for name in wildcarded_names:
+                    # ClickHouse renders the wildcard as LIKE 'name:%'.
+                    prefix = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":"
+                    if rec.op_name is not None and rec.op_name.startswith(prefix):
+                        matched = True
+                        break
+            if not matched:
+                return False
+
+        if filter.input_refs and not self._refs_filter_matches(
+            rec.input_refs, filter.input_refs
+        ):
+            return False
+        if filter.output_refs and not self._refs_filter_matches(
+            rec.output_refs, filter.output_refs
+        ):
+            return False
+        if filter.parent_ids and rec.parent_id not in filter.parent_ids:
+            return False
+        if filter.trace_ids and rec.trace_id not in filter.trace_ids:
+            return False
+        if filter.call_ids and rec.id not in filter.call_ids:
+            return False
+        if filter.trace_roots_only and rec.parent_id is not None:
+            return False
+        if filter.wb_run_ids and rec.wb_run_id not in filter.wb_run_ids:
+            return False
+        if filter.wb_user_ids and rec.wb_user_id not in filter.wb_user_ids:
+            return False
+        if filter.thread_ids is not None and rec.thread_id not in filter.thread_ids:
+            return False
+        if filter.turn_ids is not None and rec.turn_id not in filter.turn_ids:
+            return False
+        return True
+
+    @staticmethod
+    def _refs_filter_matches(stored_refs: list[str], filter_refs: list[str]) -> bool:
+        exact_refs, wildcard_refs = split_exact_and_wildcard_values(filter_refs)
+        for ref in exact_refs:
+            if ref in stored_refs:
+                return True
+        for ref in wildcard_refs:
+            prefix = wildcard_version_value_to_ref_prefix(ref)
+            if any(stored.startswith(prefix) for stored in stored_refs):
+                return True
+        return False
+
+    def _compile_calls_sort_field(
+        self,
+        sort_field: str,
+        direction: str,
+        expand_columns: list[str] | None = None,
+    ) -> list[tuple[Any, str]]:
+        """Compile an ORDER BY term into [(evaluator, direction)] terms,
+        mirroring OrderField.as_sql: dynamic (JSON/feedback) fields sort by
+        existence DESC, then the float cast, then the string cast.
+        """
+        if expand_columns and any(
+            sort_field == col or sort_field.startswith(col + ".")
+            for col in expand_columns
+        ):
+            exists_fn = self._compile_expanded_field(
+                sort_field, expand_columns, "exists"
+            )
+            value_fn = self._compile_expanded_field(sort_field, expand_columns, None)
+            return [
+                (lambda rec: 1 if exists_fn(rec) else 0, "desc"),
+                (lambda rec: _ch_to_float64_or_null(value_fn(rec)), direction),
+                (value_fn, direction),
+            ]
+        is_dynamic = any(
+            sort_field == col or sort_field.startswith(col + ".")
+            for col in ("inputs", "output", "attributes", "summary")
+        ) and not sort_field.startswith("summary.weave.")
+        if sort_field.startswith("feedback."):
+            exists_fn_inner = self._compile_feedback_field(sort_field)
+
+            def feedback_exists(rec: _CallRec) -> int:
+                return 1 if exists_fn_inner(rec) != "" else 0
+
+            value_fn = self._compile_feedback_field(sort_field)
+            return [
+                (feedback_exists, "desc"),
+                (lambda rec: _ch_to_float64_or_null(value_fn(rec)), direction),
+                (value_fn, direction),
+            ]
+        if is_dynamic:
+            exists_fn = self._compile_calls_field(sort_field, "exists")
+            value_fn = self._compile_calls_field(sort_field, None)
+            return [
+                (lambda rec: 1 if exists_fn(rec) else 0, "desc"),
+                (lambda rec: _ch_to_float64_or_null(value_fn(rec)), direction),
+                (value_fn, direction),
+            ]
+        return [(self._compile_calls_field(sort_field, None), direction)]
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
@@ -1793,6 +2311,69 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             else:
                 raise ValueError(f"Unknown ref type: {extra[extra_index]}")
         return val
+
+    def _resolve_ref_str_for_filter(self, value: Any) -> Any:
+        """Best-effort ref dereference for expand_columns filtering/sorting.
+
+        Mirrors the ObjectRef CTE joins: unresolvable refs simply produce no
+        joined value (None) rather than erroring.
+        """
+        if not isinstance(value, str) or not ri.string_will_be_interpreted_as_ref(
+            value
+        ):
+            return None
+        try:
+            parsed = ri.parse_internal_uri(value)
+        except Exception:
+            return None
+        if not isinstance(parsed, ri.InternalObjectRef):
+            return None
+        try:
+            return self._read_internal_obj_ref(parsed)
+        except (NotFoundError, KeyError, IndexError, ValueError, TypeError):
+            return None
+
+    def _compile_expanded_field(
+        self,
+        field_path: str,
+        expand_columns: list[str],
+        cast_to: str | None,
+    ) -> Any:
+        """Evaluator for a field whose path traverses refs named in
+        expand_columns (mirrors the ObjectRefQueryProcessor CTE joins).
+        """
+        ordered = sorted(
+            (
+                col
+                for col in expand_columns
+                if field_path.startswith(col + ".") or field_path == col
+            ),
+            key=lambda col: col.count("."),
+        )
+
+        def evaluate(rec: _CallRec) -> Any:
+            doc: Any = {
+                "inputs": rec.inputs,
+                "output": rec.output,
+                "attributes": rec.attributes,
+                "summary": rec.summary,
+            }
+            consumed = ""
+            for col in ordered:
+                rel = col[len(consumed) :].lstrip(".")
+                ref_value, _ = _json_extract(doc, split_escaped_field_path(rel))
+                resolved = self._resolve_ref_str_for_filter(ref_value)
+                if resolved is None:
+                    return False if cast_to == "exists" else None
+                doc = resolved
+                consumed = col
+            remainder = field_path[len(consumed) :].lstrip(".")
+            parts = split_escaped_field_path(remainder) if remainder else []
+            if cast_to == "exists":
+                return _ch_json_exists(doc, parts)
+            return _ch_cast_json_value(_ch_json_value(doc, parts), cast_to)
+
+        return evaluate
 
     # ------------------------------------------------------------------
     # Files
