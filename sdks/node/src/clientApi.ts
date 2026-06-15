@@ -8,15 +8,7 @@ import {createFetchWithRetry} from './utils/retry';
 import {getWandbConfigs} from './wandb/settings';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {type CallStackEntry, WeaveClient} from './weaveClient';
-import {globalSingleton} from './utils/globalSingleton';
-
-// Held behind a globalThis-backed container so that a dual-package-hazard load
-// (same module loaded as both CJS and ESM) resolves to a single shared client
-// across both copies.
-const _globalClientHolder = globalSingleton<{client: WeaveClient | null}>(
-  '_weave_global_client',
-  () => ({client: null})
-);
+import state from './state';
 
 /**
  * Log in to Weights & Biases (W&B) using the provided API key.
@@ -170,7 +162,7 @@ export function requireCurrentChildSummary(): {[key: string]: any} {
 }
 
 export function getGlobalClient(): WeaveClient | null {
-  return _globalClientHolder.client;
+  return state.client;
 }
 
 export function requireGlobalClient(): WeaveClient {
@@ -182,7 +174,7 @@ export function requireGlobalClient(): WeaveClient {
 }
 
 export function setGlobalClient(client: WeaveClient | null) {
-  _globalClientHolder.client = client;
+  state.client = client;
 }
 
 /**
