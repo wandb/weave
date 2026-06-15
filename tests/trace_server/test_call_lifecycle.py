@@ -3,14 +3,13 @@ import uuid
 
 import pytest
 
-from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_update_out_of_order(client: weave_client.WeaveClient):
     # Here, we are going to do an out of order sequence:
     # 1. Name a call

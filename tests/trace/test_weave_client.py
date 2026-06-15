@@ -2702,7 +2702,6 @@ def test_calls_query_filter_by_strings(client):
         assert call.inputs["value"] > 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_default_sort_secondary_id_asc(client):
     """Test that the default sort uses id ASC as a secondary tiebreaker.
 
@@ -3263,7 +3262,6 @@ def test_tracing_enabled_context(client):
         client.finish_call(call)  # Should not raise any error
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_hardcoded_filter_length_validation(client):
     @weave.op
     def test():
