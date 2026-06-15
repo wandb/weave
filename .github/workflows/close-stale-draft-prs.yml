@@ -6,8 +6,8 @@ name: Close stale draft PRs
 # actions/stale cannot filter on draft state, and the signal here is *how long a
 # PR has been a draft*, not how long since its last update.
 #
-# Logic lives in scripts/close_stale_draft_prs.py so it is unit-tested and linted
-# like the rest of the codebase (see scripts/test_close_stale_draft_prs.py).
+# Logic lives in scripts/close_stale_draft_prs.py (PyGithub, run via uv) rather
+# than inline in this workflow, so it can be linted and run locally with --dry-run.
 
 on:
   schedule:

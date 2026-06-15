@@ -44,13 +44,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
 
-# PyGithub is needed only for the GitHub I/O layer (declared in the PEP 723 block
-# above and installed by `uv run`). Keep it optional so the pure decision logic
-# can be imported for unit tests without it.
-try:
-    from github import Auth, Github, UnknownObjectException
-except ImportError:  # pragma: no cover - only when PyGithub is absent
-    Auth = Github = UnknownObjectException = None  # type: ignore[assignment,misc]
+from github import Auth, Github, UnknownObjectException
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -299,8 +293,6 @@ def run(
     repo_full_name: str, cfg: StaleConfig, now: datetime, *, token: str, dry_run: bool
 ) -> list[tuple[int, Decision]]:
     """Sweep all open PRs in a repo and return (number, decision) per PR."""
-    if Github is None or Auth is None:
-        raise RuntimeError("PyGithub is required; install it or run via `uv run`.")
     repo = Github(auth=Auth.Token(token)).get_repo(repo_full_name)
     results: list[tuple[int, Decision]] = []
     for pr in repo.get_pulls(state="open"):
