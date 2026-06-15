@@ -22,7 +22,6 @@ import weave
 import weave.trace.call
 from tests.trace.server_utils import find_server_layer
 from tests.trace.util import (
-    FAKE_NOT_IMPLEMENTED,
     NOT_CLICKHOUSE_BACKEND,
     AnyIntMatcher,
     DatetimeMatcher,
@@ -5667,7 +5666,6 @@ def test_thread_context_error_handling(weave_active):
     assert call_context.get_thread_id() is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_threads_query_endpoint(client):
     """Test the threads_query endpoint (/threads/query) functionality."""
     import datetime
@@ -5914,7 +5912,6 @@ def test_threads_query_endpoint(client):
         assert thread.start_time <= thread.last_updated
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_threads_query_aggregation_fields(client):
     """Test the new aggregation fields in threads query: first_turn_id, last_turn_id, and duration percentiles."""
     import time
