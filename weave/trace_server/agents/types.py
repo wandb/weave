@@ -972,6 +972,24 @@ class AgentTraceChatRes(BaseModel):
     feedback: list[dict[str, Any]] | None = None
 
 
+class AgentTraceMessagesReq(BaseModel):
+    """Request for the role-tagged messages of a single trace.
+
+    Fallback source for agent scoring when a root span carries no message
+    content of its own.
+    """
+
+    project_id: str
+    trace_id: str
+    limit: int = 100
+
+
+class AgentTraceMessagesRes(BaseModel):
+    """Role-tagged messages for a trace, ordered by ingest time."""
+
+    messages: list[NormalizedMessage] = Field(default_factory=list)
+
+
 class AgentConversationChatReq(BaseModel):
     """Request to get the multi-turn chat view for a conversation."""
 

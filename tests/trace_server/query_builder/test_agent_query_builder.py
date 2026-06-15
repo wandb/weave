@@ -49,6 +49,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
+    make_trace_messages_query,
     resolve_group_by,
 )
 
@@ -1045,6 +1046,36 @@ class TestMakeTraceDetailSpansQuery:
         assert_sql(
             expected,
             {"genai_0": "p1", "genai_1": "t1"},
+            query,
+            pb.get_params(),
+        )
+
+
+# ============================================================================
+# make_trace_messages_query
+# ============================================================================
+
+
+class TestMakeTraceMessagesQuery:
+    def test_basic(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_trace_messages_query(pb, "p1", "t1", 100)
+
+        expected = """
+            SELECT role,
+                   any(content) AS content,
+                   min(created_at) AS ordered_at
+            FROM messages
+            WHERE project_id = {genai_0:String}
+              AND trace_id = {genai_1:String}
+              AND role IN ('user', 'assistant', 'system')
+            GROUP BY role, content_digest
+            ORDER BY ordered_at ASC
+            LIMIT {genai_2:UInt64}
+        """
+        assert_sql(
+            expected,
+            {"genai_0": "p1", "genai_1": "t1", "genai_2": 100},
             query,
             pb.get_params(),
         )

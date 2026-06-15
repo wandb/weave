@@ -1386,6 +1386,34 @@ def make_span_group_categorical_distributions_query(
     """
 
 
+def make_trace_messages_query(
+    pb: ParamBuilder, project_id: str, trace_id: str, limit: int
+) -> str:
+    """Role-tagged messages for a single trace, read from the ``messages`` table.
+
+    Scoring fallback for root spans that carry no message content of their own.
+    Dedups identical content per role via ``GROUP BY role, content_digest`` and
+    orders by ingest time (``created_at``) so no join back to ``spans`` is
+    needed; ingest order is good enough for a fallback. The indexed ``trace_id``
+    plus ``LIMIT`` bound the scan.
+    """
+    pid = pb.add(project_id, param_type="String")
+    tid = pb.add(trace_id, param_type="String")
+    limit_slot = pb.add(limit, param_type="UInt64")
+    return f"""
+        SELECT role,
+               any(content) AS content,
+               min(created_at) AS ordered_at
+        FROM messages
+        WHERE {_project_filter_sql("project_id", pid)}
+          AND trace_id = {tid}
+          AND role IN ('user', 'assistant', 'system')
+        GROUP BY role, content_digest
+        ORDER BY ordered_at ASC
+        LIMIT {limit_slot}
+    """
+
+
 def make_trace_detail_spans_query(
     pb: ParamBuilder, project_id: str, trace_id: str
 ) -> str:
