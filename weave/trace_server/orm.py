@@ -296,7 +296,13 @@ class Select:
         self._group_by = fields
         return self
 
-    def prepare(self, param_builder: ParamBuilder | None = None) -> PreparedSelect:
+    def prepare(
+        self,
+        param_builder: ParamBuilder | None = None,
+        table_name: str | None = None,
+        cluster_name: str | None = None,
+    ) -> PreparedSelect:
+        """`table_name` overrides only the FROM (a same-schema physical variant like `<t>_local`), not joins."""
         param_builder = param_builder or ParamBuilder()
 
         sql = ""
@@ -322,7 +328,7 @@ class Select:
             fieldnames = []
             sql = "DELETE "
 
-        sql += f"FROM {self.table.name}"
+        sql += f"FROM {_format_table_name_with_cluster(table_name or self.table.name, cluster_name)}"
 
         # Handle joins
         # Returns {join type} JOIN {table name} ON {join condition}
@@ -430,6 +436,17 @@ class Select:
 
         parameters = param_builder.get_params()
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
+
+
+def _format_table_name_with_cluster(table_name: str, cluster_name: str | None) -> str:
+    """Append `ON CLUSTER {cluster_name}` to a table reference when clustered.
+
+    Callers pass the already-resolved table name (e.g. `<table>_local` in
+    distributed mode); this only appends the cluster clause.
+    """
+    if cluster_name:
+        return f"{table_name} ON CLUSTER {cluster_name}"
+    return table_name
 
 
 @dataclass(slots=True)
