@@ -20,6 +20,7 @@ import json
 import logging
 import math
 import re
+import statistics
 import threading
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
@@ -46,6 +47,11 @@ from weave.shared.trace_server_interface_util import (
     wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.stats_query_base import (
+    GRANULARITY_1H,
+    auto_select_granularity_seconds,
+    ensure_max_buckets,
+)
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 
 # Completion request preparation (prompt resolution, provider/secret setup) is
@@ -72,6 +78,7 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
+from weave.trace_server.feedback_payload_schema import discover_payload_schema
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import (
@@ -653,6 +660,85 @@ def _load_default_cost_definitions() -> tuple[dict[str, Any], ...]:
             }
         )
     return tuple(default_rows)
+
+
+# Agent-monitor scores land under this scorer_ratings key; the feedback
+# aggregate rating filter targets it (mirrors feedback_agg_query_builder).
+_FEEDBACK_RATING_KEY = "_rating_"
+
+
+def _ref_object_id(ref: str | None) -> str:
+    """A ref's object id: the last path segment's name, before any ':digest'
+    (the splitByChar expression in the aggregate query builder).
+    """
+    return (ref or "").split("/")[-1].split(":")[0]
+
+
+def _object_id_matches(ref: str | None, values: list[str]) -> bool:
+    """Exact object-id match by default; a trailing '*' opts into prefix."""
+    object_id = _ref_object_id(ref)
+    for value in values:
+        if value.endswith("*"):
+            if object_id.startswith(value.rstrip("*")):
+                return True
+        elif object_id == value:
+            return True
+    return False
+
+
+def _feedback_aggregate_dimension(row: dict[str, Any], dimension: str) -> Any:
+    """A row's value for a client-facing group_by dimension. `scorer_id` is
+    derived from runnable_ref; every other dimension is a stored column.
+    """
+    if dimension == "scorer_id":
+        return _ref_object_id(row.get("runnable_ref"))
+    return row.get(dimension)
+
+
+def _feedback_aggregate_matches(
+    row: dict[str, Any], req: tsi.FeedbackAggregateReq
+) -> bool:
+    """The WHERE clause of build_feedback_aggregate_query, row at a time."""
+    if row["project_id"] != req.project_id:
+        return False
+    created_ms = row["created_at"].timestamp() * 1000
+    if not (req.after_ms <= created_ms < req.before_ms):
+        return False
+    if req.feedback_types and not any(
+        (row.get("feedback_type") or "").startswith(value.rstrip("*"))
+        for value in req.feedback_types
+    ):
+        return False
+    if req.monitor_ids and not _object_id_matches(
+        row.get("trigger_ref"), req.monitor_ids
+    ):
+        return False
+    if req.scorer_ids and not _object_id_matches(
+        row.get("runnable_ref"), req.scorer_ids
+    ):
+        return False
+    if req.span_agent_names and row.get("span_agent_name") not in req.span_agent_names:
+        return False
+    if req.span_types:
+        # The span type is the weave_ref's second-to-last path segment.
+        segments = (row.get("weave_ref") or "").split("/")
+        span_type = segments[-2] if len(segments) >= 2 else ""
+        if span_type not in req.span_types:
+            return False
+    if req.tags:
+        row_tags = row.get("scorer_tags") or []
+        if not any(tag in row_tags for tag in req.tags):
+            return False
+    if req.rating_min is not None or req.rating_max is not None:
+        ratings = row.get("scorer_ratings") or {}
+        if _FEEDBACK_RATING_KEY not in ratings:
+            return False
+        rating = ratings[_FEEDBACK_RATING_KEY]
+        if req.rating_min is not None and not (rating >= req.rating_min):
+            return False
+        if req.rating_max is not None and not (rating <= req.rating_max):
+            return False
+    return True
 
 
 @dataclass(slots=True)
@@ -3157,6 +3243,274 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             payload=create_result.payload,
         )
 
+    def _fetch_feedback_stats_rows(
+        self,
+        project_id: str,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        feedback_type: str | None = None,
+        trigger_ref: str | None = None,
+    ) -> list[tuple[str, str]]:
+        """(created_at, payload_dump) tuples for the stats window."""
+        with self.lock:
+            rows = list(self._feedback)
+        result: list[tuple[Any, str]] = []
+        for row in rows:
+            if row["project_id"] != project_id:
+                continue
+            created_at = row["created_at"]
+            if not (_ensure_tz(start) <= created_at < _ensure_tz(end)):
+                continue
+            if feedback_type is not None and row["feedback_type"] != feedback_type:
+                continue
+            if trigger_ref is not None:
+                row_trigger = row.get("trigger_ref")
+                if trigger_ref.endswith(":*"):
+                    if row_trigger is None or not row_trigger.startswith(
+                        trigger_ref[:-2]
+                    ):
+                        continue
+                elif row_trigger != trigger_ref:
+                    continue
+            result.append((created_at, json.dumps(row["payload"])))
+        return result
+
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        """Compute feedback stats: a per-time-bucket series plus a window-wide
+        rollup, mirroring the ClickHouse stats query.
+        """
+        # ---- Resolve the window and bucket granularity ----
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        if not req.metrics:
+            return tsi.FeedbackStatsRes(
+                start=req.start,
+                end=end,
+                granularity=GRANULARITY_1H,
+                timezone=req.timezone or "UTC",
+                buckets=[],
+            )
+
+        start = req.start
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=datetime.timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=datetime.timezone.utc)
+
+        time_range = end - start
+        granularity = req.granularity or auto_select_granularity_seconds(time_range)
+        granularity = ensure_max_buckets(granularity, time_range.total_seconds())
+
+        # ---- Load the matching rows and bin each metric's values ----
+        rows = self._fetch_feedback_stats_rows(
+            req.project_id,
+            start,
+            end,
+            req.feedback_type,
+            req.trigger_ref,
+        )
+        metrics = [m for m in req.metrics if m.aggregations or m.percentiles]
+
+        bucket_data: dict[datetime.datetime, dict[str, list[Any]]] = {}
+        bucket_counts: dict[datetime.datetime, int] = {}
+        all_values: dict[str, list[Any]] = {m.json_path: [] for m in metrics}
+
+        for created_at_value, payload_str in rows:
+            ts = (
+                created_at_value
+                if isinstance(created_at_value, datetime.datetime)
+                else _parse_feedback_row_ts(created_at_value)
+            )
+            bk = _stats_bucket_key(_ensure_tz(ts), start, granularity)
+            if bk not in bucket_data:
+                bucket_data[bk] = {m.json_path: [] for m in metrics}
+            bucket_counts[bk] = bucket_counts.get(bk, 0) + 1
+            for m in metrics:
+                val = _extract_stats_value(payload_str or "", m.json_path, m.value_type)
+                if val is not None:
+                    bucket_data[bk][m.json_path].append(val)
+                    all_values[m.json_path].append(val)
+
+        # ---- Emit one row per bucket, including empty buckets (count 0) ----
+        all_bucket_starts = []
+        t = start
+        while t < end:
+            all_bucket_starts.append(t)
+            t += datetime.timedelta(seconds=granularity)
+
+        buckets: list[dict[str, Any]] = []
+        for bk in all_bucket_starts:
+            row_dict: dict[str, Any] = {"timestamp": bk}
+            for m in metrics:
+                slug = m.json_path.replace(".", "_")
+                vals = bucket_data.get(bk, {}).get(m.json_path, [])
+                if m.value_type == "boolean":
+                    bool_vals = vals
+                    for agg in m.aggregations or []:
+                        if agg.value == "count_true":
+                            row_dict[f"count_true_{slug}"] = sum(
+                                1 for v in bool_vals if v is True
+                            )
+                        elif agg.value == "count_false":
+                            row_dict[f"count_false_{slug}"] = sum(
+                                1 for v in bool_vals if v is False
+                            )
+                else:
+                    numeric_vals = [float(v) for v in vals if v is not None]
+                    for agg in m.aggregations or []:
+                        row_dict[f"{agg.value}_{slug}"] = _compute_stats_agg(
+                            numeric_vals, agg.value
+                        )
+                    for pct in m.percentiles or []:
+                        key = f"p{pct:g}"
+                        row_dict[f"{key}_{slug}"] = _compute_stats_percentile(
+                            numeric_vals, pct
+                        )
+            row_dict["count"] = bucket_counts.get(bk, 0)
+            buckets.append(row_dict)
+
+        # ---- Roll the same aggregations up over the whole window ----
+        window_stats: dict[str, dict[str, float | None]] | None = None
+        has_window_aggs = any(m.aggregations or m.percentiles for m in metrics)
+        if has_window_aggs:
+            window_stats = {}
+            for m in metrics:
+                slug = m.json_path.replace(".", "_")
+                vals = all_values[m.json_path]
+                stat: dict[str, float | None] = {}
+                if m.value_type == "boolean":
+                    for agg in m.aggregations or []:
+                        if agg.value == "count_true":
+                            stat["count_true"] = float(
+                                sum(1 for v in vals if v is True)
+                            )
+                        elif agg.value == "count_false":
+                            stat["count_false"] = float(
+                                sum(1 for v in vals if v is False)
+                            )
+                else:
+                    numeric_vals = [float(v) for v in vals if v is not None]
+                    for agg in m.aggregations or []:
+                        stat[agg.value] = _compute_stats_agg(numeric_vals, agg.value)
+                    for pct in m.percentiles or []:
+                        key = f"p{pct:g}"
+                        stat[key] = _compute_stats_percentile(numeric_vals, pct)
+                window_stats[slug] = stat
+
+        return tsi.FeedbackStatsRes(
+            start=start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone or "UTC",
+            buckets=buckets,
+            window_stats=window_stats,
+        )
+
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Mirror build_feedback_aggregate_query evaluated over stored rows:
+        the same WHERE filters, time-bucket/group_by keys, and sumMap-style
+        per-key tallies. Like ClickHouse, a query with no grouping keys at
+        all returns exactly one global rollup row.
+        """
+        # ---- Fetch the matching feedback rows ----
+        with self.lock:
+            rows = [
+                row for row in self._feedback if _feedback_aggregate_matches(row, req)
+            ]
+
+        # ---- Group rows by time bucket and group_by dimensions ----
+        bucket_seconds = req.time_bucket_seconds
+        bucketed = bucket_seconds is not None
+        groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+        for row in rows:
+            key: list[Any] = []
+            if bucket_seconds is not None:
+                epoch_s = row["created_at"].timestamp()
+                bucket_start_s = int(epoch_s // bucket_seconds) * bucket_seconds
+                key.append(bucket_start_s * 1000)
+            for dimension in req.group_by:
+                key.append(_feedback_aggregate_dimension(row, dimension))
+            groups.setdefault(tuple(key), []).append(row)
+
+        if not bucketed and not req.group_by:
+            # No GROUP BY keys: ClickHouse global aggregation always yields
+            # one row, even over an empty selection.
+            groups.setdefault((), [])
+
+        # ---- Order the groups: by bucket for a time series, else by dimensions ----
+        if bucketed:
+            ordered_keys = sorted(groups, key=lambda group_key: group_key[0])
+        else:
+            ordered_keys = sorted(groups)
+
+        # ---- Tally tags/ratings per group into output buckets ----
+        buckets: list[tsi.FeedbackAggregateBucket] = []
+        for group_key in ordered_keys:
+            group_rows = groups[group_key]
+            tag_counts: dict[str, int] = {}
+            rating_sums: dict[str, float] = {}
+            rating_counts: dict[str, int] = {}
+            scored_count = 0
+            for row in group_rows:
+                tags = row.get("scorer_tags") or []
+                ratings = row.get("scorer_ratings") or {}
+                if tags or ratings:
+                    scored_count += 1
+                for tag in tags:
+                    tag_counts[tag] = tag_counts.get(tag, 0) + 1
+                for rating_key, rating_value in ratings.items():
+                    rating_sums[rating_key] = rating_sums.get(rating_key, 0.0) + float(
+                        rating_value
+                    )
+                    rating_counts[rating_key] = rating_counts.get(rating_key, 0) + 1
+            dims = group_key[1:] if bucketed else group_key
+            buckets.append(
+                tsi.FeedbackAggregateBucket(
+                    time_bucket_start_ms=group_key[0] if bucketed else None,
+                    group={
+                        dimension: str(value)
+                        for dimension, value in zip(req.group_by, dims, strict=True)
+                    },
+                    total_count=len(group_rows),
+                    scored_count=scored_count,
+                    tag_counts=tag_counts,
+                    rating_counts=rating_counts,
+                    rating_sums=rating_sums,
+                )
+            )
+
+        return tsi.FeedbackAggregateRes(
+            time_bucket_seconds=req.time_bucket_seconds,
+            after_ms=req.after_ms,
+            before_ms=req.before_ms,
+            buckets=buckets,
+        )
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        start = req.start
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=datetime.timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=datetime.timezone.utc)
+
+        rows = self._fetch_feedback_stats_rows(
+            req.project_id,
+            start,
+            end,
+            req.feedback_type,
+            req.trigger_ref,
+        )
+        payload_strs = [row[1] for row in rows if row[1]]
+        if req.sample_limit and len(payload_strs) > req.sample_limit:
+            payload_strs = payload_strs[: req.sample_limit]
+
+        paths = discover_payload_schema(payload_strs)
+        return tsi.FeedbackPayloadSchemaRes(paths=paths)
+
     # ------------------------------------------------------------------
     # OTel export
     # ------------------------------------------------------------------
@@ -3652,3 +4006,88 @@ def _orm_select(
                 )
         result.append(row_out)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Feedback stats helpers (Python ports of methods/feedback_stats.py)
+# ---------------------------------------------------------------------------
+
+
+def _extract_stats_value(payload_str: str, json_path: str, value_type: str) -> Any:
+    """Extract a value from a JSON payload string at a dot path."""
+    try:
+        obj = json.loads(payload_str)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    for part in json_path.split("."):
+        if not isinstance(obj, dict):
+            return None
+        obj = obj.get(part)
+        if obj is None:
+            return None
+    if value_type == "numeric":
+        try:
+            return float(obj)
+        except (TypeError, ValueError):
+            return None
+    if value_type == "boolean":
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, str):
+            if obj.lower() == "true":
+                return True
+            if obj.lower() == "false":
+                return False
+        return None
+    return obj
+
+
+def _parse_feedback_row_ts(created_at_str: str) -> datetime.datetime:
+    """Parse a stored created_at string into a UTC datetime."""
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            return datetime.datetime.strptime(created_at_str, fmt).replace(
+                tzinfo=datetime.timezone.utc
+            )
+        except ValueError:
+            continue
+    return datetime.datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+
+
+def _stats_bucket_key(
+    ts: datetime.datetime, start: datetime.datetime, granularity: int
+) -> datetime.datetime:
+    offset = int((ts - start).total_seconds())
+    bucket_offset = (offset // granularity) * granularity
+    return start + datetime.timedelta(seconds=bucket_offset)
+
+
+def _compute_stats_agg(
+    values: list[float],
+    agg: str,
+) -> float | None:
+    if not values:
+        return None
+    if agg == "avg":
+        return statistics.mean(values)
+    if agg == "sum":
+        return math.fsum(values)
+    if agg == "min":
+        return min(values)
+    if agg == "max":
+        return max(values)
+    if agg == "count":
+        return float(len(values))
+    return None
+
+
+def _compute_stats_percentile(values: list[float], pct: float) -> float | None:
+    if not values:
+        return None
+    s = sorted(values)
+    k = (pct / 100.0) * (len(s) - 1)
+    f = int(k)
+    c = f + 1
+    if c >= len(s):
+        return s[-1]
+    return s[f] + (k - f) * (s[c] - s[f])
