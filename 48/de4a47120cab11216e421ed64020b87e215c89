@@ -71,3 +71,38 @@ registration order — dangling spans must end before the provider flush);
 tests inject InMemorySpanExporter via settings.genai.spanProcessor +
 clearWeaveTracerProvider between tests; semconv.ts gained
 gen_ai.agent.description/id + gen_ai.tool.definitions.
+
+## Review feedback addendum (rebase/review session)
+
+Amended in response to two local review comments on googleAdk.ts:
+
+- L113 `TRUTHY_ENV_VALUES = Set(['true','1'])` flagged "not complete". It was
+  worse than incomplete — it conflated two env vars with DIFFERENT upstream
+  contracts and lowercased both. Verified against the installed packages:
+  * @google/genai `stringToBoolean(GOOGLE_GENAI_USE_VERTEXAI)` is truthy ONLY
+    when `str.toLowerCase()==='true'` — NOT '1'. Old code mapped '1'→vertex_ai
+    while google-genai actually runs Gemini for '1' (real provider-mislabel bug).
+  * @google/adk `shouldAddRequestResponseToSpans`: `(env||'true')` then
+    `===\'true\'||===\'1\'` (case-SENSITIVE; ''→capture). Old code used `?? 'true'`
+    (so ''→no-capture) and lowercased.
+  Fix: removed the shared set; `providerName()` now mirrors genai's
+  stringToBoolean exactly, `captureMessageContent()` mirrors ADK exactly.
+
+- L162 `toJsonSafe` flagged "too defensive? + warrant a test". Dropped the
+  over-defensive nested try/catch (`String(value)` fallback — String() throwing
+  is exotic). Kept cycle (WeakSet) + bigint handling because JSON.stringify
+  GENUINELY throws on both and both are reachable via tool args/results; kept
+  one outer catch for throwing getters/toJSON. Docstring now justifies this.
+
+Tests (interface-level, asserting on exported span attributes, not internals):
+- test.each provider.name over GOOGLE_GENAI_USE_VERTEXAI (incl. '1'→gemini).
+- test.each content-capture over ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS.
+- tool result with a cycle + bigint → span result contains '[Circular]' and
+  the bigint stringified, proving sanitize-not-crash.
+
+Also fixed two pre-existing eslint errors surfaced by master's eslint-10 bump
+(now that node_modules has @eslint/js): `ReadableSpan` → inline `type` import,
+and a require-yield disable on the intentionally-throwing ExplodingLlm test
+double. Verified: 20/20 googleAdk tests pass at the stack tip; eslint+prettier
+clean. Changes were amended into THIS commit (not a fixup) and the stack
+restacked; descendants 02/03/04 had no conflicts.
