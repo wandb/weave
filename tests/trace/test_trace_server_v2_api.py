@@ -29,7 +29,6 @@ from weave.utils.project_id import from_project_id
 class TestOpsV2API:
     """Tests for Ops V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_op_create(self, client):
         """Test creating an op via V2 API."""
         project_id = client.project_id
@@ -47,7 +46,6 @@ class TestOpsV2API:
         assert res.digest is not None
         assert res.version_index == 0
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_op_read(self, client):
         """Test reading an op via V2 API."""
         project_id = client.project_id
@@ -76,7 +74,6 @@ class TestOpsV2API:
         assert read_res.code == source_code
         assert read_res.created_at is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_op_list(self, client):
         """Test listing ops via V2 API."""
         project_id = client.project_id
@@ -101,7 +98,6 @@ class TestOpsV2API:
         assert "list_test_op_1" in op_names
         assert "list_test_op_2" in op_names
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_op_list_with_limit(self, client):
         """Test listing ops with limit via V2 API."""
         project_id = client.project_id
@@ -122,7 +118,6 @@ class TestOpsV2API:
         # Verify limit is respected
         assert len(ops) == 2
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_op_delete(self, client):
         """Test deleting an op via V2 API."""
         project_id = client.project_id
@@ -146,7 +141,6 @@ class TestOpsV2API:
         # Verify deletion
         assert delete_res.num_deleted == 1
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_op_delete_all_versions(self, client):
         """Test deleting all versions of an op via V2 API."""
         project_id = client.project_id
@@ -177,7 +171,6 @@ class TestOpsV2API:
 class TestDatasetsV2API:
     """Tests for Datasets V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_dataset_create(self, client):
         """Test creating a dataset via V2 API."""
         project_id = client.project_id
@@ -200,7 +193,6 @@ class TestDatasetsV2API:
         assert res.digest is not None
         assert res.version_index == 0
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_dataset_read(self, client):
         """Test reading a dataset via V2 API."""
         project_id = client.project_id
@@ -235,7 +227,6 @@ class TestDatasetsV2API:
         assert read_res.rows is not None  # Field is 'rows', not 'rows_ref'
         assert read_res.created_at is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_dataset_list(self, client):
         """Test listing datasets via V2 API."""
         project_id = client.project_id
@@ -260,7 +251,6 @@ class TestDatasetsV2API:
         assert "list_dataset_1" in dataset_names
         assert "list_dataset_2" in dataset_names
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_dataset_delete(self, client):
         """Test deleting a dataset via V2 API."""
         project_id = client.project_id
@@ -288,7 +278,6 @@ class TestDatasetsV2API:
 class TestScorersV2API:
     """Tests for Scorers V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_scorer_create(self, client):
         """Test creating a scorer via V2 API."""
         project_id = client.project_id
@@ -308,7 +297,6 @@ class TestScorersV2API:
         assert res.digest is not None
         assert res.version_index == 0
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_scorer_read(self, client):
         """Test reading a scorer via V2 API."""
         project_id = client.project_id
@@ -342,7 +330,6 @@ class TestScorersV2API:
         assert read_res.score_op is not None  # ScorerReadRes has 'score_op', not 'code'
         assert read_res.created_at is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_scorer_list(self, client):
         """Test listing scorers via V2 API."""
         project_id = client.project_id
@@ -367,7 +354,6 @@ class TestScorersV2API:
         assert "list_scorer_1" in scorer_names
         assert "list_scorer_2" in scorer_names
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_scorer_delete(self, client):
         """Test deleting a scorer via V2 API."""
         project_id = client.project_id
@@ -395,7 +381,6 @@ class TestScorersV2API:
 class TestEvaluationsV2API:
     """Tests for Evaluations V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_create(self, client):
         """Test creating an evaluation via V2 API."""
         project_id = client.project_id
@@ -429,7 +414,6 @@ class TestEvaluationsV2API:
         assert res.version_index == 0
         assert res.evaluation_ref is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_read(self, client):
         """Test reading an evaluation via V2 API."""
         project_id = client.project_id
@@ -479,7 +463,6 @@ class TestEvaluationsV2API:
         assert read_res.summarize_op is not None
         assert read_res.created_at is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_list(self, client):
         """Test listing evaluations via V2 API."""
         project_id = client.project_id
@@ -516,7 +499,6 @@ class TestEvaluationsV2API:
         assert "list_evaluation_1" in eval_names
         assert "list_evaluation_2" in eval_names
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_delete(self, client):
         """Test deleting an evaluation via V2 API."""
         project_id = client.project_id
@@ -551,7 +533,6 @@ class TestEvaluationsV2API:
         # Verify deletion
         assert delete_res.num_deleted == 1
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_with_scorers(self, client):
         """Test creating an evaluation with scorers."""
         project_id = client.project_id
@@ -610,7 +591,6 @@ class TestEvaluationsV2API:
 class TestV2APIIntegration:
     """Integration tests for V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_complete_evaluation_workflow(self, client):
         """Test a complete workflow: create dataset, scorers, and evaluation."""
         project_id = client.project_id
@@ -703,7 +683,6 @@ class TestV2APIIntegration:
         scorer2_read_res = client.server.scorer_read(scorer2_read_req)
         assert scorer2_read_res.name == "length_check"
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_versioning_workflow(self, client):
         """Test that versioning works correctly across V2 API."""
         project_id = client.project_id
@@ -744,7 +723,6 @@ class TestV2APIIntegration:
 class TestModelsV2API:
     """Tests for Models V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_model_create(self, client):
         """Test creating a model via V2 API."""
         project_id = client.project_id
@@ -773,7 +751,6 @@ class TestModel(weave.Model):
         assert res.version_index == 0
         assert res.model_ref is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_model_read(self, client):
         """Test reading a model via V2 API."""
         project_id = client.project_id
@@ -816,7 +793,6 @@ class MyTestModel(weave.Model):
         assert read_res.attributes.get("prompt") == "Hello"
         assert read_res.created_at is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_model_list(self, client):
         """Test listing models via V2 API."""
         project_id = client.project_id
@@ -847,7 +823,6 @@ class ListTestModel{i}(weave.Model):
         assert "ListTestModel1" in model_names
         assert "ListTestModel2" in model_names
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_model_delete(self, client):
         """Test deleting a model via V2 API."""
         project_id = client.project_id
@@ -877,7 +852,6 @@ class DeletableModel(weave.Model):
         # Verify deletion
         assert delete_res.num_deleted == 1
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_model_delete_all_versions(self, client):
         """Test deleting all versions of a model via V2 API."""
         project_id = client.project_id
