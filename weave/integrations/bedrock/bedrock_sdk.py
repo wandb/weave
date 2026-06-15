@@ -350,6 +350,8 @@ def bedrock_stream_accumulator(
 ) -> dict:
     """Accumulates streaming events into a final response dictionary."""
     if acc is None:
+        # Flat accumulation shape (not the Converse message.content block list);
+        # tool_calls[].input is the raw partial-JSON arg string, not a dict.
         acc = {
             "role": None,
             "content": "",
@@ -388,15 +390,11 @@ def bedrock_stream_accumulator(
         delta = value["contentBlockDelta"]["delta"]
         if "text" in delta:
             acc["content"] += delta["text"]
-        elif "toolUse" in delta:
-            tool_input = delta["toolUse"].get("input", "")
-            if acc["tool_calls"]:
-                acc["tool_calls"][-1]["input"] += tool_input
-            else:
-                acc["tool_calls"].append(
-                    {"toolUseId": None, "name": None, "input": tool_input}
-                )
+        elif "toolUse" in delta and acc["tool_calls"]:
+            # Args always follow their opening contentBlockStart.
+            acc["tool_calls"][-1]["input"] += delta["toolUse"].get("input", "")
         elif "reasoningContent" in delta:
+            # Only human-readable text; signature/redactedContent are dropped.
             acc["reasoning"] += delta["reasoningContent"].get("text", "")
 
     # Handle 'messageStop' event
