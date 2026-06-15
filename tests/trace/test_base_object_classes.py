@@ -24,8 +24,10 @@ from weave.trace.serialization.serialize import to_json
 from weave.trace.weave_client import WeaveClient, map_to_refs
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
-    _DUMP_SUFFIX,
     ALLOWED_CALL_FIELDS,
+)
+from weave.trace_server.calls_query_builder.monitor_query_validation import (
+    _DUMP_SUFFIX,
     ALLOWED_DYNAMIC_FIELD_PREFIXES,
 )
 from weave.trace_server.errors import (

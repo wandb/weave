@@ -31,7 +31,7 @@ from collections.abc import Callable, KeysView, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 from weave.shared.trace_server_interface_util import (
@@ -64,7 +64,7 @@ from weave.trace_server.calls_query_builder.utils import (
     trace_id_index_expr,
 )
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InvalidFieldError, InvalidRequest
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import MULTI_VALUE_FEEDBACK_TYPES
 from weave.trace_server.interface.query import (
@@ -1954,94 +1954,6 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 return field
             raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
-
-
-# Field references get_field_by_name accepts beyond exact ALLOWED_CALL_FIELDS
-# keys, used only to build the user-facing error message. The `*_dump` prefixes
-# are derived so they can't drift; the special entries must be kept in sync by
-# hand with the explicit branches in get_field_by_name above
-# (`annotation_queue_items.queue_id` is an exact ref, not a prefix).
-_DUMP_SUFFIX = "_dump"
-_SPECIAL_DYNAMIC_FIELD_PREFIXES = (
-    "feedback.*",
-    "annotation_queue_items.queue_id",
-    "summary.weave.*",
-)
-ALLOWED_DYNAMIC_FIELD_PREFIXES = _SPECIAL_DYNAMIC_FIELD_PREFIXES + tuple(
-    f"{name[: -len(_DUMP_SUFFIX)]}.*"
-    for name, field in ALLOWED_CALL_FIELDS.items()
-    if isinstance(field, CallsMergedDynamicField) and name.endswith(_DUMP_SUFFIX)
-)
-
-
-# Serialized `_class_name`/`_bases` values for Monitor objects. These mirror the
-# SDK classes in weave/flow/monitor.py but are kept as server-side strings on
-# purpose: the trace server must not import from weave/flow.
-MONITOR_OBJECT_CLASSES = frozenset({"Monitor", "ClassifierMonitor"})
-
-
-def validate_monitor_query_fields(
-    base_object_class: str | None,
-    leaf_object_class: str | None,
-    val: object,
-) -> None:
-    """Reject a Monitor whose `query` references a field outside the allowed set."""
-    if (
-        base_object_class not in MONITOR_OBJECT_CLASSES
-        and leaf_object_class not in MONITOR_OBJECT_CLASSES
-    ):
-        return
-    if not isinstance(val, dict):
-        return
-    raw_query = val.get("query")
-    if raw_query is None:
-        return
-    cleaned = _strip_weave_object_keys(raw_query)
-    try:
-        query = tsi_query.Query.model_validate(cleaned)
-    except ValidationError:
-        # Not a recognizable query (e.g. a user object that happens to share
-        # the Monitor class name); leave the write untouched.
-        return
-    validate_query_compiles(query)
-
-
-def validate_query_compiles(query: tsi_query.Query) -> None:
-    """Validate that `query` references only allowed call fields and is well-formed."""
-    try:
-        process_query_to_conditions(query, ParamBuilder(), "calls_merged")
-    except InvalidFieldError as e:
-        raise InvalidFieldError(_invalid_field_message(str(e))) from e
-    except (ValueError, TypeError) as e:
-        raise InvalidRequest(f"Invalid query: {e}") from e
-
-
-_WEAVE_BOOKKEEPING_KEYS = frozenset({"_type", "_class_name", "_bases"})
-
-
-def _strip_weave_object_keys(value: object) -> object:
-    """Drop weave bookkeeping keys (`_type`, `_class_name`, `_bases`) from a serialized query."""
-    if isinstance(value, dict):
-        return {
-            k: _strip_weave_object_keys(v)
-            for k, v in value.items()
-            if k not in _WEAVE_BOOKKEEPING_KEYS
-        }
-    if isinstance(value, list):
-        return [_strip_weave_object_keys(v) for v in value]
-    return value
-
-
-def _invalid_field_message(reason: str) -> str:
-    """Append the allowed field list and dynamic prefixes to a field rejection."""
-    allowed = ", ".join(
-        sorted(k for k in ALLOWED_CALL_FIELDS if not k.endswith(_DUMP_SUFFIX))
-    )
-    prefixes = ", ".join(ALLOWED_DYNAMIC_FIELD_PREFIXES)
-    return (
-        f"{reason}. Allowed fields: {allowed}. "
-        f"Allowed dynamic field prefixes: {prefixes}"
-    )
 
 
 def _field_as_sql_maybe_agg(
