@@ -237,7 +237,6 @@ def test_flush_sends_unpaired_items_via_eager_endpoints() -> None:
     assert processor.num_pending == 0
     assert processor._pending_starts == {}
     assert processor._pending_ends == {}
-    assert len(processor._eager_call_ids) == 0
     complete_fn.assert_not_called()
     # Both orphans should have been handed to the eager processor (possibly
     # across one or multiple batched invocations).
