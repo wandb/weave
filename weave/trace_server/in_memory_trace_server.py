@@ -49,17 +49,27 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.completion_spans import build_completion_span
+from weave.trace_server.agents.types import (
+    AgentSpanSchema,
+    AgentSpansQueryReq,
+    AgentSpansQueryRes,
+)
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
 from weave.trace_server.calls_query_builder.stats_query_base import (
     GRANULARITY_1H,
     auto_select_granularity_seconds,
     ensure_max_buckets,
 )
-from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
 
 # Completion request preparation (prompt resolution, provider/secret setup) is
 # backend-agnostic business logic that currently lives in the ClickHouse
 # module; import it rather than fork it.
+from weave.trace_server.clickhouse_trace_server_batched import (
+    CompletionPrepResult,
+    _setup_completion_model_info,
+)
 from weave.trace_server.clickhouse_trace_server_settings import (
     MAX_DELETE_CALLS_COUNT,
 )
@@ -83,15 +93,25 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.feedback_payload_schema import discover_payload_schema
 from weave.trace_server.ids import generate_id
+from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import (
     MULTI_VALUE_FEEDBACK_TYPES,
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
 )
+from weave.trace_server.llm_completion import (
+    lite_llm_completion,
+    lite_llm_completion_stream,
+    resolve_and_apply_prompt,
+)
 from weave.trace_server.methods.evaluation_status import evaluation_status
+from weave.trace_server.model_providers.model_providers import (
+    read_model_to_provider_info_map,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import Table, split_escaped_field_path
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
     LLM_TOKEN_PRICES_TABLE,
@@ -704,6 +724,67 @@ def _apply_aggregations(
             idx = int(p / 100 * (n - 1))
             idx = max(0, min(idx, n - 1))
             bucket[f"p{int(p)}_{metric}"] = sorted_vals[idx]
+
+
+@lru_cache(maxsize=1)
+def _model_to_provider_info_map() -> dict[str, Any]:
+    """Provider info for known model names, loaded once (it is static file
+    data; ClickHouse loads it per server instance in __init__).
+    """
+    return read_model_to_provider_info_map()
+
+
+def _aggregate_stream_chunks(
+    chunks: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    """Assemble streamed completion chunks into a chat.completion response
+    (compact mirror of the ClickHouse stream wrapper's accumulation).
+    """
+    contents: dict[int, list[str]] = {}
+    finish_reasons: dict[int, Any] = {}
+    roles: dict[int, str] = {}
+    metadata: dict[str, Any] = {}
+    usage: dict[str, Any] | None = None
+    for chunk in chunks:
+        if not isinstance(chunk, dict):
+            continue
+        for key in ("id", "created", "model", "system_fingerprint"):
+            if key not in metadata and chunk.get(key) is not None:
+                metadata[key] = chunk[key]
+        if chunk.get("usage"):
+            usage = chunk["usage"]
+        for choice in chunk.get("choices") or []:
+            idx = choice.get("index", 0)
+            delta = choice.get("delta") or {}
+            if delta.get("role"):
+                roles[idx] = delta["role"]
+            if delta.get("content"):
+                contents.setdefault(idx, []).append(delta["content"])
+            if choice.get("finish_reason"):
+                finish_reasons[idx] = choice["finish_reason"]
+    choices = [
+        {
+            "index": idx,
+            "message": {
+                "role": roles.get(idx, "assistant"),
+                "content": "".join(contents.get(idx, [])),
+            },
+            "finish_reason": finish_reasons.get(idx),
+        }
+        for idx in sorted(set(contents) | set(finish_reasons) | {0})
+    ]
+    response: dict[str, Any] = {
+        "id": metadata.get("id", ""),
+        "object": "chat.completion",
+        "created": metadata.get("created", 0),
+        "model": model_name,
+        "choices": choices,
+    }
+    if metadata.get("system_fingerprint") is not None:
+        response["system_fingerprint"] = metadata["system_fingerprint"]
+    if usage is not None:
+        response["usage"] = usage
+    return response
 
 
 # Agent-monitor scores land under this scorer_ratings key; the feedback
@@ -4081,6 +4162,339 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         return tsi.CostPurgeRes()
 
     # ------------------------------------------------------------------
+    # LLM completions / image generation (mirrors ClickHouse: completions
+    # persist agent spans; image generation persists a call)
+    # ------------------------------------------------------------------
+
+    def _insert_agent_span(self, span: Any) -> None:
+        """ReplacingMergeTree semantics: same span_id replaces the row."""
+        with self.lock:
+            self._agent_spans[span.span_id] = span
+
+    def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
+        """Minimal spans query: project-scoped, newest first."""
+        schema_fields = set(AgentSpanSchema.model_fields)
+        with self.lock:
+            spans = [
+                span
+                for span in self._agent_spans.values()
+                if span.project_id == req.project_id
+            ]
+        spans.sort(key=lambda span: _ensure_tz(span.started_at), reverse=True)
+        total = len(spans)
+        if req.offset:
+            spans = spans[req.offset :]
+        if req.limit is not None:
+            spans = spans[: req.limit]
+        results = []
+        for span in spans:
+            data = {
+                key: value
+                for key, value in span.model_dump().items()
+                if key in schema_fields
+            }
+            results.append(AgentSpanSchema(**data))
+        return AgentSpansQueryRes(spans=results, total_count=total)
+
+    def _prepare_completion_request(
+        self, req: tsi.CompletionsCreateReq
+    ) -> CompletionPrepResult | tsi.CompletionsCreateRes:
+        """Resolve prompt + model info, or return a short-circuit error
+        response (mirrors the ClickHouse implementation).
+        """
+        prompt = req.inputs.prompt
+        template_vars = req.inputs.template_vars
+        initial_messages = req.inputs.messages or []
+
+        if prompt:
+            try:
+                combined_messages, initial_messages = resolve_and_apply_prompt(
+                    prompt=prompt,
+                    messages=req.inputs.messages,
+                    template_vars=template_vars,
+                    project_id=req.project_id,
+                    obj_read_func=self.obj_read,
+                )
+                req.inputs.messages = combined_messages
+            except Exception as e:
+                logger.exception("Failed to resolve prompt")
+                return tsi.CompletionsCreateRes(
+                    response={"error": f"Failed to resolve prompt: {e!s}"}
+                )
+
+        model_info = _model_to_provider_info_map().get(req.inputs.model)
+        try:
+            completion_model_info = _setup_completion_model_info(
+                model_info, req, self.obj_read
+            )
+        except Exception as e:
+            return tsi.CompletionsCreateRes(response={"error": str(e)})
+
+        return CompletionPrepResult(initial_messages, completion_model_info)
+
+    def _log_completion_span(
+        self,
+        req: tsi.CompletionsCreateReq,
+        prep: CompletionPrepResult,
+        response: dict[str, Any] | None,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+        span_id: str,
+        trace_id: str,
+        conversation_id: str,
+    ) -> None:
+        """Build a completion span from the request + response and insert it.
+
+        Called with response=None to open a span before a stream, then again to
+        close it.
+        """
+        retention_days = self._get_project_retention_days(req.project_id)
+        span = build_completion_span(
+            project_id=req.project_id,
+            trace_id=trace_id,
+            span_id=span_id,
+            conversation_id=conversation_id,
+            conversation_name=req.conversation_name or "",
+            started_at=start_time,
+            ended_at=end_time,
+            provider_name=prep.completion_model_info.provider or "",
+            model_name=prep.completion_model_info.model_name,
+            request_inputs=req.inputs,
+            response=response if response is not None else None,
+            wb_user_id=req.wb_user_id or "",
+            retention_days=retention_days,
+            error=(response or {}).get("error"),
+            source=req.source,
+        )
+        self._insert_agent_span(span)
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        """Non-streaming completion: prepare the request, call the provider
+        (LiteLLM), and — when tracking is on — log a span and return its ids.
+        """
+        prep = self._prepare_completion_request(req)
+        if isinstance(prep, tsi.CompletionsCreateRes):
+            return prep
+
+        info = prep.completion_model_info
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(
+            api_key=info.api_key,
+            inputs=req.inputs,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            vertex_credentials=info.vertex_credentials,
+        )
+        end_time = datetime.datetime.now()
+
+        if not req.track_llm_call:
+            return tsi.CompletionsCreateRes(response=res.response)
+
+        req.inputs.messages = prep.initial_messages
+        span_id = generate_id()
+        trace_id = req.trace_id or generate_id()
+        conversation_id = req.conversation_id or generate_id()
+        self._log_completion_span(
+            req,
+            prep,
+            res.response,
+            start_time,
+            end_time,
+            span_id,
+            trace_id,
+            conversation_id,
+        )
+        return tsi.CompletionsCreateRes(
+            response=res.response,
+            weave_call_id=span_id,
+            span_id=span_id,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+        )
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        """Streaming completion: open a span up front, stream the provider's
+        chunks to the caller, then close the span from the aggregated chunks
+        (or error) once the stream finishes.
+        """
+        prep = self._prepare_completion_request(req)
+        if isinstance(prep, tsi.CompletionsCreateRes):
+            error_response = prep.response
+
+            def error_iter() -> Iterator[dict[str, Any]]:
+                yield error_response
+
+            return error_iter()
+
+        info = prep.completion_model_info
+        start_time = datetime.datetime.now()
+
+        span_id = generate_id()
+        trace_id = req.trace_id or generate_id()
+        conversation_id = req.conversation_id or generate_id()
+
+        if req.track_llm_call:
+            # Open span (UNSET status) written before the stream starts.
+            req.inputs.messages = prep.initial_messages
+            self._log_completion_span(
+                req,
+                prep,
+                None,
+                start_time,
+                SENTINEL_EPOCH,
+                span_id,
+                trace_id,
+                conversation_id,
+            )
+
+        api_inputs = req.inputs.model_copy(deep=True)
+        api_inputs.prompt = None
+        api_inputs.template_vars = None
+        chunk_iter = lite_llm_completion_stream(
+            api_key=info.api_key,
+            inputs=api_inputs,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            return_type=info.return_type,
+            vertex_credentials=info.vertex_credentials,
+        )
+
+        if not req.track_llm_call:
+            return chunk_iter
+
+        req.inputs.messages = prep.initial_messages
+
+        def tracked() -> Iterator[dict[str, Any]]:
+            yield {
+                "_meta": {
+                    "weave_call_id": span_id,
+                    "span_id": span_id,
+                    "trace_id": trace_id,
+                    "conversation_id": conversation_id,
+                }
+            }
+            chunks: list[dict[str, Any]] = []
+            stream_error: str | None = None
+            try:
+                for chunk in chunk_iter:
+                    if "error" in chunk and "choices" not in chunk:
+                        stream_error = str(chunk["error"])
+                    chunks.append(chunk)
+                    yield chunk
+            except Exception as exc:
+                stream_error = str(exc)
+                raise
+            finally:
+                aggregated = _aggregate_stream_chunks(
+                    chunks, prep.completion_model_info.model_name
+                )
+                if stream_error is not None:
+                    aggregated["error"] = stream_error
+                self._log_completion_span(
+                    req,
+                    prep,
+                    aggregated,
+                    start_time,
+                    datetime.datetime.now(),
+                    span_id,
+                    trace_id,
+                    conversation_id,
+                )
+
+        return tracked()
+
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        """Image generation: validate inputs and credentials, call the provider,
+        and — when tracking is on — log it as a call.
+        """
+        if req.inputs.model is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No model specified in request"}
+            )
+        if req.inputs.prompt is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No prompt specified in request"}
+            )
+
+        secret_fetcher = _secret_fetcher_context.get()
+        if secret_fetcher is None:
+            return tsi.ImageGenerationCreateRes(
+                response={
+                    "error": "Unable to access required credentials for image generation"
+                }
+            )
+        api_key = (
+            secret_fetcher.fetch("OPENAI_API_KEY")
+            .get("secrets", {})
+            .get("OPENAI_API_KEY")
+        )
+        if not api_key:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No OpenAI API key found"}
+            )
+
+        start_time = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            res = lite_llm_image_generation(
+                api_key=api_key,
+                inputs=req.inputs.model_dump(exclude_none=True),
+                trace_server=self,
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+            )
+        except Exception as e:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": f"Image generation failed: {e}"}
+            )
+        if "error" in res.response:
+            return res
+        end_time = datetime.datetime.now(datetime.timezone.utc)
+
+        if not req.track_llm_call:
+            return res
+
+        call_id = generate_id()
+        trace_id = generate_id()
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=call_id,
+            trace_id=trace_id,
+            op_name=constants.IMAGE_GENERATION_CREATE_OP_NAME,
+            started_at=start_time,
+            attributes={},
+            inputs=req.inputs.model_dump(exclude_none=False),
+            wb_user_id=req.wb_user_id,
+        )
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=call_id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+        if "error" in res.response:
+            end.exception = res.response["error"]
+        try:
+            self.call_start(tsi.CallStartReq(start=start))
+            self.call_end(tsi.CallEndReq(end=end))
+        except Exception:
+            logger.exception("Failed to track image generation call")
+
+        return tsi.ImageGenerationCreateRes(
+            response=res.response, weave_call_id=call_id
+        )
+
+    # ------------------------------------------------------------------
     # OTel export
     # ------------------------------------------------------------------
 
@@ -4818,58 +5232,6 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             return tsi.AnnotatorQueueItemsProgressUpdateRes(
                 item=self._queue_item_to_schema(item)
             )
-
-    # ------------------------------------------------------------------
-    # Evaluate model / rescore
-    # ------------------------------------------------------------------
-
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        if self._evaluate_model_dispatcher is None:
-            raise ValueError("Evaluate model dispatcher is not set")
-        if req.wb_user_id is None:
-            raise ValueError("wb_user_id is required")
-        call_id = generate_id()
-        self._evaluate_model_dispatcher.dispatch(
-            EvaluateModelArgs(
-                project_id=req.project_id,
-                evaluation_ref=req.evaluation_ref,
-                model_ref=req.model_ref,
-                wb_user_id=req.wb_user_id,
-                evaluation_call_id=call_id,
-            )
-        )
-        return tsi.EvaluateModelRes(call_id=call_id)
-
-    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
-        if self._evaluate_model_dispatcher is None:
-            raise ValueError("Evaluate model dispatcher is not set")
-        if req.wb_user_id is None:
-            raise ValueError("wb_user_id is required")
-
-        new_evaluation_run_id = generate_id()
-        self._evaluate_model_dispatcher.dispatch(
-            RescoringArgs(
-                project_id=req.project_id,
-                source_evaluation_run_id=req.source_evaluation_run_id,
-                scorer_refs=req.scorer_refs,
-                wb_user_id=req.wb_user_id,
-                new_evaluation_run_id=new_evaluation_run_id,
-            )
-        )
-        return tsi.RescoreRes(
-            call_id=new_evaluation_run_id,
-            evaluation_run_id=new_evaluation_run_id,
-        )
-
-    def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
-        return evaluation_status(self, req)
-
-    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
-        # ClickHouse publishes to Kafka for async scoring; with no producer
-        # configured it raises exactly this error. The fake has no producer.
-        raise ValueError("Kafka producer is not set")
 
     # ------------------------------------------------------------------
     # Evaluate model / rescore

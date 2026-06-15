@@ -1,9 +1,6 @@
 from unittest.mock import patch
 
-import pytest
-
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.flow.scorer import Scorer
 from weave.prompt.prompt import MessagesPrompt
 from weave.scorers import LLMAsAJudgeScorer
@@ -18,7 +15,6 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_publish_and_load_scorer_with_prompt_ref(weave_active):
     """Test that LLMAsAJudgeScorer with a MessagesPrompt ref can be published and loaded.
 
