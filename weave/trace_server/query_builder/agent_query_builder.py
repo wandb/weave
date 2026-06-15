@@ -1405,6 +1405,45 @@ def make_trace_detail_spans_query(
     """
 
 
+def make_spans_existence_query(
+    pb: ParamBuilder,
+    project_id: str,
+    span_keys: Sequence[tuple[str, str]],
+) -> str:
+    """Batch existence + cached-field fetch for spans by (trace_id, span_id).
+
+    Returns ``trace_id, span_id, span_name, started_at`` for each span that
+    exists in the project. The ``spans`` table is ``ReplacingMergeTree(created_at)``
+    so we collapse versions with ``GROUP BY (project_id, trace_id, span_id)`` +
+    ``argMax(col, created_at)`` (never FINAL).
+
+    ``span_keys`` is a list of ``(trace_id, span_id)`` tuples. We filter on the
+    ``trace_id IN (...)`` and ``span_id IN (...)`` supersets (both bloom-indexed)
+    and let the caller match exact pairs — the candidate set is bounded by the
+    request size.
+
+    Owned here (agent_query_builder) because the spans table belongs to the
+    agents module; provenance callers must not hand-roll SQL against it.
+    """
+    pid = pb.add(project_id, param_type="String")
+    trace_ids = sorted({tid for tid, _ in span_keys})
+    span_ids = sorted({sid for _, sid in span_keys})
+    trace_ids_slot = pb.add(trace_ids, param_type="Array(String)")
+    span_ids_slot = pb.add(span_ids, param_type="Array(String)")
+    return f"""
+        SELECT
+            trace_id,
+            span_id,
+            argMax(span_name, created_at) AS span_name,
+            argMax(started_at, created_at) AS started_at
+        FROM spans
+        WHERE project_id = {pid}
+          AND trace_id IN {trace_ids_slot}
+          AND span_id IN {span_ids_slot}
+        GROUP BY project_id, trace_id, span_id
+    """
+
+
 # ---------------------------------------------------------------------------
 # AMT-backed queries (agents, agent_versions)
 # ---------------------------------------------------------------------------
