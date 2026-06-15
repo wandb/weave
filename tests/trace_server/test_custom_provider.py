@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from unittest.mock import patch
 
+import pytest
 from litellm.types.utils import ModelResponse
 
 from weave.trace.settings import override_settings
@@ -249,58 +250,93 @@ def test_custom_provider_model_classes():
     )
 
 
-def test_custom_provider_completions_create(client):
-    """Test the completions_create endpoint with a custom provider.
+@pytest.mark.parametrize(
+    "provider_id_prefix,model_id,model_name_part,base_url,api_key_name,extra_headers,response_model_name,expected_litellm_model,expected_api_base",
+    [
+        # openai provider with custom extra headers and default base_url.
+        (
+            "test-provider",
+            "test-model",
+            "test-model",
+            "https://api.example.com",
+            "EXAMPLE_API_KEY",
+            {"X-Custom-Header": "value"},
+            None,
+            "openai/test-model",
+            "https://api.example.com",
+        ),
+        # ollama model gets the ollama/ prefix instead of openai/.
+        (
+            "test-ollama",
+            "llama2",
+            "llama2",
+            "http://my-ollama-server.example.com:11434",
+            "OLLAMA_API_KEY",
+            {},
+            "ollama/llama2",
+            "ollama/llama2",
+            "http://my-ollama-server.example.com:11434",
+        ),
+        # trailing slash in base_url is stripped to avoid redirect-induced POST->GET.
+        (
+            "test-trailing-slash",
+            "test-model",
+            "test-model",
+            "http://my-ollama-server.example.com:11434/",
+            "TEST_API_KEY",
+            {},
+            None,
+            "openai/test-model",
+            "http://my-ollama-server.example.com:11434",
+        ),
+    ],
+    ids=["openai", "ollama", "trailing-slash"],
+)
+def test_custom_provider_completions_create(
+    client,
+    provider_id_prefix,
+    model_id,
+    model_name_part,
+    base_url,
+    api_key_name,
+    extra_headers,
+    response_model_name,
+    expected_litellm_model,
+    expected_api_base,
+):
+    """Test the completions_create endpoint across custom provider variants.
 
-    This test verifies the complete flow of creating a completion using a custom provider:
-    1. Provider and model object creation with correct configuration
-    2. Proper request handling and parameter passing to LiteLLM
-    3. Response transformation and validation
-    4. Usage tracking and logging of the completion call
-
-    The test mocks:
-    - Object read operations to simulate provider/model configuration
-    - LiteLLM completion call to simulate API response
-    - Secret fetching for API keys
-
-    Args:
-        client: The test client fixture providing access to the completion endpoint
+    Verifies the full flow (provider/model config, litellm param passing, response
+    transformation, span creation) for: openai prefixing with extra headers, ollama
+    prefixing, and trailing-slash normalization in base_url.
     """
-    # Create unique provider ID and model ID for test isolation
-    provider_id = f"test-provider-{uuid.uuid4()}"
-    model_id = "test-model"
+    provider_id = f"{provider_id_prefix}-{uuid.uuid4()}"
     model_name = f"custom::{provider_id}::{model_id}"
 
-    # Create a Provider object with test configuration
     provider_obj = create_provider_obj(
         project_id=client.project_id,
         provider_id=provider_id,
-        extra_headers={"X-Custom-Header": "value"},
+        base_url=base_url,
+        api_key_name=api_key_name,
+        extra_headers=extra_headers,
     )
-
-    # Create a ProviderModel object with test configuration
     provider_model_obj = create_provider_model_obj(
         project_id=client.project_id,
         provider_id=provider_id,
         model_id=model_id,
-        model_name=model_id,  # Use the actual model name part only
+        model_name=model_name_part,
     )
-
-    # Mock responses for obj_read calls to return our test configurations
     mock_obj_read = create_mock_obj_read(provider_obj, provider_model_obj)
 
-    # Create test input with a simple chat message
     inputs = {
         "model": model_name,
         "messages": [{"role": "user", "content": "Hello, world!"}],
     }
+    mock_response = create_mock_completion_response(
+        model_name=response_model_name or model_name
+    )
 
-    # Mock response from LiteLLM to simulate successful API call
-    mock_response = create_mock_completion_response(model_name=model_name)
-
-    # Run test with tracing disabled to avoid interference
     with override_settings(disabled=True):
-        # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
             with patch(
@@ -311,7 +347,6 @@ def test_custom_provider_completions_create(client):
                     mock_completion.return_value = ModelResponse.model_validate(
                         mock_response
                     )
-
                     res = client.server.completions_create(
                         tsi.CompletionsCreateReq.model_validate(
                             {
@@ -321,17 +356,12 @@ def test_custom_provider_completions_create(client):
                         )
                     )
 
-            # Verify the response matches our mock
             assert res.response == mock_response, (
                 f"Response mismatch. Expected {mock_response}, got {res.response}"
             )
 
-            # Verify LiteLLM was called with correct parameters
             mock_completion.assert_called_once()
             call_args = mock_completion.call_args[1]
-            expected_litellm_model = (
-                f"openai/{model_id}"  # Implementation prefixes with "openai/"
-            )
             assert call_args["model"] == expected_litellm_model, (
                 f"Model name mismatch. Expected '{expected_litellm_model}', got '{call_args['model']}'"
             )
@@ -343,171 +373,19 @@ def test_custom_provider_completions_create(client):
                 f"API key mismatch. Expected 'DUMMY_SECRET_VALUE', "
                 f"got '{call_args['api_key']}'"
             )
-            assert call_args["api_base"] == "https://api.example.com", (
-                f"API base URL mismatch. Expected 'https://api.example.com', "
+            assert call_args["api_base"] == expected_api_base, (
+                f"API base URL mismatch. Expected '{expected_api_base}', "
                 f"got '{call_args['api_base']}'"
             )
-            assert call_args["extra_headers"] == {"X-Custom-Header": "value"}, (
-                f"Extra headers mismatch. Expected {{'X-Custom-Header': 'value'}}, "
+            assert call_args["extra_headers"] == extra_headers, (
+                f"Extra headers mismatch. Expected {extra_headers}, "
                 f"got {call_args['extra_headers']}"
             )
 
-            # Completions now write to the spans table, not calls.
-            # Verify the span was created with correct identifiers.
+            # Completions write to the spans table; verify span identifiers exist.
             assert res.weave_call_id is not None, "Expected a span_id in response"
             assert res.span_id is not None, "Expected span_id in response"
             assert res.trace_id is not None, "Expected trace_id in response"
-        finally:
-            _secret_fetcher_context.reset(token)
-
-
-def test_custom_provider_ollama_model(client):
-    """Test handling of ollama models that need special prefixing."""
-    # Create provider ID and model ID for testing
-    provider_id = f"test-ollama-{uuid.uuid4()}"
-    model_id = "llama2"
-    model_name = f"custom::{provider_id}::{model_id}"
-
-    # Create a Provider object with Ollama-specific configuration
-    provider_obj = create_provider_obj(
-        project_id=client.project_id,
-        provider_id=provider_id,
-        base_url="http://my-ollama-server.example.com:11434",
-        api_key_name="OLLAMA_API_KEY",
-        extra_headers={},
-    )
-
-    # Create a ProviderModel object with Ollama-specific configuration
-    provider_model_obj = create_provider_model_obj(
-        project_id=client.project_id,
-        provider_id=provider_id,
-        model_id=model_id,
-        model_name="llama2",  # Note: this will be prefixed with ollama/
-    )
-
-    # Mock responses for obj_read calls
-    mock_obj_read = create_mock_obj_read(provider_obj, provider_model_obj)
-
-    # Create test input
-    inputs = {
-        "model": model_name,
-        "messages": [{"role": "user", "content": "Hello, world!"}],
-    }
-
-    # Mock response from LiteLLM with Ollama-specific details
-    mock_response = create_mock_completion_response(
-        model_name="ollama/llama2",
-        content="Hello from Ollama!",
-        completion_tokens=4,
-        prompt_tokens=11,
-    )
-
-    with override_settings(disabled=True):
-        # Set up the secret fetcher
-        mock_secret_fetcher, token = setup_test_environment()
-        try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
-                with patch("litellm.completion") as mock_completion:
-                    mock_completion.return_value = ModelResponse.model_validate(
-                        mock_response
-                    )
-                    res = client.server.completions_create(
-                        tsi.CompletionsCreateReq.model_validate(
-                            {
-                                "project_id": client.project_id,
-                                "inputs": inputs,
-                            }
-                        )
-                    )
-
-            # Verify the correct response is returned
-            assert res.response == mock_response
-
-            # Verify the litellm.completion was called with the right parameters
-            mock_completion.assert_called_once()
-            call_args = mock_completion.call_args[1]
-            assert call_args["model"] == "ollama/llama2"  # Should add ollama/ prefix
-            assert call_args["api_key"] == "DUMMY_SECRET_VALUE"
-            assert call_args["api_base"] == "http://my-ollama-server.example.com:11434"
-        finally:
-            _secret_fetcher_context.reset(token)
-
-
-def test_custom_provider_trailing_slash_normalization(client):
-    """Test that trailing slashes in base_url are stripped to prevent redirect issues.
-
-    When a base_url has a trailing slash, HTTP servers often redirect to the
-    canonical URL without the slash using 301/302. These redirects cause most
-    HTTP clients to change POST to GET, breaking the API call.
-
-    This test verifies that trailing slashes are stripped before making the request.
-    """
-    # Create provider ID and model ID for testing
-    provider_id = f"test-trailing-slash-{uuid.uuid4()}"
-    model_id = "test-model"
-    model_name = f"custom::{provider_id}::{model_id}"
-
-    # Create a Provider object with a trailing slash in base_url
-    provider_obj = create_provider_obj(
-        project_id=client.project_id,
-        provider_id=provider_id,
-        base_url="http://my-ollama-server.example.com:11434/",  # Note the trailing slash
-        api_key_name="TEST_API_KEY",
-        extra_headers={},
-    )
-
-    # Create a ProviderModel object
-    provider_model_obj = create_provider_model_obj(
-        project_id=client.project_id,
-        provider_id=provider_id,
-        model_id=model_id,
-        model_name=model_id,
-    )
-
-    # Mock responses for obj_read calls
-    mock_obj_read = create_mock_obj_read(provider_obj, provider_model_obj)
-
-    # Create test input
-    inputs = {
-        "model": model_name,
-        "messages": [{"role": "user", "content": "Hello, world!"}],
-    }
-
-    # Mock response from LiteLLM
-    mock_response = create_mock_completion_response(
-        model_name=model_id,
-        content="Hello!",
-    )
-
-    with override_settings(disabled=True):
-        mock_secret_fetcher, token = setup_test_environment()
-        try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
-                with patch("litellm.completion") as mock_completion:
-                    mock_completion.return_value = ModelResponse.model_validate(
-                        mock_response
-                    )
-                    client.server.completions_create(
-                        tsi.CompletionsCreateReq.model_validate(
-                            {
-                                "project_id": client.project_id,
-                                "inputs": inputs,
-                            }
-                        )
-                    )
-
-            # Verify the trailing slash was stripped from api_base
-            mock_completion.assert_called_once()
-            call_args = mock_completion.call_args[1]
-            assert (
-                call_args["api_base"] == "http://my-ollama-server.example.com:11434"
-            ), f"Expected trailing slash to be stripped. Got '{call_args['api_base']}'"
         finally:
             _secret_fetcher_context.reset(token)
 

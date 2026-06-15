@@ -52,65 +52,60 @@ def test_remote_scorer_record_excludes_op_methods() -> None:
     assert "summarize" in plain_record.__dict__
 
 
-def test_remote_scorer_oauth_auth_config_serializes_and_deserializes() -> None:
+@pytest.mark.parametrize(
+    ("auth_config", "expected_cls"),
+    [
+        (
+            {
+                "mode": "oauth_client_credentials",
+                "token_endpoint_url": "https://idp.example.com/oauth2/token",
+                "client_id": "weave-remote-scorer",
+                "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+                "scope": "remote-score",
+            },
+            OAuthClientCredentialsConfig,
+        ),
+        (
+            {
+                "mode": "static_bearer",
+                "bearer_secret_name": "REMOTE_SCORER_BEARER_TOKEN",
+            },
+            StaticBearerAuthConfig,
+        ),
+    ],
+)
+def test_remote_scorer_auth_config_serializes_and_deserializes(
+    auth_config: dict[str, str],
+    expected_cls: type,
+) -> None:
     rs = RemoteScorer(
         name="policy_remote",
         endpoint_url="https://scoring.example.com/v1/score",
-        auth_config={
-            "mode": "oauth_client_credentials",
-            "token_endpoint_url": "https://idp.example.com/oauth2/token",
-            "client_id": "weave-remote-scorer",
-            "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
-            "scope": "remote-score",
-        },
+        auth_config=auth_config,
     )
 
-    assert isinstance(rs.auth_config, OAuthClientCredentialsConfig)
+    assert isinstance(rs.auth_config, expected_cls)
     dumped = rs.model_dump()
-    assert dumped["auth_config"] == {
-        "mode": "oauth_client_credentials",
-        "token_endpoint_url": "https://idp.example.com/oauth2/token",
-        "client_id": "weave-remote-scorer",
-        "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
-        "scope": "remote-score",
-    }
+    assert dumped["auth_config"] == auth_config
 
     round_tripped = RemoteScorer.model_validate(dumped)
-    assert isinstance(round_tripped.auth_config, OAuthClientCredentialsConfig)
-    assert round_tripped.auth_config == rs.auth_config
-
-
-def test_remote_scorer_static_bearer_auth_config_serializes_and_deserializes() -> None:
-    rs = RemoteScorer(
-        endpoint_url="https://scoring.example.com/v1/score",
-        auth_config={
-            "mode": "static_bearer",
-            "bearer_secret_name": "REMOTE_SCORER_BEARER_TOKEN",
-        },
-    )
-
-    assert isinstance(rs.auth_config, StaticBearerAuthConfig)
-    dumped = rs.model_dump()
-    assert dumped["auth_config"] == {
-        "mode": "static_bearer",
-        "bearer_secret_name": "REMOTE_SCORER_BEARER_TOKEN",
-    }
-
-    round_tripped = RemoteScorer.model_validate(dumped)
-    assert isinstance(round_tripped.auth_config, StaticBearerAuthConfig)
+    assert isinstance(round_tripped.auth_config, expected_cls)
     assert round_tripped.auth_config == rs.auth_config
 
 
 @pytest.mark.parametrize(
-    "token_endpoint_url",
+    ("token_endpoint_url", "expected"),
     [
-        "https://idp.example.com/oauth2/token",
-        "http://127.0.0.1:8000/token",
-        "http://localhost:3000/token",
+        ("https://idp.example.com/oauth2/token", "https://idp.example.com/oauth2/token"),
+        ("http://127.0.0.1:8000/token", "http://127.0.0.1:8000/token"),
+        ("http://localhost:3000/token", "http://localhost:3000/token"),
+        # Leading/trailing whitespace is stripped.
+        ("  https://idp.example.com/oauth2/token\n", "https://idp.example.com/oauth2/token"),
     ],
 )
 def test_oauth_token_endpoint_url_accepts_http_s_with_host(
     token_endpoint_url: str,
+    expected: str,
 ) -> None:
     rs = RemoteScorer(
         endpoint_url="https://scoring.example.com/v1/score",
@@ -122,7 +117,7 @@ def test_oauth_token_endpoint_url_accepts_http_s_with_host(
         },
     )
     assert isinstance(rs.auth_config, OAuthClientCredentialsConfig)
-    assert rs.auth_config.token_endpoint_url == token_endpoint_url
+    assert rs.auth_config.token_endpoint_url == expected
 
 
 @pytest.mark.parametrize(
@@ -133,10 +128,12 @@ def test_oauth_token_endpoint_url_accepts_http_s_with_host(
         ("http://", "include a host"),
         ("ftp://idp.example.com/token", "http or https"),
         ("not-a-url", "http or https"),
+        # Non-string input bypasses whitespace-stripping and fails string coercion.
+        (12345, None),
     ],
 )
 def test_oauth_token_endpoint_url_rejects_malformed(
-    token_endpoint_url: str, match_substr: str
+    token_endpoint_url: object, match_substr: str | None
 ) -> None:
     with pytest.raises(ValidationError, match=match_substr):
         RemoteScorer(
@@ -144,35 +141,6 @@ def test_oauth_token_endpoint_url_rejects_malformed(
             auth_config={
                 "mode": "oauth_client_credentials",
                 "token_endpoint_url": token_endpoint_url,
-                "client_id": "weave-remote-scorer",
-                "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
-            },
-        )
-
-
-def test_oauth_token_endpoint_url_strips_whitespace() -> None:
-    rs = RemoteScorer(
-        endpoint_url="https://scoring.example.com/v1/score",
-        auth_config={
-            "mode": "oauth_client_credentials",
-            "token_endpoint_url": "  https://idp.example.com/oauth2/token\n",
-            "client_id": "weave-remote-scorer",
-            "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
-        },
-    )
-    assert isinstance(rs.auth_config, OAuthClientCredentialsConfig)
-    assert rs.auth_config.token_endpoint_url == "https://idp.example.com/oauth2/token"
-
-
-def test_oauth_token_endpoint_url_non_string_input_rejected() -> None:
-    # Non-string inputs bypass the whitespace-stripping branch and then fail
-    # the URL-shape validator with a string-coercion error from pydantic.
-    with pytest.raises(ValidationError):
-        RemoteScorer(
-            endpoint_url="https://scoring.example.com/v1/score",
-            auth_config={
-                "mode": "oauth_client_credentials",
-                "token_endpoint_url": 12345,
                 "client_id": "weave-remote-scorer",
                 "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
             },
@@ -294,27 +262,22 @@ def test_remote_scorer_auth_config_rejects_raw_secret_fields(
     assert "client_secret" not in OAuthClientCredentialsConfig.model_fields
 
 
-def test_remote_scorer_endpoint_url_allows_http_for_local_dev() -> None:
-    for url in (
-        "http://127.0.0.1:8000/v1/score",
-        "http://localhost:3000/score",
-    ):
-        rs = RemoteScorer(endpoint_url=url)
-        assert rs.endpoint_url == url
-
-
-def test_remote_scorer_endpoint_url_strips_whitespace() -> None:
-    rs = RemoteScorer(
-        endpoint_url="  https://scoring.example.com/v1  ",
-    )
-    assert rs.endpoint_url == "https://scoring.example.com/v1"
-
-
-def test_remote_scorer_endpoint_url_strips_leading_trailing_newlines_and_tabs() -> None:
-    rs = RemoteScorer(
-        endpoint_url="\thttps://scoring.example.com/v1\n",
-    )
-    assert rs.endpoint_url == "https://scoring.example.com/v1"
+@pytest.mark.parametrize(
+    ("endpoint_url", "expected"),
+    [
+        # http is allowed for local dev.
+        ("http://127.0.0.1:8000/v1/score", "http://127.0.0.1:8000/v1/score"),
+        ("http://localhost:3000/score", "http://localhost:3000/score"),
+        # Surrounding whitespace, newlines, and tabs are stripped.
+        ("  https://scoring.example.com/v1  ", "https://scoring.example.com/v1"),
+        ("\thttps://scoring.example.com/v1\n", "https://scoring.example.com/v1"),
+    ],
+)
+def test_remote_scorer_endpoint_url_normalizes(
+    endpoint_url: str, expected: str
+) -> None:
+    rs = RemoteScorer(endpoint_url=endpoint_url)
+    assert rs.endpoint_url == expected
 
 
 @pytest.mark.parametrize(

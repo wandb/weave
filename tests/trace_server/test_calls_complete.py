@@ -1148,18 +1148,15 @@ def test_calls_query_routing_by_residence(
     assert len(calls) == expected_count
 
 
-def test_v1_call_start_raises_calls_complete_mode_required(
+def test_v1_call_start_end_raise_calls_complete_mode_required(
     trace_server, clickhouse_trace_server
 ):
-    """Verify v1 call_start raises CallsCompleteModeRequired for calls_complete projects.
-
-    When a project is in calls_complete mode (has existing data in calls_complete),
-    attempting to use the legacy v1 call_start API should raise an error directing
-    the user to upgrade their SDK.
+    """Once a project has calls_complete data, the legacy v1 call_start and
+    call_end APIs both raise CallsCompleteModeRequired with an upgrade hint.
     """
-    project_id = f"{TEST_ENTITY}/calls_complete_v1_error_start"
+    project_id = f"{TEST_ENTITY}/calls_complete_v1_error"
 
-    # Seed the project with calls_complete data to establish it as a calls_complete project
+    # Seed calls_complete data so the project reads as a calls_complete project.
     seed_call = _make_completed_call(
         project_id,
         str(uuid.uuid4()),
@@ -1169,8 +1166,7 @@ def test_v1_call_start_raises_calls_complete_mode_required(
     )
     trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
 
-    # Now attempt v1 call_start - should raise CallsCompleteModeRequired
-    with pytest.raises(CallsCompleteModeRequired) as exc_info:
+    with pytest.raises(CallsCompleteModeRequired) as start_exc:
         trace_server.call_start(
             tsi.CallStartReq(
                 start=tsi.StartedCallSchemaForInsert(
@@ -1184,34 +1180,9 @@ def test_v1_call_start_raises_calls_complete_mode_required(
                 )
             )
         )
+    assert "complete" in str(start_exc.value).lower()
 
-    # Verify error contains helpful information
-    assert "complete" in str(exc_info.value).lower()
-
-
-def test_v1_call_end_raises_calls_complete_mode_required(
-    trace_server, clickhouse_trace_server
-):
-    """Verify v1 call_end raises CallsCompleteModeRequired for calls_complete projects.
-
-    When a project is in calls_complete mode (has existing data in calls_complete),
-    attempting to use the legacy v1 call_end API should raise an error directing
-    the user to upgrade their SDK.
-    """
-    project_id = f"{TEST_ENTITY}/calls_complete_v1_error_end"
-
-    # Seed the project with calls_complete data to establish it as a calls_complete project
-    seed_call = _make_completed_call(
-        project_id,
-        str(uuid.uuid4()),
-        str(uuid.uuid4()),
-        datetime.datetime.now(datetime.timezone.utc),
-        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
-    )
-    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
-
-    # Now attempt v1 call_end - should raise CallsCompleteModeRequired
-    with pytest.raises(CallsCompleteModeRequired) as exc_info:
+    with pytest.raises(CallsCompleteModeRequired) as end_exc:
         trace_server.call_end(
             tsi.CallEndReq(
                 end=tsi.EndedCallSchemaForInsert(
@@ -1222,9 +1193,7 @@ def test_v1_call_end_raises_calls_complete_mode_required(
                 )
             )
         )
-
-    # Verify error contains helpful information
-    assert "complete" in str(exc_info.value).lower()
+    assert "complete" in str(end_exc.value).lower()
 
 
 def test_calls_complete_query_with_status_filter(trace_server, clickhouse_trace_server):
@@ -1513,82 +1482,16 @@ def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
     assert len(_fetch_calls_stream(trace_server, project3)) == 0
 
 
-def test_project_stats_with_calls_complete(trace_server, clickhouse_trace_server):
-    """Test project_stats uses calls_complete_stats when project uses calls_complete.
-
-    This test verifies that the project_stats endpoint correctly queries
-    from calls_complete_stats (not calls_merged_stats) when the project
-    has data in calls_complete table.
+def test_project_stats_routes_by_residence(trace_server, clickhouse_trace_server):
+    """project_stats reads from the stats table matching each project's residence:
+    a calls_merged project from calls_merged_stats and a calls_complete project
+    from calls_complete_stats (summing all four size fields), and the two never
+    cross-read.
     """
-    project_id = f"{TEST_ENTITY}/project_stats_calls_complete"
-    internal_project_id = b64(project_id)
-
-    # Define test data sizes
-    attr_size = 100
-    inputs_size = 200
-    output_size = 300
-    summary_size = 400
-    expected_trace_size = attr_size + inputs_size + output_size + summary_size
-
-    # Insert data directly into calls_complete_stats table
-    # This bypasses the materialized view to have predictable test data
-    clickhouse_trace_server.ch_client.command(
-        f"""
-        INSERT INTO calls_complete_stats (
-            project_id,
-            id,
-            attributes_size_bytes,
-            inputs_size_bytes,
-            output_size_bytes,
-            summary_size_bytes
-        )
-        VALUES (
-            '{internal_project_id}',
-            '{uuid.uuid4()}',
-            {attr_size},
-            {inputs_size},
-            {output_size},
-            {summary_size}
-        )
-        """
-    )
-
-    # Insert a row into calls_complete to establish project residence
-    _insert_complete_call(clickhouse_trace_server.ch_client, internal_project_id)
-
-    # Verify we're reading from calls_complete
-    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
-        internal_project_id,
-        clickhouse_trace_server.ch_client,
-    )
-    assert read_table == ReadTable.CALLS_COMPLETE
-
-    # Query project stats - use defaults (all True) to get all fields
-    res = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
-
-    # Should get the data from calls_complete_stats, not calls_merged_stats
-    # The expected_trace_size is the sum of all _size_bytes fields we inserted
-    # Plus any sizes from the _insert_complete_call (which inserts empty JSON)
-    assert res.trace_storage_size_bytes >= expected_trace_size
-
-
-def test_project_stats_uses_correct_stats_table_based_on_residence(
-    trace_server, clickhouse_trace_server
-):
-    """Test project_stats uses the correct stats table based on data residence.
-
-    This test creates two projects:
-    1. One with data only in calls_merged (should use calls_merged_stats)
-    2. One with data only in calls_complete (should use calls_complete_stats)
-
-    It verifies each project gets stats from its corresponding stats table.
-    """
-    # Project 1: calls_merged only
+    # Project 1: calls_merged only, single size field.
     project1_id = f"{TEST_ENTITY}/stats_merged_only"
     internal_project1_id = b64(project1_id)
     merged_trace_size = 1000
-
-    # Insert into calls_merged_stats
     clickhouse_trace_server.ch_client.command(
         f"""
         INSERT INTO calls_merged_stats (
@@ -1609,16 +1512,13 @@ def test_project_stats_uses_correct_stats_table_based_on_residence(
         )
         """
     )
-
-    # Insert call into calls_merged to establish residence
     _insert_merged_call(clickhouse_trace_server.ch_client, internal_project1_id)
 
-    # Project 2: calls_complete only
+    # Project 2: calls_complete only, four distinct size fields that must be summed.
     project2_id = f"{TEST_ENTITY}/stats_complete_only"
     internal_project2_id = b64(project2_id)
-    complete_trace_size = 2000
-
-    # Insert into calls_complete_stats
+    attr_size, inputs_size, output_size, summary_size = 100, 200, 300, 400
+    complete_trace_size = attr_size + inputs_size + output_size + summary_size
     clickhouse_trace_server.ch_client.command(
         f"""
         INSERT INTO calls_complete_stats (
@@ -1632,40 +1532,30 @@ def test_project_stats_uses_correct_stats_table_based_on_residence(
         VALUES (
             '{internal_project2_id}',
             '{uuid.uuid4()}',
-            {complete_trace_size},
-            0,
-            0,
-            0
+            {attr_size},
+            {inputs_size},
+            {output_size},
+            {summary_size}
         )
         """
     )
-
-    # Insert call into calls_complete to establish residence
     _insert_complete_call(clickhouse_trace_server.ch_client, internal_project2_id)
 
-    # Verify project residences
     read_table1 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project1_id, clickhouse_trace_server.ch_client
     )
     read_table2 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project2_id, clickhouse_trace_server.ch_client
     )
-
     assert read_table1 == ReadTable.CALLS_MERGED
     assert read_table2 == ReadTable.CALLS_COMPLETE
 
-    # Query stats for both projects using defaults (all True)
+    # >= because _insert_*_call also adds a little size data.
     res1 = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project1_id))
     res2 = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project2_id))
-
-    # Each should get data from its respective stats table
-    # Use >= because _insert_*_call also adds some size data
     assert res1.trace_storage_size_bytes >= merged_trace_size
     assert res2.trace_storage_size_bytes >= complete_trace_size
-
-    # Critically: project1 should NOT have the complete_trace_size and vice versa
-    # This verifies we're reading from the correct table
-    # The values should be different because each project reads from different stats tables
+    # Distinct tables -> distinct totals, proving no cross-read.
     assert res1.trace_storage_size_bytes != res2.trace_storage_size_bytes
 
 

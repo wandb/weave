@@ -56,78 +56,63 @@ def test_constants() -> None:
     assert set(SENTINEL_DATETIME_VALUES) == set(DATETIME_PRECISION)
 
 
-def test_is_sentinel_field() -> None:
-    """Known sentinel fields return True; other fields return False."""
-    for field in (
-        SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS | SENTINEL_INT_FIELDS
-    ):
-        assert is_sentinel_field(field) is True, f"{field} should be sentinel"
-
-    for field in NON_SENTINEL_FIELDS:
-        assert is_sentinel_field(field) is False, f"{field} should not be sentinel"
-
-
-def test_get_sentinel_value() -> None:
-    """Returns correct sentinel for each field type, None otherwise."""
+def test_sentinel_field_membership_and_values() -> None:
+    """is_sentinel_field is True only for the three sentinel partitions, and
+    get_sentinel_value returns the partition's sentinel ('' / epoch / 0) or
+    None for non-sentinel fields.
+    """
     for field in SENTINEL_STRING_FIELDS:
+        assert is_sentinel_field(field) is True, f"{field} should be sentinel"
         assert get_sentinel_value(field) == "", f"{field} sentinel should be ''"
 
     for field in SENTINEL_DATETIME_FIELDS:
+        assert is_sentinel_field(field) is True, f"{field} should be sentinel"
         assert get_sentinel_value(field) is SENTINEL_DATETIME_VALUES[field]
 
     for field in SENTINEL_INT_FIELDS:
+        assert is_sentinel_field(field) is True, f"{field} should be sentinel"
         assert get_sentinel_value(field) == 0, f"{field} sentinel should be 0"
 
     for field in NON_SENTINEL_FIELDS:
+        assert is_sentinel_field(field) is False, f"{field} should not be sentinel"
         assert get_sentinel_value(field) is None, (
             f"{field} should return None (not a sentinel field)"
         )
 
 
-def test_sentinel_ch_type() -> None:
-    """Returns correct CH type strings and raises for non-sentinel fields."""
+def test_sentinel_ch_type_and_literal() -> None:
+    """sentinel_ch_type maps each partition to its CH type and sentinel_ch_literal
+    to its SQL literal; both raise for non-sentinel fields.
+    """
     for field in SENTINEL_STRING_FIELDS:
         assert sentinel_ch_type(field) == "String"
+        assert sentinel_ch_literal(field) == "''"
 
     for field in SENTINEL_DATETIME_FIELDS:
         precision = DATETIME_PRECISION[field]
         assert sentinel_ch_type(field) == f"DateTime64({precision})"
 
-    # Specific precision values per migration schema
+    for field in SENTINEL_INT_FIELDS:
+        assert sentinel_ch_type(field) == "UInt64"
+
+    # Specific precision/literal values per migration schema.
     assert sentinel_ch_type("ended_at") == "DateTime64(6)"
     assert sentinel_ch_type("updated_at") == "DateTime64(3)"
     assert sentinel_ch_type("deleted_at") == "DateTime64(3)"
     assert sentinel_ch_type("expire_at") == "DateTime64(3)"
-
-    for field in SENTINEL_INT_FIELDS:
-        assert sentinel_ch_type(field) == "UInt64"
-
-    for field in NON_SENTINEL_FIELDS:
-        with pytest.raises(ValueError, match=f"Not a sentinel field: {field}"):
-            sentinel_ch_type(field)
-
-
-def test_sentinel_ch_literal() -> None:
-    """Returns SQL literals for sentinel fields; raises for non-sentinel fields."""
-    # String sentinel fields return empty string literal.
     assert sentinel_ch_literal("parent_id") == "''"
-    for field in SENTINEL_STRING_FIELDS:
-        assert sentinel_ch_literal(field) == "''"
-
-    # Datetime sentinel fields return their field-specific sentinel literal.
     assert sentinel_ch_literal("ended_at") == "toDateTime64(0, 6)"
     assert sentinel_ch_literal("updated_at") == "toDateTime64(0, 3)"
     assert sentinel_ch_literal("deleted_at") == "toDateTime64(0, 3)"
     assert sentinel_ch_literal("expire_at") == (
         "toDateTime64('2100-01-01 00:00:00', 3)"
     )
-
-    # Int sentinel fields return 0.
     assert sentinel_ch_literal("wb_run_step") == "0"
     assert sentinel_ch_literal("wb_run_step_end") == "0"
 
-    # Non-sentinel fields raise ValueError.
     for field in NON_SENTINEL_FIELDS:
+        with pytest.raises(ValueError, match=f"Not a sentinel field: {field}"):
+            sentinel_ch_type(field)
         with pytest.raises(ValueError, match=f"Not a sentinel field: {field}"):
             sentinel_ch_literal(field)
 

@@ -111,14 +111,11 @@ def test_build_trial_combines_prediction_and_parent_genai_span_refs() -> None:
     ]
 
 
-def test_extract_genai_span_refs_ignores_malformed_refs() -> None:
+def test_extract_genai_span_refs_filters_malformed_refs() -> None:
+    # All-malformed lists (missing trace_id or span_id) yield None.
     for raw_refs in (
-        [
-            {"span_id": "missing-trace-id"},
-        ],
-        [
-            {"trace_id": "missing-span-id"},
-        ],
+        [{"span_id": "missing-trace-id"}],
+        [{"trace_id": "missing-span-id"}],
     ):
         call = _call(
             attributes={
@@ -127,11 +124,9 @@ def test_extract_genai_span_refs_ignores_malformed_refs() -> None:
                 }
             }
         )
-
         assert eval_helpers.extract_genai_span_refs(call) is None
 
-
-def test_extract_genai_span_refs_skips_invalid_items() -> None:
+    # Mixed lists keep only the valid refs, dropping invalid items.
     call = _call(
         attributes={
             constants.WEAVE_ATTRIBUTES_NAMESPACE: {
@@ -144,7 +139,6 @@ def test_extract_genai_span_refs_skips_invalid_items() -> None:
             }
         }
     )
-
     assert eval_helpers.extract_genai_span_refs(call) == [
         tsi.GenAISpanRef.model_validate(_genai_span_ref("valid-trace"))
     ]

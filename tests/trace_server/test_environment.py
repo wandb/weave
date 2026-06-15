@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 
 import pytest
 
@@ -25,6 +26,7 @@ from weave.trace_server.environment import (
 
 @pytest.mark.disable_logging_error_check
 def test_kafka_producer_max_buffer_size():
+    """Optional positive int: unset/empty/non-int -> None, else parsed value."""
     assert kafka_producer_max_buffer_size() is None
     os.environ["KAFKA_PRODUCER_MAX_BUFFER_SIZE"] = "10000"
     assert kafka_producer_max_buffer_size() == 10000
@@ -40,19 +42,57 @@ def test_kafka_producer_max_buffer_size():
 
 
 @pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_check_cancellation():
-    assert wf_scoring_worker_check_cancellation() is False
-    os.environ["SCORING_WORKER_CHECK_CANCELLATION"] = "true"
-    assert wf_scoring_worker_check_cancellation() is True
-    os.environ["SCORING_WORKER_CHECK_CANCELLATION"] = "True"
-    assert wf_scoring_worker_check_cancellation() is True
-    os.environ["SCORING_WORKER_CHECK_CANCELLATION"] = "false"
-    assert wf_scoring_worker_check_cancellation() is False
-    os.environ["SCORING_WORKER_CHECK_CANCELLATION"] = ""
-    assert wf_scoring_worker_check_cancellation() is False
-    os.environ["SCORING_WORKER_CHECK_CANCELLATION"] = "invalid"
-    assert wf_scoring_worker_check_cancellation() is False
-    del os.environ["SCORING_WORKER_CHECK_CANCELLATION"]
+@pytest.mark.parametrize(
+    ("getter", "env_key", "default", "true_values", "false_values"),
+    [
+        (
+            wf_scoring_worker_check_cancellation,
+            "SCORING_WORKER_CHECK_CANCELLATION",
+            False,
+            ["true", "True"],
+            ["false", "", "invalid"],
+        ),
+        (
+            wf_scoring_worker_remote_scorer_enabled,
+            "WF_SCORING_WORKER_REMOTE_SCORING_ENABLED",
+            False,
+            ["true", "True"],
+            ["false", "", "1"],
+        ),
+        (
+            wf_scoring_worker_remote_scorer_allow_insecure_http,
+            REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV,
+            False,
+            ["true", "True"],
+            ["false", "", "1"],
+        ),
+        (
+            wf_scoring_worker_remote_scorer_validate_hosts,
+            REMOTE_SCORER_VALIDATE_HOSTS_ENV,
+            True,
+            ["true", ""],
+            ["false", "False"],
+        ),
+    ],
+)
+def test_boolean_env_flags(
+    getter: Callable[[], bool],
+    env_key: str,
+    default: bool,
+    true_values: list[str],
+    false_values: list[str],
+    monkeypatch,
+):
+    """Boolean env flags: case-insensitive ``true`` toggles; unset yields the default."""
+    monkeypatch.delenv(env_key, raising=False)
+    assert getter() is default
+
+    for value in true_values:
+        monkeypatch.setenv(env_key, value)
+        assert getter() is True, f"{env_key}={value!r} should be True"
+    for value in false_values:
+        monkeypatch.setenv(env_key, value)
+        assert getter() is False, f"{env_key}={value!r} should be False"
 
 
 @pytest.mark.disable_logging_error_check
@@ -109,6 +149,7 @@ def test_wf_scoring_worker_debounced_scoring_max_call_history(monkeypatch):
 
 @pytest.mark.disable_logging_error_check
 def test_wf_scoring_worker_kafka_consumer_group_id_override():
+    """Optional string override: unset -> None, otherwise the verbatim value (incl. empty)."""
     assert wf_scoring_worker_kafka_consumer_group_id_override() is None
     os.environ["SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID"] = "test-group-id"
     assert wf_scoring_worker_kafka_consumer_group_id_override() == "test-group-id"
@@ -165,26 +206,6 @@ def test_wf_scoring_worker_remote_scorer_bearer_token(monkeypatch):
 
 
 @pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_enabled(monkeypatch):
-    """Remote scoring is off by default; only a case-insensitive ``true`` enables it."""
-    key = "WF_SCORING_WORKER_REMOTE_SCORING_ENABLED"
-    monkeypatch.delenv(key, raising=False)
-    assert wf_scoring_worker_remote_scorer_enabled() is False
-
-    monkeypatch.setenv(key, "true")
-    assert wf_scoring_worker_remote_scorer_enabled() is True
-    monkeypatch.setenv(key, "True")
-    assert wf_scoring_worker_remote_scorer_enabled() is True
-
-    monkeypatch.setenv(key, "false")
-    assert wf_scoring_worker_remote_scorer_enabled() is False
-    monkeypatch.setenv(key, "")
-    assert wf_scoring_worker_remote_scorer_enabled() is False
-    monkeypatch.setenv(key, "1")
-    assert wf_scoring_worker_remote_scorer_enabled() is False
-
-
-@pytest.mark.disable_logging_error_check
 def test_wf_scoring_worker_remote_scorer_http_timeout_seconds(monkeypatch):
     """Timeout defaults to 30s; parses positive floats; invalid or non-positive -> default."""
     key = "WF_SCORING_WORKER_REMOTE_HTTP_TIMEOUT_SECONDS"
@@ -229,43 +250,3 @@ def test_wf_scoring_worker_remote_scorer_allowed_hosts(monkeypatch):
         "api.example.com:8443",
         "localhost",
     ]
-
-
-@pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_validate_hosts(monkeypatch):
-    """Host validation is enabled by default; only case-insensitive false disables it."""
-    key = REMOTE_SCORER_VALIDATE_HOSTS_ENV
-    monkeypatch.delenv(key, raising=False)
-    assert wf_scoring_worker_remote_scorer_validate_hosts() is True
-
-    monkeypatch.setenv(key, "false")
-    assert wf_scoring_worker_remote_scorer_validate_hosts() is False
-    monkeypatch.setenv(key, "False")
-    assert wf_scoring_worker_remote_scorer_validate_hosts() is False
-
-    monkeypatch.setenv(key, "true")
-    assert wf_scoring_worker_remote_scorer_validate_hosts() is True
-    monkeypatch.setenv(key, "")
-    assert wf_scoring_worker_remote_scorer_validate_hosts() is True
-    monkeypatch.setenv(key, "0")
-    assert wf_scoring_worker_remote_scorer_validate_hosts() is True
-
-
-@pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_allow_insecure_http(monkeypatch):
-    """Insecure HTTP is disabled by default; only case-insensitive true enables it."""
-    key = REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV
-    monkeypatch.delenv(key, raising=False)
-    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
-
-    monkeypatch.setenv(key, "true")
-    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is True
-    monkeypatch.setenv(key, "True")
-    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is True
-
-    monkeypatch.setenv(key, "false")
-    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
-    monkeypatch.setenv(key, "")
-    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
-    monkeypatch.setenv(key, "1")
-    assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False

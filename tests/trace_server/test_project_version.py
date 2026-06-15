@@ -138,31 +138,51 @@ def test_version_resolution_by_table_contents(
         )
 
 
-def test_caching_behavior(client, trace_server):
+def test_resolver_caching_and_trace_server_integration(client, trace_server):
+    """Resolver is a lazily-initialized singleton; non-empty resolutions cache, empty don't."""
     ch_server = trace_server._internal_trace_server
-    resolver = ch_server.table_routing_resolver
-    resolver._mode = CallsStorageServerMode.AUTO
 
+    assert ch_server._table_routing_resolver is None
+    resolver1 = ch_server.table_routing_resolver
+    assert resolver1 is not None
+    resolver2 = ch_server.table_routing_resolver
+    assert resolver1 is resolver2
+
+    resolver1._mode = CallsStorageServerMode.AUTO
+
+    # Non-empty project: first resolve queries, subsequent resolves (even via the
+    # other handle to the same singleton) hit the cache.
     cached_proj = make_project_id("cached_project")
     insert_call(ch_server.ch_client, "calls_complete", cached_proj)
-
     with count_queries(ch_server.ch_client) as get_count:
-        table1 = resolver.resolve_read_table(cached_proj, ch_server.ch_client)
-        assert table1 == ReadTable.CALLS_COMPLETE
+        assert (
+            resolver1.resolve_read_table(cached_proj, ch_server.ch_client)
+            == ReadTable.CALLS_COMPLETE
+        )
+        assert get_count() == 1
+        assert (
+            resolver1.resolve_read_table(cached_proj, ch_server.ch_client)
+            == ReadTable.CALLS_COMPLETE
+        )
+        assert get_count() == 1
+        assert (
+            resolver2.resolve_read_table(cached_proj, ch_server.ch_client)
+            == ReadTable.CALLS_COMPLETE
+        )
         assert get_count() == 1
 
-        table2 = resolver.resolve_read_table(cached_proj, ch_server.ch_client)
-        assert table2 == ReadTable.CALLS_COMPLETE
-        assert get_count() == 1
-
+    # Empty project resolves to COMPLETE but is not cached: each call re-queries.
     empty_proj = make_project_id("empty_not_cached")
     with count_queries(ch_server.ch_client) as get_count:
-        table1 = resolver.resolve_read_table(empty_proj, ch_server.ch_client)
-        assert table1 == ReadTable.CALLS_COMPLETE
+        assert (
+            resolver1.resolve_read_table(empty_proj, ch_server.ch_client)
+            == ReadTable.CALLS_COMPLETE
+        )
         assert get_count() == 1
-
-        table2 = resolver.resolve_read_table(empty_proj, ch_server.ch_client)
-        assert table2 == ReadTable.CALLS_COMPLETE
+        assert (
+            resolver1.resolve_read_table(empty_proj, ch_server.ch_client)
+            == ReadTable.CALLS_COMPLETE
+        )
         assert get_count() == 2
 
 
@@ -199,37 +219,6 @@ def test_clickhouse_provider_directly(client, trace_server):
     residence = get_project_data_residence(project_id, ch_server.ch_client)
 
     assert residence == ProjectDataResidence.MERGED_ONLY
-
-
-def test_resolver_as_trace_server_member(client, trace_server):
-    """Test that the resolver is properly integrated as a trace server member."""
-    ch_server = trace_server._internal_trace_server
-
-    # Test that the resolver is lazily initialized
-    assert ch_server._table_routing_resolver is None
-    resolver1 = ch_server.table_routing_resolver
-    assert resolver1 is not None
-
-    resolver2 = ch_server.table_routing_resolver
-    assert resolver1 is resolver2
-
-    project_id = make_project_id("trace_server_member")
-    insert_call(ch_server.ch_client, "calls_complete", project_id)
-
-    with count_queries(ch_server.ch_client) as get_count:
-        resolver1._mode = CallsStorageServerMode.AUTO
-        table = resolver1.resolve_read_table(project_id, ch_server.ch_client)
-        assert table == ReadTable.CALLS_COMPLETE
-        assert get_count() == 1
-
-        # Subsequent requests hit the cache
-        table2 = resolver1.resolve_read_table(project_id, ch_server.ch_client)
-        assert table2 == ReadTable.CALLS_COMPLETE
-        assert get_count() == 1
-
-        table3 = resolver2.resolve_read_table(project_id, ch_server.ch_client)
-        assert table3 == ReadTable.CALLS_COMPLETE
-        assert get_count() == 1
 
 
 def test_project_version_mode_from_env():

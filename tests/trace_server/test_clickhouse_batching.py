@@ -6,6 +6,7 @@ ClickHouse insert operation for performance optimization.
 
 import base64
 import datetime
+import gc
 import json
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -22,259 +23,74 @@ from weave.trace_server.errors import (
     handle_server_exception,
 )
 from weave.trace_server.validation_util import CHValidationError
+from weave.trace_server_bindings.caching_middleware_trace_server import (
+    CachingMiddlewareTraceServer,
+)
 
 
-def make_base_64_content(content: str) -> str:
-    """Helper function to create base64 encoded content.
-
-    Args:
-        content (str): The content to encode.
-
-    Returns:
-        str: Base64 encoded content with data URI prefix.
+def test_clickhouse_batching_insert_grouping():
+    """call_start_batch coalesces inserts: 3 distinct base64 contents produce
+    exactly 2 inserts (files + call_parts), and 3 identical contents dedup to a
+    single file pair (content + metadata).
     """
-    return "data:text/plain;base64," + base64.b64encode(content.encode()).decode()
-
-
-string_suffix = "a" * AUTO_CONVERSION_MIN_SIZE
-
-
-def create_file_sized_content(content: str) -> str:
-    """Create base64 content padded to exceed AUTO_CONVERSION_MIN_SIZE.
-
-    This ensures the content is large enough to trigger file-based storage
-    in ClickHouse rather than inline storage.
-    """
-    return make_base_64_content(content + string_suffix)
-
-
-def _make_batch_req_with_contents(project_id: str, contents: list[str]):
-    """Helper to build a CallCreateBatchReq where each call has one base64 input."""
-    return tsi.CallCreateBatchReq(
-        batch=[
-            tsi.CallBatchStartMode(
-                mode="start",
-                req=tsi.CallStartReq(
-                    start=tsi.StartedCallSchemaForInsert(
-                        project_id=project_id,
-                        op_name=f"test_op_{i}",
-                        started_at=datetime.datetime.now(datetime.timezone.utc),
-                        attributes={},
-                        inputs={"input": create_file_sized_content(c)},
-                    )
-                ),
-            )
-            for i, c in enumerate(contents)
+    # Distinct contents -> exactly one files insert + one call_parts insert.
+    distinct = _run_batch_start(
+        [
+            create_file_sized_content("SOME BASE64 CONTENT - 1"),
+            create_file_sized_content("SOME BASE64 CONTENT - 2"),
+            create_file_sized_content("SOME BASE64 CONTENT - 3"),
         ]
     )
+    insert_tables = [call[0][0] for call in distinct.insert.call_args_list]
+    assert distinct.insert.call_count == 2
+    assert set(insert_tables) == {"files", "call_parts"}
+
+    # Identical content across 3 calls -> still only one file pair.
+    same = "IDENTICAL CONTENT"
+    dedup = _run_batch_start([create_file_sized_content(same)] * 3)
+    dedup_tables = [call[0][0] for call in dedup.insert.call_args_list]
+    assert set(dedup_tables) == {"files", "call_parts"}
+    files_insert = next(c for c in dedup.insert.call_args_list if c[0][0] == "files")
+    # Each Content object produces 2 files (content + metadata.json); dedup keeps 1 pair.
+    assert len(files_insert[1]["data"]) == 2
 
 
-def test_clickhouse_batching():
-    """Test that batched calls are properly sent to ClickHouse with correct parameters."""
-    # Create a mock ClickHouse client
-    mock_ch_client = MagicMock()
-
-    # Mock the command method to avoid actual database operations
-    mock_ch_client.command.return_value = None
-
-    # Mock the insert method to track calls
-    mock_ch_client.insert.return_value = MagicMock()
-    # MagicMock is truthy, so get_project_data_residence() returns BOTH, which is incorrect, mock it
-    mock_ch_client.query.return_value.result_rows = []
-
-    # Create a ClickHouseTraceServer instance and patch _mint_client
-    with patch.object(
-        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        trace_server = ClickHouseTraceServer(host="test_host")
-
-        # Use properly base64 encoded project_id (entity/project format)
-        project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
-
-        # Simulate a legacy project by returning merged-only residence.
-        mock_query_result = MagicMock()
-        mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
-        mock_ch_client.query.return_value = mock_query_result
-
-        # Create a batch of call start requests
-        batch_req = tsi.CallCreateBatchReq(
-            batch=[
-                tsi.CallBatchStartMode(
-                    mode="start",
-                    req=tsi.CallStartReq(
-                        start=tsi.StartedCallSchemaForInsert(
-                            project_id=project_id,
-                            op_name="test_op_1",
-                            started_at=datetime.datetime.now(datetime.timezone.utc),
-                            attributes={},
-                            inputs={
-                                "input": create_file_sized_content(
-                                    "SOME BASE64 CONTENT - 1"
-                                )
-                            },
-                        )
-                    ),
-                ),
-                tsi.CallBatchStartMode(
-                    mode="start",
-                    req=tsi.CallStartReq(
-                        start=tsi.StartedCallSchemaForInsert(
-                            project_id=project_id,
-                            op_name="test_op_2",
-                            started_at=datetime.datetime.now(datetime.timezone.utc),
-                            attributes={},
-                            inputs={
-                                "input": create_file_sized_content(
-                                    "SOME BASE64 CONTENT - 2"
-                                )
-                            },
-                        )
-                    ),
-                ),
-                tsi.CallBatchStartMode(
-                    mode="start",
-                    req=tsi.CallStartReq(
-                        start=tsi.StartedCallSchemaForInsert(
-                            project_id=project_id,
-                            op_name="test_op_3",
-                            started_at=datetime.datetime.now(datetime.timezone.utc),
-                            attributes={},
-                            inputs={
-                                "input": create_file_sized_content(
-                                    "SOME BASE64 CONTENT - 3"
-                                )
-                            },
-                        )
-                    ),
-                ),
-            ]
-        )
-
-        # Execute the batch
-        trace_server.call_start_batch(batch_req)
-
-        # THE KEY ASSERTION:
-        # Verify that there are exactly 2 inserts:
-        # 1 for files and 1 for call_parts (order may vary)
-        insert_call_count = mock_ch_client.insert.call_count
-        assert insert_call_count == 2, (
-            f"Expected exactly 2 ClickHouse insert calls for 3 batched calls "
-            f"(and 3 base64 content objects, which are stored in files), "
-            f"but got {insert_call_count} insert calls"
-        )
-
-        # Check that both files and call_parts were inserted (order may vary)
-        insert_tables = [
-            mock_ch_client.insert.call_args_list[0][0][0],
-            mock_ch_client.insert.call_args_list[1][0][0],
-        ]
-        assert set(insert_tables) == {"files", "call_parts"}, (
-            f"Expected inserts to files and call_parts tables, "
-            f"but got inserts to: {insert_tables}"
-        )
-
-
-def test_clickhouse_batching_deduplicates_identical_files():
-    """Duplicate content in the same batch should only produce one file insert."""
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.insert.return_value = MagicMock()
-    mock_ch_client.query.return_value.result_rows = []
-
-    with patch.object(
-        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        trace_server = ClickHouseTraceServer(host="test_host")
-        project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
-
-        mock_query_result = MagicMock()
-        mock_query_result.result_rows = [[0, 1]]
-        mock_ch_client.query.return_value = mock_query_result
-
-        # 3 calls with the SAME content
-        same_content = "IDENTICAL CONTENT"
-        batch_req = _make_batch_req_with_contents(
-            project_id, [same_content, same_content, same_content]
-        )
-        trace_server.call_start_batch(batch_req)
-
-        insert_tables = [call[0][0] for call in mock_ch_client.insert.call_args_list]
-        assert set(insert_tables) == {"files", "call_parts"}
-
-        # The files insert should contain chunks for only 1 unique file
-        # (content + metadata), not 3 copies.
-        files_insert = next(
-            call
-            for call in mock_ch_client.insert.call_args_list
-            if call[0][0] == "files"
-        )
-        file_rows = files_insert[1]["data"]
-        # Each Content object produces 2 files (content + metadata.json).
-        # With dedup, 3 identical calls should still yield only 2 file rows.
-        assert len(file_rows) == 2, (
-            f"Expected 2 file rows (1 content + 1 metadata) for deduplicated batch, "
-            f"got {len(file_rows)}"
-        )
-
-
-def _mk_obj(project_id: str, object_id: str, wb_user_id: str, val: dict[str, Any]):
-    return tsi.ObjSchemaForInsert(
-        project_id=project_id,
-        object_id=object_id,
-        wb_user_id=wb_user_id,
-        val=val,
-    )
-
-
-def _internal_pid() -> str:
-    # Any base64 string is valid for internal project id validation
-    # Reuse the same value as other tests in this module
-    return base64.b64encode(b"test_project").decode()
-
-
-def _internal_wb_user_id() -> str:
-    return base64.b64encode(b"test_user").decode()
-
-
-def test_obj_batch_same_object_id_different_hash(trace_server, client):
-    """Two versions for same object_id with different digests."""
+def test_obj_batch_two_version_scenarios(trace_server, client):
+    """obj_create_batch over two-version inputs: two digests under one
+    object_id yield two versions with exactly one latest; one digest under two
+    object_ids yields two distinct objects.
+    """
     server = trace_server._internal_trace_server
     pid = _internal_pid()
     wb_user_id = _internal_wb_user_id()
-    obj_id = "my_obj"
-    v1 = {"k": 1}
-    v2 = {"k": 2}
 
+    # Same object_id, two distinct values -> two versions, one latest.
+    v1, v2 = {"k": 1}, {"k": 2}
     server.obj_create_batch(
         batch=[
-            _mk_obj(pid, obj_id, wb_user_id, v1),
-            _mk_obj(pid, obj_id, wb_user_id, v2),
+            _mk_obj(pid, "my_obj", wb_user_id, v1),
+            _mk_obj(pid, "my_obj", wb_user_id, v2),
         ]
     )
-
     res = server.objs_query(
         tsi.ObjQueryReq(
             project_id=pid,
-            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=False),
+            filter=tsi.ObjectVersionFilter(object_ids=["my_obj"], latest_only=False),
         )
     )
     assert len(res.objs) == 2
-    digests = {o.digest for o in res.objs}
-    assert digests == {str_digest(json.dumps(v1)), str_digest(json.dumps(v2))}
-    # Exactly one latest
+    assert {o.digest for o in res.objs} == {
+        str_digest(json.dumps(v1)),
+        str_digest(json.dumps(v2)),
+    }
     assert sum(o.is_latest for o in res.objs) == 1
 
-
-def test_obj_batch_same_hash_different_object_ids(trace_server, client):
-    """Same digest payload uploaded under different object_ids yields distinct objects."""
-    server = trace_server._internal_trace_server
-    pid = _internal_pid()
-    wb_user_id = _internal_wb_user_id()
-    val = {"shared": True}
+    # Same value, two object_ids -> two distinct objects.
+    shared = {"shared": True}
     server.obj_create_batch(
         batch=[
-            _mk_obj(pid, "obj_1", wb_user_id, val),
-            _mk_obj(pid, "obj_2", wb_user_id, val),
+            _mk_obj(pid, "obj_1", wb_user_id, shared),
+            _mk_obj(pid, "obj_2", wb_user_id, shared),
         ]
     )
     res = server.objs_query(
@@ -287,29 +103,6 @@ def test_obj_batch_same_hash_different_object_ids(trace_server, client):
     )
     assert len(res.objs) == 2
     assert {o.object_id for o in res.objs} == {"obj_1", "obj_2"}
-
-
-def test_obj_batch_identical_same_id_same_hash_deduplicates(trace_server, client):
-    """Duplicate rows (same object_id and digest) are represented once in metadata view."""
-    server = trace_server._internal_trace_server
-    pid = _internal_pid()
-    wb_user_id = _internal_wb_user_id()
-    obj_id = "dup_obj"
-    val = {"x": 1}
-    server.obj_create_batch(
-        batch=[
-            _mk_obj(pid, obj_id, wb_user_id, val),
-            _mk_obj(pid, obj_id, wb_user_id, val),
-        ]
-    )
-    res = server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=pid,
-            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=False),
-        )
-    )
-    assert len(res.objs) == 1
-    assert res.objs[0].digest == str_digest(json.dumps(val))
 
 
 def test_obj_batch_four_versions_and_read_path(trace_server, client):
@@ -391,66 +184,50 @@ def test_obj_batch_delete_version_preserves_indices(trace_server, client):
     assert {obj.digest for obj in res.objs} == {pre_del_digests[0], pre_del_digests[2]}
 
 
-def test_str_digest_is_key_order_independent():
-    """str_digest must return the same value regardless of dict key insertion order."""
+def test_digest_key_order_independence(trace_server, client):
+    """Key-order independence at every layer: str_digest is order-invariant only
+    with sort_keys; obj_create_batch collapses key-reordered values (and exact
+    duplicates) to one version; table_create gives reordered rows equal digests.
+    """
+    # str_digest: equal under sort_keys, differs without it.
     val_a = {"b": 1, "a": 2, "c": [{"z": 9, "y": 8}]}
     val_b = {"a": 2, "c": [{"y": 8, "z": 9}], "b": 1}
-
-    digest_a = str_digest(json.dumps(val_a, sort_keys=True))
-    digest_b = str_digest(json.dumps(val_b, sort_keys=True))
-    assert digest_a == digest_b
-
-    # Without sort_keys the digests would differ
+    assert str_digest(json.dumps(val_a, sort_keys=True)) == str_digest(
+        json.dumps(val_b, sort_keys=True)
+    )
     assert str_digest(json.dumps(val_a)) != str_digest(json.dumps(val_b))
 
-
-def test_obj_batch_different_key_order_deduplicates(trace_server, client):
-    """Objects with identical values but different key ordering share the same digest."""
     server = trace_server._internal_trace_server
     pid = _internal_pid()
     wb_user_id = _internal_wb_user_id()
-    obj_id = "key_order_obj"
 
-    val_a = {"b": 1, "a": 2}
-    val_b = {"a": 2, "b": 1}
-
+    # obj_create_batch: key-reordered + exact-duplicate values dedup to one version.
     server.obj_create_batch(
         batch=[
-            _mk_obj(pid, obj_id, wb_user_id, val_a),
-            _mk_obj(pid, obj_id, wb_user_id, val_b),
+            _mk_obj(pid, "dedup_obj", wb_user_id, {"b": 1, "a": 2}),
+            _mk_obj(pid, "dedup_obj", wb_user_id, {"a": 2, "b": 1}),
+            _mk_obj(pid, "dedup_obj", wb_user_id, {"b": 1, "a": 2}),
         ]
     )
-
     res = server.objs_query(
         tsi.ObjQueryReq(
             project_id=pid,
-            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=False),
+            filter=tsi.ObjectVersionFilter(object_ids=["dedup_obj"], latest_only=False),
         )
     )
-    # Both values are logically identical, so only one version should exist
     assert len(res.objs) == 1
+    assert res.objs[0].digest == str_digest(json.dumps({"a": 2, "b": 1}))
 
-
-def test_table_create_different_key_order_same_digest(trace_server):
-    """Rows with different key ordering produce the same digest in table_create."""
-    server = trace_server._internal_trace_server
-    pid = _internal_pid()
-
-    row_a = {"b": 1, "a": 2}
-    row_b = {"a": 2, "b": 1}
-
-    res = server.table_create(
+    # table_create: reordered rows produce identical digests.
+    table_res = server.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
-                project_id=pid,
-                rows=[row_a, row_b],
+                project_id=pid, rows=[{"b": 1, "a": 2}, {"a": 2, "b": 1}]
             )
         )
     )
-
-    # Both rows are logically identical so their digests must match
-    assert len(res.row_digests) == 2
-    assert res.row_digests[0] == res.row_digests[1]
+    assert len(table_res.row_digests) == 2
+    assert table_res.row_digests[0] == table_res.row_digests[1]
 
 
 def test_call_start_batch_invalid_trace_id_returns_400():
@@ -522,3 +299,89 @@ def test_obj_batch_mixed_projects_errors(trace_server, client):
         match="obj_create_batch only supports updating a single project.",
     ):
         server.obj_create_batch(batch=batch)
+
+
+def test_caching_middleware_closes_cache_on_gc():
+    """Destroying the caching middleware closes its disk cache (the __del__
+    cleanup path), so a dropped reference does not leak the cache handle.
+    """
+    server = CachingMiddlewareTraceServer(next_trace_server=MagicMock())
+    assert server._cache_recorder == {"hits": 0, "misses": 0, "skips": 0}
+
+    del server
+    gc.collect()
+
+
+def make_base_64_content(content: str) -> str:
+    """Create base64 encoded content with a data URI prefix."""
+    return "data:text/plain;base64," + base64.b64encode(content.encode()).decode()
+
+
+string_suffix = "a" * AUTO_CONVERSION_MIN_SIZE
+
+
+def create_file_sized_content(content: str) -> str:
+    """Create base64 content padded past AUTO_CONVERSION_MIN_SIZE so it is
+    stored as a file rather than inline.
+    """
+    return make_base_64_content(content + string_suffix)
+
+
+def _run_batch_start(contents: list[str]) -> MagicMock:
+    """Run call_start_batch over one base64 input per content against a mocked
+    CH client (legacy merged-only residence) and return that client for insert
+    assertions.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+    mock_ch_client.query.return_value.result_rows = []
+
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        trace_server = ClickHouseTraceServer(host="test_host")
+        project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+        # Simulate a legacy project by returning merged-only residence.
+        mock_query_result = MagicMock()
+        mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
+        mock_ch_client.query.return_value = mock_query_result
+
+        batch_req = tsi.CallCreateBatchReq(
+            batch=[
+                tsi.CallBatchStartMode(
+                    mode="start",
+                    req=tsi.CallStartReq(
+                        start=tsi.StartedCallSchemaForInsert(
+                            project_id=project_id,
+                            op_name=f"test_op_{i}",
+                            started_at=datetime.datetime.now(datetime.timezone.utc),
+                            attributes={},
+                            inputs={"input": c},
+                        )
+                    ),
+                )
+                for i, c in enumerate(contents)
+            ]
+        )
+        trace_server.call_start_batch(batch_req)
+
+    return mock_ch_client
+
+
+def _mk_obj(project_id: str, object_id: str, wb_user_id: str, val: dict[str, Any]):
+    return tsi.ObjSchemaForInsert(
+        project_id=project_id,
+        object_id=object_id,
+        wb_user_id=wb_user_id,
+        val=val,
+    )
+
+
+def _internal_pid() -> str:
+    return base64.b64encode(b"test_project").decode()
+
+
+def _internal_wb_user_id() -> str:
+    return base64.b64encode(b"test_user").decode()

@@ -95,43 +95,36 @@ def test_universal_ext_to_int_ref_converter_reuses_models_and_untouched_branches
     assert original_payload == ["plain", external_ref]
 
 
-def test_universal_ext_to_int_ref_converter_handles_aliased_query_models():
-    """Query models with `$`-prefixed aliases still serialize via by_alias."""
-    project_id = "entity/project"
+def test_universal_ext_to_int_ref_converter_variant_payloads():
+    """Converter handles aliased Query models, `Any`-field dataclass roundtrips,
+    and refs stored in `extra='allow'` model extras.
+    """
     internal_project_id = "internal-project"
-    external_ref = f"weave:///{project_id}/object/name:digest"
+    external_ref = "weave:///entity/project/object/name:digest"
     internal_ref = f"weave-trace-internal:///{internal_project_id}/object/name:digest"
 
+    # `$`-prefixed query aliases still serialize via by_alias; the rewritten
+    # literal rebuilds while the untouched literal keeps identity.
     query = Query.model_validate(
-        {
-            "$expr": {
-                "$eq": [
-                    {"$literal": external_ref},
-                    {"$literal": "plain"},
-                ]
-            }
-        }
+        {"$expr": {"$eq": [{"$literal": external_ref}, {"$literal": "plain"}]}}
     )
     original_expr = query.expr_
     original_eq = query.expr_.eq_
     original_left_literal = query.expr_.eq_[0]
 
-    converted = universal_ext_to_int_ref_converter(
+    converted_query = universal_ext_to_int_ref_converter(
         query, lambda project: internal_project_id
     )
-
-    assert converted is query
-    assert converted.expr_ is original_expr
-    assert converted.expr_.eq_ is not original_eq
-    assert converted.expr_.eq_[0] is original_left_literal
-    aliased_query = converted.model_dump(by_alias=True)
+    assert converted_query is query
+    assert converted_query.expr_ is original_expr
+    assert converted_query.expr_.eq_ is not original_eq
+    assert converted_query.expr_.eq_[0] is original_left_literal
+    aliased_query = converted_query.model_dump(by_alias=True)
     assert aliased_query["$expr"]["$eq"][0]["$literal"] == internal_ref
     assert aliased_query["$expr"]["$eq"][1]["$literal"] == "plain"
 
-
-def test_universal_ext_to_int_ref_converter_roundtrips_models_with_any_payloads():
-    """Nested dataclasses inside an `Any` field force the legacy roundtrip path."""
-    req = ObjCreateReq(
+    # Nested dataclasses inside an `Any` field force the legacy roundtrip path.
+    any_req = ObjCreateReq(
         obj=ObjSchemaForInsert(
             project_id="entity/project",
             object_id="thing",
@@ -145,51 +138,29 @@ def test_universal_ext_to_int_ref_converter_roundtrips_models_with_any_payloads(
             },
         )
     )
-
-    converted = universal_ext_to_int_ref_converter(
-        req, lambda project: "internal-project"
+    converted_any = universal_ext_to_int_ref_converter(
+        any_req, lambda project: "internal-project"
     )
+    assert isinstance(converted_any.obj.val["ref"], dict)
+    json.dumps(converted_any.obj.val)
 
-    assert isinstance(converted.obj.val["ref"], dict)
-    json.dumps(converted.obj.val)
-
-
-def test_universal_ext_to_int_ref_converter_rewrites_refs_in_model_extras():
-    """Refs stored on a `extra='allow'` BaseModel must still be rewritten.
-
-    The legacy converter walked the `model_dump(by_alias=True)` output,
-    which includes fields collected into `model_extra`. The COW fast path
-    iterates `model_fields` only, so extras are silently skipped unless
-    `_walk_model` also walks them.
-    """
-    project_id = "entity/project"
-    internal_project_id = "internal-project"
-    external_ref = f"weave:///{project_id}/op/some-op:latest"
-    internal_ref = f"weave-trace-internal:///{internal_project_id}/op/some-op:latest"
-
-    class ExtraAllowed(BaseModel):
-        model_config = ConfigDict(extra="allow")
-        declared: str
-
-    model = ExtraAllowed.model_validate(
-        {"declared": "plain", "extra_ref": external_ref}
+    # Refs collected into `model_extra` must still be rewritten.
+    op_external = "weave:///entity/project/op/some-op:latest"
+    op_internal = f"weave-trace-internal:///{internal_project_id}/op/some-op:latest"
+    model = _ExtraAllowed.model_validate(
+        {"declared": "plain", "extra_ref": op_external}
     )
-
-    converted = universal_ext_to_int_ref_converter(
+    converted_extra = universal_ext_to_int_ref_converter(
         model, lambda project: internal_project_id
     )
+    assert converted_extra.declared == "plain"
+    extras = converted_extra.model_extra or {}
+    assert extras.get("extra_ref") == op_internal
 
-    assert converted.declared == "plain"
-    extras = converted.model_extra or {}
-    assert extras.get("extra_ref") == internal_ref
 
-
-def test_replace_external_weave_ref_uses_cache():
-    """Shared cache amortizes ext→int_project_id lookups across calls.
-
-    Callers that walk many refs (e.g. an OTel batch with the same
-    entity/project on every span) pass a per-request dict so the
-    underlying converter runs once per distinct project_key.
+def test_replace_external_weave_ref_cache_and_rejections():
+    """Shared cache amortizes ext->int lookups; non-external scheme and
+    malformed tails are contract violations that raise.
     """
     calls: list[str] = []
 
@@ -198,7 +169,6 @@ def test_replace_external_weave_ref_uses_cache():
         return f"internal:{project_key}"
 
     cache: dict[str, str] = {}
-
     a = replace_external_weave_ref("weave:///ent/proj/object/a:v1", converter, cache)
     b = replace_external_weave_ref("weave:///ent/proj/object/b:v1", converter, cache)
     c = replace_external_weave_ref("weave:///other/proj/object/c:v1", converter, cache)
@@ -209,21 +179,15 @@ def test_replace_external_weave_ref_uses_cache():
     # Same entity/project resolves once, distinct one resolves again.
     assert calls == ["ent/proj", "other/proj"]
 
-
-def test_replace_external_weave_ref_rejects_non_external_scheme():
-    """Inputs not on the external scheme are a contract violation; the
-    caller must precheck `startswith(weave_prefix)` before invoking.
-    """
     with pytest.raises(ValueError, match="Invalid URI"):
         replace_external_weave_ref(
             "weave-trace-internal:///proj/object/a:v1", lambda p: p
         )
 
-
-def test_replace_external_weave_ref_rejects_malformed_tail():
-    """Refs missing the `entity/project/tail` triplet trip InvalidExternalRef
-    so the caller surfaces the bad payload rather than silently passing it
-    through.
-    """
     with pytest.raises(InvalidExternalRef):
         replace_external_weave_ref("weave:///just-entity", lambda p: p)
+
+
+class _ExtraAllowed(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    declared: str

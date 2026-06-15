@@ -1487,128 +1487,108 @@ def test_conversation_chat_includes_child_spans_without_conversation_id(ch_serve
 
 
 def test_message_search(ch_server):
-    """End-to-end search against the `messages` table.
-
-    Spans are inserted and the ClickHouse MV populates the search index
-    automatically; no Python-side extraction runs. Verifies that content
-    LIKE + span-level filters return the expected hits.
+    """End-to-end search against the `messages` table populated by the MV:
+    content LIKE hits/misses, shared content_digest for identical content,
+    and tool-call argument/result indexing (incl. the "tool" role alias).
     """
-    project_id = _make_project_id("search")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
-    spans = [
-        _make_span(
-            project_id,
-            conversation_id="search-conv-1",
-            conversation_name="Search Test",
-            output_messages=[
-                NormalizedMessage(
-                    role="assistant",
-                    content="The quantum entanglement hypothesis is fascinating.",
-                ),
-            ],
-            started_at=now,
-        ),
-        _make_span(
-            project_id,
-            conversation_id="search-conv-1",
-            conversation_name="Search Test",
-            output_messages=[
-                NormalizedMessage(
-                    role="assistant",
-                    content="Classical mechanics still has many applications.",
-                ),
-            ],
-            started_at=now + datetime.timedelta(seconds=1),
-        ),
-    ]
-    _insert_spans(ch_server.ch_client, spans)
-
-    # Search for "quantum" — should match 1 message
-    res = ch_server.agent_search(AgentSearchReq(project_id=project_id, query="quantum"))
+    # Basic content match/miss in one project.
+    basic_project = _make_project_id("search")
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                basic_project,
+                conversation_id="search-conv-1",
+                conversation_name="Search Test",
+                output_messages=[
+                    NormalizedMessage(
+                        role="assistant",
+                        content="The quantum entanglement hypothesis is fascinating.",
+                    ),
+                ],
+                started_at=now,
+            ),
+            _make_span(
+                basic_project,
+                conversation_id="search-conv-1",
+                conversation_name="Search Test",
+                output_messages=[
+                    NormalizedMessage(
+                        role="assistant",
+                        content="Classical mechanics still has many applications.",
+                    ),
+                ],
+                started_at=now + datetime.timedelta(seconds=1),
+            ),
+        ],
+    )
+    res = ch_server.agent_search(
+        AgentSearchReq(project_id=basic_project, query="quantum")
+    )
     assert len(res.results) >= 1
-    matched = res.results[0]
-    assert "quantum" in matched.matched_messages[0].content_preview.lower()
-
-    # Search for "xyznonexistent" — should match nothing
+    assert "quantum" in res.results[0].matched_messages[0].content_preview.lower()
     res_empty = ch_server.agent_search(
-        AgentSearchReq(project_id=project_id, query="xyznonexistent")
+        AgentSearchReq(project_id=basic_project, query="xyznonexistent")
     )
     assert res_empty.results == []
 
-
-def test_message_search_shared_digest_across_spans(ch_server):
-    """Two spans carrying identical output message content should produce
-    two rows in `messages` that share a single content_digest — enabling
-    read-side dedup via GROUP BY content_digest when desired.
-    """
-    project_id = _make_project_id("search_dedup")
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-
+    # Identical content across two spans -> two rows sharing one content_digest.
+    dedup_project = _make_project_id("search_dedup")
     repeated = "Identical assistant response across two different spans."
-    spans = [
-        _make_span(
-            project_id,
-            conversation_id="dedup-conv-1",
-            output_messages=[NormalizedMessage(role="assistant", content=repeated)],
-            started_at=now,
-        ),
-        _make_span(
-            project_id,
-            conversation_id="dedup-conv-2",
-            output_messages=[NormalizedMessage(role="assistant", content=repeated)],
-            started_at=now + datetime.timedelta(seconds=1),
-        ),
-    ]
-    _insert_spans(ch_server.ch_client, spans)
-
-    res = ch_server.agent_search(
-        AgentSearchReq(project_id=project_id, query="Identical assistant")
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                dedup_project,
+                conversation_id="dedup-conv-1",
+                output_messages=[NormalizedMessage(role="assistant", content=repeated)],
+                started_at=now,
+            ),
+            _make_span(
+                dedup_project,
+                conversation_id="dedup-conv-2",
+                output_messages=[NormalizedMessage(role="assistant", content=repeated)],
+                started_at=now + datetime.timedelta(seconds=1),
+            ),
+        ],
     )
-    # One row per occurrence across two conversations
-    total_matches = sum(len(r.matched_messages) for r in res.results)
-    assert total_matches == 2
-    # Both occurrences share a single content_digest
-    digests = {m.content_digest for r in res.results for m in r.matched_messages}
+    res_dedup = ch_server.agent_search(
+        AgentSearchReq(project_id=dedup_project, query="Identical assistant")
+    )
+    assert sum(len(r.matched_messages) for r in res_dedup.results) == 2
+    digests = {m.content_digest for r in res_dedup.results for m in r.matched_messages}
     assert len(digests) == 1
 
-
-def test_message_search_indexes_tool_calls(ch_server):
-    """tool_call_arguments and tool_call_result should each produce a
-    searchable occurrence with role 'tool_call' / 'tool_result'.
-    """
-    project_id = _make_project_id("search_tools")
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-
-    spans = [
-        _make_span(
-            project_id,
-            conversation_id="tool-conv-1",
-            operation_name="execute_tool",
-            tool_call_arguments='{"city":"Reykjavík"}',
-            tool_call_result='{"temperature":5,"condition":"snowy"}',
-            started_at=now,
-        ),
-    ]
-    _insert_spans(ch_server.ch_client, spans)
-
-    # Hit on the arguments side
+    # Tool-call arguments and results each produce a searchable occurrence.
+    tool_project = _make_project_id("search_tools")
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                tool_project,
+                conversation_id="tool-conv-1",
+                operation_name="execute_tool",
+                tool_call_arguments='{"city":"Reykjavík"}',
+                tool_call_result='{"temperature":5,"condition":"snowy"}',
+                started_at=now,
+            ),
+        ],
+    )
     res_args = ch_server.agent_search(
-        AgentSearchReq(project_id=project_id, query="Reykjavík")
+        AgentSearchReq(project_id=tool_project, query="Reykjavík")
     )
     assert len(res_args.results) == 1
     assert res_args.results[0].matched_messages[0].role == "tool_call"
-
-    # Hit on the result side
     res_result = ch_server.agent_search(
-        AgentSearchReq(project_id=project_id, query="snowy")
+        AgentSearchReq(project_id=tool_project, query="snowy")
     )
     assert len(res_result.results) == 1
     assert res_result.results[0].matched_messages[0].role == "tool_result"
-
     # UI/back-compat alias: "tool" should include both persisted tool roles.
     res_tool_alias = ch_server.agent_search(
-        AgentSearchReq(project_id=project_id, query="Reykjavík", roles=["tool"])
+        AgentSearchReq(project_id=tool_project, query="Reykjavík", roles=["tool"])
     )
     assert len(res_tool_alias.results) == 1
     assert res_tool_alias.results[0].matched_messages[0].role == "tool_call"
@@ -1619,48 +1599,46 @@ def test_message_search_indexes_tool_calls(ch_server):
 # ---------------------------------------------------------------------------
 
 
-def test_query_dsl_combines_semconv_column_and_custom_attr(ch_server):
-    """Compile and execute a Mongo-style query mixing a semconv-mapped column
-    and an unprefixed custom_attrs_string key dispatched via sibling-literal type.
+def test_query_dsl_compiles_typed_custom_attr_predicates(ch_server):
+    """Mongo-style queries route unprefixed keys to the typed custom_attrs map
+    via sibling-literal type: a string `env` -> custom_attrs_string (combined
+    with a semconv column), and an int `retries` -> custom_attrs_int numeric `$gt`.
     """
-    project_id = _make_project_id("dsl")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
-    spans = [
-        # alpha / prod — matches
-        _make_span(
-            project_id,
-            agent_name="alpha",
-            custom_attrs_string={"env": "prod"},
-            started_at=now,
-        ),
-        # alpha / staging — agent matches but env doesn't
-        _make_span(
-            project_id,
-            agent_name="alpha",
-            custom_attrs_string={"env": "staging"},
-            started_at=now + datetime.timedelta(seconds=1),
-        ),
-        # beta / prod — env matches but agent doesn't
-        _make_span(
-            project_id,
-            agent_name="beta",
-            custom_attrs_string={"env": "prod"},
-            started_at=now + datetime.timedelta(seconds=2),
-        ),
-    ]
-    _insert_spans(ch_server.ch_client, spans)
-
-    q = Query.model_validate(
+    # String custom attr combined with a semconv-mapped column.
+    str_project = _make_project_id("dsl")
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            # alpha / prod — matches
+            _make_span(
+                str_project,
+                agent_name="alpha",
+                custom_attrs_string={"env": "prod"},
+                started_at=now,
+            ),
+            # alpha / staging — agent matches but env doesn't
+            _make_span(
+                str_project,
+                agent_name="alpha",
+                custom_attrs_string={"env": "staging"},
+                started_at=now + datetime.timedelta(seconds=1),
+            ),
+            # beta / prod — env matches but agent doesn't
+            _make_span(
+                str_project,
+                agent_name="beta",
+                custom_attrs_string={"env": "prod"},
+                started_at=now + datetime.timedelta(seconds=2),
+            ),
+        ],
+    )
+    str_q = Query.model_validate(
         {
             "$expr": {
                 "$and": [
-                    {
-                        "$eq": [
-                            {"$getField": "agent.name"},
-                            {"$literal": "alpha"},
-                        ]
-                    },
+                    {"$eq": [{"$getField": "agent.name"}, {"$literal": "alpha"}]},
                     # `env` is unknown -> falls through to custom_attrs_string
                     # (sibling literal is a str, so the String map).
                     {"$eq": [{"$getField": "env"}, {"$literal": "prod"}]},
@@ -1668,47 +1646,32 @@ def test_query_dsl_combines_semconv_column_and_custom_attr(ch_server):
             }
         }
     )
-    res = ch_server.agent_spans_query(
-        AgentSpansQueryReq(project_id=project_id, query=q)
+    str_res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=str_project, query=str_q)
     )
-    assert res.total_count == 1
-    assert len(res.spans) == 1
-    assert res.spans[0].agent_name == "alpha"
+    assert str_res.total_count == 1
+    assert len(str_res.spans) == 1
+    assert str_res.spans[0].agent_name == "alpha"
 
-
-def test_query_dsl_typed_custom_attr_comparison(ch_server):
-    """Int-typed custom attributes route to `custom_attrs_int` via the
-    sibling-literal type and compare numerically.
-    """
-    project_id = _make_project_id("dsl_int")
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-
-    spans = [
-        # retries=5 — matches > 3
-        _make_span(
-            project_id,
-            custom_attrs_int={"retries": 5},
-            started_at=now,
-        ),
-        # retries=1 — doesn't match
-        _make_span(
-            project_id,
-            custom_attrs_int={"retries": 1},
-            started_at=now + datetime.timedelta(seconds=1),
-        ),
-        # no retries attr — doesn't match
-        _make_span(
-            project_id,
-            started_at=now + datetime.timedelta(seconds=2),
-        ),
-    ]
-    _insert_spans(ch_server.ch_client, spans)
-
-    q = Query.model_validate(
+    # Int custom attr -> custom_attrs_int numeric comparison.
+    int_project = _make_project_id("dsl_int")
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(int_project, custom_attrs_int={"retries": 5}, started_at=now),
+            _make_span(
+                int_project,
+                custom_attrs_int={"retries": 1},
+                started_at=now + datetime.timedelta(seconds=1),
+            ),
+            _make_span(int_project, started_at=now + datetime.timedelta(seconds=2)),
+        ],
+    )
+    int_q = Query.model_validate(
         {"$expr": {"$gt": [{"$getField": "retries"}, {"$literal": 3}]}}
     )
-    res = ch_server.agent_spans_query(
-        AgentSpansQueryReq(project_id=project_id, query=q)
+    int_res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=int_project, query=int_q)
     )
-    assert res.total_count == 1
-    assert len(res.spans) == 1
+    assert int_res.total_count == 1
+    assert len(int_res.spans) == 1

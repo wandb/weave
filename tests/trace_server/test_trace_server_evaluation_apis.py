@@ -543,7 +543,10 @@ def test_evaluate_model_rejects_op_ref_as_eval_or_model_ref(client, op_arg):
         )
 
 
-def test_eval_results_query_basic(client):
+def test_eval_results_query_basic_and_children(client):
+    """A scored prediction is queryable; include_predict_and_score_children
+    toggles child call ids while the scores stay populated either way.
+    """
     project_id = client.project_id
     entity, project = from_project_id(project_id)
 
@@ -596,12 +599,37 @@ def test_eval_results_query_basic(client):
             evaluation_call_ids=[run.evaluation_run_id],
         )
     )
-
     assert res.total_rows == 1
     assert len(res.rows) == 1
     trial = res.rows[0].evaluations[0].trials[0]
     assert "basic_scorer" in trial.scores
     assert trial.scores["basic_scorer"] == 0.9
+
+    # Children included (default): predict_call_id + scorer_call_ids populated.
+    res_with = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_predict_and_score_children=True,
+        )
+    )
+    trial_with = res_with.rows[0].evaluations[0].trials[0]
+    assert trial_with.predict_call_id is not None
+    assert trial_with.scorer_call_ids != {}
+    assert trial_with.scores["basic_scorer"] == 0.9
+
+    # Children excluded: ids drop out but scores remain.
+    res_without = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_predict_and_score_children=False,
+        )
+    )
+    trial_without = res_without.rows[0].evaluations[0].trials[0]
+    assert trial_without.predict_call_id is None
+    assert trial_without.scorer_call_ids == {}
+    assert trial_without.scores["basic_scorer"] == 0.9
 
 
 def test_eval_results_query_returns_genai_span_ref_without_children(client):
@@ -769,81 +797,6 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
     for call in refs_read_batch_calls:
         # only resolve refs for the paginated slice, not all rows
         assert len(call.refs) <= 2
-
-
-def test_eval_results_include_predict_and_score_children(client):
-    """Verify include_predict_and_score_children controls child call data."""
-    project_id = client.project_id
-    entity, project = from_project_id(project_id)
-
-    scorer_res = client.server.scorer_create(
-        ScorerCreateReq(
-            project_id=project_id,
-            name="children_test_scorer",
-            op_source_code="def score(output):\n    return 1",
-        )
-    )
-    scorer_ref = (
-        f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
-    )
-
-    run = client.server.evaluation_run_create(
-        EvaluationRunCreateReq(
-            project_id=project_id,
-            evaluation="eval://children-test",
-            model="model://children-test",
-        )
-    )
-    pred = client.server.prediction_create(
-        PredictionCreateReq(
-            project_id=project_id,
-            model="model://children-test",
-            inputs={"x": 1},
-            output="result",
-            evaluation_run_id=run.evaluation_run_id,
-        )
-    )
-    client.server.score_create(
-        ScoreCreateReq(
-            project_id=project_id,
-            prediction_id=pred.prediction_id,
-            scorer=scorer_ref,
-            value=0.8,
-            evaluation_run_id=run.evaluation_run_id,
-        )
-    )
-    client.server.prediction_finish(
-        PredictionFinishReq(
-            project_id=project_id,
-            prediction_id=pred.prediction_id,
-        )
-    )
-
-    # With children included (default) — predict_call_id and scorer_call_ids populated
-    res_with = client.server.eval_results_query(
-        EvalResultsQueryReq(
-            project_id=project_id,
-            evaluation_call_ids=[run.evaluation_run_id],
-            include_predict_and_score_children=True,
-        )
-    )
-    trial_with = res_with.rows[0].evaluations[0].trials[0]
-    assert trial_with.predict_call_id is not None
-    assert trial_with.scorer_call_ids != {}
-    assert trial_with.scores["children_test_scorer"] == 0.8
-
-    # scores should still be present.
-    res_without = client.server.eval_results_query(
-        EvalResultsQueryReq(
-            project_id=project_id,
-            evaluation_call_ids=[run.evaluation_run_id],
-            include_predict_and_score_children=False,
-        )
-    )
-    trial_without = res_without.rows[0].evaluations[0].trials[0]
-    assert trial_without.predict_call_id is None
-    assert trial_without.scorer_call_ids == {}
-    assert trial_without.scores["children_test_scorer"] == 0.8
 
 
 def test_eval_results_resolved_inputs_inline(client):
@@ -1066,43 +1019,28 @@ def test_eval_results_excludes_deleted_calls(client):
     assert res.total_rows == 2
 
 
-def test_eval_results_sort_by_score_desc(client):
-    """Sort by scores.accuracy DESC should return highest-scoring row first."""
+@pytest.mark.parametrize(
+    ("direction", "expected"),
+    [("desc", [0.9, 0.6, 0.3]), ("asc", [0.3, 0.6, 0.9])],
+)
+def test_eval_results_sort_by_score(client, direction, expected):
+    """Sort by scores.accuracy orders rows by score in the requested direction."""
     eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
-        eval_name="sort-desc",
+        eval_name=f"sort-{direction}",
     )
     res = client.server.eval_results_query(
         EvalResultsQueryReq(
             project_id=client.project_id,
             evaluation_call_ids=[eval_id],
             include_raw_data_rows=True,
-            sort_by=[EvalResultsSortBy(field="scores.accuracy", direction="desc")],
+            sort_by=[EvalResultsSortBy(field="scores.accuracy", direction=direction)],
         )
     )
     assert res.total_rows == 3
     accuracies = [row.evaluations[0].trials[0].scores["accuracy"] for row in res.rows]
-    assert accuracies == [0.9, 0.6, 0.3]
-
-
-def test_eval_results_sort_by_score_asc(client):
-    """Sort by scores.accuracy ASC should return lowest-scoring row first."""
-    eval_id, _ = _create_eval_with_scores(
-        client,
-        [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
-        eval_name="sort-asc",
-    )
-    res = client.server.eval_results_query(
-        EvalResultsQueryReq(
-            project_id=client.project_id,
-            evaluation_call_ids=[eval_id],
-            include_raw_data_rows=True,
-            sort_by=[EvalResultsSortBy(field="scores.accuracy", direction="asc")],
-        )
-    )
-    accuracies = [row.evaluations[0].trials[0].scores["accuracy"] for row in res.rows]
-    assert accuracies == [0.3, 0.6, 0.9]
+    assert accuracies == expected
 
 
 def test_eval_results_filter_score_gte(client):

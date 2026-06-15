@@ -22,32 +22,6 @@ from weave.trace_server.migration_lock import (
 MANAGEMENT_DB = "db_management"
 
 
-def _make_ch_client(
-    initial_rows: list | None = None,
-    verify_rows: list | None = None,
-) -> Mock:
-    """Create a mock CH client.
-
-    initial_rows: rows returned by the first query (lock check).
-    verify_rows: rows returned by the second query (post-insert verify).
-    If only initial_rows is provided, both queries return that value.
-    """
-    ch_client = Mock()
-
-    if verify_rows is not None:
-        initial_result = Mock()
-        initial_result.result_rows = initial_rows or []
-        verify_result = Mock()
-        verify_result.result_rows = verify_rows
-        ch_client.query.side_effect = [initial_result, verify_result]
-    else:
-        query_result = Mock()
-        query_result.result_rows = initial_rows or []
-        ch_client.query.return_value = query_result
-
-    return ch_client
-
-
 # ---------------------------------------------------------------------------
 # try_acquire — all outcomes
 # ---------------------------------------------------------------------------
@@ -261,17 +235,19 @@ def test_migration_lock_thread_lifecycle():
     assert ch_client.command.call_args[0][0].startswith("DELETE FROM")
 
 
-def test_acquire_with_retry_times_out_when_lock_held():
-    other_holder = _generate_holder_id()
-    ch_client = _make_ch_client(initial_rows=[(other_holder, "2026-01-01 00:00:00")])
-
+def test_acquire_with_retry_outcomes():
+    """acquire_with_retry: times out under a held lock, retries through a
+    transient error, and surfaces a persistent error as MigrationLockError.
+    """
+    # Held by another holder for the whole window -> timeout.
+    held_client = _make_ch_client(
+        initial_rows=[(_generate_holder_id(), "2026-01-01 00:00:00")]
+    )
     with pytest.raises(MigrationLockError, match="Could not acquire migration lock"):
-        acquire_with_retry(ch_client, MANAGEMENT_DB, timeout_seconds=1.0)
+        acquire_with_retry(held_client, MANAGEMENT_DB, timeout_seconds=1.0)
 
-
-def test_acquire_with_retry_recovers_from_transient_error():
-    """Transient OperationalError should retry, not fail fast."""
-    ch_client = Mock()
+    # Transient OperationalError on the first query, then a normal acquire.
+    transient_client = Mock()
     empty_result = Mock()
     empty_result.result_rows = []
     call_count = 0
@@ -279,30 +255,24 @@ def test_acquire_with_retry_recovers_from_transient_error():
     def _query_side_effect(*args, **kwargs):
         nonlocal call_count
         call_count += 1
-        # First call on first attempt: raise transient error.
-        # Subsequent calls: behave like a normal successful acquire.
         if call_count == 1:
             raise OperationalError("connection reset")
-        if ch_client.insert.call_count == 0:
+        if transient_client.insert.call_count == 0:
             return empty_result
         result = Mock()
-        result.result_rows = [(ch_client.insert.call_args.kwargs["data"][0][1],)]
+        result.result_rows = [(transient_client.insert.call_args.kwargs["data"][0][1],)]
         return result
 
-    ch_client.query.side_effect = _query_side_effect
-
-    holder = acquire_with_retry(ch_client, MANAGEMENT_DB, timeout_seconds=5.0)
+    transient_client.query.side_effect = _query_side_effect
+    holder = acquire_with_retry(transient_client, MANAGEMENT_DB, timeout_seconds=5.0)
     assert len(holder) == 12
     assert call_count >= 2  # proves we retried
 
-
-def test_acquire_with_retry_surfaces_persistent_error():
-    """Persistent OperationalError should raise MigrationLockError, not bubble raw."""
-    ch_client = Mock()
-    ch_client.query.side_effect = OperationalError("clickhouse down")
-
+    # Persistent OperationalError -> MigrationLockError, not the raw error.
+    down_client = Mock()
+    down_client.query.side_effect = OperationalError("clickhouse down")
     with pytest.raises(MigrationLockError, match="Could not acquire migration lock"):
-        acquire_with_retry(ch_client, MANAGEMENT_DB, timeout_seconds=1.0)
+        acquire_with_retry(down_client, MANAGEMENT_DB, timeout_seconds=1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -360,3 +330,26 @@ def test_lock_acquire_release_real_clickhouse(real_ch_lock):
     result = acquire_with_retry(client, mgmt_db, holder=holder_b, timeout_seconds=10.0)
     assert result == holder_b
     release(client, mgmt_db, holder_b)
+
+
+def _make_ch_client(
+    initial_rows: list | None = None,
+    verify_rows: list | None = None,
+) -> Mock:
+    """Mock CH client.
+
+    initial_rows back the first query (lock check); verify_rows back the second
+    (post-insert verify). With only initial_rows, both queries return it.
+    """
+    ch_client = Mock()
+    if verify_rows is not None:
+        initial_result = Mock()
+        initial_result.result_rows = initial_rows or []
+        verify_result = Mock()
+        verify_result.result_rows = verify_rows
+        ch_client.query.side_effect = [initial_result, verify_result]
+    else:
+        query_result = Mock()
+        query_result.result_rows = initial_rows or []
+        ch_client.query.return_value = query_result
+    return ch_client

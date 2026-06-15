@@ -16,6 +16,7 @@ These tests should FAIL when the OTel calls_complete write path is disabled
 import datetime
 import uuid
 from binascii import hexlify
+from collections import defaultdict
 
 import pytest
 from cachetools import TTLCache
@@ -272,8 +273,8 @@ def test_otel_export_establishes_residence_for_subsequent_calls(
     )
     assert complete_after_v2 == 2, "V2 call should go to calls_complete"
 
-    # V1 API should raise error since project is now calls_complete mode
-    with pytest.raises(CallsCompleteModeRequired):
+    # V1 call_start should raise since project is now calls_complete mode.
+    with pytest.raises(CallsCompleteModeRequired) as exc_info:
         trace_server.call_start(
             tsi.CallStartReq(
                 start=tsi.StartedCallSchemaForInsert(
@@ -284,6 +285,20 @@ def test_otel_export_establishes_residence_for_subsequent_calls(
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={},
                     inputs={},
+                )
+            )
+        )
+    assert "complete" in str(exc_info.value).lower()
+
+    # V1 call_end should also raise for the same reason.
+    with pytest.raises(CallsCompleteModeRequired):
+        trace_server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=str(uuid.uuid4()),
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    summary={"usage": {}, "status_counts": {}},
                 )
             )
         )
@@ -461,52 +476,6 @@ def test_otel_export_reuses_existing_real_op(trace_server, clickhouse_trace_serv
     assert objs[0].digest == real_op.digest
 
 
-def test_v1_api_raises_error_for_otel_established_project(
-    trace_server, clickhouse_trace_server
-):
-    """V1 call_start and call_end raise CallsCompleteModeRequired for OTel projects.
-
-    When OTel has established a project as calls_complete mode, legacy V1 APIs
-    should fail with a clear error message directing users to upgrade.
-    """
-    project_id = f"{TEST_ENTITY}/otel_v1_error"
-
-    # OTel establishes project in calls_complete mode
-    req = _create_otel_export_req(project_id)
-    trace_server.otel_export(req)
-
-    # This will only fail if OTel wrote to calls_complete (not calls_merged)
-    # V1 call_start should raise
-    with pytest.raises(CallsCompleteModeRequired) as exc_info:
-        trace_server.call_start(
-            tsi.CallStartReq(
-                start=tsi.StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    trace_id=str(uuid.uuid4()),
-                    op_name="v1_op",
-                    started_at=datetime.datetime.now(datetime.timezone.utc),
-                    attributes={},
-                    inputs={},
-                )
-            )
-        )
-    assert "complete" in str(exc_info.value).lower()
-
-    # V1 call_end should also raise
-    with pytest.raises(CallsCompleteModeRequired):
-        trace_server.call_end(
-            tsi.CallEndReq(
-                end=tsi.EndedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    ended_at=datetime.datetime.now(datetime.timezone.utc),
-                    summary={"usage": {}, "status_counts": {}},
-                )
-            )
-        )
-
-
 def test_otel_export_null_sentinel_fields_to_calls_complete(
     trace_server, clickhouse_trace_server
 ):
@@ -591,61 +560,57 @@ def test_otel_and_calls_complete_api_interoperability(
 # =============================================================================
 
 
-def test_otel_op_ref_cached_across_batches(
+def test_otel_op_ref_cache_hits_mixed_and_many(
     trace_server, clickhouse_trace_server, monkeypatch
 ):
-    """Op ref URIs are cached: the same op name across two batches resolves identically."""
-    project_id = f"{TEST_ENTITY}/otel_cache_across_batches"
+    """Op ref cache: repeat ops hit cache (no obj_create_batch), mixed cached/new resolve, many distinct ops stay unique and stable across batches."""
+    project_id = f"{TEST_ENTITY}/otel_op_ref_cache"
+    op_names = [f"op_{i}" for i in range(20)]
 
-    # Batch 1: export span with op "foo"
-    span1 = _create_otel_span("foo")
-    req1 = _create_otel_export_req(project_id, [span1])
-    trace_server.otel_export(req1)
+    # Batch 1: 20 distinct ops, each gets a unique ref URI.
+    spans = [_create_otel_span(name) for name in op_names]
+    trace_server.otel_export(_create_otel_export_req(project_id, spans))
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 20
+    assert len({c.op_name for c in calls}) == 20
 
-    def fail_obj_create_batch(_batch):
-        raise AssertionError("obj_create_batch should not be called for cached ops")
+    # Batch 2: re-export the same 20 cached ops plus one brand-new op.
+    # The 20 cached ops must NOT trigger obj_create_batch; only the new op may.
+    new_op = "brand_new_op"
+    created_op_names: list[str] = []
+    original_obj_create_batch = clickhouse_trace_server.obj_create_batch
+
+    def tracking_obj_create_batch(batch):
+        for obj in batch:
+            created_op_names.append(obj.object_id)
+        return original_obj_create_batch(batch)
 
     monkeypatch.setattr(
-        clickhouse_trace_server, "obj_create_batch", fail_obj_create_batch
+        clickhouse_trace_server, "obj_create_batch", tracking_obj_create_batch
     )
 
-    # Batch 2: export another span with op "foo"
-    span2 = _create_otel_span("foo")
-    req2 = _create_otel_export_req(project_id, [span2])
-    trace_server.otel_export(req2)
+    spans2 = [_create_otel_span(name) for name in op_names]
+    spans2.append(_create_otel_span(new_op))
+    trace_server.otel_export(_create_otel_export_req(project_id, spans2))
 
-    calls = _fetch_calls_stream(trace_server, project_id)
-    assert len(calls) == 2
-    # Both should resolve to the same op ref URI
-    assert calls[0].op_name == calls[1].op_name
-    assert "foo" in calls[0].op_name
+    # Only the brand-new op required an obj_create_batch write; cached ops did not.
+    assert created_op_names == [new_op]
 
+    calls_after = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls_after) == 41
+    assert len([c for c in calls_after if f"/op/{new_op}:" in c.op_name]) == 1
 
-def test_otel_mixed_cached_and_new_ops(trace_server, clickhouse_trace_server):
-    """A batch with both cached and uncached ops resolves all correctly."""
-    project_id = f"{TEST_ENTITY}/otel_mixed_cache"
-
-    # Batch 1: establish "existing_op" in cache
-    span1 = _create_otel_span("existing_op")
-    req1 = _create_otel_export_req(project_id, [span1])
-    trace_server.otel_export(req1)
-
-    # Batch 2: mix of cached "existing_op" and new "brand_new_op"
-    span2 = _create_otel_span("existing_op")
-    span3 = _create_otel_span("brand_new_op")
-    req2 = _create_otel_export_req(project_id, [span2, span3])
-    trace_server.otel_export(req2)
-
-    calls = _fetch_calls_stream(trace_server, project_id)
-    assert len(calls) == 3
-
-    op_names = [c.op_name for c in calls]
-    existing_refs = [n for n in op_names if "existing_op" in n]
-    new_refs = [n for n in op_names if "brand_new_op" in n]
-    assert len(existing_refs) == 2
-    assert len(new_refs) == 1
-    # All "existing_op" refs should be identical
-    assert len(set(existing_refs)) == 1
+    # Every op name resolves to exactly one ref URI across both batches.
+    by_op: dict[str, set[str]] = defaultdict(set)
+    all_op_names = sorted([*op_names, new_op], key=len, reverse=True)
+    for c in calls_after:
+        for name in all_op_names:
+            if f"/op/{name}:" in c.op_name:
+                by_op[name].add(c.op_name)
+                break
+    assert len(by_op) == 21
+    for name, uri_set in by_op.items():
+        assert len(uri_set) == 1, f"Op {name} has inconsistent refs: {uri_set}"
 
 
 def test_otel_same_op_name_different_projects(trace_server, clickhouse_trace_server):
@@ -671,44 +636,6 @@ def test_otel_same_op_name_different_projects(trace_server, clickhouse_trace_ser
     assert "shared_op" in calls_b[0].op_name
     # URIs differ because they reference different project_ids
     assert calls_a[0].op_name != calls_b[0].op_name
-
-
-def test_otel_many_unique_ops_in_batch(trace_server, clickhouse_trace_server):
-    """A single batch with many distinct ops resolves all, and a repeat batch uses cache."""
-    project_id = f"{TEST_ENTITY}/otel_many_ops"
-    op_names = [f"op_{i}" for i in range(20)]
-
-    # Batch 1: 20 distinct ops
-    spans = [_create_otel_span(name) for name in op_names]
-    req1 = _create_otel_export_req(project_id, spans)
-    trace_server.otel_export(req1)
-
-    calls = _fetch_calls_stream(trace_server, project_id)
-    assert len(calls) == 20
-
-    # Each op should have a unique ref URI
-    refs = {c.op_name for c in calls}
-    assert len(refs) == 20
-
-    # Batch 2: re-export the same 20 ops (all should come from cache)
-    spans2 = [_create_otel_span(name) for name in op_names]
-    req2 = _create_otel_export_req(project_id, spans2)
-    trace_server.otel_export(req2)
-
-    calls_after = _fetch_calls_stream(trace_server, project_id)
-    assert len(calls_after) == 40
-
-    # All refs for the same op name should be identical across batches
-    from collections import defaultdict
-
-    by_op: dict[str, set[str]] = defaultdict(set)
-    for c in calls_after:
-        for name in sorted(op_names, key=len, reverse=True):
-            if f"/op/{name}:" in c.op_name:
-                by_op[name].add(c.op_name)
-                break
-    for name, uri_set in by_op.items():
-        assert len(uri_set) == 1, f"Op {name} has inconsistent refs: {uri_set}"
 
 
 def test_placeholder_file_created_at_most_once_per_project(
