@@ -11,85 +11,84 @@ def test_stringprompt_format():
     )
 
 
-def test_messagesprompt_format():
-    prompt = MessagesPrompt(
-        [
-            {"role": "system", "content": "You are a pirate."},
-            {"role": "user", "content": "Tell us your thoughts on {topic}."},
-        ]
-    )
-    assert prompt.format(topic="airplanes") == [
-        {"role": "system", "content": "You are a pirate."},
-        {"role": "user", "content": "Tell us your thoughts on airplanes."},
-    ]
-
-
-def test_messagesprompt_nesteddict_format():
-    prompt = MessagesPrompt(
-        [
-            {"role": "system", "content": "You are a pirate."},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "Tell us your thoughts on {topic}.",
-                    }
-                ],
-            },
-        ]
-    )
-    assert prompt.format(topic="airplanes") == [
-        {"role": "system", "content": "You are a pirate."},
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "Tell us your thoughts on airplanes.",
-                }
+@pytest.mark.parametrize(
+    ("messages", "expected"),
+    [
+        (
+            [
+                {"role": "system", "content": "You are a pirate."},
+                {"role": "user", "content": "Tell us your thoughts on {topic}."},
             ],
-        },
-    ]
+            [
+                {"role": "system", "content": "You are a pirate."},
+                {"role": "user", "content": "Tell us your thoughts on airplanes."},
+            ],
+        ),
+        (
+            [
+                {"role": "system", "content": "You are a pirate."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Tell us your thoughts on {topic}."}
+                    ],
+                },
+            ],
+            [
+                {"role": "system", "content": "You are a pirate."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Tell us your thoughts on airplanes."}
+                    ],
+                },
+            ],
+        ),
+    ],
+)
+def test_messagesprompt_format(messages, expected):
+    assert MessagesPrompt(messages).format(topic="airplanes") == expected
 
 
-def test_messagesprompt_format_missing_var_raises_error():
-    """Test that missing template variables raise IncorrectPromptVarError with helpful message."""
-    prompt = MessagesPrompt(
-        [
-            {"role": "system", "content": "You are a {role_type} assistant."},
-            {"role": "user", "content": "Evaluate {output} against {expected}."},
-        ]
-    )
-
-    # Only provide 'output', missing 'role_type' and 'expected'
+@pytest.mark.parametrize(
+    ("messages", "format_kwargs", "any_of", "all_of"),
+    [
+        (
+            [
+                {"role": "system", "content": "You are a {role_type} assistant."},
+                {"role": "user", "content": "Evaluate {output} against {expected}."},
+            ],
+            {"output": "test"},
+            ("role_type", "expected"),
+            ("output",),
+        ),
+        (
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Hello {name}, please evaluate {item}.",
+                        }
+                    ],
+                },
+            ],
+            {"name": "Alice"},
+            (),
+            ("item", "name"),
+        ),
+    ],
+)
+def test_messagesprompt_format_missing_var_raises_error(
+    messages, format_kwargs, any_of, all_of
+):
+    """Missing template variables raise IncorrectPromptVarError listing missing + available vars."""
+    prompt = MessagesPrompt(messages)
     with pytest.raises(IncorrectPromptVarError) as exc_info:
-        prompt.format(output="test")
-
+        prompt.format(**format_kwargs)
     error_msg = str(exc_info.value)
-    # Should mention one of the missing vars
-    assert "role_type" in error_msg or "expected" in error_msg
-    # Should show available vars
-    assert "output" in error_msg
-
-
-def test_messagesprompt_nesteddict_format_missing_var_raises_error():
-    """Test that missing template variables in nested content raise IncorrectPromptVarError."""
-    prompt = MessagesPrompt(
-        [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Hello {name}, please evaluate {item}."}
-                ],
-            },
-        ]
-    )
-
-    # Only provide 'name', missing 'item'
-    with pytest.raises(IncorrectPromptVarError) as exc_info:
-        prompt.format(name="Alice")
-
-    error_msg = str(exc_info.value)
-    assert "item" in error_msg
-    assert "name" in error_msg
+    if any_of:
+        assert any(substring in error_msg for substring in any_of)
+    for substring in all_of:
+        assert substring in error_msg
