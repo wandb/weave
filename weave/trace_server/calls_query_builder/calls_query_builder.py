@@ -97,14 +97,6 @@ CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 # >>1M-count requests in the wild.
 DEFAULT_STATS_MAX_LIMIT = 1_000_000
 
-# Per-row payload size sum, the inner expression behind storage_size_bytes /
-# total_storage_size_bytes wherever a stats table is read. Single source so a new
-# size column can't silently desync one path's storage number from another's.
-STORAGE_SIZE_BYTES_SUM = (
-    "COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) "
-    "+ COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)"
-)
-
 
 @dataclass(frozen=True, slots=True)
 class FilterConditionsResult:
@@ -1515,7 +1507,7 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT
                     id,
-                    sum({STORAGE_SIZE_BYTES_SUM}) AS storage_size_bytes
+                    sum({config.storage_size_bytes_sum}) AS storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY id
@@ -1546,7 +1538,7 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT
                     trace_id,
-                    sum({STORAGE_SIZE_BYTES_SUM}) AS total_storage_size_bytes
+                    sum({config.storage_size_bytes_sum}) AS total_storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 {trace_id_filter}
@@ -3223,7 +3215,7 @@ def _optimized_unfiltered_storage_query(
         {count_expr} AS count,
         toUInt8(0) AS has_more,
         coalesce(
-            (SELECT sum({STORAGE_SIZE_BYTES_SUM})
+            (SELECT sum({config.storage_size_bytes_sum})
              FROM {config.stats_table_name}
              WHERE project_id = {project_id_slot}),
             0

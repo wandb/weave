@@ -2225,7 +2225,40 @@ def test_storage_size_fields():
         FROM calls_merged
         LEFT JOIN
         (SELECT id,
-                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)) AS storage_size_bytes
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0)) AS storage_size_bytes
+        FROM calls_merged_stats
+        WHERE project_id = {pb_0:String}
+        GROUP BY id) AS storage_size_tbl ON calls_merged.id = storage_size_tbl.id
+        PREWHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id,
+                calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {"pb_0": "test/project"},
+    )
+
+
+def test_storage_size_includes_otel_dump_bytes():
+    """Per-call storage_size_bytes must include OTel dump bytes, like project stats do.
+
+    project_query_builder sums the same stats table WITH `+ COALESCE(otel_dump_size_bytes, 0)`,
+    so a call's storage_size_bytes and the project trace_storage_size_bytes (derived from the
+    same rows) disagree for any OTel-ingesting project. This pins the reconciled sum.
+    """
+    cq = CallsQuery(project_id="test/project", include_storage_size=True)
+    cq.add_field("id")
+    cq.add_field("storage_size_bytes")
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id,
+           any(storage_size_tbl.storage_size_bytes) AS storage_size_bytes
+        FROM calls_merged
+        LEFT JOIN
+        (SELECT id,
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0)) AS storage_size_bytes
         FROM calls_merged_stats
         WHERE project_id = {pb_0:String}
         GROUP BY id) AS storage_size_tbl ON calls_merged.id = storage_size_tbl.id
@@ -2285,7 +2318,7 @@ def test_total_storage_size(with_filter: bool):
             FROM calls_merged
             LEFT JOIN (SELECT
                 trace_id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0) + COALESCE(otel_dump_size_bytes,0)) AS total_storage_size_bytes
             FROM calls_merged_stats
             WHERE project_id = {pb_1:String}
             AND trace_id IN (
@@ -2317,7 +2350,7 @@ def test_total_storage_size(with_filter: bool):
             FROM calls_merged
             LEFT JOIN (SELECT
                 trace_id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0) + COALESCE(otel_dump_size_bytes,0)) AS total_storage_size_bytes
             FROM calls_merged_stats
             WHERE project_id = {pb_0:String}
             GROUP BY trace_id) AS rolled_up_cms
@@ -4224,7 +4257,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         SELECT count() AS count,
                toUInt8(0) AS has_more,
                coalesce(
-                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0))
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_size_bytes, 0))
                            FROM calls_complete_stats
                            WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
         FROM calls_complete
@@ -4380,7 +4413,7 @@ def test_stats_query_calls_merged_unfiltered_storage_uses_flat_sum() -> None:
                            OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
                toUInt8(0) AS has_more,
                coalesce(
-                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0))
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))
                            FROM calls_merged_stats
                            WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
         FROM calls_merged
