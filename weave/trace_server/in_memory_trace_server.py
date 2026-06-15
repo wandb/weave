@@ -18,9 +18,12 @@ import copy
 import datetime
 import json
 import logging
+import math
+import re
 import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from operator import attrgetter
 from typing import Any, cast
 
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
@@ -48,6 +51,7 @@ from weave.trace_server.clickhouse_trace_server_settings import (
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
+    InvalidFieldError,
     InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
@@ -56,6 +60,7 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.orm import split_escaped_field_path
 from weave.trace_server.trace_server_common import (
     apply_tags_and_synth_latest_in_place,
     digest_is_content_hash,
@@ -75,6 +80,50 @@ logger = logging.getLogger(__name__)
 
 MAX_REFS_BATCH_SIZE = 1000
 MAX_OTEL_ERROR_MESSAGES = 20
+
+# Top-level calls columns (mirrors ALLOWED_CALL_FIELDS in the ClickHouse
+# query builder, with the *_dump suffixes normalized away).
+_CALLS_PLAIN_COLUMNS = frozenset(
+    {
+        "id",
+        "project_id",
+        "trace_id",
+        "parent_id",
+        "thread_id",
+        "turn_id",
+        "op_name",
+        "display_name",
+        "started_at",
+        "ended_at",
+        "exception",
+        "wb_user_id",
+        "wb_run_id",
+        "wb_run_step",
+        "wb_run_step_end",
+        "deleted_at",
+        "expire_at",
+        "input_refs",
+        "output_refs",
+    }
+)
+
+# Mirrors DISALLOWED_FILTERING_FIELDS / DATETIME_COLUMN_FIELDS in the
+# ClickHouse calls query builder.
+_DISALLOWED_FILTERING_FIELDS = frozenset(
+    {"storage_size_bytes", "total_storage_size_bytes"}
+)
+# Summary fields with computed handlers (anything else under summary.weave.
+# raises InvalidFieldError, mirroring SUMMARY_FIELD_HANDLERS).
+_SUMMARY_FIELD_HANDLERS = frozenset({"status", "latency_ms", "trace_name"})
+
+
+def _compile_call_column(column: str) -> Any:
+    """Per-record getter for a plain calls column; unknown columns raise
+    InvalidFieldError like the ClickHouse query builder.
+    """
+    if column not in _CALLS_PLAIN_COLUMNS:
+        raise InvalidFieldError(f"Field {column} is not allowed")
+    return attrgetter(column)
 
 
 def _ensure_tz(dt: datetime.datetime) -> datetime.datetime:
@@ -137,6 +186,124 @@ def _json_extract(parsed: Any, path_parts: list[str] | None) -> tuple[Any, str |
     # Unknown python type (shouldn't happen for JSON-derived data); treat as
     # its text rendering.
     return (str(val), "text")
+
+
+def _ch_json_value(parsed: Any, path_parts: list[str] | None) -> str:
+    """Mirror the ClickHouse dynamic-field read:
+    coalesce(nullIf(JSON_VALUE(dump, path), 'null'), '').
+
+    The trace server enables function_json_value_return_type_allow_complex,
+    so objects/arrays render as minified JSON text. Missing paths and JSON
+    nulls read as ''. Numbers are normalized (5.0 -> '5', 1e3 -> '1000'),
+    booleans render as 'true'/'false', strings are unquoted.
+    """
+    val = parsed
+    for part in path_parts or []:
+        if isinstance(val, dict):
+            if part not in val:
+                return ""
+            val = val[part]
+        elif isinstance(val, list):
+            try:
+                idx = int(part)
+            except ValueError:
+                return ""
+            if idx < 0 or idx >= len(val):
+                return ""
+            val = val[idx]
+        else:
+            return ""
+    if val is None:
+        return ""
+    if isinstance(val, bool):
+        return "true" if val else "false"
+    if isinstance(val, str):
+        return val
+    if isinstance(val, (dict, list)):
+        return _minify_json(val)
+    if isinstance(val, float) and val.is_integer() and not math.isinf(val):
+        return str(int(val))
+    return str(val)
+
+
+def _ch_json_exists(parsed: Any, path_parts: list[str] | None) -> bool:
+    """Mirror the builder's exists cast:
+    NOT (JSONType(...) = 'Null' OR JSONType(...) IS NULL) — i.e. the path
+    exists AND its value is not JSON null.
+    """
+    val = parsed
+    for part in path_parts or []:
+        if isinstance(val, dict):
+            if part not in val:
+                return False
+            val = val[part]
+        elif isinstance(val, list):
+            try:
+                idx = int(part)
+            except ValueError:
+                return False
+            if idx < 0 or idx >= len(val):
+                return False
+            val = val[idx]
+        else:
+            return False
+    return val is not None
+
+
+_CH_INT64_RE = re.compile(r"^[+-]?\d+$")
+
+
+def _to_int64_or_null(value: Any) -> int | None:
+    """ClickHouse toInt64OrNull over a string expression."""
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    text = text.strip()
+    if not _CH_INT64_RE.match(text):
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def _to_float64_or_null(value: Any) -> float | None:
+    """ClickHouse toFloat64OrNull over a string expression."""
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _to_uint8_or_null(value: Any) -> int | None:
+    """ClickHouse toUInt8OrNull over a string expression."""
+    parsed = _to_int64_or_null(value)
+    if parsed is None or parsed < 0 or parsed > 255:
+        return None
+    return parsed
+
+
+def _ch_cast_json_value(value: str | None, cast_to: str | None) -> Any:
+    """Mirror clickhouse_cast_json_value applied to a JSON_VALUE string."""
+    if cast_to is None or cast_to == "string":
+        return value
+    if cast_to == "int":
+        return _to_int64_or_null(value)
+    if cast_to in {"double", "float"}:
+        return _to_float64_or_null(value)
+    if cast_to == "bool":
+        if value == "true":
+            return 1
+        if value == "false":
+            return 0
+        return _to_uint8_or_null(value)
+    raise ValueError(f"Unknown cast: {cast_to}")
 
 
 def _value_rank(value: Any) -> int:
@@ -595,6 +762,185 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     + len(summary_json)
                 )
         return tsi.CallEndRes()
+
+    def _feedback_rows_for_call(
+        self, project_id: str, call_id: str, feedback_type: str | None
+    ) -> list[dict[str, Any]]:
+        """Feedback rows attached to a call ref, in insertion (rowid) order."""
+        call_ref = ri.InternalCallRef(project_id=project_id, id=call_id).uri
+        with self.lock:
+            rows = [row for row in self._feedback if row["weave_ref"] == call_ref]
+        if feedback_type is not None:
+            rows = [row for row in rows if row["feedback_type"] == feedback_type]
+        return rows
+
+    def _compile_feedback_field(self, field_path: str) -> Any:
+        """Compile a `feedback.[type].…` field into a per-record evaluator,
+        mirroring CallsMergedFeedbackPayloadField in the ClickHouse builder:
+        anyIf over the call's feedback rows, then JSON_VALUE extraction —
+        a String expression where "no feedback" reads as ''.
+        """
+        path = field_path[len("feedback.") :]
+        match = re.match(r"^\[(.+?)\]\.(.+)$", path)
+        if not match:
+            raise InvalidFieldError(f"Invalid feedback field path: {field_path}")
+        feedback_type, rest = match.groups()
+
+        parts = rest.split(".")
+        if parts[0] == "payload":
+            db_column = "payload"
+            extra_parts = parts[1:]
+        elif parts[0] in {"runnable_ref", "trigger_ref"}:
+            db_column = parts[0]
+            extra_parts = []
+        else:
+            raise InvalidFieldError(f"Invalid feedback field path: {field_path}")
+
+        def extract(row: dict[str, Any]) -> str:
+            raw = row.get(db_column)
+            if db_column == "payload":
+                if extra_parts:
+                    return _ch_json_value(raw, extra_parts)
+                return "" if raw is None else _minify_json(raw)
+            return raw if isinstance(raw, str) else ""
+
+        if feedback_type == "*":
+
+            def evaluate_any(rec: _CallRec) -> str:
+                # anyIf(extracted, extracted != ''): first non-empty value
+                # across all feedback rows; '' when none.
+                for row in self._feedback_rows_for_call(rec.project_id, rec.id, None):
+                    value = extract(row)
+                    if value != "":
+                        return value
+                return ""
+
+            return evaluate_any
+
+        def evaluate(rec: _CallRec) -> str:
+            rows = self._feedback_rows_for_call(rec.project_id, rec.id, feedback_type)
+            if not rows:
+                return ""
+            return extract(rows[0])
+
+        return evaluate
+
+    def _feedback_values_array(self, rec: _CallRec, field_path: str) -> list[str]:
+        """Mirror as_array_sql: groupArrayIf of extracted values for a
+        multi-value feedback type (non-empty extracted values only when an
+        extra path is present).
+        """
+        path = field_path[len("feedback.") :]
+        match = re.match(r"^\[(.+?)\]\.(.+)$", path)
+        if not match:
+            raise InvalidFieldError(f"Invalid feedback field path: {field_path}")
+        feedback_type, rest = match.groups()
+        parts = rest.split(".")
+        extra_parts = parts[1:] if parts[0] == "payload" else []
+        rows = self._feedback_rows_for_call(rec.project_id, rec.id, feedback_type)
+        values: list[str] = []
+        for row in rows:
+            payload = row.get("payload")
+            if extra_parts:
+                value = _ch_json_value(payload, extra_parts)
+                if value != "":
+                    values.append(value)
+            else:
+                values.append("" if payload is None else _minify_json(payload))
+        return values
+
+    def _compile_calls_field(self, field_path: str, cast_to: str | None = None) -> Any:
+        """Compile a calls field reference into a per-record evaluator,
+        mirroring get_field_by_name + the field classes' as_sql in the
+        ClickHouse calls query builder.
+        """
+        if field_path.startswith("summary.weave."):
+            summary_field = field_path[len("summary.weave.") :]
+            if summary_field not in _SUMMARY_FIELD_HANDLERS:
+                supported = ", ".join(sorted(_SUMMARY_FIELD_HANDLERS))
+                raise InvalidFieldError(
+                    f"Summary field '{summary_field}' is not allowed. "
+                    f"Supported fields are: {supported}"
+                )
+            if summary_field == "status":
+                return self._status_case
+            if summary_field == "latency_ms":
+                return self._latency_ms
+            return self._trace_name_case
+        for col_name in ("inputs", "output", "attributes", "summary"):
+            if field_path == col_name or field_path.startswith(col_name + "."):
+                json_path = (
+                    split_escaped_field_path(field_path[len(col_name) + 1 :])
+                    if field_path != col_name
+                    else []
+                )
+                if cast_to == "exists":
+
+                    def evaluate_exists(
+                        rec: _CallRec,
+                        _col_name: str = col_name,
+                        _json_path: list[str] = json_path,
+                    ) -> bool:
+                        return _ch_json_exists(getattr(rec, _col_name), _json_path)
+
+                    return evaluate_exists
+
+                def evaluate(
+                    rec: _CallRec,
+                    _col_name: str = col_name,
+                    _json_path: list[str] = json_path,
+                    _cast_to: str | None = cast_to,
+                ) -> Any:
+                    value = _ch_json_value(getattr(rec, _col_name), _json_path)
+                    return _ch_cast_json_value(value, _cast_to)
+
+                return evaluate
+
+        # Plain column access. Casts are not applied to static columns in
+        # filters (mirroring process_operand); storage-size fields are
+        # filterable nowhere.
+        if field_path in _DISALLOWED_FILTERING_FIELDS:
+            raise InvalidFieldError(f"Field {field_path} is not allowed")
+        return _compile_call_column(field_path)
+
+    def _latency_ms(self, rec: _CallRec) -> int | None:
+        # CH: toUnixTimestamp64Milli(ended) - toUnixTimestamp64Milli(started);
+        # NULL while the call is still running.
+        if rec.ended_at is None or rec.started_at is None:
+            return None
+        started_ms = int(rec.started_at.timestamp() * 1000)
+        ended_ms = int(rec.ended_at.timestamp() * 1000)
+        return ended_ms - started_ms
+
+    def _status_case(self, rec: _CallRec) -> str:
+        # ClickHouse handler order: error, then descendant_error, then
+        # running, then success.
+        if rec.exception is not None:
+            return "error"
+        error_count = _ch_cast_json_value(
+            _ch_json_value(rec.summary, ["status_counts", "error"]), "int"
+        )
+        if (error_count or 0) > 0:
+            return "descendant_error"
+        if rec.ended_at is None:
+            return "running"
+        return "success"
+
+    def _trace_name_case(self, rec: _CallRec) -> Any:
+        if rec.display_name is not None and rec.display_name != "":
+            return rec.display_name
+        op_name = rec.op_name
+        if op_name is not None and op_name.startswith(
+            ri.WEAVE_INTERNAL_SCHEME + ":///"
+        ):
+            last_segment = op_name.rsplit("/", 1)[-1]
+            colon_idx = last_segment.find(":")
+            if colon_idx == -1:
+                # The SQL substring expression yields an empty string when no
+                # colon is present.
+                return ""
+            return last_segment[:colon_idx]
+        return op_name
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
