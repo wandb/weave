@@ -240,8 +240,7 @@ def test_purge_delete_honors_caller_table_and_cluster(
                 )
             )
             .prepare(
-                database_type="clickhouse",
-                param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
+                param_builder=ParamBuilder(prefix="p"),
                 table_name=f"feedback{suffix}",
                 cluster_name=mutation_cluster,
             )
@@ -267,8 +266,7 @@ def test_purge_delete_honors_caller_table_and_cluster(
                 )
             )
             .prepare(
-                database_type="clickhouse",
-                param_builder=ParamBuilder(prefix="p", database_type="clickhouse"),
+                param_builder=ParamBuilder(prefix="p"),
                 table_name=f"llm_token_prices{suffix}",
                 cluster_name=mutation_cluster,
             )

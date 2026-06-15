@@ -435,8 +435,8 @@ def test_server_alias_crud(client: WeaveClient):
 def test_server_tag_errors(client: WeaveClient):
     """Tags on nonexistent or deleted objects raise NotFoundError.
 
-    Note: each error scenario needs its own test function because SQLite's
-    transaction state becomes dirty after a NotFoundError.
+    Note: each error scenario lives in its own test function to keep the
+    failure modes isolated.
     """
     # Nonexistent object
     with pytest.raises(NotFoundError):
@@ -1633,8 +1633,7 @@ def test_republish_promotes_to_latest(client: WeaveClient, monkeypatch):
 #
 # These tests pin the contract for the hybrid is_latest projection:
 #   - explicit "latest" alias row wins when present (dedup-republish promote)
-#   - falls back to most-recent surviving (CH computed window / SQLite column
-#     re-pointed by obj_delete)
+#   - falls back to most-recent surviving (CH computed window)
 #   - "latest" disappears when the object has no surviving versions
 # Both backends are covered via the parameterized `client` fixture.
 # ---------------------------------------------------------------------------
@@ -1729,7 +1728,7 @@ def test_hybrid_latest_full_lifecycle(client: WeaveClient, monkeypatch):
     assert _resolve_latest_digest(client, "hybrid_obj") == ref_c.digest
 
     # Linear delete current latest: latest should fall back to B.
-    # (CH: computed window function. SQLite: column re-pointed by obj_delete.)
+    # (CH: computed window function.)
     client.server.obj_delete(
         tsi.ObjDeleteReq(
             project_id=client.project_id,
@@ -1857,11 +1856,7 @@ def test_delete_non_current_version_leaves_latest_unchanged(
     deleted.  This test exercises the opposite: when a non-current version
     is deleted, latest must stay put on the alias path.
 
-    Failure modes this catches on each backend:
-        SQLite: an over-eager `obj_delete` UPDATE that re-points
-            `objects.is_latest` based on a buggy subquery (e.g. dropping
-            `LIMIT 1`, or losing the `deleted_at IS NULL` filter so the
-            just-deleted row competes again).
+    Failure mode this catches:
         CH: an over-eager cascade that soft-deletes the alias row for the
             current latest instead of only the alias rows tied to the
             deleted digest.
@@ -1890,8 +1885,7 @@ def test_delete_non_current_version_leaves_latest_unchanged(
     # Latest must remain B across all resolution paths.
     assert _resolve_latest_digest(client, "del_non_current") == ref_b.digest, (
         "deleting a non-current version moved 'latest' — obj_delete may be "
-        "re-pointing too aggressively.  Check the SQLite UPDATE in obj_delete "
-        "(re-points objects.is_latest) and the CH alias-cascade scope."
+        "re-pointing too aggressively.  Check the CH alias-cascade scope."
     )
 
     # And B still carries is_latest=1 plus 'latest' in its aliases list.

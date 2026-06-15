@@ -8,13 +8,13 @@ export {
 export {Dataset} from './dataset';
 export {Evaluation} from './evaluation';
 export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
-export {
+export type {
   CallSchema,
   CallsFilter,
   Query,
   SortBy,
 } from './generated/traceServerApi';
-export {GetCallsOptions} from './weaveClient';
+export type {GetCallsOptions} from './weaveClient';
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
@@ -59,7 +59,12 @@ export type {
   TurnInit,
   Usage,
 } from './genai';
-export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
+export {
+  weaveAudio,
+  weaveImage,
+  type WeaveAudio,
+  type WeaveImage,
+} from './media';
 export {op} from './op';
 export * from './types';
 export {WeaveObject, ObjectRef} from './weaveObject';
@@ -73,7 +78,6 @@ export {MessagesPrompt, StringPrompt} from './prompt';
 // is emitted, the `require()` call here is dead code, and the typeof
 // check prevents the missing module from ever being requested.
 if (typeof require === 'function' && typeof module === 'object') {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('./utils/commonJSLoader');
 }
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import functools
 import json
 import os
 import threading
@@ -171,14 +172,32 @@ def _log_response(response: Response) -> None:
     pprint_response(response)
 
 
-client = httpx.Client(
-    # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
-    # works natively.
-    event_hooks={"request": [_log_request], "response": [_log_response]},
-    timeout=http_timeout(),
-    limits=CLIENT_LIMITS,
-    verify=ssl_verify(),
-)
+@functools.cache
+def _build_client(verify: bool, timeout: float) -> httpx.Client:
+    """Build an httpx.Client for a given (verify, timeout) pair.
+
+    Cached so repeated requests with the same settings reuse one connection
+    pool. A change to WEAVE_INSECURE_DISABLE_SSL / WEAVE_HTTP_TIMEOUT picks
+    up a different cached client on the next request — no stale verify flag.
+    """
+    return httpx.Client(
+        # Use HTTPX's default transport so env proxy handling (including
+        # NO_PROXY) works natively.
+        event_hooks={"request": [_log_request], "response": [_log_response]},
+        timeout=timeout,
+        limits=CLIENT_LIMITS,
+        verify=verify,
+    )
+
+
+def _get_client() -> httpx.Client:
+    """Return the httpx.Client matching the current env settings.
+
+    Reads ssl_verify() and http_timeout() per call so env-var changes after
+    `import weave` (or after the first request) are honored. The actual
+    Client objects are pooled by _build_client.
+    """
+    return _build_client(ssl_verify(), http_timeout())
 
 
 def get(
@@ -189,6 +208,7 @@ def get(
     **kwargs: Any,
 ) -> Response:
     """Send a GET request with optional logging."""
+    client = _get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -206,6 +226,7 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
+    client = _get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -223,6 +244,7 @@ def put(
     **kwargs: Any,
 ) -> Response:
     """Send a PUT request with optional logging."""
+    client = _get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -239,6 +261,7 @@ def delete(
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
+    client = _get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)

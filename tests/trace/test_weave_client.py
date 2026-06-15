@@ -22,11 +22,11 @@ from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
-    client_is_sqlite,
 )
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     UserInjectingExternalTraceServer,
 )
+from tests.trace_server.helpers import force_optimize
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
@@ -61,9 +61,6 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
     LLMStructuredCompletionModelDefaultParams,
-)
-from weave.trace_server.sqlite_trace_server import (
-    NotFoundError as sqliteNotFoundError,
 )
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -1858,9 +1855,6 @@ def clickhouse_client(client):
 
 def test_get_calls_storage_size_values(client, clickhouse_client):
     """Test that storage size values are correctly included when parameters are set."""
-    if client_is_sqlite(client):
-        pytest.skip("Skipping test for sqlite clients")
-
     _setup_calls_for_storage_size_test(client)
 
     # This is a best effort to achieve consistency in the calls_merged_stats table.
@@ -1868,7 +1862,7 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
     # ClickHouse merges data asynchronously, so queries may see unmerged data.
     # OPTIMIZE TABLE ... FINAL forces an immediate merge to ensure consistency for tests.
     if clickhouse_client:
-        clickhouse_client.command("OPTIMIZE TABLE calls_merged_stats FINAL")
+        force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Get calls via get_calls with storage size parameters
     client_calls = list(
@@ -2054,7 +2048,7 @@ def test_object_version_read(client):
     # check badly formatted digests
     digests = ["v1111", "1", ""]
     for digest in digests:
-        with pytest.raises((NotFoundError, sqliteNotFoundError)):
+        with pytest.raises(NotFoundError):
             # grab non-existant version
             obj_res = client.server.obj_read(
                 tsi.ObjReadReq(
@@ -2065,7 +2059,7 @@ def test_object_version_read(client):
             )
 
     # check non-existant object_id
-    with pytest.raises((NotFoundError, sqliteNotFoundError)):
+    with pytest.raises(NotFoundError):
         obj_res = client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client.project_id,
@@ -2948,8 +2942,7 @@ def test_calls_filter_by_latency(client):
     test_id = str(uuid.uuid4())
 
     # Create calls with different latencies.
-    # Use substantial sleep differences to ensure reliable latency ordering
-    # across all backends (SQLite, ClickHouse).
+    # Use substantial sleep differences to ensure reliable latency ordering.
     fast_call = client.create_call("x-fast", {"a": 1, "b": 1, "test_id": test_id})
     time.sleep(0.05)
     client.finish_call(fast_call, "fast result")
@@ -3272,11 +3265,6 @@ def test_calls_query_hardcoded_filter_length_validation(client):
 
 def test_calls_query_datetime_optimization_with_gt_operation(client):
     """Test that datetime optimization works correctly with GT operations on started_at and ended_at fields."""
-    if client_is_sqlite(client):
-        # TODO(gst): FIX this asap. timestamps aren't actually evaluated
-        # correctly in sqlite
-        return
-
     # Use a unique test ID to identify these calls
     test_id = generate_id()
 
@@ -3565,11 +3553,6 @@ def _make_call(client, _id):
 
 def test_calls_query_with_non_uuidv7_ids(client):
     """Test that calls query works with non-uuidv7 ids."""
-    if client_is_sqlite(client):
-        # TODO(gst): FIX this asap. timestamps aren't actually evaluated
-        # correctly in sqlite
-        return
-
     # Create a call with an 8 byte hex id
     non_uuidv7_id1 = "1111111111111111"
     non_uuidv7_id2 = "2222222222222222"
@@ -3844,9 +3827,9 @@ def test_calls_query_filter_by_root_refs(client):
         assert op_name_from_call(calls[0]) == "root_op", label
         assert calls[0].inputs["x"] == expected_x, label
 
-    # Structured root JSON values should not match scalar numeric filters.
-    # SQLite's CAST('{"x":1}' AS INT) returns 0, so inferred root casts must
-    # not turn object-valued inputs into false positive scalar matches.
+    # Structured root JSON values should not match scalar numeric filters:
+    # inferred root casts must not turn object-valued inputs into false
+    # positive scalar matches.
     calls = client.get_calls(
         filter={"trace_roots_only": True},
         query={"$expr": {"$eq": [{"$getField": "inputs"}, {"$literal": 0}]}},
@@ -3925,10 +3908,9 @@ def test_calls_query_filter_by_root_refs(client):
     )
     assert len(calls) == 0
 
-    # A stored decimal-shaped string like "1.5" must not match an int literal.
-    # ClickHouse `toInt64OrNull('1.5')` returns NULL; SQLite's CAST('1.5' AS INT)
-    # truncates to 1, so the inferred-cast plain-decimal predicate must reject
-    # dotted text when the inferred cast is int.
+    # A stored decimal-shaped string like "1.5" must not match an int literal:
+    # ClickHouse `toInt64OrNull('1.5')` returns NULL, so the inferred-cast
+    # plain-decimal predicate rejects dotted text when the inferred cast is int.
     dotted_marker = "DOTTED_RED_TEST_MARKER"
     dotted_text_call = client.create_call(
         "dotted_text_op",
@@ -4077,8 +4059,6 @@ def test_filter_calls_by_ref_wildcard_versions(client):
 
 
 def test_files_stats(client):
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
 
     f_bytes = b"0" * 10000005
     client.server.file_create(

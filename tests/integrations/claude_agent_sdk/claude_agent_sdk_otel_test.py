@@ -60,6 +60,18 @@ def get_attrs(span: Any) -> dict[str, Any]:
     return dict(span.attributes) if span.attributes is not None else {}
 
 
+def check_integration_and_strip(attrs: dict[str, Any]) -> dict[str, Any]:
+    """Assert + remove the flattened integration.* provenance keys.
+
+    The agent OTel processor stamps integration provenance on every span; pop it
+    here so the exact-shape assertions below stay focused on the GenAI semconv keys.
+    """
+    assert attrs["integration.name"] == "claude_agent_sdk"
+    assert attrs["integration.version"]  # weave SDK version
+    assert attrs["integration.meta.package_name"] == "claude_agent_sdk"
+    return {k: v for k, v in attrs.items() if not k.startswith("integration.")}
+
+
 def get_spans_by_op(spans: list[Any], op: str) -> list[Any]:
     return [
         span for span in spans if get_attrs(span).get("gen_ai.operation.name") == op
@@ -112,7 +124,7 @@ async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
     # glance and any spec drift (added/removed/renamed keys) fails the test.
     agent_span = agent_spans[0]
     assert agent_span.name == "invoke_agent claude_agent_sdk"
-    assert get_attrs(agent_span) == {
+    assert check_integration_and_strip(get_attrs(agent_span)) == {
         "gen_ai.operation.name": "invoke_agent",
         "gen_ai.agent.name": "claude_agent_sdk",
         "gen_ai.provider.name": "anthropic",
@@ -128,7 +140,7 @@ async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
     }
 
     chat_span = chat_spans[0]
-    assert get_attrs(chat_span) == {
+    assert check_integration_and_strip(get_attrs(chat_span)) == {
         "gen_ai.operation.name": "chat",
         "gen_ai.provider.name": "anthropic",
         "gen_ai.conversation.id": "s-abc123",

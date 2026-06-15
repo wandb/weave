@@ -34,6 +34,7 @@ from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
 
+from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.session.session_otel import (
     execute_tool_attributes,
@@ -51,6 +52,9 @@ _AGENT_NAME = "claude_agent_sdk"
 _PROVIDER_NAME = "anthropic"
 
 _claude_agent_sdk_otel_patcher: MultiPatcher | None = None
+
+# Integration provenance, flattened once for OTel span attributes (scalars only).
+_INTEGRATION_OTEL_ATTRS = library_integration("claude_agent_sdk").as_otel_attributes()
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,6 +220,7 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             output_messages=[output.message],
             reasoning=output.reasoning if output.reasoning.content else None,
         )
+        chat_attrs.update(_INTEGRATION_OTEL_ATTRS)
         state.pending_chat = _PendingChat(span=chat, attrs=chat_attrs)
         state.accumulated.append(output.message)
 
@@ -247,6 +252,7 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
                 tool_call_result=str(block.content),
                 tool_call_id=block.tool_use_id,
             )
+            attrs.update(_INTEGRATION_OTEL_ATTRS)
             for key, value in attrs.items():
                 open_tool.span.set_attribute(key, value)
             if block.is_error:
@@ -282,6 +288,7 @@ def _finalize_turn(root: Any, state: _TurnState) -> None:
         if state.final_text
         else None,
     )
+    attrs.update(_INTEGRATION_OTEL_ATTRS)
     for key, value in attrs.items():
         root.set_attribute(key, value)
     if state.is_error:

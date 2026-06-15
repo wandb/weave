@@ -159,10 +159,19 @@ When developing a new integration, it will automatically work with both implicit
    import importlib
 
    import weave
+   from weave.integrations.integration_metadata import (
+       library_integration,
+       with_integration_metadata,
+   )
    from weave.integrations.patcher import SymbolPatcher, MultiPatcher, NoOpPatcher
    from weave.trace.autopatch import IntegrationSettings
 
    _<vendor>_patcher: MultiPatcher | None = None
+
+   # Integration-tracking provenance stamped onto every call this integration
+   # produces, under `attributes["integration"]`. Pass `distribution_name=` when
+   # the PyPI package name differs from the integration name.
+   <VENDOR>_INTEGRATION = library_integration("<vendor>")
 
    def get_<vendor>_patcher(
        settings: IntegrationSettings | None = None,
@@ -177,7 +186,9 @@ When developing a new integration, it will automatically work with both implicit
        if _<vendor>_patcher is not None:
            return _<vendor>_patcher
 
-       base = settings.op_settings
+       # Thread integration metadata through the base op settings; every op
+       # derived from `base` via `model_copy` inherits it automatically.
+       base = with_integration_metadata(settings.op_settings, <VENDOR>_INTEGRATION)
        # Configure settings for the operation
        op_settings = base.model_copy(
            update={"name": base.name or "<vendor>.operation_name"}

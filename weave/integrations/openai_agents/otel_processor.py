@@ -62,6 +62,7 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
 
 from weave.integrations.openai_agents.openai_agents import (
+    OPENAI_AGENTS_INTEGRATION,
     _call_name,
     _is_task_span_data,
     _is_turn_span_data,
@@ -539,6 +540,8 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         )
         otel_span.set_attribute(f"{_WEAVE_ATTR_PREFIX}.span_id", span.span_id)
         otel_span.set_attribute(f"{_WEAVE_ATTR_PREFIX}.trace_id", span.trace_id)
+        # Stamp integration provenance on every span (flattened for OTel).
+        _set_attrs(otel_span, OPENAI_AGENTS_INTEGRATION.as_otel_attributes())
         self._span_otel[span.span_id] = otel_span
         self._trace_spans.setdefault(span.trace_id, {})[span.span_id] = None
         # Attach so any span the user creates inside an Agents-SDK span nests

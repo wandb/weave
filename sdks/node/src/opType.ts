@@ -1,6 +1,6 @@
-import {Call} from './call';
+import {type Call} from './call';
 import {getGlobalDomain} from './urls';
-import {WeaveObject} from './weaveObject';
+import {type WeaveObject} from './weaveObject';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 
@@ -68,6 +68,12 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   opKind?: string;
   /** Custom color for the operation in the UI */
   opColor?: string;
+  /**
+   * Default attributes applied to every call this op creates. Integrations set
+   * this to stamp `attributes.integration` provenance. Merged beneath `kind`/
+   * `color`, which take precedence on key collision.
+   */
+  attributes?: Record<string, any>;
 }
 
 type AsyncResult<F extends (...args: any[]) => any> = Promise<
@@ -97,10 +103,6 @@ export function getOpWrappedFunction<T extends (...args: any[]) => any>(
 
 export function getOpName(opValue: Op<any>): string {
   return opValue.__name;
-}
-
-export function getOpParameterNames(opValue: Op<any>): ParameterNamesOption {
-  return opValue.__parameterNames;
 }
 
 export class OpRef {

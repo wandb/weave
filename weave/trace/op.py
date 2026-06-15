@@ -224,6 +224,7 @@ class OpKwargs(TypedDict, total=False):
     accumulator: Callable[[Any | None, Any], Any] | None
     kind: OpKind | None
     color: OpColor | None
+    attributes: dict[str, Any] | None
     eager_call_start: bool
 
 
@@ -386,6 +387,11 @@ def _create_call(
     from weave.trace.serialization.serialize import dictify
 
     attributes = dictify(call_attributes.get())
+
+    # Op-level default attributes are the lowest precedence: a `weave.attributes()`
+    # context and explicit per-call attributes both override them on key collision.
+    if func.attributes:
+        attributes = {**func.attributes, **attributes}
 
     if call_attrs is not None:
         attributes = {**attributes, **call_attrs}
@@ -1243,6 +1249,7 @@ def op(
     accumulator: Callable[[Any | None, Any], Any] | None = None,
     kind: OpKind | None = None,
     color: OpColor | None = None,
+    attributes: dict[str, Any] | None = None,
     eager_call_start: bool = False,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """A decorator to weave op-ify a function or method. Works for both sync and async.
@@ -1257,6 +1264,10 @@ def op(
         tracing_sample_rate: Fraction of calls to trace (0.0 to 1.0).
         enable_code_capture: Whether to capture source code for this op.
         accumulator: Function to accumulate results for streaming ops.
+        attributes: Default attributes merged into every call this op creates,
+            at the lowest precedence. A `weave.attributes()` context and explicit
+            per-call attributes override them on key collision. The reserved
+            "weave" key may not be set here.
         eager_call_start: If True, call starts are sent immediately rather than batched.
             Useful for long-running operations like evaluations that should
             be visible in the UI immediately.
@@ -1265,6 +1276,11 @@ def op(
         raise TypeError("tracing_sample_rate must be a float")
     if not 0 <= tracing_sample_rate <= 1:
         raise ValueError("tracing_sample_rate must be between 0 and 1")
+    if attributes is not None and "weave" in attributes:
+        raise ValueError(
+            "op `attributes` cannot set the reserved 'weave' key; "
+            "it is managed internally by Weave."
+        )
 
     def op_deco(func: Callable[P, R]) -> Op[P, R]:
         # Check function type
@@ -1367,6 +1383,7 @@ def op(
 
             wrapper.kind = kind  # type: ignore
             wrapper.color = color  # type: ignore
+            wrapper.attributes = attributes  # type: ignore
 
             # Set `__signature__` so future `inspect.signature(wrapper)` calls
             # short-circuit to this object instead of re-walking `func`.

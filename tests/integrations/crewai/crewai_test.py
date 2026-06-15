@@ -129,7 +129,6 @@ def get_flow_with_router_or():
     return support_flow
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -139,6 +138,18 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
 
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
+
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    # The crew also drives litellm/openai sub-calls, which carry their own metadata,
+    # so filter to the crewai-stamped calls before asserting their shape.
+    stamped = [
+        c.attributes["integration"]
+        for c, _ in flattened_calls
+        if "integration" in c.attributes
+    ]
+    crewai_meta = [i for i in stamped if i["name"] == "crewai"]
+    assert crewai_meta, "expected >=1 call to carry crewai metadata"
+    assert all(i["meta"]["package_name"] == "crewai" for i in crewai_meta)
 
     assert len(flattened_calls) == 6
 
@@ -261,7 +272,6 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -304,7 +314,6 @@ def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -336,7 +345,6 @@ async def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -383,7 +391,6 @@ async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) ->
     assert len(outputs) == 2
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )

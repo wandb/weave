@@ -9,10 +9,15 @@ from weave.integrations.instructor.instructor_iterable_utils import (
 from weave.integrations.instructor.instructor_partial_utils import (
     instructor_wrapper_partial,
 )
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 
 _instructor_patcher: MultiPatcher | None = None
+INSTRUCTOR_INTEGRATION = library_integration("instructor")
 
 
 def get_instructor_patcher(
@@ -28,7 +33,7 @@ def get_instructor_patcher(
     if _instructor_patcher is not None:
         return _instructor_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, INSTRUCTOR_INTEGRATION)
 
     create_settings = base.model_copy(
         update={

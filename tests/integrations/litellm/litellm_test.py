@@ -52,7 +52,6 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
     openai_patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_litellm_quickstart(
     client: weave.trace.weave_client.WeaveClient, patch_litellm: None
@@ -73,6 +72,11 @@ def test_litellm_quickstart(
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "litellm"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "litellm"
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -91,7 +95,6 @@ def test_litellm_quickstart(
     assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 44
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_litellm_quickstart_async(
@@ -113,6 +116,11 @@ async def test_litellm_quickstart_async(
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "litellm"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "litellm"
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -132,7 +140,6 @@ async def test_litellm_quickstart_async(
     assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 48
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_litellm_quickstart_stream(
     client: weave.trace.weave_client.WeaveClient, patch_litellm: None
@@ -179,7 +186,6 @@ def test_litellm_quickstart_stream(
         assert model_usage["total_tokens"] == 44
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_litellm_quickstart_stream_async(
@@ -226,7 +232,6 @@ async def test_litellm_quickstart_stream_async(
         assert model_usage["total_tokens"] == 54
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )

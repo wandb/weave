@@ -293,7 +293,6 @@ def mock_invoke_agent_make_api_call(
     return orig(self, operation_name, api_params)
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
 def test_bedrock_converse(
@@ -326,6 +325,12 @@ def test_bedrock_converse(
     assert call.exception is None
     assert call.ended_at is not None
 
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "bedrock"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "boto3"
+
     # Inspect the captured output if desired
     output = call.output
 
@@ -348,7 +353,6 @@ def test_bedrock_converse(
     assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 70
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
 def test_bedrock_converse_stream(
@@ -403,7 +407,6 @@ def test_bedrock_converse_stream(
     assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 85
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
@@ -455,7 +458,6 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
     assert model_usage["requests"] == 1
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -> None:
     from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
@@ -531,7 +533,6 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         assert result.metadata["usage"]["totalTokens"] == 55
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_invoke_exception_handling(
     client: weave.trace.weave_client.WeaveClient,
@@ -581,7 +582,6 @@ def test_bedrock_invoke_exception_handling(
     assert call.output is None
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_agent_invoke_agent(
     client: weave.trace.weave_client.WeaveClient,

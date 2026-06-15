@@ -128,6 +128,7 @@ jobs:
             --env CLICKHOUSE_PASSWORD= \
             --env CLICKHOUSE_DB=default \
             --publish 8123:8123 \
+            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro \
             "$image"
           for _i in {1..30}; do
             if wget -q -O- 'http://localhost:8123/ping' >/dev/null; then
@@ -167,7 +168,7 @@ jobs:
           else
             echo "needs_markers=false" >> $GITHUB_OUTPUT
           fi
-      - name: Run nox (Sqlite Trace Server)
+      - name: Run nox (Clickhouse Trace Server)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
         env:
           WEAVE_SENTRY_ENV: ci
@@ -185,22 +186,7 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server" \
-            --trace-server=sqlite
-      - name: Run nox (Clickhouse Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
-        run: |
-          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
+            -m "trace_server"
       - name: Run nox (No marker filters for integration-only shards)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
         env:

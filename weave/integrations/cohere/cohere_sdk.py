@@ -14,6 +14,10 @@ from cohere.types.usage import Usage
 from cohere.v2.types.v2chat_response import V2ChatResponse
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
@@ -23,6 +27,8 @@ if TYPE_CHECKING:
 
 
 _cohere_patcher: MultiPatcher | None = None
+
+COHERE_INTEGRATION = library_integration("cohere")
 
 
 def cohere_accumulator(acc: dict | None, value: Any) -> NonStreamedChatResponse:
@@ -209,7 +215,7 @@ def get_cohere_patcher(
     if _cohere_patcher is not None:
         return _cohere_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, COHERE_INTEGRATION)
 
     chat_settings = base.model_copy(
         update={

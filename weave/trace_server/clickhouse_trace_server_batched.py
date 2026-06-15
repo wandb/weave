@@ -214,6 +214,9 @@ from weave.trace_server.llm_completion import (
     resolve_and_apply_prompt,
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
+from weave.trace_server.methods.feedback_aggregate import (
+    feedback_aggregate as feedback_aggregate_handler,
+)
 from weave.trace_server.methods.feedback_stats import (
     feedback_payload_schema as feedback_payload_schema_handler,
 )
@@ -1466,6 +1469,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Also includes window-level stats (min, max, avg, percentiles) over the full range.
         """
         return feedback_stats_handler(self, req)
+
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Query the feedback table for aggregate scores over time."""
+        return feedback_aggregate_handler(self, req)
 
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
@@ -3389,7 +3398,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_position=req.include_position,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
 
         items = []
         for row in result.named_results():
@@ -3434,7 +3443,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
 
         stats = []
         for row in result.result_rows:
@@ -3465,7 +3474,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             offset=None,
             include_position=False,
         )
-        fetch_result = self.ch_client.query(fetch_query, parameters=pb.get_params())
+        fetch_result = self._query(fetch_query, pb.get_params())
 
         for row in fetch_result.named_results():
             item = tsi.AnnotationQueueItemSchema(
@@ -3669,7 +3678,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns the actual source code of the op.
         """
 
-        def _query_op() -> list[Any]:
+        def _query_op() -> list[SelectableCHObjSchema]:
             object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
             object_query_builder.add_is_op_condition(True)
             object_query_builder.add_object_ids_condition([req.object_id])
@@ -6245,9 +6254,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             costs.append((cost_id, llm_id))
 
-            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
-                database_type="clickhouse"
-            )
+            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare()
             self._insert(
                 LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
             )
@@ -6281,10 +6288,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.where(query_with_pricing_level)
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
-        prepared = query.prepare(database_type="clickhouse")
+        prepared = query.prepare()
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
-            query_result.result_rows, prepared.fields, database_type="clickhouse"
+            query_result.result_rows, prepared.fields
         )
         return tsi.CostQueryRes(results=results)
 
@@ -6313,7 +6320,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = LLM_TOKEN_PRICES_TABLE.purge()
         query = query.where(query_with_pricing_level)
         prepared = query.prepare(
-            database_type="clickhouse",
             table_name=self._mutation_table_name(LLM_TOKEN_PRICES_TABLE.name),
             cluster_name=self._mutation_cluster_name(),
         )
@@ -6331,7 +6337,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
-        prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
+        prepared = TABLE_FEEDBACK.insert(row).prepare()
         self._insert(
             TABLE_FEEDBACK.name,
             prepared.data,
@@ -6367,7 +6373,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             insert_query = TABLE_FEEDBACK.insert()
             for row in rows_to_insert:
                 insert_query.row(row)
-            prepared = insert_query.prepare(database_type="clickhouse")
+            prepared = insert_query.prepare()
             self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
 
         return tsi.FeedbackCreateBatchRes(res=results)
@@ -6379,10 +6385,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.where(req.query)
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
-        prepared = query.prepare(database_type="clickhouse")
+        prepared = query.prepare()
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
-            query_result.result_rows, prepared.fields, database_type="clickhouse"
+            query_result.result_rows, prepared.fields
         )
         # Make `created_at` tz-aware (otherwise the client will assume local time)
         for row in result:
@@ -6400,7 +6406,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.project_id(req.project_id)
         query = query.where(req.query)
         prepared = query.prepare(
-            database_type="clickhouse",
             table_name=self._mutation_table_name(TABLE_FEEDBACK.name),
             cluster_name=self._mutation_cluster_name(),
         )

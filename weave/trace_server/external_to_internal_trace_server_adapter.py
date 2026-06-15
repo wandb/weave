@@ -636,6 +636,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.feedback_stats, req, req.project_id
         )
 
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Query the feedback table for aggregate scores over time."""
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.feedback_aggregate, req, req.project_id
+        )
+
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
     ) -> tsi.FeedbackPayloadSchemaRes:

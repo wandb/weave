@@ -20,7 +20,6 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
-from tests.trace.util import client_is_sqlite
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
@@ -266,13 +265,11 @@ def test_otel_export_multiple_processed_spans(client: weave_client.WeaveClient):
         assert sid in ingested_ids
 
     # In clickhouse, every call's op_name must be a valid ref URI, not a
-    # mangled/re-sanitized name.  The sqlite server doesn't do op object
-    # resolution, so we skip this assertion there.
-    if not client_is_sqlite(client):
-        for call in res.calls:
-            assert call.op_name.startswith("weave:///"), (
-                f"op_name should be a ref URI, got: {call.op_name}"
-            )
+    # mangled/re-sanitized name.
+    for call in res.calls:
+        assert call.op_name.startswith("weave:///"), (
+            f"op_name should be a ref URI, got: {call.op_name}"
+        )
 
 
 def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
@@ -404,6 +401,27 @@ class TestPythonSpans:
         assert len(array_value) == 2
         assert array_value[0] == "value1"
         assert array_value[1] == "value2"
+
+    def test_span_from_proto_parent_id_normalization(self):
+        """Test that empty and all-zero parent_span_id values normalize to None."""
+        # All-zero parent_span_id is the OTel invalid-id sentinel; must mean no parent.
+        pb_span = create_test_span()
+        pb_span.parent_span_id = b"\x00" * 8
+        assert PySpan.from_proto(pb_span).parent_id is None, (
+            "all-zero parent_span_id should yield parent_id=None"
+        )
+
+        pb_span = create_test_span()
+        pb_span.parent_span_id = b""
+        assert PySpan.from_proto(pb_span).parent_id is None, (
+            "empty parent_span_id should yield parent_id=None"
+        )
+
+        pb_span = create_test_span()
+        pb_span.parent_span_id = bytes.fromhex("0123456789abcdef")
+        assert PySpan.from_proto(pb_span).parent_id == "0123456789abcdef", (
+            "real parent_span_id should hex-encode to parent_id"
+        )
 
     def test_span_to_call(self):
         """Test converting a Python Span to Weave Calls."""
@@ -1477,10 +1495,6 @@ class TestSemanticConventionParsing:
 
     def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
         """Test that costs are properly calculated for OTEL spans with usage at query time."""
-        if client_is_sqlite(client):
-            # SQLite does not support costs
-            return
-
         project_id = client.project_id
 
         # Create span with gpt-4 model and usage

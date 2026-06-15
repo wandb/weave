@@ -934,6 +934,18 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Query the feedback table for aggregate scores over time."""
+        return self._generic_request(
+            "/feedback/aggregate",
+            req,
+            tsi.FeedbackAggregateReq,
+            tsi.FeedbackAggregateRes,
+        )
+
+    @validate_call
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
     ) -> tsi.FeedbackPayloadSchemaRes:

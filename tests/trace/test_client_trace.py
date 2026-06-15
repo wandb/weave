@@ -26,12 +26,12 @@ from tests.trace.util import (
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
-    client_is_sqlite,
     get_info_loglines,
 )
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
+from tests.trace_server.helpers import force_optimize
 from weave import Thread, ThreadPoolExecutor
 from weave.shared.refs_internal import extra_value_quoter
 from weave.shared.trace_server_interface_util import (
@@ -1166,10 +1166,6 @@ def test_trace_call_sort(client):
 
 
 def test_trace_call_sort_with_mixed_types(client):
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # SQLite does not support sorting over mixed types in a column, so we skip this test
-        return
 
     @weave.op
     def basic_op(in_val: dict) -> dict:
@@ -1211,8 +1207,6 @@ def test_trace_call_sort_with_mixed_types(client):
 
 
 def test_trace_call_filter(client):
-    is_sqlite = client_is_sqlite(client)
-
     @weave.op
     def basic_op(in_val: dict, delay) -> dict:
         return in_val
@@ -1311,10 +1305,7 @@ def test_trace_call_filter(client):
         ),
         # not gt = lte
         (
-            6
-            + (
-                1 if is_sqlite else 0
-            ),  # SQLite casting transforms strings to 0, instead of NULL
+            6,
             {
                 "$not": [
                     {
@@ -1333,10 +1324,7 @@ def test_trace_call_filter(client):
         ),
         # not gte = lt
         (
-            5
-            + (
-                1 if is_sqlite else 0
-            ),  # SQLite casting transforms strings to 0, instead of NULL
+            5,
             {
                 "$not": [
                     {
@@ -1355,10 +1343,7 @@ def test_trace_call_filter(client):
         ),
         # like all
         (
-            13
-            + (
-                -2 if is_sqlite else 0
-            ),  # SQLite returns NULL for non-existent fields rather than ''.
+            13,
             {
                 "$contains": {
                     "input": {"$getField": "inputs.in_val.str"},
@@ -1433,10 +1418,7 @@ def test_trace_call_filter(client):
         ),
         # or
         (
-            5
-            + (
-                1 if is_sqlite else 0
-            ),  # SQLite casting transforms strings to 0, instead of NULL
+            5,
             {
                 "$or": [
                     {
@@ -1570,10 +1552,7 @@ def test_trace_call_filter(client):
         ),
         # Negative integer literal - all 10 numeric rows (0-9) are >= -1
         (
-            10
-            + (
-                1 if is_sqlite else 0
-            ),  # SQLite casting transforms strings to 0, instead of NULL
+            10,
             {
                 "$gte": [
                     {
@@ -2864,9 +2843,6 @@ def test_call_query_stream_trace_name_column_with_costs(client):
 
 
 def test_read_call_start_with_cost(client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
 
     project_id = client.project_id
     call_id = generate_id()
@@ -3630,7 +3606,7 @@ def test_calls_stream_feedback(client):
 def test_feedback_filter_finds_minority_reaction(client):
     """Regression test-ish: filtering by emoji must check all reactions, not pick one arbitrarily.
 
-    previously `anyIf` (clickhouse) / `LIMIT 1` (sqlite) would pick one reaction per call, leading to unpredictable results when filtering by reaction.
+    previously `anyIf` would pick one reaction per call, leading to unpredictable results when filtering by reaction.
     this test has a 10% chance of passing on the original implementation, but will always pass on the groupArrayIf implementation.
     """
 
@@ -3763,10 +3739,6 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
 
 
 def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to strip in sqlite
-        return
 
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
     max_size = 10 * 1024
@@ -4253,22 +4225,10 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
     assert calls[0].output["a"]["b"]["c"]["d"] == 1
 
     # now make sure we don't make duplicate selects
-    if client_is_sqlite(client):
-        select_queries = [
-            line
-            for line in capsys.readouterr().out.split("\n")
-            if line.startswith("QUERY SELECT")
-        ]
-        for query in select_queries:
-            assert query.count("output") == 1
-    else:
-        select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[
-            0
-        ]
-        assert (
-            select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
-            == 1
-        )
+    select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[0]
+    assert (
+        select_query["query"].count("any(calls_merged.output_dump) AS output_dump") == 1
+    )
 
 
 def test_calls_stream_heavy_condition_aggregation_parts(client):
@@ -4448,8 +4408,6 @@ def clickhouse_client(client):
 
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with storage size information."""
-    if client_is_sqlite(client):
-        pytest.skip("Skipping test for sqlite clients")
 
     @weave.op
     def test_op(x: dict):
@@ -4462,9 +4420,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with storage size
     calls = list(
@@ -4485,8 +4441,6 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
 
 def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
-    if client_is_sqlite(client):
-        pytest.skip("Skipping test for sqlite clients")
 
     @weave.op
     def parent_op(x: dict):
@@ -4503,9 +4457,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4540,8 +4492,6 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
 
 def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
-    if client_is_sqlite(client):
-        pytest.skip("Skipping test for sqlite clients")
 
     @weave.op
     def parent_op(x: dict):
@@ -4558,9 +4508,7 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4635,9 +4583,6 @@ def test_calls_hydrated(client):
 
 def test_obj_query_with_storage_size_clickhouse(client):
     """Test querying objects with storage size information."""
-    if client_is_sqlite(client):
-        pytest.skip("Skipping test for sqlite clients")
-
     # Create a test object with some data to ensure it has size
     dataset = weave.Dataset(name="test_dataset", rows=[{"key": "value" * 1000}])
     weave.publish(dataset)
@@ -4705,13 +4650,8 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    if not client_is_sqlite(client):
-        clickhouse_client.command(
-            "OPTIMIZE TABLE calls_merged FINAL",
-        )
-        clickhouse_client.command(
-            "OPTIMIZE TABLE calls_merged_stats FINAL",
-        )
+    force_optimize(clickhouse_client, "calls_merged")
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
@@ -4743,9 +4683,6 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
 
 
 def test_call_query_stream_with_invalid_filter_field(client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
 
     with pytest.raises(InvalidFieldError):
         res = get_client_trace_server(client).calls_query(
@@ -4927,12 +4864,78 @@ def test_calls_query_stats_with_limit(client):
     assert result.total_storage_size_bytes is not None
 
 
+def test_calls_query_stats_unfiltered_storage_counts_deleted_bytes(
+    client, clickhouse_client
+):
+    """Unfiltered storage stats: count drops soft-deleted, storage keeps their bytes."""
+    if clickhouse_client is None:
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def child(x: dict):
+        return x
+
+    @weave.op
+    def parent(x: dict):
+        return child(x)
+
+    for _ in range(3):
+        parent({"data": "x" * 2000})
+
+    project_id = get_client_project_id(client)
+
+    def optimize():
+        # Optimize both residences' tables so the test is deterministic under
+        # the calls_merged and calls_complete (WEAVE_USE_CALLS_COMPLETE) shards.
+        for table in (
+            "calls_merged",
+            "calls_merged_stats",
+            "calls_complete",
+            "calls_complete_stats",
+        ):
+            force_optimize(clickhouse_client, table)
+
+    optimize()
+
+    def stats():
+        res = client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id=project_id, include_total_storage_size=True
+            )
+        )
+        return res.count, res.total_storage_size_bytes
+
+    count_before, storage_before = stats()
+    assert count_before == 6
+    assert storage_before > 0
+
+    roots = [c for c in client.get_calls() if c.parent_id is None]
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[roots[0].id])
+    )
+    optimize()
+
+    count_after, storage_after = stats()
+    assert count_after == 4
+    assert storage_after == storage_before
+
+    # Divergence: a filter routes through the GROUP BY + JOIN path, which DOES
+    # exclude the soft-deleted trace's bytes (unlike the unfiltered flat sum).
+    live_op_names = sorted({c.op_name for c in client.get_calls()})
+    filtered = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=project_id,
+            include_total_storage_size=True,
+            filter=tsi.CallsFilter(op_names=live_op_names),
+        )
+    )
+    assert filtered.total_storage_size_bytes < storage_before
+
+
 def test_calls_query_stats_started_at_window_excludes_deletes(client):
-    """A started_at lower-bound count must match across backends and exclude
-    soft-deleted calls and orphaned call-ends. On ClickHouse this exercises the
-    windowed distinct-id fast path; on SQLite it exercises the reference
-    implementation, so equal results pin the optimization to the GROUP BY
-    semantics.
+    """A started_at lower-bound count must exclude soft-deleted calls and
+    orphaned call-ends. This exercises the windowed distinct-id fast path,
+    pinning the optimization to the GROUP BY semantics.
     """
 
     @weave.op
@@ -5090,8 +5093,6 @@ def test_calls_query_thread_ids_filter_returns_matching_thread(client):
 
 def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
-    if client_is_sqlite(client):
-        pytest.skip("Skipping test for sqlite clients")
 
     @weave.op
     def parent_op(x: dict):
@@ -5108,9 +5109,7 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Query with total storage size
     result = client.server.calls_query_stats(
@@ -5129,8 +5128,6 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
 
 
 def test_project_stats_clickhouse(client, clickhouse_client):
-    if client_is_sqlite(client):
-        pytest.skip("Skipping test for sqlite clients")
 
     project_id = get_client_project_id(client)
     internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
@@ -5849,11 +5846,6 @@ def test_threads_query_endpoint(client):
 
 def test_threads_query_aggregation_fields(client):
     """Test the new aggregation fields in threads query: first_turn_id, last_turn_id, and duration percentiles."""
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # SQLite does not support sorting over mixed types in a column, so we skip this test
-        return
-
     import time
 
     import weave
