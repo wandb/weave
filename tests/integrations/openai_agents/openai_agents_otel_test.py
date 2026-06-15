@@ -215,34 +215,26 @@ def test_agent_span_carries_provider_name(
 
 
 def test_agent_name_override_wins_over_native(
-    client: WeaveClient, otel_spans: InMemorySpanExporter
+    otel_spans: InMemorySpanExporter,
 ) -> None:
-    """An explicit override replaces the SDK-native agent name on the span."""
-    processor = WeaveOtelTracingProcessor()
-    trace = Mock(spec=Trace)
-    trace.trace_id = "trace_o"
-    trace.name = "wf"
-    trace.group_id = None
-
+    """An override replaces the SDK-native agent name on the emitted span."""
     agent_span = Mock(spec=Span)
-    agent_span.trace_id = "trace_o"
-    agent_span.span_id = "span_o"
-    agent_span.parent_id = None
     agent_span.span_data = AgentSpanData(name="Bot")
-    agent_span.started_at = None
-    agent_span.ended_at = None
-    agent_span.error = None
+    agent_span.span_id = "s1"
+    agent_span.trace_id = "t1"
+    agent_span.parent_id = None
+    # Timing/error aren't asserted here, but the processor reads them.
+    agent_span.started_at = agent_span.ended_at = agent_span.error = None
 
-    # The name is resolved at span start/end, so the override must be active then.
+    processor = WeaveOtelTracingProcessor()
     with agent_name_override("research_agent"):
-        processor.on_trace_start(trace)
         processor.on_span_start(agent_span)
         processor.on_span_end(agent_span)
-        processor.on_trace_end(trace)
 
-    spans = otel_spans.get_finished_spans()
     agent = next(
-        s for s in spans if _attrs(s).get("gen_ai.operation.name") == "invoke_agent"
+        s
+        for s in otel_spans.get_finished_spans()
+        if _attrs(s).get("gen_ai.operation.name") == "invoke_agent"
     )
     assert agent.name == "invoke_agent research_agent"
     assert _attrs(agent)["gen_ai.agent.name"] == "research_agent"

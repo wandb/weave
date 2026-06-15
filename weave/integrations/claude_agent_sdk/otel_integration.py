@@ -42,7 +42,7 @@ from opentelemetry.trace import StatusCode
 
 from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.session.agent_context import resolve_agent_name
+from weave.session.agent_context import resolve_agent_name_or_default
 from weave.session.session_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
@@ -321,7 +321,7 @@ async def _trace_turn(
     tracer = _tracer()
     # Resolve once here: this runs on the first __anext__, inside the user's
     # ``agent_name_override(...)`` block, so the override contextvar is visible.
-    agent_name = resolve_agent_name(_DEFAULT_AGENT_NAME)
+    agent_name = resolve_agent_name_or_default(_DEFAULT_AGENT_NAME)
     root = tracer.start_span(f"invoke_agent {agent_name}")
     token = otel_context.attach(otel_trace.set_span_in_context(root))
     state = _TurnState(user_prompt=user_prompt, agent_name=agent_name)

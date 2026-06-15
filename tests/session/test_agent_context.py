@@ -1,7 +1,15 @@
 """Unit tests for the generic agent-name override.
 
-Exercises ``weave.session.agent_name_override`` and the internal
-``resolve_agent_name`` resolver that auto-instrumentation integrations call.
+These exercise the integration-agnostic mechanism only:
+``weave.session.agent_name_override`` (the public context manager) and the
+internal ``resolve_agent_name_or_default(default)`` that auto-instrumentation integrations
+call when naming their ``invoke_agent`` span.
+
+``resolve_agent_name_or_default(default)`` returns the user's active override
+when one is set, otherwise the ``default`` name the calling integration would use
+on its own (claude uses ``"claude_agent_sdk"``; openai_agents uses the SDK-native
+agent name). The agent names below are illustrative — the resolver is
+integration-agnostic and doesn't know who is calling.
 """
 
 from __future__ import annotations
@@ -9,28 +17,42 @@ from __future__ import annotations
 import pytest
 
 from weave.session import agent_name_override
-from weave.session.agent_context import resolve_agent_name
+from weave.session.agent_context import resolve_agent_name_or_default
 
 
-def test_resolve_returns_default_when_unset() -> None:
-    assert resolve_agent_name("claude_agent_sdk") == "claude_agent_sdk"
+def test_no_override_keeps_the_default_name() -> None:
+    # No override active: the agent keeps the default name it would otherwise get.
+    assert resolve_agent_name_or_default("default_agent_name") == "default_agent_name"
 
 
-def test_override_wins_over_default_and_native_name() -> None:
-    with agent_name_override("researcher"):
-        # over an integration default...
-        assert resolve_agent_name("claude_agent_sdk") == "researcher"
-        # ...and over a non-empty SDK-native name.
-        assert resolve_agent_name("Assistant") == "researcher"
+def test_override_replaces_the_default_name() -> None:
+    # A user labels their agent; that name is what gets used...
+    with agent_name_override("research_agent"):
+        assert resolve_agent_name_or_default("default_agent_name") == "research_agent"
+        # ...and it wins no matter what default the integration would have used.
+        assert (
+            resolve_agent_name_or_default("customer_support_agent") == "research_agent"
+        )
 
 
 def test_nested_overrides_restore_outer_then_default() -> None:
-    with agent_name_override("outer"):
-        assert resolve_agent_name("d") == "outer"
-        with agent_name_override("inner"):
-            assert resolve_agent_name("d") == "inner"
-        assert resolve_agent_name("d") == "outer"
-    assert resolve_agent_name("d") == "d"
+    with agent_name_override("research_agent"):
+        assert resolve_agent_name_or_default("default_agent_name") == "research_agent"
+        with agent_name_override("summarizer_agent"):
+            assert (
+                resolve_agent_name_or_default("default_agent_name")
+                == "summarizer_agent"
+            )
+        assert resolve_agent_name_or_default("default_agent_name") == "research_agent"
+    assert resolve_agent_name_or_default("default_agent_name") == "default_agent_name"
+
+
+def test_none_default_coalesces_to_empty_string() -> None:
+    # An integration that didn't name the agent passes None; the resolver returns
+    # "" so callers never have to write `or ""`. An override still wins.
+    assert resolve_agent_name_or_default(None) == ""
+    with agent_name_override("research_agent"):
+        assert resolve_agent_name_or_default(None) == "research_agent"
 
 
 @pytest.mark.parametrize("bad_name", ["", "   ", "\n\t"])

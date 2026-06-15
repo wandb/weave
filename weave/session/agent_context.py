@@ -55,11 +55,15 @@ def agent_name_override(agent_name: str) -> Iterator[None]:
         _current_agent_name.reset(token)
 
 
-def resolve_agent_name(default: str) -> str:
-    """Return the ambient override if one is set, else ``default``.
+def resolve_agent_name_or_default(default: str | None) -> str:
+    """Return the active override if one is set, else ``default`` (or ``""``).
 
     Precedence at an auto-instrumentation call site: explicit override >
-    integration-native name (passed as ``default``) > integration default.
+    integration-native name (passed as ``default``) > ``""``. ``default`` may be
+    ``None`` (e.g. an SDK that didn't name the agent); it is coalesced to ``""``
+    so callers never have to, and the return is always a ``str``.
     """
     override = _current_agent_name.get()
-    return override if override is not None else default
+    if override is not None:
+        return override
+    return default or ""
