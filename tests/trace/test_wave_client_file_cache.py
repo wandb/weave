@@ -14,387 +14,243 @@ from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateR
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 
-class TestThreadSafeLRUCache:
-    """Test the ThreadSafeLRUCache class."""
-
-    def test_init_default(self):
-        """Test that the cache initializes with default max_size."""
-        cache = ThreadSafeLRUCache()
-        assert cache.max_size == 1000
-
-    def test_init_custom_size(self):
-        """Test that the cache initializes with custom max_size."""
-        cache = ThreadSafeLRUCache(max_size=100)
-        assert cache.max_size == 100
-
-    def test_init_zero_size(self):
-        """Test that the cache initializes with zero max_size (unlimited)."""
-        cache = ThreadSafeLRUCache(max_size=0)
-        assert cache.max_size == 0
-
-    def test_init_negative_size(self):
-        """Test that negative max_size is handled correctly (converted to 0)."""
-        cache = ThreadSafeLRUCache(max_size=-10)
-        assert cache.max_size == 0
-
-    def test_put_get_basic(self):
-        """Test basic put and get operations."""
-        cache = ThreadSafeLRUCache()
-        cache.put("key1", "value1")
-        assert cache.get("key1") == "value1"
-
-    def test_get_nonexistent(self):
-        """Test get on a non-existent key."""
-        cache = ThreadSafeLRUCache()
-        assert cache.get("nonexistent") is None
-
-    def test_put_update(self):
-        """Test updating an existing key."""
-        cache = ThreadSafeLRUCache()
-        cache.put("key1", "value1")
-        cache.put("key1", "value2")
-        assert cache.get("key1") == "value2"
-
-    def test_delete(self):
-        """Test deleting a key."""
-        cache = ThreadSafeLRUCache()
-        cache.put("key1", "value1")
-        cache.delete("key1")
-        assert cache.get("key1") is None
-
-    def test_delete_nonexistent(self):
-        """Test deleting a non-existent key (should not raise an error)."""
-        cache = ThreadSafeLRUCache()
-        cache.delete("nonexistent")  # Should not raise an error
-
-    def test_contains(self):
-        """Test the contains method."""
-        cache = ThreadSafeLRUCache()
-        cache.put("key1", "value1")
-        assert cache.contains("key1") is True
-        assert cache.contains("nonexistent") is False
-
-    def test_clear(self):
-        """Test clearing the cache."""
-        cache = ThreadSafeLRUCache()
-        cache.put("key1", "value1")
-        cache.put("key2", "value2")
-        cache.clear()
-        assert cache.size() == 0
-        assert cache.get("key1") is None
-        assert cache.get("key2") is None
-
-    def test_size(self):
-        """Test the size method."""
-        cache = ThreadSafeLRUCache()
-        assert cache.size() == 0
-        cache.put("key1", "value1")
-        assert cache.size() == 1
-        cache.put("key2", "value2")
-        assert cache.size() == 2
-        cache.delete("key1")
-        assert cache.size() == 1
-        cache.clear()
-        assert cache.size() == 0
-
-    def test_max_size_property(self):
-        """Test getting and setting the max_size property."""
-        cache = ThreadSafeLRUCache(max_size=100)
-        assert cache.max_size == 100
-        cache.max_size = 200
-        assert cache.max_size == 200
-        cache.max_size = 0  # unlimited
-        assert cache.max_size == 0
-        cache.max_size = -10  # should convert to 0
-        assert cache.max_size == 0
-
-    def test_lru_eviction(self):
-        """Test that LRU eviction works correctly."""
-        cache = ThreadSafeLRUCache(max_size=3)
-        cache.put("key1", "value1")
-        cache.put("key2", "value2")
-        cache.put("key3", "value3")
-        # Cache is now at max size (3)
-
-        # Add a new key, should evict the least recently used (key1)
-        cache.put("key4", "value4")
-        assert cache.get("key1") is None
-        assert cache.get("key2") == "value2"
-        assert cache.get("key3") == "value3"
-        assert cache.get("key4") == "value4"
-
-        # Access key2, making key3 the least recently used
-        cache.get("key2")
-
-        # Add a new key, should evict the least recently used (key3)
-        cache.put("key5", "value5")
-        assert cache.get("key2") == "value2"
-        assert cache.get("key3") is None
-        assert cache.get("key4") == "value4"
-        assert cache.get("key5") == "value5"
-
-    def test_lru_update(self):
-        """Test that updating an existing key preserves LRU order."""
-        cache = ThreadSafeLRUCache(max_size=3)
-        cache.put("key1", "value1")
-        cache.put("key2", "value2")
-        cache.put("key3", "value3")
-
-        # Update key1, making it the most recently used
-        cache.put("key1", "value1_updated")
-
-        # Add a new key, should evict the least recently used (key2)
-        cache.put("key4", "value4")
-        assert cache.get("key1") == "value1_updated"
-        assert cache.get("key2") is None
-        assert cache.get("key3") == "value3"
-        assert cache.get("key4") == "value4"
-
-    def test_thread_safety(self):
-        """Test that the cache is thread-safe."""
-        cache = ThreadSafeLRUCache(max_size=1000)
-        num_threads = 10
-        operations_per_thread = 100
-
-        def worker(thread_id):
-            for i in range(operations_per_thread):
-                key = f"key{thread_id}_{i}"
-                value = f"value{thread_id}_{i}"
-                cache.put(key, value)
-                assert cache.get(key) == value
-
-        threads = []
-        for i in range(num_threads):
-            thread = threading.Thread(target=worker, args=(i,))
-            threads.append(thread)
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
-        # Verify all keys are still there
-        for i in range(num_threads):
-            for j in range(operations_per_thread):
-                key = f"key{i}_{j}"
-                value = f"value{i}_{j}"
-                assert cache.get(key) == value
-
-        assert cache.size() == num_threads * operations_per_thread
-
-    def test_max_size_reduction(self):
-        """Test reducing max_size evicts the least recently used items."""
-        cache = ThreadSafeLRUCache(max_size=5)
-        for i in range(5):
-            cache.put(f"key{i}", f"value{i}")
-
-        assert cache.size() == 5
-
-        # Access keys in a specific order to establish LRU order
-        # Order of access (oldest to newest): key0, key1, key2, key3, key4
-        for i in range(5):
-            cache.get(f"key{i}")
-
-        # Reduce max_size to 3, should keep the 3 most recently used: key2, key3, key4
-        cache.max_size = 3
-
-        assert cache.size() == 3
-        # The 2 least recently used keys should be evicted (key0, key1)
-        assert cache.get("key0") is None
-        assert cache.get("key1") is None
-        # The 3 most recently used keys should remain
-        assert cache.get("key2") == "value2"
-        assert cache.get("key3") == "value3"
-        assert cache.get("key4") == "value4"
-
-    def test_unlimited_size(self):
-        """Test that setting max_size to 0 allows unlimited entries."""
-        cache = ThreadSafeLRUCache(max_size=0)  # unlimited
-
-        # Add many entries, should not evict any
-        for i in range(1000):
-            cache.put(f"key{i}", f"value{i}")
-
-        assert cache.size() == 1000
-
-        # Check all entries are still there
-        for i in range(1000):
-            assert cache.get(f"key{i}") == f"value{i}"
-
-
-class TestWeaveClientSendFileCache:
-    """Test the WeaveClientSendFileCache class."""
-
-    def test_init_default(self):
-        """Test that the cache initializes with default max_size."""
-        cache = WeaveClientSendFileCache()
-        assert cache.max_size == 1000
-
-    def test_init_custom_size(self):
-        """Test that the cache initializes with custom max_size."""
-        cache = WeaveClientSendFileCache(max_size=100)
-        assert cache.max_size == 100
-
-    def test_key_generation(self):
-        """Test that the _key method generates unique keys for different requests."""
-        cache = WeaveClientSendFileCache()
-
-        req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
-        req2 = FileCreateReq(project_id="test", name="file2", content=b"content1")
-        req3 = FileCreateReq(project_id="other", name="file1", content=b"content1")
-        req4 = FileCreateReq(project_id="test", name="file1", content=b"different")
-
-        key1 = cache._key(req1)
-        key2 = cache._key(req2)
-        key3 = cache._key(req3)
-        key4 = cache._key(req4)
-
-        # Different requests should have different keys
-        assert key1 != key2
-        assert key1 != key3
-        assert key1 != key4
-
-        # Same request should have the same key
-        assert key1 == cache._key(
-            FileCreateReq(project_id="test", name="file1", content=b"content1")
-        )
-
-    def test_put_get_basic(self):
-        """Test basic put and get operations."""
-        cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="test", content=b"test")
-        res = FileCreateRes(digest="test_digest")
-
-        cache.put(req, res)
-        assert cache.get(req) == res
-
-    def test_get_nonexistent(self):
-        """Test get on a non-existent key."""
-        cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="nonexistent", content=b"test")
-        assert cache.get(req) is None
-
-    def test_put_update(self):
-        """Test updating an existing key."""
-        cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="test", content=b"test")
-        res1 = FileCreateRes(digest="digest1")
-        res2 = FileCreateRes(digest="digest2")
-
-        cache.put(req, res1)
-        cache.put(req, res2)
-        assert cache.get(req) == res2
-
-    def test_clear(self):
-        """Test clearing the cache."""
-        cache = WeaveClientSendFileCache()
-        req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
-        req2 = FileCreateReq(project_id="test", name="file2", content=b"content2")
-        res1 = FileCreateRes(digest="digest1")
-        res2 = FileCreateRes(digest="digest2")
-
-        cache.put(req1, res1)
-        cache.put(req2, res2)
-        assert cache.size() == 2
-
-        cache.clear()
-        assert cache.size() == 0
-        assert cache.get(req1) is None
-        assert cache.get(req2) is None
-
-    def test_delete(self):
-        """Test deleting a cached entry by request."""
-        cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="file", content=b"content")
-        cache.put(req, FileCreateRes(digest="d"))
-        assert cache.get(req) is not None
-        cache.delete(req)
-        assert cache.get(req) is None
-
-    def test_delete_nonexistent(self):
-        """Deleting a missing entry should not raise."""
-        cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="missing", content=b"x")
-        cache.delete(req)  # no-op
-
-    def test_size(self):
-        """Test the size method."""
-        cache = WeaveClientSendFileCache()
-        assert cache.size() == 0
-
-        req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
-        req2 = FileCreateReq(project_id="test", name="file2", content=b"content2")
-        res1 = FileCreateRes(digest="digest1")
-        res2 = FileCreateRes(digest="digest2")
-
-        cache.put(req1, res1)
-        assert cache.size() == 1
-        cache.put(req2, res2)
-        assert cache.size() == 2
-        cache.clear()
-        assert cache.size() == 0
-
-    def test_max_size_property(self):
-        """Test getting and setting the max_size property."""
-        cache = WeaveClientSendFileCache(max_size=100)
-        assert cache.max_size == 100
-
-        cache.max_size = 200
-        assert cache.max_size == 200
-
-        cache.max_size = 0  # unlimited
-        assert cache.max_size == 0
-
-    def test_lru_eviction(self):
-        """Test that LRU eviction works correctly."""
-        cache = WeaveClientSendFileCache(max_size=2)
-
-        req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
-        req2 = FileCreateReq(project_id="test", name="file2", content=b"content2")
-        req3 = FileCreateReq(project_id="test", name="file3", content=b"content3")
-
-        res1 = FileCreateRes(digest="digest1")
-        res2 = FileCreateRes(digest="digest2")
-        res3 = FileCreateRes(digest="digest3")
-
-        # Add two items, filling the cache
-        cache.put(req1, res1)
-        cache.put(req2, res2)
-        assert cache.size() == 2
-
-        # Add a third item, should evict the least recently used (req1)
-        cache.put(req3, res3)
-        assert cache.size() == 2
-        assert cache.get(req1) is None
-        assert cache.get(req2) == res2
-        assert cache.get(req3) == res3
-
-        # Access req2, making req3 the least recently used
-        cache.get(req2)
-
-        # Add req1 back, should evict req3
-        cache.put(req1, res1)
-        assert cache.size() == 2
-        assert cache.get(req1) == res1
-        assert cache.get(req2) == res2
-        assert cache.get(req3) is None
-
-
-def test_wave_client_file_cache_backwards_compatible():
-    """Test that the cache is backwards compatible with the original test."""
-    cache = WeaveClientSendFileCache()
-    req = FileCreateReq(project_id="test", name="test", content=b"test")
-    res = FileCreateRes(digest="test")
-    cache.put(req, res)
-    assert cache.get(req) == res
-
-
-def _make_502() -> httpx.HTTPStatusError:
-    response = httpx.Response(
-        status_code=502,
-        request=httpx.Request("POST", "http://example.com/file/create"),
-        content=b"Bad Gateway",
+@pytest.mark.parametrize(
+    ("init_size", "expected"),
+    [(None, 1000), (100, 100), (0, 0), (-10, 0)],
+)
+def test_lru_cache_init_max_size(init_size, expected):
+    """Default, custom, zero (unlimited), and negative (clamped to 0) max_size."""
+    cache = ThreadSafeLRUCache() if init_size is None else ThreadSafeLRUCache(
+        max_size=init_size
     )
-    return httpx.HTTPStatusError("502", request=response.request, response=response)
+    assert cache.max_size == expected
+
+
+def test_lru_cache_put_get_update_delete_contains():
+    """Basic put/get, overwrite, missing-key, delete, delete-missing, contains."""
+    cache = ThreadSafeLRUCache()
+    assert cache.get("nonexistent") is None
+    assert cache.contains("nonexistent") is False
+
+    cache.put("key1", "value1")
+    assert cache.get("key1") == "value1"
+    assert cache.contains("key1") is True
+
+    cache.put("key1", "value2")
+    assert cache.get("key1") == "value2"
+
+    cache.delete("key1")
+    assert cache.get("key1") is None
+    cache.delete("nonexistent")  # no-op, must not raise
+
+
+def test_lru_cache_size_and_clear():
+    """size() tracks puts/deletes/clear; clear() empties the cache."""
+    cache = ThreadSafeLRUCache()
+    assert cache.size() == 0
+    cache.put("key1", "value1")
+    assert cache.size() == 1
+    cache.put("key2", "value2")
+    assert cache.size() == 2
+    cache.delete("key1")
+    assert cache.size() == 1
+    cache.clear()
+    assert cache.size() == 0
+    assert cache.get("key2") is None
+
+
+def test_lru_cache_max_size_property():
+    """max_size getter/setter; setting negative clamps to 0 (unlimited)."""
+    cache = ThreadSafeLRUCache(max_size=100)
+    assert cache.max_size == 100
+    cache.max_size = 200
+    assert cache.max_size == 200
+    cache.max_size = 0
+    assert cache.max_size == 0
+    cache.max_size = -10
+    assert cache.max_size == 0
+
+
+def test_lru_cache_eviction_and_update_order():
+    """Insertion evicts oldest; get() and put()-update both refresh recency."""
+    cache = ThreadSafeLRUCache(max_size=3)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    cache.put("key3", "value3")
+
+    # Insert key4 -> evicts LRU (key1).
+    cache.put("key4", "value4")
+    assert cache.get("key1") is None
+    assert cache.get("key2") == "value2"
+    assert cache.get("key3") == "value3"
+    assert cache.get("key4") == "value4"
+
+    # get(key2) makes key3 the LRU; key5 evicts key3.
+    cache.get("key2")
+    cache.put("key5", "value5")
+    assert cache.get("key2") == "value2"
+    assert cache.get("key3") is None
+    assert cache.get("key4") == "value4"
+    assert cache.get("key5") == "value5"
+
+    # put-update refreshes recency: re-fill, update key_a, insert evicts key_b.
+    cache.clear()
+    cache.put("key_a", "a")
+    cache.put("key_b", "b")
+    cache.put("key_c", "c")
+    cache.put("key_a", "a_updated")
+    cache.put("key_d", "d")
+    assert cache.get("key_a") == "a_updated"
+    assert cache.get("key_b") is None
+    assert cache.get("key_c") == "c"
+    assert cache.get("key_d") == "d"
+
+
+def test_lru_cache_max_size_reduction_evicts_lru():
+    """Shrinking max_size evicts the least recently used entries."""
+    cache = ThreadSafeLRUCache(max_size=5)
+    for i in range(5):
+        cache.put(f"key{i}", f"value{i}")
+    assert cache.size() == 5
+
+    for i in range(5):
+        cache.get(f"key{i}")
+
+    cache.max_size = 3
+    assert cache.size() == 3
+    assert cache.get("key0") is None
+    assert cache.get("key1") is None
+    assert cache.get("key2") == "value2"
+    assert cache.get("key3") == "value3"
+    assert cache.get("key4") == "value4"
+
+
+def test_lru_cache_unlimited_size_keeps_all():
+    """max_size=0 disables eviction; many entries all persist."""
+    cache = ThreadSafeLRUCache(max_size=0)
+    for i in range(1000):
+        cache.put(f"key{i}", f"value{i}")
+    assert cache.size() == 1000
+    for i in range(1000):
+        assert cache.get(f"key{i}") == f"value{i}"
+
+
+def test_lru_cache_thread_safety():
+    """Concurrent put/get from many threads preserves every entry."""
+    cache = ThreadSafeLRUCache(max_size=1000)
+    num_threads = 10
+    operations_per_thread = 100
+
+    def worker(thread_id):
+        for i in range(operations_per_thread):
+            key = f"key{thread_id}_{i}"
+            value = f"value{thread_id}_{i}"
+            cache.put(key, value)
+            assert cache.get(key) == value
+
+    threads = [
+        threading.Thread(target=worker, args=(i,)) for i in range(num_threads)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    for i in range(num_threads):
+        for j in range(operations_per_thread):
+            assert cache.get(f"key{i}_{j}") == f"value{i}_{j}"
+    assert cache.size() == num_threads * operations_per_thread
+
+
+@pytest.mark.parametrize("init_size", [None, 100])
+def test_send_file_cache_init_and_max_size_property(init_size):
+    """Default/custom init plus max_size getter/setter including unlimited."""
+    expected = 1000 if init_size is None else init_size
+    cache = WeaveClientSendFileCache() if init_size is None else (
+        WeaveClientSendFileCache(max_size=init_size)
+    )
+    assert cache.max_size == expected
+    cache.max_size = 200
+    assert cache.max_size == 200
+    cache.max_size = 0
+    assert cache.max_size == 0
+
+
+def test_send_file_cache_key_generation():
+    """`_key` is unique per (project_id, name, content) and stable for equal reqs."""
+    cache = WeaveClientSendFileCache()
+    req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
+    req2 = FileCreateReq(project_id="test", name="file2", content=b"content1")
+    req3 = FileCreateReq(project_id="other", name="file1", content=b"content1")
+    req4 = FileCreateReq(project_id="test", name="file1", content=b"different")
+
+    key1 = cache._key(req1)
+    assert key1 != cache._key(req2)
+    assert key1 != cache._key(req3)
+    assert key1 != cache._key(req4)
+    assert key1 == cache._key(
+        FileCreateReq(project_id="test", name="file1", content=b"content1")
+    )
+
+
+def test_send_file_cache_put_get_update_delete_size():
+    """put/get, overwrite, missing-key, delete, delete-missing, size, clear."""
+    cache = WeaveClientSendFileCache()
+    assert cache.size() == 0
+
+    miss = FileCreateReq(project_id="test", name="nonexistent", content=b"test")
+    assert cache.get(miss) is None
+
+    req = FileCreateReq(project_id="test", name="test", content=b"test")
+    cache.put(req, FileCreateRes(digest="digest1"))
+    assert cache.get(req) == FileCreateRes(digest="digest1")
+    assert cache.size() == 1
+
+    cache.put(req, FileCreateRes(digest="digest2"))
+    assert cache.get(req) == FileCreateRes(digest="digest2")
+    assert cache.size() == 1
+
+    cache.delete(req)
+    assert cache.get(req) is None
+    cache.delete(req)  # delete-missing no-op
+
+    req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
+    req2 = FileCreateReq(project_id="test", name="file2", content=b"content2")
+    cache.put(req1, FileCreateRes(digest="d1"))
+    cache.put(req2, FileCreateRes(digest="d2"))
+    assert cache.size() == 2
+    cache.clear()
+    assert cache.size() == 0
+    assert cache.get(req1) is None
+    assert cache.get(req2) is None
+
+
+def test_send_file_cache_lru_eviction():
+    """LRU eviction over FileCreateReq keys, with get() refreshing recency."""
+    cache = WeaveClientSendFileCache(max_size=2)
+    req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
+    req2 = FileCreateReq(project_id="test", name="file2", content=b"content2")
+    req3 = FileCreateReq(project_id="test", name="file3", content=b"content3")
+    res1 = FileCreateRes(digest="digest1")
+    res2 = FileCreateRes(digest="digest2")
+    res3 = FileCreateRes(digest="digest3")
+
+    cache.put(req1, res1)
+    cache.put(req2, res2)
+    assert cache.size() == 2
+
+    cache.put(req3, res3)
+    assert cache.size() == 2
+    assert cache.get(req1) is None
+    assert cache.get(req2) == res2
+    assert cache.get(req3) == res3
+
+    cache.get(req2)  # req3 becomes LRU
+    cache.put(req1, res1)
+    assert cache.size() == 2
+    assert cache.get(req1) == res1
+    assert cache.get(req2) == res2
+    assert cache.get(req3) is None
 
 
 @pytest.fixture
@@ -521,3 +377,12 @@ def test_stale_failure_callback_does_not_evict_replacement_entry(offline_client)
     )
 
     assert client.send_file_cache.get(req_a) is fut_a_v2
+
+
+def _make_502() -> httpx.HTTPStatusError:
+    response = httpx.Response(
+        status_code=502,
+        request=httpx.Request("POST", "http://example.com/file/create"),
+        content=b"Bad Gateway",
+    )
+    return httpx.HTTPStatusError("502", request=response.request, response=response)

@@ -65,13 +65,6 @@ def py_obj():
 def test_sync_func(weave_active, func):
     assert func(1) == 2
 
-    ref = weave.publish(func)
-    func2 = ref.get()
-
-    assert func2(1) == 2
-
-
-def test_sync_func_call(weave_active, func):
     res, call = func.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
@@ -81,6 +74,7 @@ def test_sync_func_call(weave_active, func):
     ref = weave.publish(func)
     func2 = ref.get()
 
+    assert func2(1) == 2
     res2, call2 = func2.call(1)
     assert isinstance(call2, Call)
     assert call2.inputs == {"a": 1}
@@ -92,14 +86,6 @@ def test_sync_func_call(weave_active, func):
 async def test_async_func(weave_active, afunc):
     assert await afunc(1) == 2
 
-    ref = weave.publish(afunc)
-    afunc2 = ref.get()
-
-    assert await afunc2(1) == 2
-
-
-@pytest.mark.asyncio
-async def test_async_func_call(weave_active, afunc):
     res, call = await afunc.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
@@ -109,6 +95,7 @@ async def test_async_func_call(weave_active, afunc):
     ref = weave.publish(afunc)
     afunc2 = ref.get()
 
+    assert await afunc2(1) == 2
     res2, call2 = await afunc2.call(1)
     assert isinstance(call2, Call)
     assert call2.inputs == {"a": 1}
@@ -120,12 +107,6 @@ def test_sync_method(weave_active, weave_obj, py_obj):
     assert weave_obj.method(1) == 2
     assert py_obj.method(1) == 2
 
-    weave_obj_method_ref = weave.publish(weave_obj.method)
-    with pytest.raises(MissingSelfInstanceError):
-        weave_obj_method2 = weave_obj_method_ref.get()
-
-
-def test_sync_method_call(weave_active, weave_obj, py_obj):
     res, call = weave_obj.method.call(weave_obj, 1)
     assert isinstance(call, Call)
     assert call.inputs == {
@@ -154,13 +135,6 @@ async def test_async_method(weave_active, weave_obj, py_obj):
     assert await weave_obj.amethod(1) == 2
     assert await py_obj.amethod(1) == 2
 
-    weave_obj_amethod_ref = weave.publish(weave_obj.amethod)
-    with pytest.raises(MissingSelfInstanceError):
-        weave_obj_amethod2 = weave_obj_amethod_ref.get()
-
-
-@pytest.mark.asyncio
-async def test_async_method_call(weave_active, weave_obj, py_obj):
     res, call = await weave_obj.amethod.call(weave_obj, 1)
     assert isinstance(call, Call)
     assert call.inputs == {
@@ -184,29 +158,21 @@ async def test_async_method_call(weave_active, weave_obj, py_obj):
         res2, call2 = await py_obj.amethod.call(1)
 
 
-def test_sync_func_patching_passes_inspection(func):
+def test_patching_passes_inspection(func, afunc, weave_obj, py_obj):
     assert is_op(func)
     assert inspect.isfunction(func)
 
-
-def test_async_func_patching_passes_inspection(afunc):
     assert is_op(afunc)
     assert inspect.iscoroutinefunction(afunc)
 
-
-def test_sync_method_patching_passes_inspection(weave_obj, py_obj):
     assert is_op(weave_obj.method)
     assert inspect.ismethod(weave_obj.method)
-
     assert is_op(py_obj.method)
     assert inspect.ismethod(py_obj.method)
 
-
-def test_async_method_patching_passes_inspection(weave_obj, py_obj):
     assert is_op(weave_obj.amethod)
     assert inspect.iscoroutinefunction(weave_obj.amethod)
     assert inspect.ismethod(weave_obj.amethod)
-
     assert is_op(py_obj.amethod)
     assert inspect.iscoroutinefunction(py_obj.amethod)
     assert inspect.ismethod(py_obj.amethod)
@@ -301,19 +267,6 @@ def test_postprocessing_funcs(client):
     assert call.output == {"postprocessed_b": 2}
 
 
-def test_op_call_display_name_str(client):
-    @op(call_display_name="example")
-    def func():
-        return 1
-
-    func()
-
-    calls = list(client.get_calls())
-    call = calls[0]
-
-    assert call.display_name == "example"
-
-
 def test_op_call_display_name_callable_invalid():
     with pytest.raises(ValueError, match="must take exactly 1 argument"):
 
@@ -322,35 +275,32 @@ def test_op_call_display_name_callable_invalid():
             return 1
 
 
-def test_op_call_display_name_callable_lambda(client):
-    @op(call_display_name=lambda call: f"{call.project_id}-123")
-    def func():
-        return 1
-
-    func()
-
-    calls = list(client.get_calls())
-    call = calls[0]
-
-    assert call.display_name == "shawn/test-project-123"
-
-
-def test_op_call_display_name_callable_func(client):
-    def custom_display_name_func(call) -> str:
+def test_op_call_display_name(client):
+    def reversed_project_name(call) -> str:
         reversed_project = call.project_id[::-1]
         name_ascii_sum = sum(ord(c) for c in reversed_project)
         return f"wow-{name_ascii_sum}-{reversed_project}"
 
-    @op(call_display_name=custom_display_name_func)
-    def func():
+    @op(call_display_name="example")
+    def str_func():
         return 1
 
-    func()
+    @op(call_display_name=lambda call: f"{call.project_id}-123")
+    def lambda_func():
+        return 1
+
+    @op(call_display_name=reversed_project_name)
+    def func_func():
+        return 1
+
+    str_func()
+    lambda_func()
+    func_func()
 
     calls = list(client.get_calls())
-    call = calls[0]
-
-    assert call.display_name == "wow-1844-tcejorp-tset/nwahs"
+    assert calls[0].display_name == "example"
+    assert calls[1].display_name == "shawn/test-project-123"
+    assert calls[2].display_name == "wow-1844-tcejorp-tset/nwahs"
 
 
 def test_op_call_display_name_callable_other_attributes(client):
@@ -544,49 +494,33 @@ def test_op_signature_failure_at_call_raises_op_call_error(monkeypatch):
         _default_on_input_handler(my_op, (5,), {})
 
 
-def test_op_kind_attribute():
-    """Test that setting kind on op decorator sets attributes.weave.kind."""
+@pytest.mark.parametrize(
+    ("kind", "color", "expected_kind", "expected_color"),
+    [
+        ("tool", None, "tool", None),
+        (None, "blue", None, "blue"),
+        ("guardrail", None, "guardrail", None),
+        ("llm", "green", "llm", "green"),
+    ],
+)
+def test_op_kind_and_color_attributes(kind, color, expected_kind, expected_color):
+    """Setting kind/color on the op decorator populates attributes.weave."""
+    op_kwargs = {}
+    if kind is not None:
+        op_kwargs["kind"] = kind
+    if color is not None:
+        op_kwargs["color"] = color
 
-    @op(kind="tool")
-    def tool_func(x: int) -> int:
+    @op(**op_kwargs)
+    def func(x: int) -> int:
         return x + 1
 
-    result = setup_dunder_weave_dict(tool_func)
-    assert result["attributes"]["weave"]["kind"] == "tool"
-    assert "color" not in result["attributes"]["weave"]
-
-
-def test_op_color_attribute():
-    """Test that setting color on op decorator sets attributes.weave.color."""
-
-    @op(color="blue")
-    def colored_func(x: int) -> int:
-        return x + 1
-
-    result = setup_dunder_weave_dict(colored_func)
-    assert result["attributes"]["weave"]["color"] == "blue"
-    assert "kind" not in result["attributes"]["weave"]
-
-
-def test_op_kind_guardrail_attribute():
-    """Test that setting kind='guardrail' on op decorator sets attributes.weave.kind."""
-
-    @op(kind="guardrail")
-    def guardrail_func(x: str) -> bool:
-        return True
-
-    result = setup_dunder_weave_dict(guardrail_func)
-    assert result["attributes"]["weave"]["kind"] == "guardrail"
-    assert "color" not in result["attributes"]["weave"]
-
-
-def test_op_kind_and_color_attributes():
-    """Test that setting both kind and color on op decorator sets both attributes."""
-
-    @op(kind="llm", color="green")
-    def llm_func(x: int) -> int:
-        return x + 1
-
-    result = setup_dunder_weave_dict(llm_func)
-    assert result["attributes"]["weave"]["kind"] == "llm"
-    assert result["attributes"]["weave"]["color"] == "green"
+    weave_attrs = setup_dunder_weave_dict(func)["attributes"]["weave"]
+    if expected_kind is None:
+        assert "kind" not in weave_attrs
+    else:
+        assert weave_attrs["kind"] == expected_kind
+    if expected_color is None:
+        assert "color" not in weave_attrs
+    else:
+        assert weave_attrs["color"] == expected_color

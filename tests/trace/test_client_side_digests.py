@@ -7,6 +7,8 @@ the expected_digest field.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from PIL import Image
 
@@ -58,477 +60,352 @@ def _publish_with_digests(
     return ref.digest
 
 
+def _make_op():
+    """Return a fresh `@weave.op` for publish/digest tests."""
+
+    @weave.op
+    def my_test_op(x: int) -> int:
+        return x + 1
+
+    return my_test_op
+
+
 @pytest.fixture
 def fast_path(client: WeaveClient):
     """Enable the client-side digest fast path for a test."""
     _configure_digests(client, enable=True)
 
 
-class TestClientServerDigestConsistency:
-    """Client-side and server-side digests must agree for the same data."""
-
-    def test_object(self, client: WeaveClient):
-        obj = {"model": "gpt-4", "temperature": 0.7, "tags": ["a", "b"]}
-
-        digest_client = _publish_with_digests(client, obj, "obj_client", enable=True)
-        digest_server = _publish_with_digests(client, obj, "obj_server", enable=False)
-
-        assert digest_client == digest_server
-
-    def test_dataset(self, client: WeaveClient):
-        rows = [{"x": i, "y": str(i)} for i in range(10)]
-
-        ds_client = weave.Dataset(name="bench_ds", rows=rows)
-        digest_client = _publish_with_digests(
-            client, ds_client, "ds_client", enable=True
-        )
-
-        ds_server = weave.Dataset(name="bench_ds", rows=rows)
-        digest_server = _publish_with_digests(
-            client, ds_server, "ds_server", enable=False
-        )
-
-        assert digest_client == digest_server
-
-    def test_nested_object(self, client: WeaveClient):
-        obj = {
-            "config": {"a": 1, "b": [2, 3]},
-            "metadata": {"nested": {"deep": True}},
-        }
-
-        digest_client = _publish_with_digests(client, obj, "nested_client", enable=True)
-        digest_server = _publish_with_digests(
-            client, obj, "nested_server", enable=False
-        )
-
-        assert digest_client == digest_server
-
-    def test_op(self, client: WeaveClient):
-        @weave.op
-        def my_test_op(x: int) -> int:
-            return x + 1
-
-        digest_client = _publish_with_digests(
-            client, my_test_op, "op_client", enable=True
-        )
-        digest_server = _publish_with_digests(
-            client, my_test_op, "op_server", enable=False
-        )
-
-        assert digest_client == digest_server
-
-    def test_empty_dict(self, client: WeaveClient):
-        obj: dict = {}
-
-        digest_client = _publish_with_digests(client, obj, "empty_client", enable=True)
-        digest_server = _publish_with_digests(client, obj, "empty_server", enable=False)
-
-        assert digest_client == digest_server
-
-    def test_unicode_content(self, client: WeaveClient):
-        obj = {
+# Client-side and server-side digests must agree for the same data. Each case
+# supplies a factory so dataset/image inputs are rebuilt fresh per publish.
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: {"model": "gpt-4", "temperature": 0.7, "tags": ["a", "b"]},
+        lambda: weave.Dataset(name="bench_ds", rows=[{"x": i, "y": str(i)} for i in range(10)]),
+        lambda: {"config": {"a": 1, "b": [2, 3]}, "metadata": {"nested": {"deep": True}}},
+        _make_op,
+        lambda: {},
+        lambda: {
             "emoji": "\U0001f680\U0001f30d",
             "cjk": "\u4f60\u597d\u4e16\u754c",
             "accent": "\u00e9\u00e0\u00fc",
-        }
-
-        digest_client = _publish_with_digests(
-            client, obj, "unicode_client", enable=True
-        )
-        digest_server = _publish_with_digests(
-            client, obj, "unicode_server", enable=False
-        )
-
-        assert digest_client == digest_server
-
-    def test_large_dataset(self, client: WeaveClient):
-        rows = [
-            {"idx": i, "val": f"row_{i}", "data": list(range(i % 10))}
-            for i in range(100)
-        ]
-
-        ds_client = weave.Dataset(name="bench_large_ds", rows=rows)
-        digest_client = _publish_with_digests(
-            client, ds_client, "large_client", enable=True
-        )
-
-        ds_server = weave.Dataset(name="bench_large_ds", rows=rows)
-        digest_server = _publish_with_digests(
-            client, ds_server, "large_server", enable=False
-        )
-
-        assert digest_client == digest_server
-
-    def test_object_with_ref(self, client: WeaveClient):
-        """Object containing a ref to another object."""
-        inner = {"inner_key": "inner_value"}
-        inner_ref = weave.publish(inner, name="inner_obj")
-        client._flush()
-
-        outer = {"ref": inner_ref.uri(), "extra": "data"}
-
-        digest_client = _publish_with_digests(
-            client, outer, "outer_client", enable=True
-        )
-        digest_server = _publish_with_digests(
-            client, outer, "outer_server", enable=False
-        )
-
-        assert digest_client == digest_server
-
-    def test_custom_weave_type(self, client: WeaveClient):
-        """CustomWeaveType (PIL Image) produces the same digest on both paths."""
-        img_client = Image.new("RGB", (16, 16), color=(0, 128, 255))
-        digest_client = _publish_with_digests(
-            client, img_client, "img_client", enable=True
-        )
-
-        img_server = Image.new("RGB", (16, 16), color=(0, 128, 255))
-        digest_server = _publish_with_digests(
-            client, img_server, "img_server", enable=False
-        )
-
-        assert digest_client == digest_server
-
-    def test_table_row_digests(self, client: WeaveClient):
-        """Client-computed row and table digests match the server's."""
-        rows = [{"x": i, "y": str(i)} for i in range(5)]
-
-        client_row_digests = [compute_row_digest(r) for r in rows]
-        client_table_digest = compute_table_digest(client_row_digests)
-
-        req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client.project_id,
-                rows=rows,
-            )
-        )
-        res = client.server.table_create(req)
-
-        assert res.row_digests == client_row_digests
-        assert res.digest == client_table_digest
+        },
+        lambda: weave.Dataset(
+            name="bench_large_ds",
+            rows=[{"idx": i, "val": f"row_{i}", "data": list(range(i % 10))} for i in range(100)],
+        ),
+        lambda: Image.new("RGB", (16, 16), color=(0, 128, 255)),
+    ],
+    ids=[
+        "object",
+        "dataset",
+        "nested_object",
+        "op",
+        "empty_dict",
+        "unicode_content",
+        "large_dataset",
+        "custom_weave_type",
+    ],
+)
+def test_client_server_digest_consistency(
+    client: WeaveClient, make: Callable[[], object]
+) -> None:
+    digest_client = _publish_with_digests(client, make(), "consistency_client", enable=True)
+    digest_server = _publish_with_digests(client, make(), "consistency_server", enable=False)
+    assert digest_client == digest_server
 
 
-class TestDataCorrectness:
-    """Publish (client-side and server-side), read back, verify data is intact."""
+def test_client_server_digest_consistency_with_ref(client: WeaveClient) -> None:
+    # Object containing a ref to another object hashes identically both ways.
+    inner_ref = weave.publish({"inner_key": "inner_value"}, name="inner_obj")
+    client._flush()
+    outer = {"ref": inner_ref.uri(), "extra": "data"}
 
-    def test_object(self, client: WeaveClient, fast_path: None):
-        obj = {"key": "value", "number": 42, "list": [1, 2, 3]}
-        ref = weave.publish(obj, name="round_trip_obj")
-        client._flush()
-
-        got = ref.get()
-        assert got["key"] == "value"
-        assert got["number"] == 42
-        assert got["list"] == [1, 2, 3]
-
-    def test_dataset(self, client: WeaveClient, fast_path: None):
-        rows = [{"a": i, "b": i * 2} for i in range(5)]
-        ds = weave.Dataset(name="round_trip_ds", rows=rows)
-        ref = weave.publish(ds)
-        client._flush()
-
-        got = ref.get()
-        got_rows = list(got.rows)
-        assert len(got_rows) == 5
-        for i, row in enumerate(got_rows):
-            assert row["a"] == i
-            assert row["b"] == i * 2
-
-    def test_nested_object(self, client: WeaveClient, fast_path: None):
-        obj = {
-            "config": {"a": 1, "b": [2, 3]},
-            "metadata": {"nested": {"deep": True}},
-        }
-        ref = weave.publish(obj, name="nested_rt")
-        client._flush()
-
-        got = ref.get()
-        assert got["config"]["a"] == 1
-        assert got["metadata"]["nested"]["deep"] is True
-
-    def test_op(self, client: WeaveClient, fast_path: None):
-        @weave.op
-        def my_rt_op(x: int) -> int:
-            return x + 1
-
-        ref = weave.publish(my_rt_op, name="op_rt")
-        client._flush()
-
-        got = ref.get()
-        assert got(3) == 4
-
-    def test_empty_dict(self, client: WeaveClient, fast_path: None):
-        ref = weave.publish({}, name="empty_rt")
-        client._flush()
-        assert ref.get() == {}
-
-    def test_unicode_content(self, client: WeaveClient, fast_path: None):
-        obj = {"emoji": "\U0001f680", "cjk": "\u4f60\u597d"}
-        ref = weave.publish(obj, name="unicode_rt")
-        client._flush()
-
-        got = ref.get()
-        assert got["emoji"] == "\U0001f680"
-        assert got["cjk"] == "\u4f60\u597d"
-
-    def test_custom_weave_type(self, client: WeaveClient, fast_path: None):
-        img = Image.new("RGB", (32, 32), color=(255, 0, 0))
-        ref = weave.publish(img, name="fast_path_image")
-        client._flush()
-
-        got = ref.get()
-        assert isinstance(got, Image.Image)
-        assert got.size == (32, 32)
-        assert got.getpixel((0, 0)) == (255, 0, 0)
-
-    def test_get_without_explicit_flush(self, weave_active, fast_path: None):
-        """ref.get() must work without an explicit _flush() call.
-
-        In production, the FutureExecutor resolves deferred work when the
-        digest or data is accessed. The test client auto-flushes, but this
-        test documents the contract that callers don't need to flush manually.
-        """
-        obj = {"immediate": "access", "count": 99}
-        ref = weave.publish(obj, name="no-flush-get-test")
-
-        got = ref.get()
-        assert got["immediate"] == "access"
-        assert got["count"] == 99
+    digest_client = _publish_with_digests(client, outer, "outer_client", enable=True)
+    digest_server = _publish_with_digests(client, outer, "outer_server", enable=False)
+    assert digest_client == digest_server
 
 
-class TestServerDigestValidation:
-    """Server must reject wrong expected_digest and accept correct ones."""
+def test_republish_same_project_object_keeps_ref(client: WeaveClient) -> None:
+    # Re-saving an instance that already carries a same-project ref is a no-op
+    # in _save_nested_objects (the ref.project == self.project early return).
+    obj = weave.Dataset(name="republish_ds", rows=[{"a": 1}, {"a": 2}])
+    first = weave.publish(obj, name="republish_obj")
+    client._flush()
+    second = weave.publish(obj, name="republish_obj")
+    client._flush()
+    assert first.digest == second.digest
 
-    @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
-    def test_object(self, client: WeaveClient, correct: bool):
-        val = {"hello": "world"}
-        expected_digest = compute_object_digest(val) if correct else "definitely_wrong"
 
-        req = tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=client.project_id,
-                object_id="digest_obj",
-                val=val,
-                expected_digest=expected_digest,
-            )
-        )
+def test_client_table_row_digests_match_server(client: WeaveClient) -> None:
+    rows = [{"x": i, "y": str(i)} for i in range(5)]
+    client_row_digests = [compute_row_digest(r) for r in rows]
+    client_table_digest = compute_table_digest(client_row_digests)
 
-        if correct:
-            res = client.server.obj_create(req)
-            assert res.digest == expected_digest
-        else:
-            with pytest.raises(DigestMismatchError):
-                client.server.obj_create(req)
+    req = tsi.TableCreateReq(
+        table=tsi.TableSchemaForInsert(project_id=client.project_id, rows=rows)
+    )
+    res = client.server.table_create(req)
 
-    @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
-    def test_table(self, client: WeaveClient, correct: bool):
-        rows = [{"a": 1}, {"a": 2}, {"a": 3}]
-        row_digests = [compute_row_digest(r) for r in rows]
-        expected_digest = (
-            compute_table_digest(row_digests) if correct else "definitely_wrong"
-        )
+    assert res.row_digests == client_row_digests
+    assert res.digest == client_table_digest
 
-        req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client.project_id,
-                rows=rows,
-                expected_digest=expected_digest,
-            )
-        )
 
-        if correct:
-            res = client.server.table_create(req)
-            assert res.digest == expected_digest
-            assert res.row_digests == row_digests
-        else:
-            with pytest.raises(DigestMismatchError):
-                client.server.table_create(req)
+# Publish via the fast path, read back, verify data is intact across types.
+def test_data_correctness_scalar_and_nested_objects(
+    client: WeaveClient, fast_path: None
+) -> None:
+    flat = weave.publish(
+        {"key": "value", "number": 42, "list": [1, 2, 3]}, name="round_trip_obj"
+    )
+    nested = weave.publish(
+        {"config": {"a": 1, "b": [2, 3]}, "metadata": {"nested": {"deep": True}}},
+        name="nested_rt",
+    )
+    empty = weave.publish({}, name="empty_rt")
+    unicode_ref = weave.publish({"emoji": "\U0001f680", "cjk": "\u4f60\u597d"}, name="unicode_rt")
+    client._flush()
 
-    @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
-    def test_file(self, client: WeaveClient, correct: bool):
-        content = b"hello world"
-        expected_digest = (
-            compute_file_digest(content) if correct else "definitely_wrong"
-        )
+    flat_got = flat.get()
+    assert flat_got["key"] == "value"
+    assert flat_got["number"] == 42
+    assert flat_got["list"] == [1, 2, 3]
 
-        req = tsi.FileCreateReq(
+    nested_got = nested.get()
+    assert nested_got["config"]["a"] == 1
+    assert nested_got["metadata"]["nested"]["deep"] is True
+
+    assert empty.get() == {}
+
+    unicode_got = unicode_ref.get()
+    assert unicode_got["emoji"] == "\U0001f680"
+    assert unicode_got["cjk"] == "\u4f60\u597d"
+
+
+def test_data_correctness_dataset_op_and_image(
+    client: WeaveClient, fast_path: None
+) -> None:
+    ds_ref = weave.publish(
+        weave.Dataset(name="round_trip_ds", rows=[{"a": i, "b": i * 2} for i in range(5)])
+    )
+    op_ref = weave.publish(_make_op(), name="op_rt")
+    img_ref = weave.publish(
+        Image.new("RGB", (32, 32), color=(255, 0, 0)), name="fast_path_image"
+    )
+    client._flush()
+
+    got_rows = list(ds_ref.get().rows)
+    assert len(got_rows) == 5
+    for i, row in enumerate(got_rows):
+        assert row["a"] == i
+        assert row["b"] == i * 2
+
+    assert op_ref.get()(3) == 4
+
+    img_got = img_ref.get()
+    assert isinstance(img_got, Image.Image)
+    assert img_got.size == (32, 32)
+    assert img_got.getpixel((0, 0)) == (255, 0, 0)
+
+
+def test_data_correctness_get_without_explicit_flush(
+    weave_active, fast_path: None
+) -> None:
+    # ref.get() resolves deferred work via the FutureExecutor, so callers
+    # don't need an explicit _flush() (the test client auto-flushes).
+    ref = weave.publish({"immediate": "access", "count": 99}, name="no-flush-get-test")
+    got = ref.get()
+    assert got["immediate"] == "access"
+    assert got["count"] == 99
+
+
+# Server must reject a wrong expected_digest and accept a correct one.
+@pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
+def test_server_digest_validation_object(client: WeaveClient, correct: bool) -> None:
+    val = {"hello": "world"}
+    expected_digest = compute_object_digest(val) if correct else "definitely_wrong"
+    req = tsi.ObjCreateReq(
+        obj=tsi.ObjSchemaForInsert(
             project_id=client.project_id,
-            name="test.txt",
-            content=content,
+            object_id="digest_obj",
+            val=val,
             expected_digest=expected_digest,
         )
-
-        if correct:
-            res = client.server.file_create(req)
-            assert res.digest == expected_digest
-        else:
-            with pytest.raises(DigestMismatchError):
-                client.server.file_create(req)
-
-
-class TestConvertRefsToInternal:
-    """Unit tests for _convert_refs_to_internal."""
-
-    def test_raises_when_no_internal_id(self, client: WeaveClient) -> None:
-        """Raises NoInternalProjectIDError when the resolver returns None.
-
-        This happens when the feature flag is off (default) or the resolver
-        is disabled — get_internal_project_id returns None.
-        """
-        json_val = {
-            "key": "value",
-            "ref": f"weave:///{client.entity}/{client.project}/object/foo:abc123",
-        }
-
-        # Ensure the setting is off so the resolver returns None
-        with (
-            override_settings(enable_client_side_digests=False),
-            pytest.raises(NoInternalProjectIDError),
-        ):
-            client._convert_refs_to_internal(json_val)
-
-    def test_raises_for_cross_project_ref(
-        self, client: WeaveClient, fast_path: None
-    ) -> None:
-        """Raises CrossProjectRefError when cross-project refs are present."""
-        json_val = {
-            "same_project": f"weave:///{client.entity}/{client.project}/object/foo:abc123",
-            "cross_project": f"weave:///{client.entity}/other-project/object/bar:def456",
-        }
-
-        with pytest.raises(CrossProjectRefError):
-            client._convert_refs_to_internal(json_val)
-
-    def test_cross_project_ref_skips_expected_digest(
-        self, client: WeaveClient, fast_path: None, monkeypatch
-    ) -> None:
-        """Publishing with a cross-project ref falls back to no expected_digest.
-
-        When the client encounters an unresolvable cross-project ref, it raises
-        CrossProjectRefError which is caught by the caller, causing it to skip
-        expected_digest and let the server compute the digest instead.
-        """
-        # Spy on the adapter's obj_create to capture expected_digest values
-        captured: list[str | None] = []
-        adapter = find_server_layer(client.server, ExternalTraceServer)
-        original = type(adapter).obj_create
-
-        def spy(self, req):
-            captured.append(req.obj.expected_digest)
-            return original(self, req)
-
-        monkeypatch.setattr(type(adapter), "obj_create", spy)
-
-        # Publish an inner object in a different project to get a cross-project ref
-        original_project = client.project
-        client.project = "other-project"
-        inner_ref = client._save_object({"msg": "hi"}, "inner")
-        client._flush()
-
-        # Now publish an outer object in the original project that references it
-        client.project = original_project
-        outer = {"cross_ref": inner_ref.uri(), "data": "test"}
-        weave.publish(outer, name="outer-with-cross-ref")
-        client._flush()
-
-        # The outer object's obj_create should have expected_digest=None
-        # because of the unresolvable cross-project ref
-        assert len(captured) >= 1
-        assert captured[-1] is None
+    )
+    if correct:
+        assert client.server.obj_create(req).digest == expected_digest
+    else:
+        with pytest.raises(DigestMismatchError):
+            client.server.obj_create(req)
 
 
-class TestDigestMismatchAutoDisable:
-    """On DigestMismatchError the client retries without expected_digest
-    and disables client-side digests for the rest of the session.
-    """
+@pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
+def test_server_digest_validation_table(client: WeaveClient, correct: bool) -> None:
+    rows = [{"a": 1}, {"a": 2}, {"a": 3}]
+    row_digests = [compute_row_digest(r) for r in rows]
+    expected_digest = (
+        compute_table_digest(row_digests) if correct else "definitely_wrong"
+    )
+    req = tsi.TableCreateReq(
+        table=tsi.TableSchemaForInsert(
+            project_id=client.project_id, rows=rows, expected_digest=expected_digest
+        )
+    )
+    if correct:
+        res = client.server.table_create(req)
+        assert res.digest == expected_digest
+        assert res.row_digests == row_digests
+    else:
+        with pytest.raises(DigestMismatchError):
+            client.server.table_create(req)
 
-    @pytest.mark.disable_logging_error_check
-    def test_object_mismatch_retries_and_disables(
-        self, client: WeaveClient, fast_path: None, monkeypatch
-    ) -> None:
-        """First obj_create with expected_digest fails; client retries without
-        it and disables fast path for subsequent saves.
-        """
-        adapter = find_server_layer(client.server, ExternalTraceServer)
-        original = adapter.obj_create
-        seen_digests: list[str | None] = []
-        injected = False
 
-        def mismatch_once(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-            nonlocal injected
-            seen_digests.append(req.obj.expected_digest)
-            if not injected and req.obj.expected_digest is not None:
-                injected = True
-                raise DigestMismatchError("forced mismatch")
-            return original(req)
+@pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
+def test_server_digest_validation_file(client: WeaveClient, correct: bool) -> None:
+    content = b"hello world"
+    expected_digest = compute_file_digest(content) if correct else "definitely_wrong"
+    req = tsi.FileCreateReq(
+        project_id=client.project_id,
+        name="test.txt",
+        content=content,
+        expected_digest=expected_digest,
+    )
+    if correct:
+        assert client.server.file_create(req).digest == expected_digest
+    else:
+        with pytest.raises(DigestMismatchError):
+            client.server.file_create(req)
 
-        monkeypatch.setattr(adapter, "obj_create", mismatch_once)
 
-        # First publish: expected_digest sent, server rejects, client retries
-        ref = weave.publish({"first": True}, name="mismatch-first")
-        client._flush()
+# _convert_refs_to_internal unit behavior.
+def test_convert_refs_raises_when_no_internal_id(client: WeaveClient) -> None:
+    # Resolver returns None when the flag is off (default), so conversion raises.
+    json_val = {
+        "key": "value",
+        "ref": f"weave:///{client.entity}/{client.project}/object/foo:abc123",
+    }
+    with (
+        override_settings(enable_client_side_digests=False),
+        pytest.raises(NoInternalProjectIDError),
+    ):
+        client._convert_refs_to_internal(json_val)
 
-        # Should have seen: [digest, None] (first attempt + retry)
-        assert seen_digests == [ref.digest, None]
-        assert client.project_id_resolver.is_disabled
 
-        # Second publish: fast path is disabled, no expected_digest
-        seen_digests.clear()
-        weave.publish({"second": True}, name="mismatch-second")
-        client._flush()
+def test_convert_refs_raises_for_cross_project_ref(
+    client: WeaveClient, fast_path: None
+) -> None:
+    json_val = {
+        "same_project": f"weave:///{client.entity}/{client.project}/object/foo:abc123",
+        "cross_project": f"weave:///{client.entity}/other-project/object/bar:def456",
+    }
+    with pytest.raises(CrossProjectRefError):
+        client._convert_refs_to_internal(json_val)
 
-        assert seen_digests == [None]
 
-    @pytest.mark.disable_logging_error_check
-    def test_table_mismatch_retries_and_disables(
-        self, client: WeaveClient, fast_path: None, monkeypatch
-    ) -> None:
-        """Table digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, ExternalTraceServer)
-        original = adapter.table_create
-        injected = False
+def test_cross_project_ref_skips_expected_digest(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    # An unresolvable cross-project ref makes the caller skip expected_digest
+    # and let the server compute the digest instead.
+    captured: list[str | None] = []
+    adapter = find_server_layer(client.server, ExternalTraceServer)
+    original = type(adapter).obj_create
 
-        def mismatch_once(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-            nonlocal injected
-            if not injected and req.table.expected_digest is not None:
-                injected = True
-                raise DigestMismatchError("forced table mismatch")
-            return original(req)
+    def spy(self, req):
+        captured.append(req.obj.expected_digest)
+        return original(self, req)
 
-        monkeypatch.setattr(adapter, "table_create", mismatch_once)
+    monkeypatch.setattr(type(adapter), "obj_create", spy)
 
-        ds = weave.Dataset(name="mismatch-ds", rows=[{"x": 1}, {"x": 2}])
-        ref = weave.publish(ds, name="mismatch-ds")
-        client._flush()
+    original_project = client.project
+    client.project = "other-project"
+    inner_ref = client._save_object({"msg": "hi"}, "inner")
+    client._flush()
 
-        assert client.project_id_resolver.is_disabled
+    client.project = original_project
+    weave.publish({"cross_ref": inner_ref.uri(), "data": "test"}, name="outer-with-cross-ref")
+    client._flush()
 
-        # Data should still be readable (retry succeeded)
-        got = ref.get()
-        got_rows = list(got.rows)
-        assert len(got_rows) == 2
+    assert len(captured) >= 1
+    assert captured[-1] is None
 
-    @pytest.mark.disable_logging_error_check
-    def test_file_mismatch_retries_and_disables(
-        self, client: WeaveClient, fast_path: None, monkeypatch
-    ) -> None:
-        """File digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, ExternalTraceServer)
-        original = adapter.file_create
-        injected = False
 
-        def mismatch_once(req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-            nonlocal injected
-            if not injected and req.expected_digest is not None:
-                injected = True
-                raise DigestMismatchError("forced file mismatch")
-            return original(req)
+# On DigestMismatchError the client retries without expected_digest and
+# disables client-side digests for the rest of the session.
+@pytest.mark.disable_logging_error_check
+def test_object_mismatch_retries_and_disables(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    adapter = find_server_layer(client.server, ExternalTraceServer)
+    original = adapter.obj_create
+    seen_digests: list[str | None] = []
+    injected = False
 
-        monkeypatch.setattr(adapter, "file_create", mismatch_once)
+    def mismatch_once(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        nonlocal injected
+        seen_digests.append(req.obj.expected_digest)
+        if not injected and req.obj.expected_digest is not None:
+            injected = True
+            raise DigestMismatchError("forced mismatch")
+        return original(req)
 
-        img = Image.new("RGB", (2, 2), color="red")
-        weave.publish(img, name="mismatch-img")
-        client._flush()
+    monkeypatch.setattr(adapter, "obj_create", mismatch_once)
 
-        assert client.project_id_resolver.is_disabled
+    ref = weave.publish({"first": True}, name="mismatch-first")
+    client._flush()
+
+    assert seen_digests == [ref.digest, None]
+    assert client.project_id_resolver.is_disabled
+
+    seen_digests.clear()
+    weave.publish({"second": True}, name="mismatch-second")
+    client._flush()
+    assert seen_digests == [None]
+
+
+@pytest.mark.disable_logging_error_check
+def test_table_mismatch_retries_and_disables(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    adapter = find_server_layer(client.server, ExternalTraceServer)
+    original = adapter.table_create
+    injected = False
+
+    def mismatch_once(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        nonlocal injected
+        if not injected and req.table.expected_digest is not None:
+            injected = True
+            raise DigestMismatchError("forced table mismatch")
+        return original(req)
+
+    monkeypatch.setattr(adapter, "table_create", mismatch_once)
+
+    ds = weave.Dataset(name="mismatch-ds", rows=[{"x": 1}, {"x": 2}])
+    ref = weave.publish(ds, name="mismatch-ds")
+    client._flush()
+
+    assert client.project_id_resolver.is_disabled
+    assert len(list(ref.get().rows)) == 2
+
+
+@pytest.mark.disable_logging_error_check
+def test_file_mismatch_retries_and_disables(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    adapter = find_server_layer(client.server, ExternalTraceServer)
+    original = adapter.file_create
+    injected = False
+
+    def mismatch_once(req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        nonlocal injected
+        if not injected and req.expected_digest is not None:
+            injected = True
+            raise DigestMismatchError("forced file mismatch")
+        return original(req)
+
+    monkeypatch.setattr(adapter, "file_create", mismatch_once)
+
+    weave.publish(Image.new("RGB", (2, 2), color="red"), name="mismatch-img")
+    client._flush()
+    assert client.project_id_resolver.is_disabled

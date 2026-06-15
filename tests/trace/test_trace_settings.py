@@ -75,73 +75,41 @@ def test_disabled_env(client):
     )
 
 
+class _NamedObj:
+    name = "my_obj"
+
+
+class _UnnamedClass:
+    pass
+
+
 def test_publish_when_disabled(weave_active, monkeypatch):
-    """Test that weave.publish() returns a dummy ref when WEAVE_DISABLED=true."""
+    """publish() returns a DISABLED dummy ref and makes no network call when WEAVE_DISABLED=true.
+
+    Covers explicit name, name from obj attribute, name from class, and that
+    tags/aliases are silently ignored.
+    """
     monkeypatch.setenv("WEAVE_DISABLED", "true")
 
     with mock.patch(
         "weave.trace.api.weave_client_context.require_weave_client"
     ) as mock_require_client:
         ref = weave.publish({"foo": "bar"}, name="test_obj")
+        ref_obj_name = weave.publish(_NamedObj())
+        ref_class_name = weave.publish(_UnnamedClass())
+        ref_tagged = weave.publish(
+            {"data": "test"}, name="disabled_obj", tags=["prod"], aliases=["v1"]
+        )
         mock_require_client.assert_not_called()
 
     assert ref.entity == "DISABLED"
     assert ref.project == "DISABLED"
     assert ref.name == "test_obj"
     assert ref.digest == "DISABLED"
-
-
-def test_publish_when_disabled_uses_obj_name(weave_active, monkeypatch):
-    """Test that publish uses object's name attribute when no explicit name given."""
-    monkeypatch.setenv("WEAVE_DISABLED", "true")
-
-    class NamedObj:
-        name = "my_obj"
-
-    # Assert there is no network call made
-    with mock.patch(
-        "weave.trace.api.weave_client_context.require_weave_client"
-    ) as mock_require_client:
-        ref = weave.publish(NamedObj())
-        mock_require_client.assert_not_called()
-
-    assert ref.name == "my_obj"
-
-
-def test_publish_when_disabled_uses_class_name(weave_active, monkeypatch):
-    """Test that publish uses class name when object has no name attribute."""
-    monkeypatch.setenv("WEAVE_DISABLED", "true")
-
-    class MyClass:
-        pass
-
-    # Assert there is no network call made
-    with mock.patch(
-        "weave.trace.api.weave_client_context.require_weave_client"
-    ) as mock_require_client:
-        ref = weave.publish(MyClass())
-        mock_require_client.assert_not_called()
-
-    assert ref.name == "MyClass"
-
-
-def test_publish_when_disabled_ignores_tags_aliases(weave_active, monkeypatch):
-    """Tags and aliases should be silently ignored when weave is disabled."""
-    monkeypatch.setenv("WEAVE_DISABLED", "true")
-
-    with mock.patch(
-        "weave.trace.api.weave_client_context.require_weave_client"
-    ) as mock_require_client:
-        ref = weave.publish(
-            {"data": "test"},
-            name="disabled_obj",
-            tags=["prod"],
-            aliases=["v1"],
-        )
-        mock_require_client.assert_not_called()
-
-    assert ref.entity == "DISABLED"
-    assert ref.digest == "DISABLED"
+    assert ref_obj_name.name == "my_obj"
+    assert ref_class_name.name == "_UnnamedClass"
+    assert ref_tagged.entity == "DISABLED"
+    assert ref_tagged.digest == "DISABLED"
 
 
 def test_print_call_link_setting(client_creator):
@@ -484,158 +452,135 @@ def clean_settings_env(monkeypatch):
 
 
 @pytest.mark.usefixtures("clean_settings_env")
-class TestReplaceSettings:
-    def test_installs_snapshot(self):
-        replace_settings(UserSettings(disabled=True, print_call_link=False))
-        assert should_disable_weave() is True
-        assert should_print_call_link() is False
+def test_replace_settings_snapshot_semantics():
+    """replace_settings installs a full snapshot, resets unmentioned fields, and
+    None/no-args/dict inputs behave as documented."""
+    replace_settings(UserSettings(disabled=True, print_call_link=False))
+    assert should_disable_weave() is True
+    assert should_print_call_link() is False
 
-    def test_resets_unmentioned_fields(self):
-        replace_settings(UserSettings(disabled=True, print_call_link=False))
-        # Replacing with a fresh UserSettings(disabled=True) should NOT
-        # preserve print_call_link=False — replace-all semantics.
-        replace_settings(UserSettings(disabled=True))
-        assert should_disable_weave() is True
-        assert should_print_call_link() is True
+    # Replace-all semantics: a fresh UserSettings(disabled=True) drops the prior
+    # print_call_link=False.
+    replace_settings(UserSettings(disabled=True))
+    assert should_disable_weave() is True
+    assert should_print_call_link() is True
 
-    def test_none_resets_to_defaults(self):
-        replace_settings(UserSettings(disabled=True))
-        assert should_disable_weave() is True
-        replace_settings(None)
-        assert should_disable_weave() is False
+    replace_settings(None)
+    assert should_disable_weave() is False
 
-    def test_no_args_resets_to_defaults(self):
-        replace_settings(UserSettings(disabled=True))
-        replace_settings()
-        assert should_disable_weave() is False
+    replace_settings(UserSettings(disabled=True))
+    replace_settings()
+    assert should_disable_weave() is False
 
-    def test_dict_input(self):
-        replace_settings({"disabled": True, "redact_pii": True})
-        assert should_disable_weave() is True
-        assert should_redact_pii() is True
-
-    def test_dict_unknown_field_raises(self):
-        with pytest.raises(TypeError):
-            replace_settings({"definitely_not_a_real_field": True})
-
-    def test_invalid_type_raises(self):
-        with pytest.raises(TypeError):
-            replace_settings(42)
+    replace_settings({"disabled": True, "redact_pii": True})
+    assert should_disable_weave() is True
+    assert should_redact_pii() is True
 
 
 @pytest.mark.usefixtures("clean_settings_env")
-class TestOverrideSettings:
-    def test_scopes_one_field(self):
-        replace_settings(UserSettings(print_call_link=False))
-        assert should_disable_weave() is False
-        with override_settings(disabled=True):
+def test_replace_settings_invalid_inputs_raise():
+    with pytest.raises(TypeError):
+        replace_settings({"definitely_not_a_real_field": True})
+    with pytest.raises(TypeError):
+        replace_settings(42)
+
+
+@pytest.mark.usefixtures("clean_settings_env")
+def test_override_settings_scopes_and_nests():
+    """override_settings scopes a single field, restores on exit, and nests."""
+    replace_settings(UserSettings(print_call_link=False))
+    assert should_disable_weave() is False
+    with override_settings(disabled=True):
+        assert should_disable_weave() is True
+        assert should_print_call_link() is False
+        with override_settings(print_call_link=False):
             assert should_disable_weave() is True
-            # Other fields keep the surrounding snapshot's values
             assert should_print_call_link() is False
-        assert should_disable_weave() is False
+        assert should_disable_weave() is True
         assert should_print_call_link() is False
+    assert should_disable_weave() is False
+    assert should_print_call_link() is False
 
-    def test_nested(self):
+
+@pytest.mark.usefixtures("clean_settings_env")
+def test_override_settings_unknown_field_raises():
+    with pytest.raises(TypeError), override_settings(not_a_real_field=True):
+        pass
+
+
+@pytest.mark.usefixtures("clean_settings_env")
+def test_override_settings_async_context_does_not_leak():
+    """Each async context gets its own override stack."""
+
+    async def child():
         with override_settings(disabled=True):
             assert should_disable_weave() is True
-            with override_settings(print_call_link=False):
-                assert should_disable_weave() is True
-                assert should_print_call_link() is False
+            await asyncio.sleep(0)
             assert should_disable_weave() is True
-            assert should_print_call_link() is True
+
+    async def parent():
+        assert should_disable_weave() is False
+        await child()
         assert should_disable_weave() is False
 
-    def test_unknown_field_raises(self):
-        with pytest.raises(TypeError), override_settings(not_a_real_field=True):
-            pass
-
-    def test_async_context_does_not_leak(self):
-        """Each async context gets its own override stack."""
-
-        async def child():
-            with override_settings(disabled=True):
-                assert should_disable_weave() is True
-                await asyncio.sleep(0)
-                assert should_disable_weave() is True
-
-        async def parent():
-            # Parent does not override; child should see its own override;
-            # parent should not see leakage.
-            assert should_disable_weave() is False
-            await child()
-            assert should_disable_weave() is False
-
-        asyncio.run(parent())
+    asyncio.run(parent())
 
 
 @pytest.mark.usefixtures("clean_settings_env")
-class TestEnvOverlay:
-    def test_env_var_wins_over_snapshot(self, monkeypatch):
-        replace_settings(UserSettings(disabled=False))
-        assert should_disable_weave() is False
-        monkeypatch.setenv("WEAVE_DISABLED", "true")
-        assert should_disable_weave() is True
+def test_env_overlay_precedence_and_immediacy(monkeypatch):
+    """Env vars win over the snapshot, take effect immediately on change, and an
+    empty env var falls through to the snapshot value."""
+    replace_settings(UserSettings(disabled=False))
+    assert should_disable_weave() is False
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+    assert should_disable_weave() is True
+    monkeypatch.setenv("WEAVE_DISABLED", "false")
+    assert should_disable_weave() is False
+    monkeypatch.delenv("WEAVE_DISABLED")
+    assert should_disable_weave() is False
 
-    def test_env_var_change_takes_effect_immediately(self, monkeypatch):
-        """Q2 contract: users may flip env vars mid-process and reads pick it up."""
-        assert should_disable_weave() is False
-        monkeypatch.setenv("WEAVE_DISABLED", "true")
-        assert should_disable_weave() is True
-        monkeypatch.setenv("WEAVE_DISABLED", "false")
-        assert should_disable_weave() is False
-        monkeypatch.delenv("WEAVE_DISABLED")
-        assert should_disable_weave() is False
-
-    def test_empty_env_var_falls_through_to_snapshot(self, monkeypatch):
-        """An env var that exists but is empty is treated as unset."""
-        replace_settings(UserSettings(disabled=True))
-        monkeypatch.setenv("WEAVE_DISABLED", "")
-        assert should_disable_weave() is True
-
-    def test_coerces_int(self, monkeypatch):
-        monkeypatch.setenv("WEAVE_MAX_CALLS_QUEUE_SIZE", "42")
-        assert max_calls_queue_size() == 42
-
-    def test_coerces_float(self, monkeypatch):
-        monkeypatch.setenv("WEAVE_HTTP_TIMEOUT", "12.5")
-        assert http_timeout() == 12.5
-
-    def test_coerces_list(self, monkeypatch):
-        monkeypatch.setenv("WEAVE_REDACT_PII_FIELDS", "a,b,c")
-        assert redact_pii_fields() == ["a", "b", "c"]
-
-    def test_coerces_optional_int(self, monkeypatch):
-        monkeypatch.setenv("WEAVE_CLIENT_PARALLELISM", "7")
-        assert client_parallelism() == 7
+    # Empty env var is treated as unset, so the snapshot value shows through.
+    replace_settings(UserSettings(disabled=True))
+    monkeypatch.setenv("WEAVE_DISABLED", "")
+    assert should_disable_weave() is True
 
 
 @pytest.mark.usefixtures("clean_settings_env")
-class TestBackCompat:
-    def test_parse_and_apply_settings_is_alias_for_replace_settings(self):
-        """Back-compat: the prior public name still works."""
-        parse_and_apply_settings(UserSettings(disabled=True))
-        assert should_disable_weave() is True
-        parse_and_apply_settings(None)
-        assert should_disable_weave() is False
+def test_env_overlay_type_coercion(monkeypatch):
+    """Env values coerce to int, float, list, and optional-int."""
+    monkeypatch.setenv("WEAVE_MAX_CALLS_QUEUE_SIZE", "42")
+    monkeypatch.setenv("WEAVE_HTTP_TIMEOUT", "12.5")
+    monkeypatch.setenv("WEAVE_REDACT_PII_FIELDS", "a,b,c")
+    monkeypatch.setenv("WEAVE_CLIENT_PARALLELISM", "7")
+    assert max_calls_queue_size() == 42
+    assert http_timeout() == 12.5
+    assert redact_pii_fields() == ["a", "b", "c"]
+    assert client_parallelism() == 7
 
 
-class TestUserSettingsValue:
-    def test_is_frozen(self):
-        settings = UserSettings()
-        with pytest.raises(dataclasses.FrozenInstanceError):
-            settings.disabled = True
+@pytest.mark.usefixtures("clean_settings_env")
+def test_parse_and_apply_settings_is_alias_for_replace_settings():
+    """Back-compat: the prior public name still works."""
+    parse_and_apply_settings(UserSettings(disabled=True))
+    assert should_disable_weave() is True
+    parse_and_apply_settings(None)
+    assert should_disable_weave() is False
 
-    def test_rejects_unknown_kwargs(self):
-        with pytest.raises(TypeError):
-            UserSettings(not_a_field=True)
 
-    def test_settings_overrides_typeddict_matches_user_settings(self):
-        """The _SettingsOverrides TypedDict that types override_settings(**fields)
-        must mirror UserSettings exactly (same names, same types).  Drift means
-        the types lie to callers.
-        """
-        user_settings_hints = typing.get_type_hints(UserSettings)
-        overrides_hints = typing.get_type_hints(_SettingsOverrides)
-        assert user_settings_hints == overrides_hints, (
-            "_SettingsOverrides drift: add/update fields to match UserSettings"
-        )
+def test_user_settings_value_is_frozen_and_strict():
+    """UserSettings is a frozen dataclass that rejects unknown kwargs."""
+    settings = UserSettings()
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        settings.disabled = True
+    with pytest.raises(TypeError):
+        UserSettings(not_a_field=True)
+
+
+def test_settings_overrides_typeddict_matches_user_settings():
+    """The _SettingsOverrides TypedDict typing override_settings(**fields) must
+    mirror UserSettings exactly; drift means the types lie to callers."""
+    user_settings_hints = typing.get_type_hints(UserSettings)
+    overrides_hints = typing.get_type_hints(_SettingsOverrides)
+    assert user_settings_hints == overrides_hints, (
+        "_SettingsOverrides drift: add/update fields to match UserSettings"
+    )

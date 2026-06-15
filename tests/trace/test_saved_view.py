@@ -25,12 +25,9 @@ def test_to_seconds():
     assert to_seconds(dt) == 1740873600.0
 
 
-def test_filters_to_query():
+def test_filters_query_empty_inputs_return_none():
     assert filters_to_query(None) is None
     assert filters_to_query([]) is None
-
-
-def test_query_to_filters_none():
     assert query_to_filters(None) is None
 
 
@@ -218,18 +215,17 @@ def test_column_manipulation():
     assert view.base.definition.columns[0].path == ["inputs", "foo"]
 
 
-def test_saved_view_create(weave_active):
-    view = weave.SavedView("traces", "My saved view").hide_column("feedback").save()
-    assert view.label == "My saved view"
-    assert isinstance(view.ref, ObjectRef)
+def test_saved_view_create_save_and_load(weave_active):
+    # save() returns a view with a label and ObjectRef; load(uri) round-trips
+    # label, view_type, and column visibility back out.
+    created = weave.SavedView("traces", "My saved view").hide_column("feedback").save()
+    assert created.label == "My saved view"
+    assert isinstance(created.ref, ObjectRef)
 
-
-def test_saved_view_load(weave_active):
     saved_view = weave.SavedView("traces", "My saved view")
     saved_view.show_column("attributes.weave.client_version")
     saved_view.save()
-    uri = saved_view.ref.uri
-    loaded_view = weave.SavedView.load(uri)
+    loaded_view = weave.SavedView.load(saved_view.ref.uri)
     assert loaded_view.label == saved_view.label
     assert loaded_view.view_type == saved_view.view_type
     assert loaded_view.base.definition.cols["attributes.weave.client_version"] is True

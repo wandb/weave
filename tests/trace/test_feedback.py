@@ -1935,44 +1935,20 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
     )
     assert no_queue_feedback["queue_id"] is None
 
-
-def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
-    """Test feedback creation with invalid queue_id."""
-    project_id = client.project_id
-    weave_ref = f"weave:///{project_id}/call/call_id_invalid"
-    invalid_queue_id = "00000000-0000-0000-0000-000000000000"
-
-    # Case 1: Error with non-existent queue_id
+    # Case 3: non-existent queue_id is rejected.
     with pytest.raises(InvalidRequest, match="Queue .* not found or has been deleted"):
         client.server.feedback_create(
             FeedbackCreateReq(
                 project_id=project_id,
-                weave_ref=weave_ref,
+                weave_ref=f"weave:///{project_id}/call/call_id_invalid",
                 feedback_type="custom.score",
                 payload={"score": 5},
-                queue_id=invalid_queue_id,
+                queue_id="00000000-0000-0000-0000-000000000000",
             )
         )
 
-
-def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
-    """Test feedback creation with queue_id from a different project."""
-    project_id = client.project_id
+    # Case 4: a valid queue_id from another project does not cross over.
     other_project_id = f"{project_id}_other"
-
-    # Create a queue in the original project
-    queue_create_req = tsi.AnnotationQueueCreateReq(
-        project_id=project_id,
-        name="Original Project Queue",
-        description="Queue in original project",
-        scorer_refs=[],
-        wb_user_id="test_user",
-    )
-    queue_res = client.server.annotation_queue_create(queue_create_req)
-    queue_id = queue_res.id
-
-    # Try to create feedback in a different project with the queue_id
-    # This should fail because the queue doesn't belong to the target project
     with pytest.raises(InvalidRequest, match="Queue .* not found or has been deleted"):
         client.server.feedback_create(
             FeedbackCreateReq(
@@ -2170,6 +2146,18 @@ def test_feedback_stats(client: WeaveClient) -> None:
     assert ws["max"] == pytest.approx(1.0)
     assert ws["avg"] == pytest.approx(sum(scores) / len(scores), abs=1e-6)
 
+    # Empty metrics list returns empty buckets at the default granularity.
+    empty = client.server.feedback_stats(
+        tsi.FeedbackStatsReq(
+            project_id=project_id,
+            start=now - datetime.timedelta(hours=1),
+            end=now + datetime.timedelta(minutes=5),
+            metrics=[],
+        )
+    )
+    assert empty.buckets == []
+    assert empty.granularity == 3600
+
 
 def test_feedback_payload_schema(client: WeaveClient) -> None:
     """End-to-end: seed varied feedback, discover payload schema paths."""
@@ -2213,23 +2201,6 @@ def test_feedback_payload_schema(client: WeaveClient) -> None:
     assert path_map["output.score"] == "numeric"
     assert "label" in path_map
     assert path_map["label"] == "categorical"
-
-
-def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
-    """Empty metrics list returns empty buckets without error."""
-    project_id = client.project_id
-    now = datetime.datetime.now(datetime.timezone.utc)
-    res = client.server.feedback_stats(
-        tsi.FeedbackStatsReq(
-            project_id=project_id,
-            start=now - datetime.timedelta(hours=1),
-            end=now + datetime.timedelta(minutes=5),
-            metrics=[],
-        )
-    )
-
-    assert res.buckets == []
-    assert res.granularity == 3600
 
 
 def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None:

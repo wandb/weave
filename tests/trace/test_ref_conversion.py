@@ -33,133 +33,124 @@ from weave.trace.ref_conversion import (
 # ---------------------------------------------------------------------------
 
 
-def test_same_project_object_ref() -> None:
+@pytest.mark.parametrize(
+    ("uri", "expected_type", "expected_uri", "field_name", "field_value"),
+    [
+        (
+            "weave:///entity/proj/object/my_obj:abc123",
+            InternalObjectRef,
+            "weave-trace-internal:///int-id-1/object/my_obj:abc123",
+            "name",
+            "my_obj",
+        ),
+        (
+            "weave:///entity/proj/op/my_op:def456",
+            InternalOpRef,
+            "weave-trace-internal:///int-id-1/op/my_op:def456",
+            None,
+            None,
+        ),
+        (
+            "weave:///entity/proj/table/abc123",
+            InternalTableRef,
+            "weave-trace-internal:///int-id-1/table/abc123",
+            "digest",
+            "abc123",
+        ),
+        (
+            "weave:///entity/proj/call/call-id-123",
+            InternalCallRef,
+            "weave-trace-internal:///int-id-1/call/call-id-123",
+            "id",
+            "call-id-123",
+        ),
+        (
+            "weave:///entity/proj/agent_turn/0123456789abcdef0123456789abcdef",
+            InternalAgentTurnRef,
+            "weave-trace-internal:///int-id-1/agent_turn/0123456789abcdef0123456789abcdef",
+            "trace_id",
+            "0123456789abcdef0123456789abcdef",
+        ),
+        (
+            "weave:///entity/proj/agent_span/0123456789abcdef",
+            InternalAgentSpanRef,
+            "weave-trace-internal:///int-id-1/agent_span/0123456789abcdef",
+            "span_id",
+            "0123456789abcdef",
+        ),
+        (
+            "weave:///entity/proj/agent_conversation/sess-abc-123",
+            InternalAgentConversationRef,
+            "weave-trace-internal:///int-id-1/agent_conversation/sess-abc-123",
+            "conversation_id",
+            "sess-abc-123",
+        ),
+        (
+            "weave:///entity/proj/agent_conversation/user%2F42%3Asession",
+            InternalAgentConversationRef,
+            "weave-trace-internal:///int-id-1/agent_conversation/user%2F42%3Asession",
+            "conversation_id",
+            "user/42:session",
+        ),
+    ],
+    ids=[
+        "object",
+        "op",
+        "table",
+        "call",
+        "agent_turn",
+        "agent_span",
+        "agent_conversation",
+        "agent_conversation_encoded",
+    ],
+)
+def test_same_project_happy_path(
+    uri: str,
+    expected_type: type,
+    expected_uri: str,
+    field_name: str | None,
+    field_value: object,
+) -> None:
+    """Each ref kind parses to its Internal*Ref with the rewritten internal uri."""
     result = convert_same_project_ref(
-        "weave:///entity/proj/object/my_obj:abc123",
+        uri,
+        ext_project_id="entity/proj",
+        internal_project_id="int-id-1",
+    )
+    assert isinstance(result, expected_type)
+    assert result.uri == expected_uri
+    if field_name is not None:
+        assert getattr(result, field_name) == field_value
+
+
+@pytest.mark.parametrize(
+    ("uri", "expected_extra", "expected_uri"),
+    [
+        (
+            "weave:///entity/proj/object/ds:abc/attr/rows/id/rowdigest",
+            ["attr", "rows", "id", "rowdigest"],
+            "weave-trace-internal:///int-id-1/object/ds:abc/attr/rows/id/rowdigest",
+        ),
+        (
+            "weave:///entity/proj/object/ds:abc/attr/items/index/3",
+            ["attr", "items", "index", "3"],
+            "weave-trace-internal:///int-id-1/object/ds:abc/attr/items/index/3",
+        ),
+    ],
+    ids=["rows_id", "items_index"],
+)
+def test_same_project_preserves_extra_path(
+    uri: str, expected_extra: list[str], expected_uri: str
+) -> None:
+    """Extra path (attr/rows/id/... or .../index/N) is validated and preserved."""
+    result = convert_same_project_ref(
+        uri,
         ext_project_id="entity/proj",
         internal_project_id="int-id-1",
     )
     assert isinstance(result, InternalObjectRef)
-    assert result.name == "my_obj"
-    assert result.version == "abc123"
-    assert result.uri == "weave-trace-internal:///int-id-1/object/my_obj:abc123"
-
-
-def test_same_project_op_ref() -> None:
-    result = convert_same_project_ref(
-        "weave:///entity/proj/op/my_op:def456",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalOpRef)
-    assert result.uri == "weave-trace-internal:///int-id-1/op/my_op:def456"
-
-
-def test_same_project_table_ref() -> None:
-    result = convert_same_project_ref(
-        "weave:///entity/proj/table/abc123",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalTableRef)
-    assert result.digest == "abc123"
-    assert result.uri == "weave-trace-internal:///int-id-1/table/abc123"
-
-
-def test_same_project_call_ref() -> None:
-    result = convert_same_project_ref(
-        "weave:///entity/proj/call/call-id-123",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalCallRef)
-    assert result.id == "call-id-123"
-    assert result.uri == "weave-trace-internal:///int-id-1/call/call-id-123"
-
-
-def test_same_project_preserves_extra_path() -> None:
-    """Extra path (attr/rows/id/...) is validated and preserved.
-
-    Internal*Ref dataclasses run validate_extra in __post_init__,
-    matching the server's validation in refs_internal.py.
-    """
-    result = convert_same_project_ref(
-        "weave:///entity/proj/object/ds:abc/attr/rows/id/rowdigest",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalObjectRef)
-    assert result.extra == ["attr", "rows", "id", "rowdigest"]
-    assert (
-        result.uri
-        == "weave-trace-internal:///int-id-1/object/ds:abc/attr/rows/id/rowdigest"
-    )
-
-
-def test_same_project_with_index_extra() -> None:
-    result = convert_same_project_ref(
-        "weave:///entity/proj/object/ds:abc/attr/items/index/3",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalObjectRef)
-    assert result.extra == ["attr", "items", "index", "3"]
-    assert (
-        result.uri
-        == "weave-trace-internal:///int-id-1/object/ds:abc/attr/items/index/3"
-    )
-
-
-def test_same_project_agent_turn_ref() -> None:
-    result = convert_same_project_ref(
-        "weave:///entity/proj/agent_turn/0123456789abcdef0123456789abcdef",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalAgentTurnRef)
-    assert result.trace_id == "0123456789abcdef0123456789abcdef"
-    assert (
-        result.uri
-        == "weave-trace-internal:///int-id-1/agent_turn/0123456789abcdef0123456789abcdef"
-    )
-
-
-def test_same_project_agent_span_ref() -> None:
-    result = convert_same_project_ref(
-        "weave:///entity/proj/agent_span/0123456789abcdef",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalAgentSpanRef)
-    assert result.span_id == "0123456789abcdef"
-    assert result.uri == "weave-trace-internal:///int-id-1/agent_span/0123456789abcdef"
-
-
-def test_same_project_agent_conversation_ref_simple() -> None:
-    result = convert_same_project_ref(
-        "weave:///entity/proj/agent_conversation/sess-abc-123",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalAgentConversationRef)
-    assert result.conversation_id == "sess-abc-123"
-    assert (
-        result.uri == "weave-trace-internal:///int-id-1/agent_conversation/sess-abc-123"
-    )
-
-
-def test_same_project_agent_conversation_ref_encoded() -> None:
-    result = convert_same_project_ref(
-        "weave:///entity/proj/agent_conversation/user%2F42%3Asession",
-        ext_project_id="entity/proj",
-        internal_project_id="int-id-1",
-    )
-    assert isinstance(result, InternalAgentConversationRef)
-    assert result.conversation_id == "user/42:session"
-    assert (
-        result.uri
-        == "weave-trace-internal:///int-id-1/agent_conversation/user%2F42%3Asession"
-    )
+    assert result.extra == expected_extra
+    assert result.uri == expected_uri
 
 
 # ---------------------------------------------------------------------------
@@ -167,46 +158,30 @@ def test_same_project_agent_conversation_ref_encoded() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_same_project_raises_cross_project_for_different_project() -> None:
-    with pytest.raises(CrossProjectRefError, match="other/proj"):
-        convert_same_project_ref(
+@pytest.mark.parametrize(
+    ("uri", "exc", "match"),
+    [
+        (
             "weave:///other/proj/object/thing:xyz",
-            ext_project_id="entity/proj",
-            internal_project_id="int-id-1",
-        )
-
-
-def test_same_project_raises_for_non_weave_uri() -> None:
-    with pytest.raises(ValueError, match="Invalid URI"):
-        convert_same_project_ref(
-            "https://example.com/foo",
-            ext_project_id="entity/proj",
-            internal_project_id="int-id-1",
-        )
-
-
-def test_same_project_raises_for_malformed_ref() -> None:
-    with pytest.raises(ValueError, match="Invalid URI"):
-        convert_same_project_ref(
-            "weave:///onlyonepart",
-            ext_project_id="entity/proj",
-            internal_project_id="int-id-1",
-        )
-
-
-def test_same_project_raises_for_already_internal_ref() -> None:
-    with pytest.raises(ValueError, match="Invalid URI"):
-        convert_same_project_ref(
+            CrossProjectRefError,
+            "other/proj",
+        ),
+        ("https://example.com/foo", ValueError, "Invalid URI"),
+        ("weave:///onlyonepart", ValueError, "Invalid URI"),
+        (
             "weave-trace-internal:///int-id/object/thing:abc",
-            ext_project_id="entity/proj",
-            internal_project_id="int-id-1",
-        )
-
-
-def test_same_project_raises_for_unknown_kind() -> None:
-    with pytest.raises(ValueError, match="Unknown ref kind"):
+            ValueError,
+            "Invalid URI",
+        ),
+        ("weave:///entity/proj/unknown/foo:bar", ValueError, "Unknown ref kind"),
+    ],
+    ids=["cross_project", "non_weave", "malformed", "already_internal", "unknown_kind"],
+)
+def test_same_project_error_cases(uri: str, exc: type[Exception], match: str) -> None:
+    """Cross-project, non-weave, malformed, already-internal, and unknown kinds all raise."""
+    with pytest.raises(exc, match=match):
         convert_same_project_ref(
-            "weave:///entity/proj/unknown/foo:bar",
+            uri,
             ext_project_id="entity/proj",
             internal_project_id="int-id-1",
         )
@@ -217,36 +192,36 @@ def test_same_project_raises_for_unknown_kind() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_cross_project_resolves_via_resolver() -> None:
+@pytest.mark.parametrize(
+    ("uri", "expected_type", "expected_uri"),
+    [
+        (
+            "weave:///other_entity/other_proj/object/thing:xyz",
+            InternalObjectRef,
+            "weave-trace-internal:///other-int-id/object/thing:xyz",
+        ),
+        (
+            "weave:///other_entity/other_proj/agent_turn/0123456789abcdef0123456789abcdef",
+            InternalAgentTurnRef,
+            "weave-trace-internal:///other-int-id/agent_turn/0123456789abcdef0123456789abcdef",
+        ),
+    ],
+    ids=["object", "agent_turn"],
+)
+def test_cross_project_resolves_via_resolver(
+    uri: str, expected_type: type, expected_uri: str
+) -> None:
+    """Foreign project id is resolved and the ref is rewritten to the internal uri."""
     resolver = MagicMock()
     resolver.resolve_external_to_internal_project_id.return_value = "other-int-id"
 
     result = convert_cross_project_ref(
-        "weave:///other_entity/other_proj/object/thing:xyz",
+        uri,
         ext_project_id="entity/proj",
         resolver=resolver,
     )
-    assert isinstance(result, InternalObjectRef)
-    assert result.uri == "weave-trace-internal:///other-int-id/object/thing:xyz"
-    resolver.resolve_external_to_internal_project_id.assert_called_once_with(
-        "other_entity/other_proj"
-    )
-
-
-def test_cross_project_resolves_agent_turn_ref() -> None:
-    resolver = MagicMock()
-    resolver.resolve_external_to_internal_project_id.return_value = "other-int-id"
-
-    result = convert_cross_project_ref(
-        "weave:///other_entity/other_proj/agent_turn/0123456789abcdef0123456789abcdef",
-        ext_project_id="entity/proj",
-        resolver=resolver,
-    )
-    assert isinstance(result, InternalAgentTurnRef)
-    assert (
-        result.uri
-        == "weave-trace-internal:///other-int-id/agent_turn/0123456789abcdef0123456789abcdef"
-    )
+    assert isinstance(result, expected_type)
+    assert result.uri == expected_uri
     resolver.resolve_external_to_internal_project_id.assert_called_once_with(
         "other_entity/other_proj"
     )

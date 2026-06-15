@@ -37,61 +37,44 @@ def example_class():
     return Example, expected_record
 
 
-def test_deepcopy_weavelist(client):
-    lst = WeaveList([1, 2, 3], server=client.server)
-    res = deepcopy(lst)
-    assert res == [1, 2, 3]
-    assert id(res) != id(lst)
-
-
-def test_deepcopy_weavelist_e2e(weave_active):
-    lst = [1, 2, 3]
-    ref = weave.publish(lst)
-    lst2 = ref.get()
-    res = deepcopy(lst2)
-    assert res == [1, 2, 3]
-    assert id(res) != id(lst2)
-
-
-def test_deepcopy_weavedict(client):
-    d = WeaveDict({"a": 1, "b": 2}, server=client.server)
-    res = deepcopy(d)
-    assert res == {"a": 1, "b": 2}
-    assert id(res) != id(d)
-
-
-def test_deepcopy_weavedict_e2e(weave_active):
-    d = {"a": 1, "b": 2}
-    ref = weave.publish(d)
-    d2 = ref.get()
-    res = deepcopy(d2)
-    assert res == {"a": 1, "b": 2}
-    assert id(res) != id(d2)
-
-
-def test_deepcopy_weaveobject(client, example_class):
+def test_deepcopy_weave_containers(client, example_class):
+    """deepcopy of server-backed WeaveList/WeaveDict/WeaveObject yields equal, distinct copies."""
     _, expected_record = example_class
 
-    o = WeaveObject(
-        expected_record,
-        ref=None,
-        root=None,
-        server=client.server,
-    )
-    res = deepcopy(o)
-    assert res == expected_record
-    assert id(res) != id(o)
+    lst = WeaveList([1, 2, 3], server=client.server)
+    lst_copy = deepcopy(lst)
+    assert lst_copy == [1, 2, 3]
+    assert id(lst_copy) != id(lst)
+
+    d = WeaveDict({"a": 1, "b": 2}, server=client.server)
+    d_copy = deepcopy(d)
+    assert d_copy == {"a": 1, "b": 2}
+    assert id(d_copy) != id(d)
+
+    o = WeaveObject(expected_record, ref=None, root=None, server=client.server)
+    o_copy = deepcopy(o)
+    assert o_copy == expected_record
+    assert id(o_copy) != id(o)
 
 
-def test_deepcopy_weaveobject_e2e(weave_active, example_class):
+def test_deepcopy_weave_containers_e2e(weave_active, example_class):
+    """deepcopy of published-then-fetched list/dict/object yields equal, distinct copies."""
     cls, expected_record = example_class
 
-    o = cls()
-    ref = weave.publish(o)
-    o2 = ref.get()
-    res = deepcopy(o2)
-    assert res == expected_record
-    assert id(res) != id(o2)
+    lst2 = weave.publish([1, 2, 3]).get()
+    lst_copy = deepcopy(lst2)
+    assert lst_copy == [1, 2, 3]
+    assert id(lst_copy) != id(lst2)
+
+    d2 = weave.publish({"a": 1, "b": 2}).get()
+    d_copy = deepcopy(d2)
+    assert d_copy == {"a": 1, "b": 2}
+    assert id(d_copy) != id(d2)
+
+    o2 = weave.publish(cls()).get()
+    o_copy = deepcopy(o2)
+    assert o_copy == expected_record
+    assert id(o_copy) != id(o2)
 
 
 @pytest.mark.parametrize(
@@ -132,16 +115,3 @@ def test_deepcopy_ref_with_future():
 
     assert res == ref
     assert id(res) != id(ref)
-
-
-# # Not sure about the implications here yet
-# def test_deepcopy_weavetable(client):
-#     t = WeaveTable(
-#         table_ref=None,
-#         ref=None,
-#         server=client.server,
-#         filter=TableRowFilter(),
-#         root=None,
-#     )
-#     res = deepcopy(t)
-#     assert res == t

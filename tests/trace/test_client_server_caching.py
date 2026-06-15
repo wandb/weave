@@ -558,158 +558,73 @@ def test_cache_directory_creation(tmp_path):
     cache_server.close()
 
 
-def test_cache_invalidation_on_add_tags(client):
-    """obj_read cache should be invalidated when tags are added."""
+def test_cache_invalidation_on_tag_and_alias_mutations(client):
+    """obj_read cache is invalidated by every tag/alias mutation path.
+
+    Covers add/remove tags and set/remove aliases: each primes the cache (and
+    verifies a hit on re-read), mutates, then asserts the next read misses and
+    reflects the mutation.
+    """
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
-    ref = weave.publish({"data": "test"}, name="cache_inv_add_tags")
 
-    # Prime the cache with an obj_read that includes tags
-    caching_server.reset_cache_recorder()
-    res1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
+    def read(ref):
+        return client.server.obj_read(
+            ObjReadReq(
+                project_id=client.project_id,
+                object_id=ref.name,
+                digest=ref.digest,
+                include_tags_and_aliases=True,
+            )
         )
-    )
+
+    # add tags: starts empty, second read hits cache, mutation invalidates.
+    add_ref = weave.publish({"data": "test"}, name="cache_inv_add_tags")
+    caching_server.reset_cache_recorder()
+    assert read(add_ref).obj.tags == []
     assert caching_server.get_cache_recorder()["misses"] == 1
-    assert res1.obj.tags == []
-
-    # Second read should hit cache
     caching_server.reset_cache_recorder()
-    client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
-    )
+    read(add_ref)
     assert caching_server.get_cache_recorder()["hits"] == 1
-
-    # Add tags — should invalidate cache
-    client.add_tags(ref, ["new-tag"])
-
-    # Next read should miss (cache was invalidated)
+    client.add_tags(add_ref, ["new-tag"])
     caching_server.reset_cache_recorder()
-    res2 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
-    )
+    res = read(add_ref)
     assert caching_server.get_cache_recorder()["misses"] == 1
-    assert res2.obj.tags == ["new-tag"]
+    assert res.obj.tags == ["new-tag"]
 
-
-def test_cache_invalidation_on_remove_tags(client):
-    """obj_read cache should be invalidated when tags are removed."""
-    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
-    ref = weave.publish({"data": "test"}, name="cache_inv_rm_tags")
-    client.add_tags(ref, ["removable"])
-
-    # Prime cache
+    # remove tags.
+    rm_tag_ref = weave.publish({"data": "test"}, name="cache_inv_rm_tags")
+    client.add_tags(rm_tag_ref, ["removable"])
     caching_server.reset_cache_recorder()
-    res1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
-    )
-    assert res1.obj.tags == ["removable"]
+    assert read(rm_tag_ref).obj.tags == ["removable"]
     assert caching_server.get_cache_recorder()["misses"] == 1
-
-    # Remove tags — should invalidate cache
-    client.remove_tags(ref, ["removable"])
-
-    # Next read should miss
+    client.remove_tags(rm_tag_ref, ["removable"])
     caching_server.reset_cache_recorder()
-    res2 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
-    )
+    res = read(rm_tag_ref)
     assert caching_server.get_cache_recorder()["misses"] == 1
-    assert res2.obj.tags == []
+    assert res.obj.tags == []
 
-
-def test_cache_invalidation_on_set_alias(client):
-    """obj_read cache should be invalidated when an alias is set."""
-    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
-    ref = weave.publish({"data": "test"}, name="cache_inv_set_alias")
-
-    # Prime cache
+    # set alias.
+    set_alias_ref = weave.publish({"data": "test"}, name="cache_inv_set_alias")
     caching_server.reset_cache_recorder()
-    res1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
-    )
+    assert read(set_alias_ref).obj.aliases == ["latest"]
     assert caching_server.get_cache_recorder()["misses"] == 1
-    assert res1.obj.aliases == ["latest"]
-
-    # Set alias — should invalidate cache
-    client.set_aliases(ref, "prod")
-
-    # Next read should miss
+    client.set_aliases(set_alias_ref, "prod")
     caching_server.reset_cache_recorder()
-    res2 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
-    )
+    res = read(set_alias_ref)
     assert caching_server.get_cache_recorder()["misses"] == 1
-    assert "prod" in res2.obj.aliases
+    assert "prod" in res.obj.aliases
 
-
-def test_cache_invalidation_on_remove_aliases(client):
-    """obj_read cache should be invalidated when aliases are removed."""
-    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
-    ref = weave.publish({"data": "test"}, name="cache_inv_rm_alias")
-    client.set_aliases(ref, "staging")
-
-    # Prime cache
+    # remove aliases.
+    rm_alias_ref = weave.publish({"data": "test"}, name="cache_inv_rm_alias")
+    client.set_aliases(rm_alias_ref, "staging")
     caching_server.reset_cache_recorder()
-    res1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
-    )
-    assert "staging" in res1.obj.aliases
+    assert "staging" in read(rm_alias_ref).obj.aliases
     assert caching_server.get_cache_recorder()["misses"] == 1
-
-    # Remove alias — should invalidate cache
-    client.remove_aliases(ref, "staging")
-
-    # Next read should miss
+    client.remove_aliases(rm_alias_ref, "staging")
     caching_server.reset_cache_recorder()
-    res2 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
-    )
+    res = read(rm_alias_ref)
     assert caching_server.get_cache_recorder()["misses"] == 1
-    assert "staging" not in res2.obj.aliases
+    assert "staging" not in res.obj.aliases
 
 
 def test_invalidation_prefix_is_prefix_of_cache_key():

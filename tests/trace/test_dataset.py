@@ -17,22 +17,16 @@ def test_basic_dataset_lifecycle(weave_active):
         )
 
 
-def test_dataset_iteration(weave_active):
+def test_dataset_iteration_and_pythonic_access(weave_active):
+    # Iteration is repeatable; len/__getitem__ work and negative indices raise.
     dataset = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     rows = list(dataset)
     assert rows == [{"a": 5, "b": 6}, {"a": 7, "b": 10}]
+    assert list(dataset) == rows
 
-    # Test that we can iterate multiple times
-    rows2 = list(dataset)
-    assert rows2 == rows
-
-
-def test_pythonic_access(weave_active):
-    rows = [{"a": 1}, {"a": 2}, {"a": 3}, {"a": 4}, {"a": 5}]
-    ds = weave.Dataset(rows=rows)
+    ds = weave.Dataset(rows=[{"a": i} for i in range(1, 6)])
     assert len(ds) == 5
     assert ds[0] == {"a": 1}
-
     with pytest.raises(IndexError):
         ds[-1]
 
@@ -231,11 +225,10 @@ def test_add_rows(weave_active):
     ds4 = weave.publish(ds3).get()
     assert ds3.rows == ds4.rows
 
-
-def test_add_rows_to_unsaved_dataset(weave_active):
-    ds = weave.Dataset(rows=[{"a": i} for i in range(10)])
+    # add_rows on an unsaved (never-published) dataset raises TypeError.
+    unsaved = weave.Dataset(rows=[{"a": i} for i in range(10)])
     with pytest.raises(TypeError):
-        ds.add_rows([{"a": 10}])
+        unsaved.add_rows([{"a": 10}])
 
 
 def test_hf_conversion(weave_active):

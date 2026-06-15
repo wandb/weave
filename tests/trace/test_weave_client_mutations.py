@@ -249,14 +249,16 @@ def test_dict_mutation_saving_nested_lists(weave_active):
     assert d3["c"] == [5, 6]
 
 
-def test_table_mutation_saving_append_rows(weave_active):
-    t = weave.Table(rows=[{"a": 1, "b": 2}])
+def test_table_mutation_saving(weave_active):
+    # Append/pop on a fresh table, then append/pop/replace on published tables.
+    t = weave.Table(rows=[{"a": 1, "b": 2}, {"a": 9, "b": 10}])
     t.append({"a": 3, "b": 4})
+    t.pop(0)
     ref = weave.publish(t)
 
     t2 = ref.get()
     assert t2.rows == [
-        {"a": 1, "b": 2},
+        {"a": 9, "b": 10},
         {"a": 3, "b": 4},
     ]
     t2.append({"a": 5, "b": 6})
@@ -264,69 +266,33 @@ def test_table_mutation_saving_append_rows(weave_active):
 
     t3 = ref2.get()
     assert t3.rows == [
-        {"a": 1, "b": 2},
+        {"a": 9, "b": 10},
+        {"a": 3, "b": 4},
+        {"a": 5, "b": 6},
+    ]
+    t3.pop(0)
+    ref3 = weave.publish(t3)
+
+    t4 = ref3.get()
+    assert t4.rows == [
         {"a": 3, "b": 4},
         {"a": 5, "b": 6},
     ]
 
+    t4.rows = [{"a": 7, "b": 8}]
+    ref4 = weave.publish(t4)
 
-def test_table_mutation_saving_pop_rows(weave_active):
-    t = weave.Table(
-        rows=[
-            {"a": 1, "b": 2},
-            {"a": 3, "b": 4},
-            {"a": 5, "b": 6},
-        ]
-    )
-    t.pop(0)
-    ref = weave.publish(t)
-
-    t2 = ref.get()
-    assert t2.rows == [
-        {"a": 3, "b": 4},
-        {"a": 5, "b": 6},
-    ]
-    t2.pop(0)
-    ref2 = weave.publish(t2)
-
-    t3 = ref2.get()
-    assert t3.rows == [{"a": 5, "b": 6}]
+    t5 = ref4.get()
+    assert t5.rows == [{"a": 7, "b": 8}]
 
 
-def test_table_mutation_saving_replace_rows(weave_active):
-    t = weave.Table(
-        rows=[
-            {"a": 1, "b": 2},
-            {"a": 3, "b": 4},
-        ]
-    )
-    ref = weave.publish(t)
-
-    t2 = ref.get()
-    t2.rows = [{"a": 5, "b": 6}]
-    ref2 = weave.publish(t2)
-
-    t3 = ref2.get()
-    assert t3.rows == [{"a": 5, "b": 6}]
-
-
-def test_table_cant_append_bad_data(weave_active):
+def test_table_validation_rejects_bad_data(weave_active):
+    # Bad append payloads and bad row assignments, on fresh and published tables.
     t = weave.Table(rows=[{"a": 1, "b": 2}])
     with pytest.raises(TypeError):
         t.append(1)
     with pytest.raises(TypeError):
         t.append([1, 2, 3])
-
-    ref = weave.publish(t)
-    t2 = ref.get()
-    with pytest.raises(TypeError):
-        t2.append(1)
-    with pytest.raises(TypeError):
-        t2.append([1, 2, 3])
-
-
-def test_table_cant_set_bad_data(weave_active):
-    t = weave.Table(rows=[{"a": 1, "b": 2}])
     with pytest.raises(ValueError, match="must be (a list of )?dicts"):
         t.rows = [1, 2, 3]
     with pytest.raises(ValueError, match="must be (a list of )?dicts"):
@@ -334,6 +300,10 @@ def test_table_cant_set_bad_data(weave_active):
 
     ref = weave.publish(t)
     t2 = ref.get()
+    with pytest.raises(TypeError):
+        t2.append(1)
+    with pytest.raises(TypeError):
+        t2.append([1, 2, 3])
     with pytest.raises(ValueError, match="must be (a list of )?dicts"):
         t2.rows = [1, 2, 3]
     with pytest.raises(ValueError, match="must be (a list of )?dicts"):

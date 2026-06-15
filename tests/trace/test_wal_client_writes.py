@@ -34,6 +34,386 @@ from weave.trace import weave_client
 from weave.trace.settings import UserSettings, override_settings
 from weave.trace_server import trace_server_interface as tsi
 
+# The initial WAL points at the shared ~/.weave/wal/<entity>/<project>/
+# directory, so starting a sender there races with parallel xdist workers
+# and has triggered Windows file-handle errors.  Both fixtures redirect
+# to an isolated tmp_path, so no sender needs to run against the default.
+_INITIAL_WAL_SETTINGS = UserSettings(enable_wal=True, disable_wal_sender=True)
+
+
+@pytest.fixture
+def wal_client(client_creator, tmp_path):
+    """Create a client with WAL enabled but sender stopped (write-only)."""
+    wal_dir = str(tmp_path / "wal")
+    with client_creator(settings=_INITIAL_WAL_SETTINGS) as client:
+        _redirect_wal_to(client, wal_dir)
+        yield client
+
+
+@pytest.fixture
+def wal_client_with_sender(client_creator, tmp_path):
+    """Create a client with WAL enabled and sender running."""
+    wal_dir = str(tmp_path / "wal")
+    with client_creator(settings=_INITIAL_WAL_SETTINGS) as client:
+        _redirect_wal_to(client, wal_dir)
+        client._wal._sender = create_sender(wal_dir, client.server)
+        client._wal._sender.start()
+        yield client
+
+
+def test_obj_table_and_file_create_write_records(wal_client):
+    """obj_create, table_create, and image publish (file+obj) all hit the WAL."""
+    project_id = f"{wal_client.entity}/{wal_client.project}"
+
+    weave.publish({"model": "gpt-4", "temp": 0.7}, name="my_obj")
+    wal_client._flush()
+    records = _read_all_wal_records(wal_client)
+    assert len(records) == 1
+    assert records[0] == {
+        "type": "obj_create",
+        "req": {
+            "obj": {
+                "project_id": project_id,
+                "object_id": "my_obj",
+                "val": {"model": "gpt-4", "temp": 0.7},
+                "builtin_object_class": None,
+                "expected_digest": None,
+                "wb_user_id": None,
+            }
+        },
+    }
+
+    wal_client._send_table_create([{"x": 1}, {"x": 2}])
+    wal_client._flush()
+    table_recs = [r for r in _read_all_wal_records(wal_client) if r["type"] == "table_create"]
+    assert len(table_recs) == 1
+    assert table_recs[0] == {
+        "type": "table_create",
+        "req": {
+            "table": {
+                "project_id": project_id,
+                "rows": [{"x": 1}, {"x": 2}],
+                "expected_digest": None,
+            }
+        },
+    }
+
+    img = Image.new("RGB", (2, 2), color="red")
+    weave.publish(img, name="my_image")
+    wal_client._flush()
+    img_records = _read_all_wal_records(wal_client)
+    file_recs = [r for r in img_records if r["type"] == "file_create"]
+    assert any(
+        r["req"]["project_id"] == project_id and r["req"]["name"] == "obj.py"
+        for r in file_recs
+    )
+    image_obj = next(
+        r
+        for r in img_records
+        if r["type"] == "obj_create"
+        and r["req"]["obj"]["object_id"] == "my_image"
+    )
+    assert image_obj["req"]["obj"]["val"]["weave_type"] == {"type": "PIL.Image.Image"}
+
+
+def test_call_start_and_end_records(wal_client):
+    """A traced op writes one call_start and one call_end with all fields populated."""
+
+    @weave.op
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    add(1, 2)
+    wal_client._flush()
+
+    records = _read_all_wal_records(wal_client)
+    project_id = f"{wal_client.entity}/{wal_client.project}"
+
+    call_starts = [r for r in records if r["type"] == "call_start"]
+    call_ends = [r for r in records if r["type"] == "call_end"]
+    assert len(call_starts) == 1
+    assert len(call_ends) == 1
+
+    start = call_starts[0]["req"]["start"]
+    assert start["project_id"] == project_id
+    assert "/op/add:" in start["op_name"]
+    assert start["inputs"] == {"a": 1, "b": 2}
+    assert start["id"] is not None
+    assert start["trace_id"] is not None
+    assert start["started_at"] is not None
+    assert isinstance(start["attributes"], dict)
+    assert start["parent_id"] is None
+
+    end = call_ends[0]["req"]["end"]
+    assert end["project_id"] == project_id
+    assert end["id"] is not None
+    assert end["output"] == 3
+    assert end["ended_at"] is not None
+    assert end["exception"] is None
+    assert isinstance(end["summary"], dict)
+
+
+def test_call_with_exception(wal_client):
+    """A failing op should record the exception in call_end."""
+
+    @weave.op
+    def fail() -> None:
+        raise ValueError("boom")
+
+    with pytest.raises(ValueError, match="boom"):
+        fail()
+    wal_client._flush()
+
+    records = _read_all_wal_records(wal_client)
+    call_ends = [r for r in records if r["type"] == "call_end"]
+    assert len(call_ends) == 1
+    assert "boom" in call_ends[0]["req"]["end"]["exception"]
+
+
+def test_nested_calls(wal_client):
+    """Nested op calls should produce parent-child call_start records."""
+
+    @weave.op
+    def inner(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def outer(x: int) -> int:
+        return inner(x)
+
+    outer(5)
+    wal_client._flush()
+
+    records = _read_all_wal_records(wal_client)
+    call_starts = [r for r in records if r["type"] == "call_start"]
+    call_ends = [r for r in records if r["type"] == "call_end"]
+    assert len(call_starts) == 2
+    assert len(call_ends) == 2
+
+    outer_start = next(s for s in call_starts if "outer" in s["req"]["start"]["op_name"])
+    inner_start = next(s for s in call_starts if "inner" in s["req"]["start"]["op_name"])
+    assert (
+        inner_start["req"]["start"]["parent_id"] == outer_start["req"]["start"]["id"]
+    )
+    assert (
+        inner_start["req"]["start"]["trace_id"]
+        == outer_start["req"]["start"]["trace_id"]
+    )
+
+    outer_end = next(
+        e for e in call_ends if e["req"]["end"]["id"] == outer_start["req"]["start"]["id"]
+    )
+    inner_end = next(
+        e for e in call_ends if e["req"]["end"]["id"] == inner_start["req"]["start"]["id"]
+    )
+    assert inner_end["req"]["end"]["output"] == 10
+    assert outer_end["req"]["end"]["output"] == 10
+
+
+def test_wal_records_json_serializable_and_flush_fsyncs(wal_client):
+    """Records round-trip through JSON, and flush() fsyncs (records survive a crash)."""
+    weave.publish({"nested": {"list": [1, 2, 3]}}, name="json_obj")
+    wal_client._flush()
+    records = _read_all_wal_records(wal_client)
+    assert len(records) == 1
+    assert json.loads(json.dumps(records[0])) == records[0]
+
+    weave.publish({"a": 1}, name="fsync_obj")
+    wal_client.flush()
+    records = _read_all_wal_records(wal_client)
+    fsync_recs = [r for r in records if r["req"]["obj"]["object_id"] == "fsync_obj"]
+    assert len(fsync_recs) == 1
+    assert fsync_recs[0]["type"] == "obj_create"
+
+
+def test_client_works_when_wal_disabled(client, weave_active):
+    """Default client has _wal=None; publish/dataset-publish/flush all work."""
+    assert client._wal is None
+
+    assert weave.publish({"key": "value"}, name="no_wal_obj") is not None
+    ds = weave.Dataset(name="no_wal_ds", rows=[{"x": 1}])
+    assert weave.publish(ds, name="no_wal_ds") is not None
+
+    weave.publish({"a": 1}, name="flush_obj")
+    client.flush()  # must not raise
+
+
+@pytest.mark.parametrize("publish_fn", ["obj", "dataset"])
+def test_sender_drains_wal_on_close(wal_client_with_sender, publish_fn):
+    """The in-process sender drains obj and table records, leaving no files on close."""
+    if publish_fn == "obj":
+        weave.publish({"k": "v"}, name="sender_obj")
+    else:
+        weave.publish(weave.Dataset(name="sender_ds", rows=[{"x": 1}]), name="sender_ds")
+    wal_client_with_sender._flush()
+    wal_dir = Path(wal_client_with_sender._wal.wal_dir)
+    wal_client_with_sender._wal.close()
+    assert len(list(wal_dir.glob("*.jsonl"))) == 0
+
+
+def test_write_only_manager_persists_records(tmp_path):
+    """WALManager without sender writes records but doesn't drain them."""
+    mgr = WALManager("test-entity", "test-project")
+    mgr.wal_dir = str(tmp_path)
+    mgr._writer = JSONLWALWriter(FileWALDirectoryManager(str(tmp_path)))
+
+    mgr.write(
+        "obj_create",
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id="test-entity/test-project",
+                object_id="test_obj",
+                val={"hello": "world"},
+            )
+        ),
+    )
+    mgr.flush()
+
+    records: list[dict] = []
+    for path in sorted(tmp_path.glob("*.jsonl")):
+        consumer = JSONLWALConsumer(str(path))
+        try:
+            for entry in consumer.read_pending():
+                records.append(entry.record)
+        finally:
+            consumer.close()
+
+    assert len(records) == 1
+    assert records[0] == {
+        "type": "obj_create",
+        "req": {
+            "obj": {
+                "project_id": "test-entity/test-project",
+                "object_id": "test_obj",
+                "val": {"hello": "world"},
+                "builtin_object_class": None,
+                "expected_digest": None,
+                "wb_user_id": None,
+            }
+        },
+    }
+    # No sender — file should still be on disk.
+    assert len(list(tmp_path.glob("*.jsonl"))) == 1
+    mgr.close()
+
+
+@pytest.mark.disable_logging_error_check
+def test_close_is_idempotent(tmp_path, wal_client_with_sender):
+    """close() is safe to call twice, both bare-manager and with a running sender."""
+    mgr = WALManager("test-entity", "test-project")
+    mgr.close()
+    mgr.close()
+
+    wal_client_with_sender._wal.close()
+    wal_client_with_sender._wal.close()
+
+
+def test_trace_server_handlers_dispatch():
+    """Handlers cover every record type and each replays the dict to the matching method.
+
+    Covers the obj_create, table_create, and call_start replay paths plus parity
+    between the class `as_dict()` and the `build_trace_server_handlers` convenience.
+    """
+    mock_server = MagicMock()
+    handlers = TraceServerHandlers(mock_server).as_dict()
+    assert set(handlers.keys()) == set(_RECORD_TYPE_TO_REQ.keys())
+    assert set(build_trace_server_handlers(mock_server).keys()) == set(handlers.keys())
+
+    obj_req = tsi.ObjCreateReq(
+        obj=tsi.ObjSchemaForInsert(project_id="e/p", object_id="test", val={"x": 1})
+    )
+    handlers["obj_create"]({"type": "obj_create", "req": obj_req.model_dump(mode="json")})
+    mock_server.obj_create.assert_called_once()
+    obj_arg = mock_server.obj_create.call_args[0][0]
+    assert isinstance(obj_arg, tsi.ObjCreateReq)
+    assert obj_arg.obj.object_id == "test"
+
+    table_req = tsi.TableCreateReq(
+        table=tsi.TableSchemaForInsert(
+            project_id="e/p", rows=[{"val": {"x": 1}, "digest": "abc123"}]
+        )
+    )
+    handlers["table_create"](
+        {"type": "table_create", "req": table_req.model_dump(mode="json")}
+    )
+    mock_server.table_create.assert_called_once()
+
+    started = datetime.datetime.now(datetime.timezone.utc)
+    start_req = tsi.CallStartReq(
+        start=tsi.StartedCallSchemaForInsert(
+            project_id="e/p",
+            op_name="predict",
+            trace_id="t1",
+            started_at=started,
+            attributes={"k": "v"},
+            inputs={"x": 1},
+        )
+    )
+    handlers["call_start"](
+        {"type": "call_start", "req": start_req.model_dump(mode="json")}
+    )
+    mock_server.call_start.assert_called_once()
+    start_arg = mock_server.call_start.call_args[0][0]
+    assert isinstance(start_arg, tsi.CallStartReq)
+    assert start_arg.start.op_name == "predict"
+    assert start_arg.start.started_at == started
+    assert start_arg.start.attributes == {"k": "v"}
+    assert start_arg.start.inputs == {"x": 1}
+
+
+def test_file_create_roundtrips_bytes_content():
+    """file_create handler must preserve bytes content through replay.
+
+    Pydantic v2 dumps bytes fields as utf-8 strings under mode="json" and
+    model_validate re-encodes them; the round-trip must be lossless for content
+    that actually reaches the WAL (non-utf8 bytes fail at write time).
+    """
+    mock_server = MagicMock()
+    handlers = TraceServerHandlers(mock_server).as_dict()
+
+    original_content = "small file body — including non-ascii: café 🎉".encode()
+    req = tsi.FileCreateReq(project_id="e/p", name="note.txt", content=original_content)
+    handlers["file_create"]({"type": "file_create", "req": req.model_dump(mode="json")})
+
+    mock_server.file_create.assert_called_once()
+    call_arg = mock_server.file_create.call_args[0][0]
+    assert isinstance(call_arg, tsi.FileCreateReq)
+    assert call_arg.content == original_content
+
+
+def test_create_sender_returns_startable_sender(tmp_path):
+    """create_sender returns a configured BackgroundWALSender that starts and stops."""
+    mock_server = MagicMock()
+    sender = create_sender(str(tmp_path), mock_server, poll_interval=0.5)
+    assert isinstance(sender, BackgroundWALSender)
+    assert sender._poll_interval == 0.5
+
+    sender2 = create_sender(str(tmp_path), mock_server, poll_interval=0.1)
+    sender2.start()
+    sender2.stop()
+
+
+@pytest.mark.parametrize("with_api_key", [True, False])
+def test_wal_directory_namespacing_by_api_key(client, with_api_key):
+    """With api_key the WAL dir ends in an HMAC subdir; without it, the flat project path."""
+    api_key = "wk-test-key-for-wal-namespacing" if with_api_key else None
+    with override_settings(enable_wal=True, disable_wal_sender=True):
+        wc = weave_client.WeaveClient(
+            client.entity,
+            client.project,
+            client.server,
+            ensure_project_exists=False,
+            api_key=api_key,
+        )
+        try:
+            assert wc._wal is not None
+            if with_api_key:
+                assert wc._wal.wal_dir.endswith(compute_client_id(api_key))
+            else:
+                assert wc._wal.wal_dir.endswith(wc.project)
+        finally:
+            wc._wal.close()
+
 
 def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
     """Read all records from a client's WAL directory."""
@@ -52,544 +432,8 @@ def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
 
 
 def _redirect_wal_to(client: weave.WeaveClient, wal_dir: str) -> None:
-    """Replace the client's WAL writer (and optionally sender) to use *wal_dir*.
-
-    This gives each test an isolated WAL directory so parallel xdist
-    workers never interfere with each other.
-    """
+    """Replace the client's WAL writer to use *wal_dir* for test isolation."""
     wal = client._wal
-    # Tear down whatever was created during init.
     wal.close()
-    # Re-create writer (and optionally sender) in the isolated directory.
     wal.wal_dir = wal_dir
-    dir_mgr = FileWALDirectoryManager(wal_dir)
-    wal._writer = JSONLWALWriter(dir_mgr)
-
-
-# The initial WAL points at the shared ~/.weave/wal/<entity>/<project>/
-# directory, so starting a sender there races with parallel xdist workers
-# and has triggered Windows file-handle errors.  Both fixtures redirect
-# to an isolated tmp_path, so no sender needs to run against the default.
-_INITIAL_WAL_SETTINGS = UserSettings(enable_wal=True, disable_wal_sender=True)
-
-
-@pytest.fixture
-def wal_client(client_creator, tmp_path):
-    """Create a client with WAL enabled but sender stopped (write-only).
-
-    Redirects the WAL to ``tmp_path`` for test isolation.
-    """
-    wal_dir = str(tmp_path / "wal")
-    with client_creator(settings=_INITIAL_WAL_SETTINGS) as client:
-        _redirect_wal_to(client, wal_dir)
-        yield client
-
-
-@pytest.fixture
-def wal_client_with_sender(client_creator, tmp_path):
-    """Create a client with WAL enabled and sender running.
-
-    Redirects the WAL to ``tmp_path`` for test isolation.
-    """
-    wal_dir = str(tmp_path / "wal")
-    with client_creator(settings=_INITIAL_WAL_SETTINGS) as client:
-        _redirect_wal_to(client, wal_dir)
-        # Create sender pointing at the isolated directory.
-        client._wal._sender = create_sender(wal_dir, client.server)
-        client._wal._sender.start()
-        yield client
-
-
-class TestWALClientWrites:
-    """Verify that client operations produce WAL records when enabled."""
-
-    def test_obj_create(self, wal_client):
-        weave.publish({"model": "gpt-4", "temp": 0.7}, name="my_obj")
-        wal_client._flush()
-
-        records = _read_all_wal_records(wal_client)
-        assert len(records) == 1
-        project_id = f"{wal_client.entity}/{wal_client.project}"
-        assert records[0] == {
-            "type": "obj_create",
-            "req": {
-                "obj": {
-                    "project_id": project_id,
-                    "object_id": "my_obj",
-                    "val": {"model": "gpt-4", "temp": 0.7},
-                    "builtin_object_class": None,
-                    "expected_digest": None,
-                    "wb_user_id": None,
-                }
-            },
-        }
-
-    def test_table_create(self, wal_client):
-        wal_client._send_table_create([{"x": 1}, {"x": 2}])
-        wal_client._flush()
-
-        records = _read_all_wal_records(wal_client)
-        project_id = f"{wal_client.entity}/{wal_client.project}"
-
-        assert len(records) == 1
-        assert records[0] == {
-            "type": "table_create",
-            "req": {
-                "table": {
-                    "project_id": project_id,
-                    "rows": [{"x": 1}, {"x": 2}],
-                    "expected_digest": None,
-                }
-            },
-        }
-
-    def test_file_create(self, wal_client):
-        img = Image.new("RGB", (2, 2), color="red")
-        weave.publish(img, name="my_image")
-        wal_client._flush()
-
-        records = _read_all_wal_records(wal_client)
-        project_id = f"{wal_client.entity}/{wal_client.project}"
-
-        # Image publish produces: 1 file_create (op code) + 1 obj_create (load op)
-        # + 1 obj_create (image object).  The file_create for the image.png
-        # binary is embedded within the image obj_create's val.files.
-        assert len(records) == 3
-        file_rec = records[0]
-        assert file_rec["type"] == "file_create"
-        assert file_rec["req"]["project_id"] == project_id
-        assert file_rec["req"]["name"] == "obj.py"
-
-        image_obj = records[2]
-        assert image_obj["type"] == "obj_create"
-        assert image_obj["req"]["obj"]["object_id"] == "my_image"
-        assert image_obj["req"]["obj"]["val"]["weave_type"] == {
-            "type": "PIL.Image.Image"
-        }
-
-    def test_call_start(self, wal_client):
-        """Calling an op should produce a call_start WAL record with all fields."""
-
-        @weave.op
-        def add(a: int, b: int) -> int:
-            return a + b
-
-        add(1, 2)
-        wal_client._flush()
-
-        records = _read_all_wal_records(wal_client)
-        project_id = f"{wal_client.entity}/{wal_client.project}"
-
-        call_starts = [r for r in records if r["type"] == "call_start"]
-        assert len(call_starts) == 1
-
-        start = call_starts[0]["req"]["start"]
-        assert start["project_id"] == project_id
-        assert "/op/add:" in start["op_name"]
-        assert start["inputs"] == {"a": 1, "b": 2}
-        assert start["id"] is not None
-        assert start["trace_id"] is not None
-        assert start["started_at"] is not None
-        assert isinstance(start["attributes"], dict)
-        assert start["parent_id"] is None  # root call
-
-    def test_call_end(self, wal_client):
-        """Calling an op should produce a call_end WAL record with all fields."""
-
-        @weave.op
-        def add(a: int, b: int) -> int:
-            return a + b
-
-        add(1, 2)
-        wal_client._flush()
-
-        records = _read_all_wal_records(wal_client)
-        project_id = f"{wal_client.entity}/{wal_client.project}"
-
-        call_ends = [r for r in records if r["type"] == "call_end"]
-        assert len(call_ends) == 1
-
-        end = call_ends[0]["req"]["end"]
-        assert end["project_id"] == project_id
-        assert end["id"] is not None
-        assert end["output"] == 3
-        assert end["ended_at"] is not None
-        assert end["exception"] is None
-        assert isinstance(end["summary"], dict)
-
-    def test_call_with_exception(self, wal_client):
-        """A failing op should record the exception in call_end."""
-
-        @weave.op
-        def fail() -> None:
-            raise ValueError("boom")
-
-        with pytest.raises(ValueError, match="boom"):
-            fail()
-        wal_client._flush()
-
-        records = _read_all_wal_records(wal_client)
-
-        call_ends = [r for r in records if r["type"] == "call_end"]
-        assert len(call_ends) == 1
-        assert "boom" in call_ends[0]["req"]["end"]["exception"]
-
-    def test_nested_calls(self, wal_client):
-        """Nested op calls should produce parent-child call_start records."""
-
-        @weave.op
-        def inner(x: int) -> int:
-            return x * 2
-
-        @weave.op
-        def outer(x: int) -> int:
-            return inner(x)
-
-        outer(5)
-        wal_client._flush()
-
-        records = _read_all_wal_records(wal_client)
-
-        call_starts = [r for r in records if r["type"] == "call_start"]
-        call_ends = [r for r in records if r["type"] == "call_end"]
-        assert len(call_starts) == 2
-        assert len(call_ends) == 2
-
-        # Find outer and inner by op_name
-        outer_start = next(
-            s for s in call_starts if "outer" in s["req"]["start"]["op_name"]
-        )
-        inner_start = next(
-            s for s in call_starts if "inner" in s["req"]["start"]["op_name"]
-        )
-
-        # Inner call's parent_id should match outer call's id
-        assert (
-            inner_start["req"]["start"]["parent_id"]
-            == outer_start["req"]["start"]["id"]
-        )
-        # Both should share the same trace_id
-        assert (
-            inner_start["req"]["start"]["trace_id"]
-            == outer_start["req"]["start"]["trace_id"]
-        )
-
-        # Verify outputs
-        outer_end = next(
-            e
-            for e in call_ends
-            if e["req"]["end"]["id"] == outer_start["req"]["start"]["id"]
-        )
-        inner_end = next(
-            e
-            for e in call_ends
-            if e["req"]["end"]["id"] == inner_start["req"]["start"]["id"]
-        )
-        assert inner_end["req"]["end"]["output"] == 10
-        assert outer_end["req"]["end"]["output"] == 10
-
-    def test_wal_records_are_json_serializable(self, wal_client):
-        """Ensure WAL records round-trip through JSON without loss."""
-        weave.publish({"nested": {"list": [1, 2, 3]}}, name="json_obj")
-        wal_client._flush()
-
-        records = _read_all_wal_records(wal_client)
-        assert len(records) == 1
-        roundtripped = json.loads(json.dumps(records[0]))
-        assert roundtripped == records[0]
-
-    def test_flush_fsyncs_wal(self, wal_client):
-        """flush() should fsync the WAL so records survive a process crash."""
-        weave.publish({"a": 1}, name="fsync_obj")
-        wal_client.flush()
-
-        records = _read_all_wal_records(wal_client)
-        assert len(records) == 1
-        assert records[0]["type"] == "obj_create"
-
-
-class TestWALDisabled:
-    """Verify the client works normally when WAL is disabled (the default)."""
-
-    def test_wal_is_none_by_default(self, client):
-        """Default client should have _wal=None."""
-        assert client._wal is None
-
-    def test_publish_works_without_wal(self, weave_active):
-        """publish() should succeed and return a ref when WAL is disabled."""
-        ref = weave.publish({"key": "value"}, name="no_wal_obj")
-        assert ref is not None
-
-    def test_dataset_publish_works_without_wal(self, weave_active):
-        """Dataset publish should succeed when WAL is disabled."""
-        ds = weave.Dataset(name="no_wal_ds", rows=[{"x": 1}])
-        ref = weave.publish(ds, name="no_wal_ds")
-        assert ref is not None
-
-    def test_flush_works_without_wal(self, client):
-        """flush() should not raise when WAL is disabled."""
-        weave.publish({"a": 1}, name="flush_obj")
-        client.flush()
-
-
-class TestWALSender:
-    """Verify that the in-process sender drains WAL records automatically."""
-
-    def test_sender_drains_on_close(self, wal_client_with_sender):
-        """After close(), the sender's final drain should consume all records."""
-        weave.publish({"k": "v"}, name="sender_obj")
-        wal_client_with_sender._flush()
-        wal_dir = Path(wal_client_with_sender._wal.wal_dir)
-        wal_client_with_sender._wal.close()
-
-        remaining = list(wal_dir.glob("*.jsonl"))
-        assert len(remaining) == 0
-
-    def test_sender_drains_table_create(self, wal_client_with_sender):
-        """Table-create records should be drained and files cleaned up."""
-        ds = weave.Dataset(name="sender_ds", rows=[{"x": 1}])
-        weave.publish(ds, name="sender_ds")
-        wal_client_with_sender._flush()
-        wal_dir = Path(wal_client_with_sender._wal.wal_dir)
-        wal_client_with_sender._wal.close()
-
-        remaining = list(wal_dir.glob("*.jsonl"))
-        assert len(remaining) == 0
-
-
-class TestWALManagerLifecycle:
-    """Unit tests for WALManager without a full client."""
-
-    def test_write_only_manager(self, tmp_path):
-        """WALManager without sender writes records but doesn't drain them."""
-        mgr = WALManager("test-entity", "test-project")
-        mgr.wal_dir = str(tmp_path)
-        dir_mgr = FileWALDirectoryManager(str(tmp_path))
-        mgr._writer = JSONLWALWriter(dir_mgr)
-
-        mgr.write(
-            "obj_create",
-            tsi.ObjCreateReq(
-                obj=tsi.ObjSchemaForInsert(
-                    project_id="test-entity/test-project",
-                    object_id="test_obj",
-                    val={"hello": "world"},
-                )
-            ),
-        )
-        mgr.flush()
-
-        records: list[dict] = []
-        for path in sorted(tmp_path.glob("*.jsonl")):
-            consumer = JSONLWALConsumer(str(path))
-            try:
-                for entry in consumer.read_pending():
-                    records.append(entry.record)
-            finally:
-                consumer.close()
-
-        assert len(records) == 1
-        assert records[0] == {
-            "type": "obj_create",
-            "req": {
-                "obj": {
-                    "project_id": "test-entity/test-project",
-                    "object_id": "test_obj",
-                    "val": {"hello": "world"},
-                    "builtin_object_class": None,
-                    "expected_digest": None,
-                    "wb_user_id": None,
-                }
-            },
-        }
-
-        # No sender — file should still be on disk.
-        assert len(list(tmp_path.glob("*.jsonl"))) == 1
-        mgr.close()
-
-    def test_close_is_idempotent(self, tmp_path):
-        """Calling close() multiple times should not raise."""
-        mgr = WALManager("test-entity", "test-project")
-        mgr.close()
-        mgr.close()  # second call should be a no-op
-
-    @pytest.mark.disable_logging_error_check
-    def test_close_with_sender_is_idempotent(self, wal_client_with_sender):
-        """close() on a manager with sender should be safe to call twice."""
-        wal_client_with_sender._wal.close()
-        wal_client_with_sender._wal.close()  # should not raise
-
-
-class TestTraceServerHandlers:
-    """Verify TraceServerHandlers and build_trace_server_handlers."""
-
-    def test_builds_handler_for_every_record_type(self):
-        """Should produce a handler for each type in _RECORD_TYPE_TO_REQ."""
-        mock_server = MagicMock()
-        h = TraceServerHandlers(mock_server)
-        handlers = h.as_dict()
-
-        assert set(handlers.keys()) == set(_RECORD_TYPE_TO_REQ.keys())
-
-    def test_handler_calls_correct_server_method(self):
-        """Each handler should call the matching method on the server."""
-        mock_server = MagicMock()
-        handlers = TraceServerHandlers(mock_server).as_dict()
-
-        req = tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id="e/p",
-                object_id="test",
-                val={"x": 1},
-            )
-        )
-        record = {"type": "obj_create", "req": req.model_dump(mode="json")}
-        handlers["obj_create"](record)
-
-        mock_server.obj_create.assert_called_once()
-        call_arg = mock_server.obj_create.call_args[0][0]
-        assert isinstance(call_arg, tsi.ObjCreateReq)
-        assert call_arg.obj.object_id == "test"
-
-    def test_handler_calls_table_create(self):
-        """table_create handler should call server.table_create."""
-        mock_server = MagicMock()
-        handlers = TraceServerHandlers(mock_server).as_dict()
-
-        req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id="e/p",
-                rows=[{"val": {"x": 1}, "digest": "abc123"}],
-            )
-        )
-        record = {"type": "table_create", "req": req.model_dump(mode="json")}
-        handlers["table_create"](record)
-
-        mock_server.table_create.assert_called_once()
-
-    def test_file_create_roundtrips_bytes_content(self):
-        """file_create handler must preserve bytes content through replay.
-
-        Regression guard for the model_validate(dict) replay path: Pydantic
-        v2 dumps bytes fields as utf-8 strings under mode="json", and
-        model_validate accepts strings for bytes fields by re-encoding them.
-        The round-trip must be lossless for content that actually reaches
-        the WAL (non-utf8 bytes already fail at write time, so they never
-        reach replay).
-        """
-        mock_server = MagicMock()
-        handlers = TraceServerHandlers(mock_server).as_dict()
-
-        # utf-8-decodable content — this is the only kind that can reach the
-        # WAL today (model_dump(mode="json") rejects non-utf8 bytes at write
-        # time, so non-utf8 content never appears in a replayed record).
-        original_content = "small file body — including non-ascii: café 🎉".encode()
-        req = tsi.FileCreateReq(
-            project_id="e/p",
-            name="note.txt",
-            content=original_content,
-        )
-        # Match the write path exactly: same call as wal_manager.write does.
-        record = {"type": "file_create", "req": req.model_dump(mode="json")}
-        handlers["file_create"](record)
-
-        mock_server.file_create.assert_called_once()
-        call_arg = mock_server.file_create.call_args[0][0]
-        assert isinstance(call_arg, tsi.FileCreateReq)
-        assert call_arg.content == original_content
-
-    def test_call_start_roundtrips_through_handler(self):
-        """call_start handler validates the dict directly (no json.dumps).
-
-        Regression guard for the dominant WAL replay path — every traced
-        op produces a call_start record.  datetime, dict, and string
-        fields must all round-trip correctly via model_validate(dict).
-        """
-        mock_server = MagicMock()
-        handlers = TraceServerHandlers(mock_server).as_dict()
-
-        started = datetime.datetime.now(datetime.timezone.utc)
-        req = tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id="e/p",
-                op_name="predict",
-                trace_id="t1",
-                started_at=started,
-                attributes={"k": "v"},
-                inputs={"x": 1},
-            )
-        )
-        record = {"type": "call_start", "req": req.model_dump(mode="json")}
-        handlers["call_start"](record)
-
-        mock_server.call_start.assert_called_once()
-        call_arg = mock_server.call_start.call_args[0][0]
-        assert isinstance(call_arg, tsi.CallStartReq)
-        assert call_arg.start.op_name == "predict"
-        assert call_arg.start.started_at == started
-        assert call_arg.start.attributes == {"k": "v"}
-        assert call_arg.start.inputs == {"x": 1}
-
-    def test_convenience_function_matches_class(self):
-        """build_trace_server_handlers should return the same keys as the class."""
-        mock_server = MagicMock()
-        from_func = build_trace_server_handlers(mock_server)
-        from_class = TraceServerHandlers(mock_server).as_dict()
-
-        assert set(from_func.keys()) == set(from_class.keys())
-
-
-class TestCreateSender:
-    """Verify the create_sender factory wires things up correctly."""
-
-    def test_returns_configured_sender(self, tmp_path):
-        """create_sender should return a BackgroundWALSender ready to start."""
-        mock_server = MagicMock()
-        sender = create_sender(str(tmp_path), mock_server, poll_interval=0.5)
-
-        assert isinstance(sender, BackgroundWALSender)
-        assert sender._poll_interval == 0.5
-
-    def test_sender_can_start_and_stop(self, tmp_path):
-        """The created sender should be startable and stoppable."""
-        mock_server = MagicMock()
-        sender = create_sender(str(tmp_path), mock_server, poll_interval=0.1)
-        sender.start()
-        sender.stop()
-
-
-class TestWALClientApiKeyNamespacing:
-    """Verify that WeaveClient threads the api_key through to WALManager."""
-
-    def test_wal_directory_is_namespaced_by_api_key(self, client):
-        """When api_key is provided, the WAL dir includes an HMAC subdirectory."""
-        api_key = "wk-test-key-for-wal-namespacing"
-        with override_settings(enable_wal=True, disable_wal_sender=True):
-            wc = weave_client.WeaveClient(
-                client.entity,
-                client.project,
-                client.server,
-                ensure_project_exists=False,
-                api_key=api_key,
-            )
-            try:
-                assert wc._wal is not None
-                expected_suffix = compute_client_id(api_key)
-                assert wc._wal.wal_dir.endswith(expected_suffix)
-            finally:
-                wc._wal.close()
-
-    def test_wal_directory_not_namespaced_without_api_key(self, client):
-        """When api_key is None, the WAL dir is the flat entity/project path."""
-        with override_settings(enable_wal=True, disable_wal_sender=True):
-            wc = weave_client.WeaveClient(
-                client.entity,
-                client.project,
-                client.server,
-                ensure_project_exists=False,
-            )
-            try:
-                assert wc._wal is not None
-                assert wc._wal.wal_dir.endswith(wc.project)
-            finally:
-                wc._wal.close()
+    wal._writer = JSONLWALWriter(FileWALDirectoryManager(wal_dir))

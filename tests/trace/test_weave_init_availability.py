@@ -7,24 +7,17 @@ from weave.trace import weave_init
 from weave.trace_server_bindings import remote_http_trace_server
 
 
-def test_get_server_info_json_decode_error():
-    """Test that _get_server_info returns None when server info cannot be decoded."""
-    mock_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
-    mock_server.server_info.side_effect = json.JSONDecodeError("test error", "doc", 0)
-
-    result = weave_init._get_server_info(mock_server)
-
-    assert result is None
-    mock_server.server_info.assert_called_once()
-
-
-def test_get_server_info_success():
-    """Test that _get_server_info returns server info when server is available."""
-    mock_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
+def test_get_server_info_success_and_json_decode_error():
+    """_get_server_info returns the server info on success and None when the
+    response cannot be decoded; either way it calls server_info exactly once.
+    """
+    ok_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
     server_info = {"version": "1.0.0"}
-    mock_server.server_info.return_value = server_info
+    ok_server.server_info.return_value = server_info
+    assert weave_init._get_server_info(ok_server) == server_info
+    ok_server.server_info.assert_called_once()
 
-    result = weave_init._get_server_info(mock_server)
-
-    assert result == server_info
-    mock_server.server_info.assert_called_once()
+    bad_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
+    bad_server.server_info.side_effect = json.JSONDecodeError("test error", "doc", 0)
+    assert weave_init._get_server_info(bad_server) is None
+    bad_server.server_info.assert_called_once()

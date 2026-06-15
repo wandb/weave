@@ -13,7 +13,9 @@ from weave.trace.serialization.serialize import (
 )
 
 
-def test_dictify_simple() -> None:
+def test_dictify_objects() -> None:
+    # Plain object (attribute scan, methods ignored), nested list of
+    # dataclasses, and the `to_dict` protocol override.
     class Point:
         x: int
         y: int
@@ -28,37 +30,35 @@ def test_dictify_simple() -> None:
     assert dictify(pt) == {
         "__class__": {
             "module": "test_serialize",
-            "qualname": "test_dictify_simple.<locals>.Point",
+            "qualname": "test_dictify_objects.<locals>.Point",
             "name": "Point",
         },
         "x": 1,
         "y": 2,
     }
 
-
-def test_dictify_complex() -> None:
     @dataclass
-    class Point:
+    class DataPoint:
         x: int
         y: int
 
     class Points:
         def __init__(self) -> None:
-            self.points = [Point(1, 2), Point(3, 4)]
+            self.points = [DataPoint(1, 2), DataPoint(3, 4)]
 
     pts = Points()
     assert dictify(pts) == {
         "__class__": {
             "module": "test_serialize",
-            "qualname": "test_dictify_complex.<locals>.Points",
+            "qualname": "test_dictify_objects.<locals>.Points",
             "name": "Points",
         },
         "points": [
             {
                 "__class__": {
                     "module": "test_serialize",
-                    "qualname": "test_dictify_complex.<locals>.Point",
-                    "name": "Point",
+                    "qualname": "test_dictify_objects.<locals>.DataPoint",
+                    "name": "DataPoint",
                 },
                 "x": 1,
                 "y": 2,
@@ -66,13 +66,32 @@ def test_dictify_complex() -> None:
             {
                 "__class__": {
                     "module": "test_serialize",
-                    "qualname": "test_dictify_complex.<locals>.Point",
-                    "name": "Point",
+                    "qualname": "test_dictify_objects.<locals>.DataPoint",
+                    "name": "DataPoint",
                 },
                 "x": 3,
                 "y": 4,
             },
         ],
+    }
+
+    class ToDictPoint:
+        x: int
+        y: int
+
+        def __init__(self, x: int, y: int) -> None:
+            self.x = x
+            self.y = y
+
+        def to_dict(self) -> dict:
+            return {
+                "foo": "bar",
+                "baz": 42,
+            }
+
+    assert dictify(ToDictPoint(1, 2)) == {
+        "foo": "bar",
+        "baz": 42,
     }
 
 
@@ -122,28 +141,6 @@ def test_dictify_maxdepth() -> None:
     }
 
 
-def test_dictify_to_dict() -> None:
-    class Point:
-        x: int
-        y: int
-
-        def __init__(self, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
-
-        def to_dict(self) -> dict:
-            return {
-                "foo": "bar",
-                "baz": 42,
-            }
-
-    pt = Point(1, 2)
-    assert dictify(pt) == {
-        "foo": "bar",
-        "baz": 42,
-    }
-
-
 def test_stringify_returns_repr() -> None:
     @dataclass
     class Point:
@@ -155,6 +152,7 @@ def test_stringify_returns_repr() -> None:
 
 
 def test_dictify_sanitizes() -> None:
+    # Sensitive keys are redacted at top level and through nested objects.
     @dataclass
     class MyClass:
         api_key: str
@@ -169,8 +167,6 @@ def test_dictify_sanitizes() -> None:
         "api_key": "REDACTED",
     }
 
-
-def test_dictify_sanitizes_nested() -> None:
     @dataclass
     class MyClassA:
         api_key: str
@@ -179,17 +175,17 @@ def test_dictify_sanitizes_nested() -> None:
     class MyClassB:
         a: MyClassA
 
-    instance = MyClassB(MyClassA("sk-1234567890qwertyuiop"))
-    assert dictify(instance) == {
+    nested = MyClassB(MyClassA("sk-1234567890qwertyuiop"))
+    assert dictify(nested) == {
         "__class__": {
             "module": "test_serialize",
-            "qualname": "test_dictify_sanitizes_nested.<locals>.MyClassB",
+            "qualname": "test_dictify_sanitizes.<locals>.MyClassB",
             "name": "MyClassB",
         },
         "a": {
             "__class__": {
                 "module": "test_serialize",
-                "qualname": "test_dictify_sanitizes_nested.<locals>.MyClassA",
+                "qualname": "test_dictify_sanitizes.<locals>.MyClassA",
                 "name": "MyClassA",
             },
             "api_key": "REDACTED",
