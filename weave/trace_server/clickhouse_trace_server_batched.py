@@ -1821,6 +1821,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
+    @tag_db_insert_path("calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > ch_settings.MAX_DELETE_CALLS_COUNT:
