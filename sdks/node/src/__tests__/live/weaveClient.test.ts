@@ -146,4 +146,105 @@ describe('WeaveClient', () => {
       });
     });
   });
+
+  describe('getAgentVersions', () => {
+    vcrTest('gets agent versions', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentVersions({agentName: 'my-cool-agent'});
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "total_count": 1,
+          "versions": [
+            {
+              "agent_name": "my-cool-agent",
+              "agent_version": "",
+              "error_count": 0,
+              "first_seen": "2026-06-15T20:37:39.749000",
+              "invocation_count": 33,
+              "last_seen": "2026-06-15T20:49:24.875000",
+              "project_id": "drtangible-mocha/example",
+              "span_count": 33,
+              "total_duration_ms": 4,
+              "total_input_tokens": 0,
+              "total_output_tokens": 0,
+            },
+          ],
+        }
+      `);
+    });
+
+    vcrTest('supports limit and offset', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      let resp = await client.getAgentVersions({
+        agentName: 'my-cool-agent',
+        limit: 1,
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "total_count": 1,
+          "versions": [
+            {
+              "agent_name": "my-cool-agent",
+              "agent_version": "",
+              "error_count": 0,
+              "first_seen": "2026-06-15T20:37:39.749000",
+              "invocation_count": 33,
+              "last_seen": "2026-06-15T20:49:24.875000",
+              "project_id": "drtangible-mocha/example",
+              "span_count": 33,
+              "total_duration_ms": 4,
+              "total_input_tokens": 0,
+              "total_output_tokens": 0,
+            },
+          ],
+        }
+      `);
+
+      resp = await client.getAgentVersions({
+        agentName: 'my-cool-agent',
+        limit: 1,
+        offset: 1,
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "total_count": 1,
+          "versions": [],
+        }
+      `);
+    });
+
+    vcrTest('returns no versions for nonexistent agent', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      const resp = await client.getAgentVersions({
+        agentName: 'some-nonexistent-agent',
+        limit: 1,
+      });
+
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "total_count": 0,
+          "versions": [],
+        }
+      `);
+    });
+
+    vcrTest('errors with invalid project id', async () => {
+      await authenticate();
+      const client = await init('nonexistent-project');
+
+      expect(
+        client.getAgentVersions({agentName: 'my-cool-agent'})
+      ).rejects.toMatchObject({
+        data: null,
+        error: {
+          detail: 'Project not found',
+        },
+      });
+    });
+  });
 });
