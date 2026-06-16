@@ -161,7 +161,16 @@ def postprocess_inputs_invoke_agent(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def postprocess_inputs_invoke(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Post-process the inputs for the invoke_model API call.
+
+    This function extracts the model name from the inference profile ARN if any
+    and updates the modelId in the kwargs to match model-cost list.
+    """
     exploded_kwargs = inputs.get("kwargs", {})
+    if "modelId" in exploded_kwargs and "arn" in exploded_kwargs["modelId"]:
+        exploded_kwargs["modelId"] = extract_model_name_from_inference_profile_arn(
+            exploded_kwargs["modelId"]
+        )
     if "body" in exploded_kwargs:
         exploded_kwargs["body"] = json.loads(exploded_kwargs["body"])
     return exploded_kwargs
