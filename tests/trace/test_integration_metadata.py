@@ -126,12 +126,43 @@ def test_with_integration_metadata_preserves_existing_attributes():
 # --- op-level default attributes (end to end) ---------------------------------
 
 
-def test_op_level_attributes_land_on_call(client):
-    @weave.op(attributes={"integration": {"name": "demo"}})
-    def func():
-        return 1
+@pytest.mark.asyncio
+@pytest.mark.parametrize("flavor", ["sync", "async", "sync_gen", "async_gen"])
+async def test_op_level_attributes_land_on_call(client, flavor):
+    """op(attributes=...) stamps the integration block on every call flavor."""
+    if flavor == "sync":
 
-    func()
+        @weave.op(attributes={"integration": {"name": "demo"}})
+        def func():
+            return 1
+
+        func()
+    elif flavor == "async":
+
+        @weave.op(attributes={"integration": {"name": "demo"}})
+        async def func():
+            return 1
+
+        await func()
+    elif flavor == "sync_gen":
+
+        @weave.op(attributes={"integration": {"name": "demo"}})
+        def func():
+            yield 1
+            yield 2
+
+        list(func())
+    elif flavor == "async_gen":
+
+        @weave.op(attributes={"integration": {"name": "demo"}})
+        async def func():
+            yield 1
+            yield 2
+
+        [x async for x in func()]
+    else:
+        raise AssertionError(f"unhandled flavor {flavor}")
+
     call = _only_call(client)
     assert call.attributes["integration"] == {"name": "demo"}
 
@@ -190,40 +221,6 @@ def test_op_without_attributes_has_no_integration_key(client):
     func()
     call = _only_call(client)
     assert "integration" not in call.attributes
-
-
-@pytest.mark.asyncio
-async def test_op_level_attributes_on_async_call(client):
-    @weave.op(attributes={"integration": {"name": "demo"}})
-    async def afunc():
-        return 1
-
-    await afunc()
-    call = _only_call(client)
-    assert call.attributes["integration"] == {"name": "demo"}
-
-
-def test_op_level_attributes_on_sync_generator(client):
-    @weave.op(attributes={"integration": {"name": "demo"}})
-    def gen():
-        yield 1
-        yield 2
-
-    list(gen())
-    call = _only_call(client)
-    assert call.attributes["integration"] == {"name": "demo"}
-
-
-@pytest.mark.asyncio
-async def test_op_level_attributes_on_async_generator(client):
-    @weave.op(attributes={"integration": {"name": "demo"}})
-    async def agen():
-        yield 1
-        yield 2
-
-    [x async for x in agen()]
-    call = _only_call(client)
-    assert call.attributes["integration"] == {"name": "demo"}
 
 
 # --- callback/tracer path (Family B: direct create_call) ----------------------

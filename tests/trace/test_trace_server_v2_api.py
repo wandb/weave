@@ -25,205 +25,164 @@ from weave.trace_server.ids import generate_id
 from weave.utils.project_id import from_project_id
 
 
-class TestOpsV2API:
-    """Tests for Ops V2 API endpoints."""
+def test_op_create_and_read(client):
+    """Create then read an op via V2 API, covering both create and read responses."""
+    project_id = client.project_id
 
-    def test_op_create(self, client):
-        """Test creating an op via V2 API."""
-        project_id = client.project_id
-
-        # Create an op
-        req = tsi.OpCreateReq(
+    # Create response shape.
+    res = client.server.op_create(
+        tsi.OpCreateReq(
             project_id=project_id,
             name="test_op",
             source_code="def test_op():\n    return 42",
         )
-        res = client.server.op_create(req)
+    )
+    assert res.object_id == "test_op"
+    assert res.digest is not None
+    assert res.version_index == 0
 
-        # Verify response
-        assert res.object_id == "test_op"
-        assert res.digest is not None
-        assert res.version_index == 0
-
-    def test_op_read(self, client):
-        """Test reading an op via V2 API."""
-        project_id = client.project_id
-
-        # Create an op first
-        source_code = "def my_test_op():\n    return 'hello world'"
-        create_req = tsi.OpCreateReq(
+    # Create a second op and read it back.
+    source_code = "def my_test_op():\n    return 'hello world'"
+    create_res = client.server.op_create(
+        tsi.OpCreateReq(
             project_id=project_id,
             name="readable_op",
             source_code=source_code,
         )
-        create_res = client.server.op_create(create_req)
-
-        # Read the op
-        read_req = tsi.OpReadReq(
+    )
+    read_res = client.server.op_read(
+        tsi.OpReadReq(
             project_id=project_id,
             object_id="readable_op",
             digest=create_res.digest,
         )
-        read_res = client.server.op_read(read_req)
+    )
+    assert read_res.object_id == "readable_op"
+    assert read_res.digest == create_res.digest
+    assert read_res.version_index == 0
+    assert read_res.code == source_code
+    assert read_res.created_at is not None
 
-        # Verify response
-        assert read_res.object_id == "readable_op"
-        assert read_res.digest == create_res.digest
-        assert read_res.version_index == 0
-        assert read_res.code == source_code
-        assert read_res.created_at is not None
 
-    def test_op_list(self, client):
-        """Test listing ops via V2 API."""
-        project_id = client.project_id
+def test_op_list(client):
+    """List ops, plus the limit-respecting variant, via V2 API."""
+    project_id = client.project_id
 
-        # Create multiple ops
-        for i in range(3):
-            req = tsi.OpCreateReq(
+    for i in range(3):
+        client.server.op_create(
+            tsi.OpCreateReq(
                 project_id=project_id,
                 name=f"list_test_op_{i}",
                 source_code=f"def op_{i}():\n    return {i}",
             )
-            client.server.op_create(req)
+        )
 
-        # List ops
-        list_req = tsi.OpListReq(project_id=project_id)
-        ops = list(client.server.op_list(list_req))
+    ops = list(client.server.op_list(tsi.OpListReq(project_id=project_id)))
+    assert len(ops) >= 3
+    op_names = [op.object_id for op in ops]
+    assert "list_test_op_0" in op_names
+    assert "list_test_op_1" in op_names
+    assert "list_test_op_2" in op_names
 
-        # Verify we get at least our 3 ops
-        assert len(ops) >= 3
-        op_names = [op.object_id for op in ops]
-        assert "list_test_op_0" in op_names
-        assert "list_test_op_1" in op_names
-        assert "list_test_op_2" in op_names
-
-    def test_op_list_with_limit(self, client):
-        """Test listing ops with limit via V2 API."""
-        project_id = client.project_id
-
-        # Create multiple ops
-        for i in range(5):
-            req = tsi.OpCreateReq(
+    for i in range(5):
+        client.server.op_create(
+            tsi.OpCreateReq(
                 project_id=project_id,
                 name=f"limit_test_op_{i}",
                 source_code=f"def op_{i}():\n    return {i}",
             )
-            client.server.op_create(req)
+        )
+    limited = list(client.server.op_list(tsi.OpListReq(project_id=project_id, limit=2)))
+    assert len(limited) == 2
 
-        # List ops with limit
-        list_req = tsi.OpListReq(project_id=project_id, limit=2)
-        ops = list(client.server.op_list(list_req))
 
-        # Verify limit is respected
-        assert len(ops) == 2
+def test_op_delete(client):
+    """Delete a single op version and, separately, all versions of an op."""
+    project_id = client.project_id
 
-    def test_op_delete(self, client):
-        """Test deleting an op via V2 API."""
-        project_id = client.project_id
-
-        # Create an op
-        create_req = tsi.OpCreateReq(
+    create_res = client.server.op_create(
+        tsi.OpCreateReq(
             project_id=project_id,
             name="deletable_op",
             source_code="def deletable():\n    pass",
         )
-        create_res = client.server.op_create(create_req)
-
-        # Delete the op
-        delete_req = tsi.OpDeleteReq(
+    )
+    delete_res = client.server.op_delete(
+        tsi.OpDeleteReq(
             project_id=project_id,
             object_id="deletable_op",
             digests=[create_res.digest],
         )
-        delete_res = client.server.op_delete(delete_req)
+    )
+    assert delete_res.num_deleted == 1
 
-        # Verify deletion
-        assert delete_res.num_deleted == 1
-
-    def test_op_delete_all_versions(self, client):
-        """Test deleting all versions of an op via V2 API."""
-        project_id = client.project_id
-
-        # Create multiple versions
-        digests = []
-        for i in range(3):
-            create_req = tsi.OpCreateReq(
+    for i in range(3):
+        client.server.op_create(
+            tsi.OpCreateReq(
                 project_id=project_id,
                 name="multi_version_op",
                 source_code=f"def multi_version():\n    return {i}",
             )
-            create_res = client.server.op_create(create_req)
-            digests.append(create_res.digest)
-
-        # Delete all versions (None means delete all)
-        delete_req = tsi.OpDeleteReq(
+        )
+    # digests=None means delete all versions.
+    delete_all_res = client.server.op_delete(
+        tsi.OpDeleteReq(
             project_id=project_id,
             object_id="multi_version_op",
             digests=None,
         )
-        delete_res = client.server.op_delete(delete_req)
-
-        # Verify all versions deleted
-        assert delete_res.num_deleted == 3
+    )
+    assert delete_all_res.num_deleted == 3
 
 
 class TestDatasetsV2API:
     """Tests for Datasets V2 API endpoints."""
 
-    def test_dataset_create(self, client):
-        """Test creating a dataset via V2 API."""
+    def test_dataset_create_and_read(self, client):
+        """Create then read a dataset via V2 API, covering both responses."""
         project_id = client.project_id
 
-        # Create a dataset
-        req = tsi.DatasetCreateReq(
-            project_id=project_id,
-            name="test_dataset",
-            description="A test dataset",
-            rows=[
-                {"input": "hello", "output": "world"},
-                {"input": "foo", "output": "bar"},
-            ],
+        # Create response shape (object_id is the sanitized name).
+        res = client.server.dataset_create(
+            tsi.DatasetCreateReq(
+                project_id=project_id,
+                name="test_dataset",
+                description="A test dataset",
+                rows=[
+                    {"input": "hello", "output": "world"},
+                    {"input": "foo", "output": "bar"},
+                ],
+            )
         )
-        res = client.server.dataset_create(req)
-
-        # Verify response
-        # When name is provided, object_id should be the sanitized name
         assert res.object_id == "test_dataset"
         assert res.digest is not None
         assert res.version_index == 0
 
-    def test_dataset_read(self, client):
-        """Test reading a dataset via V2 API."""
-        project_id = client.project_id
-
-        # Create a dataset first
         rows = [
             {"question": "What is 2+2?", "answer": "4"},
             {"question": "What is the capital of France?", "answer": "Paris"},
         ]
-        create_req = tsi.DatasetCreateReq(
-            project_id=project_id,
-            name="readable_dataset",
-            description="Test dataset for reading",
-            rows=rows,
+        create_res = client.server.dataset_create(
+            tsi.DatasetCreateReq(
+                project_id=project_id,
+                name="readable_dataset",
+                description="Test dataset for reading",
+                rows=rows,
+            )
         )
-        create_res = client.server.dataset_create(create_req)
-
-        # Read the dataset
-        read_req = tsi.DatasetReadReq(
-            project_id=project_id,
-            object_id=create_res.object_id,
-            digest=create_res.digest,
+        read_res = client.server.dataset_read(
+            tsi.DatasetReadReq(
+                project_id=project_id,
+                object_id=create_res.object_id,
+                digest=create_res.digest,
+            )
         )
-        read_res = client.server.dataset_read(read_req)
-
-        # Verify response
         assert read_res.object_id == create_res.object_id
         assert read_res.digest == create_res.digest
         assert read_res.version_index == 0
         assert read_res.name == "readable_dataset"
         assert read_res.description == "Test dataset for reading"
-        assert read_res.rows is not None  # Field is 'rows', not 'rows_ref'
+        assert read_res.rows is not None
         assert read_res.created_at is not None
 
     def test_dataset_list(self, client):
@@ -277,56 +236,47 @@ class TestDatasetsV2API:
 class TestScorersV2API:
     """Tests for Scorers V2 API endpoints."""
 
-    def test_scorer_create(self, client):
-        """Test creating a scorer via V2 API."""
+    def test_scorer_create_and_read(self, client):
+        """Create then read a scorer via V2 API, covering both responses."""
         project_id = client.project_id
 
-        # Create a scorer
-        req = tsi.ScorerCreateReq(
-            project_id=project_id,
-            name="test_scorer",
-            description="A test scorer",
-            op_source_code="def score(output, target):\n    return output == target",
+        # Create response shape (object_id is the sanitized name).
+        res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="test_scorer",
+                description="A test scorer",
+                op_source_code="def score(output, target):\n    return output == target",
+            )
         )
-        res = client.server.scorer_create(req)
-
-        # Verify response
-        # When name is provided, object_id should be the sanitized name
         assert res.object_id == "test_scorer"
         assert res.digest is not None
         assert res.version_index == 0
 
-    def test_scorer_read(self, client):
-        """Test reading a scorer via V2 API."""
-        project_id = client.project_id
-
-        # Create a scorer first
         source_code = (
             "def accuracy_score(output, target):\n    return int(output == target)"
         )
-        create_req = tsi.ScorerCreateReq(
-            project_id=project_id,
-            name="accuracy_scorer",
-            description="Measures accuracy",
-            op_source_code=source_code,
+        create_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="accuracy_scorer",
+                description="Measures accuracy",
+                op_source_code=source_code,
+            )
         )
-        create_res = client.server.scorer_create(create_req)
-
-        # Read the scorer
-        read_req = tsi.ScorerReadReq(
-            project_id=project_id,
-            object_id=create_res.object_id,
-            digest=create_res.digest,
+        read_res = client.server.scorer_read(
+            tsi.ScorerReadReq(
+                project_id=project_id,
+                object_id=create_res.object_id,
+                digest=create_res.digest,
+            )
         )
-        read_res = client.server.scorer_read(read_req)
-
-        # Verify response
         assert read_res.object_id == create_res.object_id
         assert read_res.digest == create_res.digest
         assert read_res.version_index == 0
         assert read_res.name == "accuracy_scorer"
         assert read_res.description == "Measures accuracy"
-        assert read_res.score_op is not None  # ScorerReadRes has 'score_op', not 'code'
+        assert read_res.score_op is not None
         assert read_res.created_at is not None
 
     def test_scorer_list(self, client):

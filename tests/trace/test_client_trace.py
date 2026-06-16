@@ -791,7 +791,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_parent_ids(client):
+def test_trace_call_query_filter_id_fields(client):
     call_spec = simple_line_call_bootstrap()
 
     res = get_all_calls_asserting_finished(client, call_spec)
@@ -800,84 +800,58 @@ def test_trace_call_query_filter_parent_ids(client):
         [call.parent_id for call in res.calls if call.parent_id is not None]
     )
     assert len(parent_ids) > 3
+    trace_ids = [call.trace_id for call in res.calls]
+    call_ids = [call.id for call in res.calls]
 
-    for parent_id_list, exp_count in [
-        # Test the None case
+    parent_cases = [
         (None, call_spec.total_calls),
-        # Test the empty list case
         ([], call_spec.total_calls),
-        # Test single
         (
             parent_ids[:1],
             len([call for call in res.calls if call.parent_id in parent_ids[:1]]),
         ),
-        # Test multiple
         (
             parent_ids[:3],
             len([call for call in res.calls if call.parent_id in parent_ids[:3]]),
         ),
-    ]:
+    ]
+    for parent_id_list, exp_count in parent_cases:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
                 filter=tsi.CallsFilter(parent_ids=parent_id_list),
             )
         )
-
         assert len(inner_res.calls) == exp_count
 
-
-def test_trace_call_query_filter_trace_ids(client):
-    call_spec = simple_line_call_bootstrap()
-
-    res = get_all_calls_asserting_finished(client, call_spec)
-
-    trace_ids = [call.trace_id for call in res.calls]
-
-    for trace_id_list, exp_count in [
-        # Test the None case
+    trace_cases = [
         (None, call_spec.total_calls),
-        # Test the empty list case
         ([], call_spec.total_calls),
-        # Test single
         ([trace_ids[0]], 1),
-        # Test multiple
         (trace_ids[:3], 3),
-    ]:
+    ]
+    for trace_id_list, exp_count in trace_cases:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
                 filter=tsi.CallsFilter(trace_ids=trace_id_list),
             )
         )
-
         assert len(inner_res.calls) == exp_count
 
-
-def test_trace_call_query_filter_call_ids(client):
-    call_spec = simple_line_call_bootstrap()
-
-    res = get_all_calls_asserting_finished(client, call_spec)
-
-    call_ids = [call.id for call in res.calls]
-
-    for call_id_list, exp_count in [
-        # Test the None case
+    call_cases = [
         (None, call_spec.total_calls),
-        # Test the empty list case
         ([], call_spec.total_calls),
-        # Test single
         ([call_ids[0]], 1),
-        # Test multiple
         (call_ids[:3], 3),
-    ]:
+    ]
+    for call_id_list, exp_count in call_cases:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
                 filter=tsi.CallsFilter(call_ids=call_id_list),
             )
         )
-
         assert len(inner_res.calls) == exp_count
 
 
@@ -1012,16 +986,13 @@ def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush)
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_limit(client, no_autoflush):
+def test_trace_call_query_limit_and_offset(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
     client.flush()
 
     for limit, exp_count in [
-        # Test the None case
         (None, call_spec.total_calls),
-        # Test limit of 1
         (1, 1),
-        # Test limit of 10
         (10, 10),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
@@ -1030,20 +1001,11 @@ def test_trace_call_query_limit(client, no_autoflush):
                 limit=limit,
             )
         )
-
         assert len(inner_res.calls) == exp_count
 
-
-def test_trace_call_query_offset(client, no_autoflush):
-    call_spec = simple_line_call_bootstrap()
-    client.flush()
-
     for offset, exp_count in [
-        # Test the None case
         (None, call_spec.total_calls),
-        # Test offset of 1
         (1, call_spec.total_calls - 1),
-        # Test offset of 10
         (10, call_spec.total_calls - 10),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
@@ -1052,7 +1014,6 @@ def test_trace_call_query_offset(client, no_autoflush):
                 offset=offset,
             )
         )
-
         assert len(inner_res.calls) == exp_count
 
 
@@ -3443,49 +3404,33 @@ def test_object_with_disallowed_keys(client):
 CHAR_LIMIT = 128
 
 
-def test_object_with_char_limit(client):
-    name = "l" * CHAR_LIMIT
+@pytest.mark.parametrize("over_limit", [False, True])
+def test_object_with_char_limit_boundary(client, over_limit):
+    length = CHAR_LIMIT + 1 if over_limit else CHAR_LIMIT
+    name = "l" * length
     obj = Custom(name=name, val={"1": 1})
 
     weave.publish(obj)
 
-    # we sanitize the name
-    assert obj.ref.name == name
+    # at the limit the name is preserved; over the limit it is truncated by one
+    assert obj.ref.name == (name[:-1] if over_limit else name)
 
-    # Use a distinct name for the raw obj_create path: re-using `name` would
+    # Use a distinct object_id for the raw obj_create path: re-using `name` would
     # collide with the SDK publish above (Custom-typed -> untyped), which the
     # server now rejects (WB-30574).
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
                 "project_id": client.project_id,
-                "object_id": "r" * CHAR_LIMIT,
+                "object_id": "r" * length,
                 "val": {"1": 1},
             }
         }
     )
-    client.server.obj_create(create_req)
-
-
-def test_object_with_char_over_limit(client):
-    name = "l" * (CHAR_LIMIT + 1)
-    obj = Custom(name=name, val={"1": 1})
-
-    weave.publish(obj)
-
-    # we sanitize the name
-    assert obj.ref.name == name[:-1]
-
-    create_req = tsi.ObjCreateReq.model_validate(
-        {
-            "obj": {
-                "project_id": client.project_id,
-                "object_id": "r" * (CHAR_LIMIT + 1),
-                "val": {"1": 1},
-            }
-        }
-    )
-    with pytest.raises(CHValidationError):
+    if over_limit:
+        with pytest.raises(CHValidationError):
+            client.server.obj_create(create_req)
+    else:
         client.server.obj_create(create_req)
 
 
@@ -3646,16 +3591,15 @@ def test_feedback_filter_finds_minority_reaction(client):
     assert results[0].id == calls[0].id
 
 
-def test_inline_dataclass_generates_no_refs_in_function(client):
-    @dataclasses.dataclass
-    class A:
-        b: int
+@pytest.mark.parametrize("kind", ["dataclass", "basemodel"])
+def test_inline_type_generates_no_refs_in_function(client, kind):
+    inline_type = _make_inline_type(kind)
 
     @weave.op
-    def func(a: A):
-        return A(b=a.b + 1)
+    def func(a: inline_type):
+        return inline_type(b=a.b + 1)
 
-    a = A(b=1)
+    a = inline_type(b=1)
     func(a)
 
     res = get_client_trace_server(client).calls_query(
@@ -3674,15 +3618,14 @@ def test_inline_dataclass_generates_no_refs_in_function(client):
     assert len(output_object_version_refs) == 0
 
 
-def test_inline_dataclass_generates_no_refs_in_object(client):
-    @dataclasses.dataclass
-    class A:
-        b: int
+@pytest.mark.parametrize("kind", ["dataclass", "basemodel"])
+def test_inline_type_generates_no_refs_in_object(client, kind):
+    inline_type = _make_inline_type(kind)
 
     class WeaveObject(weave.Object):
-        a: A
+        a: inline_type
 
-    wo = WeaveObject(a=A(b=1))
+    wo = WeaveObject(a=inline_type(b=1))
     ref = weave.publish(wo)
 
     res = get_client_trace_server(client).objs_query(
@@ -3690,52 +3633,7 @@ def test_inline_dataclass_generates_no_refs_in_object(client):
             project_id=get_client_project_id(client),
         )
     )
-    assert len(res.objs) == 1  # Just the weave object, and not the dataclass
-
-
-def test_inline_pydantic_basemodel_generates_no_refs_in_function(client):
-    class A(BaseModel):
-        b: int
-
-    @weave.op
-    def func(a: A):
-        return A(b=a.b + 1)
-
-    a = A(b=1)
-    func(a)
-
-    res = get_client_trace_server(client).calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-        )
-    )
-    input_object_version_refs = unique_vals(
-        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
-    )
-    assert len(input_object_version_refs) == 0
-
-    output_object_version_refs = unique_vals(
-        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
-    )
-    assert len(output_object_version_refs) == 0
-
-
-def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
-    class A(BaseModel):
-        b: int
-
-    class WeaveObject(weave.Object):
-        a: A
-
-    wo = WeaveObject(a=A(b=1))
-    ref = weave.publish(wo)
-
-    res = get_client_trace_server(client).objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-        )
-    )
-    assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
+    assert len(res.objs) == 1  # Just the weave object, not the inline type
 
 
 def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
@@ -4439,8 +4337,11 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     assert call.storage_size_bytes is not None
 
 
-def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
-    """Test querying calls with total storage size."""
+@pytest.mark.parametrize("include_storage_size", [False, True])
+def test_calls_query_with_total_storage_size_clickhouse(
+    client, clickhouse_client, include_storage_size
+):
+    """Total storage size on a parent/child trace, with and without per-call storage size."""
 
     @weave.op
     def parent_op(x: dict):
@@ -4459,86 +4360,31 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     # to return the correct results.
     force_optimize(clickhouse_client, "calls_merged_stats")
 
-    # Query with total storage size
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
+                include_storage_size=include_storage_size,
                 include_total_storage_size=True,
             )
         )
     )
     assert len(calls) == 2  # Parent and child calls
 
-    # Find parent and child calls
     parent_call = next(c for c in calls if c.parent_id is None)
     child_call = next(c for c in calls if c.parent_id is not None)
-
-    # Verify that both parent and child calls are present
     assert parent_call is not None
     assert child_call is not None
 
-    # Verify the total storage size is present, despite that the race condition
-    # that the calls_merged_stats table is not updated in time, and we are unable to
-    # verify the value against an expected value.
-    assert (
-        parent_call.total_storage_size_bytes is not None
-    )  # Parent should have total size
-    assert child_call.storage_size_bytes is None
-    assert (
-        child_call.total_storage_size_bytes is None
-    )  # Child should not have total size
-
-
-def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
-    """Test querying calls with total storage size."""
-
-    @weave.op
-    def parent_op(x: dict):
-        return child_op(x)  # Call child op to create a trace
-
-    @weave.op
-    def child_op(x: dict):
-        return x
-
-    # Create a call with nested structure
-    parent_op({"data": "x" * 1000})
-
-    # This is a best effort to achive consistency in the calls_merged_stats table.
-    # due to some race condition/optimizations in clickhouse, there is a chance
-    # that the calls_merged_stats table is not updated in time for the query below
-    # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
-
-    # Query with total storage size
-    calls = list(
-        client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                include_storage_size=True,
-                include_total_storage_size=True,
-            )
-        )
-    )
-
-    assert len(calls) == 2  # Parent and child calls
-
-    # Find parent and child calls
-    parent_call = next(c for c in calls if c.parent_id is None)
-    child_call = next(c for c in calls if c.parent_id is not None)
-
-    # Verify that both parent and child calls are present
-    assert parent_call is not None
-    assert child_call is not None
-
-    # Verify the storage sizes are present, despite that the race condition
-    # that the calls_merged_stats table is not updated in time, and we are unable to
-    # verify the value against an expected value.
-    assert parent_call.storage_size_bytes is not None
+    # Storage sizes are present despite the calls_merged_stats race; values are
+    # not asserted. Total size only attaches to the parent (trace root).
     assert parent_call.total_storage_size_bytes is not None
-    assert child_call.storage_size_bytes is not None
-    # Child should not have total size
     assert child_call.total_storage_size_bytes is None
+    if include_storage_size:
+        assert parent_call.storage_size_bytes is not None
+        assert child_call.storage_size_bytes is not None
+    else:
+        assert child_call.storage_size_bytes is None
 
 
 def test_calls_hydrated(client):
@@ -6831,3 +6677,21 @@ def test_sentinel_round_trip_none_values(client):
     assert c.started_at is not None
     assert c.ended_at is not None
     assert c.op_name is not None
+
+
+def _make_inline_type(kind: str) -> type:
+    """Build an inline single-field type as either a dataclass or a pydantic model."""
+    if kind == "dataclass":
+
+        @dataclasses.dataclass
+        class A:
+            b: int
+
+        return A
+    if kind == "basemodel":
+
+        class A(BaseModel):
+            b: int
+
+        return A
+    raise ValueError(f"unknown inline type kind: {kind}")

@@ -195,121 +195,55 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
 @patch(
     "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
-def test_llm_structured_completion_model_predict_text_response(mock_get_client):
-    """Test the predict function with mocked LLM API response for text format."""
-    # Setup mock client
-    mock_client = Mock()
-    mock_client.entity = "test_entity"
-    mock_client.project = "test_project"
+def test_predict_text_and_json_response(mock_get_client):
+    """predict() returns raw text for response_format=text and parsed dict for json_object."""
+    mock_client = _mock_client(mock_get_client)
 
-    # Mock successful API response
-    mock_response = tsi.CompletionsCreateRes(
-        response={
-            "choices": [
-                {
-                    "message": {
-                        "role": "assistant",
-                        "content": "Hello! How can I help you today?",
-                    }
-                }
-            ]
-        }
+    mock_client.server.completions_create.return_value = _completion_res(
+        "Hello! How can I help you today?"
     )
-    mock_client.server.completions_create.return_value = mock_response
-    mock_get_client.return_value = mock_client
-
-    # Create model with text response format
-    model = LLMStructuredCompletionModel(
+    text_model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            temperature=0.7,
-            max_tokens=100,
-            response_format="text",
+            temperature=0.7, max_tokens=100, response_format="text"
         ),
     )
-
-    # Test predict with simple string input
-    result = model.predict(user_input="Hello")
-
-    # Verify result
-    assert result == "Hello! How can I help you today?"
-
-    # Verify API call was made correctly
+    assert text_model.predict(user_input="Hello") == "Hello! How can I help you today?"
     mock_client.server.completions_create.assert_called_once()
-    call_args = mock_client.server.completions_create.call_args[1]["req"]
-    assert call_args.project_id == "test_entity/test_project"
-    assert call_args.inputs.model == "gpt-4"
-    assert call_args.inputs.temperature == 0.7
-    assert call_args.inputs.max_tokens == 100
-    assert call_args.inputs.messages == [{"role": "user", "content": "Hello"}]
+    text_args = mock_client.server.completions_create.call_args[1]["req"]
+    assert text_args.project_id == "test_entity/test_project"
+    assert text_args.inputs.model == "gpt-4"
+    assert text_args.inputs.temperature == 0.7
+    assert text_args.inputs.max_tokens == 100
+    assert text_args.inputs.messages == [{"role": "user", "content": "Hello"}]
 
-
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
-def test_llm_structured_completion_model_predict_json_response(mock_get_client):
-    """Test the predict function with mocked LLM API response for JSON format."""
-    # Setup mock client
-    mock_client = Mock()
-    mock_client.entity = "test_entity"
-    mock_client.project = "test_project"
-
-    # Mock successful API response with JSON content
     json_content = {"result": "success", "data": {"message": "Hello World"}}
-    mock_response = tsi.CompletionsCreateRes(
-        response={
-            "choices": [
-                {"message": {"role": "assistant", "content": json.dumps(json_content)}}
-            ]
-        }
+    mock_client.server.completions_create.return_value = _completion_res(
+        json.dumps(json_content)
     )
-    mock_client.server.completions_create.return_value = mock_response
-    mock_get_client.return_value = mock_client
-
-    # Create model with JSON response format
-    model = LLMStructuredCompletionModel(
+    json_model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            response_format="json_object",
+            response_format="json_object"
         ),
     )
-
-    # Test predict
-    result = model.predict(user_input="Generate JSON")
-
-    # Verify result is parsed JSON
-    assert result == json_content
-    assert isinstance(result, dict)
-    assert result["result"] == "success"
+    json_result = json_model.predict(user_input="Generate JSON")
+    assert isinstance(json_result, dict)
+    assert json_result == json_content
+    assert json_result["result"] == "success"
 
 
 @patch(
     "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
-def test_llm_structured_completion_model_predict_with_template(mock_get_client):
-    """Test the predict function with message templates and template variables."""
-    # Setup mock client
-    mock_client = Mock()
-    mock_client.entity = "test_entity"
-    mock_client.project = "test_project"
+def test_predict_with_template_and_config_override(mock_get_client):
+    """Template vars are substituted into messages; a `config` arg overrides defaults."""
+    mock_client = _mock_client(mock_get_client)
 
-    mock_response = tsi.CompletionsCreateRes(
-        response={
-            "choices": [
-                {
-                    "message": {
-                        "role": "assistant",
-                        "content": "Hello Alice! I'm Claude, nice to meet you.",
-                    }
-                }
-            ]
-        }
+    mock_client.server.completions_create.return_value = _completion_res(
+        "Hello Alice! I'm Claude, nice to meet you."
     )
-    mock_client.server.completions_create.return_value = mock_response
-    mock_get_client.return_value = mock_client
-
-    # Create model with message template
-    model = LLMStructuredCompletionModel(
+    template_model = LLMStructuredCompletionModel(
         llm_model_id="claude-3",
         default_params=LLMStructuredCompletionModelDefaultParams(
             messages_template=[
@@ -321,77 +255,37 @@ def test_llm_structured_completion_model_predict_with_template(mock_get_client):
             response_format="text",
         ),
     )
-
-    # Test predict with template variables
-    result = model.predict(
+    template_result = template_model.predict(
         user_input=[Message(role="user", content="What's your name?")],
         assistant_name="Claude",
         user_name="Alice",
     )
-
-    # Verify result
-    assert result == "Hello Alice! I'm Claude, nice to meet you."
-
-    # Verify the messages were properly prepared with template substitution
-    call_args = mock_client.server.completions_create.call_args[1]["req"]
-    expected_messages = [
+    assert template_result == "Hello Alice! I'm Claude, nice to meet you."
+    template_args = mock_client.server.completions_create.call_args[1]["req"]
+    assert template_args.inputs.messages == [
         {"role": "system", "content": "You are Claude, a helpful AI."},
         {"role": "user", "content": "Hello, my name is Alice"},
         {"role": "user", "content": "What's your name?"},
     ]
-    assert call_args.inputs.messages == expected_messages
 
-
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
-def test_llm_structured_completion_model_predict_with_config_override(mock_get_client):
-    """Test the predict function with config parameter overriding defaults."""
-    # Setup mock client
-    mock_client = Mock()
-    mock_client.entity = "test_entity"
-    mock_client.project = "test_project"
-
-    mock_response = tsi.CompletionsCreateRes(
-        response={
-            "choices": [
-                {
-                    "message": {
-                        "role": "assistant",
-                        "content": "Response with overridden config",
-                    }
-                }
-            ]
-        }
+    mock_client.server.completions_create.return_value = _completion_res(
+        "Response with overridden config"
     )
-    mock_client.server.completions_create.return_value = mock_response
-    mock_get_client.return_value = mock_client
-
-    # Create model with default parameters
-    model = LLMStructuredCompletionModel(
+    override_model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            temperature=0.5,
-            max_tokens=100,
-            response_format="text",
+            temperature=0.5, max_tokens=100, response_format="text"
         ),
     )
-
-    # Test predict with config override
-    override_config = LLMStructuredCompletionModelDefaultParams(
-        temperature=0.9,
-        max_tokens=200,
-    )
-
-    result = model.predict(
+    override_model.predict(
         user_input="Test message",
-        config=override_config,
+        config=LLMStructuredCompletionModelDefaultParams(
+            temperature=0.9, max_tokens=200
+        ),
     )
-
-    # Verify override was applied
-    call_args = mock_client.server.completions_create.call_args[1]["req"]
-    assert call_args.inputs.temperature == 0.9  # Overridden
-    assert call_args.inputs.max_tokens == 200  # Overridden
+    override_args = mock_client.server.completions_create.call_args[1]["req"]
+    assert override_args.inputs.temperature == 0.9
+    assert override_args.inputs.max_tokens == 200
 
 
 @patch(
@@ -438,12 +332,10 @@ def test_llm_structured_completion_model_predict_error_handling(mock_get_client)
         model.predict(user_input="Test")
 
 
-def test_parse_response_user_facing_errors():
-    """Guards in `parse_response` should surface user-actionable messages.
+def test_parse_response_errors_and_happy_paths():
+    """`parse_response` surfaces user-actionable errors and returns good content unchanged.
 
-    Replaces raw Python TypeError/JSONDecodeError when the LLM returns no
-    content or unparseable content. These were the top sources of
-    scoring-worker error noise (WB-34500).
+    Guards replace raw TypeError/JSONDecodeError noise from the scoring worker (WB-34500).
     """
     # API-level error: still RuntimeError (unchanged contract).
     with pytest.raises(RuntimeError, match="LLM API returned an error"):
@@ -476,9 +368,7 @@ def test_parse_response_user_facing_errors():
             "json_object",
         )
 
-
-def test_parse_response_happy_paths():
-    """`parse_response` returns the content / parsed JSON unchanged on good input."""
+    # Happy paths: content / parsed JSON returned unchanged on good input.
     assert (
         parse_response({"choices": [{"message": {"content": "hello"}}]}, "text")
         == "hello"
@@ -591,203 +481,128 @@ def test_parse_params_to_litellm_params():
     assert result_with_prompt["temperature"] == 0.5
 
 
-def test_cast_to_message_list():
-    """Test the cast_to_message_list function."""
-    # Test single Message object
+def test_cast_to_message_and_message_list():
+    """`cast_to_message` and `cast_to_message_list` coerce Message/str/dict, reject bad types."""
+    # cast_to_message: passthrough, string, dict, and invalid type.
     msg = Message(role="user", content="Hello")
-    result = cast_to_message_list(msg)
-    assert len(result) == 1
-    assert result[0] == msg
+    assert cast_to_message(msg) == msg
+    from_str = cast_to_message("Hello world")
+    assert from_str.role == "user"
+    assert from_str.content == "Hello world"
+    from_dict = cast_to_message({"role": "system", "content": "System message"})
+    assert from_dict.role == "system"
+    assert from_dict.content == "System message"
+    with pytest.raises(TypeError):
+        cast_to_message(123)
 
-    # Test single string
-    result = cast_to_message_list("Hello world")
-    assert len(result) == 1
-    assert result[0].role == "user"
-    assert result[0].content == "Hello world"
+    # cast_to_message_list: single Message, single string, single dict.
+    single_msg = cast_to_message_list(msg)
+    assert len(single_msg) == 1
+    assert single_msg[0] == msg
+    single_str = cast_to_message_list("Hello world")
+    assert len(single_str) == 1
+    assert single_str[0].role == "user"
+    assert single_str[0].content == "Hello world"
+    single_dict = cast_to_message_list({"role": "system", "content": "You are helpful"})
+    assert len(single_dict) == 1
+    assert single_dict[0].role == "system"
+    assert single_dict[0].content == "You are helpful"
 
-    # Test single dict
-    msg_dict = {"role": "system", "content": "You are helpful"}
-    result = cast_to_message_list(msg_dict)
-    assert len(result) == 1
-    assert result[0].role == "system"
-    assert result[0].content == "You are helpful"
-
-    # Test list of mixed types
-    mixed_list = [
-        "Hello",
-        {"role": "assistant", "content": "Hi there"},
-        Message(role="user", content="How are you?"),
-    ]
-    result = cast_to_message_list(mixed_list)
-    assert len(result) == 3
-    assert result[0].role == "user"
-    assert result[0].content == "Hello"
-    assert result[1].role == "assistant"
-    assert result[1].content == "Hi there"
-    assert result[2].role == "user"
-    assert result[2].content == "How are you?"
-
-    # Test invalid type
+    # cast_to_message_list: mixed list and invalid type.
+    mixed = cast_to_message_list(
+        [
+            "Hello",
+            {"role": "assistant", "content": "Hi there"},
+            Message(role="user", content="How are you?"),
+        ]
+    )
+    assert len(mixed) == 3
+    assert mixed[0].role == "user"
+    assert mixed[0].content == "Hello"
+    assert mixed[1].role == "assistant"
+    assert mixed[1].content == "Hi there"
+    assert mixed[2].role == "user"
+    assert mixed[2].content == "How are you?"
     with pytest.raises(TypeError):
         cast_to_message_list(123)
 
 
-def test_cast_to_message():
-    """Test the cast_to_message function."""
-    # Test Message object (passthrough)
-    msg = Message(role="user", content="Hello")
-    result = cast_to_message(msg)
-    assert result == msg
-
-    # Test string conversion
-    result = cast_to_message("Hello world")
-    assert result.role == "user"
-    assert result.content == "Hello world"
-
-    # Test dict conversion
-    msg_dict = {"role": "system", "content": "System message"}
-    result = cast_to_message(msg_dict)
-    assert result.role == "system"
-    assert result.content == "System message"
-
-    # Test invalid type
-    with pytest.raises(TypeError):
-        cast_to_message(123)
-
-
 @patch(
     "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
-def test_llm_structured_completion_model_predict_with_prompt(
+def test_predict_with_prompt_delegates_and_takes_precedence(
     mock_get_client, client: WeaveClient
 ):
-    """Test the predict function with a prompt that references a MessagesPrompt object.
+    """A `prompt` ref + template_vars are delegated to completions_create.
 
-    With the current architecture, the model passes the prompt reference and template_vars
-    to the completions endpoint, which handles resolution and substitution.
+    The model no longer resolves prompts itself; it passes the ref through and, when both
+    prompt and messages_template are set, prompt wins (messages_template is dropped).
     """
-    # Create and publish a MessagesPrompt
-    messages_prompt = MessagesPrompt(
-        messages=[
-            {"role": "system", "content": "You are {assistant_name}, a helpful AI."},
-            {"role": "user", "content": "Hello, my name is {user_name}"},
-        ]
+    mock_client = _mock_client(
+        mock_get_client, entity=client.entity, project=client.project
     )
-    prompt_ref = publish(messages_prompt, name="test_messages_prompt")
 
-    # Setup mock client
-    mock_client = Mock()
-    mock_client.entity = client.entity
-    mock_client.project = client.project
-
-    mock_response = tsi.CompletionsCreateRes(
-        response={
-            "choices": [
+    # Prompt-only model: delegates prompt + template_vars, keeps only user_input messages.
+    prompt_ref = publish(
+        MessagesPrompt(
+            messages=[
                 {
-                    "message": {
-                        "role": "assistant",
-                        "content": "Hello Alice! I'm Claude, nice to meet you.",
-                    }
-                }
+                    "role": "system",
+                    "content": "You are {assistant_name}, a helpful AI.",
+                },
+                {"role": "user", "content": "Hello, my name is {user_name}"},
             ]
-        }
+        ),
+        name="test_messages_prompt",
     )
-    mock_client.server.completions_create.return_value = mock_response
-    mock_get_client.return_value = mock_client
-
-    # Create model with prompt
-    model = LLMStructuredCompletionModel(
+    mock_client.server.completions_create.return_value = _completion_res(
+        "Hello Alice! I'm Claude, nice to meet you."
+    )
+    prompt_model = LLMStructuredCompletionModel(
         llm_model_id="claude-3",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            prompt=prompt_ref.uri,
-            response_format="text",
+            prompt=prompt_ref.uri, response_format="text"
         ),
     )
-
-    # Test predict with template variables
-    result = model.predict(
+    prompt_result = prompt_model.predict(
         user_input=[Message(role="user", content="What's your name?")],
         assistant_name="Claude",
         user_name="Alice",
     )
-
-    # Verify result
-    assert result == "Hello Alice! I'm Claude, nice to meet you."
-
-    # Verify the prompt reference and template_vars were passed to completions_create
-    # The model no longer does prompt resolution - it delegates to the completions endpoint
-    call_args = mock_client.server.completions_create.call_args[1]["req"]
-
-    # Should have the prompt reference and template_vars in the request
-    assert call_args.inputs.prompt == prompt_ref.uri
-    assert call_args.inputs.template_vars == {
+    assert prompt_result == "Hello Alice! I'm Claude, nice to meet you."
+    prompt_args = mock_client.server.completions_create.call_args[1]["req"]
+    assert prompt_args.inputs.prompt == prompt_ref.uri
+    assert prompt_args.inputs.template_vars == {
         "assistant_name": "Claude",
         "user_name": "Alice",
     }
-
-    # Should have only the user_input messages (prompt resolution happens in completions endpoint)
-    expected_messages = [
-        {"role": "user", "content": "What's your name?"},
+    assert prompt_args.inputs.messages == [
+        {"role": "user", "content": "What's your name?"}
     ]
-    assert call_args.inputs.messages == expected_messages
 
-
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
-def test_llm_structured_completion_model_prompt_takes_precedence(
-    mock_get_client, client: WeaveClient
-):
-    """Test that prompt takes precedence over messages_template when both are provided.
-
-    When prompt is set, the model passes it to completions_create and ignores messages_template.
-    """
-    # Create and publish a MessagesPrompt
-    messages_prompt = MessagesPrompt(
-        messages=[
-            {"role": "system", "content": "Message from prompt: {var}"},
-        ]
+    # prompt + messages_template: prompt takes precedence, no user_input -> empty messages.
+    precedence_ref = publish(
+        MessagesPrompt(
+            messages=[{"role": "system", "content": "Message from prompt: {var}"}]
+        ),
+        name="test_precedence_prompt",
     )
-    prompt_ref = publish(messages_prompt, name="test_precedence_prompt")
-
-    # Setup mock client
-    mock_client = Mock()
-    mock_client.entity = client.entity
-    mock_client.project = client.project
-
-    mock_response = tsi.CompletionsCreateRes(
-        response={
-            "choices": [{"message": {"role": "assistant", "content": "Response"}}]
-        }
-    )
-    mock_client.server.completions_create.return_value = mock_response
-    mock_get_client.return_value = mock_client
-
-    # Create model with both prompt and messages_template
-    model = LLMStructuredCompletionModel(
+    mock_client.server.completions_create.return_value = _completion_res("Response")
+    precedence_model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            prompt=prompt_ref.uri,
+            prompt=precedence_ref.uri,
             messages_template=[
                 Message(role="system", content="Message from template: {var}"),
             ],
             response_format="text",
         ),
     )
-
-    # Test predict
-    result = model.predict(var="test_value")
-
-    # Verify that prompt was passed (not messages_template)
-    call_args = mock_client.server.completions_create.call_args[1]["req"]
-
-    # Should have prompt reference and template_vars
-    assert call_args.inputs.prompt == prompt_ref.uri
-    assert call_args.inputs.template_vars == {"var": "test_value"}
-
-    # Should NOT have messages from messages_template (prompt takes precedence)
-    # Messages should be empty since no user_input was provided
-    assert call_args.inputs.messages == []
+    precedence_model.predict(var="test_value")
+    precedence_args = mock_client.server.completions_create.call_args[1]["req"]
+    assert precedence_args.inputs.prompt == precedence_ref.uri
+    assert precedence_args.inputs.template_vars == {"var": "test_value"}
+    assert precedence_args.inputs.messages == []
 
 
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
@@ -852,3 +667,21 @@ def test_cast_to_llm_structured_model_params_handles_weave_object():
     assert isinstance(result, LLMStructuredCompletionModelDefaultParams)
     assert result.response_format == "json_object"
     assert result.temperature == 0.5
+
+
+def _mock_client(
+    mock_get_client, entity: str = "test_entity", project: str = "test_project"
+) -> Mock:
+    """Wire a Mock weave client into the patched `get_weave_client` and return it."""
+    mock_client = Mock()
+    mock_client.entity = entity
+    mock_client.project = project
+    mock_get_client.return_value = mock_client
+    return mock_client
+
+
+def _completion_res(content: str) -> tsi.CompletionsCreateRes:
+    """Build a single-choice assistant CompletionsCreateRes with `content`."""
+    return tsi.CompletionsCreateRes(
+        response={"choices": [{"message": {"role": "assistant", "content": content}}]}
+    )

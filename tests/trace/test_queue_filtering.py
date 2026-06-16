@@ -80,6 +80,22 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
     excluded_ids = set(call_ids[:2] + call_ids[7:])
     assert returned_ids.isdisjoint(excluded_ids)
 
+    # A non-existent queue id matches no queue items, so INNER JOIN -> empty.
+    nonexistent_query = tsi.Query(
+        **{
+            "$expr": {
+                "$eq": [
+                    {"$getField": "annotation_queue_items.queue_id"},
+                    {"$literal": generate_id()},
+                ]
+            }
+        }
+    )
+    empty_res = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client.project_id, query=nonexistent_query)
+    )
+    assert len(empty_res.calls) == 0
+
 
 def test_filter_calls_by_multiple_distinct_queues(client):
     """Test that queue filtering correctly isolates calls by queue_id.
@@ -258,42 +274,6 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
     # Should return only the 2 op_include calls in the queue
     assert len(res.calls) == 2
     assert {call.id for call in res.calls} == set(include_ids[:2])
-
-
-def test_filter_calls_by_nonexistent_queue(client):
-    """Test that filtering by a non-existent queue returns empty results.
-
-    Verifies INNER JOIN behavior when no matching queue items exist.
-    """
-
-    # Create some calls
-    @weave.op(name="test_nonexistent")
-    def test_op(x: int) -> int:
-        return x
-
-    for i in range(3):
-        test_op(i)
-
-    # Use a random queue ID that doesn't exist
-    nonexistent_queue_id = generate_id()
-
-    query = tsi.Query(
-        **{
-            "$expr": {
-                "$eq": [
-                    {"$getField": "annotation_queue_items.queue_id"},
-                    {"$literal": nonexistent_queue_id},
-                ]
-            }
-        }
-    )
-
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client.project_id, query=query)
-    )
-
-    # Should return no calls
-    assert len(res.calls) == 0
 
 
 def test_filter_calls_by_queue_with_calls_complete_table(trace_server):

@@ -162,34 +162,6 @@ def test_setting_disables_unsafe_decode_globally(client):
 
 
 def test_encode_custom_obj_save_exception_returns_none(client, failing_serializer):
-    """Requirement: Type handler save exceptions should not crash user code
-    Interface: encode_custom_obj function
-    Given: A serializer is registered whose save function raises an exception
-    When: encode_custom_obj is called with an object of that type
-    Then: Returns None (graceful degradation)
-    """
+    """A type handler save exception degrades gracefully to None, never propagating."""
     obj = FailingSaveType("test_value")
-
-    # This should NOT raise - if it does, the test fails
-    result = encode_custom_obj(obj)
-
-    # Should return None instead of raising
-    assert result is None
-
-
-def test_encode_custom_obj_save_exception_does_not_propagate(
-    client, failing_serializer
-):
-    """Requirement: Type handler save exceptions must not propagate to user code
-    Interface: encode_custom_obj function
-    Given: A serializer is registered whose save function raises RuntimeError
-    When: encode_custom_obj is called
-    Then: No exception is raised to the caller
-    """
-    obj = FailingSaveType("test_value")
-
-    # This should NOT raise - if it does, the test fails
-    result = encode_custom_obj(obj)
-
-    # We expect None as the graceful degradation
-    assert result is None
+    assert encode_custom_obj(obj) is None

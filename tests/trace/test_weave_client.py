@@ -1312,7 +1312,11 @@ def test_op_query(client):
     assert len(res) == 1
 
 
-def test_refs_read_batch_noextra(client):
+def test_refs_read_batch(client):
+    """refs_read_batch over top-level objects, refs with extra (list/dataset
+    rows), cross-project refs, and the unsupported call-ref error.
+    """
+    # Top-level object refs.
     ref = client._save_object([1, 2, 3], "my-list")
     ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
     res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri, ref2.uri]))
@@ -1320,49 +1324,45 @@ def test_refs_read_batch_noextra(client):
     assert res.vals[0] == [1, 2, 3]
     assert res.vals[1] == {"a": [3, 4, 5]}
 
-
-def test_refs_read_batch_with_extra(client):
+    # Refs that descend into a saved list.
     saved = client.save([{"a": 5}, {"a": 6}], "my-list")
-    ref1 = saved[0]["a"].ref
-    ref2 = saved[1].ref
-    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri, ref2.uri]))
+    res = client.server.refs_read_batch(
+        RefsReadBatchReq(refs=[saved[0]["a"].ref.uri, saved[1].ref.uri])
+    )
     assert len(res.vals) == 2
     assert res.vals[0] == 5
     assert res.vals[1] == {"a": 6}
 
-
-def test_refs_read_batch_dataset_rows(client):
-    saved = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
-    ref1 = saved.rows[0]["a"].ref
-    ref2 = saved.rows[1]["a"].ref
-    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri, ref2.uri]))
+    # Refs that descend into dataset rows.
+    saved_ds = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
+    res = client.server.refs_read_batch(
+        RefsReadBatchReq(
+            refs=[saved_ds.rows[0]["a"].ref.uri, saved_ds.rows[1]["a"].ref.uri]
+        )
+    )
     assert len(res.vals) == 2
     assert res.vals[0] == 5
     assert res.vals[1] == 6
 
+    # Call refs are not supported.
+    call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
+    with pytest.raises(ValueError, match="Call refs not supported"):
+        client.server.refs_read_batch(RefsReadBatchReq(refs=[call_ref.uri]))
 
-def test_refs_read_batch_multi_project(client):
+    # A single batch can resolve refs spanning multiple projects.
     client.project = "test111"
-    ref = client._save_object([1, 2, 3], "my-list")
-
+    mp_ref = client._save_object([1, 2, 3], "my-list")
     client.project = "test222"
-    ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
-
+    mp_ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
     client.project = "test333"
-    ref3 = client._save_object({"ab": [3, 4, 5]}, "my-obj-2")
-
-    refs = [ref.uri, ref2.uri, ref3.uri]
-    res = client.server.refs_read_batch(RefsReadBatchReq(refs=refs))
+    mp_ref3 = client._save_object({"ab": [3, 4, 5]}, "my-obj-2")
+    res = client.server.refs_read_batch(
+        RefsReadBatchReq(refs=[mp_ref.uri, mp_ref2.uri, mp_ref3.uri])
+    )
     assert len(res.vals) == 3
     assert res.vals[0] == [1, 2, 3]
     assert res.vals[1] == {"a": [3, 4, 5]}
     assert res.vals[2] == {"ab": [3, 4, 5]}
-
-
-def test_refs_read_batch_call_ref(client):
-    call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
-    with pytest.raises(ValueError, match="Call refs not supported"):
-        client.server.refs_read_batch(RefsReadBatchReq(refs=[call_ref.uri]))
 
 
 def test_large_files(client):
@@ -1810,30 +1810,22 @@ def _setup_calls_for_storage_size_test(client):
     return [call0, call0_child1, call1]
 
 
-def test_get_calls_storage_size_with_filter(client):
-    """Test that storage size parameters can be combined with other get_calls parameters."""
+def test_get_calls_storage_size_combined_params(client):
+    """Storage size params combine with both an op_names filter and a limit."""
     all_calls = _setup_calls_for_storage_size_test(client)
     assert len(all_calls) > 2
 
-    call0 = all_calls[0]
-
-    # Test that parameters can be combined with other parameters
+    # Combined with an op_names filter (call0 + its child both have op "x").
     calls_filtered = list(
         client.get_calls(
-            filter=tsi.CallsFilter(op_names=[call0.op_name]),
+            filter=tsi.CallsFilter(op_names=[all_calls[0].op_name]),
             include_storage_size=True,
             include_total_storage_size=True,
         )
     )
     assert len(calls_filtered) == 2
 
-
-def test_get_calls_storage_size_with_limit(client):
-    """Test that storage size parameters can be combined with other get_calls parameters."""
-    all_calls = _setup_calls_for_storage_size_test(client)
-    assert len(all_calls) > 2
-
-    # Test that parameters can be combined with other parameters
+    # Combined with a limit.
     calls_limited = list(
         client.get_calls(
             include_storage_size=True,
@@ -2270,7 +2262,10 @@ def test_flush_progress_bar(client):
     def op_1():
         time.sleep(0.01)
 
-    op_1()
+    # Enqueue enough work that the flush spans multiple progress-bar refresh
+    # intervals, so the "jobs completed since last update" branch is exercised.
+    for _ in range(20):
+        op_1()
 
     # flush with progress bar
     client.finish(use_progress_bar=True)
@@ -4069,23 +4064,19 @@ def test_files_stats(client):
     assert read_res.total_size_bytes == 10000005
 
 
-def test_no_400_on_invalid_artifact_url(client):
+@pytest.mark.parametrize(
+    "bad_output",
+    [
+        # Over-long artifact url: should be wandb-artifact:///entity/project/name:version
+        "wandb-artifact:///entity/project/toxic-extra-path/artifact:latest",
+        # Over-long ref: should be weave:///entity/project/object/name:version
+        "weave:///entity/project/object/toxic-extra-path/object:latest",
+    ],
+)
+def test_no_400_on_invalid_ref_like_output(client, bad_output):
     @weave.op
     def test() -> str:
-        # This url is too long, should be wandb-artifact:///entity/project/name:version
-        return "wandb-artifact:///entity/project/toxic-extra-path/artifact:latest"
-
-    _, call = test.call()
-    id = call.id
-    server_call = client.get_call(id)
-    assert server_call.id == id
-
-
-def test_no_400_on_invalid_refs(client):
-    @weave.op
-    def test() -> str:
-        # This ref is too long, should be weave:///entity/project/object/name:version
-        return "weave:///entity/project/object/toxic-extra-path/object:latest"
+        return bad_output
 
     _, call = test.call()
     id = call.id
@@ -4094,14 +4085,14 @@ def test_no_400_on_invalid_refs(client):
 
 
 def test_get_evaluation(client, make_evals):
-    ref, _ = make_evals
+    ref, ref2 = make_evals
+
+    # Single lookup by ref.
     ev = client.get_evaluation(ref.uri)
     assert isinstance(ev, Evaluation)
     assert ev.ref.uri == ref.uri
 
-
-def test_get_evaluations(client, make_evals):
-    ref, ref2 = make_evals
+    # Listing returns both evaluations with their datasets.
     evs = client.get_evaluations()
     assert len(evs) == 2
     assert isinstance(evs[0], Evaluation)

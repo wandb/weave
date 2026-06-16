@@ -1,8 +1,8 @@
 """Tests for file storage implementations (S3, GCS, Azure Blob).
 
-This module tests the different cloud storage backends used for file storage.
-Each storage implementation is tested with similar patterns but with their
-specific setup requirements.
+Each cloud backend is tested with a similar store-then-read pattern, plus the
+write-once (no-overwrite) contract and the call_batch fan-out path. Only the
+cloud SDKs are mocked (external services); the trace server runs for real.
 """
 
 import base64
@@ -20,370 +20,201 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
-# Test Data Constants
 TEST_CONTENT = b"Hello, world!"
 TEST_BUCKET = "test-bucket"
 
 
-@pytest.fixture
-def run_storage_test(client: WeaveClient):
-    """Shared test runner for all storage implementations."""
+@pytest.mark.usefixtures("aws_storage_env")
+def test_aws_storage(run_storage_test, s3):
+    """File storage round-trips through AWS S3 and the object lands in the bucket."""
+    res = run_storage_test()
 
-    def _run_test():
-        # Create a new trace
+    response = s3.list_objects_v2(Bucket=TEST_BUCKET)
+    assert "Contents" in response
+    assert len(response["Contents"]) == 1
+
+    obj = response["Contents"][0]
+    obj_response = s3.get_object(Bucket=TEST_BUCKET, Key=obj["Key"])
+    assert obj_response["Body"].read() == TEST_CONTENT
+
+
+def test_large_file_migration(s3, client: WeaveClient):
+    """Large files read back identically with storage disabled, enabled, then
+    disabled again, yielding a stable digest across the migration.
+    """
+    chunk_size = 100000
+    num_chunks = 3
+    file_part = b"1234567890"
+    large_file = file_part * (chunk_size * num_chunks // len(file_part))
+
+    def _run_single_test():
         res = client.server.file_create(
             FileCreateReq(
-                project_id=client.project_id,
-                name="test.txt",
-                content=TEST_CONTENT,
+                project_id=client.project_id, name="test.txt", content=large_file
             )
         )
         assert res.digest is not None
         assert res.digest != ""
-
-        # Get the file
         file = client.server.file_content_read(
             FileContentReadReq(project_id=client.project_id, digest=res.digest)
         )
-        assert file.content == TEST_CONTENT
-        return res
+        assert file.content == large_file
+        return res.digest
 
-    return _run_test
-
-
-class TestS3Storage:
-    """Tests for AWS S3 storage implementation."""
-
-    @pytest.fixture
-    def s3(self):
-        """Moto S3 mock that implements the S3 API."""
-        with mock_aws():
-            s3_client = boto3.client(
-                "s3",
-                aws_access_key_id="test-key",
-                aws_secret_access_key="test-secret",
-                region_name="us-east-1",
-            )
-            s3_client.create_bucket(Bucket=TEST_BUCKET)
-            yield s3_client
-
-    @pytest.fixture
-    def aws_storage_env(self):
-        """Setup AWS storage environment."""
-        with mock.patch.dict(
-            os.environ,
-            {
-                "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
-                "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
-                "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
-                "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
-            },
-        ):
-            yield
-
-    @pytest.mark.usefixtures("aws_storage_env")
-    def test_aws_storage(self, run_storage_test, s3):
-        """Test file storage using AWS S3."""
-        res = run_storage_test()
-
-        # Verify the object exists in S3
-        response = s3.list_objects_v2(Bucket=TEST_BUCKET)
-        assert "Contents" in response
-        assert len(response["Contents"]) == 1
-
-        # Verify content
-        obj = response["Contents"][0]
-        obj_response = s3.get_object(Bucket=TEST_BUCKET, Key=obj["Key"])
-        assert obj_response["Body"].read() == TEST_CONTENT
-
-    def test_large_file_migration(self, run_storage_test, s3, client: WeaveClient):
-        # This test is critical in that it ensures that the system works correctly for large files. Both
-        # before and after the migration to file storage, we should be able to read the file correctly.
-        def _run_single_test():
-            chunk_size = 100000
-            num_chunks = 3
-            file_part = b"1234567890"
-            large_file = file_part * (chunk_size * num_chunks // len(file_part))
-
-            # Create a new trace
-            res = client.server.file_create(
-                FileCreateReq(
-                    project_id=client.project_id,
-                    name="test.txt",
-                    content=large_file,
-                )
-            )
-            assert res.digest is not None
-            assert res.digest != ""
-
-            # Get the file
-            file = client.server.file_content_read(
-                FileContentReadReq(project_id=client.project_id, digest=res.digest)
-            )
-            assert file.content == large_file
-            return res.digest
-
-        def _run_test():
-            # Run with disabled storage:
-            d1 = _run_single_test()
-            # Now "enable" bucket storage:
-            with mock.patch.dict(
-                os.environ,
-                {
-                    "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
-                    "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
-                    "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
-                    "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
-                },
-            ):
-                # This line would error before the fix
-                d2 = _run_single_test()
-            # Run again with disabled storage:
-            d3 = _run_single_test()
-            assert d1 == d2 == d3
-
-        _run_test()
+    d1 = _run_single_test()
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
+            "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+            "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
+            "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
+        },
+    ):
+        d2 = _run_single_test()
+    d3 = _run_single_test()
+    assert d1 == d2 == d3
 
 
-class TestGCSStorage:
-    """Tests for Google Cloud Storage implementation.
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+def test_gcp_storage(run_storage_test, gcs, client: WeaveClient):
+    """File storage round-trips through Google Cloud Storage under the b64 project key."""
+    res = run_storage_test()
 
-    `gcs`, `gcp_storage_env`, and `mock_gcp_credentials` live in
-    `tests/trace/conftest.py` so other suites in the package can drive the
-    bucket write path without copy-pasting the SDK mock.
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+    expected_key = f"weave/projects/{project_b64}/files/{res.digest}"
+    assert gcs.state.blob_data[expected_key] == TEST_CONTENT
+    assert gcs.state.upload_count == 1
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+def test_gcp_storage_skips_duplicate_write(client: WeaveClient):
+    """The if_generation_match=0 conditional write skips a second write of identical
+    content, returning the same digest and remaining readable.
     """
+    upload_count = 0
+    blob_data = {}
 
-    @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
-    def test_gcp_storage(self, run_storage_test, gcs, client: WeaveClient):
-        """Test file storage using Google Cloud Storage."""
-        res = run_storage_test()
+    def mock_upload_from_string(data, timeout=None, if_generation_match=None, **kwargs):
+        nonlocal upload_count
+        blob_name = mock_blob.name
+        if if_generation_match == 0 and blob_name in blob_data:
+            raise exceptions.PreconditionFailed("Object already exists")
+        upload_count += 1
+        blob_data[blob_name] = data
 
-        # GCS path uses the base64-encoded project_id (matches azure test).
-        project_b64 = base64.b64encode(client.project_id.encode()).decode()
-        expected_key = f"weave/projects/{project_b64}/files/{res.digest}"
-        assert gcs.state.blob_data[expected_key] == TEST_CONTENT
-        assert gcs.state.upload_count == 1
+    def mock_download_as_bytes(timeout=None, **kwargs):
+        return blob_data.get(mock_blob.name, b"")
 
-    @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
-    def test_gcp_storage_skips_duplicate_write(self, client: WeaveClient):
-        """Test that writing the same content twice skips the second write.
+    mock_storage_client = mock.MagicMock()
+    mock_bucket = mock.MagicMock()
+    mock_blob = mock.MagicMock()
+    mock_storage_client.bucket.return_value = mock_bucket
+    mock_bucket.blob.return_value = mock_blob
+    mock_blob.upload_from_string.side_effect = mock_upload_from_string
+    mock_blob.download_as_bytes.side_effect = mock_download_as_bytes
 
-        This verifies the if_generation_match=0 conditional write works correctly
-        to prevent GCS rate limiting when multiple pods write the same object.
-        """
-        upload_count = 0
-        blob_data = {}
-
-        def mock_upload_from_string(
-            data, timeout=None, if_generation_match=None, **kwargs
-        ):
-            nonlocal upload_count
-            blob_name = mock_blob.name
-
-            # Simulate GCS behavior: if_generation_match=0 means only write if not exists
-            if if_generation_match == 0 and blob_name in blob_data:
-                raise exceptions.PreconditionFailed("Object already exists")
-
-            upload_count += 1
-            blob_data[blob_name] = data
-
-        def mock_download_as_bytes(timeout=None, **kwargs):
-            blob_name = mock_blob.name
-            return blob_data.get(blob_name, b"")
-
-        mock_storage_client = mock.MagicMock()
-        mock_bucket = mock.MagicMock()
-        mock_blob = mock.MagicMock()
-
-        mock_storage_client.bucket.return_value = mock_bucket
-        mock_bucket.blob.return_value = mock_blob
-        mock_blob.upload_from_string.side_effect = mock_upload_from_string
-        mock_blob.download_as_bytes.side_effect = mock_download_as_bytes
-
-        with mock.patch(
-            "google.cloud.storage.Client", return_value=mock_storage_client
-        ):
-            # First write should succeed
-            res1 = client.server.file_create(
-                FileCreateReq(
-                    project_id=client.project_id,
-                    name="test.txt",
-                    content=TEST_CONTENT,
-                )
+    with mock.patch("google.cloud.storage.Client", return_value=mock_storage_client):
+        res1 = client.server.file_create(
+            FileCreateReq(
+                project_id=client.project_id, name="test.txt", content=TEST_CONTENT
             )
-            assert upload_count == 1
-
-            # Second write with same content should be skipped (no error, no upload)
-            res2 = client.server.file_create(
-                FileCreateReq(
-                    project_id=client.project_id,
-                    name="test.txt",
-                    content=TEST_CONTENT,
-                )
-            )
-            # Should still be 1 - second write was skipped
-            assert upload_count == 1
-            # Both should return the same digest
-            assert res1.digest == res2.digest
-
-            # Verify we can still read the content
-            file = client.server.file_content_read(
-                FileContentReadReq(project_id=client.project_id, digest=res1.digest)
-            )
-            assert file.content == TEST_CONTENT
-
-
-class TestAzureStorage:
-    """Tests for Azure Blob Storage implementation using mocks."""
-
-    @pytest.fixture
-    def azure_blob(self):
-        """Fully mocked Azure Blob Storage client."""
-        mock_service_client = mock.MagicMock()
-        mock_container_client = mock.MagicMock()
-        mock_blob_client = mock.MagicMock()
-
-        mock_service_client.get_container_client.return_value = mock_container_client
-        mock_container_client.get_blob_client.return_value = mock_blob_client
-
-        # In-memory storage for blobs
-        blob_data = {}
-
-        def mock_upload_blob(data, overwrite=False, **kwargs):
-            blob_name = mock_blob_client.blob_name
-            blob_data[blob_name] = data
-
-        def mock_download_blob(**kwargs):
-            blob_name = mock_blob_client.blob_name
-            download = mock.MagicMock()
-            download.readall.return_value = blob_data.get(blob_name, b"")
-            return download
-
-        # Track blob_name through get_blob_client calls
-        def mock_get_blob_client(name):
-            mock_blob_client.blob_name = name
-            return mock_blob_client
-
-        mock_container_client.get_blob_client.side_effect = mock_get_blob_client
-        mock_blob_client.upload_blob.side_effect = mock_upload_blob
-        mock_blob_client.download_blob.side_effect = mock_download_blob
-
-        with mock.patch(
-            "weave.trace_server.file_storage.BlobServiceClient",
-            return_value=mock_service_client,
-        ) as mock_cls:
-            mock_cls.from_connection_string.return_value = mock_service_client
-            yield mock_service_client
-
-    @pytest.fixture
-    def azure_storage_env(self):
-        """Setup Azure storage environment."""
-        with mock.patch.dict(
-            os.environ,
-            {
-                "WF_FILE_STORAGE_AZURE_ACCESS_KEY": "fake-key",
-                "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": "http://fake-account.blob.core.windows.net",
-                "WF_FILE_STORAGE_URI": f"az://fakeaccount/{TEST_BUCKET}",
-                "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
-            },
-        ):
-            yield
-
-    @pytest.mark.usefixtures("azure_storage_env")
-    def test_azure_storage(self, run_storage_test, azure_blob):
-        """Test file storage using Azure Blob Storage."""
-        res = run_storage_test()
-
-        # Verify upload was called
-        azure_blob.get_container_client.assert_called()
-        container_client = azure_blob.get_container_client(TEST_BUCKET)
-        project = "c2hhd24vdGVzdC1wcm9qZWN0"
-        blob_client = container_client.get_blob_client(
-            f"weave/projects/{project}/files/{res.digest}"
         )
-        assert blob_client.download_blob().readall() == TEST_CONTENT
-
-    @pytest.mark.usefixtures("azure_storage_env")
-    def test_azure_storage_does_not_overwrite_existing_blob(self, client: WeaveClient):
-        """Azure store must not clobber an existing content-addressable blob.
-
-        Mirrors `test_gcp_storage_skips_duplicate_write`. Content-addressable
-        storage is a write-once contract: re-uploading at a known digest must
-        be a no-op, not an overwrite. Otherwise any project with write scope
-        can substitute content at a known URI.
-        """
-        blob_data: dict[str, bytes] = {}
-        upload_calls: list[dict] = []
-
-        mock_service_client = mock.MagicMock()
-        mock_container_client = mock.MagicMock()
-        mock_blob_client = mock.MagicMock()
-        mock_service_client.get_container_client.return_value = mock_container_client
-
-        def mock_get_blob_client(name):
-            mock_blob_client.blob_name = name
-            return mock_blob_client
-
-        def mock_upload_blob(data, overwrite=False, **kwargs):
-            blob_name = mock_blob_client.blob_name
-            upload_calls.append({"name": blob_name, "overwrite": overwrite})
-            # Azure semantics: overwrite=False on an existing blob raises.
-            if blob_name in blob_data and not overwrite:
-                raise ResourceExistsError("blob already exists")
-            blob_data[blob_name] = data
-
-        def mock_download_blob(**kwargs):
-            blob_name = mock_blob_client.blob_name
-            download = mock.MagicMock()
-            download.readall.return_value = blob_data.get(blob_name, b"")
-            return download
-
-        mock_container_client.get_blob_client.side_effect = mock_get_blob_client
-        mock_blob_client.upload_blob.side_effect = mock_upload_blob
-        mock_blob_client.download_blob.side_effect = mock_download_blob
-
-        original = b"original-content"
-
-        with mock.patch(
-            "weave.trace_server.file_storage.BlobServiceClient",
-            return_value=mock_service_client,
-        ) as mock_cls:
-            mock_cls.from_connection_string.return_value = mock_service_client
-
-            res1 = client.server.file_create(
-                FileCreateReq(
-                    project_id=client.project_id,
-                    name="test.txt",
-                    content=original,
-                )
+        assert upload_count == 1
+        res2 = client.server.file_create(
+            FileCreateReq(
+                project_id=client.project_id, name="test.txt", content=TEST_CONTENT
             )
-            res2 = client.server.file_create(
-                FileCreateReq(
-                    project_id=client.project_id,
-                    name="test.txt",
-                    content=original,
-                )
-            )
+        )
+        assert upload_count == 1
+        assert res1.digest == res2.digest
 
-            assert res1.digest == res2.digest
-            assert upload_calls, "upload_blob was never invoked"
-            assert all(call["overwrite"] is False for call in upload_calls), (
-                f"upload_blob called with overwrite=True: {upload_calls}"
-            )
+        file = client.server.file_content_read(
+            FileContentReadReq(project_id=client.project_id, digest=res1.digest)
+        )
+        assert file.content == TEST_CONTENT
 
-            stored = blob_data[next(iter(blob_data))]
-            assert stored == original
 
-            file = client.server.file_content_read(
-                FileContentReadReq(project_id=client.project_id, digest=res1.digest)
+@pytest.mark.usefixtures("azure_storage_env")
+def test_azure_storage(run_storage_test, azure_blob):
+    """File storage round-trips through Azure Blob Storage under the b64 project key."""
+    res = run_storage_test()
+
+    azure_blob.get_container_client.assert_called()
+    container_client = azure_blob.get_container_client(TEST_BUCKET)
+    project = "c2hhd24vdGVzdC1wcm9qZWN0"
+    blob_client = container_client.get_blob_client(
+        f"weave/projects/{project}/files/{res.digest}"
+    )
+    assert blob_client.download_blob().readall() == TEST_CONTENT
+
+
+@pytest.mark.usefixtures("azure_storage_env")
+def test_azure_storage_does_not_overwrite_existing_blob(client: WeaveClient):
+    """Content-addressable storage is write-once: re-uploading at a known digest is a
+    no-op (overwrite=False), so a write-scoped project cannot substitute content.
+    """
+    blob_data: dict[str, bytes] = {}
+    upload_calls: list[dict] = []
+
+    mock_service_client = mock.MagicMock()
+    mock_container_client = mock.MagicMock()
+    mock_blob_client = mock.MagicMock()
+    mock_service_client.get_container_client.return_value = mock_container_client
+
+    def mock_get_blob_client(name):
+        mock_blob_client.blob_name = name
+        return mock_blob_client
+
+    def mock_upload_blob(data, overwrite=False, **kwargs):
+        blob_name = mock_blob_client.blob_name
+        upload_calls.append({"name": blob_name, "overwrite": overwrite})
+        if blob_name in blob_data and not overwrite:
+            raise ResourceExistsError("blob already exists")
+        blob_data[blob_name] = data
+
+    def mock_download_blob(**kwargs):
+        download = mock.MagicMock()
+        download.readall.return_value = blob_data.get(mock_blob_client.blob_name, b"")
+        return download
+
+    mock_container_client.get_blob_client.side_effect = mock_get_blob_client
+    mock_blob_client.upload_blob.side_effect = mock_upload_blob
+    mock_blob_client.download_blob.side_effect = mock_download_blob
+
+    original = b"original-content"
+    with mock.patch(
+        "weave.trace_server.file_storage.BlobServiceClient",
+        return_value=mock_service_client,
+    ) as mock_cls:
+        mock_cls.from_connection_string.return_value = mock_service_client
+
+        res1 = client.server.file_create(
+            FileCreateReq(
+                project_id=client.project_id, name="test.txt", content=original
             )
-            assert file.content == original
+        )
+        res2 = client.server.file_create(
+            FileCreateReq(
+                project_id=client.project_id, name="test.txt", content=original
+            )
+        )
+        assert res1.digest == res2.digest
+        assert upload_calls, "upload_blob was never invoked"
+        assert all(call["overwrite"] is False for call in upload_calls), (
+            f"upload_blob called with overwrite=True: {upload_calls}"
+        )
+        stored = blob_data[next(iter(blob_data))]
+        assert stored == original
+
+        file = client.server.file_content_read(
+            FileContentReadReq(project_id=client.project_id, digest=res1.digest)
+        )
+        assert file.content == original
 
 
 def test_support_for_variable_length_chunks(client: WeaveClient):
-    """Test that the system supports variable length chunks.
-    We don't actually want to change this often, but we need to make sure it works.
-    """
+    """File read-back is stable across a range of increasing and decreasing chunk sizes."""
 
     def create_and_read_file(content: bytes):
         res = client.server.file_create(
@@ -393,12 +224,10 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
         )
         assert res.digest is not None
         assert res.digest != ""
-
         file = client.server.file_content_read(
             FileContentReadReq(project_id=client.project_id, digest=res.digest)
         )
         assert file.content == content
-
         return res.digest
 
     base_chunk_size = 100000
@@ -407,7 +236,6 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
     large_file = file_part * (base_chunk_size * num_chunks // len(file_part))
     large_digest = create_and_read_file(large_file)
 
-    #  Test increasing and decreasing chunk sizes
     for size in [
         base_chunk_size,
         2 * base_chunk_size,
@@ -419,21 +247,17 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
         with mock.patch.object(
             clickhouse_trace_server_settings, "FILE_CHUNK_SIZE", size
         ):
-            digest = create_and_read_file(large_file)
-            assert digest == large_digest
+            assert create_and_read_file(large_file) == large_digest
 
 
 @pytest.mark.disable_logging_error_check
 def test_file_storage_retry_limit(client: WeaveClient):
-    """Test that file storage operations retry exactly 3 times on storage failures."""
+    """File storage retries a 429 exactly 3 times, then falls back to database storage."""
     attempt_count = 0
 
     def mock_upload_fail(*args, **kwargs):
         nonlocal attempt_count
         attempt_count += 1
-        # Simulate a 429 rate limit error
-        from google.api_core import exceptions
-
         raise exceptions.TooManyRequests("Rate limit exceeded")
 
     with mock.patch.dict(
@@ -455,12 +279,9 @@ def test_file_storage_retry_limit(client: WeaveClient):
             "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "*",
         },
     ):
-        # Mock GCS client
         mock_storage_client = mock.MagicMock()
         mock_bucket = mock.MagicMock()
         mock_blob = mock.MagicMock()
-
-        # Setup mock chain
         mock_storage_client.bucket.return_value = mock_bucket
         mock_bucket.blob.return_value = mock_blob
         mock_blob.upload_from_string.side_effect = mock_upload_fail
@@ -471,55 +292,31 @@ def test_file_storage_retry_limit(client: WeaveClient):
                 "google.oauth2.service_account.Credentials.from_service_account_info"
             ),
         ):
-            # GCS should fail after 3 attempts, then fall back to database storage
             result = client.server.file_create(
                 FileCreateReq(
-                    project_id=client.project_id,
-                    name="test.txt",
-                    content=TEST_CONTENT,
+                    project_id=client.project_id, name="test.txt", content=TEST_CONTENT
                 )
             )
-            # Should succeed via database fallback
             assert result.digest is not None
 
-        # Verify GCS was attempted exactly 3 times before fallback
         assert attempt_count == 3, f"Expected 3 GCS attempts, got {attempt_count}"
-
-
-# ---------------------------------------------------------------------------
-# Parallel bucket-upload fan-out during call_batch
-# ---------------------------------------------------------------------------
-#
-# These drive the trace server's bucket-storage path with the shared `gcs`
-# fixture (mocked at `google.cloud.storage.Client`). Multiple `file_create`
-# calls inside one `call_batch()` context should stage and then fan out to
-# GCS in parallel on context exit.
-
-
-def _unique_payload(unique: str, size: int) -> bytes:
-    """Build a deterministic, unique payload of the requested size."""
-    body = (unique + "_" + ("x" * size)).encode()
-    return body
 
 
 @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
 @pytest.mark.disable_logging_error_check
 def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs):
-    """Multiple file_create calls inside one call_batch fan out to GCS in
-    parallel: concurrent uploads happen, identical content within the batch
-    collapses to one upload, and every stored object lands under the
-    expected project prefix.
+    """file_create calls inside one call_batch fan out to GCS in parallel, identical
+    content collapses to one upload, and every object lands under the project prefix.
     """
     gcs.state.delay = 0.1
-    # 4 unique blobs + 2 duplicates of the first => 4 GCS uploads after dedup.
     payload_size = 50_000
     payloads = [
         _unique_payload("alpha", payload_size),
         _unique_payload("beta", payload_size),
         _unique_payload("gamma", payload_size),
         _unique_payload("delta", payload_size),
-        _unique_payload("alpha", payload_size),  # dup
-        _unique_payload("alpha", payload_size),  # dup
+        _unique_payload("alpha", payload_size),
+        _unique_payload("alpha", payload_size),
     ]
     server = client.server
 
@@ -531,14 +328,11 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
                 )
             )
 
-    # Pool defaults to 8 workers, so all 4 unique uploads should run
-    # concurrently. concurrent_peak is the load-bearing parallelism signal;
-    # wall-time assertions on top would flake on contended CI runners.
+    # concurrent_peak is the load-bearing parallelism signal; wall-time assertions
+    # would flake on contended CI runners.
     assert gcs.state.concurrent_peak >= 4, (
         f"expected 4 concurrent uploads, peak={gcs.state.concurrent_peak}"
     )
-
-    # Dedup: 4 unique blobs => 4 GCS uploads, not 6.
     assert gcs.state.upload_count == 4
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
     expected_prefix = f"weave/projects/{project_b64}/files/"
@@ -549,33 +343,21 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
     "fail_payload_size",
-    [
-        # Single inline-CH chunk fallback (< FILE_CHUNK_SIZE = 100_000).
-        50_000,
-        # Multi-chunk fallback: 250KB content splits into 3 inline-CH chunks,
-        # exercising the chunk_index / n_chunks reassembly on read.
-        250_000,
-    ],
+    [50_000, 250_000],
     ids=["single-chunk-fallback", "multi-chunk-fallback"],
 )
 def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     client: WeaveClient, gcs, fail_payload_size: int
 ):
-    """When one upload in a batch hits a non-retriable GCS error, the server
-    should fall back to inline ClickHouse chunks for that file only; other
-    uploads in the same batch keep their bucket URIs, and the whole batch
-    still completes. We verify by reading the failed file back through the
-    server's read path -- it must reassemble bit-for-bit from CH chunks for
-    both single-chunk and multi-chunk payloads.
+    """When one upload in a batch hits a non-retriable GCS error, that file falls back
+    to inline ClickHouse chunks while the others keep bucket URIs; the failed file
+    reassembles bit-for-bit on read for single- and multi-chunk payloads.
     """
     server = client.server
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
 
-    # Compute the digest directly so the only `files` row at
-    # (project, digest, chunk_index=0) comes from the in-batch fallback.
-    # Doing a probe file_create first would write a bucket-URI row with the
-    # same primary key, and the read query's row_number() pick across two
-    # rows at the same key is non-deterministic.
+    # Compute the digest directly so the only `files` row at chunk_index=0 comes
+    # from the in-batch fallback (a probe file_create would race the read query).
     fail_payload = _unique_payload("fail", fail_payload_size)
     fail_digest = compute_file_digest(fail_payload)
     fail_key = f"weave/projects/{project_b64}/files/{fail_digest}"
@@ -594,17 +376,115 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
             )
         )
 
-    # The successful upload made it through.
     assert any(
         k.startswith(f"weave/projects/{project_b64}/files/")
         for k in gcs.state.blob_data
     )
-    # The failing one is not present in the bucket.
     assert fail_key not in gcs.state.blob_data
-    # ...but is readable via the server, because it landed as inline chunks.
-    # For multi-chunk payloads, byte-equality here implicitly verifies that
-    # all chunk_index rows reassembled correctly.
     fallback_read = server.file_content_read(
         FileContentReadReq(project_id=client.project_id, digest=fail_digest)
     )
     assert fallback_read.content == fail_payload
+
+
+@pytest.fixture
+def run_storage_test(client: WeaveClient):
+    """Store TEST_CONTENT and read it back, asserting the digest round-trips."""
+
+    def _run_test():
+        res = client.server.file_create(
+            FileCreateReq(
+                project_id=client.project_id, name="test.txt", content=TEST_CONTENT
+            )
+        )
+        assert res.digest is not None
+        assert res.digest != ""
+        file = client.server.file_content_read(
+            FileContentReadReq(project_id=client.project_id, digest=res.digest)
+        )
+        assert file.content == TEST_CONTENT
+        return res
+
+    return _run_test
+
+
+@pytest.fixture
+def s3():
+    """Moto S3 mock implementing the S3 API with TEST_BUCKET created."""
+    with mock_aws():
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id="test-key",
+            aws_secret_access_key="test-secret",
+            region_name="us-east-1",
+        )
+        s3_client.create_bucket(Bucket=TEST_BUCKET)
+        yield s3_client
+
+
+@pytest.fixture
+def aws_storage_env():
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
+            "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+            "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
+            "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
+        },
+    ):
+        yield
+
+
+@pytest.fixture
+def azure_blob():
+    """Fully mocked Azure Blob Storage client backed by an in-memory dict."""
+    mock_service_client = mock.MagicMock()
+    mock_container_client = mock.MagicMock()
+    mock_blob_client = mock.MagicMock()
+    mock_service_client.get_container_client.return_value = mock_container_client
+    mock_container_client.get_blob_client.return_value = mock_blob_client
+
+    blob_data = {}
+
+    def mock_upload_blob(data, overwrite=False, **kwargs):
+        blob_data[mock_blob_client.blob_name] = data
+
+    def mock_download_blob(**kwargs):
+        download = mock.MagicMock()
+        download.readall.return_value = blob_data.get(mock_blob_client.blob_name, b"")
+        return download
+
+    def mock_get_blob_client(name):
+        mock_blob_client.blob_name = name
+        return mock_blob_client
+
+    mock_container_client.get_blob_client.side_effect = mock_get_blob_client
+    mock_blob_client.upload_blob.side_effect = mock_upload_blob
+    mock_blob_client.download_blob.side_effect = mock_download_blob
+
+    with mock.patch(
+        "weave.trace_server.file_storage.BlobServiceClient",
+        return_value=mock_service_client,
+    ) as mock_cls:
+        mock_cls.from_connection_string.return_value = mock_service_client
+        yield mock_service_client
+
+
+@pytest.fixture
+def azure_storage_env():
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_AZURE_ACCESS_KEY": "fake-key",
+            "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": "http://fake-account.blob.core.windows.net",
+            "WF_FILE_STORAGE_URI": f"az://fakeaccount/{TEST_BUCKET}",
+            "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
+        },
+    ):
+        yield
+
+
+def _unique_payload(unique: str, size: int) -> bytes:
+    """Build a deterministic, unique payload of the requested size."""
+    return (unique + "_" + ("x" * size)).encode()

@@ -16,44 +16,45 @@ import pytest
 
 from weave.telemetry import trace_sentry
 
-
-@pytest.mark.parametrize(
-    "value",
-    ["false", "False", "FALSE", "0", "no", "off", "anything-else", ""],
-)
-def test_disabled_when_wandb_error_reporting_is_not_truthy(
-    monkeypatch: pytest.MonkeyPatch, value: str
-) -> None:
-    """Anything that is not a recognized truthy value disables Sentry."""
-    monkeypatch.setenv("WANDB_ERROR_REPORTING", value)
-    sentry = trace_sentry.Sentry()
-    assert sentry._disabled is True
+# `None` means leave `WANDB_ERROR_REPORTING` unset entirely.
+_UNSET = None
 
 
 @pytest.mark.parametrize(
-    "value",
-    ["true", "True", "TRUE", "1", "yes", "Yes", "on", "ON"],
+    ("value", "disabled"),
+    [
+        # Not-truthy values disable Sentry outright.
+        ("false", True),
+        ("False", True),
+        ("FALSE", True),
+        ("0", True),
+        ("no", True),
+        ("off", True),
+        ("anything-else", True),
+        ("", True),
+        # Truthy values and an unset var keep reporting enabled (modulo the
+        # optional `sentry-sdk` dependency reflected by `SENTRY_AVAILABLE`).
+        ("true", not trace_sentry.SENTRY_AVAILABLE),
+        ("True", not trace_sentry.SENTRY_AVAILABLE),
+        ("TRUE", not trace_sentry.SENTRY_AVAILABLE),
+        ("1", not trace_sentry.SENTRY_AVAILABLE),
+        ("yes", not trace_sentry.SENTRY_AVAILABLE),
+        ("Yes", not trace_sentry.SENTRY_AVAILABLE),
+        ("on", not trace_sentry.SENTRY_AVAILABLE),
+        ("ON", not trace_sentry.SENTRY_AVAILABLE),
+        (_UNSET, not trace_sentry.SENTRY_AVAILABLE),
+    ],
 )
-def test_enabled_when_wandb_error_reporting_is_truthy(
-    monkeypatch: pytest.MonkeyPatch, value: str
+def test_wandb_error_reporting_controls_disabled(
+    monkeypatch: pytest.MonkeyPatch, value: str | None, disabled: bool
 ) -> None:
-    """Recognized truthy values leave Sentry enabled (modulo `SENTRY_AVAILABLE`).
-
-    `_disabled` still reflects whether the optional `sentry-sdk` dependency is
-    installed in the env, so this passes whether or not Sentry is importable.
-    """
-    monkeypatch.setenv("WANDB_ERROR_REPORTING", value)
+    """`WANDB_ERROR_REPORTING` truthiness (and absence) drives `Sentry._disabled`."""
+    if value is _UNSET:
+        monkeypatch.delenv("WANDB_ERROR_REPORTING", raising=False)
+    else:
+        monkeypatch.setenv("WANDB_ERROR_REPORTING", value)
     sentry = trace_sentry.Sentry()
-    assert sentry._disabled == (not trace_sentry.SENTRY_AVAILABLE)
-
-
-def test_enabled_when_wandb_error_reporting_unset(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An unset `WANDB_ERROR_REPORTING` defaults to enabled (no opt-out)."""
-    monkeypatch.delenv("WANDB_ERROR_REPORTING", raising=False)
-    sentry = trace_sentry.Sentry()
-    assert sentry._disabled == (not trace_sentry.SENTRY_AVAILABLE)
+    assert sentry._disabled is disabled
 
 
 def test_setup_is_a_noop_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -12,6 +12,7 @@ higher-priority encoders win when multiple could match — and that the terminal
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, NamedTuple
@@ -41,11 +42,29 @@ PROJECT_ID = "entity/project"
 
 class _ExampleModel(BaseModel):
     """Concrete pydantic subclass. Only used to get an INSTANCE for miss
-    tests — the class itself needs to live at module scope so ``_ExampleModel(x=1)``
+    tests. The class itself needs to live at module scope so `_ExampleModel(x=1)`
     can appear inside a parametrize decorator (evaluated at import time).
     """
 
     x: int
+
+
+# Helper classes for the dictify cases below. They live at module scope (like
+# `_ExampleModel`) so the parametrize factories can reference them at import time.
+class _PlainXY:  # noqa: B903 — plain class intentional (no auto __repr__)
+    def __init__(self, x: int, y: str = "") -> None:
+        self.x = x
+        self.y = y
+
+
+@dataclass
+class _DictifyDataclass:
+    x: int
+
+
+class _CustomRepr:
+    def __repr__(self) -> str:
+        return "CustomFoo"
 
 
 # ---------- _encode_ref ----------
@@ -74,37 +93,38 @@ def test_encode_ref_non_ref_returns_miss(value: Any) -> None:
 # ---------- _encode_object_record ----------
 
 
-def test_encode_object_record_basic() -> None:
-    # The encoder adds "_type" at the top then copies every attribute from
-    # __dict__, which includes the raw "_class_name" as well. Both keys end
-    # up in the payload; downstream code treats "_type" as authoritative.
-    rec = ObjectRecord({"_class_name": "Foo", "x": 1, "y": "hi"})
-    result = _encode_object_record(rec, PROJECT_ID, None, False)
-    assert result == {"_type": "Foo", "_class_name": "Foo", "x": 1, "y": "hi"}
-
-
-def test_encode_object_record_recurses_into_nested_values() -> None:
-    rec = ObjectRecord(
-        {
-            "_class_name": "Foo",
-            "nested_list": [1, 2, 3],
-            "nested_dict": {"k": "v"},
-        }
+def test_encode_object_record_copies_attrs_recurses_and_drops_null_ref() -> None:
+    # "_type" is added at the top, then __dict__ is copied verbatim (so raw
+    # "_class_name" survives; "_type" is authoritative). Nested values recurse,
+    # and a null "ref" is dropped.
+    basic = _encode_object_record(
+        ObjectRecord({"_class_name": "Foo", "x": 1, "y": "hi"}), PROJECT_ID, None, False
     )
-    result = _encode_object_record(rec, PROJECT_ID, None, False)
-    assert result == {
+    assert basic == {"_type": "Foo", "_class_name": "Foo", "x": 1, "y": "hi"}
+
+    nested = _encode_object_record(
+        ObjectRecord(
+            {"_class_name": "Foo", "nested_list": [1, 2, 3], "nested_dict": {"k": "v"}}
+        ),
+        PROJECT_ID,
+        None,
+        False,
+    )
+    assert nested == {
         "_type": "Foo",
         "_class_name": "Foo",
         "nested_list": [1, 2, 3],
         "nested_dict": {"k": "v"},
     }
 
-
-def test_encode_object_record_drops_null_ref() -> None:
-    rec = ObjectRecord({"_class_name": "Foo", "ref": None, "x": 1})
-    result = _encode_object_record(rec, PROJECT_ID, None, False)
-    assert "ref" not in result
-    assert result == {"_type": "Foo", "_class_name": "Foo", "x": 1}
+    dropped = _encode_object_record(
+        ObjectRecord({"_class_name": "Foo", "ref": None, "x": 1}),
+        PROJECT_ID,
+        None,
+        False,
+    )
+    assert "ref" not in dropped
+    assert dropped == {"_type": "Foo", "_class_name": "Foo", "x": 1}
 
 
 def test_encode_object_record_logs_on_non_null_ref(
@@ -228,24 +248,21 @@ def test_encode_primitive_non_primitive_returns_miss(value: Any) -> None:
 # ---------- _encode_weave_scorer_result ----------
 
 
-def test_encode_weave_scorer_result_basic() -> None:
-    result = WeaveScorerResult(passed=True, metadata={"score": 0.9})
-    encoded = _encode_weave_scorer_result(result, PROJECT_ID, None, False)
-    assert encoded == {"passed": True, "metadata": {"score": 0.9}}
-
-
-def test_encode_weave_scorer_result_recurses_into_metadata() -> None:
-    # Metadata values are recursively encoded via to_json — nested containers
-    # should flatten through the ladder.
-    result = WeaveScorerResult(
-        passed=False,
-        metadata={"list": [1, 2], "dict": {"a": 1}},
+def test_encode_weave_scorer_result_basic_and_recurses_into_metadata() -> None:
+    # Encodes to a plain {passed, metadata} dict; metadata values recurse
+    # through to_json so nested containers flatten through the ladder.
+    basic = _encode_weave_scorer_result(
+        WeaveScorerResult(passed=True, metadata={"score": 0.9}), PROJECT_ID, None, False
     )
-    encoded = _encode_weave_scorer_result(result, PROJECT_ID, None, False)
-    assert encoded == {
-        "passed": False,
-        "metadata": {"list": [1, 2], "dict": {"a": 1}},
-    }
+    assert basic == {"passed": True, "metadata": {"score": 0.9}}
+
+    recursed = _encode_weave_scorer_result(
+        WeaveScorerResult(passed=False, metadata={"list": [1, 2], "dict": {"a": 1}}),
+        PROJECT_ID,
+        None,
+        False,
+    )
+    assert recursed == {"passed": False, "metadata": {"list": [1, 2], "dict": {"a": 1}}}
 
 
 @pytest.mark.parametrize(
@@ -282,42 +299,32 @@ def test_encode_custom_obj_unregistered_returns_miss() -> None:
 
 
 def test_encode_dictify_with_flag_scans_attributes() -> None:
-    # Dataclasses generate __repr__ which trips has_custom_repr — must use
-    # a plain class so dictify actually runs.
-    class Foo:  # noqa: B903 — plain class intentional (see comment above)
-        def __init__(self, x: int, y: str) -> None:
-            self.x = x
-            self.y = y
-
-    result = _encode_dictify(Foo(1, "hi"), PROJECT_ID, None, True)
+    # Plain class (no auto __repr__) so dictify actually runs.
+    result = _encode_dictify(_PlainXY(1, "hi"), PROJECT_ID, None, True)
     assert result is not _MISS
     assert result["x"] == 1
     assert result["y"] == "hi"
     assert "__class__" in result
 
 
-def test_encode_dictify_without_flag_returns_miss() -> None:
-    class Foo:  # noqa: B903 — plain class intentional
-        def __init__(self, x: int) -> None:
-            self.x = x
-
-    assert _encode_dictify(Foo(1), PROJECT_ID, None, False) is _MISS
-
-
-def test_encode_dictify_dataclass_returns_miss_due_to_custom_repr() -> None:
-    # Dataclasses auto-generate __repr__, which opts them out of the dictify
-    # fallback (assumption: the repr is the intended human form).
-    @dataclass
-    class Foo:
-        x: int
-
-    assert _encode_dictify(Foo(1), PROJECT_ID, None, True) is _MISS
-
-
-def test_encode_dictify_logger_returns_miss() -> None:
-    # Loggers are in ALWAYS_STRINGIFY — recursing attributes causes problems.
-    logger = logging.getLogger("test_encoder")
-    assert _encode_dictify(logger, PROJECT_ID, None, True) is _MISS
+@pytest.mark.parametrize(
+    ("make", "use_dictify"),
+    [
+        # Plain dictifiable class, but the flag is off -> miss.
+        (lambda: _PlainXY(1, "z"), False),
+        # Dataclass auto-__repr__ opts out of dictify (repr is the human form).
+        (lambda: _DictifyDataclass(1), True),
+        # Loggers are in ALWAYS_STRINGIFY; recursing attributes causes problems.
+        (lambda: logging.getLogger("test_encoder"), True),
+        # Custom __repr__ is assumed sensible; dictify would be redundant.
+        (_CustomRepr, True),
+    ],
+    ids=["flag-off", "dataclass-repr", "logger", "custom-repr"],
+)
+def test_encode_dictify_returns_miss(
+    make: Callable[[], object], use_dictify: bool
+) -> None:
+    assert _encode_dictify(make(), PROJECT_ID, None, use_dictify) is _MISS
 
 
 def test_encode_dictify_coroutine_returns_miss() -> None:
@@ -329,16 +336,6 @@ def test_encode_dictify_coroutine_returns_miss() -> None:
         assert _encode_dictify(c, PROJECT_ID, None, True) is _MISS
     finally:
         c.close()
-
-
-def test_encode_dictify_custom_repr_returns_miss() -> None:
-    # Objects with a custom __repr__ are assumed to have a sensible string
-    # form; dictify would be redundant or lossy.
-    class Foo:
-        def __repr__(self) -> str:
-            return "CustomFoo"
-
-    assert _encode_dictify(Foo(), PROJECT_ID, None, True) is _MISS
 
 
 # ---------- _encode_try_to_dict ----------
@@ -397,13 +394,20 @@ def test_to_json_pydantic_class_emits_schema_not_stringified(
     assert "properties" in result
 
 
-def test_to_json_primitive_passes_through() -> None:
-    # Primitives skip the custom-obj registry entirely — no client required.
+def test_to_json_primitive_and_scorer_pass_through_without_client() -> None:
+    # Primitives skip the custom-obj registry entirely; WeaveScorerResult
+    # round-trips as a plain dict (no CustomWeaveType wrapper). Neither needs
+    # a client, pinning the no-client fast paths through the ladder.
     assert to_json(42, PROJECT_ID, None) == 42
     assert to_json(3.14, PROJECT_ID, None) == 3.14
     assert to_json("hi", PROJECT_ID, None) == "hi"
     assert to_json(True, PROJECT_ID, None) is True
     assert to_json(None, PROJECT_ID, None) is None
+    scorer = WeaveScorerResult(passed=True, metadata={"score": 1.0})
+    assert to_json(scorer, PROJECT_ID, None) == {
+        "passed": True,
+        "metadata": {"score": 1.0},
+    }
 
 
 def test_to_json_container_recurses(client: Any) -> None:
@@ -426,14 +430,6 @@ def test_to_json_object_record_recurses_values(client: Any) -> None:
         "nested": [1, 2, 3],
         "obj": {"a": 1},
     }
-
-
-def test_to_json_weave_scorer_result_emits_plain_dict() -> None:
-    # WeaveScorerResult round-trips as a plain dict (no CustomWeaveType
-    # wrapper) — this is the wire contract the encoder preserves.
-    result = WeaveScorerResult(passed=True, metadata={"score": 1.0})
-    encoded = to_json(result, PROJECT_ID, None)
-    assert encoded == {"passed": True, "metadata": {"score": 1.0}}
 
 
 def test_to_json_custom_obj_datetime_roundtrips_via_registry(client: Any) -> None:

@@ -16,166 +16,98 @@ def generate_objects(weave_client: WeaveClient, obj_count: int, version_count: i
             weave.publish({"i": i, "j": j}, name=f"obj_{i}")
 
 
-def test_objs_query_all(client: WeaveClient):
+def test_objs_query_filters_over_shared_fixture(client: WeaveClient):
+    """Against 10 objects x 10 versions: all/object_ids/is_op/latest_only/metadata_only filters."""
     generate_objects(client, 10, 10)
+    project_id = client.project_id
 
-    res = client.server.objs_query(
+    all_res = client.server.objs_query(tsi.ObjQueryReq(project_id=project_id))
+    assert len(all_res.objs) == 100
+
+    ids_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client.project_id,
-        )
-    )
-    assert len(res.objs) == 100
-
-
-def test_objs_query_filter_object_ids(client: WeaveClient):
-    generate_objects(client, 10, 10)
-
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
+            project_id=project_id,
             filter=tsi.ObjectVersionFilter(object_ids=["obj_0", "obj_1"]),
         )
     )
-    assert len(res.objs) == 20
-    assert all(obj.object_id in {"obj_0", "obj_1"} for obj in res.objs)
+    assert len(ids_res.objs) == 20
+    assert all(obj.object_id in {"obj_0", "obj_1"} for obj in ids_res.objs)
 
-
-def test_objs_query_filter_is_op(client: WeaveClient):
-    generate_objects(client, 10, 10)
-
-    res = client.server.objs_query(
+    op_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client.project_id, filter=tsi.ObjectVersionFilter(is_op=True)
+            project_id=project_id, filter=tsi.ObjectVersionFilter(is_op=True)
         )
     )
-    assert len(res.objs) == 0
-    res = client.server.objs_query(
+    assert len(op_res.objs) == 0
+    non_op_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client.project_id, filter=tsi.ObjectVersionFilter(is_op=False)
+            project_id=project_id, filter=tsi.ObjectVersionFilter(is_op=False)
         )
     )
-    assert len(res.objs) == 100
+    assert len(non_op_res.objs) == 100
 
-
-def test_objs_query_filter_latest_only(client: WeaveClient):
-    generate_objects(client, 10, 10)
-
-    res = client.server.objs_query(
+    latest_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client.project_id,
+            project_id=project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
         )
     )
-    assert len(res.objs) == 10
-    assert all(obj.is_latest for obj in res.objs)
-    assert all(obj.val["j"] == 9 for obj in res.objs)
+    assert len(latest_res.objs) == 10
+    assert all(obj.is_latest for obj in latest_res.objs)
+    assert all(obj.val["j"] == 9 for obj in latest_res.objs)
 
-
-def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
-    generate_objects(client, 10, 10)
-
-    res = client.server.objs_query(
+    meta_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            limit=3,
-            offset=5,
-            sort_by=[SortBy(field="created_at", direction="desc")],
-        )
-    )
-    assert len(res.objs) == 3
-    assert all(obj.is_latest for obj in res.objs)
-    assert res.objs[0].val["j"] == 9
-    assert res.objs[0].val["i"] == 4
-    assert res.objs[1].val["j"] == 9
-    assert res.objs[1].val["i"] == 3
-    assert res.objs[2].val["j"] == 9
-    assert res.objs[2].val["i"] == 2
-
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            limit=3,
-            offset=5,
-            sort_by=[SortBy(field="created_at", direction="asc")],
-        )
-    )
-    assert len(res.objs) == 3
-    assert all(obj.is_latest for obj in res.objs)
-    assert res.objs[0].val["j"] == 9
-    assert res.objs[0].val["i"] == 5
-    assert res.objs[1].val["j"] == 9
-    assert res.objs[1].val["i"] == 6
-    assert res.objs[2].val["j"] == 9
-    assert res.objs[2].val["i"] == 7
-
-
-def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
-    generate_objects(client, 10, 10)
-
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            limit=3,
-            offset=5,
-            sort_by=[SortBy(field="object_id", direction="desc")],
-        )
-    )
-    assert len(res.objs) == 3
-    assert all(obj.is_latest for obj in res.objs)
-    assert res.objs[0].val["j"] == 9
-    assert res.objs[0].val["i"] == 4
-    assert res.objs[1].val["j"] == 9
-    assert res.objs[1].val["i"] == 3
-    assert res.objs[2].val["j"] == 9
-    assert res.objs[2].val["i"] == 2
-
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            limit=3,
-            offset=5,
-            sort_by=[SortBy(field="object_id", direction="asc")],
-        )
-    )
-    assert len(res.objs) == 3
-    assert all(obj.is_latest for obj in res.objs)
-    assert res.objs[0].val["j"] == 9
-    assert res.objs[0].val["i"] == 5
-    assert res.objs[1].val["j"] == 9
-    assert res.objs[1].val["i"] == 6
-    assert res.objs[2].val["j"] == 9
-    assert res.objs[2].val["i"] == 7
-
-
-def test_objs_query_filter_metadata_only(client: WeaveClient):
-    generate_objects(client, 10, 10)
-
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
+            project_id=project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
             metadata_only=True,
         )
     )
-    assert len(res.objs) == 10
-    for obj in res.objs:
-        assert obj.val == {}
-
-    # sanity check that we get the full object when we don't ask for metadata only
-    res = client.server.objs_query(
+    assert len(meta_res.objs) == 10
+    assert all(obj.val == {} for obj in meta_res.objs)
+    full_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client.project_id,
+            project_id=project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
             metadata_only=False,
         )
     )
-    assert len(res.objs) == 10
-    for obj in res.objs:
-        assert obj.val
+    assert len(full_res.objs) == 10
+    assert all(obj.val for obj in full_res.objs)
+
+
+@pytest.mark.parametrize("sort_field", ["created_at", "object_id"])
+def test_objs_query_filter_limit_offset_sort(client: WeaveClient, sort_field: str):
+    """limit/offset with desc and asc sort by created_at or object_id (same order here)."""
+    generate_objects(client, 10, 10)
+
+    desc_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(latest_only=True),
+            limit=3,
+            offset=5,
+            sort_by=[SortBy(field=sort_field, direction="desc")],
+        )
+    )
+    assert len(desc_res.objs) == 3
+    assert all(obj.is_latest for obj in desc_res.objs)
+    assert [obj.val["i"] for obj in desc_res.objs] == [4, 3, 2]
+    assert all(obj.val["j"] == 9 for obj in desc_res.objs)
+
+    asc_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client.project_id,
+            filter=tsi.ObjectVersionFilter(latest_only=True),
+            limit=3,
+            offset=5,
+            sort_by=[SortBy(field=sort_field, direction="asc")],
+        )
+    )
+    assert len(asc_res.objs) == 3
+    assert all(obj.is_latest for obj in asc_res.objs)
+    assert [obj.val["i"] for obj in asc_res.objs] == [5, 6, 7]
+    assert all(obj.val["j"] == 9 for obj in asc_res.objs)
 
 
 def test_objs_query_wb_user_id(client: WeaveClient):

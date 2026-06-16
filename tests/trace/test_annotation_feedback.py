@@ -258,80 +258,51 @@ def test_field_schema_with_pydantic_field(client):
     assert enum_spec.val["field_schema"]["description"] == "Category selection"
 
 
-def test_annotation_spec_validation():
-    # Test validation with direct schema
+def test_annotation_spec_value_is_valid():
+    """value_is_valid across dict, Pydantic model, Pydantic Field, and nested schemas."""
+    # direct numeric schema
     number_spec = AnnotationSpec(
         name="Number Rating",
-        field_schema={
-            "type": "number",
-            "minimum": 1,
-            "maximum": 5,
-        },
+        field_schema={"type": "number", "minimum": 1, "maximum": 5},
     )
-
-    # Valid cases
     assert number_spec.value_is_valid(3)
     assert number_spec.value_is_valid(1)
     assert number_spec.value_is_valid(5)
-
-    # Invalid cases
     assert not number_spec.value_is_valid(0)  # too low
     assert not number_spec.value_is_valid(6)  # too high
     assert not number_spec.value_is_valid("3")  # wrong type
 
-    # Test validation with Pydantic model schema
+    # Pydantic model schema
     class FeedbackModel(BaseModel):
         rating: int = Field(ge=1, le=5)
         comment: str = Field(max_length=100)
         tags: list[str] = Field(min_length=1, max_length=3)
 
     model_spec = AnnotationSpec(name="Complex Feedback", field_schema=FeedbackModel)
-
-    # Valid cases
     assert model_spec.value_is_valid(
         {"rating": 4, "comment": "Good work!", "tags": ["positive", "helpful"]}
     )
-
-    # Invalid cases
     assert not model_spec.value_is_valid(
-        {
-            "rating": 4,
-            "comment": "Good work!",
-            # missing tags
-        }
+        {"rating": 4, "comment": "Good work!"}  # missing tags
+    )
+    assert not model_spec.value_is_valid(
+        {"rating": 6, "comment": "Good work!", "tags": ["positive"]}  # invalid rating
+    )
+    assert not model_spec.value_is_valid(
+        {"rating": 4, "comment": "Good work!", "tags": []}  # empty tags list
     )
 
-    assert not model_spec.value_is_valid(
-        {
-            "rating": 6,  # invalid rating
-            "comment": "Good work!",
-            "tags": ["positive"],
-        }
+    # Pydantic Field enum schema
+    enum_spec = AnnotationSpec(
+        name="Simple Enum",
+        field_schema=(str, Field(enum=["excellent", "good", "fair", "poor"])),
     )
-
-    assert not model_spec.value_is_valid(
-        {
-            "rating": 4,
-            "comment": "Good work!",
-            "tags": [],  # empty tags list
-        }
-    )
-
-    # Test validation with Pydantic Field schema
-    enum_field = Field(enum=["excellent", "good", "fair", "poor"])
-    enum_spec = AnnotationSpec(name="Simple Enum", field_schema=(str, enum_field))
-
-    # Valid cases
     assert enum_spec.value_is_valid("good")
     assert enum_spec.value_is_valid("excellent")
-
-    # Invalid cases
     assert not enum_spec.value_is_valid("invalid_choice")
     assert not enum_spec.value_is_valid(123)
 
-
-def test_annotation_spec_validation_with_complex_types():
-    # Test nested object validation
+    # nested-object schema
     class Address(BaseModel):
         street: str
         city: str
@@ -343,119 +314,24 @@ def test_annotation_spec_validation_with_complex_types():
         addresses: list[Address] = Field(min_length=1, max_length=3)
 
     person_spec = AnnotationSpec(name="Person Feedback", field_schema=PersonFeedback)
-
-    # Valid case
+    valid_address = {
+        "street": "123 Main St",
+        "city": "Springfield",
+        "zip_code": "12345",
+    }
     assert person_spec.value_is_valid(
-        {
-            "name": "John Doe",
-            "age": 30,
-            "addresses": [
-                {"street": "123 Main St", "city": "Springfield", "zip_code": "12345"}
-            ],
-        }
+        {"name": "John Doe", "age": 30, "addresses": [valid_address]}
     )
-
-    # Invalid cases
     assert not person_spec.value_is_valid(
         {
             "name": "John Doe",
             "age": 30,
-            "addresses": [
-                {
-                    "street": "123 Main St",
-                    "city": "Springfield",
-                    "zip_code": "123",  # invalid zip code
-                }
-            ],
+            "addresses": [{**valid_address, "zip_code": "123"}],  # invalid zip code
         }
     )
-
     assert not person_spec.value_is_valid(
-        {
-            "name": "John Doe",
-            "age": 150,  # invalid age
-            "addresses": [
-                {
-                    "street": "123 Main St",
-                    "city": "Springfield",
-                    "zip_code": "12345",
-                }
-            ],
-        }
+        {"name": "John Doe", "age": 150, "addresses": [valid_address]}  # invalid age
     )
-
-
-def test_annotation_spec_validate_return_value():
-    # Test with a simple numeric schema
-    number_spec = AnnotationSpec(
-        name="Number Rating",
-        field_schema={
-            "type": "number",
-            "minimum": 1,
-            "maximum": 5,
-        },
-    )
-
-    # Valid cases should return True
-    assert number_spec.value_is_valid(3)
-    assert number_spec.value_is_valid(1)
-    assert number_spec.value_is_valid(5)
-
-    # Invalid cases should return False
-    assert not number_spec.value_is_valid(0)  # too low
-    assert not number_spec.value_is_valid(6)  # too high
-    assert not number_spec.value_is_valid("3")  # wrong type
-
-    # Test with a Pydantic model schema
-    class FeedbackModel(BaseModel):
-        rating: int = Field(ge=1, le=5)
-        comment: str = Field(max_length=100)
-        tags: list[str] = Field(min_length=1, max_length=3)
-
-    model_spec = AnnotationSpec(name="Complex Feedback", field_schema=FeedbackModel)
-
-    # Valid case should return True
-    assert model_spec.value_is_valid(
-        {"rating": 4, "comment": "Good work!", "tags": ["positive", "helpful"]}
-    )
-
-    # Invalid cases should return False
-    assert not model_spec.value_is_valid(
-        {
-            "rating": 4,
-            "comment": "Good work!",
-            # missing tags
-        }
-    )
-
-    assert not model_spec.value_is_valid(
-        {
-            "rating": 6,  # invalid rating
-            "comment": "Good work!",
-            "tags": ["positive"],
-        }
-    )
-    assert not model_spec.value_is_valid(
-        {
-            "rating": 4,
-            "comment": "Good work!",
-            "tags": [],  # empty tags list
-        }
-    )
-
-    # Test with a Pydantic Field schema
-    enum_spec = AnnotationSpec(
-        name="Simple Enum",
-        field_schema=(str, Field(enum=["excellent", "good", "fair", "poor"])),
-    )
-
-    # Valid cases should return True
-    assert enum_spec.value_is_valid("good")
-    assert enum_spec.value_is_valid("excellent")
-
-    # Invalid cases should return False
-    assert not enum_spec.value_is_valid("invalid_choice")
-    assert not enum_spec.value_is_valid(123)
 
 
 def test_annotation_feedback_sdk(weave_active):

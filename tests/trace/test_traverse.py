@@ -11,151 +11,108 @@ def test_escape_key() -> None:
     assert escape_key("user.name[0].name") == "user\\.name\\[0\\]\\.name"
 
 
-class TestObjectPathToStr:
-    def test_handles_empty_path(self) -> None:
-        assert ObjectPath([]).to_str() == ""
-
-    def test_handles_simple_cases(self) -> None:
-        assert ObjectPath(["foo"]).to_str() == "foo"
-        assert ObjectPath(["foo", "bar"]).to_str() == "foo.bar"
-        assert ObjectPath(["foo", "4"]).to_str() == "foo.4"
-        assert ObjectPath(["foo", 4]).to_str() == "foo[4]"
-
-    def test_escapes_periods(self) -> None:
-        assert ObjectPath(["foo.bar.baz"]).to_str() == "foo\\.bar\\.baz"
-
-    def test_escapes_brackets(self) -> None:
-        assert ObjectPath(["foo[5]"]).to_str() == "foo\\[5\\]"
-
-    def test_str(self) -> None:
-        assert str(ObjectPath(["foo", "bar"])) == "foo.bar"
-        assert str(ObjectPath(["foo", 4])) == "foo[4]"
+def test_object_path_to_str_and_str() -> None:
+    """to_str renders dotted/indexed paths, escaping periods and brackets; str mirrors it."""
+    assert ObjectPath([]).to_str() == ""
+    assert ObjectPath(["foo"]).to_str() == "foo"
+    assert ObjectPath(["foo", "bar"]).to_str() == "foo.bar"
+    assert ObjectPath(["foo", "4"]).to_str() == "foo.4"
+    assert ObjectPath(["foo", 4]).to_str() == "foo[4]"
+    assert ObjectPath(["foo.bar.baz"]).to_str() == "foo\\.bar\\.baz"
+    assert ObjectPath(["foo[5]"]).to_str() == "foo\\[5\\]"
+    assert str(ObjectPath(["foo", "bar"])) == "foo.bar"
+    assert str(ObjectPath(["foo", 4])) == "foo[4]"
 
 
-class TestObjectPathParseStr:
-    def test_handles_empty_path(self) -> None:
-        assert ObjectPath.parse_str("").elements == []
-
-    def test_handles_simple_cases(self) -> None:
-        assert ObjectPath.parse_str("foo").elements == ["foo"]
-        assert ObjectPath.parse_str("foo.bar").elements == ["foo", "bar"]
-
-    def test_handles_numeric_keys(self) -> None:
-        assert ObjectPath.parse_str("0").elements == ["0"]
-        assert ObjectPath.parse_str("42").elements == ["42"]
-
-    def test_handles_punctuation_in_keys(self) -> None:
-        assert ObjectPath.parse_str("a,b!").elements == ["a,b!"]
-
-    def test_handles_key_access_errors(self) -> None:
-        with pytest.raises(ValueError, match="Invalid object access"):
-            ObjectPath.parse_str(".")
-        with pytest.raises(ValueError, match="Invalid object access"):
-            ObjectPath.parse_str("a[0].")
-        with pytest.raises(ValueError, match="Invalid object access"):
-            ObjectPath.parse_str("a..b")
-
-    def test_handles_array_index_cases(self) -> None:
-        assert ObjectPath.parse_str("foo[2]").elements == ["foo", 2]
-        assert ObjectPath.parse_str("foo[2][3]").elements == ["foo", 2, 3]
-
-    def test_handles_array_index_errors(self) -> None:
-        with pytest.raises(ValueError, match="Invalid array index"):
-            ObjectPath.parse_str("foo[")
-        with pytest.raises(ValueError, match="Invalid array index"):
-            ObjectPath.parse_str("foo[]")
-        with pytest.raises(ValueError, match="Invalid array index"):
-            ObjectPath.parse_str("foo[1e3]")
-        with pytest.raises(ValueError, match="Invalid object access"):
-            ObjectPath.parse_str("foo.[1]")
-
-    def test_handles_escaped_chars(self) -> None:
-        assert ObjectPath.parse_str("foo\\.bar").elements == ["foo.bar"]
-        assert ObjectPath.parse_str("foo\\[").elements == ["foo["]
-
-    def test_handles_escaping_errors(self) -> None:
-        with pytest.raises(ValueError, match="Invalid escape sequence"):
-            ObjectPath.parse_str("foo\\")
-
-    def test_handles_complex_cases(self) -> None:
-        assert ObjectPath.parse_str("fo\\.o[1].bar.baz.bim[3][5].wat").elements == [
-            "fo.o",
-            1,
-            "bar",
-            "baz",
-            "bim",
-            3,
-            5,
-            "wat",
-        ]
+def test_object_path_parse_str_valid() -> None:
+    """parse_str handles empty, simple, numeric, punctuation, array-index, escapes, and complex paths."""
+    assert ObjectPath.parse_str("").elements == []
+    assert ObjectPath.parse_str("foo").elements == ["foo"]
+    assert ObjectPath.parse_str("foo.bar").elements == ["foo", "bar"]
+    assert ObjectPath.parse_str("0").elements == ["0"]
+    assert ObjectPath.parse_str("42").elements == ["42"]
+    assert ObjectPath.parse_str("a,b!").elements == ["a,b!"]
+    assert ObjectPath.parse_str("foo[2]").elements == ["foo", 2]
+    assert ObjectPath.parse_str("foo[2][3]").elements == ["foo", 2, 3]
+    assert ObjectPath.parse_str("foo\\.bar").elements == ["foo.bar"]
+    assert ObjectPath.parse_str("foo\\[").elements == ["foo["]
+    assert ObjectPath.parse_str("fo\\.o[1].bar.baz.bim[3][5].wat").elements == [
+        "fo.o",
+        1,
+        "bar",
+        "baz",
+        "bim",
+        3,
+        5,
+        "wat",
+    ]
 
 
-class TestObjectPathDunderMethods:
-    def test_hash(self) -> None:
-        assert isinstance(hash(ObjectPath(["foo", 42, "bar"])), int)
-
-    def test_getitem(self) -> None:
-        path = ObjectPath(["foo", 42, "bar"])
-        assert path[0] == "foo"
-        assert path[1] == 42
-        assert path[2] == "bar"
-
-    def test_add(self) -> None:
-        assert ObjectPath() + ["foo"] == ObjectPath(["foo"])
-        assert ObjectPath(["foo"]) + [0] == ObjectPath(["foo", 0])
-        assert ObjectPath(["foo"]) + [0, "bar"] == ObjectPath(["foo", 0, "bar"])
-
-    def test_len(self) -> None:
-        assert len(ObjectPath(["foo", 42, "bar"])) == 3
-
-    def test_repr(self) -> None:
-        assert repr(ObjectPath(["foo", 42, "bar"])) == "ObjectPath(['foo', 42, 'bar'])"
+@pytest.mark.parametrize(
+    ("text", "match"),
+    [
+        (".", "Invalid object access"),
+        ("a[0].", "Invalid object access"),
+        ("a..b", "Invalid object access"),
+        ("foo.[1]", "Invalid object access"),
+        ("foo[", "Invalid array index"),
+        ("foo[]", "Invalid array index"),
+        ("foo[1e3]", "Invalid array index"),
+        ("foo\\", "Invalid escape sequence"),
+    ],
+)
+def test_object_path_parse_str_errors(text: str, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        ObjectPath.parse_str(text)
 
 
-class TestObjectPathComparePaths:
-    def test_simple_cases(self) -> None:
-        assert ObjectPath(["foo"]).__eq__(42) is NotImplemented  # noqa: PLC2801
-        assert ObjectPath(["foo"]).__ne__(42) is NotImplemented  # noqa: PLC2801
-        assert ObjectPath(["foo"]) == ObjectPath(["foo"])
-        assert ObjectPath(["foo"]) != ObjectPath(["foo", 42])
-        assert ObjectPath(["foo", 10]) == ObjectPath(["foo", 10])
-        assert ObjectPath(["foo"]) < ObjectPath(["foo", "bar"])
-        assert ObjectPath(["foo"]) <= ObjectPath(["foo", "bar"])
-        assert ObjectPath(["foo"]) <= ObjectPath(["foo"])
-        assert ObjectPath(["foo", "bar"]) > ObjectPath(["foo"])
-        assert ObjectPath(["foo", "bar"]) < ObjectPath(["foo", "baz"])
-        assert ObjectPath(["foo", 9]) < ObjectPath(["foo", 10])
-        assert ObjectPath(["foo", 11]) > ObjectPath(["foo", 1])
-        assert ObjectPath(["foo", 11]) >= ObjectPath(["foo", 11])
-        assert ObjectPath(["foo", "z"]) < ObjectPath(["foo", 0])
-        assert not (ObjectPath(["foo", 0]) < ObjectPath(["foo", "a"]))
+def test_object_path_dunder_methods() -> None:
+    """hash, getitem, add, len, and repr behave as expected."""
+    path = ObjectPath(["foo", 42, "bar"])
+    assert isinstance(hash(path), int)
+    assert path[0] == "foo"
+    assert path[1] == 42
+    assert path[2] == "bar"
+    assert len(path) == 3
+    assert repr(path) == "ObjectPath(['foo', 42, 'bar'])"
+    assert ObjectPath() + ["foo"] == ObjectPath(["foo"])
+    assert ObjectPath(["foo"]) + [0] == ObjectPath(["foo", 0])
+    assert ObjectPath(["foo"]) + [0, "bar"] == ObjectPath(["foo", 0, "bar"])
 
 
-class TestObjectPathGetPaths:
-    def test_object_cases(self) -> None:
-        assert get_paths({}) == []
-        assert get_paths({"foo": 42}) == [ObjectPath(["foo"])]
-        assert get_paths({"foo": {"bar": 42}}) == [
-            ObjectPath(["foo"]),
-            ObjectPath(["foo", "bar"]),
-        ]
-
-    def test_list_cases(self) -> None:
-        obj = {
-            "foo": [
-                {"bar": 42},
-                {"baz": 43},
-            ]
-        }
-        assert get_paths(obj) == [
-            ObjectPath(["foo"]),
-            ObjectPath(["foo", 0]),
-            ObjectPath(["foo", 0, "bar"]),
-            ObjectPath(["foo", 1]),
-            ObjectPath(["foo", 1, "baz"]),
-        ]
+def test_object_path_comparisons() -> None:
+    """Equality returns NotImplemented for foreign types; ordering compares element-wise."""
+    assert ObjectPath(["foo"]).__eq__(42) is NotImplemented  # noqa: PLC2801
+    assert ObjectPath(["foo"]).__ne__(42) is NotImplemented  # noqa: PLC2801
+    assert ObjectPath(["foo"]) == ObjectPath(["foo"])
+    assert ObjectPath(["foo"]) != ObjectPath(["foo", 42])
+    assert ObjectPath(["foo", 10]) == ObjectPath(["foo", 10])
+    assert ObjectPath(["foo"]) < ObjectPath(["foo", "bar"])
+    assert ObjectPath(["foo"]) <= ObjectPath(["foo", "bar"])
+    assert ObjectPath(["foo"]) <= ObjectPath(["foo"])
+    assert ObjectPath(["foo", "bar"]) > ObjectPath(["foo"])
+    assert ObjectPath(["foo", "bar"]) < ObjectPath(["foo", "baz"])
+    assert ObjectPath(["foo", 9]) < ObjectPath(["foo", 10])
+    assert ObjectPath(["foo", 11]) > ObjectPath(["foo", 1])
+    assert ObjectPath(["foo", 11]) >= ObjectPath(["foo", 11])
+    assert ObjectPath(["foo", "z"]) < ObjectPath(["foo", 0])
+    assert not (ObjectPath(["foo", 0]) < ObjectPath(["foo", "a"]))
 
 
-class TestObjectPathSortPaths:
-    def test_sorting(self) -> None:
-        assert sort_paths([]) == []
+def test_get_paths_and_sort_paths() -> None:
+    """get_paths walks objects and nested lists depth-first; sort_paths handles empty input."""
+    assert get_paths({}) == []
+    assert get_paths({"foo": 42}) == [ObjectPath(["foo"])]
+    assert get_paths({"foo": {"bar": 42}}) == [
+        ObjectPath(["foo"]),
+        ObjectPath(["foo", "bar"]),
+    ]
+    list_obj = {"foo": [{"bar": 42}, {"baz": 43}]}
+    assert get_paths(list_obj) == [
+        ObjectPath(["foo"]),
+        ObjectPath(["foo", 0]),
+        ObjectPath(["foo", 0, "bar"]),
+        ObjectPath(["foo", 1]),
+        ObjectPath(["foo", 1, "baz"]),
+    ]
+    assert sort_paths([]) == []

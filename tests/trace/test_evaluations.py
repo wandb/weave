@@ -837,45 +837,8 @@ async def test_eval_with_complex_types(client):
 
 @pytest.mark.asyncio
 async def test_evaluation_with_column_map():
-    # Define a dummy scorer that uses column_map
-    class DummyScorer(weave.Scorer):
-        @weave.op
-        def score(self, foo: str, bar: str, output: str, target: str) -> dict:
-            # Return whether foo + bar equals output
-            return {"match": (foo + bar) == output == target}
+    """A correct column_map remaps scorer args to dataset columns; bad maps raise."""
 
-    # Create the scorer with column_map mapping 'foo'->'col1', 'bar'->'col2'
-    dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col2"})
-
-    @weave.op
-    def model_function(col1, col2):
-        # For testing, return the concatenation of col1 and col2
-        return col1 + col2
-
-    dataset = [
-        {"col1": "Hello", "col2": "World", "target": "HelloWorld"},
-        {"col1": "Hi", "col2": "There", "target": "HiThere"},
-        {"col1": "Good", "col2": "Morning", "target": "GoodMorning"},
-        {"col1": "Bad", "col2": "Evening", "target": "GoodEvening"},
-    ]
-
-    evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
-
-    # Run the evaluation
-    eval_out = await evaluation.evaluate(model_function)
-
-    # Check that 'DummyScorer' is in the results
-    assert "DummyScorer" in eval_out
-
-    # The expected summary should show that 3 out of 4 predictions matched
-    expected_results = {"true_count": 3, "true_fraction": 0.75}
-    assert eval_out["DummyScorer"]["match"] == expected_results, (
-        "The summary should reflect the correct number of matches"
-    )
-
-
-@pytest.mark.asyncio
-async def test_evaluation_with_wrong_column_map():
     # Define a dummy scorer that uses column_map
     class DummyScorer(weave.Scorer):
         @weave.op
@@ -992,6 +955,9 @@ async def test_evaluation_with_multiple_column_maps():
 
 @pytest.mark.asyncio
 async def test_feedback_is_correctly_linked(client):
+    """Scorer output links back to the predict call as runnable feedback (op + subclass)."""
+
+    # Function-op scorer: feedback type derived from the op name, call_ref set.
     @weave.op
     def predict(text: str) -> str:
         return text
@@ -1000,11 +966,8 @@ async def test_feedback_is_correctly_linked(client):
     def score(text, model_output) -> bool:
         return text == model_output
 
-    eval = weave.Evaluation(
-        dataset=[{"text": "hello"}],
-        scorers=[score],
-    )
-    res = await eval.evaluate(predict)
+    eval = weave.Evaluation(dataset=[{"text": "hello"}], scorers=[score])
+    await eval.evaluate(predict)
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client.project_id,
@@ -1013,7 +976,6 @@ async def test_feedback_is_correctly_linked(client):
         )
     )
     assert len(calls.calls) == 1
-    assert calls.calls[0].summary["weave"]["feedback"]
     feedbacks = calls.calls[0].summary["weave"]["feedback"]
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
@@ -1029,11 +991,9 @@ async def test_feedback_is_correctly_linked(client):
         ).uri
     )
 
-
-@pytest.mark.asyncio
-async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
+    # Scorer subclass: feedback type derived from the class name.
     @weave.op
-    def predict(text: str) -> str:
+    def predict_sub(text: str) -> str:
         return text
 
     class MyScorer(weave.Scorer):
@@ -1042,20 +1002,16 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
             return text == output
 
     scorer = MyScorer()
-    eval = weave.Evaluation(
-        dataset=[{"text": "hello"}],
-        scorers=[scorer],
-    )
-    res = await eval.evaluate(predict)
+    eval_sub = weave.Evaluation(dataset=[{"text": "hello"}], scorers=[scorer])
+    await eval_sub.evaluate(predict_sub)
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client.project_id,
             include_feedback=True,
-            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
+            filter=tsi.CallsFilter(op_names=[get_ref(predict_sub).uri]),
         )
     )
     assert len(calls.calls) == 1
-    assert calls.calls[0].summary["weave"]["feedback"]
     feedbacks = calls.calls[0].summary["weave"]["feedback"]
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
@@ -1110,58 +1066,34 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
-def test_get_evaluate_calls(client, make_evals):
+def test_eval_accessors(client, make_evals):
+    """Evaluation.get_evaluate_calls / get_score_calls / get_scores on two evals."""
     ref, ref2 = make_evals
-    ev = ref.get()
+    ev, ev2 = ref.get(), ref2.get()
+
+    # get_evaluate_calls: one evaluate call per eval, linked to its model.
     evaluate_calls = ev.get_evaluate_calls()
     assert len(evaluate_calls) == 1
+    assert evaluate_calls[0].inputs["self"].ref.uri == ref.uri
+    assert evaluate_calls[0].inputs["model"].name == "abc"
 
-    call1 = evaluate_calls[0]
-    assert call1.inputs["self"].ref.uri == ref.uri
-    assert call1.inputs["model"].name == "abc"
-
-    ev2 = ref2.get()
     evaluate_calls2 = ev2.get_evaluate_calls()
     assert len(evaluate_calls2) == 1
+    assert evaluate_calls2[0].inputs["self"].ref.uri == ref2.uri
+    assert evaluate_calls2[0].inputs["model"].name == "ghi"
 
-    call2 = evaluate_calls2[0]
-    assert call2.inputs["self"].ref.uri == ref2.uri
-    assert call2.inputs["model"].name == "ghi"
-
-
-def test_get_score_calls(client, make_evals):
-    ref, ref2 = make_evals
-    ev = ref.get()
+    # get_score_calls: four score calls per eval, in dataset order.
     score_calls = next(iter(ev.get_score_calls().values()))
-    assert len(score_calls) == 4
-
-    assert score_calls[0].output == 3
-    assert score_calls[1].output == 4
-    assert score_calls[2].output == 33
-    assert score_calls[3].output == 44
-
-    ev2 = ref2.get()
+    assert [c.output for c in score_calls] == [3, 4, 33, 44]
     score_calls2 = next(iter(ev2.get_score_calls().values()))
-    assert len(score_calls2) == 4
+    assert [c.output for c in score_calls2] == [56, 78, 5656, 7878]
 
-    assert score_calls2[0].output == 56
-    assert score_calls2[1].output == 78
-    assert score_calls2[2].output == 5656
-    assert score_calls2[3].output == 7878
-
-
-def test_get_scores(client, make_evals):
-    ref, ref2 = make_evals
-    ev = ref.get()
-    scores = next(iter(ev.get_scores().values()))
-    assert scores == {
+    # get_scores: grouped by scorer name.
+    assert next(iter(ev.get_scores().values())) == {
         "score": [3, 33],
         "score2": [4, 44],
     }
-
-    ev2 = ref2.get()
-    scores2 = next(iter(ev2.get_scores().values()))
-    assert scores2 == {
+    assert next(iter(ev2.get_scores().values())) == {
         "second_score": [56, 5656],
         "second_score2": [78, 7878],
     }

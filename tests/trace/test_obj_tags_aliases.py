@@ -433,11 +433,7 @@ def test_server_alias_crud(client: WeaveClient):
 
 
 def test_server_tag_errors(client: WeaveClient):
-    """Tags on nonexistent or deleted objects raise NotFoundError.
-
-    Note: each error scenario lives in its own test function to keep the
-    failure modes isolated.
-    """
+    """Tags on nonexistent or deleted objects raise NotFoundError."""
     # Nonexistent object
     with pytest.raises(NotFoundError):
         client.server.obj_add_tags(
@@ -449,23 +445,7 @@ def test_server_tag_errors(client: WeaveClient):
             )
         )
 
-
-def test_server_alias_errors(client: WeaveClient):
-    """Aliases on nonexistent or deleted objects raise NotFoundError."""
-    # Nonexistent object
-    with pytest.raises(NotFoundError):
-        client.server.obj_set_aliases(
-            tsi.ObjSetAliasesReq(
-                project_id=client.project_id,
-                object_id="nonexistent_object",
-                digest="0" * 64,
-                aliases=["prod"],
-            )
-        )
-
-
-def test_server_tag_on_deleted_object(client: WeaveClient):
-    """Tags on deleted objects raise NotFoundError."""
+    # Deleted object
     oid, digest = _publish_obj(client, "srv_err_deleted")
     client.server.obj_delete(
         tsi.ObjDeleteReq(
@@ -485,8 +465,20 @@ def test_server_tag_on_deleted_object(client: WeaveClient):
         )
 
 
-def test_server_alias_on_deleted_object(client: WeaveClient):
-    """Aliases on deleted objects raise NotFoundError."""
+def test_server_alias_errors(client: WeaveClient):
+    """Aliases on nonexistent or deleted objects raise NotFoundError."""
+    # Nonexistent object
+    with pytest.raises(NotFoundError):
+        client.server.obj_set_aliases(
+            tsi.ObjSetAliasesReq(
+                project_id=client.project_id,
+                object_id="nonexistent_object",
+                digest="0" * 64,
+                aliases=["prod"],
+            )
+        )
+
+    # Deleted object
     oid, digest = _publish_obj(client, "srv_err_deleted2")
     client.server.obj_delete(
         tsi.ObjDeleteReq(
@@ -1341,8 +1333,8 @@ def test_sdk_uri_strings(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
-def test_sdk_add_tags_error_nonexistent(client: WeaveClient):
-    """SDK add_tags raises NotFoundError on fake ref."""
+def test_sdk_errors_nonexistent(client: WeaveClient):
+    """SDK add_tags and set_aliases both raise NotFoundError on a fake ref."""
     fake_ref = ObjectRef(
         entity="test",
         project="test",
@@ -1351,16 +1343,6 @@ def test_sdk_add_tags_error_nonexistent(client: WeaveClient):
     )
     with pytest.raises(NotFoundError):
         client.add_tags(fake_ref, ["tag"])
-
-
-def test_sdk_set_aliases_error_nonexistent(client: WeaveClient):
-    """SDK set_aliases raises NotFoundError on fake ref."""
-    fake_ref = ObjectRef(
-        entity="test",
-        project="test",
-        name="nonexistent_object",
-        _digest="0" * 43,
-    )
     with pytest.raises(NotFoundError):
         client.set_aliases(fake_ref, "prod")
 

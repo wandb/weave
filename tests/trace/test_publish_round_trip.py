@@ -26,7 +26,11 @@ def test_publish_round_trip_query_object(client) -> None:
     assert query_2 == query
 
 
-def test_publish_round_trip_register_object_nested(weave_active) -> None:
+def test_publish_round_trip_get_and_unwrap(weave_active) -> None:
+    """A register_object nested pydantic model round-trips via .get() as its real
+    type, and a plain nested dict round-trips via .unwrap().
+    """
+
     class Inner(BaseModel):
         name: str
 
@@ -39,24 +43,12 @@ def test_publish_round_trip_register_object_nested(weave_active) -> None:
             return cls.model_validate(obj.unwrap())
 
     outer = Outer(inner=Inner(name="test"))
-    outer_ref = weave.publish(outer)
-    outer_gotten = outer_ref.get()
+    outer_gotten = weave.publish(outer).get()
     assert isinstance(outer_gotten, Outer)
     assert isinstance(outer_gotten.inner, Inner)
     assert outer_gotten.inner.name == "test"
     assert outer == outer_gotten
 
-
-def test_round_trip_unwrap(weave_active) -> None:
-    data = {
-        "a": 1,
-        "b": [
-            {
-                "c": 2,
-                "d": 3,
-            }
-        ],
-    }
-    ref = weave.publish(data)
-    gotten = ref.get()
+    data = {"a": 1, "b": [{"c": 2, "d": 3}]}
+    gotten = weave.publish(data).get()
     assert gotten.unwrap() == data

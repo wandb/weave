@@ -91,24 +91,16 @@ async def test_can_preprocess_model_input(weave_active):
 
 
 @pytest.mark.asyncio
-async def test_evaluate_rows_only(weave_active):
-    evaluation = Evaluation(
-        dataset=dataset_rows,
-        scorers=[score_oldstyle],
-    )
+async def test_evaluate_model_with_scorers(weave_active):
+    # EvalModel against a rows dataset: single oldstyle scorer, then both styles.
     model = EvalModel()
-    result = await evaluation.evaluate(model)
+
+    oldstyle_only = Evaluation(dataset=dataset_rows, scorers=[score_oldstyle])
+    result = await oldstyle_only.evaluate(model)
     assert result == expected_eval_result
 
-
-@pytest.mark.asyncio
-async def test_evaluate_both_styles(weave_active):
-    evaluation = Evaluation(
-        dataset=dataset_rows,
-        scorers=[score_oldstyle, score_newstyle],
-    )
-    model = EvalModel()
-    result = await evaluation.evaluate(model)
+    both = Evaluation(dataset=dataset_rows, scorers=[score_oldstyle, score_newstyle])
+    result = await both.evaluate(model)
     assert result == {
         "model_output": {"mean": 9.5},
         "score_oldstyle": {"true_count": 1, "true_fraction": 0.5},
@@ -135,29 +127,13 @@ async def test_evaluate_other_model_method_names():
 
 @pytest.mark.asyncio
 async def test_score_as_class(weave_active):
+    # Scorer subclass: default summarize, then a custom summarize override.
     class MyScorerOldstyle(weave.Scorer):
         @weave.op
         def score(self, model_output, target):
             return model_output == target
 
-    evaluation = Evaluation(
-        dataset=dataset_rows,
-        scorers=[MyScorerOldstyle()],
-    )
-    model = EvalModel()
-    result = await evaluation.evaluate(model)
-    assert result == {
-        "model_output": {"mean": 9.5},
-        "MyScorerOldstyle": {"true_count": 1, "true_fraction": 0.5},
-        "model_latency": {
-            "mean": pytest.approx(0, abs=LATENCY_TOL),
-        },
-    }
-
-
-@pytest.mark.asyncio
-async def test_score_with_custom_summarize(weave_active):
-    class MyScorerOldstyle(weave.Scorer):
+    class MyScorerCustomSummarize(weave.Scorer):
         @weave.op
         def summarize(self, score_rows):
             assert list(score_rows) == [True, False]
@@ -167,15 +143,23 @@ async def test_score_with_custom_summarize(weave_active):
         def score(self, model_output, target):
             return model_output == target
 
-    evaluation = Evaluation(
-        dataset=dataset_rows,
-        scorers=[MyScorerOldstyle()],
-    )
     model = EvalModel()
-    result = await evaluation.evaluate(model)
+
+    default_eval = Evaluation(dataset=dataset_rows, scorers=[MyScorerOldstyle()])
+    result = await default_eval.evaluate(model)
     assert result == {
         "model_output": {"mean": 9.5},
-        "MyScorerOldstyle": {"awesome": 3},
+        "MyScorerOldstyle": {"true_count": 1, "true_fraction": 0.5},
+        "model_latency": {
+            "mean": pytest.approx(0, abs=LATENCY_TOL),
+        },
+    }
+
+    custom_eval = Evaluation(dataset=dataset_rows, scorers=[MyScorerCustomSummarize()])
+    result = await custom_eval.evaluate(model)
+    assert result == {
+        "model_output": {"mean": 9.5},
+        "MyScorerCustomSummarize": {"awesome": 3},
         "model_latency": {
             "mean": pytest.approx(0, abs=LATENCY_TOL),
         },

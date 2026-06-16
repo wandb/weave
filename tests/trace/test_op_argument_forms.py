@@ -433,144 +433,162 @@ def test_general_arg_variations(client, fn, arg_variations):
 # a bit easier to read and understand (technically, the above test is more comprehensive and should be enough)
 
 
-def test_no_args(client):
+def _no_args_op():
     @weave.op
     def my_op() -> int:
         return 1
 
-    my_op()
-
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
-    )
-
-    assert res.calls[0].op_name == my_op.ref.uri
-    assert res.calls[0].inputs == {}
+    return my_op
 
 
-def test_args_concrete(client):
+def _concrete_op():
     @weave.op
     def my_op(val):
         return [val]
 
-    my_op(1)
-
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
-    )
-
-    assert res.calls[0].op_name == my_op.ref.uri
-    assert res.calls[0].inputs == {"val": 1}
-    assert res.calls[0].output == [1]
+    return my_op
 
 
-def test_args_concrete_splat(client):
+def _concrete_splat_op():
     @weave.op
     def my_op(val, *args):
         return [val, args]
 
-    my_op(1)
-    my_op(1, 2, 3)
-
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
-    )
-
-    assert res.calls[0].op_name == my_op.ref.uri
-    assert res.calls[0].inputs == {"val": 1, "args": []}
-    assert res.calls[0].output == [1, []]
-    assert res.calls[1].op_name == my_op.ref.uri
-    assert res.calls[1].inputs == {"val": 1, "args": [2, 3]}
-    assert res.calls[1].output == [1, [2, 3]]
+    return my_op
 
 
-def test_args_concrete_splats(client):
+def _concrete_splats_op():
     @weave.op
     def my_op(val, *args, **kwargs):
         return [val, args, kwargs]
 
-    my_op(1)
-    my_op(1, 2, 3)
-    my_op(1, a=2, b=3)
-    my_op(1, 2, 3, a=4, b=5)
-
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
-    )
-
-    assert res.calls[0].op_name == my_op.ref.uri
-    assert res.calls[0].inputs == {"val": 1, "args": [], "kwargs": {}}
-    assert res.calls[0].output == [1, [], {}]
-    assert res.calls[1].op_name == my_op.ref.uri
-    assert res.calls[1].inputs == {"val": 1, "args": [2, 3], "kwargs": {}}
-    assert res.calls[1].output == [1, [2, 3], {}]
-    assert res.calls[2].op_name == my_op.ref.uri
-    assert res.calls[2].inputs == {"val": 1, "args": [], "kwargs": {"a": 2, "b": 3}}
-    assert res.calls[2].output == [1, [], {"a": 2, "b": 3}]
-    assert res.calls[3].op_name == my_op.ref.uri
-    assert res.calls[3].inputs == {"val": 1, "args": [2, 3], "kwargs": {"a": 4, "b": 5}}
-    assert res.calls[3].output == [1, [2, 3], {"a": 4, "b": 5}]
+    return my_op
 
 
-def test_args_concrete_splat_concrete(client):
+def _concrete_splat_concrete_op():
     @weave.op
     def my_op(val, *args, a=0):
         return [val, args, a]
 
-    my_op(1)
-    my_op(1, a=2)
-    my_op(1, 2, 3, a=4)
-
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
-    )
-
-    assert res.calls[0].op_name == my_op.ref.uri
-    assert res.calls[0].inputs == {"val": 1, "args": [], "a": 0}
-    assert res.calls[0].output == [1, [], 0]
-    assert res.calls[1].op_name == my_op.ref.uri
-    assert res.calls[1].inputs == {"val": 1, "args": [], "a": 2}
-    assert res.calls[1].output == [1, [], 2]
-    assert res.calls[2].op_name == my_op.ref.uri
-    assert res.calls[2].inputs == {"val": 1, "args": [2, 3], "a": 4}
-    assert res.calls[2].output == [1, [2, 3], 4]
+    return my_op
 
 
-def test_args_concrete_splat_concrete_splat(client):
+def _concrete_splat_concrete_splat_op():
     @weave.op
     def my_op(val, *args, a=0, **kwargs):
         return [val, args, a, kwargs]
 
-    my_op(1)
-    my_op(1, a=2)
-    my_op(1, 2, 3, a=4)
-    my_op(1, 2, 3, a=4, b=5)
+    return my_op
 
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
-    )
 
-    assert res.calls[0].op_name == my_op.ref.uri
-    assert res.calls[0].inputs == {"val": 1, "args": [], "a": 0, "kwargs": {}}
-    assert res.calls[0].output == [1, [], 0, {}]
-    assert res.calls[1].op_name == my_op.ref.uri
-    assert res.calls[1].inputs == {"val": 1, "args": [], "a": 2, "kwargs": {}}
-    assert res.calls[1].output == [1, [], 2, {}]
-    assert res.calls[2].op_name == my_op.ref.uri
-    assert res.calls[2].inputs == {"val": 1, "args": [2, 3], "a": 4, "kwargs": {}}
-    assert res.calls[2].output == [1, [2, 3], 4, {}]
-    assert res.calls[3].op_name == my_op.ref.uri
-    assert res.calls[3].inputs == {"val": 1, "args": [2, 3], "a": 4, "kwargs": {"b": 5}}
-    assert res.calls[3].output == [1, [2, 3], 4, {"b": 5}]
+@pytest.mark.parametrize(
+    ("op_factory", "expected_calls"),
+    [
+        # | fn()  -> no inputs recorded, output unchecked (matches original)
+        (_no_args_op, [((), {}, {}, None)]),
+        # | fn(val)
+        (_concrete_op, [((1,), {}, {"val": 1}, [1])]),
+        # | fn(val, *args)
+        (
+            _concrete_splat_op,
+            [
+                ((1,), {}, {"val": 1, "args": []}, [1, []]),
+                ((1, 2, 3), {}, {"val": 1, "args": [2, 3]}, [1, [2, 3]]),
+            ],
+        ),
+        # | fn(val, *args, **kwargs)
+        (
+            _concrete_splats_op,
+            [
+                ((1,), {}, {"val": 1, "args": [], "kwargs": {}}, [1, [], {}]),
+                (
+                    (1, 2, 3),
+                    {},
+                    {"val": 1, "args": [2, 3], "kwargs": {}},
+                    [1, [2, 3], {}],
+                ),
+                (
+                    (1,),
+                    {"a": 2, "b": 3},
+                    {"val": 1, "args": [], "kwargs": {"a": 2, "b": 3}},
+                    [1, [], {"a": 2, "b": 3}],
+                ),
+                (
+                    (1, 2, 3),
+                    {"a": 4, "b": 5},
+                    {"val": 1, "args": [2, 3], "kwargs": {"a": 4, "b": 5}},
+                    [1, [2, 3], {"a": 4, "b": 5}],
+                ),
+            ],
+        ),
+        # | fn(val, *args, a=0)
+        (
+            _concrete_splat_concrete_op,
+            [
+                ((1,), {}, {"val": 1, "args": [], "a": 0}, [1, [], 0]),
+                ((1,), {"a": 2}, {"val": 1, "args": [], "a": 2}, [1, [], 2]),
+                (
+                    (1, 2, 3),
+                    {"a": 4},
+                    {"val": 1, "args": [2, 3], "a": 4},
+                    [1, [2, 3], 4],
+                ),
+            ],
+        ),
+        # | fn(val, *args, a=0, **kwargs)
+        (
+            _concrete_splat_concrete_splat_op,
+            [
+                (
+                    (1,),
+                    {},
+                    {"val": 1, "args": [], "a": 0, "kwargs": {}},
+                    [1, [], 0, {}],
+                ),
+                (
+                    (1,),
+                    {"a": 2},
+                    {"val": 1, "args": [], "a": 2, "kwargs": {}},
+                    [1, [], 2, {}],
+                ),
+                (
+                    (1, 2, 3),
+                    {"a": 4},
+                    {"val": 1, "args": [2, 3], "a": 4, "kwargs": {}},
+                    [1, [2, 3], 4, {}],
+                ),
+                (
+                    (1, 2, 3),
+                    {"a": 4, "b": 5},
+                    {"val": 1, "args": [2, 3], "a": 4, "kwargs": {"b": 5}},
+                    [1, [2, 3], 4, {"b": 5}],
+                ),
+            ],
+        ),
+    ],
+    ids=[
+        "no-args",
+        "concrete",
+        "concrete-splat",
+        "concrete-splats",
+        "concrete-splat-concrete",
+        "concrete-splat-concrete-splat",
+    ],
+)
+def test_specific_arg_forms(client, op_factory, expected_calls):
+    """Concrete per-stub coverage: each call's recorded inputs/output by position.
+
+    The general parametrized test above is more comprehensive; these are the
+    individually-readable per-stub forms.
+    """
+    my_op = op_factory()
+    for call_args, call_kwargs, _, _ in expected_calls:
+        my_op(*call_args, **call_kwargs)
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client.project_id))
+
+    for ndx, (_, _, expected_inputs, expected_output) in enumerate(expected_calls):
+        assert res.calls[ndx].op_name == my_op.ref.uri
+        assert res.calls[ndx].inputs == expected_inputs
+        if expected_output is not None:
+            assert res.calls[ndx].output == expected_output
