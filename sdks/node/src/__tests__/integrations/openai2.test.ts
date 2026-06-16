@@ -1,11 +1,11 @@
-import {Api as TraceServerApi} from '../../generated/traceServerApi';
+import {type Api as TraceServerApi} from '../../generated/traceServerApi';
 import {
   makeOpenAIImagesGenerateOp,
   openAIStreamReducer,
   wrapOpenAI,
 } from '../../integrations/openai';
 import {isWeaveImage} from '../../media';
-import {WandbServerApi} from '../../wandb/wandbServerApi';
+import {type WandbServerApi} from '../../wandb/wandbServerApi';
 import {WeaveClient} from '../../weaveClient';
 import {makeAPIPromiseShim} from '../openaiMock';
 
@@ -55,11 +55,10 @@ describe('OpenAI Integration', () => {
       },
     } as any;
     mockWandbServerApi = {} as any;
-    weaveClient = new WeaveClient(
-      mockTraceServerApi,
-      mockWandbServerApi,
-      'test-project'
-    );
+    weaveClient = new WeaveClient({
+      traceServerApi: mockTraceServerApi,
+      projectId: 'test-project',
+    });
 
     wrappedOpenAI = wrapOpenAI(mockOpenAI);
   });

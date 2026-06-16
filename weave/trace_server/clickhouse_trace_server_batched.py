@@ -104,6 +104,9 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
+from weave.trace_server.calls_query_builder.monitor_query_validation import (
+    validate_monitor_query_fields,
+)
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
@@ -179,6 +182,7 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     ObjectNameTypeCollision,
+    RefObjectsNotFoundError,
     RequestTooLarge,
     handle_clickhouse_query_error,
 )
@@ -575,6 +579,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self.use_distributed_mode:
             return f"{table}{ch_settings.LOCAL_TABLE_SUFFIX}"
         return table
+
+    def _mutation_cluster_name(self) -> str | None:
+        """`ON CLUSTER` target for a mutation: set only in distributed mode (replicated tables self-replicate via Keeper)."""
+        if self.use_distributed_mode:
+            return self.clickhouse_cluster_name
+        return None
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -1815,6 +1825,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
+    @tag_db_insert_path("calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > ch_settings.MAX_DELETE_CALLS_COUNT:
@@ -1987,6 +1998,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             expected=req.obj.expected_digest,
             actual=digest,
             label=f"obj {req.obj.object_id!r}",
+        )
+        validate_monitor_query_fields(
+            digest_result.base_object_class,
+            digest_result.leaf_object_class,
+            processed_val,
         )
 
         kind = get_kind(processed_val)
@@ -5810,8 +5826,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 objs = self._select_objs_query(object_query_builder)
                 found_digests = {obj.digest for obj in objs}
                 if len(ref_digests) != len(found_digests):
-                    raise NotFoundError(
-                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
+                    missing_digests = sorted(ref_digests - found_digests)
+                    raise RefObjectsNotFoundError(
+                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {missing_digests}",
+                        missing_digests,
                     )
                 # filter out deleted objects
                 valid_objects = [obj for obj in objs if obj.deleted_at is None]
@@ -6248,9 +6266,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             costs.append((cost_id, llm_id))
 
-            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
-                database_type="clickhouse"
-            )
+            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare()
             self._insert(
                 LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
             )
@@ -6284,10 +6300,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.where(query_with_pricing_level)
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
-        prepared = query.prepare(database_type="clickhouse")
+        prepared = query.prepare()
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
-            query_result.result_rows, prepared.fields, database_type="clickhouse"
+            query_result.result_rows, prepared.fields
         )
         return tsi.CostQueryRes(results=results)
 
@@ -6315,8 +6331,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         query = LLM_TOKEN_PRICES_TABLE.purge()
         query = query.where(query_with_pricing_level)
-        prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
+        prepared = query.prepare(
+            table_name=self._mutation_table_name(LLM_TOKEN_PRICES_TABLE.name),
+            cluster_name=self._mutation_cluster_name(),
+        )
+        self._command(
+            prepared.sql,
+            parameters=prepared.parameters,
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
         return tsi.CostPurgeRes()
 
     @tag_db_insert_path("feedback_create")
@@ -6326,7 +6349,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
-        prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
+        prepared = TABLE_FEEDBACK.insert(row).prepare()
         self._insert(
             TABLE_FEEDBACK.name,
             prepared.data,
@@ -6362,7 +6385,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             insert_query = TABLE_FEEDBACK.insert()
             for row in rows_to_insert:
                 insert_query.row(row)
-            prepared = insert_query.prepare(database_type="clickhouse")
+            prepared = insert_query.prepare()
             self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
 
         return tsi.FeedbackCreateBatchRes(res=results)
@@ -6374,10 +6397,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.where(req.query)
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
-        prepared = query.prepare(database_type="clickhouse")
+        prepared = query.prepare()
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
-            query_result.result_rows, prepared.fields, database_type="clickhouse"
+            query_result.result_rows, prepared.fields
         )
         # Make `created_at` tz-aware (otherwise the client will assume local time)
         for row in result:
@@ -6394,8 +6417,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = TABLE_FEEDBACK.purge()
         query = query.project_id(req.project_id)
         query = query.where(req.query)
-        prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
+        prepared = query.prepare(
+            table_name=self._mutation_table_name(TABLE_FEEDBACK.name),
+            cluster_name=self._mutation_cluster_name(),
+        )
+        self._command(
+            prepared.sql,
+            parameters=prepared.parameters,
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
         return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:

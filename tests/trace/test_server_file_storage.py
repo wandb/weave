@@ -13,12 +13,13 @@ import boto3
 import pytest
 from azure.core.exceptions import ResourceExistsError
 from google.api_core import exceptions
+from google.auth import credentials as ga_credentials
+from google.cloud import storage
 from moto import mock_aws
 
-from tests.trace.util import client_is_sqlite
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import clickhouse_trace_server_settings
+from weave.trace_server import clickhouse_trace_server_settings, file_storage
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 # Test Data Constants
@@ -49,8 +50,6 @@ def run_storage_test(client: WeaveClient):
         assert file.content == TEST_CONTENT
         return res
 
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
     return _run_test
 
 
@@ -145,9 +144,6 @@ class TestS3Storage:
             d3 = _run_single_test()
             assert d1 == d2 == d3
 
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         _run_test()
 
 
@@ -177,9 +173,6 @@ class TestGCSStorage:
         This verifies the if_generation_match=0 conditional write works correctly
         to prevent GCS rate limiting when multiple pods write the same object.
         """
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         upload_count = 0
         blob_data = {}
 
@@ -240,6 +233,50 @@ class TestGCSStorage:
                 FileContentReadReq(project_id=client.project_id, digest=res1.digest)
             )
             assert file.content == TEST_CONTENT
+
+
+class _ScopedFakeCredentials(ga_credentials.Credentials, ga_credentials.Scoped):
+    """Service-account-like credentials that require scoping before use."""
+
+    def __init__(self, scopes: list[str] | None = None):
+        super().__init__()
+        self._scopes = scopes
+
+    @property
+    def requires_scopes(self) -> bool:
+        return not self._scopes
+
+    @property
+    def scopes(self) -> list[str] | None:
+        return self._scopes
+
+    def with_scopes(self, scopes, default_scopes=None) -> "_ScopedFakeCredentials":
+        return _ScopedFakeCredentials(scopes=list(scopes))
+
+    def refresh(self, request) -> None:
+        self.token = "fake-token"
+
+
+def test_keepalive_gcs_client_scopes_credentials_for_session():
+    """Regression for #7221: the keep-alive GCS session must carry scoped credentials."""
+    expected_scopes = list(storage.Client.SCOPE)
+
+    unscoped = _ScopedFakeCredentials()
+    assert unscoped.requires_scopes
+    client = file_storage._build_keepalive_gcs_client(unscoped)
+
+    # The session that mints tokens must hold scoped creds, else invalid_scope.
+    assert client._http.credentials.scopes == expected_scopes
+    assert not client._http.credentials.requires_scopes
+    assert isinstance(
+        client._http.get_adapter("https://storage.googleapis.com"),
+        file_storage._KeepAliveHTTPAdapter,
+    )
+
+    # Already-scoped creds (local user creds) pass through, so prod-only repro.
+    prescoped = _ScopedFakeCredentials(scopes=["existing-scope"])
+    passthrough = file_storage._build_keepalive_gcs_client(prescoped)
+    assert passthrough._http.credentials.scopes == ["existing-scope"]
 
 
 class TestAzureStorage:
@@ -321,9 +358,6 @@ class TestAzureStorage:
         be a no-op, not an overwrite. Otherwise any project with write scope
         can substitute content at a known URI.
         """
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         blob_data: dict[str, bytes] = {}
         upload_calls: list[dict] = []
 
@@ -396,8 +430,6 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
     """Test that the system supports variable length chunks.
     We don't actually want to change this often, but we need to make sure it works.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
 
     def create_and_read_file(content: bytes):
         res = client.server.file_create(
@@ -440,9 +472,6 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
 @pytest.mark.disable_logging_error_check
 def test_file_storage_retry_limit(client: WeaveClient):
     """Test that file storage operations retry exactly 3 times on storage failures."""
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
     attempt_count = 0
 
     def mock_upload_fail(*args, **kwargs):
@@ -527,9 +556,6 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
     collapses to one upload, and every stored object lands under the
     expected project prefix.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
     gcs.state.delay = 0.1
     # 4 unique blobs + 2 duplicates of the first => 4 GCS uploads after dedup.
     payload_size = 50_000
@@ -588,9 +614,6 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     server's read path -- it must reassemble bit-for-bit from CH chunks for
     both single-chunk and multi-chunk payloads.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
     server = client.server
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
 

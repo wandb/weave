@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import pathlib
+import time
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -216,8 +217,8 @@ def test_missing_trace_id_raises_value_error() -> None:
         processor.stop_accepting_new_work_and_flush_queue()
 
 
-def test_flush_eager_sends_unpaired_items_and_clears_state() -> None:
-    """Flush sends unpaired items via the eager v2 endpoints and clears caches."""
+def test_flush_sends_unpaired_items_via_eager_endpoints() -> None:
+    """Flush sends unpaired items via the eager v2 endpoints."""
     complete_fn = MagicMock()
     eager_fn = MagicMock()
     processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
@@ -236,13 +237,49 @@ def test_flush_eager_sends_unpaired_items_and_clears_state() -> None:
     assert processor.num_pending == 0
     assert processor._pending_starts == {}
     assert processor._pending_ends == {}
-    assert len(processor._eager_call_ids) == 0
     complete_fn.assert_not_called()
     # Both orphans should have been handed to the eager processor (possibly
     # across one or multiple batched invocations).
     sent_items = [item for call in eager_fn.call_args_list for item in call.args[0]]
     assert orphan_start in sent_items
     assert orphan_end in sent_items
+
+
+def test_flush_does_not_stall_on_eager_end_after_intermediate_flush() -> None:
+    """Eager tracking survives a mid-eval flush, so the later end never orphans."""
+    eager_fn = MagicMock()
+    timeout = 2.0
+    processor = CallBatchProcessor(MagicMock(), eager_fn, min_batch_interval=0.01)
+
+    # Eager start, then a flush before the eval finishes. Eager tracking must
+    # survive the flush or the end below becomes a never-pairing orphan.
+    processor.enqueue_start(_make_start_item("ev-1", "trace-1"), eager_call_start=True)
+    with patch(
+        "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS",
+        timeout,
+    ):
+        processor.stop_accepting_new_work_and_flush_queue()
+    assert "ev-1" in processor._eager_call_ids
+    processor.accept_new_work()
+
+    # Eval finishes: the end pairs via _eager_call_ids and is sent immediately,
+    # so the flush returns well under the timeout instead of waiting it out.
+    processor.enqueue([_make_end_item("ev-1")])
+    start = time.monotonic()
+    with patch(
+        "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS",
+        timeout,
+    ):
+        processor.stop_accepting_new_work_and_flush_queue()
+    assert time.monotonic() - start < timeout
+    assert processor._pending_ends == {}
+    sent_end_ids = {
+        item.req.end.id
+        for call in eager_fn.call_args_list
+        for item in call.args[0]
+        if isinstance(item, EndBatchItem)
+    }
+    assert sent_end_ids == {"ev-1"}
 
 
 def test_queue_full_writes_to_disk(tmp_path: pathlib.Path) -> None:

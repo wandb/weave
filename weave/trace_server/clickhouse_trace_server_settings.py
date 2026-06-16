@@ -52,7 +52,7 @@ DEFAULT_MAX_ESTIMATED_EXECUTION_TIME = DEFAULT_MAX_EXECUTION_TIME
 # ClickHouse waits this long before doing the projection check, avoiding the
 # overhead on short queries.
 # https://clickhouse.com/docs/operations/settings/settings#timeout_before_checking_execution_speed
-DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED = 5
+DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED = 10
 
 # https://clickhouse.com/docs/sql-reference/functions/json-functions#json_value
 RETURN_TYPE_ALLOW_COMPLEX = "1"

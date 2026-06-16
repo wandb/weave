@@ -17,10 +17,7 @@ from weave.trace_server.calls_query_builder.usage_query_builder import (
 )
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
-from weave.trace_server.threads_query_builder import (
-    make_threads_query,
-    make_threads_query_sqlite,
-)
+from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.trace_server_interface import (
     CallMetricSpec,
     CallsQueryStatsReq,
@@ -69,27 +66,6 @@ def assert_clickhouse_sql(expected_query: str, expected_params: dict, **kwargs) 
     pb = ParamBuilder("pb")
     query = make_threads_query(pb=pb, **kwargs)
     params = pb.get_params()
-
-    expected_formatted = sqlparse.format(expected_query, reindent=True)
-    found_formatted = sqlparse.format(query, reindent=True)
-
-    assert expected_formatted == found_formatted, (
-        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
-    )
-    assert expected_params == params, (
-        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
-    )
-
-
-def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs) -> None:
-    """Helper to test SQLite query generation for threads.
-
-    Args:
-        expected_query: The expected SQL query string
-        expected_params: The expected parameter list
-        **kwargs: Arguments to pass to make_threads_query_sqlite
-    """
-    query, params = make_threads_query_sqlite(**kwargs)
 
     expected_formatted = sqlparse.format(expected_query, reindent=True)
     found_formatted = sqlparse.format(query, reindent=True)

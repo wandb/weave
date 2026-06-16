@@ -327,7 +327,7 @@ def test_holder_validation():
 
 
 @pytest.fixture
-def real_ch_lock(require_clickhouse, ensure_clickhouse_db):
+def real_ch_lock(ensure_clickhouse_db):
     """Real ClickHouse client + lock table for integration tests."""
     host, port = next(ensure_clickhouse_db())
     client = clickhouse_connect.get_client(host=host, port=port)

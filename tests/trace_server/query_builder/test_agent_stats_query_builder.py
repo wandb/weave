@@ -822,8 +822,18 @@ def test_request_validation_rejects_numeric_bucket_group_by() -> None:
         )
 
 
-def test_request_validation_rejects_large_range() -> None:
+def test_request_validation_rejects_large_range_when_grouped() -> None:
     with pytest.raises(ValidationError):
         _req(
             end=datetime.datetime(2026, 2, 15, tzinfo=datetime.timezone.utc),
+            group_by=[
+                AgentGroupByRef(source="column", key="agent_name", alias="agent")
+            ],
         )
+
+
+def test_request_validation_allows_large_range_when_ungrouped() -> None:
+    # No group_by / group_filters / numeric bucket: a single-series rollup may
+    # span any range (used for all-time totals), so the cap does not apply.
+    req = _req(end=datetime.datetime(2026, 2, 15, tzinfo=datetime.timezone.utc))
+    assert req.end == datetime.datetime(2026, 2, 15, tzinfo=datetime.timezone.utc)

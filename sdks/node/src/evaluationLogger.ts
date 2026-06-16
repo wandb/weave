@@ -16,13 +16,13 @@
  * await ev.logSummary();
  */
 
-import {WeaveObject, WeaveObjectParameters} from './weaveObject';
-import {Dataset, DatasetRow} from './dataset';
+import {WeaveObject, type WeaveObjectParameters} from './weaveObject';
+import {type Dataset, type DatasetRow} from './dataset';
 import {op} from './op';
 import {requireGlobalClient} from './clientApi';
 import {InternalCall} from './call';
-import {CallStackEntry, WeaveClient} from './weaveClient';
-import {Op, OpRef, ParameterNamesOption} from './opType';
+import {type CallStackEntry, type WeaveClient} from './weaveClient';
+import {type Op, type OpRef, type ParameterNamesOption} from './opType';
 import {uuidv7} from 'uuidv7';
 
 // ============================================================================

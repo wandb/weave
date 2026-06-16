@@ -1,6 +1,5 @@
 """Helper functions for eval_results_query.
 
-These are shared between ClickHouse and SQLite trace server implementations.
 Most helpers are pure (operate on in-memory data). The orchestration functions
 (eval_results_grouped_rows, fetch_eval_root_metadata, eval_results_query) take
 a TraceServerInterface and perform DB access via calls_query_stream and

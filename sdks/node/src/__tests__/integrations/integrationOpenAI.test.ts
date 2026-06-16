@@ -84,6 +84,9 @@ describe('OpenAI Integration', () => {
     const calls = await getCalls(inMemoryTraceServer, testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.create');
+    // Integration-tracking metadata is stamped on every patched call.
+    expect(calls[0].attributes?.integration?.name).toBe('openai');
+    expect(calls[0].attributes?.integration?.meta?.package_name).toBe('openai');
     expect(calls[0].inputs).toEqual({messages});
     expect(calls[0].output).toMatchObject({
       object: opResult.object,

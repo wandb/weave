@@ -9,8 +9,16 @@ from weave.integrations.google_genai.imagen_utils import (
     google_genai_imagen_wrapper_async,
     google_genai_imagen_wrapper_sync,
 )
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+
+GOOGLE_GENAI_INTEGRATION = library_integration(
+    "google_genai", distribution_name="google-genai"
+)
 
 
 def get_google_genai_symbol_patcher(
@@ -45,7 +53,7 @@ def get_google_genai_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, GOOGLE_GENAI_INTEGRATION)
 
     google_genai_patcher = MultiPatcher(
         [

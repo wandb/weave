@@ -8,13 +8,14 @@ export {
 export {Dataset} from './dataset';
 export {Evaluation} from './evaluation';
 export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
-export {
+export type {
   CallSchema,
   CallsFilter,
   Query,
   SortBy,
 } from './generated/traceServerApi';
-export {GetCallsOptions} from './weaveClient';
+export type {Settings} from './settings';
+export type {GetCallsOptions, WeaveClient} from './weaveClient';
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
@@ -59,11 +60,17 @@ export type {
   TurnInit,
   Usage,
 } from './genai';
-export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
+export {
+  weaveAudio,
+  weaveImage,
+  type WeaveAudio,
+  type WeaveImage,
+} from './media';
 export {op} from './op';
-export * from './types';
+export type {Op, OpDecorator} from './opType';
 export {WeaveObject, ObjectRef} from './weaveObject';
 export {MessagesPrompt, StringPrompt} from './prompt';
+
 // CJS-only side-effect: install the `require()` patcher so CJS hosts
 // auto-instrument supported modules. ESM hosts use the loader hook in
 // `./esm/instrument.mjs` instead, registered via `--import=weave/instrument`.

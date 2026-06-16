@@ -5,10 +5,15 @@ from collections.abc import Callable
 from typing import Any
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 _notdiamond_patcher: MultiPatcher | None = None
+NOTDIAMOND_INTEGRATION = library_integration("notdiamond")
 
 
 def not_diamond_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -74,7 +79,7 @@ def get_notdiamond_patcher(
     if _notdiamond_patcher is not None:
         return _notdiamond_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, NOTDIAMOND_INTEGRATION)
 
     model_select_settings = base.model_copy(
         update={

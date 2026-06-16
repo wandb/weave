@@ -232,6 +232,36 @@ def test_full_agent_turn() -> None:
     assert _assistant_payload(by_type["assistant_message"]).output_tokens == 105
 
 
+def test_chat_view_exposes_agent_metadata_for_reactions() -> None:
+    """The chat view surfaces agent_version + status_code so reaction feedback
+    can carry them: per-message from the message's span, and the trace root's
+    metadata on AgentTraceChatRes (used for turn-level reactions).
+    """
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            agent_version="1.2.0",  # `_span` hardcodes status_code="OK"
+            output_messages=[{"role": "assistant", "content": "done"}],
+        ),
+    ]
+
+    res = build_trace_chat(spans, "trace-1")
+
+    # Root span metadata on the trace — turn-level reactions read these.
+    assert res.agent_name == "my-bot"
+    assert res.agent_version == "1.2.0"
+    assert res.status_code == "OK"
+
+    # Each message built from the span carries the same metadata.
+    span_messages = [m for m in res.messages if m.span_id == "agent"]
+    assert span_messages
+    for m in span_messages:
+        assert m.agent_version == "1.2.0"
+        assert m.status_code == "OK"
+
+
 def test_agent_start_uses_agent_id_when_name_missing() -> None:
     messages = build_chat_messages(
         [

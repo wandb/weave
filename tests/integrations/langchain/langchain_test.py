@@ -66,7 +66,6 @@ def assert_correct_calls_for_chain_invoke(
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -95,6 +94,14 @@ def test_simple_chain_invoke(
     calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_invoke(calls, exp_name)
 
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    langchain_meta = [i for i in stamped if i["name"] == "langchain"]
+    assert langchain_meta, "expected >=1 call to carry langchain metadata"
+    assert all(i["meta"]["package_name"] == "langchain-core" for i in langchain_meta)
+
     call = calls[0]
     # Assert that the call has usage metadata
     assert call.summary is not None
@@ -102,7 +109,6 @@ def test_simple_chain_invoke(
     assert "gpt-4o-mini-2024-07-18" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -130,7 +136,6 @@ def test_simple_chain_invoke_no_client(client) -> None:
     _ = llm_chain.invoke({"number": 2})
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -154,7 +159,6 @@ async def test_simple_chain_ainvoke(
     assert_correct_calls_for_chain_invoke(calls)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -178,7 +182,6 @@ def test_simple_chain_stream(
     assert_correct_calls_for_chain_invoke(calls)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -224,7 +227,6 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -249,7 +251,6 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
     assert_correct_calls_for_chain_batch(calls)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -295,7 +296,6 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -412,7 +412,6 @@ def fix_chroma_ci() -> Generator[None, None, None]:
         sys.modules["sqlite3"] = old
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -492,7 +491,6 @@ def assert_correct_calls_for_agent_with_tool(calls: list[Call]) -> None:
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -607,7 +605,6 @@ def assert_correct_calls_for_agent_with_function_call(calls: list[Call]) -> None
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     before_record_request=filter_body,
@@ -699,7 +696,6 @@ def test_agent_run_with_function_call(
     assert_correct_calls_for_agent_with_function_call(calls)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -726,7 +722,6 @@ def test_weave_attributes_in_call(client: WeaveClient) -> None:
     assert "lc_name" in call_attrs
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     before_record_request=filter_body,
@@ -769,7 +764,6 @@ def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
     assert "gemini-2.5-pro-preview-05-06" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -800,7 +794,6 @@ def test_langchain_google_genai_usage(client: WeaveClient) -> None:
     assert "gemini-1.5-pro-002" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -831,7 +824,6 @@ def test_langchain_google_chat_genai_usage(client: WeaveClient) -> None:
     assert "gemini-1.5-pro-002" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -866,7 +858,6 @@ def test_langchain_anthropic_usage(client: WeaveClient) -> None:
     assert "claude-opus-4-20250514" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,
@@ -901,7 +892,6 @@ def test_langchain_cohere_usage(client: WeaveClient) -> None:
     assert "command-r" in call.summary["usage"].unwrap()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     before_record_request=filter_body,

@@ -4,7 +4,6 @@ import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
-from tests.trace.util import client_is_sqlite
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -194,12 +193,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "weave_ref": weave_ref,
         "wb_user_id": "shawn",
         "creator": None,
-        # Sad - seems like sqlite and clickhouse remote different types here
-        "created_at": (
-            create_res.created_at.isoformat().replace("T", " ")
-            if client_is_sqlite(client)
-            else MatchAnyDatetime()
-        ),
+        "created_at": MatchAnyDatetime(),
         "feedback_type": feedback_type,
         "payload": payload,
         "annotation_ref": annotation_ref,
@@ -354,12 +348,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "weave_ref": weave_ref,
         "wb_user_id": "shawn",
         "creator": None,
-        # Sad - seems like sqlite and clickhouse remote different types here
-        "created_at": (
-            create_res.created_at.isoformat().replace("T", " ")
-            if client_is_sqlite(client)
-            else MatchAnyDatetime()
-        ),
+        "created_at": MatchAnyDatetime(),
         "feedback_type": feedback_type,
         "payload": payload,
         "annotation_ref": None,
@@ -563,6 +552,44 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     assert query_res.result[0]["span_status_code"] == "UNSET"
 
 
+def test_agent_user_feedback(client: WeaveClient) -> None:
+    """A human agent score's value is a tag in scorer_tags (e.g. an emoji
+    glyph), carrying no scorer refs. Non-emoji tags are allowed too.
+    """
+    project_id = client.project_id
+    feedback_type = "wandb.agent_user_feedback"
+    weave_ref = f"weave:///{project_id}/object/agent_turn:turn_id_123"
+
+    create_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type=feedback_type,
+            payload={"emoji": "👍", "scorer_tags": ["👍"]},
+            scorer_tags=["👍"],
+            # Denormalized agent metadata the UI attaches for dashboard filtering.
+            span_agent_name="support-bot",
+            span_agent_version="1.2.0",
+            span_status_code="OK",
+        )
+    )
+    assert create_res.id is not None
+
+    query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(project_id=project_id)
+    )
+    assert len(query_res.result) == 1
+    row = query_res.result[0]
+    assert row["feedback_type"] == feedback_type
+    assert row["scorer_tags"] == ["👍"]
+    assert row["runnable_ref"] is None
+    assert row["trigger_ref"] is None
+    assert row["scorer_ratings"] == {}
+    assert row["span_agent_name"] == "support-bot"
+    assert row["span_agent_version"] == "1.2.0"
+    assert row["span_status_code"] == "OK"
+
+
 def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
     """Filter agent_monitor rows by typed scorer columns.
 
@@ -709,7 +736,7 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
 def test_feedback_aggregate(client: WeaveClient) -> None:
     """Aggregate scorer feedback, asserting the entire FeedbackAggregateRes shape.
 
-    ClickHouse-only (uses sumMap / toStartOfInterval); SQLite raises. Ratings are
+    Uses sumMap / toStartOfInterval. Ratings are
     exact binary fractions (0.75, 0.5) so the summed Float64 (1.25) compares
     exactly without approx. Covers both a time-bucketed query and several
     unbucketed (whole-range rollup) queries.
@@ -718,18 +745,6 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
     after_ms = now_ms - 3_600_000
     before_ms = now_ms + 3_600_000
-
-    if client_is_sqlite(client):
-        with pytest.raises(NotImplementedError):
-            client.server.feedback_aggregate(
-                FeedbackAggregateReq(
-                    project_id=project_id,
-                    after_ms=after_ms,
-                    before_ms=before_ms,
-                    time_bucket_seconds=3600,
-                )
-            )
-        return
 
     scorer_a = f"weave:///{project_id}/object/scorer_a:obj_id_a"
     scorer_b = f"weave:///{project_id}/object/scorer_b:obj_id_b"
@@ -1339,9 +1354,6 @@ def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> N
     object-id filters match the id exactly (a trailing '*' opts into prefix), and
     span_types matches the ref's span-type segment, not an arbitrary substring.
     """
-    if client_is_sqlite(client):
-        pytest.skip("feedback_aggregate query is ClickHouse-only (sumMap/splitByChar)")
-
     project_id = client.project_id
     now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
     after_ms = now_ms - 3_600_000
@@ -1802,28 +1814,27 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     # Query for feedback where dataset_id contains the numeric literal 94
     # This should work but currently fails with:
     # "Illegal type Int64 of argument of function position"
-    if not client_is_sqlite(client):
-        with pytest.raises(
-            DatabaseError,
-            match="Illegal type Int64 of argument of function position",
-        ):
-            client.server.feedback_query(
-                FeedbackQueryReq(
-                    project_id=project_id,
-                    query=Query(
-                        **{
-                            "$expr": {
-                                "$contains": {
-                                    "input": {"$getField": "payload.dataset_id"},
-                                    "substr": {
-                                        "$literal": 94
-                                    },  # Numeric literal, not string
-                                }
+    with pytest.raises(
+        DatabaseError,
+        match="Illegal type Int64 of argument of function position",
+    ):
+        client.server.feedback_query(
+            FeedbackQueryReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$contains": {
+                                "input": {"$getField": "payload.dataset_id"},
+                                "substr": {
+                                    "$literal": 94
+                                },  # Numeric literal, not string
                             }
                         }
-                    ),
-                )
+                    }
+                ),
             )
+        )
 
     res = client.server.feedback_query(
         FeedbackQueryReq(
@@ -1853,9 +1864,6 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     literal string `'true'` / `'false'`, so the bool path must coerce
     those before any numeric fallback.
 
-    Asserts on both backends so the same query shape works through sqlite
-    too (where the cast is silently dropped and sqlite's loose typing
-    handles the comparison).
     """
     project_id = client.project_id
     call_ref = f"weave:///{project_id}/call/call_id_typed_payload"
@@ -1917,10 +1925,6 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
 
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
-    if client_is_sqlite(client):
-        # Skip for SQLite - annotation queues not implemented
-        return pytest.skip()
-
     project_id = client.project_id
     weave_ref = f"weave:///{project_id}/call/call_id_789"
 
@@ -1972,10 +1976,6 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
 
 def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with invalid queue_id."""
-    if client_is_sqlite(client):
-        # Skip for SQLite - annotation queues not implemented
-        return pytest.skip()
-
     project_id = client.project_id
     weave_ref = f"weave:///{project_id}/call/call_id_invalid"
     invalid_queue_id = "00000000-0000-0000-0000-000000000000"
@@ -1995,10 +1995,6 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
 
 def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
     """Test feedback creation with queue_id from a different project."""
-    if client_is_sqlite(client):
-        # Skip for SQLite - annotation queues not implemented
-        return pytest.skip()
-
     project_id = client.project_id
     other_project_id = f"{project_id}_other"
 
@@ -2029,10 +2025,6 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
 
 def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     """Test querying feedback filtered by queue_id."""
-    if client_is_sqlite(client):
-        # Skip for SQLite - annotation queues not implemented
-        return pytest.skip()
-
     project_id = client.project_id
 
     # Create two queues
@@ -2170,10 +2162,7 @@ def _seed_numeric_feedback(
 
 
 def test_feedback_stats(client: WeaveClient) -> None:
-    """End-to-end: seed feedback, query aggregated stats, verify buckets and window_stats.
-
-    Runs with both SQLite and ClickHouse backends (controlled by --trace-server).
-    """
+    """End-to-end: seed feedback, query aggregated stats, verify buckets and window_stats."""
     project_id = client.project_id
     trigger = f"weave:///{project_id}/object/test-scorer:trig_1"
     scores = [0.5, 0.8, 1.0]
@@ -2265,10 +2254,7 @@ def test_feedback_payload_schema(client: WeaveClient) -> None:
 
 
 def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
-    """Empty metrics list returns empty buckets without error.
-
-    Runs with both SQLite and ClickHouse backends (controlled by --trace-server).
-    """
+    """Empty metrics list returns empty buckets without error."""
     project_id = client.project_id
     now = datetime.datetime.now(datetime.timezone.utc)
     res = client.server.feedback_stats(
@@ -2286,9 +2272,6 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
 
 def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None:
     """Ensure `feedback_query` returns tz-aware `created_at`."""
-    if client_is_sqlite(client):
-        pytest.skip("created_at is a string on sqlite; tz semantics only apply to CH")
-
     project_id = client.project_id
     client.server.feedback_create(
         tsi.FeedbackCreateReq(

@@ -25,6 +25,9 @@ class OpSettings(BaseModel):
     postprocess_output: Callable[[Any], Any] | None = None
     kind: OpKind | None = None
     color: OpColor | None = None
+    # Default attributes applied to every call this op creates. Integrations set
+    # this (via `with_integration_metadata`) to stamp `attributes["integration"]`.
+    attributes: dict[str, Any] | None = None
 
 
 class IntegrationSettings(BaseModel):
