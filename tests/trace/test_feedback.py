@@ -552,6 +552,44 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     assert query_res.result[0]["span_status_code"] == "UNSET"
 
 
+def test_agent_user_feedback(client: WeaveClient) -> None:
+    """A human agent score's value is a tag in scorer_tags (e.g. an emoji
+    glyph), carrying no scorer refs. Non-emoji tags are allowed too.
+    """
+    project_id = client.project_id
+    feedback_type = "wandb.agent_user_feedback"
+    weave_ref = f"weave:///{project_id}/object/agent_turn:turn_id_123"
+
+    create_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type=feedback_type,
+            payload={"emoji": "👍", "scorer_tags": ["👍"]},
+            scorer_tags=["👍"],
+            # Denormalized agent metadata the UI attaches for dashboard filtering.
+            span_agent_name="support-bot",
+            span_agent_version="1.2.0",
+            span_status_code="OK",
+        )
+    )
+    assert create_res.id is not None
+
+    query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(project_id=project_id)
+    )
+    assert len(query_res.result) == 1
+    row = query_res.result[0]
+    assert row["feedback_type"] == feedback_type
+    assert row["scorer_tags"] == ["👍"]
+    assert row["runnable_ref"] is None
+    assert row["trigger_ref"] is None
+    assert row["scorer_ratings"] == {}
+    assert row["span_agent_name"] == "support-bot"
+    assert row["span_agent_version"] == "1.2.0"
+    assert row["span_status_code"] == "OK"
+
+
 def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
     """Filter agent_monitor rows by typed scorer columns.
 
