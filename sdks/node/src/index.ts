@@ -14,7 +14,7 @@ export type {
   Query,
   SortBy,
 } from './generated/traceServerApi';
-export type {GetCallsOptions} from './weaveClient';
+export type {GetCallsOptions, WeaveClient} from './weaveClient';
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
@@ -67,12 +67,6 @@ export {
 } from './media';
 export {op} from './op';
 export type {Op, OpDecorator} from './opType';
-/**
- * @deprecated Create clients via `weave.init()` — direct construction is
- * not part of the supported public API and the runtime export will be
- * removed in a future release.
- */
-export {WeaveClient} from './weaveClient';
 export {WeaveObject, ObjectRef} from './weaveObject';
 export {MessagesPrompt, StringPrompt} from './prompt';
 
