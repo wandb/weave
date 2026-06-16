@@ -1066,13 +1066,13 @@ class TestMakeTraceMessagesQuery:
         expected = """
             SELECT role,
                    any(content) AS content,
-                   min(created_at) AS min_created_at
+                   min(started_at) AS min_started_at
             FROM messages
             WHERE project_id = {genai_0:String}
               AND trace_id = {genai_1:String}
               AND role IN ('assistant', 'system', 'user')
             GROUP BY role, content_digest
-            ORDER BY min_created_at ASC
+            ORDER BY min_started_at ASC
             LIMIT {genai_2:UInt64}
         """
         assert_sql(

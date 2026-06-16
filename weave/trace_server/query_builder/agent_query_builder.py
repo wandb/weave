@@ -1398,7 +1398,8 @@ def make_trace_messages_query(
     """Build SQL selecting a trace's distinct user/assistant/system messages.
 
     Reads the `messages` table, dedups identical content per role via `GROUP BY
-    role, content_digest`, orders by earliest ingest time, and caps at `limit`.
+    role, content_digest`, orders by earliest `started_at` (the table's sort key,
+    so no extra sort), and caps at `limit`.
     """
     pid = pb.add(project_id, param_type="String")
     tid = pb.add(trace_id, param_type="String")
@@ -1407,13 +1408,13 @@ def make_trace_messages_query(
     return f"""
         SELECT role,
                any(content) AS content,
-               min(created_at) AS min_created_at
+               min(started_at) AS min_started_at
         FROM messages
         WHERE {_project_filter_sql("project_id", pid)}
           AND trace_id = {tid}
           AND role IN ({role_list})
         GROUP BY role, content_digest
-        ORDER BY min_created_at ASC
+        ORDER BY min_started_at ASC
         LIMIT {limit_slot}
     """
 
