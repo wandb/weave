@@ -2,6 +2,7 @@ import {weaveImage} from '../media';
 import {op} from '../op';
 import {type OpOptions} from '../opType';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {asAttributes, libraryIntegration} from './integrationMetadata';
 import {getGlobalClient} from '../clientApi';
 import {InternalCall} from '../call';
 import {type WeaveClient} from '../weaveClient';
@@ -11,6 +12,9 @@ import {
   isInOpenAIAgentsContext,
 } from './openai-agents/weave-tracing-processor';
 import {shouldUseOtelV2} from '../settings';
+
+// Integration provenance stamped onto every call this integration produces.
+const OPENAI_INTEGRATION = libraryIntegration('openai');
 
 /**
  * Wraps a function to run with OpenAI Agents call stack if available.
@@ -177,6 +181,7 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
   const options: OpOptions<typeof wrapped> = {
     name: 'openai.images.generate',
     opKind: 'llm',
+    attributes: asAttributes(OPENAI_INTEGRATION),
     summarize: result => ({
       usage: {
         'dall-e': {
@@ -565,7 +570,7 @@ function traceOpenAICall(args: {
     parentCall,
     startTime,
     undefined,
-    {kind: 'llm'}
+    {kind: 'llm', ...asAttributes(OPENAI_INTEGRATION)}
   );
 
   const traced = apiPromise._thenUnwrap((value: any) => {

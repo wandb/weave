@@ -75,7 +75,6 @@ def _run_tracer_lifecycle(
     return list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
 
 
-@pytest.mark.skip_clickhouse_client
 def test_tracer_traces_call_when_kwargs_contain_pydantic_model_class(
     client: WeaveClient,
 ) -> None:
@@ -108,7 +107,6 @@ def test_tracer_traces_call_when_kwargs_contain_pydantic_model_class(
     assert "name" in response_format["properties"]
 
 
-@pytest.mark.skip_clickhouse_client
 def test_tracer_traces_call_when_kwargs_contain_arbitrary_non_serializable_objects(
     client: WeaveClient,
 ) -> None:

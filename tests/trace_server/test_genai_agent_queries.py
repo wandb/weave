@@ -1,6 +1,6 @@
 """Integration tests for GenAI agent tables and query layer.
 
-Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
+Runs against the ClickHouse backend (the only supported backend).
 Migration 030 creates the genai tables automatically.
 """
 

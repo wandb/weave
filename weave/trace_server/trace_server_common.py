@@ -477,9 +477,8 @@ def apply_tags_and_synth_latest_in_place(
     new digest. Skip synthesizing 'latest' on any digest whose object_id
     already has an explicit 'latest' alias in the just-fetched map.
 
-    Shared between ClickHouse and SQLite trace servers, both of which
-    return identically-shaped tags_map / aliases_map keyed by
-    (object_id, digest).
+    Operates on the tags_map / aliases_map keyed by (object_id, digest)
+    returned by the ClickHouse trace server.
     """
     object_ids_with_alias_latest = {
         oid for (oid, _), aliases in aliases_map.items() if "latest" in aliases

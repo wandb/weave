@@ -2,17 +2,13 @@ import datetime
 
 import pytest
 
-from tests.trace_server.query_builder.utils import (
-    assert_clickhouse_sql,
-    assert_sqlite_sql,
-)
+from tests.trace_server.query_builder.utils import assert_clickhouse_sql
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.threads_query_builder import (
     _validate_and_map_sort_field,
     make_threads_query,
-    make_threads_query_sqlite,
 )
 
 # Basic Functionality Tests
@@ -65,42 +61,6 @@ def test_clickhouse_basic_query(read_table: ReadTable, expected_table: str):
     )
 
 
-def test_sqlite_basic_query():
-    """Test basic SQLite query with turn-only filtering."""
-    assert_sqlite_sql(
-        """
-            SELECT
-                thread_id,
-                COUNT(*) AS turn_count,
-                MIN(started_at) AS start_time,
-                MAX(ended_at) AS last_updated,
-                (SELECT id FROM calls c2
-                 WHERE c2.thread_id = c1.thread_id
-                 AND c2.project_id = c1.project_id
-                 AND c2.id = c2.turn_id
-                 ORDER BY c2.started_at ASC
-                 LIMIT 1) AS first_turn_id,
-                (SELECT id FROM calls c2
-                 WHERE c2.thread_id = c1.thread_id
-                 AND c2.project_id = c1.project_id
-                 AND c2.id = c2.turn_id
-                 ORDER BY c2.ended_at DESC
-                 LIMIT 1) AS last_turn_id,
-                -1 AS p50_turn_duration_ms,
-                -1 AS p99_turn_duration_ms
-            FROM calls c1
-            WHERE project_id = ?
-                AND id = turn_id
-                AND thread_id IS NOT NULL
-                AND thread_id != ''
-            GROUP BY thread_id
-            ORDER BY last_updated DESC
-            """,
-        ["test_project"],
-        project_id="test_project",
-    )
-
-
 # Sorting Tests
 
 
@@ -143,48 +103,6 @@ def test_clickhouse_custom_sorting():
         ORDER BY turn_count ASC, start_time DESC
         """,
         {"pb_0": "test_project"},
-        project_id="test_project",
-        sort_by=sort_by,
-    )
-
-
-def test_sqlite_custom_sorting():
-    """Test SQLite query with custom sorting."""
-    sort_by = [
-        SortBy(field="thread_id", direction="asc"),
-        SortBy(field="turn_count", direction="desc"),
-    ]
-
-    assert_sqlite_sql(
-        """
-        SELECT
-            thread_id,
-            COUNT(*) AS turn_count,
-            MIN(started_at) AS start_time,
-            MAX(ended_at) AS last_updated,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.started_at ASC
-             LIMIT 1) AS first_turn_id,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.ended_at DESC
-             LIMIT 1) AS last_turn_id,
-            -1 AS p50_turn_duration_ms,
-            -1 AS p99_turn_duration_ms
-        FROM calls c1
-        WHERE project_id = ?
-            AND id = turn_id
-            AND thread_id IS NOT NULL
-            AND thread_id != ''
-        GROUP BY thread_id
-        ORDER BY thread_id ASC, turn_count DESC
-        """,
-        ["test_project"],
         project_id="test_project",
         sort_by=sort_by,
     )
@@ -275,46 +193,6 @@ def test_clickhouse_with_limit_and_offset():
     )
 
 
-def test_sqlite_with_limit_and_offset():
-    """Test SQLite query with limit and offset."""
-    assert_sqlite_sql(
-        """
-        SELECT
-            thread_id,
-            COUNT(*) AS turn_count,
-            MIN(started_at) AS start_time,
-            MAX(ended_at) AS last_updated,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.started_at ASC
-             LIMIT 1) AS first_turn_id,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.ended_at DESC
-             LIMIT 1) AS last_turn_id,
-            -1 AS p50_turn_duration_ms,
-            -1 AS p99_turn_duration_ms
-        FROM calls c1
-        WHERE project_id = ?
-            AND id = turn_id
-            AND thread_id IS NOT NULL
-            AND thread_id != ''
-        GROUP BY thread_id
-        ORDER BY last_updated DESC
-        LIMIT ?
-        OFFSET ?
-        """,
-        ["test_project", 10, 20],
-        project_id="test_project",
-        limit=10,
-        offset=20,
-    )
-
-
 # Date Filtering Tests
 
 
@@ -359,48 +237,6 @@ def test_clickhouse_with_date_filters():
             "pb_1": "2024-01-01 12:00:00.000000",
             "pb_2": "2024-12-31 23:59:59.000000",
         },
-        project_id="test_project",
-        sortable_datetime_after=after_date,
-        sortable_datetime_before=before_date,
-    )
-
-
-def test_sqlite_with_date_filters():
-    """Test SQLite query with started_at filters."""
-    after_date = datetime.datetime(2024, 6, 15, 10, 30, 0)
-    before_date = datetime.datetime(2024, 6, 15, 18, 0, 0)
-
-    assert_sqlite_sql(
-        """
-        SELECT
-            thread_id,
-            COUNT(*) AS turn_count,
-            MIN(started_at) AS start_time,
-            MAX(ended_at) AS last_updated,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.started_at ASC
-             LIMIT 1) AS first_turn_id,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.ended_at DESC
-             LIMIT 1) AS last_turn_id,
-            -1 AS p50_turn_duration_ms,
-            -1 AS p99_turn_duration_ms
-        FROM calls c1
-        WHERE project_id = ?
-            AND id = turn_id
-            AND started_at > ? AND started_at < ?
-            AND thread_id IS NOT NULL
-            AND thread_id != ''
-        GROUP BY thread_id
-        ORDER BY last_updated DESC
-        """,
-        ["test_project", "2024-06-15T10:30:00", "2024-06-15T18:00:00"],
         project_id="test_project",
         sortable_datetime_after=after_date,
         sortable_datetime_before=before_date,
@@ -465,53 +301,6 @@ def test_clickhouse_full_featured_query():
     )
 
 
-def test_sqlite_full_featured_query():
-    """Test SQLite query with all features: custom sorting, pagination, and date filtering."""
-    after_date = datetime.datetime(2024, 3, 15)
-    sort_by = [
-        SortBy(field="last_updated", direction="asc"),
-        SortBy(field="thread_id", direction="desc"),
-    ]
-
-    assert_sqlite_sql(
-        """
-        SELECT
-            thread_id,
-            COUNT(*) AS turn_count,
-            MIN(started_at) AS start_time,
-            MAX(ended_at) AS last_updated,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.started_at ASC
-             LIMIT 1) AS first_turn_id,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.ended_at DESC
-             LIMIT 1) AS last_turn_id,
-            -1 AS p50_turn_duration_ms,
-            -1 AS p99_turn_duration_ms
-        FROM calls c1
-        WHERE project_id = ?
-            AND id = turn_id
-            AND started_at > ?
-            AND thread_id IS NOT NULL
-            AND thread_id != ''
-        GROUP BY thread_id
-        ORDER BY last_updated ASC, thread_id DESC
-        LIMIT ?
-        """,
-        ["test_project", "2024-03-15T00:00:00", 5],
-        project_id="test_project",
-        sortable_datetime_after=after_date,
-        sort_by=sort_by,
-        limit=5,
-    )
-
-
 # Edge Cases
 
 
@@ -553,46 +342,6 @@ def test_clickhouse_only_after_date():
         {"pb_0": "test_project", "pb_1": "2024-01-01 00:00:00.000000"},
         project_id="test_project",
         sortable_datetime_after=after_date,
-    )
-
-
-def test_sqlite_only_before_date():
-    """Test SQLite query with only before date filter."""
-    before_date = datetime.datetime(2024, 12, 31, 23, 59, 59)
-
-    assert_sqlite_sql(
-        """
-        SELECT
-            thread_id,
-            COUNT(*) AS turn_count,
-            MIN(started_at) AS start_time,
-            MAX(ended_at) AS last_updated,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.started_at ASC
-             LIMIT 1) AS first_turn_id,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.ended_at DESC
-             LIMIT 1) AS last_turn_id,
-            -1 AS p50_turn_duration_ms,
-            -1 AS p99_turn_duration_ms
-        FROM calls c1
-        WHERE project_id = ?
-            AND id = turn_id
-            AND started_at < ?
-            AND thread_id IS NOT NULL
-            AND thread_id != ''
-        GROUP BY thread_id
-        ORDER BY last_updated DESC
-        """,
-        ["test_project", "2024-12-31T23:59:59"],
-        project_id="test_project",
-        sortable_datetime_before=before_date,
     )
 
 
@@ -641,7 +390,9 @@ def test_sort_field_validation_in_query():
     """Test that invalid sort fields raise errors in query generation."""
     invalid_sort = [SortBy(field="nonexistent_field", direction="asc")]
     with pytest.raises(ValueError, match="Unsupported sort field"):
-        make_threads_query_sqlite(project_id="test_project", sort_by=invalid_sort)
+        make_threads_query(
+            project_id="test_project", pb=ParamBuilder("pb"), sort_by=invalid_sort
+        )
 
 
 # Turn-ID Filtering Behavior Tests
@@ -654,31 +405,23 @@ def test_turn_filtering_explanation():
     implementation details. It shows that the filtering `id = turn_id` ensures
     only turn calls are included in thread statistics, not their descendants.
     """
-    # The key filtering conditions in both implementations:
-    # ClickHouse: "id = any(turn_id)" in HAVING clause
-    # SQLite: "id = turn_id" in WHERE clause
+    # The key filtering condition: "id = any(turn_id)" in the HAVING clause.
 
     # This means:
     # ✅ Turn calls (where call.id == call.turn_id) are included
     # ❌ Descendant calls (where call.id != call.turn_id) are excluded
-
-    # Verify this is present in both query builders
     pb = ParamBuilder("pb")
     clickhouse_query = make_threads_query(project_id="test", pb=pb)
-    sqlite_query, _ = make_threads_query_sqlite(project_id="test")
 
     # Check that turn filtering is present
     assert "id = any(turn_id)" in clickhouse_query
-    assert "id = turn_id" in sqlite_query
 
-    # Check that thread filtering is also present (non-null, non-empty)
-    # For ClickHouse, filtering is now in the HAVING clause using aggregated_thread_id
+    # Check that thread filtering is also present (non-null, non-empty),
+    # in the HAVING clause using aggregated_thread_id
     assert (
         "aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
         in clickhouse_query
     )
-    assert "thread_id IS NOT NULL" in sqlite_query
-    assert "thread_id != ''" in sqlite_query
 
 
 # Thread ID Filtering Tests
@@ -720,42 +463,6 @@ def test_clickhouse_with_thread_id_filter():
         {"pb_0": "test_project", "pb_1": "my_specific_thread"},
         project_id="test_project",
         thread_ids=["my_specific_thread"],
-    )
-
-
-def test_sqlite_with_thread_id_filter():
-    """Test SQLite query with thread_id filter."""
-    assert_sqlite_sql(
-        """
-        SELECT
-            thread_id,
-            COUNT(*) AS turn_count,
-            MIN(started_at) AS start_time,
-            MAX(ended_at) AS last_updated,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.started_at ASC
-             LIMIT 1) AS first_turn_id,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.ended_at DESC
-             LIMIT 1) AS last_turn_id,
-            -1 AS p50_turn_duration_ms,
-            -1 AS p99_turn_duration_ms
-        FROM calls c1
-        WHERE project_id = ?
-            AND id = turn_id
-            AND thread_id IN (?)
-        GROUP BY thread_id
-        ORDER BY last_updated DESC
-        """,
-        ["test_project", "another_thread_id"],
-        project_id="test_project",
-        thread_ids=["another_thread_id"],
     )
 
 
@@ -806,53 +513,6 @@ def test_clickhouse_with_thread_id_and_date_filters():
         sortable_datetime_after=after_date,
         sortable_datetime_before=before_date,
         thread_ids=["thread_with_dates"],
-    )
-
-
-def test_sqlite_with_thread_id_and_date_filters():
-    """Test SQLite query with both thread_id and date filters."""
-    after_date = datetime.datetime(2024, 6, 15, 10, 30, 0)
-    before_date = datetime.datetime(2024, 6, 15, 18, 0, 0)
-
-    assert_sqlite_sql(
-        """
-        SELECT
-            thread_id,
-            COUNT(*) AS turn_count,
-            MIN(started_at) AS start_time,
-            MAX(ended_at) AS last_updated,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.started_at ASC
-             LIMIT 1) AS first_turn_id,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.ended_at DESC
-             LIMIT 1) AS last_turn_id,
-            -1 AS p50_turn_duration_ms,
-            -1 AS p99_turn_duration_ms
-        FROM calls c1
-        WHERE project_id = ?
-            AND id = turn_id
-            AND started_at > ? AND started_at < ?
-            AND thread_id IN (?)
-        GROUP BY thread_id
-        ORDER BY last_updated DESC
-        """,
-        [
-            "test_project",
-            "2024-06-15T10:30:00",
-            "2024-06-15T18:00:00",
-            "specific_thread",
-        ],
-        project_id="test_project",
-        sortable_datetime_after=after_date,
-        sortable_datetime_before=before_date,
-        thread_ids=["specific_thread"],
     )
 
 
@@ -914,53 +574,6 @@ def test_clickhouse_with_thread_id_and_all_options():
     )
 
 
-def test_sqlite_with_thread_id_and_all_options():
-    """Test SQLite query with thread_id, dates, sorting, and pagination."""
-    after_date = datetime.datetime(2024, 3, 15)
-    sort_by = [
-        SortBy(field="last_updated", direction="asc"),
-        SortBy(field="thread_id", direction="desc"),
-    ]
-
-    assert_sqlite_sql(
-        """
-        SELECT
-            thread_id,
-            COUNT(*) AS turn_count,
-            MIN(started_at) AS start_time,
-            MAX(ended_at) AS last_updated,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.started_at ASC
-             LIMIT 1) AS first_turn_id,
-            (SELECT id FROM calls c2
-             WHERE c2.thread_id = c1.thread_id
-             AND c2.project_id = c1.project_id
-             AND c2.id = c2.turn_id
-             ORDER BY c2.ended_at DESC
-             LIMIT 1) AS last_turn_id,
-            -1 AS p50_turn_duration_ms,
-            -1 AS p99_turn_duration_ms
-        FROM calls c1
-        WHERE project_id = ?
-            AND id = turn_id
-            AND started_at > ?
-            AND thread_id IN (?)
-        GROUP BY thread_id
-        ORDER BY last_updated ASC, thread_id DESC
-        LIMIT ?
-        """,
-        ["test_project", "2024-03-15T00:00:00", "comprehensive_thread", 5],
-        project_id="test_project",
-        sortable_datetime_after=after_date,
-        sort_by=sort_by,
-        limit=5,
-        thread_ids=["comprehensive_thread"],
-    )
-
-
 def test_thread_id_filter_no_match():
     """Test that thread_id filter doesn't break query even if no threads match."""
     # This test verifies that the SQL generation doesn't break with thread_id filter
@@ -976,28 +589,6 @@ def test_thread_id_filter_no_match():
     params = pb.get_params()
     assert "pb_1" in params
     assert params["pb_1"] == "nonexistent_thread"
-
-
-def test_thread_id_filter_consistency():
-    """Test that both ClickHouse and SQLite handle thread_id filtering consistently."""
-    pb = ParamBuilder("pb")
-
-    # Generate both queries with same parameters
-    clickhouse_query = make_threads_query(
-        project_id="test_project", pb=pb, thread_ids=["consistency_test"]
-    )
-    sqlite_query, sqlite_params = make_threads_query_sqlite(
-        project_id="test_project", thread_ids=["consistency_test"]
-    )
-
-    # Both should filter by thread_ids
-    assert "thread_id IN ({pb_1: String})" in clickhouse_query  # ClickHouse style
-    assert "AND thread_id IN (?)" in sqlite_query  # SQLite style
-
-    # Parameters should be consistent
-    ch_params = pb.get_params()
-    assert ch_params["pb_1"] == "consistency_test"
-    assert "consistency_test" in sqlite_params
 
 
 def test_query_structure_documentation():

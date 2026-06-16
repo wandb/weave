@@ -226,9 +226,7 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
         )
     )
 
-    prepared_query = select_query.prepare(
-        database_type="clickhouse", param_builder=param_builder
-    )
+    prepared_query = select_query.prepare(param_builder=param_builder)
     return prepared_query
 
 
@@ -360,9 +358,7 @@ def get_ranked_prices(
         )
     )
 
-    prepared_query = select_query.prepare(
-        database_type="clickhouse", param_builder=param_builder
-    )
+    prepared_query = select_query.prepare(param_builder=param_builder)
     return prepared_query
 
 

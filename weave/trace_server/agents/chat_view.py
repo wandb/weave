@@ -151,12 +151,18 @@ def build_trace_chat(
     messages = build_chat_messages(spans)
 
     root_span_name: str | None = None
+    root_agent_name: str | None = None
+    root_agent_version: str | None = None
+    root_status_code: str | None = None
     provider: str | None = None
     total_duration_ms: int | None = None
 
     if spans:
         root = _select_root_span(spans)
         root_span_name = root.agent_name or root.span_name
+        root_agent_name = root.agent_name
+        root_agent_version = root.agent_version
+        root_status_code = root.status_code
         provider = root.provider_name
         # `total_duration_ms` == root span wall-clock duration
         # (`root.ended_at - root.started_at`). Under OTel convention the
@@ -168,6 +174,9 @@ def build_trace_chat(
     return AgentTraceChatRes(
         trace_id=trace_id,
         root_span_name=root_span_name,
+        agent_name=root_agent_name,
+        agent_version=root_agent_version,
+        status_code=root_status_code,
         provider=provider,
         total_duration_ms=total_duration_ms,
         messages=messages,
@@ -245,6 +254,8 @@ class ChatTraversal:
                     type="agent_start",
                     span_id=span.span_id,
                     agent_name=agent_start_label,
+                    agent_version=span.agent_version,
+                    status_code=span.status_code,
                     started_at=span.started_at,
                     agent_start=AgentChatAgentStart(
                         model=span.request_model,
@@ -266,6 +277,8 @@ class ChatTraversal:
                     type="context_compacted",
                     span_id=span.span_id,
                     agent_name=subtree_agent,
+                    agent_version=span.agent_version,
+                    status_code=span.status_code,
                     started_at=span.started_at,
                     context_compacted=AgentChatContextCompacted(
                         compaction_summary=span.compaction_summary,
@@ -297,6 +310,8 @@ class ChatTraversal:
                 type="tool_call",
                 span_id=span.span_id,
                 agent_name=agent_name,
+                agent_version=span.agent_version,
+                status_code=span.status_code,
                 started_at=span.started_at,
                 tool_call=AgentChatToolCall(
                     tool_name=tool_name,
@@ -673,6 +688,8 @@ def _emit_assistant_message(
         type="assistant_message",
         span_id=span.span_id,
         agent_name=agent_name,
+        agent_version=span.agent_version,
+        status_code=span.status_code,
         started_at=span.started_at,
         assistant_message=AgentChatAssistantMessage(
             model=span.response_model or span.request_model,

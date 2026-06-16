@@ -6,11 +6,16 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import Patcher
 from weave.trace.call import Call
 from weave.trace.context import weave_client_context
 from weave.trace.util import log_once
 from weave.trace.weave_client import WeaveClient
+
+LLAMAINDEX_INTEGRATION = library_integration(
+    "llamaindex", distribution_name="llama-index-core"
+)
 
 _import_failed = False
 
@@ -274,7 +279,9 @@ if not _import_failed:
             try:
                 # Determine kind based on operation name
                 kind = _get_kind_for_span(op_name)
-                span_attributes = {"weave": {"kind": kind}} if kind else None
+                span_attributes = LLAMAINDEX_INTEGRATION.as_attributes()
+                if kind:
+                    span_attributes["weave"] = {"kind": kind}
 
                 call = gc.create_call(
                     op_name, inputs, parent_call, attributes=span_attributes
@@ -410,7 +417,9 @@ if not _import_failed:
 
             # Determine kind based on event name
             kind = _get_kind_for_event(base_event_name)
-            event_attributes = {"weave": {"kind": kind}} if kind else None
+            event_attributes = LLAMAINDEX_INTEGRATION.as_attributes()
+            if kind:
+                event_attributes["weave"] = {"kind": kind}
 
             try:
                 if is_start_event:

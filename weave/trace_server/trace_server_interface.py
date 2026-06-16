@@ -222,6 +222,13 @@ class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
 
+    # Trace ID. Optional for backward compatibility: older clients omit it and
+    # the server derives it from the matching call-start. Carried here so a
+    # server-side ingest sampler can make a consistent keep/drop decision on the
+    # call-end message too. One field covers /call/end, the end-parts of
+    # /call/upsert_batch, and v2 call/end (via EndedCallSchemaForInsertWithStartedAt).
+    trace_id: str | None = None
+
     # End time is required
     ended_at: datetime.datetime
 

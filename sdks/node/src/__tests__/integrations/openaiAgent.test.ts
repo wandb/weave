@@ -29,10 +29,10 @@ import * as weave from '../..';
 import {clearWeaveTracerProvider} from '../../genai/provider';
 import {Settings} from '../../settings';
 import {initWithCustomTraceServer} from '../clientMock';
-import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
-import {agentsInstrumentedHolder} from 'weave/integrations/openai.agent';
 import {wrapOpenAIChatCompletionsCreate} from '../../integrations/openai';
 import {makeAPIPromiseShim} from '../openaiMock';
+import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
+import state from 'weave/state';
 
 describe('OpenAI Agents Integration', () => {
   withOpenAITracingEnabled();
@@ -45,7 +45,7 @@ describe('OpenAI Agents Integration', () => {
     initWithCustomTraceServer(testProjectName, inMemoryTraceServer);
 
     setTraceProcessors([]);
-    agentsInstrumentedHolder.value = false;
+    state.integrations.openaiAgents.instrumented = false;
     await weave.instrumentOpenAIAgents();
   });
 
@@ -209,6 +209,16 @@ describe('OpenAI Agents Integration', () => {
       }
     `);
 
+    // Integration-tracking metadata is stamped on calls this processor
+    // produces. The trace also contains nested OpenAI SDK calls with their
+    // own integration block, so match by name rather than by index.
+    const stamped = calls.map(c => c.attributes?.integration).filter(Boolean);
+    const mine = stamped.filter(i => i.name === 'openai_agents');
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.every(i => i.meta?.package_name === '@openai/agents')).toBe(
+      true
+    );
+
     // openai_agent_trace
     // ├── openai_agent_agent
     //     └── openai_agent_function
@@ -241,7 +251,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     clearWeaveTracerProvider();
     setTraceProcessors([]);
-    agentsInstrumentedHolder.value = false;
+    state.integrations.openaiAgents.instrumented = false;
     await weave.instrumentOpenAIAgents();
   });
 

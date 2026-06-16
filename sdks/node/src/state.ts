@@ -1,7 +1,10 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
+import type OpenAIAgents from '@openai/agents';
 import {BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
 import {globalSingleton} from './utils/globalSingleton';
 import {GenAIState} from './genai/context';
+import {WeaveClient} from './weaveClient';
+import {TracerProvider} from '@opentelemetry/api';
 
 /**
  * Holds all SDK-wide mutable state.
@@ -15,6 +18,9 @@ import {GenAIState} from './genai/context';
  * See: https://github.com/wandb/weave/pull/6682
  */
 type State = {
+  client: WeaveClient | null;
+  domain: string | null;
+
   genAi: {
     provider: BasicTracerProvider | null;
 
@@ -44,15 +50,68 @@ type State = {
      */
     defaultState: GenAIState;
   };
+
+  integrations: {
+    openaiAgents: {
+      instrumented: boolean;
+
+      /**
+       * Hooks into the `@openai/agents` SDK that the `openai` integration uses
+       * without adding a direct depenency on the library.
+       */
+      contextProvider: {
+        getCurrentTrace?: () => OpenAIAgents.Trace | null;
+        getCurrentSpan?: () => OpenAIAgents.Span<any> | null;
+      };
+
+      /**
+       * Global map to store Weave call data for OpenAI Agent spans/traces
+       * This allows the OpenAI SDK integration to look up parent call information
+       * Uses globalThis + Symbol.for to ensure a single shared Map instance across
+       * CJS and ESM module boundaries (the module can be loaded twice by different loaders).
+       */
+      callData: Map<string, {weaveCallId: string; weaveTraceId: string}>;
+    };
+
+    openaiAgentsRealtime: {
+      patched: boolean;
+    };
+  };
+
+  evalLink: {
+    registeredProviders: WeakSet<TracerProvider>;
+  };
 };
 
 function defaultState(): State {
   return {
+    client: null,
+    domain: null,
+
     genAi: {
       provider: null,
       providerRegistered: false,
       state: new AsyncLocalStorage<GenAIState>(),
       defaultState: {session: null, turn: null, llm: null},
+    },
+
+    evalLink: {
+      registeredProviders: new WeakSet(),
+    },
+
+    integrations: {
+      openaiAgents: {
+        instrumented: false,
+        contextProvider: {
+          getCurrentTrace: undefined,
+          getCurrentSpan: undefined,
+        },
+        callData: new Map(),
+      },
+
+      openaiAgentsRealtime: {
+        patched: false,
+      },
     },
   };
 }

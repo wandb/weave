@@ -1,15 +1,9 @@
-import {
-  type Context,
-  type Span,
-  SpanKind,
-  SpanStatusCode,
-  trace,
-} from '@opentelemetry/api';
+import {type Context, type Span, SpanKind, trace} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {_getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
-import {SpanBase} from './spanBase';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
@@ -28,7 +22,7 @@ import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
 import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
 
-export interface LLMInit {
+export interface LLMInit extends SpanInitBase {
   model: string;
   providerName?: string;
 }
@@ -120,7 +114,7 @@ export class LLM extends SpanBase {
     }
     const span = tracer.startSpan(
       'chat',
-      {kind: SpanKind.CLIENT, attributes},
+      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       opts.parentContext
     );
     const llm = new LLM(
@@ -240,11 +234,8 @@ export class LLM extends SpanBase {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
-  /**
-   * Flush accumulated state to the span and close it. Idempotent. Pass
-   * `error` to mark the span as failed.
-   */
-  end(opts?: {error?: Error}): void {
+  /** Flush accumulated state and close the span. Idempotent. Pass `error` to mark failed; pass `endTime` to backdate the close. */
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
@@ -297,14 +288,7 @@ export class LLM extends SpanBase {
       );
     }
 
-    if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
-    }
-    this.span.end();
+    this._closeSpan(opts);
     const state = _getGenaiState();
     if (state.llm === this) {
       state.llm = null;
