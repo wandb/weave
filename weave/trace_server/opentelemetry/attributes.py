@@ -24,6 +24,12 @@ class SpanEvent(dict):
     dropped_attributes_count: int
 
 
+def _has_attribute_value(value: Any) -> bool:
+    if isinstance(value, bool):
+        return True
+    return bool(value)
+
+
 def parse_weave_values(
     attributes: dict[str, Any],
     key_mapping: list[str]
@@ -42,7 +48,7 @@ def parse_weave_values(
             else:
                 attribute_key = attribute_key_or_tuple
             value = get_attribute(attributes, attribute_key)
-            if value:
+            if _has_attribute_value(value):
                 # Handler should never raise - Always use a try in handler and default to passed in value
                 if handler:
                     value = handler(value)
@@ -62,7 +68,7 @@ def parse_weave_values(
                 attribute_key = attribute_key_or_tuple
 
             value = get_attribute(attributes, attribute_key)
-            if value:
+            if _has_attribute_value(value):
                 if handler:
                     # Handler should never raise - Always use a try in handler and default to passed in value
                     value = handler(value)

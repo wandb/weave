@@ -173,9 +173,10 @@ WB_KEYS = {
     "wb_run_step": ["wandb.wb_run_step"],
     "wb_run_step_end": ["wandb.wb_run_step_end"],
     "is_turn": [
+        # Explicit Weave metadata can opt out of semconv turn inference.
+        "wandb.is_turn",
         "gen_ai.conversation.id",  # OpenTelemetry GenAI semconv - presence implies a turn
         "gcp.vertex.agent.session_id",
-        "wandb.is_turn",
     ],  # We just check if this is truthy so we can reuse the id
 }
 

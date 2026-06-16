@@ -20,6 +20,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
@@ -607,6 +608,26 @@ class TestPythonSpans:
         # is_turn is truthy via conversation.id, so turn_id should be set
         assert start_call.turn_id == py_span.span_id
 
+    def test_span_to_call_wandb_is_turn_false_overrides_conversation_id(self):
+        """Test that explicit wandb.is_turn=False disables turn inference."""
+        pb_span = create_test_span()
+
+        kv_conv = KeyValue()
+        kv_conv.key = "gen_ai.conversation.id"
+        kv_conv.value.string_value = "conv-xyz"
+        pb_span.attributes.append(kv_conv)
+
+        kv_is_turn = KeyValue()
+        kv_is_turn.key = "wandb.is_turn"
+        kv_is_turn.value.bool_value = False
+        pb_span.attributes.append(kv_is_turn)
+
+        py_span = PySpan.from_proto(pb_span)
+        start_call, _ = py_span.to_call("test_project")
+
+        assert start_call.thread_id == "conv-xyz"
+        assert start_call.turn_id is None
+
     def test_traces_data_from_proto(self):
         """Test converting protobuf TracesData to Python TracesData."""
         export_req = create_test_export_request()
@@ -1061,7 +1082,7 @@ class TestSemanticConventionParsing:
             }
         )
         extracted_false = get_wandb_attributes(attributes_false)
-        assert "is_turn" not in extracted_false.keys()
+        assert extracted_false["is_turn"] is False
         assert extracted_false["thread_id"] == test_thread_id
 
         # Test with only thread_id
@@ -1493,6 +1514,19 @@ class TestSemanticConventionParsing:
         extracted = get_wandb_attributes(attributes)
         assert extracted["thread_id"] == "conv-from-semconv"
 
+    def test_genai_semconv_conversation_id_turn_can_be_disabled(self):
+        """Test that wandb.is_turn=False overrides conversation turn inference."""
+        attributes = create_attributes(
+            {
+                "gen_ai.conversation.id": "conv-from-semconv",
+                "wandb.is_turn": False,
+            }
+        )
+        extracted = get_wandb_attributes(attributes)
+        assert extracted["thread_id"] == "conv-from-semconv"
+        assert extracted["is_turn"] is False
+
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
         """Test that costs are properly calculated for OTEL spans with usage at query time."""
         project_id = client.project_id
