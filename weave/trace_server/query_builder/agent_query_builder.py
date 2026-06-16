@@ -1421,9 +1421,6 @@ def make_spans_existence_query(
     ``trace_id IN (...)`` and ``span_id IN (...)`` supersets (both bloom-indexed)
     and let the caller match exact pairs — the candidate set is bounded by the
     request size.
-
-    Owned here (agent_query_builder) because the spans table belongs to the
-    agents module; provenance callers must not hand-roll SQL against it.
     """
     pid = pb.add(project_id, param_type="String")
     trace_ids = sorted({tid for tid, _ in span_keys})

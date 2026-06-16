@@ -100,9 +100,6 @@ _ARGMAX_PAYLOAD_COLUMNS = [
     "deleted_at",
 ]
 
-# Nullable columns need tuple-wrapped argMax — see _argmax_select docstring.
-_NULLABLE_PAYLOAD_COLUMNS = {"added_by", "deleted_at"}
-
 
 def _argmax_select(columns: list[str]) -> str:
     """Build ``argMax(ds.col, (ds.updated_at, ds.id)) AS col`` per payload column.
@@ -119,24 +116,15 @@ def _argmax_select(columns: list[str]) -> str:
     with ILLEGAL_AGGREGATION. Qualified references always resolve to the
     table column, never the alias.
 
-    Nullable columns (``deleted_at``, ``added_by``) are tuple-wrapped:
-    ClickHouse aggregate functions SKIP NULL values of the aggregated
-    expression, so a bare ``argMax(deleted_at, ...)`` would return the
-    latest NON-NULL deleted_at — i.e. a restored (un-deleted) link would
-    read as deleted forever, because its tombstone version's timestamp
-    out-survives the restore version's NULL. Tuples are never NULL, so
-    ``argMax(tuple(col), ...).1`` faithfully returns the latest version's
-    value, NULL included.
+    All payload columns are non-nullable: added_by and deleted_at use sentinels
+    ('' and the 1970 epoch), not Nullable, so a plain ``argMax(col, ...)`` is
+    correct — there are no NULLs for the aggregate to skip, and the latest
+    version's value (sentinel included) always wins.
     """
     parts = []
     for col in columns:
         if col == "id":
             parts.append("argMax(ds.id, ds.updated_at) AS id")
-        elif col in _NULLABLE_PAYLOAD_COLUMNS:
-            parts.append(
-                f"tupleElement(argMax(tuple(ds.{col}), (ds.updated_at, ds.id)), 1)"
-                f" AS {col}"
-            )
         else:
             parts.append(f"argMax(ds.{col}, (ds.updated_at, ds.id)) AS {col}")
     return ",\n            ".join(parts)
@@ -256,7 +244,7 @@ def make_dataset_sources_select(
     and source_kind IN narrowing. Collapses versions via GROUP BY logical key +
     argMax. ``include_deleted=False`` filters the COLLAPSED deleted_at via HAVING
     (must run AFTER the argMax so a tombstone version actually hides the link —
-    a pre-collapse WHERE deleted_at IS NULL would wrongly resurface a link that
+    a pre-collapse WHERE on the sentinel would wrongly resurface a link that
     has a live earlier version and a later tombstone).
     """
     project_param = pb.add(project_id, param_type="String")
@@ -278,8 +266,9 @@ def make_dataset_sources_select(
     payload = _argmax_select(_ARGMAX_PAYLOAD_COLUMNS)
 
     # HAVING intentionally references the collapsed alias (the argMax output),
-    # not the raw column — a tombstone latest-version must hide the link.
-    having_sql = "" if include_deleted else "HAVING deleted_at IS NULL"
+    # not the raw column — a tombstone latest-version must hide the link. The
+    # 1970-epoch sentinel means "live"; a tombstone has a real deletion time.
+    having_sql = "" if include_deleted else "HAVING deleted_at = toDateTime64(0, 3)"
 
     query = f"""
         SELECT
@@ -352,7 +341,7 @@ def make_source_datasets_select(
 
     group_by_inner = ", ".join(f"ds.{c}" for c in _LOGICAL_KEY_COLUMNS)
     # HAVING intentionally references the collapsed alias (argMax output).
-    inner_having = "" if include_deleted else "HAVING deleted_at IS NULL"
+    inner_having = "" if include_deleted else "HAVING deleted_at = toDateTime64(0, 3)"
 
     # groupArray(N) requires N as a parametric literal (not a query-bound
     # parameter). row_digests_cap is a server-controlled constant
@@ -380,9 +369,7 @@ def make_source_datasets_select(
                 ds.source_id,
                 ds.source_trace_id,
                 argMax(ds.created_at, (ds.updated_at, ds.id)) AS created_at,
-                tupleElement(
-                    argMax(tuple(ds.deleted_at), (ds.updated_at, ds.id)), 1
-                ) AS deleted_at
+                argMax(ds.deleted_at, (ds.updated_at, ds.id)) AS deleted_at
             FROM dataset_sources AS ds
             WHERE ds.project_id = {project_param}
                 AND ds.source_id IN {source_ids_param}

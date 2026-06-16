@@ -171,8 +171,9 @@ def test_make_dataset_sources_select_excludes_deleted_by_default() -> None:
         pb=pb,
     )
     normalized = " ".join(query.split()).lower()
-    # Default filters out tombstoned rows (post-collapse, via HAVING).
-    assert "deleted_at is null" in normalized
+    # Default filters out tombstoned rows (post-collapse, via HAVING). deleted_at
+    # is a sentinel-epoch column (not Nullable), so "live" is `= toDateTime64(0)`.
+    assert "having deleted_at = todatetime64(0, 3)" in normalized
 
 
 # ---------------------------------------------------------------------------
