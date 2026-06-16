@@ -1,4 +1,4 @@
-import {globalSingleton} from './utils/globalSingleton';
+import state from './state';
 
 export const defaultHost = 'api.wandb.ai';
 export const defaultDomain = 'wandb.ai';
@@ -67,16 +67,9 @@ export function getUrls(hostOrUrl?: string) {
   };
 }
 
-// Held behind a globalThis-backed container so that a dual-package-hazard load
-// (same module as both CJS and ESM) still observes a single shared domain.
-const _globalDomainHolder = globalSingleton<{domain: string | undefined}>(
-  '_weave_global_domain',
-  () => ({domain: undefined})
-);
-
 export function getGlobalDomain() {
-  return _globalDomainHolder.domain;
+  return state.domain;
 }
 export function setGlobalDomain(domain: string) {
-  _globalDomainHolder.domain = domain;
+  state.domain = domain;
 }
