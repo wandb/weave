@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import os
 import threading
-import time
 from dataclasses import dataclass, field
 from unittest import mock
 
@@ -51,8 +50,6 @@ class GCSMockState:
 
     Test-side knobs:
       `fail_paths` - inject `PreconditionFailed`-style failures by GCS path.
-      `delay`      - sleep inside upload_from_string so parallel tests can
-                     assert wall-time savings + concurrent peak.
       `expected_concurrency` - when set, uploads block on a barrier until this
                      many are simultaneously in-flight, making `concurrent_peak`
                      deterministic instead of dependent on scheduler timing.
@@ -67,7 +64,6 @@ class GCSMockState:
     upload_count: int = 0
     concurrent_peak: int = 0
     fail_paths: set[str] = field(default_factory=set)
-    delay: float = 0.0
     expected_concurrency: int | None = None
 
 
@@ -145,8 +141,6 @@ def gcs():
                         barrier["b"].wait(timeout=_BARRIER_TIMEOUT_SECONDS)
                     except threading.BrokenBarrierError:
                         pass
-                if state.delay:
-                    time.sleep(state.delay)
                 with state_lock:
                     state.blob_data[path] = data
                     state.upload_count += 1
