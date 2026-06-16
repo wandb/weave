@@ -472,10 +472,10 @@ class AgentQueryHandler:
         return [AgentSpanSchema.model_validate(normalize_span_row(r)) for r in rows]
 
     def trace_messages(self, req: AgentTraceMessagesReq) -> AgentTraceMessagesRes:
-        """Fetch role-tagged messages for a trace from the ``messages`` table.
+        """Fetch role-tagged messages for a trace from the `messages` table.
 
         Scoring fallback for root spans with no message content of their own.
-        Rows map directly to ``NormalizedMessage``; ``finish_reason`` is not
+        Rows map directly to `NormalizedMessage`; `finish_reason` is not
         stored per message row, so it is left empty.
         """
         rows = self._run_trace_messages_query(

@@ -1389,13 +1389,13 @@ def make_span_group_categorical_distributions_query(
 def make_trace_messages_query(
     pb: ParamBuilder, project_id: str, trace_id: str, limit: int
 ) -> str:
-    """Role-tagged messages for a single trace, read from the ``messages`` table.
+    """Role-tagged messages for a single trace, read from the `messages` table.
 
     Scoring fallback for root spans that carry no message content of their own.
-    Dedups identical content per role via ``GROUP BY role, content_digest`` and
-    orders by ingest time (``created_at``) so no join back to ``spans`` is
-    needed; ingest order is good enough for a fallback. The indexed ``trace_id``
-    plus ``LIMIT`` bound the scan.
+    Dedups identical content per role via `GROUP BY role, content_digest` and
+    orders by ingest time (`created_at`) so no join back to `spans` is
+    needed; ingest order is good enough for a fallback. The indexed `trace_id`
+    plus `LIMIT` bound the scan.
     """
     pid = pb.add(project_id, param_type="String")
     tid = pb.add(trace_id, param_type="String")
