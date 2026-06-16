@@ -1,4 +1,4 @@
-import {defaultSettings, makeSettings} from '../settings';
+import {makeSettings} from '../settings';
 
 describe('makeSettings', () => {
   const originalEnv = process.env;
@@ -38,10 +38,6 @@ describe('makeSettings', () => {
   describe('explicit settings', () => {
     it('honors printCallLink', () => {
       expect(makeSettings({printCallLink: false}).printCallLink).toBe(false);
-    });
-
-    it('honors useOTelV2', () => {
-      expect(makeSettings({useOTelV2: false}).useOTelV2).toBe(false);
     });
 
     it('honors attributes', () => {
@@ -84,41 +80,5 @@ describe('makeSettings', () => {
       process.env.WEAVE_PRINT_CALL_LINK = 'maybe';
       expect(makeSettings().printCallLink).toBe(true);
     });
-
-    it('WEAVE_USE_OTEL_V2=true overrides explicit false', () => {
-      process.env.WEAVE_USE_OTEL_V2 = 'true';
-      expect(makeSettings({useOTelV2: false}).useOTelV2).toBe(true);
-    });
-
-    it('WEAVE_USE_OTEL_V2=false overrides explicit true', () => {
-      process.env.WEAVE_USE_OTEL_V2 = 'false';
-      expect(makeSettings({useOTelV2: true}).useOTelV2).toBe(false);
-    });
-  });
-});
-
-describe('defaultSettings', () => {
-  const originalEnv = process.env;
-
-  beforeEach(() => {
-    process.env = {...originalEnv};
-    delete process.env.WEAVE_PRINT_CALL_LINK;
-    delete process.env.WEAVE_USE_OTEL_V2;
-  });
-
-  afterAll(() => {
-    process.env = originalEnv;
-  });
-
-  it('matches makeSettings() with no args', () => {
-    expect(defaultSettings()).toEqual(makeSettings());
-  });
-
-  it('applies env vars', () => {
-    process.env.WEAVE_PRINT_CALL_LINK = 'false';
-    process.env.WEAVE_USE_OTEL_V2 = 'false';
-    const s = defaultSettings();
-    expect(s.printCallLink).toBe(false);
-    expect(s.useOTelV2).toBe(false);
   });
 });
