@@ -46,9 +46,7 @@ describe('makeSettings', () => {
 
     it('honors attributes', () => {
       const attrs = {tenant: 'acme', region: 'us-west'};
-      expect(makeSettings({attributes: attrs}).attributes).toEqual(
-        attrs
-      );
+      expect(makeSettings({attributes: attrs}).attributes).toEqual(attrs);
     });
 
     it('honors genai settings', () => {
