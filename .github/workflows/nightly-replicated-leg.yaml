@@ -28,11 +28,8 @@ on:
 jobs:
   run:
     name: ${{ inputs.topology }} (3.${{ matrix.python-version-minor }}, ${{ matrix.shard }})
-    # id-token: write lets google-github-actions/auth mint an OIDC token for
-    # Workload Identity Federation (same keyless auth as test.yaml).
     permissions:
       contents: read
-      id-token: write
     # Successful 8-core trace leg ran in ~16 min; cap at 25 min so any hang
     # fails fast and we can RCA from the captured CH logs + faulthandler dump.
     timeout-minutes: 25
@@ -109,36 +106,6 @@ jobs:
           fi
           echo "Running shard: ${{ matrix.shard }}"
           echo "skip=false" >> $GITHUB_OUTPUT
-      - id: auth
-        name: Authenticate to Google Cloud
-        if: steps.filter_shards.outputs.skip != 'true'
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
-        with:
-          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
-          token_format: access_token
-      - name: Start wandb service
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: |
-          set -euo pipefail
-          echo "${{ steps.auth.outputs.access_token }}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
-          docker run --detach --name wandbservice \
-            --env CI=1 \
-            --env WANDB_ENABLE_TEST_CONTAINER=true \
-            --env LOGGING_ENABLED=true \
-            --publish 8080:8080 \
-            --publish 8083:8083 \
-            --publish 9015:9015 \
-            us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-          for _i in {1..30}; do
-            if curl --silent --fail --show-error http://localhost:8080/healthz >/dev/null; then
-              echo "wandb service is healthy"
-              exit 0
-            fi
-            sleep 5
-          done
-          docker logs wandbservice
-          exit 1
       - name: Enable debug logging
         if: steps.filter_shards.outputs.skip != 'true'
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
@@ -184,7 +151,6 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://localhost
           WF_CLICKHOUSE_HOST: localhost
           WF_CLICKHOUSE_PORT: ${{ inputs.ch_port }}
           WF_CLICKHOUSE_REPLICATED: "true"
@@ -213,7 +179,6 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://localhost
           WF_CLICKHOUSE_HOST: localhost
           WF_CLICKHOUSE_PORT: ${{ inputs.ch_port }}
           WF_CLICKHOUSE_REPLICATED: "true"
