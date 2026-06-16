@@ -15,7 +15,9 @@ def _mock_client_with_get_side_effect(side_effect):
 
 
 @patch("tests.trace_server.conftest_lib.container_management.time.sleep")
-def test_check_server_health_retries_transient_httpx_errors_and_statuses(mock_sleep):
+def test_check_server_health_retries_recovers_and_reports_last_error(
+    mock_sleep, capsys
+):
     # Transient protocol error during startup, then success.
     client_factory = _mock_client_with_get_side_effect(
         [
@@ -46,9 +48,9 @@ def test_check_server_health_retries_transient_httpx_errors_and_statuses(mock_sl
         assert _check_server_health("http://localhost:8123/", "ping", num_retries=2)
     assert mock_sleep.call_count == 1
 
+    mock_sleep.reset_mock()
 
-@patch("tests.trace_server.conftest_lib.container_management.time.sleep")
-def test_check_server_health_reports_last_httpx_error(mock_sleep, capsys):
+    # Exhausting retries returns False and reports the last error.
     client_factory = _mock_client_with_get_side_effect(
         [
             httpx.RemoteProtocolError("server disconnected without sending a response"),

@@ -1,5 +1,5 @@
 import datetime
-import unittest
+from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,10 +14,24 @@ from weave.trace_server.errors import (
     NotFoundError,
 )
 from weave.trace_server.interface.builtin_object_classes.provider import Provider
-from weave.trace_server.llm_completion import get_custom_provider_info
-from weave.trace_server.secret_fetcher_context import (
-    _secret_fetcher_context,
+from weave.trace_server.llm_completion import (
+    get_custom_provider_info,
+    resolve_and_apply_prompt,
+    resolve_prompt_messages,
 )
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+
+LITELLM_STREAM = (
+    "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+)
+LITELLM_COMPLETION = (
+    "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+)
+AGENT_WRITER = "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+
+
+class StreamingException(Exception):
+    """Sentinel exception raised by a mocked litellm stream."""
 
 
 @pytest.fixture(autouse=True)
@@ -27,1305 +41,738 @@ def _clear_custom_provider_cache():
         llm_mod._custom_provider_cache.clear()
 
 
-class MockObjectReadError(Exception):
-    """Custom exception for mock object read failures."""
-
-    pass
+# --- get_custom_provider_info --------------------------------------------------
 
 
-class TestGetCustomProviderInfo(unittest.TestCase):
-    """Tests for the get_custom_provider_info function in llm_completion.py.
+def test_successful_provider_info_fetch():
+    """Provider + model objects and API key are resolved into a populated ProviderInfo."""
+    project_id = "test-project"
+    provider_id = "test-provider"
+    model_name = f"{provider_id}/test-model"
+    provider_obj = _provider_obj(project_id, provider_id)
+    model_obj = _provider_model_obj(
+        project_id, f"{provider_id}-test-model", provider_id
+    )
 
-    This test suite verifies the functionality of retrieving and validating custom provider
-    information for LLM completions. It tests:
-    1. Successful retrieval of provider and model information
-    2. Error handling for missing or invalid configurations
-    3. Secret fetching and validation
-    4. Type checking for provider and model objects
-
-    The suite uses mock objects to simulate database interactions and secret fetching,
-    allowing for controlled testing of various scenarios and edge cases.
-    """
-
-    def setUp(self):
-        """Set up test fixtures before each test.
-
-        Creates mock objects and test data including:
-        - Project and provider IDs
-        - Provider configuration with API endpoints and headers
-        - Provider model configuration with model parameters
-        - Mock secret fetcher for API key management
-        """
-        self.project_id = "test-project"
-
-        # Provider data with complete configuration
-        self.provider_id = "test-provider"
-        self.provider_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id=self.provider_id,
-            digest="digest-1",
-            base_object_class="Provider",
-            leaf_object_class="Provider",
-            val={
-                "base_url": "https://api.example.com",
-                "api_key_name": "TEST_API_KEY",
-                "extra_headers": {"X-Header": "value"},
-                "return_type": "openai",
-            },
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
+    obj_read = MagicMock(
+        side_effect=_obj_read_router({provider_id: provider_obj, model_name: model_obj})
+    )
+    secret_fetcher = _secret_fetcher({"TEST_API_KEY": "test-api-key-value"})
+    token = _secret_fetcher_context.set(secret_fetcher)
+    try:
+        info = get_custom_provider_info(
+            project_id=project_id,
+            provider_name=provider_id,
+            model_name=model_name,
+            obj_read_func=obj_read,
         )
+        assert info.base_url == "https://api.example.com"
+        assert info.api_key == "test-api-key-value"
+        assert info.extra_headers == {"X-Header": "value"}
+        assert info.return_type == "openai"
+        assert info.actual_model_name == "actual-model-name"
+        obj_read.assert_called()
+        secret_fetcher.fetch.assert_called_with("TEST_API_KEY")
+    finally:
+        _secret_fetcher_context.reset(token)
 
-        # Provider model data with model-specific settings
-        self.model_id = "test-model"
-        self.provider_model_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id=f"{self.provider_id}-{self.model_id}",
-            digest="digest-2",
-            base_object_class="ProviderModel",
-            leaf_object_class="ProviderModel",
-            val={
-                "name": "actual-model-name",
-                "provider": self.provider_id,
-                "max_tokens": 4096,
-                "mode": "chat",
-            },
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
+
+@pytest.mark.parametrize(
+    ("scenario", "expected_message"),
+    [
+        ("missing_secret_fetcher", "No secret fetcher found"),
+        ("provider_not_found", "Failed to fetch provider model information"),
+        ("wrong_provider_type", "Could not find Provider"),
+        ("wrong_provider_model_type", "Could not find Provider"),
+    ],
+)
+def test_get_custom_provider_info_error_paths(scenario, expected_message):
+    """Missing fetcher, unreadable objects, and wrong object types each raise InvalidRequest."""
+    project_id = "test-project"
+    provider_id = "test-provider"
+    model_name = f"{provider_id}/test-model"
+    provider_obj = _provider_obj(project_id, provider_id)
+    model_obj = _provider_model_obj(
+        project_id, f"{provider_id}-test-model", provider_id
+    )
+    secret_fetcher = _secret_fetcher({"TEST_API_KEY": "test-api-key-value"})
+
+    if scenario == "missing_secret_fetcher":
+        obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes] = MagicMock()
+        fetcher = None
+    elif scenario == "provider_not_found":
+        obj_read = MagicMock(side_effect=NotFoundError("Provider not found"))
+        fetcher = secret_fetcher
+    elif scenario == "wrong_provider_type":
+        wrong = provider_obj.model_copy()
+        wrong.base_object_class = "NotAProvider"
+        obj_read = MagicMock(
+            side_effect=_obj_read_router({provider_id: wrong}, default=model_obj)
         )
+        fetcher = secret_fetcher
+    elif scenario == "wrong_provider_model_type":
+        wrong = model_obj.model_copy()
+        wrong.base_object_class = "NotAProviderModel"
+        obj_read = MagicMock(
+            side_effect=_obj_read_router({provider_id: provider_obj}, default=wrong)
+        )
+        fetcher = secret_fetcher
+    else:
+        raise AssertionError(f"unhandled scenario: {scenario}")
 
-        # Model name in format provider_id/model_id for API calls
-        self.model_name = f"{self.provider_id}/{self.model_id}"
-
-        # Mock secret fetcher for API key management
-        self.mock_secret_fetcher = MagicMock()
-        self.mock_secret_fetcher.fetch.return_value = {
-            "secrets": {"TEST_API_KEY": "test-api-key-value"}
-        }
-
-        # Mock object read function for database interactions
-        self.mock_obj_read_func = MagicMock()
-
-    def test_successful_provider_info_fetch(self):
-        """Test successful retrieval of provider information.
-
-        Verifies that:
-        1. Provider and model information are correctly retrieved
-        2. API credentials are properly fetched
-        3. All configuration parameters are returned as expected
-        4. Object read and secret fetch calls are made correctly
-        """
-
-        def mock_obj_read(req):
-            if req.object_id == self.provider_id:
-                return tsi.ObjReadRes(obj=self.provider_obj)
-            elif req.object_id == self.model_name:
-                return tsi.ObjReadRes(obj=self.provider_model_obj)
-            raise NotFoundError(f"Unknown object_id: {req.object_id}")
-
-        self.mock_obj_read_func.side_effect = mock_obj_read
-
-        # Set up the secret fetcher context
-        token = _secret_fetcher_context.set(self.mock_secret_fetcher)
-        try:
-            # Call the function under test
-            provider_info = get_custom_provider_info(
-                project_id=self.project_id,
-                provider_name=self.provider_id,
-                model_name=self.model_name,
-                obj_read_func=self.mock_obj_read_func,
+    token = _secret_fetcher_context.set(fetcher)
+    try:
+        with pytest.raises(InvalidRequest, match=expected_message):
+            get_custom_provider_info(
+                project_id=project_id,
+                provider_name=provider_id,
+                model_name=model_name,
+                obj_read_func=obj_read,
             )
+    finally:
+        _secret_fetcher_context.reset(token)
 
-            # Verify the results
-            assert provider_info.base_url == "https://api.example.com", (
-                f"Base URL mismatch. Expected 'https://api.example.com', "
-                f"got '{provider_info.base_url}'"
-            )
-            assert provider_info.api_key == "test-api-key-value", (
-                f"API key mismatch. Expected 'test-api-key-value', "
-                f"got '{provider_info.api_key}'"
-            )
-            assert provider_info.extra_headers == {"X-Header": "value"}, (
-                f"Extra headers mismatch. Expected {{'X-Header': 'value'}}, "
-                f"got {provider_info.extra_headers}"
-            )
-            assert provider_info.return_type == "openai", (
-                f"Return type mismatch. Expected 'openai', "
-                f"got '{provider_info.return_type}'"
-            )
-            assert provider_info.actual_model_name == "actual-model-name", (
-                f"Actual model name mismatch. Expected 'actual-model-name', "
-                f"got '{provider_info.actual_model_name}'"
-            )
 
-            # Verify the mock calls
-            self.mock_obj_read_func.assert_called()
-            self.mock_secret_fetcher.fetch.assert_called_with("TEST_API_KEY")
-        finally:
-            _secret_fetcher_context.reset(token)
+# --- streaming completions -----------------------------------------------------
 
-    def test_missing_secret_fetcher(self):
-        """Test error handling when secret fetcher is not configured.
 
-        Verifies that appropriate error is raised when attempting to
-        fetch provider information without a configured secret fetcher.
-        """
-        # Set the context to None to simulate missing secret fetcher
-        token = _secret_fetcher_context.set(None)
-        try:
-            with pytest.raises(InvalidRequest) as context:
-                get_custom_provider_info(
-                    project_id=self.project_id,
-                    provider_name=self.provider_id,
-                    model_name=self.model_name,
-                    obj_read_func=self.mock_obj_read_func,
+def test_basic_streaming_completion(streaming_server):
+    """Content deltas and the terminal usage chunk pass through verbatim."""
+    chunks_in = [
+        _delta_chunk("Hello"),
+        _delta_chunk(" world"),
+        _stop_chunk({"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12}),
+    ]
+    with patch(LITELLM_STREAM, return_value=_iter_mock(chunks_in)):
+        chunks = list(
+            streaming_server.completions_create_stream(
+                _completion_req("test_project", track=False)
+            )
+        )
+    assert len(chunks) == 3
+    assert chunks[0]["choices"][0]["delta"]["content"] == "Hello"
+    assert chunks[1]["choices"][0]["delta"]["content"] == " world"
+    assert chunks[2]["choices"][0]["finish_reason"] == "stop"
+    assert "usage" in chunks[2]
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        StreamingException("Test error"),
+        MissingLLMApiKeyError("No API key found", api_key_name="TEST_API_KEY"),
+    ],
+    ids=["generic_error", "missing_api_key"],
+)
+def test_streaming_propagates_litellm_errors(streaming_server, exc):
+    """Errors raised by the litellm stream propagate out of the generator."""
+    with patch(LITELLM_STREAM, side_effect=exc):
+        with pytest.raises(type(exc)):
+            list(
+                streaming_server.completions_create_stream(
+                    _completion_req("test_project", track=False)
                 )
-
-            assert "No secret fetcher found" in str(context.value), (
-                "Expected error message about missing secret fetcher not found"
-            )
-        finally:
-            _secret_fetcher_context.reset(token)
-
-    def test_provider_not_found(self):
-        """Test error handling when provider object cannot be found.
-
-        Verifies that appropriate error is raised when the provider
-        object cannot be retrieved from the database.
-        """
-        # Make obj_read_func raise an exception to simulate missing provider
-        self.mock_obj_read_func.side_effect = NotFoundError("Provider not found")
-
-        token = _secret_fetcher_context.set(self.mock_secret_fetcher)
-        try:
-            with pytest.raises(InvalidRequest) as context:
-                get_custom_provider_info(
-                    project_id=self.project_id,
-                    provider_name=self.provider_id,
-                    model_name=self.model_name,
-                    obj_read_func=self.mock_obj_read_func,
-                )
-
-            assert "Failed to fetch provider model information" in str(context.value), (
-                "Expected error message about failed provider fetch not found"
-            )
-        finally:
-            _secret_fetcher_context.reset(token)
-
-    def test_wrong_provider_type(self):
-        """Test error handling when provider object has incorrect type.
-
-        Verifies that appropriate error is raised when the retrieved
-        provider object is not of the expected Provider type.
-        """
-        # Create provider object with incorrect type
-        wrong_type_provider = self.provider_obj.model_copy()
-        wrong_type_provider.base_object_class = "NotAProvider"
-
-        def mock_obj_read(req):
-            if req.object_id == self.provider_id:
-                return tsi.ObjReadRes(obj=wrong_type_provider)
-            else:
-                return tsi.ObjReadRes(obj=self.provider_model_obj)
-
-        self.mock_obj_read_func.side_effect = mock_obj_read
-
-        token = _secret_fetcher_context.set(self.mock_secret_fetcher)
-        try:
-            with pytest.raises(InvalidRequest) as context:
-                get_custom_provider_info(
-                    project_id=self.project_id,
-                    provider_name=self.provider_id,
-                    model_name=self.model_name,
-                    obj_read_func=self.mock_obj_read_func,
-                )
-
-            assert "Could not find Provider" in str(context.value), (
-                "Expected error message about incorrect provider type not found"
-            )
-        finally:
-            _secret_fetcher_context.reset(token)
-
-    def test_wrong_provider_model_type(self):
-        """Test error handling when provider model object has incorrect type.
-
-        Verifies that appropriate error is raised when the retrieved
-        provider model object is not of the expected ProviderModel type.
-        """
-        # Create provider model object with incorrect type
-        wrong_type_model = self.provider_model_obj.model_copy()
-        wrong_type_model.base_object_class = "NotAProviderModel"
-
-        def mock_obj_read(req):
-            if req.object_id == self.provider_id:
-                return tsi.ObjReadRes(obj=self.provider_obj)
-            else:
-                return tsi.ObjReadRes(obj=wrong_type_model)
-
-        self.mock_obj_read_func.side_effect = mock_obj_read
-
-        token = _secret_fetcher_context.set(self.mock_secret_fetcher)
-        try:
-            with pytest.raises(InvalidRequest) as context:
-                get_custom_provider_info(
-                    project_id=self.project_id,
-                    provider_name=self.provider_id,
-                    model_name=self.model_name,
-                    obj_read_func=self.mock_obj_read_func,
-                )
-
-            assert "Could not find Provider" in str(context.value), (
-                "Expected error message about incorrect provider model type not found"
-            )
-        finally:
-            _secret_fetcher_context.reset(token)
-
-
-class TestLLMCompletionStreaming(unittest.TestCase):
-    """Tests for LLM completion streaming functionality."""
-
-    def setUp(self):
-        """Set up test fixtures before each test."""
-        self.server = chts.ClickHouseTraceServer(host="test_host")
-        mock_ch_client = MagicMock()
-        mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
-        # ch_client is lazy; pre-populating _thread_local.ch_client bypasses _mint_client.
-        self.server._thread_local.ch_client = mock_ch_client
-        self.mock_secret_fetcher = MagicMock()
-        self.mock_secret_fetcher.fetch.return_value = {
-            "secrets": {
-                "OPENAI_API_KEY": "test-api-key-value",
-                "CUSTOM_API_KEY": "test-api-key-value",
-                "TEST_API_KEY": "test-api-key-value",
-            }
-        }
-        self.token = _secret_fetcher_context.set(self.mock_secret_fetcher)
-
-    def tearDown(self):
-        _secret_fetcher_context.reset(self.token)
-
-    def test_basic_streaming_completion(self):
-        """Test basic streaming completion functionality."""
-        # Mock the litellm completion stream
-        mock_chunks = [
-            {
-                "choices": [
-                    {
-                        "delta": {"content": "Hello"},
-                        "finish_reason": None,
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "test-model",
-                "created": 1234567890,
-            },
-            {
-                "choices": [
-                    {
-                        "delta": {"content": " world"},
-                        "finish_reason": None,
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "test-model",
-                "created": 1234567890,
-            },
-            {
-                "choices": [
-                    {
-                        "delta": {},
-                        "finish_reason": "stop",
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "test-model",
-                "created": 1234567890,
-                "usage": {
-                    "prompt_tokens": 10,
-                    "completion_tokens": 2,
-                    "total_tokens": 12,
-                },
-            },
-        ]
-
-        with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm:
-            # Mock the litellm completion stream
-            mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = mock_chunks
-            mock_litellm.return_value = mock_stream
-
-            # Create test request
-            req = tsi.CompletionsCreateReq(
-                project_id="test_project",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                ),
-                track_llm_call=False,
             )
 
-            # Get the stream
-            stream = self.server.completions_create_stream(req)
 
-            # Collect all chunks
-            chunks = list(stream)
-
-            # Verify the chunks
-            assert len(chunks) == 3
-            assert chunks[0]["choices"][0]["delta"]["content"] == "Hello"
-            assert chunks[1]["choices"][0]["delta"]["content"] == " world"
-            assert chunks[2]["choices"][0]["finish_reason"] == "stop"
-            assert "usage" in chunks[2]
-
-    def test_streaming_error_handling(self):
-        """Test error handling in streaming completion."""
-
-        class StreamingException(Exception): ...
-
-        with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm:
-            # Mock litellm to raise an exception
-            mock_litellm.side_effect = StreamingException("Test error")
-
-            # Create test request
-            req = tsi.CompletionsCreateReq(
-                project_id="test_project",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                ),
-                track_llm_call=False,
+def test_streaming_with_call_tracking(streaming_server):
+    """Tracking emits a leading _meta chunk and writes open + completed spans."""
+    chunks_in = [
+        _delta_chunk("Hello"),
+        _stop_chunk({"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11}),
+    ]
+    with (
+        patch(LITELLM_STREAM, return_value=_iter_mock(chunks_in)),
+        patch(AGENT_WRITER) as writer_cls,
+    ):
+        writer = writer_cls.return_value
+        chunks = list(
+            streaming_server.completions_create_stream(
+                _completion_req("dGVzdF9wcm9qZWN0", track=True)
             )
-
-            # Get the stream and expect an exception
-            with pytest.raises(StreamingException):
-                list(self.server.completions_create_stream(req))
-
-    def test_streaming_with_call_tracking(self):
-        """Test streaming completion with call tracking enabled."""
-        mock_chunks = [
-            {
-                "choices": [
-                    {
-                        "delta": {"content": "Hello"},
-                        "finish_reason": None,
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "test-model",
-                "created": 1234567890,
-            },
-            {
-                "choices": [
-                    {
-                        "delta": {},
-                        "finish_reason": "stop",
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "test-model",
-                "created": 1234567890,
-                "usage": {
-                    "prompt_tokens": 10,
-                    "completion_tokens": 1,
-                    "total_tokens": 11,
-                },
-            },
-        ]
-
-        with (
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-            ) as mock_litellm,
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
-            ) as mock_agent_writer_cls,
-        ):
-            mock_agent_writer = MagicMock()
-            mock_agent_writer_cls.return_value = mock_agent_writer
-
-            mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = mock_chunks
-            mock_litellm.return_value = mock_stream
-
-            req = tsi.CompletionsCreateReq(
-                project_id="dGVzdF9wcm9qZWN0",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                ),
-                track_llm_call=True,
-            )
-
-            stream = self.server.completions_create_stream(req)
-            chunks = list(stream)
-
-            assert len(chunks) == 3  # Meta chunk + 2 content chunks
-            assert "_meta" in chunks[0]
-            assert "weave_call_id" in chunks[0]["_meta"]
-            assert chunks[1]["choices"][0]["delta"]["content"] == "Hello"
-            assert chunks[2]["choices"][0]["finish_reason"] == "stop"
-
-            # Open span + completed span = 2 insert_span calls
-            assert mock_agent_writer.insert_span.call_count == 2
-            completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
-            assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
-
-    def test_custom_provider_streaming(self):
-        """Test streaming completion with a custom provider."""
-        # Mock the litellm completion stream
-        mock_chunks = [
-            {
-                "choices": [
-                    {
-                        "delta": {"content": "Custom"},
-                        "finish_reason": None,
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "custom-model",
-                "created": 1234567890,
-            },
-            {
-                "choices": [
-                    {
-                        "delta": {},
-                        "finish_reason": "stop",
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "custom-model",
-                "created": 1234567890,
-                "usage": {
-                    "prompt_tokens": 5,
-                    "completion_tokens": 1,
-                    "total_tokens": 6,
-                },
-            },
-        ]
-
-        with (
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-            ) as mock_litellm,
-            patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
-        ):
-            # Mock the litellm completion stream
-            mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = mock_chunks
-            mock_litellm.return_value = mock_stream
-
-            # Mock provider and model objects
-            mock_provider = tsi.ObjSchema(
-                project_id="test_project",
-                object_id="custom-provider",
-                digest="digest-1",
-                base_object_class="Provider",
-                leaf_object_class="Provider",
-                val={
-                    "base_url": "https://api.custom.com",
-                    "api_key_name": "CUSTOM_API_KEY",
-                    "extra_headers": {"X-Custom": "value"},
-                    "return_type": "openai",
-                    "api_base": "https://api.custom.com",
-                },
-                created_at=datetime.datetime.now(),
-                version_index=1,
-                is_latest=1,
-                kind="object",
-                deleted_at=None,
-            )
-
-            mock_model = tsi.ObjSchema(
-                project_id="test_project",
-                object_id="custom-provider-model",
-                digest="digest-2",
-                base_object_class="ProviderModel",
-                leaf_object_class="ProviderModel",
-                val={
-                    "name": "custom-model",
-                    "provider": "custom-provider",
-                    "max_tokens": 4096,
-                    "mode": "chat",
-                },
-                created_at=datetime.datetime.now(),
-                version_index=1,
-                is_latest=1,
-                kind="object",
-                deleted_at=None,
-            )
-
-            def mock_obj_read_func(req):
-                if req.object_id == "custom-provider":
-                    return tsi.ObjReadRes(obj=mock_provider)
-                elif req.object_id == "custom-provider-model":
-                    return tsi.ObjReadRes(obj=mock_model)
-                raise MockObjectReadError(f"Unknown object_id: {req.object_id}")
-
-            mock_obj_read.side_effect = mock_obj_read_func
-
-            # Create test request
-            req = tsi.CompletionsCreateReq(
-                project_id="dGVzdF9wcm9qZWN0",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="custom::custom-provider::model",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                ),
-                track_llm_call=False,
-            )
-
-            # Get the stream
-            stream = self.server.completions_create_stream(req)
-
-            # Collect all chunks
-            chunks = list(stream)
-
-            # Verify the chunks
-            assert len(chunks) == 2
-            assert chunks[0]["choices"][0]["delta"]["content"] == "Custom"
-            assert chunks[1]["choices"][0]["finish_reason"] == "stop"
-
-            # Verify litellm was called with correct parameters
-            mock_litellm.assert_called_once()
-            call_args = mock_litellm.call_args[1]
-            assert (
-                call_args.get("api_base") or call_args.get("base_url")
-            ) == "https://api.custom.com"
-            assert call_args["extra_headers"] == {"X-Custom": "value"}
-
-    def test_missing_api_key(self):
-        """Test handling of missing API key in streaming completion."""
-        with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm:
-            # Mock litellm to raise MissingLLMApiKeyError
-            mock_litellm.side_effect = MissingLLMApiKeyError(
-                "No API key found", api_key_name="TEST_API_KEY"
-            )
-
-            # Create test request
-            req = tsi.CompletionsCreateReq(
-                project_id="test_project",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                ),
-                track_llm_call=False,
-            )
-
-            # Get the stream and expect an exception
-            with pytest.raises(MissingLLMApiKeyError):
-                list(self.server.completions_create_stream(req))
+        )
+    assert len(chunks) == 3
+    assert "_meta" in chunks[0]
+    assert "weave_call_id" in chunks[0]["_meta"]
+    assert chunks[1]["choices"][0]["delta"]["content"] == "Hello"
+    assert chunks[2]["choices"][0]["finish_reason"] == "stop"
+    assert writer.insert_span.call_count == 2
+    completed_span = writer.insert_span.call_args_list[1][0][0]
+    assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
 
 
-class TestPromptResolution(unittest.TestCase):
-    """Tests for prompt resolution and template variable substitution."""
+def test_custom_provider_streaming(streaming_server):
+    """A custom:: model resolves provider config and forwards base_url + extra_headers."""
+    chunks_in = [
+        _delta_chunk("Custom", model="custom-model"),
+        _stop_chunk(
+            {"prompt_tokens": 5, "completion_tokens": 1, "total_tokens": 6},
+            model="custom-model",
+        ),
+    ]
+    provider = _provider_obj(
+        "test_project",
+        "custom-provider",
+        base_url="https://api.custom.com",
+        api_key_name="CUSTOM_API_KEY",
+        extra_headers={"X-Custom": "value"},
+        extra_val={"api_base": "https://api.custom.com"},
+    )
+    model = _provider_model_obj(
+        "test_project", "custom-provider-model", "custom-provider", name="custom-model"
+    )
+    with (
+        patch(LITELLM_STREAM, return_value=_iter_mock(chunks_in)) as mock_litellm,
+        patch.object(
+            chts.ClickHouseTraceServer,
+            "obj_read",
+            side_effect=_obj_read_router(
+                {"custom-provider": provider, "custom-provider-model": model}
+            ),
+        ),
+    ):
+        req = _completion_req(
+            "dGVzdF9wcm9qZWN0", track=False, model="custom::custom-provider::model"
+        )
+        chunks = list(streaming_server.completions_create_stream(req))
+    assert len(chunks) == 2
+    assert chunks[0]["choices"][0]["delta"]["content"] == "Custom"
+    assert chunks[1]["choices"][0]["finish_reason"] == "stop"
+    mock_litellm.assert_called_once()
+    call_args = mock_litellm.call_args[1]
+    assert (
+        call_args.get("api_base") or call_args.get("base_url")
+    ) == "https://api.custom.com"
+    assert call_args["extra_headers"] == {"X-Custom": "value"}
 
-    def setUp(self):
-        """Set up test fixtures before each test."""
-        self.project_id = "test-project"
-        self.mock_secret_fetcher = MagicMock()
-        self.mock_secret_fetcher.fetch.return_value = {
-            "secrets": {"OPENAI_API_KEY": "test-api-key"}
-        }
-        self.token = _secret_fetcher_context.set(self.mock_secret_fetcher)
 
-    def tearDown(self):
-        _secret_fetcher_context.reset(self.token)
+# --- prompt resolution ---------------------------------------------------------
 
-    def test_resolve_prompt_messages(self):
-        """Test resolving prompt messages from a MessagesPrompt object."""
-        from weave.trace_server.llm_completion import resolve_prompt_messages
 
-        # Create a mock MessagesPrompt object
-        mock_prompt_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id="test-prompt",
-            digest="digest-1",
-            base_object_class="MessagesPrompt",
-            leaf_object_class="MessagesPrompt",
-            val={
-                "messages": [
-                    {"role": "system", "content": "You are {assistant_name}."},
-                    {"role": "user", "content": "Hello!"},
-                ]
-            },
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
+def test_resolve_prompt_messages():
+    """resolve_prompt_messages returns prompt messages without substituting template vars."""
+    project_id = "test-project"
+    prompt_obj = _messages_prompt_obj(
+        project_id,
+        [
+            {"role": "system", "content": "You are {assistant_name}."},
+            {"role": "user", "content": "Hello!"},
+        ],
+    )
+    messages = resolve_prompt_messages(
+        prompt=_prompt_uri(project_id, "test-prompt"),
+        project_id=project_id,
+        obj_read_func=lambda req: tsi.ObjReadRes(obj=prompt_obj),
+    )
+    assert messages == [
+        {"role": "system", "content": "You are {assistant_name}."},
+        {"role": "user", "content": "Hello!"},
+    ]
+
+
+def test_resolve_prompt_messages_invalid_prompt():
+    """A non-Prompt object raises InvalidRequest."""
+    project_id = "test-project"
+    not_prompt = _model_obj(project_id, "test-obj")
+    with pytest.raises(InvalidRequest, match="is not a Prompt or MessagesPrompt"):
+        resolve_prompt_messages(
+            prompt=_prompt_uri(project_id, "test-obj"),
+            project_id=project_id,
+            obj_read_func=lambda req: tsi.ObjReadRes(obj=not_prompt),
         )
 
-        def mock_obj_read(req):
-            return tsi.ObjReadRes(obj=mock_prompt_obj)
 
-        prompt_uri = (
-            f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
+def test_streaming_with_prompt_resolution(streaming_server):
+    """A prompt reference is resolved via obj_read before streaming."""
+    project_id = "test-project"
+    prompt_obj = _messages_prompt_obj(
+        project_id, [{"role": "system", "content": "You are a helpful assistant."}]
+    )
+    chunks_in = [
+        _delta_chunk("Hello"),
+        _stop_chunk({"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11}),
+    ]
+    with (
+        patch(LITELLM_STREAM, return_value=_iter_mock(chunks_in)),
+        patch.object(
+            chts.ClickHouseTraceServer,
+            "obj_read",
+            return_value=tsi.ObjReadRes(obj=prompt_obj),
+        ) as mock_obj_read,
+    ):
+        req = _completion_req(
+            project_id, track=False, prompt=_prompt_uri(project_id, "test-prompt")
         )
+        chunks = list(streaming_server.completions_create_stream(req))
+    assert len(chunks) == 2
+    assert chunks[0]["choices"][0]["delta"]["content"] == "Hello"
+    assert chunks[1]["choices"][0]["finish_reason"] == "stop"
+    mock_obj_read.assert_called_once()
 
-        # Test resolving messages (without template var substitution)
-        messages = resolve_prompt_messages(
-            prompt=prompt_uri,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
+
+def test_streaming_with_prompt_and_template_vars(streaming_server):
+    """Template vars are substituted into the resolved prompt before the litellm call."""
+    project_id = "test-project"
+    prompt_obj = _messages_prompt_obj(
+        project_id,
+        [
+            {"role": "system", "content": "You are {assistant_name}."},
+            {"role": "user", "content": "Tell me about {topic}."},
+        ],
+    )
+    chunks_in = [
+        _delta_chunk("Mathematics"),
+        _stop_chunk({"prompt_tokens": 15, "completion_tokens": 1, "total_tokens": 16}),
+    ]
+    with (
+        patch(LITELLM_STREAM, return_value=_iter_mock(chunks_in)) as mock_litellm,
+        patch.object(
+            chts.ClickHouseTraceServer,
+            "obj_read",
+            return_value=tsi.ObjReadRes(obj=prompt_obj),
+        ),
+    ):
+        req = tsi.CompletionsCreateReq(
+            project_id=project_id,
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[],
+                prompt=_prompt_uri(project_id, "test-prompt"),
+                template_vars={"assistant_name": "MathBot", "topic": "mathematics"},
+            ),
+            track_llm_call=False,
         )
+        chunks = list(streaming_server.completions_create_stream(req))
+    assert len(chunks) == 2
+    assert chunks[0]["choices"][0]["delta"]["content"] == "Mathematics"
+    mock_litellm.assert_called_once()
+    messages = mock_litellm.call_args[1]["inputs"].messages
+    assert messages == [
+        {"role": "system", "content": "You are MathBot."},
+        {"role": "user", "content": "Tell me about mathematics."},
+    ]
 
-        # Template variables should NOT be substituted (that's handled separately)
-        assert len(messages) == 2
-        assert messages[0]["role"] == "system"
-        assert messages[0]["content"] == "You are {assistant_name}."
-        assert messages[1]["role"] == "user"
-        assert messages[1]["content"] == "Hello!"
 
-    def test_resolve_prompt_messages_invalid_prompt(self):
-        """Test error handling when prompt object is not a Prompt or MessagesPrompt."""
-        from weave.trace_server.errors import InvalidRequest
-        from weave.trace_server.llm_completion import resolve_prompt_messages
-
-        # Create a mock object that is NOT a MessagesPrompt
-        mock_not_prompt = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id="test-obj",
-            digest="digest-1",
-            base_object_class="Model",
-            leaf_object_class="Model",
-            val={"name": "test"},
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
+@pytest.mark.disable_logging_error_check
+def test_streaming_with_prompt_error(streaming_server):
+    """A failed prompt resolution yields a single error chunk instead of raising."""
+    project_id = "test-project"
+    with patch.object(
+        chts.ClickHouseTraceServer,
+        "obj_read",
+        side_effect=NotFoundError("Prompt not found"),
+    ):
+        req = _completion_req(
+            project_id, track=False, prompt=_prompt_uri(project_id, "missing-prompt")
         )
-
-        def mock_obj_read(req):
-            return tsi.ObjReadRes(obj=mock_not_prompt)
-
-        prompt_uri = (
-            f"weave-trace-internal:///{self.project_id}/object/test-obj:digest-1"
-        )
-
-        # Should raise InvalidRequest when object is not a Prompt or MessagesPrompt
-        with pytest.raises(InvalidRequest) as context:
-            resolve_prompt_messages(
-                prompt=prompt_uri,
-                project_id=self.project_id,
-                obj_read_func=mock_obj_read,
-            )
-
-        assert "is not a Prompt or MessagesPrompt" in str(context.value)
+        chunks = list(streaming_server.completions_create_stream(req))
+    assert len(chunks) == 1
+    assert "error" in chunks[0]
+    assert "Failed to resolve and apply prompt" in chunks[0]["error"]
 
 
-class TestStreamingWithPrompts(unittest.TestCase):
-    """Tests for streaming completions with prompt resolution and template variables."""
-
-    def setUp(self):
-        """Set up test fixtures before each test."""
-        self.server = chts.ClickHouseTraceServer(host="test_host")
-        self.project_id = "test-project"
-        self.mock_secret_fetcher = MagicMock()
-        self.mock_secret_fetcher.fetch.return_value = {
-            "secrets": {"OPENAI_API_KEY": "test-api-key"}
-        }
-        self.token = _secret_fetcher_context.set(self.mock_secret_fetcher)
-
-    def tearDown(self):
-        _secret_fetcher_context.reset(self.token)
-
-    def test_streaming_with_prompt_resolution(self):
-        """Test streaming completion with prompt resolution."""
-        # Mock the MessagesPrompt object
-        mock_prompt_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id="test-prompt",
-            digest="digest-1",
-            base_object_class="MessagesPrompt",
-            leaf_object_class="MessagesPrompt",
-            val={
-                "messages": [
-                    {"role": "system", "content": "You are a helpful assistant."},
-                ]
-            },
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
-        )
-
-        # Mock response chunks
-        mock_chunks = [
-            {
-                "choices": [
-                    {
-                        "delta": {"content": "Hello"},
-                        "finish_reason": None,
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "gpt-3.5-turbo",
-                "created": 1234567890,
-            },
-            {
-                "choices": [
-                    {
-                        "delta": {},
-                        "finish_reason": "stop",
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "gpt-3.5-turbo",
-                "created": 1234567890,
-                "usage": {
-                    "prompt_tokens": 10,
-                    "completion_tokens": 1,
-                    "total_tokens": 11,
-                },
-            },
-        ]
-
-        with (
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-            ) as mock_litellm,
-            patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
-        ):
-            # Mock the litellm completion stream
-            mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = mock_chunks
-            mock_litellm.return_value = mock_stream
-
-            # Mock obj_read to return the prompt
-            mock_obj_read.return_value = tsi.ObjReadRes(obj=mock_prompt_obj)
-
-            prompt_uri = (
-                f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
-            )
-
-            # Create test request with prompt
-            req = tsi.CompletionsCreateReq(
-                project_id=self.project_id,
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": "Hi there"}],
-                    prompt=prompt_uri,
-                ),
-                track_llm_call=False,
-            )
-
-            # Get the stream
-            stream = self.server.completions_create_stream(req)
-
-            # Collect all chunks
-            chunks = list(stream)
-
-            # Verify the chunks
-            assert len(chunks) == 2
-            assert chunks[0]["choices"][0]["delta"]["content"] == "Hello"
-            assert chunks[1]["choices"][0]["finish_reason"] == "stop"
-
-            # Verify obj_read was called to resolve the prompt
-            mock_obj_read.assert_called_once()
-
-    def test_streaming_with_prompt_and_template_vars(self):
-        """Test streaming completion with prompt resolution and template variables."""
-        # Mock the MessagesPrompt object with template variables
-        mock_prompt_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id="test-prompt",
-            digest="digest-1",
-            base_object_class="MessagesPrompt",
-            leaf_object_class="MessagesPrompt",
-            val={
-                "messages": [
-                    {"role": "system", "content": "You are {assistant_name}."},
-                    {"role": "user", "content": "Tell me about {topic}."},
-                ]
-            },
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
-        )
-
-        # Mock response chunks
-        mock_chunks = [
-            {
-                "choices": [
-                    {
-                        "delta": {"content": "Mathematics"},
-                        "finish_reason": None,
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "gpt-3.5-turbo",
-                "created": 1234567890,
-            },
-            {
-                "choices": [
-                    {
-                        "delta": {},
-                        "finish_reason": "stop",
-                        "index": 0,
-                    }
-                ],
-                "id": "test-id",
-                "model": "gpt-3.5-turbo",
-                "created": 1234567890,
-                "usage": {
-                    "prompt_tokens": 15,
-                    "completion_tokens": 1,
-                    "total_tokens": 16,
-                },
-            },
-        ]
-
-        with (
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-            ) as mock_litellm,
-            patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
-        ):
-            # Mock the litellm completion stream
-            mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = mock_chunks
-            mock_litellm.return_value = mock_stream
-
-            # Mock obj_read to return the prompt
-            mock_obj_read.return_value = tsi.ObjReadRes(obj=mock_prompt_obj)
-
-            prompt_uri = (
-                f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
-            )
-
-            # Create test request with prompt and template_vars
-            req = tsi.CompletionsCreateReq(
-                project_id=self.project_id,
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[],
-                    prompt=prompt_uri,
-                    template_vars={"assistant_name": "MathBot", "topic": "mathematics"},
-                ),
-                track_llm_call=False,
-            )
-
-            # Get the stream
-            stream = self.server.completions_create_stream(req)
-
-            # Collect all chunks
-            chunks = list(stream)
-
-            # Verify the chunks
-            assert len(chunks) == 2
-            assert chunks[0]["choices"][0]["delta"]["content"] == "Mathematics"
-            assert chunks[1]["choices"][0]["finish_reason"] == "stop"
-
-            # Verify litellm was called with substituted messages
-            mock_litellm.assert_called_once()
-            call_kwargs = mock_litellm.call_args[1]
-            messages = call_kwargs["inputs"].messages
-
-            # Should have 2 messages with template vars replaced
-            assert len(messages) == 2
-            assert messages[0]["content"] == "You are MathBot."
-            assert messages[1]["content"] == "Tell me about mathematics."
-
-    @pytest.mark.disable_logging_error_check
-    def test_streaming_with_prompt_error(self):
-        """Test error handling when prompt resolution fails during streaming."""
-        with patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read:
-            # Mock obj_read to raise an error
-            from weave.trace_server.errors import NotFoundError
-
-            mock_obj_read.side_effect = NotFoundError("Prompt not found")
-
-            prompt_uri = f"weave-trace-internal:///{self.project_id}/object/missing-prompt:digest-1"
-
-            # Create test request with non-existent prompt
-            req = tsi.CompletionsCreateReq(
-                project_id=self.project_id,
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": "Hi"}],
-                    prompt=prompt_uri,
-                ),
-                track_llm_call=False,
-            )
-
-            # Get the stream
-            stream = self.server.completions_create_stream(req)
-
-            # Collect all chunks - should get error chunk
-            chunks = list(stream)
-
-            # Should have exactly one error chunk
-            assert len(chunks) == 1
-            assert "error" in chunks[0]
-            assert "Failed to resolve and apply prompt" in chunks[0]["error"]
+# --- resolve_and_apply_prompt --------------------------------------------------
 
 
-class TestResolveAndApplyPrompt(unittest.TestCase):
-    """Tests for the resolve_and_apply_prompt helper function.
-
-    This test suite verifies the consolidated helper that:
-    1. Resolves prompt references to messages
-    2. Combines prompt messages with user messages
-    3. Applies template variable substitution to combined messages
-    """
-
-    def setUp(self):
-        """Set up test fixtures before each test."""
-        self.project_id = "test-project"
-
-    def test_resolve_and_apply_prompt_with_all_params(self):
-        """Test with prompt, messages, and template vars all provided."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
-
-        # Mock prompt object
-        mock_prompt_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id="test-prompt",
-            digest="digest-1",
-            base_object_class="MessagesPrompt",
-            leaf_object_class="MessagesPrompt",
-            val={
-                "messages": [
-                    {"role": "system", "content": "You are {assistant_name}."},
-                    {"role": "user", "content": "Answer in {language}."},
-                ]
-            },
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
-        )
-
-        def mock_obj_read(req):
-            return tsi.ObjReadRes(obj=mock_prompt_obj)
-
-        prompt_uri = (
-            f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
-        )
-        messages = [{"role": "user", "content": "My question: {question}"}]
-        template_vars = {
+def test_resolve_and_apply_prompt_with_all_params():
+    """Prompt + user messages combine and all non-assistant messages get template vars."""
+    project_id = "test-project"
+    prompt_obj = _messages_prompt_obj(
+        project_id,
+        [
+            {"role": "system", "content": "You are {assistant_name}."},
+            {"role": "user", "content": "Answer in {language}."},
+        ],
+    )
+    combined, initial = resolve_and_apply_prompt(
+        prompt=_prompt_uri(project_id, "test-prompt"),
+        messages=[{"role": "user", "content": "My question: {question}"}],
+        template_vars={
             "assistant_name": "TestBot",
             "language": "Spanish",
             "question": "What is 2+2?",
-        }
+        },
+        project_id=project_id,
+        obj_read_func=lambda req: tsi.ObjReadRes(obj=prompt_obj),
+    )
+    assert combined == [
+        {"role": "system", "content": "You are TestBot."},
+        {"role": "user", "content": "Answer in Spanish."},
+        {"role": "user", "content": "My question: What is 2+2?"},
+    ]
+    assert initial == [{"role": "user", "content": "My question: {question}"}]
 
-        combined, initial = resolve_and_apply_prompt(
-            prompt=prompt_uri,
-            messages=messages,
-            template_vars=template_vars,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
-        )
 
-        # Check combined messages (prompt + user, with template vars applied)
-        assert len(combined) == 3
-        assert combined[0]["role"] == "system"
-        assert combined[0]["content"] == "You are TestBot."
-        assert combined[1]["role"] == "user"
-        assert combined[1]["content"] == "Answer in Spanish."
-        assert combined[2]["role"] == "user"
-        assert combined[2]["content"] == "My question: What is 2+2?"
+def test_resolve_and_apply_prompt_only_prompt_no_template_vars():
+    """A prompt with no user messages or vars passes its messages through unchanged."""
+    project_id = "test-project"
+    prompt_obj = _messages_prompt_obj(
+        project_id, [{"role": "system", "content": "You are a helpful assistant."}]
+    )
+    combined, initial = resolve_and_apply_prompt(
+        prompt=_prompt_uri(project_id, "test-prompt"),
+        messages=None,
+        template_vars=None,
+        project_id=project_id,
+        obj_read_func=lambda req: tsi.ObjReadRes(obj=prompt_obj),
+    )
+    assert combined == [{"role": "system", "content": "You are a helpful assistant."}]
+    assert initial == []
 
-        # Check initial messages (original user messages before template vars)
-        assert len(initial) == 1
-        assert initial[0]["content"] == "My question: {question}"
 
-    def test_resolve_and_apply_prompt_only_prompt_no_template_vars(self):
-        """Test with only prompt, no user messages or template vars."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
-
-        mock_prompt_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id="test-prompt",
-            digest="digest-1",
-            base_object_class="MessagesPrompt",
-            leaf_object_class="MessagesPrompt",
-            val={
-                "messages": [
-                    {"role": "system", "content": "You are a helpful assistant."},
-                ]
-            },
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
-        )
-
-        def mock_obj_read(req):
-            return tsi.ObjReadRes(obj=mock_prompt_obj)
-
-        prompt_uri = (
-            f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
-        )
-
-        combined, initial = resolve_and_apply_prompt(
-            prompt=prompt_uri,
-            messages=None,
-            template_vars=None,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
-        )
-
-        # Should just have the prompt messages
-        assert len(combined) == 1
-        assert combined[0]["content"] == "You are a helpful assistant."
-
-        # No initial messages
-        assert len(initial) == 0
-
-    def test_resolve_and_apply_prompt_only_messages_and_template_vars(self):
-        """Test with only user messages and template vars, no prompt."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
-
-        def mock_obj_read(req):
-            raise NotImplementedError("Should not be called")
-
-        messages = [
+def test_resolve_and_apply_prompt_only_messages_and_template_vars():
+    """With no prompt, user messages get vars applied while initial stays raw."""
+    combined, initial = resolve_and_apply_prompt(
+        prompt=None,
+        messages=[
             {"role": "system", "content": "You are {assistant_name}."},
             {"role": "user", "content": "Hello {user_name}!"},
-        ]
-        template_vars = {
-            "assistant_name": "ChatBot",
-            "user_name": "Alice",
-        }
+        ],
+        template_vars={"assistant_name": "ChatBot", "user_name": "Alice"},
+        project_id="test-project",
+        obj_read_func=_unused_obj_read,
+    )
+    assert combined == [
+        {"role": "system", "content": "You are ChatBot."},
+        {"role": "user", "content": "Hello Alice!"},
+    ]
+    assert initial[0]["content"] == "You are {assistant_name}."
 
-        combined, initial = resolve_and_apply_prompt(
-            prompt=None,
-            messages=messages,
-            template_vars=template_vars,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
-        )
 
-        # Should have messages with template vars applied
-        assert len(combined) == 2
-        assert combined[0]["content"] == "You are ChatBot."
-        assert combined[1]["content"] == "Hello Alice!"
+def test_resolve_and_apply_prompt_only_messages_no_template_vars():
+    """User messages with no prompt or vars pass through unchanged."""
+    user_messages = [{"role": "user", "content": "Hello!"}]
+    combined, initial = resolve_and_apply_prompt(
+        prompt=None,
+        messages=user_messages,
+        template_vars=None,
+        project_id="test-project",
+        obj_read_func=_unused_obj_read,
+    )
+    assert combined == [{"role": "user", "content": "Hello!"}]
+    assert initial == user_messages
 
-        # Initial messages should be untouched
-        assert len(initial) == 2
-        assert initial[0]["content"] == "You are {assistant_name}."
 
-    def test_resolve_and_apply_prompt_only_messages_no_template_vars(self):
-        """Test with only user messages, no prompt or template vars."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+@pytest.mark.parametrize(
+    "template_vars",
+    [None, {"name": "Alice"}],
+    ids=["empty_inputs", "template_vars_no_messages"],
+)
+def test_resolve_and_apply_prompt_empty_message_set(template_vars):
+    """No prompt and no messages yields empty output even when template vars are present."""
+    combined, initial = resolve_and_apply_prompt(
+        prompt=None,
+        messages=None,
+        template_vars=template_vars,
+        project_id="test-project",
+        obj_read_func=_unused_obj_read,
+    )
+    assert combined == []
+    assert initial == []
 
-        def mock_obj_read(req):
-            raise NotImplementedError("Should not be called")
 
-        user_messages = [
-            {"role": "user", "content": "Hello!"},
-        ]
-
-        combined, initial = resolve_and_apply_prompt(
-            prompt=None,
-            messages=user_messages,
-            template_vars=None,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
-        )
-
-        # Should just pass through the messages unchanged
-        assert len(combined) == 1
-        assert combined[0]["content"] == "Hello!"
-        assert initial == user_messages
-
-    def test_resolve_and_apply_prompt_empty_inputs(self):
-        """Test with all inputs empty/None."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
-
-        def mock_obj_read(req):
-            raise NotImplementedError("Should not be called")
-
-        combined, initial = resolve_and_apply_prompt(
-            prompt=None,
-            messages=None,
-            template_vars=None,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
-        )
-
-        # Should return empty lists
-        assert len(combined) == 0
-        assert len(initial) == 0
-
-    def test_resolve_and_apply_prompt_prompt_not_found(self):
-        """Test error handling when prompt reference cannot be found."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
-
-        def mock_obj_read(req):
-            # Raise NotFoundError directly (simulating obj_read behavior when object doesn't exist)
-            raise NotFoundError(f"Object not found: {req.object_id}")
-
-        prompt_uri = (
-            f"weave-trace-internal:///{self.project_id}/object/missing-prompt:digest-1"
-        )
-
-        with pytest.raises(NotFoundError) as context:
-            resolve_and_apply_prompt(
-                prompt=prompt_uri,
-                messages=None,
-                template_vars=None,
-                project_id=self.project_id,
-                obj_read_func=mock_obj_read,
-            )
-
-        assert "Object not found" in str(context.value)
-
-    def test_resolve_and_apply_prompt_invalid_prompt_type(self):
-        """Test error handling when prompt reference is not a Prompt object."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
-
-        # Mock an object that's not a MessagesPrompt
-        mock_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id="test-obj",
-            digest="digest-1",
-            base_object_class="Model",
-            leaf_object_class="Model",
-            val={"name": "test"},
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
-        )
-
-        def mock_obj_read(req):
-            return tsi.ObjReadRes(obj=mock_obj)
-
-        prompt_uri = (
-            f"weave-trace-internal:///{self.project_id}/object/test-obj:digest-1"
-        )
-
-        with pytest.raises(InvalidRequest) as context:
-            resolve_and_apply_prompt(
-                prompt=prompt_uri,
-                messages=None,
-                template_vars=None,
-                project_id=self.project_id,
-                obj_read_func=mock_obj_read,
-            )
-
-        assert "is not a Prompt or MessagesPrompt" in str(context.value)
-
-    def test_resolve_and_apply_prompt_template_vars_with_empty_messages(self):
-        """Test that template vars are skipped when there are no messages."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
-
-        def mock_obj_read(req):
-            raise NotImplementedError("Should not be called")
-
-        # Template vars provided but no messages
-        template_vars = {"name": "Alice"}
-
-        combined, initial = resolve_and_apply_prompt(
-            prompt=None,
-            messages=None,
-            template_vars=template_vars,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
-        )
-
-        # Should return empty lists (template vars skipped when no messages)
-        assert len(combined) == 0
-        assert len(initial) == 0
-
-    def test_resolve_and_apply_prompt_skips_assistant_messages(self):
-        """Test that template variable substitution is skipped for assistant messages."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
-
-        def mock_obj_read(req):
-            raise NotImplementedError("Should not be called")
-
-        # Messages including an assistant message with template-like content
-        # If for example we specified a JSON response format, the assistant message would be a JSON object.
-        messages = [
+def test_resolve_and_apply_prompt_skips_assistant_messages():
+    """Template substitution applies to system/user messages but never assistant ones."""
+    combined, _ = resolve_and_apply_prompt(
+        prompt=None,
+        messages=[
             {"role": "system", "content": "You are {assistant_name}."},
             {"role": "user", "content": "Hello {user_name}!"},
             {"role": "assistant", "content": '{"response": "My name is ChatBot."}'},
             {"role": "user", "content": "Yes, my name is {user_name}."},
-        ]
-        template_vars = {
-            "assistant_name": "ChatBot",
-            "user_name": "Alice",
-        }
+        ],
+        template_vars={"assistant_name": "ChatBot", "user_name": "Alice"},
+        project_id="test-project",
+        obj_read_func=_unused_obj_read,
+    )
+    assert combined == [
+        {"role": "system", "content": "You are ChatBot."},
+        {"role": "user", "content": "Hello Alice!"},
+        {"role": "assistant", "content": '{"response": "My name is ChatBot."}'},
+        {"role": "user", "content": "Yes, my name is Alice."},
+    ]
 
-        combined, initial = resolve_and_apply_prompt(
-            prompt=None,
-            messages=messages,
-            template_vars=template_vars,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
+
+def test_resolve_and_apply_prompt_prompt_not_found():
+    """A missing prompt reference raises NotFoundError."""
+    project_id = "test-project"
+
+    def obj_read(req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        raise NotFoundError(f"Object not found: {req.object_id}")
+
+    with pytest.raises(NotFoundError, match="Object not found"):
+        resolve_and_apply_prompt(
+            prompt=_prompt_uri(project_id, "missing-prompt"),
+            messages=None,
+            template_vars=None,
+            project_id=project_id,
+            obj_read_func=obj_read,
         )
 
-        # Should have 4 messages
-        assert len(combined) == 4
 
-        # System message should have template vars applied
-        assert combined[0]["role"] == "system"
-        assert combined[0]["content"] == "You are ChatBot."
+def test_resolve_and_apply_prompt_invalid_prompt_type():
+    """A non-Prompt prompt reference raises InvalidRequest."""
+    project_id = "test-project"
+    obj = _model_obj(project_id, "test-obj")
+    with pytest.raises(InvalidRequest, match="is not a Prompt or MessagesPrompt"):
+        resolve_and_apply_prompt(
+            prompt=_prompt_uri(project_id, "test-obj"),
+            messages=None,
+            template_vars=None,
+            project_id=project_id,
+            obj_read_func=lambda req: tsi.ObjReadRes(obj=obj),
+        )
 
-        # First user message should have template vars applied
-        assert combined[1]["role"] == "user"
-        assert combined[1]["content"] == "Hello Alice!"
 
-        # Assistant message should NOT have template vars applied (kept as-is)
-        assert combined[2]["role"] == "assistant"
-        assert combined[2]["content"] == '{"response": "My name is ChatBot."}'
+# --- non-streaming completions write agent spans -------------------------------
 
-        # Second user message should have template vars applied
-        assert combined[3]["role"] == "user"
-        assert combined[3]["content"] == "Yes, my name is Alice."
+
+def test_completions_writes_agent_span(
+    completions_mock_server, completions_secret_fetcher, completions_mock_response
+):
+    """completions_create writes one span carrying model, tokens, OK status, and ids."""
+    with (
+        patch(
+            LITELLM_COMPLETION,
+            return_value=MagicMock(response=completions_mock_response),
+        ),
+        patch(AGENT_WRITER) as writer_cls,
+    ):
+        writer = writer_cls.return_value
+        result = completions_mock_server.completions_create(
+            _completion_req("dGVzdF9wcm9qZWN0", track=True)
+        )
+    writer.insert_span.assert_called_once()
+    assert result.weave_call_id is not None
+    assert result.span_id is not None
+    assert result.trace_id is not None
+    assert result.response["choices"][0]["message"]["content"] == "Hello!"
+    span = writer.insert_span.call_args[0][0]
+    assert span.project_id == "dGVzdF9wcm9qZWN0"
+    assert span.request_model == "gpt-3.5-turbo"
+    assert span.input_tokens == 10
+    assert span.output_tokens == 5
+    assert span.status_code == "OK"
+
+
+def test_completions_handles_error_response(
+    completions_mock_server, completions_secret_fetcher
+):
+    """An error response is surfaced and recorded as an ERROR span."""
+    error_response = {"error": "Rate limit exceeded", "choices": []}
+    with (
+        patch(LITELLM_COMPLETION, return_value=MagicMock(response=error_response)),
+        patch(AGENT_WRITER) as writer_cls,
+    ):
+        writer = writer_cls.return_value
+        result = completions_mock_server.completions_create(
+            _completion_req("dGVzdF9wcm9qZWN0", track=True)
+        )
+    assert result.response["error"] == "Rate limit exceeded"
+    writer.insert_span.assert_called_once()
+    span = writer.insert_span.call_args[0][0]
+    assert span.status_code == "ERROR"
+    assert span.status_message == "Rate limit exceeded"
+
+
+def test_streaming_completions_writes_agent_spans(
+    completions_mock_server, completions_secret_fetcher
+):
+    """Streaming with tracking writes an open (UNSET) span then a completed (OK) span."""
+    chunks_in = [
+        _delta_chunk("Hi"),
+        _stop_chunk({"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11}),
+    ]
+    with (
+        patch(LITELLM_STREAM, return_value=_iter_mock(chunks_in)),
+        patch(AGENT_WRITER) as writer_cls,
+    ):
+        writer = writer_cls.return_value
+        chunks = list(
+            completions_mock_server.completions_create_stream(
+                _completion_req("dGVzdF9wcm9qZWN0", track=True)
+            )
+        )
+    assert "_meta" in chunks[0]
+    assert "weave_call_id" in chunks[0]["_meta"]
+    assert "span_id" in chunks[0]["_meta"]
+    assert "trace_id" in chunks[0]["_meta"]
+    assert writer.insert_span.call_count == 2
+    assert writer.insert_span.call_args_list[0][0][0].status_code == "UNSET"
+    completed_span = writer.insert_span.call_args_list[1][0][0]
+    assert completed_span.status_code == "OK"
+    assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
+
+
+def test_streaming_completions_error_writes_error_span(
+    completions_mock_server, completions_secret_fetcher
+):
+    """A mid-stream exception is captured in the completed span as an ERROR."""
+
+    def _error_stream():
+        yield _delta_chunk("Hi")
+        raise RuntimeError("stream died")
+
+    with (
+        patch(LITELLM_STREAM, return_value=_error_stream()),
+        patch(AGENT_WRITER) as writer_cls,
+    ):
+        writer = writer_cls.return_value
+        list(
+            completions_mock_server.completions_create_stream(
+                _completion_req("dGVzdF9wcm9qZWN0", track=True)
+            )
+        )
+    assert writer.insert_span.call_count == 2
+    completed_span = writer.insert_span.call_args_list[1][0][0]
+    assert completed_span.status_code == "ERROR"
+    assert "stream died" in completed_span.status_message
+
+
+# --- provider base_url / header validation -------------------------------------
+
+
+def test_provider_base_url_validation():
+    """Provider.base_url only accepts well-formed, public HTTP(S) URLs and safe headers."""
+    assert (
+        _make_provider("https://api.openai.com/v1").base_url
+        == "https://api.openai.com/v1"
+    )
+    assert (
+        _make_provider("http://my-ollama-server.example.com:11434").base_url
+        == "http://my-ollama-server.example.com:11434"
+    )
+
+    for bad_url in (
+        "ftp://bad.example.com",
+        "file:///etc/passwd",
+        "https://api.example.com/v1?foo=bar",
+        "https://api.example.com/v1#section",
+        "http://10.0.0.1/path?",
+    ):
+        with pytest.raises(ValidationError):
+            _make_provider(bad_url)
+
+    for hostname in (
+        "metadata.google.internal",
+        "metadata.google.internal.",
+        "foo.metadata.google.internal",
+        "169.254.169.254",
+    ):
+        with pytest.raises(ValidationError):
+            _make_provider(f"http://{hostname}/v1")
+
+    for addr in ("10.0.0.1", "172.16.0.1", "192.168.1.1", "127.0.0.1"):
+        with pytest.raises(ValidationError):
+            _make_provider(f"http://{addr}/v1")
+
+    for alt_ip in ("0xa9fea9fe", "2852039166", "0x7f000001", "0"):
+        with pytest.raises(ValidationError):
+            _make_provider(f"http://{alt_ip}/v1")
+
+    with pytest.raises(ValidationError):
+        _make_provider("http://[::1]/v1")
+    with pytest.raises(ValidationError):
+        _make_provider("http://[::ffff:169.254.169.254]/v1")
+
+    for blocked in ("Metadata-Flavor", "METADATA-FLAVOR", "X-aws-ec2-metadata-token"):
+        with pytest.raises(ValidationError):
+            _make_provider("https://api.example.com", extra_headers={blocked: "val"})
+
+    allowed = _make_provider(
+        "https://api.example.com",
+        extra_headers={"X-Custom-Header": "value", "Authorization": "Bearer tok"},
+    )
+    assert "X-Custom-Header" in allowed.extra_headers
+
+    # Validation also runs on assignment, not just init.
+    p = _make_provider("https://api.example.com")
+    with pytest.raises(ValidationError):
+        p.base_url = "http://169.254.169.254/v1"
+    with pytest.raises(ValidationError):
+        p.extra_headers = {"Metadata-Flavor": "Google"}
+
+
+# --- custom provider cache -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    (
+        "override_project",
+        "expected_obj_reads",
+        "expected_secret_fetches",
+        "same_instance",
+    ),
+    [
+        (False, 2, 1, True),  # same key on second call -> cache hit
+        (True, 4, 2, False),  # distinct project_id -> distinct cache key
+    ],
+    ids=["cache_hit_within_ttl", "distinct_keys_isolate"],
+)
+def test_get_custom_provider_info_cache_behavior(
+    custom_provider_fixture,
+    override_project,
+    expected_obj_reads,
+    expected_secret_fetches,
+    same_instance,
+):
+    """Cache hits within TTL skip resolution; distinct keys do not collide."""
+    project_id, provider_id, model_object_id, obj_read, secret_fetcher = (
+        custom_provider_fixture
+    )
+    first = get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
+    second_project = "other-project" if override_project else project_id
+    second = get_custom_provider_info(
+        second_project, provider_id, model_object_id, obj_read
+    )
+    assert (first is second) is same_instance
+    assert obj_read.call_count == expected_obj_reads
+    assert secret_fetcher.fetch.call_count == expected_secret_fetches
+
+
+def test_get_custom_provider_info_requires_secret_fetcher_on_cache_hit(
+    custom_provider_fixture,
+):
+    """A cache hit must not bypass the secret_fetcher-required guard."""
+    project_id, provider_id, model_object_id, obj_read, _ = custom_provider_fixture
+    get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
+
+    _secret_fetcher_context.set(None)
+    with pytest.raises(InvalidRequest, match="No secret fetcher found"):
+        get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
+
+
+# --- fixtures ------------------------------------------------------------------
+
+
+@pytest.fixture
+def streaming_server():
+    """ClickHouseTraceServer with a stubbed CH client and an OPENAI/CUSTOM/TEST key fetcher."""
+    server = _mock_ch_server()
+    fetcher = _secret_fetcher(
+        {
+            "OPENAI_API_KEY": "test-api-key-value",
+            "CUSTOM_API_KEY": "test-api-key-value",
+            "TEST_API_KEY": "test-api-key-value",
+        }
+    )
+    token = _secret_fetcher_context.set(fetcher)
+    yield server
+    _secret_fetcher_context.reset(token)
 
 
 @pytest.fixture
 def completions_mock_server():
-    """Create a mock ClickHouseTraceServer for completions tests."""
-    server = chts.ClickHouseTraceServer(host="test_host")
-    mock_ch_client = MagicMock()
-    mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
-    # ch_client is lazy; pre-populating _thread_local.ch_client bypasses _mint_client.
-    server._thread_local.ch_client = mock_ch_client
-    return server
+    """ClickHouseTraceServer with a stubbed CH client for completions tests."""
+    return _mock_ch_server()
 
 
 @pytest.fixture
 def completions_secret_fetcher():
-    """Set up mock secret fetcher with test API key."""
-    mock_fetcher = MagicMock()
-    mock_fetcher.fetch.return_value = {
-        "secrets": {"OPENAI_API_KEY": "test-api-key-value"}
-    }
-    token = _secret_fetcher_context.set(mock_fetcher)
-    yield mock_fetcher
+    """Set up a mock secret fetcher with the OPENAI test key."""
+    fetcher = _secret_fetcher({"OPENAI_API_KEY": "test-api-key-value"})
+    token = _secret_fetcher_context.set(fetcher)
+    yield fetcher
     _secret_fetcher_context.reset(token)
 
 
@@ -1344,446 +791,212 @@ def completions_mock_response():
                 "finish_reason": "stop",
             }
         ],
-        "usage": {
-            "prompt_tokens": 10,
-            "completion_tokens": 5,
-            "total_tokens": 15,
-        },
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
     }
 
 
-def test_completions_writes_agent_span(
-    completions_mock_server,
-    completions_secret_fetcher,
-    completions_mock_response,
-):
-    """Verify completions_create writes an agent span via AgentWriteHandler."""
-    with (
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
-        ) as mock_litellm,
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
-        ) as mock_agent_writer_cls,
-    ):
-        mock_agent_writer = MagicMock()
-        mock_agent_writer_cls.return_value = mock_agent_writer
-        mock_litellm.return_value = MagicMock(response=completions_mock_response)
+@pytest.fixture
+def custom_provider_fixture():
+    """Provider/model/secret fixture for cache tests.
 
-        req = tsi.CompletionsCreateReq(
-            project_id="dGVzdF9wcm9qZWN0",
-            inputs=tsi.CompletionsCreateRequestInputs(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "Say hello"}],
-            ),
-            track_llm_call=True,
+    Yields (project_id, provider_id, model_object_id, mock_obj_read, mock_secret_fetcher).
+    """
+    project_id = "p"
+    provider_id = "prov"
+    model_object_id = f"{provider_id}-mdl"
+    provider_obj = _provider_obj(project_id, provider_id, digest="d1", extra_headers={})
+    model_obj = _provider_model_obj(
+        project_id, model_object_id, provider_id, digest="d2", name="actual-model"
+    )
+    obj_read = MagicMock(
+        side_effect=_obj_read_router(
+            {provider_id: provider_obj, model_object_id: model_obj}
         )
-
-        result = completions_mock_server.completions_create(req)
-
-        mock_agent_writer.insert_span.assert_called_once()
-        assert result.weave_call_id is not None
-        assert result.span_id is not None
-        assert result.trace_id is not None
-        assert result.response["choices"][0]["message"]["content"] == "Hello!"
-
-        span = mock_agent_writer.insert_span.call_args[0][0]
-        assert span.project_id == "dGVzdF9wcm9qZWN0"
-        assert span.request_model == "gpt-3.5-turbo"
-        assert span.input_tokens == 10
-        assert span.output_tokens == 5
-        assert span.status_code == "OK"
+    )
+    secret_fetcher = _secret_fetcher({"TEST_API_KEY": "k"})
+    token = _secret_fetcher_context.set(secret_fetcher)
+    try:
+        yield project_id, provider_id, model_object_id, obj_read, secret_fetcher
+    finally:
+        _secret_fetcher_context.reset(token)
 
 
-def test_completions_handles_error_response(
-    completions_mock_server,
-    completions_secret_fetcher,
-):
-    """Verify error responses are properly captured in the agent span."""
-    error_response = {"error": "Rate limit exceeded", "choices": []}
-
-    with (
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
-        ) as mock_litellm,
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
-        ) as mock_agent_writer_cls,
-    ):
-        mock_agent_writer = MagicMock()
-        mock_agent_writer_cls.return_value = mock_agent_writer
-        mock_litellm.return_value = MagicMock(response=error_response)
-
-        req = tsi.CompletionsCreateReq(
-            project_id="dGVzdF9wcm9qZWN0",
-            inputs=tsi.CompletionsCreateRequestInputs(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "Say hello"}],
-            ),
-            track_llm_call=True,
-        )
-
-        result = completions_mock_server.completions_create(req)
-
-        assert result.response["error"] == "Rate limit exceeded"
-
-        mock_agent_writer.insert_span.assert_called_once()
-        span = mock_agent_writer.insert_span.call_args[0][0]
-        assert span.status_code == "ERROR"
-        assert span.status_message == "Rate limit exceeded"
+# --- helpers -------------------------------------------------------------------
 
 
-def test_completions_usage_captured_in_span(
-    completions_mock_server, completions_secret_fetcher, completions_mock_response
-):
-    """Verify usage data is properly captured in the agent span token fields."""
-    with (
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
-        ) as mock_litellm,
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
-        ) as mock_agent_writer_cls,
-    ):
-        mock_agent_writer = MagicMock()
-        mock_agent_writer_cls.return_value = mock_agent_writer
-        mock_litellm.return_value = MagicMock(response=completions_mock_response)
-
-        req = tsi.CompletionsCreateReq(
-            project_id="dGVzdF9wcm9qZWN0",
-            inputs=tsi.CompletionsCreateRequestInputs(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "Say hello"}],
-            ),
-            track_llm_call=True,
-        )
-
-        completions_mock_server.completions_create(req)
-
-        mock_agent_writer.insert_span.assert_called_once()
-        span = mock_agent_writer.insert_span.call_args[0][0]
-
-        assert span.input_tokens == 10
-        assert span.output_tokens == 5
-        assert span.request_model == "gpt-3.5-turbo"
+def _mock_ch_server() -> chts.ClickHouseTraceServer:
+    server = chts.ClickHouseTraceServer(host="test_host")
+    mock_ch_client = MagicMock()
+    mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
+    # ch_client is lazy; pre-populating _thread_local.ch_client bypasses _mint_client.
+    server._thread_local.ch_client = mock_ch_client
+    return server
 
 
-def test_streaming_completions_writes_agent_spans(
-    completions_mock_server,
-    completions_secret_fetcher,
-):
-    """Verify completions_create_stream writes open + completed agent spans."""
-    mock_chunks = [
-        {
-            "choices": [
-                {"delta": {"content": "Hi"}, "finish_reason": None, "index": 0}
-            ],
-            "id": "test-id",
-            "model": "gpt-3.5-turbo",
-            "created": 1234567890,
-        },
-        {
-            "choices": [{"delta": {}, "finish_reason": "stop", "index": 0}],
-            "id": "test-id",
-            "model": "gpt-3.5-turbo",
-            "created": 1234567890,
-            "usage": {"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11},
-        },
-    ]
-
-    with (
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm,
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
-        ) as mock_agent_writer_cls,
-    ):
-        mock_agent_writer = MagicMock()
-        mock_agent_writer_cls.return_value = mock_agent_writer
-
-        mock_stream = MagicMock()
-        mock_stream.__iter__.return_value = mock_chunks
-        mock_litellm.return_value = mock_stream
-
-        req = tsi.CompletionsCreateReq(
-            project_id="dGVzdF9wcm9qZWN0",
-            inputs=tsi.CompletionsCreateRequestInputs(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "Say hello"}],
-            ),
-            track_llm_call=True,
-        )
-
-        stream = completions_mock_server.completions_create_stream(req)
-        chunks = list(stream)
-
-        assert "_meta" in chunks[0]
-        assert "weave_call_id" in chunks[0]["_meta"]
-        assert "span_id" in chunks[0]["_meta"]
-        assert "trace_id" in chunks[0]["_meta"]
-
-        # Open span + completed span = 2 insert_span calls
-        assert mock_agent_writer.insert_span.call_count == 2
-
-        open_span = mock_agent_writer.insert_span.call_args_list[0][0][0]
-        assert open_span.status_code == "UNSET"
-
-        completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
-        assert completed_span.status_code == "OK"
-        assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
+def _secret_fetcher(secrets: dict[str, str]) -> MagicMock:
+    fetcher = MagicMock()
+    fetcher.fetch.return_value = {"secrets": secrets}
+    return fetcher
 
 
-def test_streaming_completions_error_writes_error_span(
-    completions_mock_server,
-    completions_secret_fetcher,
-):
-    """Verify streaming errors are captured in the completed agent span."""
+def _obj_read_router(
+    objs: dict[str, tsi.ObjSchema], default: tsi.ObjSchema | None = None
+) -> Callable[[tsi.ObjReadReq], tsi.ObjReadRes]:
+    """Return an obj_read side-effect that maps object_id -> ObjReadRes."""
 
-    def _error_stream():
-        yield {
-            "choices": [
-                {"delta": {"content": "Hi"}, "finish_reason": None, "index": 0}
-            ],
-            "id": "test-id",
-            "model": "gpt-3.5-turbo",
-            "created": 1234567890,
-        }
-        raise RuntimeError("stream died")
+    def _read(req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        obj = objs.get(req.object_id)
+        if obj is not None:
+            return tsi.ObjReadRes(obj=obj)
+        if default is not None:
+            return tsi.ObjReadRes(obj=default)
+        raise NotFoundError(f"Unknown object_id: {req.object_id}")
 
-    with (
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm,
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
-        ) as mock_agent_writer_cls,
-    ):
-        mock_agent_writer = MagicMock()
-        mock_agent_writer_cls.return_value = mock_agent_writer
-        mock_litellm.return_value = _error_stream()
-
-        req = tsi.CompletionsCreateReq(
-            project_id="dGVzdF9wcm9qZWN0",
-            inputs=tsi.CompletionsCreateRequestInputs(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "Say hello"}],
-            ),
-            track_llm_call=True,
-        )
-
-        stream = completions_mock_server.completions_create_stream(req)
-        # The new wrapper catches the error and records it in the span
-        chunks = list(stream)
-
-        # Open span + completed (error) span
-        assert mock_agent_writer.insert_span.call_count == 2
-        completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
-        assert completed_span.status_code == "ERROR"
-        assert "stream died" in completed_span.status_message
+    return _read
 
 
-def _make_provider(base_url: str, extra_headers: dict | None = None):
+def _unused_obj_read(req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    raise NotImplementedError("Should not be called")
+
+
+def _obj_schema(project_id: str, object_id: str, **kwargs) -> tsi.ObjSchema:
+    base = {
+        "project_id": project_id,
+        "object_id": object_id,
+        "created_at": datetime.datetime.now(),
+        "version_index": 1,
+        "is_latest": 1,
+        "kind": "object",
+        "deleted_at": None,
+    }
+    base.update(kwargs)
+    return tsi.ObjSchema(**base)
+
+
+def _provider_obj(
+    project_id: str,
+    object_id: str,
+    *,
+    digest: str = "digest-1",
+    base_url: str = "https://api.example.com",
+    api_key_name: str = "TEST_API_KEY",
+    extra_headers: dict | None = None,
+    extra_val: dict | None = None,
+) -> tsi.ObjSchema:
+    val = {
+        "base_url": base_url,
+        "api_key_name": api_key_name,
+        "extra_headers": {"X-Header": "value"}
+        if extra_headers is None
+        else extra_headers,
+        "return_type": "openai",
+    }
+    if extra_val:
+        val.update(extra_val)
+    return _obj_schema(
+        project_id,
+        object_id,
+        digest=digest,
+        base_object_class="Provider",
+        leaf_object_class="Provider",
+        val=val,
+    )
+
+
+def _provider_model_obj(
+    project_id: str,
+    object_id: str,
+    provider_id: str,
+    *,
+    digest: str = "digest-2",
+    name: str = "actual-model-name",
+) -> tsi.ObjSchema:
+    return _obj_schema(
+        project_id,
+        object_id,
+        digest=digest,
+        base_object_class="ProviderModel",
+        leaf_object_class="ProviderModel",
+        val={"name": name, "provider": provider_id, "max_tokens": 4096, "mode": "chat"},
+    )
+
+
+def _messages_prompt_obj(project_id: str, messages: list[dict]) -> tsi.ObjSchema:
+    return _obj_schema(
+        project_id,
+        "test-prompt",
+        digest="digest-1",
+        base_object_class="MessagesPrompt",
+        leaf_object_class="MessagesPrompt",
+        val={"messages": messages},
+    )
+
+
+def _model_obj(project_id: str, object_id: str) -> tsi.ObjSchema:
+    return _obj_schema(
+        project_id,
+        object_id,
+        digest="digest-1",
+        base_object_class="Model",
+        leaf_object_class="Model",
+        val={"name": "test"},
+    )
+
+
+def _prompt_uri(project_id: str, object_id: str) -> str:
+    return f"weave-trace-internal:///{project_id}/object/{object_id}:digest-1"
+
+
+def _completion_req(
+    project_id: str,
+    *,
+    track: bool,
+    model: str = "gpt-3.5-turbo",
+    prompt: str | None = None,
+) -> tsi.CompletionsCreateReq:
+    inputs_kwargs: dict[str, object] = {
+        "model": model,
+        "messages": [{"role": "user", "content": "Say hello"}],
+    }
+    if prompt is not None:
+        inputs_kwargs["messages"] = [{"role": "user", "content": "Hi"}]
+        inputs_kwargs["prompt"] = prompt
+    return tsi.CompletionsCreateReq(
+        project_id=project_id,
+        inputs=tsi.CompletionsCreateRequestInputs(**inputs_kwargs),
+        track_llm_call=track,
+    )
+
+
+def _delta_chunk(content: str, *, model: str = "test-model") -> dict:
+    return {
+        "choices": [{"delta": {"content": content}, "finish_reason": None, "index": 0}],
+        "id": "test-id",
+        "model": model,
+        "created": 1234567890,
+    }
+
+
+def _stop_chunk(usage: dict, *, model: str = "test-model") -> dict:
+    return {
+        "choices": [{"delta": {}, "finish_reason": "stop", "index": 0}],
+        "id": "test-id",
+        "model": model,
+        "created": 1234567890,
+        "usage": usage,
+    }
+
+
+def _iter_mock(chunks: list[dict]) -> MagicMock:
+    stream = MagicMock()
+    stream.__iter__.return_value = chunks
+    return stream
+
+
+def _make_provider(base_url: str, extra_headers: dict | None = None) -> Provider:
     return Provider(
         name="test",
         base_url=base_url,
         api_key_name="MY_KEY",
         extra_headers=extra_headers or {},
     )
-
-
-def test_provider_base_url_validation():
-    """Verify that Provider.base_url only accepts well-formed, public HTTP(S) URLs."""
-    # Valid URLs accepted
-    p = _make_provider("https://api.openai.com/v1")
-    assert p.base_url == "https://api.openai.com/v1"
-    p = _make_provider("http://my-ollama-server.example.com:11434")
-    assert p.base_url == "http://my-ollama-server.example.com:11434"
-
-    # Non-http schemes rejected
-    with pytest.raises(ValidationError):
-        _make_provider("ftp://bad.example.com")
-    with pytest.raises(ValidationError):
-        _make_provider("file:///etc/passwd")
-
-    # Query strings, bare '?', and fragments rejected
-    with pytest.raises(ValidationError):
-        _make_provider("https://api.example.com/v1?foo=bar")
-    with pytest.raises(ValidationError):
-        _make_provider("https://api.example.com/v1#section")
-    with pytest.raises(ValidationError):
-        _make_provider("http://10.0.0.1/path?")
-
-    # Blocked hostnames rejected
-    for hostname in (
-        "metadata.google.internal",
-        "metadata.google.internal.",
-        "foo.metadata.google.internal",
-        "169.254.169.254",
-    ):
-        with pytest.raises(ValidationError):
-            _make_provider(f"http://{hostname}/v1")
-
-    # Non-globally-routable IPs rejected
-    for addr in ("10.0.0.1", "172.16.0.1", "192.168.1.1", "127.0.0.1"):
-        with pytest.raises(ValidationError):
-            _make_provider(f"http://{addr}/v1")
-
-    # Alternative IP encodings rejected
-    for alt_ip in ("0xa9fea9fe", "2852039166", "0x7f000001", "0"):
-        with pytest.raises(ValidationError):
-            _make_provider(f"http://{alt_ip}/v1")
-
-    # IPv6 non-global addresses rejected
-    with pytest.raises(ValidationError):
-        _make_provider("http://[::1]/v1")
-    with pytest.raises(ValidationError):
-        _make_provider("http://[::ffff:169.254.169.254]/v1")
-
-    # Blocked extra_headers rejected
-    for blocked in ("Metadata-Flavor", "METADATA-FLAVOR", "X-aws-ec2-metadata-token"):
-        with pytest.raises(ValidationError):
-            _make_provider("https://api.example.com", extra_headers={blocked: "val"})
-
-    # Allowed headers accepted
-    p = _make_provider(
-        "https://api.example.com",
-        extra_headers={"X-Custom-Header": "value", "Authorization": "Bearer tok"},
-    )
-    assert "X-Custom-Header" in p.extra_headers
-
-    # Validation also runs on assignment, not just init
-    p = _make_provider("https://api.example.com")
-    with pytest.raises(ValidationError):
-        p.base_url = "http://169.254.169.254/v1"
-    with pytest.raises(ValidationError):
-        p.extra_headers = {"Metadata-Flavor": "Google"}
-
-
-@pytest.fixture
-def custom_provider_fixture():
-    """Build a provider/model/secret fixture and clear the module-level cache.
-
-    Yields a tuple of (project_id, provider_id, model_object_id, mock_obj_read,
-    mock_secret_fetcher). The autouse fixture clears the module-level cache.
-    """
-    project_id = "p"
-    provider_id = "prov"
-    model_object_id = f"{provider_id}-mdl"
-
-    provider_obj = tsi.ObjSchema(
-        project_id=project_id,
-        object_id=provider_id,
-        digest="d1",
-        base_object_class="Provider",
-        leaf_object_class="Provider",
-        val={
-            "base_url": "https://api.example.com",
-            "api_key_name": "TEST_API_KEY",
-            "extra_headers": {},
-            "return_type": "openai",
-        },
-        created_at=datetime.datetime.now(),
-        version_index=1,
-        is_latest=1,
-        kind="object",
-        deleted_at=None,
-    )
-    model_obj = tsi.ObjSchema(
-        project_id=project_id,
-        object_id=model_object_id,
-        digest="d2",
-        base_object_class="ProviderModel",
-        leaf_object_class="ProviderModel",
-        val={
-            "name": "actual-model",
-            "provider": provider_id,
-            "max_tokens": 4096,
-            "mode": "chat",
-        },
-        created_at=datetime.datetime.now(),
-        version_index=1,
-        is_latest=1,
-        kind="object",
-        deleted_at=None,
-    )
-
-    def mock_obj_read(req):
-        if req.object_id == provider_id:
-            return tsi.ObjReadRes(obj=provider_obj)
-        if req.object_id == model_object_id:
-            return tsi.ObjReadRes(obj=model_obj)
-        raise NotFoundError(req.object_id)
-
-    mock_obj_read_func = MagicMock(side_effect=mock_obj_read)
-    mock_secret_fetcher = MagicMock()
-    mock_secret_fetcher.fetch.return_value = {"secrets": {"TEST_API_KEY": "k"}}
-
-    token = _secret_fetcher_context.set(mock_secret_fetcher)
-    try:
-        yield (
-            project_id,
-            provider_id,
-            model_object_id,
-            mock_obj_read_func,
-            mock_secret_fetcher,
-        )
-    finally:
-        _secret_fetcher_context.reset(token)
-
-
-@pytest.mark.parametrize(
-    (
-        "override_project",
-        "expected_obj_reads",
-        "expected_secret_fetches",
-        "same_instance",
-    ),
-    [
-        # Same key on the second call -> cache hit; only the first call resolves.
-        (False, 2, 1, True),
-        # Different project_id -> distinct cache key; both calls resolve.
-        (True, 4, 2, False),
-    ],
-    ids=["cache_hit_within_ttl", "distinct_keys_isolate"],
-)
-def test_get_custom_provider_info_cache_behavior(
-    custom_provider_fixture,
-    override_project,
-    expected_obj_reads,
-    expected_secret_fetches,
-    same_instance,
-):
-    """Cache hits within TTL skip resolution; distinct keys do not collide."""
-    project_id, provider_id, model_object_id, obj_read, secret_fetcher = (
-        custom_provider_fixture
-    )
-
-    first = get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
-    second_project = "other-project" if override_project else project_id
-    second = get_custom_provider_info(
-        second_project, provider_id, model_object_id, obj_read
-    )
-
-    assert (first is second) is same_instance
-    assert obj_read.call_count == expected_obj_reads
-    assert secret_fetcher.fetch.call_count == expected_secret_fetches
-
-
-def test_get_custom_provider_info_requires_secret_fetcher_on_cache_hit(
-    custom_provider_fixture,
-):
-    """A cache hit must not bypass the secret_fetcher-required guard."""
-    project_id, provider_id, model_object_id, obj_read, _ = custom_provider_fixture
-
-    # Populate the cache while the fixture's fetcher is in context.
-    get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
-
-    # Drop the fetcher; a subsequent call must still raise rather than serve cache.
-    _secret_fetcher_context.set(None)
-    with pytest.raises(InvalidRequest, match="No secret fetcher found"):
-        get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
-
-
-if __name__ == "__main__":
-    unittest.main()

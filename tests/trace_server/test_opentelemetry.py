@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 import pytest
+from openinference.semconv.trace import SpanAttributes as OISpanAttr
 from opentelemetry.proto.common.v1.common_pb2 import (
     AnyValue,
     InstrumentationScope,
@@ -374,1432 +375,1137 @@ def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
     )
 
 
-class TestPythonSpans:
-    def test_span_from_proto(self):
-        """Test converting a protobuf Span to a Python Span."""
-        pb_span = create_test_span()
-        py_span = PySpan.from_proto(pb_span)
+def test_span_from_proto() -> None:
+    """Test converting a protobuf Span to a Python Span."""
+    pb_span = create_test_span()
+    py_span = PySpan.from_proto(pb_span)
 
-        assert py_span.name == pb_span.name
-        assert py_span.trace_id == pb_span.trace_id.hex()
-        assert py_span.span_id == pb_span.span_id.hex()
-        assert py_span.start_time_unix_nano == pb_span.start_time_unix_nano
-        assert py_span.end_time_unix_nano == pb_span.end_time_unix_nano
-        assert py_span.kind == SpanKind.INTERNAL
-        assert py_span.status.code == StatusCode.OK
-        assert py_span.status.message == pb_span.status.message
+    assert py_span.name == pb_span.name
+    assert py_span.trace_id == pb_span.trace_id.hex()
+    assert py_span.span_id == pb_span.span_id.hex()
+    assert py_span.start_time_unix_nano == pb_span.start_time_unix_nano
+    assert py_span.end_time_unix_nano == pb_span.end_time_unix_nano
+    assert py_span.kind == SpanKind.INTERNAL
+    assert py_span.status.code == StatusCode.OK
+    assert py_span.status.message == pb_span.status.message
 
-        # Verify attributes were correctly converted
-        assert get_attribute(py_span.attributes, "test.attribute") == "test_value"
-        assert get_attribute(py_span.attributes, "test.number") == 42
-        assert (
-            get_attribute(py_span.attributes, "test.nested.value")
-            == "nested_test_value"
+    # Verify attributes were correctly converted
+    assert get_attribute(py_span.attributes, "test.attribute") == "test_value"
+    assert get_attribute(py_span.attributes, "test.number") == 42
+    assert get_attribute(py_span.attributes, "test.nested.value") == "nested_test_value"
+    array_value = get_attribute(py_span.attributes, "test.array")
+    assert isinstance(array_value, list)
+    assert len(array_value) == 2
+    assert array_value[0] == "value1"
+    assert array_value[1] == "value2"
+
+
+def test_span_from_proto_parent_id_normalization() -> None:
+    """Test that empty and all-zero parent_span_id values normalize to None."""
+    # All-zero parent_span_id is the OTel invalid-id sentinel; must mean no parent.
+    pb_span = create_test_span()
+    pb_span.parent_span_id = b"\x00" * 8
+    assert PySpan.from_proto(pb_span).parent_id is None, (
+        "all-zero parent_span_id should yield parent_id=None"
+    )
+
+    pb_span = create_test_span()
+    pb_span.parent_span_id = b""
+    assert PySpan.from_proto(pb_span).parent_id is None, (
+        "empty parent_span_id should yield parent_id=None"
+    )
+
+    pb_span = create_test_span()
+    pb_span.parent_span_id = bytes.fromhex("0123456789abcdef")
+    assert PySpan.from_proto(pb_span).parent_id == "0123456789abcdef", (
+        "real parent_span_id should hex-encode to parent_id"
+    )
+
+
+def test_span_to_call() -> None:
+    """Test converting a Python Span to Weave Calls."""
+    pb_span = create_test_span()
+    py_span = PySpan.from_proto(pb_span)
+
+    start_call, _ = py_span.to_call("test_project")
+
+    # Verify start call
+    assert isinstance(start_call, tsi.StartedCallSchemaForInsert)
+    assert start_call.project_id == "test_project"
+    assert start_call.id == py_span.span_id
+    assert (
+        start_call.op_name == py_span.name
+    )  # This should be using the shortened name if necessary
+    assert start_call.trace_id == py_span.trace_id
+    assert start_call.started_at == py_span.start_time
+
+
+def test_span_to_call_long_name() -> None:
+    """Test that span names are properly shortened when too long."""
+    # Create a test span with a very long name
+    pb_span = create_test_span()
+    long_name = "a" * (MAX_OP_NAME_LENGTH + 10)
+    pb_span.name = long_name
+
+    py_span = PySpan.from_proto(pb_span)
+    start_call, end_call = py_span.to_call("test_project")
+
+    # Verify that the op_name was shortened
+    identifier = hashlib.sha256(long_name.encode("utf-8")).hexdigest()[:4]
+    shortened_name = shorten_name(
+        long_name,
+        MAX_OP_NAME_LENGTH,
+        abbrv=f":{identifier}",
+        use_delimiter_in_abbr=False,
+    )
+    assert start_call.op_name == shortened_name
+    assert len(start_call.op_name) <= MAX_OP_NAME_LENGTH
+
+    # Verify attributes in start call
+    assert "test" in start_call.attributes
+    assert "attribute" in start_call.attributes["test"]
+    assert start_call.attributes["test"]["attribute"] == "test_value"
+    assert start_call.attributes["test"]["number"] == 42
+    assert "nested" in start_call.attributes["test"]
+    assert start_call.attributes["test"]["nested"]["value"] == "nested_test_value"
+    assert "array" in start_call.attributes["test"]
+    assert start_call.attributes["test"]["array"] == ["value1", "value2"]
+
+    # Verify otel_dump is included in the call (otel_span is now in otel_dump)
+    assert start_call.otel_dump is not None
+    assert start_call.otel_dump["name"] == long_name
+    assert start_call.otel_dump["context"]["trace_id"] == py_span.trace_id
+    assert start_call.otel_dump["context"]["span_id"] == py_span.span_id
+
+    # Verify end call
+    assert isinstance(end_call, tsi.EndedCallSchemaForInsert)
+    assert end_call.project_id == "test_project"
+    assert end_call.id == py_span.span_id
+    assert end_call.ended_at == py_span.end_time
+    assert end_call.exception is None
+
+
+def test_span_to_call_with_turn_and_thread() -> None:
+    """Test that turn_id equals thread_id when is_turn is True."""
+    # Create a test span with turn and thread attributes
+    pb_span = create_test_span()
+    test_thread_id = str(uuid.uuid4())
+
+    # Add wandb.is_turn and wandb.thread_id attributes
+    kv_is_turn = KeyValue()
+    kv_is_turn.key = "wandb.is_turn"
+    kv_is_turn.value.bool_value = True
+    pb_span.attributes.append(kv_is_turn)
+
+    kv_thread = KeyValue()
+    kv_thread.key = "wandb.thread_id"
+    kv_thread.value.string_value = test_thread_id
+    pb_span.attributes.append(kv_thread)
+
+    py_span = PySpan.from_proto(pb_span)
+    start_call, end_call = py_span.to_call("test_project")
+
+    # Verify turn_id equals call.id (span_id) when is_turn is True
+    assert start_call.turn_id == py_span.span_id
+    # Verify thread_id is passed through
+    assert start_call.thread_id == test_thread_id
+
+    # Test with is_turn = False
+    pb_span_false = create_test_span()
+    kv_is_turn_false = KeyValue()
+    kv_is_turn_false.key = "wandb.is_turn"
+    kv_is_turn_false.value.bool_value = False
+    pb_span_false.attributes.append(kv_is_turn_false)
+
+    kv_thread_false = KeyValue()
+    kv_thread_false.key = "wandb.thread_id"
+    kv_thread_false.value.string_value = test_thread_id
+    pb_span_false.attributes.append(kv_thread_false)
+
+    py_span_false = PySpan.from_proto(pb_span_false)
+    start_call_false, _ = py_span_false.to_call("test_project")
+
+    # Verify turn_id is None when is_turn is False
+    assert start_call_false.turn_id is None
+    assert start_call_false.thread_id == test_thread_id
+
+    # Test without is_turn (should default to None)
+    pb_span_no_turn = create_test_span()
+    kv_thread_only = KeyValue()
+    kv_thread_only.key = "wandb.thread_id"
+    kv_thread_only.value.string_value = test_thread_id
+    pb_span_no_turn.attributes.append(kv_thread_only)
+
+    py_span_no_turn = PySpan.from_proto(pb_span_no_turn)
+    start_call_no_turn, _ = py_span_no_turn.to_call("test_project")
+
+    # Verify turn_id is None when is_turn is not present
+    assert start_call_no_turn.turn_id is None
+    assert start_call_no_turn.thread_id == test_thread_id
+
+    # Test with is_turn = True but no thread_id
+    pb_span_turn_no_thread = create_test_span()
+    kv_is_turn_only = KeyValue()
+    kv_is_turn_only.key = "wandb.is_turn"
+    kv_is_turn_only.value.bool_value = True
+    pb_span_turn_no_thread.attributes.append(kv_is_turn_only)
+
+    py_span_turn_no_thread = PySpan.from_proto(pb_span_turn_no_thread)
+    start_call_turn_no_thread, _ = py_span_turn_no_thread.to_call("test_project")
+
+    # Verify turn_id is None when is_turn is True but thread_id is missing
+    assert start_call_turn_no_thread.turn_id is None
+    assert start_call_turn_no_thread.thread_id is None
+
+    # gen_ai.conversation.id sets thread_id and (being truthy) turn_id.
+    pb_span_conv = create_test_span()
+    kv_conv = KeyValue()
+    kv_conv.key = "gen_ai.conversation.id"
+    kv_conv.value.string_value = "conv-xyz"
+    pb_span_conv.attributes.append(kv_conv)
+
+    py_span_conv = PySpan.from_proto(pb_span_conv)
+    start_call_conv, _ = py_span_conv.to_call("test_project")
+    assert start_call_conv.thread_id == "conv-xyz"
+    assert start_call_conv.turn_id == py_span_conv.span_id
+
+
+def test_span_to_call_with_cache_tokens() -> None:
+    """Test that cache token usage attributes flow through to_call summary."""
+    pb_span = create_test_span()
+
+    # Add cache token usage attributes
+    kv_cache_creation = KeyValue()
+    kv_cache_creation.key = "gen_ai.usage.cache_creation.input_tokens"
+    kv_cache_creation.value.int_value = 500
+    pb_span.attributes.append(kv_cache_creation)
+
+    kv_cache_read = KeyValue()
+    kv_cache_read.key = "gen_ai.usage.cache_read.input_tokens"
+    kv_cache_read.value.int_value = 200
+    pb_span.attributes.append(kv_cache_read)
+
+    kv_input = KeyValue()
+    kv_input.key = "gen_ai.usage.input_tokens"
+    kv_input.value.int_value = 100
+    pb_span.attributes.append(kv_input)
+
+    kv_output = KeyValue()
+    kv_output.key = "gen_ai.usage.output_tokens"
+    kv_output.value.int_value = 50
+    pb_span.attributes.append(kv_output)
+
+    py_span = PySpan.from_proto(pb_span)
+    _, end_call = py_span.to_call("test_project")
+
+    # Usage is keyed by model name or "usage" when no model is set
+    usage = end_call.summary["usage"]["usage"]  # type: ignore
+    assert usage["cache_creation_input_tokens"] == 500
+    assert usage["cache_read_input_tokens"] == 200
+    assert usage["input_tokens"] == 100
+    assert usage["output_tokens"] == 50
+
+
+def test_traces_data_from_proto() -> None:
+    """Test converting protobuf TracesData to Python TracesData."""
+    export_req = create_test_export_request()
+    resource_spans_list = [ps.resource_spans for ps in export_req.processed_spans]
+    traces_data = PyTracesData.from_proto(
+        TracesData(resource_spans=resource_spans_list)
+    )
+
+    assert len(traces_data.resource_spans) == 1
+    resource_spans = traces_data.resource_spans[0]
+    assert len(resource_spans.scope_spans) == 1
+    scope_spans = resource_spans.scope_spans[0]
+    assert len(scope_spans.spans) == 1
+    span = scope_spans.spans[0]
+
+    assert span.name == "test_span"
+    assert span.kind == SpanKind.INTERNAL
+
+
+def test_to_json_serializable() -> None:
+    """to_json_serializable handles primitives, containers, and stdlib types."""
+    from dataclasses import dataclass
+    from datetime import date, time, timedelta
+    from decimal import Decimal
+
+    # Primitives, lists/tuples, dicts, nested structures, datetime, enums.
+    assert to_json_serializable("string") == "string"
+    assert to_json_serializable(42) == 42
+    assert to_json_serializable(3.14) == 3.14
+    assert to_json_serializable(True) == True
+    assert to_json_serializable(None) is None
+    assert to_json_serializable(["a", 1, True]) == ["a", 1, True]
+    assert to_json_serializable(("a", 1, True)) == ["a", 1, True]
+    assert to_json_serializable({"a": 1, "b": "two"}) == {"a": 1, "b": "two"}
+    nested = {"a": [1, 2, {"b": "c"}], "d": {"e": [3, 4]}}
+    assert to_json_serializable(nested) == nested
+    assert to_json_serializable(datetime(2023, 1, 1, 12, 0, 0)) == "2023-01-01T12:00:00"
+    assert to_json_serializable(SpanKind.INTERNAL) == 1
+
+    # Special floats serialize to their string form.
+    assert to_json_serializable(float("nan")) == "nan"
+    assert to_json_serializable(float("inf")) == "inf"
+    assert to_json_serializable(float("-inf")) == "-inf"
+
+    # date / time.
+    assert to_json_serializable(date(2023, 1, 1)) == "2023-01-01"
+    assert to_json_serializable(time(12, 30, 45)) == "12:30:45"
+
+    # timedelta -> total seconds.
+    assert to_json_serializable(timedelta(days=1)) == 86400.0
+    assert (
+        to_json_serializable(timedelta(days=1, hours=2, minutes=30, seconds=15))
+        == (1 * 24 * 60 * 60) + (2 * 60 * 60) + (30 * 60) + 15
+    )
+
+    # UUID -> str.
+    assert (
+        to_json_serializable(uuid.UUID("12345678-1234-5678-1234-567812345678"))
+        == "12345678-1234-5678-1234-567812345678"
+    )
+
+    # Decimal -> float.
+    assert to_json_serializable(Decimal("10.5")) == 10.5
+    assert (
+        to_json_serializable(Decimal("3.14159265358979323846"))
+        == 3.14159265358979323846
+    )
+    assert to_json_serializable(Decimal("0")) == 0.0
+
+    # set / frozenset -> unordered list.
+    set_result = to_json_serializable({1, 2, 3, "test"})
+    assert isinstance(set_result, list)
+    assert len(set_result) == 4
+    assert {1, 2, 3, "test"} == set(set_result)
+    frozen_result = to_json_serializable(frozenset([4, 5, 6, "frozen"]))
+    assert isinstance(frozen_result, list)
+    assert len(frozen_result) == 4
+    assert {4, 5, 6, "frozen"} == set(frozen_result)
+
+    # complex -> {real, imag}.
+    assert to_json_serializable(complex(3, 4)) == {"real": 3.0, "imag": 4.0}
+    assert to_json_serializable(complex(1, -2)) == {"real": 1.0, "imag": -2.0}
+
+    # bytes / bytearray -> base64.
+    assert to_json_serializable(b"hello world") == "aGVsbG8gd29ybGQ="
+    assert to_json_serializable(bytearray(b"hello world")) == "aGVsbG8gd29ybGQ="
+
+    # dataclass -> dict (including nested dataclasses).
+    @dataclass
+    class Person:
+        name: str
+        age: int
+
+    assert to_json_serializable(Person(name="John", age=30)) == {
+        "name": "John",
+        "age": 30,
+    }
+
+    @dataclass
+    class Department:
+        name: str
+        head: Person
+
+    assert to_json_serializable(
+        Department(name="Engineering", head=Person(name="Jane", age=35))
+    ) == {"name": "Engineering", "head": {"name": "Jane", "age": 35}}
+
+
+def test_unflatten_key_values() -> None:
+    """Test unflattening key-value pairs into nested structure."""
+    kv1 = KeyValue(key="a.b.c", value=AnyValue(string_value="value1"))
+    kv2 = KeyValue(key="a.b.d", value=AnyValue(int_value=42))
+    kv3 = KeyValue(key="a.e", value=AnyValue(bool_value=True))
+    kv4 = KeyValue(key="f.0", value=AnyValue(string_value="item0"))
+    kv5 = KeyValue(key="f.1", value=AnyValue(string_value="item1"))
+
+    result = unflatten_key_values([kv1, kv2, kv3, kv4, kv5])
+
+    assert result == {
+        "a": {"b": {"c": "value1", "d": 42}, "e": True},
+        "f": {"0": "item0", "1": "item1"},
+    }
+
+
+def test_get_attribute() -> None:
+    """Test getting attributes from nested structures."""
+    nested = {"a": {"b": {"c": "value1"}}, "d": [1, 2, 3]}
+
+    assert get_attribute(nested, "a.b.c") == "value1"
+    assert get_attribute(nested, "a.b") == {"c": "value1"}
+    assert get_attribute(nested, "d") == [1, 2, 3]
+    assert get_attribute(nested, "d.0") == 1
+    assert get_attribute(nested, "nonexistent") is None
+
+
+def test_expand_and_flatten_attributes() -> None:
+    """expand_attributes nests, convert_numeric_keys_to_list lists, flatten reverses."""
+    flat_attrs = [
+        ("a.b.c", "value1"),
+        ("a.b.d", 42),
+        ("a.e", True),
+        ("f.0", "item0"),
+        ("f.1", "item1"),
+    ]
+
+    expanded = expand_attributes(flat_attrs)
+    assert expanded == {
+        "a": {"b": {"c": "value1", "d": 42}, "e": True},
+        "f": {"0": "item0", "1": "item1"},
+    }
+
+    listed = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
+    assert listed == {
+        "a": {"b": {"c": "value1", "d": 42}, "e": True},
+        "f": ["item0", "item1"],
+    }
+
+    assert flatten_attributes(listed) == {
+        "a.b.c": "value1",
+        "a.b.d": 42,
+        "a.e": True,
+        "f.0": "item0",
+        "f.1": "item1",
+    }
+
+
+def test_expand_attributes_parent_child_primitive_conflict_raises() -> None:
+    """A parent primitive and a nested subkey for the same path conflict either order."""
+    # parent primitive set first, then a nested subkey.
+    try:
+        expand_attributes([("gen_ai.prompt", True), ("gen_ai.prompt.content", "Hello")])
+        raise AssertionError("Expected AttributePathConflictError")
+    except AttributePathConflictError as e:
+        msg = str(e)
+        assert "gen_ai.prompt" in msg
+        assert "content" in msg
+        assert "Do not" in msg or "Invalid attribute structure" in msg
+
+    # nested subkey set first, then the parent primitive.
+    try:
+        expand_attributes([("gen_ai.prompt.content", "Hello"), ("gen_ai.prompt", True)])
+        raise AssertionError("Expected AttributePathConflictError")
+    except AttributePathConflictError as e:
+        msg = str(e)
+        assert "gen_ai.prompt" in msg
+        assert "Do not" in msg or "Invalid attribute structure" in msg
+
+
+def test_expand_attributes_json_string_and_dotted_subkeys_merge() -> None:
+    """A JSON-string blob and dotted subkeys for the same path merge across orderings."""
+    # JSON string first, then a matching dotted subkey -> single merged element.
+    result = convert_numeric_keys_to_list(
+        expand_attributes(
+            [
+                ("gen_ai.completion", '[{"role": "assistant", "content": "hello"}]'),
+                ("gen_ai.completion.0.role", "assistant"),
+            ]
         )
-        array_value = get_attribute(py_span.attributes, "test.array")
-        assert isinstance(array_value, list)
-        assert len(array_value) == 2
-        assert array_value[0] == "value1"
-        assert array_value[1] == "value2"
+    )
+    assert result["gen_ai"]["completion"] == [{"role": "assistant", "content": "hello"}]
 
-    def test_span_from_proto_parent_id_normalization(self):
-        """Test that empty and all-zero parent_span_id values normalize to None."""
-        # All-zero parent_span_id is the OTel invalid-id sentinel; must mean no parent.
-        pb_span = create_test_span()
-        pb_span.parent_span_id = b"\x00" * 8
-        assert PySpan.from_proto(pb_span).parent_id is None, (
-            "all-zero parent_span_id should yield parent_id=None"
+    # Dotted subkeys first, then JSON string (reversed ordering) -> same merge.
+    result = convert_numeric_keys_to_list(
+        expand_attributes(
+            [
+                ("gen_ai.completion.0.role", "assistant"),
+                ("gen_ai.completion.0.content", "hello"),
+                ("gen_ai.completion", '[{"role": "assistant", "content": "hello"}]'),
+            ]
         )
+    )
+    assert result["gen_ai"]["completion"] == [{"role": "assistant", "content": "hello"}]
 
-        pb_span = create_test_span()
-        pb_span.parent_span_id = b""
-        assert PySpan.from_proto(pb_span).parent_id is None, (
-            "empty parent_span_id should yield parent_id=None"
+    # Dotted subkeys arriving after JSON string win at the leaves.
+    result = convert_numeric_keys_to_list(
+        expand_attributes(
+            [
+                ("gen_ai.completion", '[{"role": "assistant", "content": "original"}]'),
+                ("gen_ai.completion.0.content", "overridden"),
+            ]
         )
+    )
+    assert result["gen_ai"]["completion"] == [
+        {"role": "assistant", "content": "overridden"}
+    ]
 
-        pb_span = create_test_span()
-        pb_span.parent_span_id = bytes.fromhex("0123456789abcdef")
-        assert PySpan.from_proto(pb_span).parent_id == "0123456789abcdef", (
-            "real parent_span_id should hex-encode to parent_id"
+    # JSON string arriving after dotted subkeys merges in extra fields.
+    result = convert_numeric_keys_to_list(
+        expand_attributes(
+            [
+                ("gen_ai.completion.0.role", "assistant"),
+                (
+                    "gen_ai.completion",
+                    '[{"role": "assistant", "content": "hello", "extra": true}]',
+                ),
+            ]
         )
+    )
+    assert result["gen_ai"]["completion"] == [
+        {"role": "assistant", "content": "hello", "extra": True}
+    ]
 
-    def test_span_to_call(self):
-        """Test converting a Python Span to Weave Calls."""
-        pb_span = create_test_span()
-        py_span = PySpan.from_proto(pb_span)
-
-        start_call, _ = py_span.to_call("test_project")
-
-        # Verify start call
-        assert isinstance(start_call, tsi.StartedCallSchemaForInsert)
-        assert start_call.project_id == "test_project"
-        assert start_call.id == py_span.span_id
-        assert (
-            start_call.op_name == py_span.name
-        )  # This should be using the shortened name if necessary
-        assert start_call.trace_id == py_span.trace_id
-        assert start_call.started_at == py_span.start_time
-
-    def test_span_to_call_long_name(self):
-        """Test that span names are properly shortened when too long."""
-        # Create a test span with a very long name
-        pb_span = create_test_span()
-        long_name = "a" * (MAX_OP_NAME_LENGTH + 10)
-        pb_span.name = long_name
-
-        py_span = PySpan.from_proto(pb_span)
-        start_call, end_call = py_span.to_call("test_project")
-
-        # Verify that the op_name was shortened
-        identifier = hashlib.sha256(long_name.encode("utf-8")).hexdigest()[:4]
-        shortened_name = shorten_name(
-            long_name,
-            MAX_OP_NAME_LENGTH,
-            abbrv=f":{identifier}",
-            use_delimiter_in_abbr=False,
+    # A nested-list element present only in dotted attrs must survive a later JSON blob:
+    # top-level completion lists are index-merged, but _deep_merge clobbers nested lists,
+    # so a second tool_call sent only via dotted keys must not vanish.
+    result = convert_numeric_keys_to_list(
+        expand_attributes(
+            [
+                ("gen_ai.completion.0.tool_calls.0.id", "call_0"),
+                ("gen_ai.completion.0.tool_calls.1.id", "call_1"),
+                ("gen_ai.completion.0.tool_calls.1.type", "function"),
+                (
+                    "gen_ai.completion",
+                    '[{"role": "assistant", "tool_calls": [{"id": "call_0", "type": "function"}]}]',
+                ),
+            ]
         )
-        assert start_call.op_name == shortened_name
-        assert len(start_call.op_name) <= MAX_OP_NAME_LENGTH
-
-        # Verify attributes in start call
-        assert "test" in start_call.attributes
-        assert "attribute" in start_call.attributes["test"]
-        assert start_call.attributes["test"]["attribute"] == "test_value"
-        assert start_call.attributes["test"]["number"] == 42
-        assert "nested" in start_call.attributes["test"]
-        assert start_call.attributes["test"]["nested"]["value"] == "nested_test_value"
-        assert "array" in start_call.attributes["test"]
-        assert start_call.attributes["test"]["array"] == ["value1", "value2"]
-
-        # Verify otel_dump is included in the call (otel_span is now in otel_dump)
-        assert start_call.otel_dump is not None
-        assert start_call.otel_dump["name"] == long_name
-        assert start_call.otel_dump["context"]["trace_id"] == py_span.trace_id
-        assert start_call.otel_dump["context"]["span_id"] == py_span.span_id
-
-        # Verify end call
-        assert isinstance(end_call, tsi.EndedCallSchemaForInsert)
-        assert end_call.project_id == "test_project"
-        assert end_call.id == py_span.span_id
-        assert end_call.ended_at == py_span.end_time
-        assert end_call.exception is None
-
-    def test_span_to_call_with_turn_and_thread(self):
-        """Test that turn_id equals thread_id when is_turn is True."""
-        # Create a test span with turn and thread attributes
-        pb_span = create_test_span()
-        test_thread_id = str(uuid.uuid4())
-
-        # Add wandb.is_turn and wandb.thread_id attributes
-        kv_is_turn = KeyValue()
-        kv_is_turn.key = "wandb.is_turn"
-        kv_is_turn.value.bool_value = True
-        pb_span.attributes.append(kv_is_turn)
-
-        kv_thread = KeyValue()
-        kv_thread.key = "wandb.thread_id"
-        kv_thread.value.string_value = test_thread_id
-        pb_span.attributes.append(kv_thread)
-
-        py_span = PySpan.from_proto(pb_span)
-        start_call, end_call = py_span.to_call("test_project")
-
-        # Verify turn_id equals call.id (span_id) when is_turn is True
-        assert start_call.turn_id == py_span.span_id
-        # Verify thread_id is passed through
-        assert start_call.thread_id == test_thread_id
-
-        # Test with is_turn = False
-        pb_span_false = create_test_span()
-        kv_is_turn_false = KeyValue()
-        kv_is_turn_false.key = "wandb.is_turn"
-        kv_is_turn_false.value.bool_value = False
-        pb_span_false.attributes.append(kv_is_turn_false)
-
-        kv_thread_false = KeyValue()
-        kv_thread_false.key = "wandb.thread_id"
-        kv_thread_false.value.string_value = test_thread_id
-        pb_span_false.attributes.append(kv_thread_false)
-
-        py_span_false = PySpan.from_proto(pb_span_false)
-        start_call_false, _ = py_span_false.to_call("test_project")
-
-        # Verify turn_id is None when is_turn is False
-        assert start_call_false.turn_id is None
-        assert start_call_false.thread_id == test_thread_id
-
-        # Test without is_turn (should default to None)
-        pb_span_no_turn = create_test_span()
-        kv_thread_only = KeyValue()
-        kv_thread_only.key = "wandb.thread_id"
-        kv_thread_only.value.string_value = test_thread_id
-        pb_span_no_turn.attributes.append(kv_thread_only)
-
-        py_span_no_turn = PySpan.from_proto(pb_span_no_turn)
-        start_call_no_turn, _ = py_span_no_turn.to_call("test_project")
-
-        # Verify turn_id is None when is_turn is not present
-        assert start_call_no_turn.turn_id is None
-        assert start_call_no_turn.thread_id == test_thread_id
-
-        # Test with is_turn = True but no thread_id
-        pb_span_turn_no_thread = create_test_span()
-        kv_is_turn_only = KeyValue()
-        kv_is_turn_only.key = "wandb.is_turn"
-        kv_is_turn_only.value.bool_value = True
-        pb_span_turn_no_thread.attributes.append(kv_is_turn_only)
-
-        py_span_turn_no_thread = PySpan.from_proto(pb_span_turn_no_thread)
-        start_call_turn_no_thread, _ = py_span_turn_no_thread.to_call("test_project")
-
-        # Verify turn_id is None when is_turn is True but thread_id is missing
-        assert start_call_turn_no_thread.turn_id is None
-        assert start_call_turn_no_thread.thread_id is None
-
-    def test_span_to_call_with_cache_tokens(self):
-        """Test that cache token usage attributes flow through to_call summary."""
-        pb_span = create_test_span()
-
-        # Add cache token usage attributes
-        kv_cache_creation = KeyValue()
-        kv_cache_creation.key = "gen_ai.usage.cache_creation.input_tokens"
-        kv_cache_creation.value.int_value = 500
-        pb_span.attributes.append(kv_cache_creation)
-
-        kv_cache_read = KeyValue()
-        kv_cache_read.key = "gen_ai.usage.cache_read.input_tokens"
-        kv_cache_read.value.int_value = 200
-        pb_span.attributes.append(kv_cache_read)
-
-        kv_input = KeyValue()
-        kv_input.key = "gen_ai.usage.input_tokens"
-        kv_input.value.int_value = 100
-        pb_span.attributes.append(kv_input)
-
-        kv_output = KeyValue()
-        kv_output.key = "gen_ai.usage.output_tokens"
-        kv_output.value.int_value = 50
-        pb_span.attributes.append(kv_output)
-
-        py_span = PySpan.from_proto(pb_span)
-        _, end_call = py_span.to_call("test_project")
-
-        # Usage is keyed by model name or "usage" when no model is set
-        usage = end_call.summary["usage"]["usage"]  # type: ignore
-        assert usage["cache_creation_input_tokens"] == 500
-        assert usage["cache_read_input_tokens"] == 200
-        assert usage["input_tokens"] == 100
-        assert usage["output_tokens"] == 50
-
-    def test_span_to_call_with_genai_conversation_id(self):
-        """Test that gen_ai.conversation.id sets thread_id and turn_id."""
-        pb_span = create_test_span()
-
-        kv_conv = KeyValue()
-        kv_conv.key = "gen_ai.conversation.id"
-        kv_conv.value.string_value = "conv-xyz"
-        pb_span.attributes.append(kv_conv)
-
-        py_span = PySpan.from_proto(pb_span)
-        start_call, _ = py_span.to_call("test_project")
-
-        assert start_call.thread_id == "conv-xyz"
-        # is_turn is truthy via conversation.id, so turn_id should be set
-        assert start_call.turn_id == py_span.span_id
-
-    def test_traces_data_from_proto(self):
-        """Test converting protobuf TracesData to Python TracesData."""
-        export_req = create_test_export_request()
-        resource_spans_list = [ps.resource_spans for ps in export_req.processed_spans]
-        traces_data = PyTracesData.from_proto(
-            TracesData(resource_spans=resource_spans_list)
-        )
-
-        assert len(traces_data.resource_spans) == 1
-        resource_spans = traces_data.resource_spans[0]
-        assert len(resource_spans.scope_spans) == 1
-        scope_spans = resource_spans.scope_spans[0]
-        assert len(scope_spans.spans) == 1
-        span = scope_spans.spans[0]
-
-        assert span.name == "test_span"
-        assert span.kind == SpanKind.INTERNAL
-
-
-class TestAttributes:
-    def test_to_json_serializable(self):
-        """Test converting various types to JSON serializable values."""
-        # Test primitive types
-        assert to_json_serializable("string") == "string"
-        assert to_json_serializable(42) == 42
-        assert to_json_serializable(3.14) == 3.14
-        assert to_json_serializable(True) == True
-        assert to_json_serializable(None) is None
-
-        # Test lists and tuples
-        assert to_json_serializable(["a", 1, True]) == ["a", 1, True]
-        assert to_json_serializable(("a", 1, True)) == ["a", 1, True]
-
-        # Test dictionaries
-        assert to_json_serializable({"a": 1, "b": "two"}) == {"a": 1, "b": "two"}
-
-        # Test nested structures
-        nested = {"a": [1, 2, {"b": "c"}], "d": {"e": [3, 4]}}
-        assert to_json_serializable(nested) == nested
-
-        # Test datetime
-        dt = datetime(2023, 1, 1, 12, 0, 0)
-        assert to_json_serializable(dt) == "2023-01-01T12:00:00"
-
-        # Test enums
-        assert to_json_serializable(SpanKind.INTERNAL) == 1
-
-    def test_to_json_serializable_special_floats(self):
-        """Test converting special float values (NaN, Infinity)."""
-        # Test NaN
-        assert to_json_serializable(float("nan")) == "nan"
-
-        # Test positive infinity
-        assert to_json_serializable(float("inf")) == "inf"
-
-        # Test negative infinity
-        assert to_json_serializable(float("-inf")) == "-inf"
-
-    def test_to_json_serializable_date_time(self):
-        """Test converting date and time objects."""
-        from datetime import date, time
-
-        # Test date
-        d = date(2023, 1, 1)
-        assert to_json_serializable(d) == "2023-01-01"
-
-        # Test time
-        t = time(12, 30, 45)
-        assert to_json_serializable(t) == "12:30:45"
-
-    def test_to_json_serializable_timedelta(self):
-        """Test converting timedelta objects."""
-        from datetime import timedelta
-
-        # Test one day
-        td = timedelta(days=1)
-        assert to_json_serializable(td) == 86400.0  # 24 * 60 * 60 seconds
-
-        # Test complex timedelta
-        td = timedelta(days=1, hours=2, minutes=30, seconds=15)
-        expected_seconds = (1 * 24 * 60 * 60) + (2 * 60 * 60) + (30 * 60) + 15
-        assert to_json_serializable(td) == expected_seconds
-
-    def test_to_json_serializable_uuid(self):
-        """Test converting UUID objects."""
-        import uuid
-
-        # Create a UUID with a known value
-        test_uuid = uuid.UUID("12345678-1234-5678-1234-567812345678")
-        assert to_json_serializable(test_uuid) == "12345678-1234-5678-1234-567812345678"
-
-    def test_to_json_serializable_decimal(self):
-        """Test converting Decimal objects."""
-        from decimal import Decimal
-
-        # Test simple decimal
-        assert to_json_serializable(Decimal("10.5")) == 10.5
-
-        # Test high precision decimal
-        assert (
-            to_json_serializable(Decimal("3.14159265358979323846"))
-            == 3.14159265358979323846
-        )
-
-        # Test zero
-        assert to_json_serializable(Decimal("0")) == 0.0
-
-    def test_to_json_serializable_sets(self):
-        """Test converting set and frozenset objects."""
-        # Test set
-        s = {1, 2, 3, "test"}
-        result = to_json_serializable(s)
-        assert isinstance(result, list)
-        assert len(result) == 4
-        assert 1 in result
-        assert 2 in result
-        assert 3 in result
-        assert "test" in result
-
-        # Test frozenset
-        fs = frozenset([4, 5, 6, "frozen"])
-        result = to_json_serializable(fs)
-        assert isinstance(result, list)
-        assert len(result) == 4
-        assert 4 in result
-        assert 5 in result
-        assert 6 in result
-        assert "frozen" in result
-
-    def test_to_json_serializable_complex(self):
-        """Test converting complex numbers."""
-        c = complex(3, 4)
-        result = to_json_serializable(c)
-        assert isinstance(result, dict)
-        assert result == {"real": 3.0, "imag": 4.0}
-
-        # Test complex with negative imaginary part
-        c = complex(1, -2)
-        assert to_json_serializable(c) == {"real": 1.0, "imag": -2.0}
-
-    def test_to_json_serializable_bytes(self):
-        """Test converting bytes and bytearray objects."""
-        # Test bytes
-        b = b"hello world"
-        assert to_json_serializable(b) == "aGVsbG8gd29ybGQ="  # Base64 encoded
-
-        # Test bytearray
-        ba = bytearray(b"hello world")
-        assert to_json_serializable(ba) == "aGVsbG8gd29ybGQ="  # Base64 encoded
-
-    def test_to_json_serializable_dataclass(self):
-        """Test converting dataclass objects."""
-        from dataclasses import dataclass
-
-        @dataclass
-        class Person:
-            name: str
-            age: int
-
-        person = Person(name="John", age=30)
-        result = to_json_serializable(person)
-        assert isinstance(result, dict)
-        assert result == {"name": "John", "age": 30}
-
-        # Nested dataclass
-        @dataclass
-        class Department:
-            name: str
-            head: Person
-
-        dept = Department(name="Engineering", head=Person(name="Jane", age=35))
-        result = to_json_serializable(dept)
-        assert result == {"name": "Engineering", "head": {"name": "Jane", "age": 35}}
-
-    def test_unflatten_key_values(self):
-        """Test unflattening key-value pairs into nested structure."""
-        # Create key-value pairs
-        kv1 = KeyValue(key="a.b.c", value=AnyValue(string_value="value1"))
-        kv2 = KeyValue(key="a.b.d", value=AnyValue(int_value=42))
-        kv3 = KeyValue(key="a.e", value=AnyValue(bool_value=True))
-        kv4 = KeyValue(key="f.0", value=AnyValue(string_value="item0"))
-        kv5 = KeyValue(key="f.1", value=AnyValue(string_value="item1"))
-
-        # Unflatten key-values
-        result = unflatten_key_values([kv1, kv2, kv3, kv4, kv5])
-
-        # Verify the result
-        assert result == {
-            "a": {"b": {"c": "value1", "d": 42}, "e": True},
-            "f": {"0": "item0", "1": "item1"},
-        }
-
-    def test_get_attribute(self):
-        """Test getting attributes from nested structures."""
-        nested = {"a": {"b": {"c": "value1"}}, "d": [1, 2, 3]}
-
-        assert get_attribute(nested, "a.b.c") == "value1"
-        assert get_attribute(nested, "a.b") == {"c": "value1"}
-        assert get_attribute(nested, "d") == [1, 2, 3]
-
-        assert get_attribute(nested, "d.0") == 1
-
-        assert get_attribute(nested, "nonexistent") is None
-
-    def test_expand_attributes(self):
-        """Test expanding flattened attributes into nested structure."""
-        flat_attrs = [
-            ("a.b.c", "value1"),
-            ("a.b.d", 42),
-            ("a.e", True),
-            ("f.0", "item0"),
-            ("f.1", "item1"),
-        ]
-
-        result = expand_attributes(flat_attrs)
-
-        assert result == {
-            "a": {"b": {"c": "value1", "d": 42}, "e": True},
-            "f": {"0": "item0", "1": "item1"},
-        }
-
-    def test_expand_attributes_convert_numeric_to_list(self):
-        """Test expanding flattened attributes into nested structure."""
-        flat_attrs = [
-            ("a.b.c", "value1"),
-            ("a.b.d", 42),
-            ("a.e", True),
-            ("f.0", "item0"),
-            ("f.1", "item1"),
-        ]
-
-        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
-
-        assert result == {
-            "a": {"b": {"c": "value1", "d": 42}, "e": True},
-            "f": ["item0", "item1"],
-        }
-
-    def test_flatten_attributes(self):
-        """Test flattening nested attributes into key-value pairs."""
-        nested = {
-            "a": {"b": {"c": "value1", "d": 42}, "e": True},
-            "f": ["item0", "item1"],
-        }
-
-        result = flatten_attributes(nested)
-
-        expected = {
-            "a.b.c": "value1",
-            "a.b.d": 42,
-            "a.e": True,
-            "f.0": "item0",
-            "f.1": "item1",
-        }
-
-        assert result == expected
-
-    def test_expand_attributes_conflict_parent_then_child(self):
-        """Setting a parent primitive then a nested subkey should raise a clear error."""
-        flat_attrs = [
-            ("gen_ai.prompt", True),
-            ("gen_ai.prompt.content", "Hello"),
-        ]
-
-        try:
-            expand_attributes(flat_attrs)
-            raise AssertionError("Expected AttributePathConflictError")
-        except AttributePathConflictError as e:
-            msg = str(e)
-            assert "gen_ai.prompt" in msg
-            assert "content" in msg
-            assert "Do not" in msg or "Invalid attribute structure" in msg
-
-    def test_expand_attributes_conflict_child_then_parent(self):
-        """Setting nested subkeys then a parent primitive should raise a clear error."""
-        flat_attrs = [
-            ("gen_ai.prompt.content", "Hello"),
-            ("gen_ai.prompt", True),
-        ]
-
-        try:
-            expand_attributes(flat_attrs)
-            raise AssertionError("Expected AttributePathConflictError")
-        except AttributePathConflictError as e:
-            msg = str(e)
-            assert "gen_ai.prompt" in msg
-            assert "Do not" in msg or "Invalid attribute structure" in msg
-
-    def test_expand_attributes_json_string_and_dotted_subkeys_coexist(self):
-        """JSON string + dotted subkeys for the same path should merge, not conflict."""
-        flat_attrs = [
-            ("gen_ai.completion", '[{"role": "assistant", "content": "hello"}]'),
-            ("gen_ai.completion.0.role", "assistant"),
-        ]
-        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
-        assert result["gen_ai"]["completion"] == [
-            {"role": "assistant", "content": "hello"}
-        ]
-
-    def test_expand_attributes_dotted_subkeys_then_json_string_coexist(self):
-        """Same merge but with reversed attribute ordering."""
-        flat_attrs = [
-            ("gen_ai.completion.0.role", "assistant"),
-            ("gen_ai.completion.0.content", "hello"),
-            ("gen_ai.completion", '[{"role": "assistant", "content": "hello"}]'),
-        ]
-        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
-        assert result["gen_ai"]["completion"] == [
-            {"role": "assistant", "content": "hello"}
-        ]
-
-    def test_expand_attributes_dotted_subkeys_override_json_string(self):
-        """Dotted subkeys arriving after JSON string should win at leaves."""
-        flat_attrs = [
-            ("gen_ai.completion", '[{"role": "assistant", "content": "original"}]'),
-            ("gen_ai.completion.0.content", "overridden"),
-        ]
-        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
-        assert result["gen_ai"]["completion"] == [
-            {"role": "assistant", "content": "overridden"}
-        ]
-
-    def test_expand_attributes_json_string_adds_fields_to_dotted(self):
-        """JSON string arriving after dotted subkeys should merge in extra fields."""
-        flat_attrs = [
-            ("gen_ai.completion.0.role", "assistant"),
-            (
-                "gen_ai.completion",
-                '[{"role": "assistant", "content": "hello", "extra": true}]',
-            ),
-        ]
-        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
-        assert result["gen_ai"]["completion"] == [
-            {"role": "assistant", "content": "hello", "extra": True}
-        ]
-
-    def test_expand_attributes_nested_list_merge_preserves_dotted_only_elements(self):
-        """A nested-list element present only in dotted attrs must survive a later JSON blob.
-
-        Top-level completion lists are index-merged, but _deep_merge clobbers nested
-        lists (base[key] = value), so a second tool_call sent only via dotted keys is
-        silently dropped when the gen_ai.completion JSON blob is emitted after the
-        dotted attributes. Same data, different OTel emission order -> a tool call
-        vanishes from the stored call.
-        """
-        flat_attrs = [
-            ("gen_ai.completion.0.tool_calls.0.id", "call_0"),
-            ("gen_ai.completion.0.tool_calls.1.id", "call_1"),
-            ("gen_ai.completion.0.tool_calls.1.type", "function"),
-            (
-                "gen_ai.completion",
-                '[{"role": "assistant", "tool_calls": [{"id": "call_0", "type": "function"}]}]',
-            ),
-        ]
-        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
-        tool_calls = result["gen_ai"]["completion"][0]["tool_calls"]
-        assert [tc["id"] for tc in tool_calls] == ["call_0", "call_1"]
+    )
+    tool_calls = result["gen_ai"]["completion"][0]["tool_calls"]
+    assert [tc["id"] for tc in tool_calls] == ["call_0", "call_1"]
 
 
 def create_attributes(d: dict[str, Any]):
     return expand_attributes(d.items())
 
 
-class TestSemanticConventionParsing:
-    """Test the semantic convention parsing functionality in attributes.py."""
+def test_openinference_attributes_extraction() -> None:
+    """Test extracting attributes from OpenInference attributes."""
+    attributes = create_attributes(
+        {
+            OISpanAttr.LLM_SYSTEM: "This is a system prompt",
+            OISpanAttr.LLM_PROVIDER: "test-provider",
+            OISpanAttr.LLM_MODEL_NAME: "test-model",
+            OISpanAttr.OPENINFERENCE_SPAN_KIND: "llm",
+            OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
+                {"temperature": 0.7, "max_tokens": 100}
+            ),
+        }
+    )
 
-    def test_openinference_attributes_extraction(self):
-        """Test extracting attributes from OpenInference attributes."""
-        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+    extracted = get_weave_attributes(attributes)
+    assert extracted["system"] == "This is a system prompt"
+    assert extracted["provider"] == "test-provider"
+    assert extracted["model"] == "test-model"
+    assert extracted["kind"] == "llm"
+    assert extracted["model_parameters"]["max_tokens"] == 100
+    assert extracted["model_parameters"]["temperature"] == 0.7
 
-        # Create attribute dictionary with OpenInference attributes
-        attributes = create_attributes(
-            {
-                OISpanAttr.LLM_SYSTEM: "This is a system prompt",
-                OISpanAttr.LLM_PROVIDER: "test-provider",
-                OISpanAttr.LLM_MODEL_NAME: "test-model",
-                OISpanAttr.OPENINFERENCE_SPAN_KIND: "llm",
-                OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
-                    {"temperature": 0.7, "max_tokens": 100}
-                ),
-            }
+
+def test_opentelemetry_attributes_extraction() -> None:
+    """Test extracting attributes from OpenTelemetry attributes."""
+    attributes = create_attributes(
+        {
+            OTSpanAttr.LLM_SYSTEM: "You are a helpful assistant",
+            OTSpanAttr.LLM_REQUEST_MAX_TOKENS: 150,
+            OTSpanAttr.TRACELOOP_SPAN_KIND: "llm",
+            OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
+        }
+    )
+
+    extracted = get_weave_attributes(attributes)
+    assert extracted["system"] == "You are a helpful assistant"
+    assert extracted["model_parameters"]["max_tokens"] == 150
+    assert extracted["kind"] == "llm"
+    assert extracted["model"] == "gpt-4"
+
+
+def test_wandb_attributes_extraction() -> None:
+    """Test extracting wandb-specific attributes (flat, empty, partial, nested)."""
+    extracted = get_wandb_attributes(
+        create_attributes({"wandb.display_name": "My Custom Display Name"})
+    )
+    assert extracted["display_name"] == "My Custom Display Name"
+
+    assert get_wandb_attributes(create_attributes({})) == {}
+
+    extracted = get_wandb_attributes(
+        create_attributes({"wandb.display_name": "Only Display Name"})
+    )
+    assert extracted["display_name"] == "Only Display Name"
+    assert "project_id" not in extracted
+
+    extracted = get_wandb_attributes(
+        create_attributes({"wandb": {"display_name": "Nested Display Name"}})
+    )
+    assert extracted["display_name"] == "Nested Display Name"
+
+
+def test_wandb_turn_and_thread_attributes() -> None:
+    """is_turn is only kept when truthy; thread_id is always passed through."""
+    test_thread_id = str(uuid.uuid4())
+
+    extracted = get_wandb_attributes(
+        create_attributes({"wandb.is_turn": True, "wandb.thread_id": test_thread_id})
+    )
+    assert extracted["is_turn"] is True
+    assert extracted["thread_id"] == test_thread_id
+
+    extracted_false = get_wandb_attributes(
+        create_attributes({"wandb.is_turn": False, "wandb.thread_id": test_thread_id})
+    )
+    assert "is_turn" not in extracted_false.keys()
+    assert extracted_false["thread_id"] == test_thread_id
+
+    extracted_thread_only = get_wandb_attributes(
+        create_attributes({"wandb.thread_id": test_thread_id})
+    )
+    assert "is_turn" not in extracted_thread_only
+    assert extracted_thread_only["thread_id"] == test_thread_id
+
+    extracted_turn_only = get_wandb_attributes(
+        create_attributes({"wandb.is_turn": True})
+    )
+    assert extracted_turn_only["is_turn"] is True
+    assert "thread_id" not in extracted_turn_only
+
+
+@pytest.mark.skip(reason="wb_run_id extraction not yet implemented")
+def test_wandb_wb_run_id_extraction() -> None:
+    """Test extracting wb_run_id from both wb_run_id and wandb.wb_run_id attributes."""
+    extracted_top_level = get_wandb_attributes(
+        create_attributes({"wb_run_id": "run_top_123"})
+    )
+    assert extracted_top_level["wb_run_id"] == "run_top_123"
+
+    extracted_namespaced = get_wandb_attributes(
+        create_attributes({"wandb.wb_run_id": "run_ns_456"})
+    )
+    assert extracted_namespaced["wb_run_id"] == "run_ns_456"
+
+    # Both present: top-level takes precedence.
+    extracted_both = get_wandb_attributes(
+        create_attributes(
+            {"wb_run_id": "preferred_top", "wandb.wb_run_id": "fallback_ns"}
         )
+    )
+    assert extracted_both["wb_run_id"] == "preferred_top"
 
-        # Test get_weave_attributes
-        extracted = get_weave_attributes(attributes)
-        assert extracted["system"] == "This is a system prompt"
-        assert extracted["provider"] == "test-provider"
-        assert extracted["model"] == "test-model"
-        assert extracted["kind"] == "llm"
-        assert extracted["model_parameters"]["max_tokens"] == 100
-        assert extracted["model_parameters"]["temperature"] == 0.7
 
-    def test_wandb_attributes_extraction(self):
-        """Test extracting wandb-specific attributes."""
-        # Create attribute dictionary with W&B specific attributes
-        attributes = create_attributes(
-            {
-                "wandb.display_name": "My Custom Display Name",
-            }
-        )
-
-        # Test get_wandb_attributes
-        extracted = get_wandb_attributes(attributes)
-        assert extracted["display_name"] == "My Custom Display Name"
-
-        # Test with missing attributes
-        empty_attributes = create_attributes({})
-        extracted = get_wandb_attributes(empty_attributes)
-        assert extracted == {}
-
-        # Test with partial attributes
-        partial_attributes = create_attributes(
-            {
-                "wandb.display_name": "Only Display Name",
-            }
-        )
-        extracted = get_wandb_attributes(partial_attributes)
-        assert extracted["display_name"] == "Only Display Name"
-        assert "project_id" not in extracted
-
-        # Test with nested attributes format
-        nested_attributes = create_attributes(
-            {
-                "wandb": {
-                    "display_name": "Nested Display Name",
-                }
-            }
-        )
-        extracted = get_wandb_attributes(nested_attributes)
-        assert extracted["display_name"] == "Nested Display Name"
-
-    def test_wandb_turn_and_thread_attributes(self):
-        """Test extracting turn and thread attributes from wandb attributes."""
-        # Test with is_turn = True and thread_id
-        test_thread_id = str(uuid.uuid4())
-        attributes = create_attributes(
-            {
-                "wandb.is_turn": True,
-                "wandb.thread_id": test_thread_id,
-            }
-        )
-
-        extracted = get_wandb_attributes(attributes)
-        assert extracted["is_turn"] is True
-        assert extracted["thread_id"] == test_thread_id
-
-        # Test with is_turn = False
-        attributes_false = create_attributes(
-            {
-                "wandb.is_turn": False,
-                "wandb.thread_id": test_thread_id,
-            }
-        )
-        extracted_false = get_wandb_attributes(attributes_false)
-        assert "is_turn" not in extracted_false.keys()
-        assert extracted_false["thread_id"] == test_thread_id
-
-        # Test with only thread_id
-        attributes_thread_only = create_attributes(
-            {
-                "wandb.thread_id": test_thread_id,
-            }
-        )
-        extracted_thread_only = get_wandb_attributes(attributes_thread_only)
-        assert "is_turn" not in extracted_thread_only
-        assert extracted_thread_only["thread_id"] == test_thread_id
-
-        # Test with only is_turn
-        attributes_turn_only = create_attributes(
-            {
-                "wandb.is_turn": True,
-            }
-        )
-        extracted_turn_only = get_wandb_attributes(attributes_turn_only)
-        assert extracted_turn_only["is_turn"] is True
-        assert "thread_id" not in extracted_turn_only
-
-    @pytest.mark.skip(reason="wb_run_id extraction not yet implemented")
-    def test_wandb_wb_run_id_extraction(self):
-        """Test extracting wb_run_id from both wb_run_id and wandb.wb_run_id attributes."""
-        # Case 1: Only top-level wb_run_id present
-        attributes_top_level = create_attributes(
-            {
-                "wb_run_id": "run_top_123",
-            }
-        )
-        extracted_top_level = get_wandb_attributes(attributes_top_level)
-        assert extracted_top_level["wb_run_id"] == "run_top_123"
-
-        # Case 2: Only namespaced wandb.wb_run_id present
-        attributes_namespaced = create_attributes(
-            {
-                "wandb.wb_run_id": "run_ns_456",
-            }
-        )
-        extracted_namespaced = get_wandb_attributes(attributes_namespaced)
-        assert extracted_namespaced["wb_run_id"] == "run_ns_456"
-
-        # Case 3: Both present, top-level should take precedence
-        attributes_both = create_attributes(
-            {
-                "wb_run_id": "preferred_top",
-                "wandb.wb_run_id": "fallback_ns",
-            }
-        )
-        extracted_both = get_wandb_attributes(attributes_both)
-        assert extracted_both["wb_run_id"] == "preferred_top"
-
-    def test_openinference_inputs_extraction(self):
-        """Test extracting inputs from OpenInference attributes."""
-        from openinference.semconv.trace import SpanAttributes as OISpanAttr
-
-        # Create attribute dictionary with OpenInference input value and mime type
-        attributes = create_attributes(
+def test_openinference_inputs_extraction() -> None:
+    """get_weave_inputs handles OpenInference text and JSON input values."""
+    inputs = get_weave_inputs(
+        [],
+        create_attributes(
             {
                 OISpanAttr.INPUT_VALUE: "What is machine learning?",
                 OISpanAttr.INPUT_MIME_TYPE: "text/plain",
             }
-        )
+        ),
+    )
+    assert inputs == {"input.value": "What is machine learning?"}
 
-        # Test get_weave_inputs with text input
-        inputs = get_weave_inputs([], attributes)
-        assert inputs == {
-            "input.value": "What is machine learning?",
+    json_input = json.dumps(
+        {
+            "messages": [
+                {"role": "system", "content": "You are an assistant"},
+                {"role": "user", "content": "What is machine learning?"},
+            ]
         }
-
-        # Test with JSON input
-        json_input = json.dumps(
-            {
-                "messages": [
-                    {"role": "system", "content": "You are an assistant"},
-                    {"role": "user", "content": "What is machine learning?"},
-                ]
-            }
-        )
-        attributes = create_attributes(
+    )
+    inputs = get_weave_inputs(
+        [],
+        create_attributes(
             {
                 OISpanAttr.INPUT_VALUE: json_input,
                 OISpanAttr.INPUT_MIME_TYPE: "application/json",
             }
-        )
-        inputs = get_weave_inputs([], attributes)
-        assert inputs == {
-            "input.value": {
-                "messages": [
-                    {"role": "system", "content": "You are an assistant"},
-                    {"role": "user", "content": "What is machine learning?"},
-                ]
-            },
-        }
+        ),
+    )
+    assert inputs == {
+        "input.value": {
+            "messages": [
+                {"role": "system", "content": "You are an assistant"},
+                {"role": "user", "content": "What is machine learning?"},
+            ]
+        },
+    }
 
-    def test_openinference_outputs_extraction(self):
-        """Test extracting outputs from OpenInference attributes."""
-        from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
-        # Create attribute dictionary with OpenInference output value and mime type
-        attributes = create_attributes(
+def test_openinference_outputs_extraction() -> None:
+    """get_weave_outputs handles OpenInference text and JSON output values."""
+    outputs = get_weave_outputs(
+        [],
+        create_attributes(
             {
                 OISpanAttr.OUTPUT_VALUE: "Machine learning is a field of AI...",
                 OISpanAttr.OUTPUT_MIME_TYPE: "text/plain",
             }
-        )
+        ),
+    )
+    assert outputs == {"output.value": "Machine learning is a field of AI..."}
 
-        # Test get_weave_outputs with text output
-        outputs = get_weave_outputs([], attributes)
-        assert outputs == {
-            "output.value": "Machine learning is a field of AI...",
-        }
-
-        # Test with JSON output
-        json_output = json.dumps(
-            {
-                "response": {
-                    "role": "assistant",
-                    "content": "Machine learning is a field of AI...",
-                }
+    json_output = json.dumps(
+        {
+            "response": {
+                "role": "assistant",
+                "content": "Machine learning is a field of AI...",
             }
-        )
-        attributes = create_attributes(
+        }
+    )
+    outputs = get_weave_outputs(
+        [],
+        create_attributes(
             {
                 OISpanAttr.OUTPUT_VALUE: json_output,
                 OISpanAttr.OUTPUT_MIME_TYPE: "application/json",
             }
-        )
-        outputs = get_weave_outputs([], attributes)
-        assert outputs == {
-            "output.value": {
-                "response": {
-                    "role": "assistant",
-                    "content": "Machine learning is a field of AI...",
-                }
-            },
+        ),
+    )
+    assert outputs == {
+        "output.value": {
+            "response": {
+                "role": "assistant",
+                "content": "Machine learning is a field of AI...",
+            }
+        },
+    }
+
+
+def test_opentelemetry_inputs_extraction() -> None:
+    """get_weave_inputs expands OpenTelemetry prompts into a message list."""
+    attributes = create_attributes(
+        {
+            OTSpanAttr.LLM_PROMPTS: {
+                "0": {"role": "user", "content": "Tell me about quantum computing"}
+            }
         }
+    )
+    inputs = get_weave_inputs([], attributes)
+    assert inputs == {
+        "gen_ai.prompt": [
+            {"role": "user", "content": "Tell me about quantum computing"}
+        ]
+    }
 
-    def test_openinference_usage_extraction(self):
-        """Test extracting usage from OpenInference attributes."""
-        from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
-        # Create attribute dictionary with OpenInference token counts
-        attributes = create_attributes(
+def test_opentelemetry_outputs_extraction() -> None:
+    """get_weave_outputs expands OpenTelemetry completions into a message list."""
+    attributes = create_attributes(
+        {
+            OTSpanAttr.LLM_COMPLETIONS: {
+                "0": {
+                    "role": "assistant",
+                    "content": "Quantum computing uses quantum mechanics...",
+                }
+            }
+        }
+    )
+    outputs = get_weave_outputs([], attributes)
+    assert outputs == {
+        "gen_ai.completion": [
+            {
+                "role": "assistant",
+                "content": "Quantum computing uses quantum mechanics...",
+            }
+        ]
+    }
+
+
+def test_usage_token_extraction() -> None:
+    """get_weave_usage parses token counts across OpenInference, OTel, gen_ai, and cache."""
+    # OpenInference token counts.
+    usage = get_weave_usage(
+        create_attributes(
             {
                 OISpanAttr.LLM_TOKEN_COUNT_PROMPT: 10,
                 OISpanAttr.LLM_TOKEN_COUNT_COMPLETION: 20,
                 OISpanAttr.LLM_TOKEN_COUNT_TOTAL: 30,
             }
         )
+    )
+    assert usage.get("prompt_tokens") == 10
+    assert usage.get("completion_tokens") == 20
+    assert usage.get("total_tokens") == 30
 
-        # Test get_weave_usage
-        usage = get_weave_usage(attributes)
-        assert usage.get("prompt_tokens") == 10
-        assert usage.get("completion_tokens") == 20
-        assert usage.get("total_tokens") == 30
-
-    def test_opentelemetry_attributes_extraction(self):
-        """Test extracting attributes from OpenTelemetry attributes."""
-        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
-
-        # Create attribute dictionary with OpenTelemetry attributes
-        attributes = create_attributes(
-            {
-                OTSpanAttr.LLM_SYSTEM: "You are a helpful assistant",
-                OTSpanAttr.LLM_REQUEST_MAX_TOKENS: 150,
-                OTSpanAttr.TRACELOOP_SPAN_KIND: "llm",
-                OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
-            }
-        )
-
-        # Test get_weave_attributes
-        extracted = get_weave_attributes(attributes)
-        assert extracted["system"] == "You are a helpful assistant"
-        assert extracted["model_parameters"]["max_tokens"] == 150
-        assert extracted["kind"] == "llm"
-        assert extracted["model"] == "gpt-4"
-
-    def test_opentelemetry_inputs_extraction(self):
-        """Test extracting inputs from OpenTelemetry attributes."""
-        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
-
-        # Create attribute dictionary with OpenTelemetry prompts
-        prompts = {"0": {"role": "user", "content": "Tell me about quantum computing"}}
-        attributes = create_attributes(
-            {
-                OTSpanAttr.LLM_PROMPTS: prompts,
-            }
-        )
-
-        # Test get_weave_inputs
-        inputs = get_weave_inputs([], attributes)
-        assert inputs == {
-            "gen_ai.prompt": [
-                {"role": "user", "content": "Tell me about quantum computing"}
-            ]
-        }
-
-    def test_opentelemetry_outputs_extraction(self):
-        """Test extracting outputs from OpenTelemetry attributes."""
-        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
-
-        # Create attribute dictionary with OpenTelemetry completions
-        completions = {
-            "0": {
-                "role": "assistant",
-                "content": "Quantum computing uses quantum mechanics...",
-            }
-        }
-        attributes = create_attributes(
-            {
-                OTSpanAttr.LLM_COMPLETIONS: completions,
-            }
-        )
-
-        # Create OpenTelemetry attributes object
-
-        # Test get_weave_outputs
-        outputs = get_weave_outputs([], attributes)
-        assert outputs == {
-            "gen_ai.completion": [
+    # OpenTelemetry token counts.
+    usage = (
+        get_weave_usage(
+            create_attributes(
                 {
-                    "role": "assistant",
-                    "content": "Quantum computing uses quantum mechanics...",
+                    OTSpanAttr.LLM_USAGE_PROMPT_TOKENS: 15,
+                    OTSpanAttr.LLM_USAGE_COMPLETION_TOKENS: 25,
+                    OTSpanAttr.LLM_USAGE_TOTAL_TOKENS: 40,
                 }
-            ]
-        }
-
-    def test_opentelemetry_usage_extraction(self):
-        """Test extracting usage from OpenTelemetry attributes."""
-        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
-
-        # Create attribute dictionary with OpenTelemetry token usage
-        attributes = create_attributes(
-            {
-                OTSpanAttr.LLM_USAGE_PROMPT_TOKENS: 15,
-                OTSpanAttr.LLM_USAGE_COMPLETION_TOKENS: 25,
-                OTSpanAttr.LLM_USAGE_TOTAL_TOKENS: 40,
-            }
+            )
         )
+        or {}
+    )
+    assert usage.get("prompt_tokens") == 15
+    assert usage.get("completion_tokens") == 25
+    assert usage.get("total_tokens") == 40
 
-        # Create OpenTelemetry attributes object
-        usage = get_weave_usage(attributes) or {}
-
-        assert usage.get("prompt_tokens") == 15
-        assert usage.get("completion_tokens") == 25
-        assert usage.get("total_tokens") == 40
-
-    def test_opentelemetry_usage_output_tokens_extraction(self):
-        """Test that gen_ai.usage.output_tokens is properly parsed and combined with input_tokens."""
-        # Test with gen_ai.usage.input_tokens and gen_ai.usage.output_tokens
-        attributes = create_attributes(
-            {
-                "gen_ai.usage.input_tokens": 10,
-                "gen_ai.usage.output_tokens": 20,
-            }
+    # gen_ai input/output tokens: total is computed when not provided.
+    usage = (
+        get_weave_usage(
+            create_attributes(
+                {"gen_ai.usage.input_tokens": 10, "gen_ai.usage.output_tokens": 20}
+            )
         )
+        or {}
+    )
+    assert usage.get("input_tokens") == 10
+    assert usage.get("output_tokens") == 20
+    assert usage.get("total_tokens") == 30
 
-        usage = get_weave_usage(attributes) or {}
-
-        # Verify individual tokens are parsed
-        assert usage.get("input_tokens") == 10
-        assert usage.get("output_tokens") == 20
-        # Verify total_tokens is calculated when not provided
-        assert usage.get("total_tokens") == 30
-
-    def test_opentelemetry_usage_output_tokens_with_explicit_total(self):
-        """Test that explicit total_tokens takes precedence over calculated value."""
-        # Test with explicit total_tokens provided
-        attributes = create_attributes(
-            {
-                "gen_ai.usage.input_tokens": 10,
-                "gen_ai.usage.output_tokens": 20,
-                "llm.usage.total_tokens": 35,  # Explicit total (might include overhead)
-            }
+    # An explicit total_tokens takes precedence over the computed value.
+    usage = (
+        get_weave_usage(
+            create_attributes(
+                {
+                    "gen_ai.usage.input_tokens": 10,
+                    "gen_ai.usage.output_tokens": 20,
+                    "llm.usage.total_tokens": 35,
+                }
+            )
         )
+        or {}
+    )
+    assert usage.get("input_tokens") == 10
+    assert usage.get("output_tokens") == 20
+    assert usage.get("total_tokens") == 35
 
-        usage = get_weave_usage(attributes) or {}
+    # cache_creation / cache_read token usage rolls into the total.
+    usage = (
+        get_weave_usage(
+            create_attributes(
+                {
+                    "gen_ai.usage.input_tokens": 100,
+                    "gen_ai.usage.output_tokens": 50,
+                    "gen_ai.usage.cache_creation.input_tokens": 80,
+                    "gen_ai.usage.cache_read.input_tokens": 20,
+                }
+            )
+        )
+        or {}
+    )
+    assert usage.get("input_tokens") == 100
+    assert usage.get("output_tokens") == 50
+    assert usage.get("cache_creation_input_tokens") == 80
+    assert usage.get("cache_read_input_tokens") == 20
+    assert usage.get("total_tokens") == 150
 
-        # Verify individual tokens are parsed
-        assert usage.get("input_tokens") == 10
-        assert usage.get("output_tokens") == 20
-        # Verify explicit total_tokens is used instead of calculated value
-        assert usage.get("total_tokens") == 35
 
-    def test_genai_semconv_system_instructions(self):
-        """Test that gen_ai.system_instructions takes priority over gen_ai.system."""
-        # gen_ai.system_instructions (new semconv) should take priority
-        attributes = create_attributes(
+def test_genai_semconv_attribute_priority_and_fallback() -> None:
+    """get_weave_attributes prefers new gen_ai semconv keys, falling back to legacy."""
+    # gen_ai.system_instructions takes priority over gen_ai.system.
+    extracted = get_weave_attributes(
+        create_attributes(
             {
                 "gen_ai.system_instructions": "You are a new-style assistant",
                 "gen_ai.system": "You are a legacy assistant",
             }
         )
-        extracted = get_weave_attributes(attributes)
-        assert extracted["system"] == "You are a new-style assistant"
+    )
+    assert extracted["system"] == "You are a new-style assistant"
+    extracted_legacy = get_weave_attributes(
+        create_attributes({"gen_ai.system": "You are a legacy assistant"})
+    )
+    assert extracted_legacy["system"] == "You are a legacy assistant"
 
-        # gen_ai.system still works when system_instructions is absent
-        attributes_legacy = create_attributes(
-            {
-                "gen_ai.system": "You are a legacy assistant",
-            }
-        )
-        extracted_legacy = get_weave_attributes(attributes_legacy)
-        assert extracted_legacy["system"] == "You are a legacy assistant"
-
-    def test_genai_semconv_request_model_fallback(self):
-        """Test that gen_ai.request.model is used when gen_ai.response.model is absent."""
-        # response.model takes priority
-        attributes_both = create_attributes(
+    # gen_ai.response.model takes priority over gen_ai.request.model (fallback).
+    extracted = get_weave_attributes(
+        create_attributes(
             {
                 "gen_ai.response.model": "gpt-4-actual",
                 "gen_ai.request.model": "gpt-4-requested",
             }
         )
-        extracted = get_weave_attributes(attributes_both)
-        assert extracted["model"] == "gpt-4-actual"
+    )
+    assert extracted["model"] == "gpt-4-actual"
+    extracted_request = get_weave_attributes(
+        create_attributes({"gen_ai.request.model": "gpt-4-requested"})
+    )
+    assert extracted_request["model"] == "gpt-4-requested"
 
-        # request.model used as fallback
-        attributes_request_only = create_attributes(
-            {
-                "gen_ai.request.model": "gpt-4-requested",
-            }
+    # gen_ai.provider.name takes priority over llm.provider (fallback).
+    extracted = get_weave_attributes(
+        create_attributes(
+            {"gen_ai.provider.name": "anthropic", "llm.provider": "legacy-provider"}
         )
-        extracted_request = get_weave_attributes(attributes_request_only)
-        assert extracted_request["model"] == "gpt-4-requested"
+    )
+    assert extracted["provider"] == "anthropic"
+    extracted_legacy = get_weave_attributes(
+        create_attributes({"llm.provider": "legacy-provider"})
+    )
+    assert extracted_legacy["provider"] == "legacy-provider"
 
-    def test_genai_semconv_provider_name(self):
-        """Test that gen_ai.provider.name takes priority over llm.provider."""
-        attributes = create_attributes(
-            {
-                "gen_ai.provider.name": "anthropic",
-                "llm.provider": "legacy-provider",
-            }
+
+def test_genai_semconv_scalar_attribute_extraction() -> None:
+    """get_weave_attributes maps single gen_ai semconv keys to their weave fields."""
+    extracted = get_weave_attributes(
+        create_attributes({"gen_ai.operation.name": "chat"})
+    )
+    assert extracted["operation_name"] == "chat"
+
+    extracted = get_weave_attributes(
+        create_attributes({"gen_ai.response.id": "chatcmpl-abc123"})
+    )
+    assert extracted["response_id"] == "chatcmpl-abc123"
+
+    extracted = get_weave_attributes(
+        create_attributes({"gen_ai.response.finish_reasons": ["stop", "length"]})
+    )
+    assert extracted["finish_reasons"] == ["stop", "length"]
+
+    extracted = get_weave_attributes(
+        create_attributes(
+            {"gen_ai.agent.name": "my-agent", "gen_ai.agent.id": "agent-42"}
         )
-        extracted = get_weave_attributes(attributes)
-        assert extracted["provider"] == "anthropic"
+    )
+    assert extracted["agent_name"] == "my-agent"
+    assert extracted["agent_id"] == "agent-42"
 
-        # llm.provider still works as fallback
-        attributes_legacy = create_attributes(
-            {
-                "llm.provider": "legacy-provider",
-            }
-        )
-        extracted_legacy = get_weave_attributes(attributes_legacy)
-        assert extracted_legacy["provider"] == "legacy-provider"
 
-    def test_genai_semconv_operation_name(self):
-        """Test extraction of gen_ai.operation.name attribute."""
-        attributes = create_attributes(
-            {
-                "gen_ai.operation.name": "chat",
-            }
-        )
-        extracted = get_weave_attributes(attributes)
-        assert extracted["operation_name"] == "chat"
+def test_genai_semconv_conversation_id_thread_and_priority() -> None:
+    """gen_ai.conversation.id sets thread_id + is_turn and outranks wandb.thread_id."""
+    extracted = get_wandb_attributes(
+        create_attributes({"gen_ai.conversation.id": "conv-abc-123"})
+    )
+    assert extracted["thread_id"] == "conv-abc-123"
+    assert extracted["is_turn"]
 
-    def test_genai_semconv_response_id(self):
-        """Test extraction of gen_ai.response.id attribute."""
-        attributes = create_attributes(
-            {
-                "gen_ai.response.id": "chatcmpl-abc123",
-            }
-        )
-        extracted = get_weave_attributes(attributes)
-        assert extracted["response_id"] == "chatcmpl-abc123"
-
-    def test_genai_semconv_finish_reasons(self):
-        """Test extraction of gen_ai.response.finish_reasons attribute."""
-        attributes = create_attributes(
-            {
-                "gen_ai.response.finish_reasons": ["stop", "length"],
-            }
-        )
-        extracted = get_weave_attributes(attributes)
-        assert extracted["finish_reasons"] == ["stop", "length"]
-
-    def test_genai_semconv_agent_attributes(self):
-        """Test extraction of gen_ai.agent.name and gen_ai.agent.id attributes."""
-        attributes = create_attributes(
-            {
-                "gen_ai.agent.name": "my-agent",
-                "gen_ai.agent.id": "agent-42",
-            }
-        )
-        extracted = get_weave_attributes(attributes)
-        assert extracted["agent_name"] == "my-agent"
-        assert extracted["agent_id"] == "agent-42"
-
-    def test_genai_semconv_cache_token_usage(self):
-        """Test extraction of cache_creation and cache_read token usage."""
-        attributes = create_attributes(
-            {
-                "gen_ai.usage.input_tokens": 100,
-                "gen_ai.usage.output_tokens": 50,
-                "gen_ai.usage.cache_creation.input_tokens": 80,
-                "gen_ai.usage.cache_read.input_tokens": 20,
-            }
-        )
-        usage = get_weave_usage(attributes) or {}
-        assert usage.get("input_tokens") == 100
-        assert usage.get("output_tokens") == 50
-        assert usage.get("cache_creation_input_tokens") == 80
-        assert usage.get("cache_read_input_tokens") == 20
-        assert usage.get("total_tokens") == 150
-
-    def test_genai_semconv_conversation_id_as_thread_and_turn(self):
-        """Test that gen_ai.conversation.id maps to both thread_id and is_turn."""
-        test_conversation_id = "conv-abc-123"
-        attributes = create_attributes(
-            {
-                "gen_ai.conversation.id": test_conversation_id,
-            }
-        )
-        extracted = get_wandb_attributes(attributes)
-        assert extracted["thread_id"] == test_conversation_id
-        # is_turn should be truthy (the conversation id itself)
-        assert extracted["is_turn"]
-
-    def test_genai_semconv_conversation_id_priority_over_wandb(self):
-        """Test that gen_ai.conversation.id takes priority over wandb.thread_id."""
-        attributes = create_attributes(
+    extracted = get_wandb_attributes(
+        create_attributes(
             {
                 "gen_ai.conversation.id": "conv-from-semconv",
                 "wandb.thread_id": "thread-from-wandb",
             }
         )
-        extracted = get_wandb_attributes(attributes)
-        assert extracted["thread_id"] == "conv-from-semconv"
+    )
+    assert extracted["thread_id"] == "conv-from-semconv"
 
-    def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
-        """Test that costs are properly calculated for OTEL spans with usage at query time."""
-        project_id = client.project_id
 
-        # Create span with gpt-4 model and usage
-        span_gpt4 = create_test_span()
-        span_gpt4.name = "llm_call_gpt4"
+def test_opentelemetry_cost_calculation(client: weave_client.WeaveClient) -> None:
+    """Test that costs are properly calculated for OTEL spans with usage at query time."""
+    project_id = client.project_id
 
-        # Add model attribute
-        kv_model = KeyValue()
-        kv_model.key = "gen_ai.request.model"
-        kv_model.value.string_value = "gpt-4"
-        span_gpt4.attributes.append(kv_model)
+    # Create span with gpt-4 model and usage
+    span_gpt4 = create_test_span()
+    span_gpt4.name = "llm_call_gpt4"
 
-        # Add usage attributes
-        kv_prompt = KeyValue()
-        kv_prompt.key = "gen_ai.usage.prompt_tokens"
-        kv_prompt.value.int_value = 1000000
-        span_gpt4.attributes.append(kv_prompt)
+    # Add model attribute
+    kv_model = KeyValue()
+    kv_model.key = "gen_ai.request.model"
+    kv_model.value.string_value = "gpt-4"
+    span_gpt4.attributes.append(kv_model)
 
-        kv_completion = KeyValue()
-        kv_completion.key = "gen_ai.usage.completion_tokens"
-        kv_completion.value.int_value = 2000000
-        span_gpt4.attributes.append(kv_completion)
+    # Add usage attributes
+    kv_prompt = KeyValue()
+    kv_prompt.key = "gen_ai.usage.prompt_tokens"
+    kv_prompt.value.int_value = 1000000
+    span_gpt4.attributes.append(kv_prompt)
 
-        # Create export request
-        export_req = create_test_export_request(project_id=project_id)
-        # Materialize processed_spans to avoid iterator exhaustion
-        processed_spans_list = export_req.processed_spans
-        processed_spans_list[0].resource_spans.scope_spans[0].spans[0].CopyFrom(
-            span_gpt4
+    kv_completion = KeyValue()
+    kv_completion.key = "gen_ai.usage.completion_tokens"
+    kv_completion.value.int_value = 2000000
+    span_gpt4.attributes.append(kv_completion)
+
+    # Create export request
+    export_req = create_test_export_request(project_id=project_id)
+    # Materialize processed_spans to avoid iterator exhaustion
+    processed_spans_list = export_req.processed_spans
+    processed_spans_list[0].resource_spans.scope_spans[0].spans[0].CopyFrom(span_gpt4)
+    export_req.processed_spans = processed_spans_list
+    export_req.wb_user_id = "test_user"
+
+    # Export the trace
+    client.server.otel_export(export_req)
+
+    # Query with costs
+    res_with_cost = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            include_costs=True,
         )
-        export_req.processed_spans = processed_spans_list
-        export_req.wb_user_id = "test_user"
+    )
 
-        # Export the trace
-        client.server.otel_export(export_req)
-
-        # Query with costs
-        res_with_cost = client.server.calls_query(
-            tsi.CallsQueryReq(
-                project_id=project_id,
-                include_costs=True,
-            )
+    # Query without costs
+    res_no_cost = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            include_costs=False,
         )
+    )
 
-        # Query without costs
-        res_no_cost = client.server.calls_query(
-            tsi.CallsQueryReq(
-                project_id=project_id,
-                include_costs=False,
-            )
-        )
+    assert len(res_with_cost.calls) == 1
+    assert len(res_no_cost.calls) == 1
 
-        assert len(res_with_cost.calls) == 1
-        assert len(res_no_cost.calls) == 1
+    call_with_cost = res_with_cost.calls[0]
+    call_no_cost = res_no_cost.calls[0]
+    assert call_with_cost.summary is not None
 
-        call_with_cost = res_with_cost.calls[0]
-        call_no_cost = res_no_cost.calls[0]
-        assert call_with_cost.summary is not None
+    # Verify model cost information is present when requested
+    assert "gpt-4" in call_with_cost.summary["weave"]["costs"]  # type: ignore
 
-        # Verify model cost information is present when requested
-        assert "gpt-4" in call_with_cost.summary["weave"]["costs"]  # type: ignore
+    gpt4_cost = call_with_cost.summary["weave"]["costs"]["gpt-4"]  # type: ignore
+    del gpt4_cost["effective_date"]  # type: ignore
+    del gpt4_cost["created_at"]  # type: ignore
+    # Verify cost calculation matches expected values
+    assert (
+        gpt4_cost
+        == {
+            "prompt_tokens": 1000000,
+            "completion_tokens": 2000000,
+            "requests": 0,  # OTEL doesn't track requests separately
+            "total_tokens": 3000000,  # Now properly calculated from prompt + completion tokens
+            "prompt_tokens_total_cost": pytest.approx(30),
+            "completion_tokens_total_cost": pytest.approx(120),
+            "prompt_token_cost": 3e-05,
+            "completion_token_cost": 6e-05,
+            "prompt_token_cost_unit": "USD",
+            "completion_token_cost_unit": "USD",
+            "provider_id": "openai",
+            "pricing_level": "default",
+            "pricing_level_id": "default",
+            "created_by": "system",
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens_total_cost": 0,
+            "cache_creation_input_tokens_total_cost": 0,
+            "cache_read_input_token_cost": 0,
+            "cache_creation_input_token_cost": 0,
+        }
+    )
 
-        gpt4_cost = call_with_cost.summary["weave"]["costs"]["gpt-4"]  # type: ignore
-        del gpt4_cost["effective_date"]  # type: ignore
-        del gpt4_cost["created_at"]  # type: ignore
-        # Verify cost calculation matches expected values
-        assert (
-            gpt4_cost
-            == {
-                "prompt_tokens": 1000000,
-                "completion_tokens": 2000000,
-                "requests": 0,  # OTEL doesn't track requests separately
-                "total_tokens": 3000000,  # Now properly calculated from prompt + completion tokens
-                "prompt_tokens_total_cost": pytest.approx(30),
-                "completion_tokens_total_cost": pytest.approx(120),
-                "prompt_token_cost": 3e-05,
-                "completion_token_cost": 6e-05,
-                "prompt_token_cost_unit": "USD",
-                "completion_token_cost_unit": "USD",
-                "provider_id": "openai",
-                "pricing_level": "default",
-                "pricing_level_id": "default",
-                "created_by": "system",
-                "cache_read_input_tokens": 0,
-                "cache_creation_input_tokens": 0,
-                "cache_read_input_tokens_total_cost": 0,
-                "cache_creation_input_tokens_total_cost": 0,
-                "cache_read_input_token_cost": 0,
-                "cache_creation_input_token_cost": 0,
-            }
-        )
-
-        # Verify no cost information when not requested
-        assert "costs" not in call_no_cost.summary.get("weave", {})  # type: ignore
+    # Verify no cost information when not requested
+    assert "costs" not in call_no_cost.summary.get("weave", {})  # type: ignore
 
 
-class TestHelpers:
-    def test_capture_parts(self):
-        """Test capturing parts of a string split by delimiters."""
-        # Test with a single delimiter
-        assert capture_parts("part1.part2") == ["part1", ".", "part2"]
+def test_capture_parts() -> None:
+    """Test capturing parts of a string split by delimiters."""
+    assert capture_parts("part1.part2") == ["part1", ".", "part2"]
+    assert capture_parts("part1.part2,part3") == [
+        "part1",
+        ".",
+        "part2",
+        ",",
+        "part3",
+    ]
+    assert capture_parts("nodelimiters") == ["nodelimiters"]
+    assert capture_parts("") == [""]
+    assert capture_parts("a-b-c", delimiters=["-"]) == ["a", "-", "b", "-", "c"]
+    assert capture_parts("part1..part2") == ["part1", ".", ".", "part2"]
 
-        # Test with multiple delimiters
-        assert capture_parts("part1.part2,part3") == [
-            "part1",
-            ".",
-            "part2",
-            ",",
-            "part3",
-        ]
 
-        # Test with delimiters that don't appear in the string
-        assert capture_parts("nodelimiters") == ["nodelimiters"]
+def test_shorten_name() -> None:
+    """shorten_name truncates on delimiter boundaries respecting max_len and abbrev."""
+    # No delimiters: short names pass through, long names get an ellipsis.
+    assert shorten_name("short", 10) == "short"
+    assert shorten_name("abcdefghijklmnopqrstuvwxyz", 10) == "abcdefg..."
 
-        # Test with an empty string
-        assert capture_parts("") == [""]
+    # Delimiters: truncate on a boundary, or keep whole when it fits.
+    assert shorten_name("part1.part2", 10) == "part1..."
+    assert shorten_name("a.b.c", 10) == "a.b.c"
+    assert shorten_name("part1.part2.part3", 12) == "part1..."
 
-        # Test with custom delimiters
-        assert capture_parts("a-b-c", delimiters=["-"]) == ["a", "-", "b", "-", "c"]
+    # First part already too long.
+    assert shorten_name("verylongfirstpart.second", 10) == "verylon..."
 
-        # Test with adjacent delimiters
-        assert capture_parts("part1..part2") == ["part1", ".", ".", "part2"]
+    # Custom and empty abbreviations.
+    assert shorten_name("part1.part2.part3", 10, "***") == "part1.***"
+    assert shorten_name("part1.part2.part3", 10, "") == "part1"
 
-    def test_shorten_name_no_delimiters(self):
-        """Test shortening a name with no delimiters."""
-        # Test a string shorter than max_len - the function always adds ellipsis
-        assert shorten_name("short", 10) == "short"
+    # Different delimiter types (space, slash, mixed, question mark).
+    assert shorten_name("word1 word2 word3", 12) == "word1 ..."
+    assert shorten_name("path/to/file", 8) == "path/..."
+    assert shorten_name("user.name@example.com", 12) == "user..."
+    assert shorten_name("api/endpoint?param=value", 15) == "api/..."
 
-        # Test a string longer than max_len with no delimiters
-        long_name = "abcdefghijklmnopqrstuvwxyz"
-        assert shorten_name(long_name, 10) == "abcdefg..."
+    # '-' is not a default delimiter, so it is treated as part of the string.
+    result = shorten_name("part1-part2-part3", 10)
+    assert result.startswith("part1-")
+    assert result.endswith("...")
+    assert len(result) == 10
 
-    def test_shorten_name_with_delimiters(self):
-        """Test shortening a name with delimiters."""
-        # Test with a single delimiter
-        assert shorten_name("part1.part2", 10) == "part1..."
 
-        # Test with multiple delimiters where it fits within the max_len
-        assert shorten_name("a.b.c", 10) == "a.b.c"
+def test_long_url_regression() -> None:
+    # A modified version of the URL that caused failed traces due to op_name length.
+    actual = shorten_name(
+        "GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig?batch=1&input=%8A%220%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%221%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%222%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%223%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%8D",
+        128,
+    )
+    assert actual.startswith("GET /")
+    assert actual.endswith("...")
+    assert len(actual) <= 128
 
-        # Test with multiple delimiters where it needs truncation
-        assert shorten_name("part1.part2.part3", 12) == "part1..."
 
-    def test_shorten_name_first_part_too_long(self):
-        """Test shortening a name where first part is already too long."""
-        # First part already exceeds max_len
-        assert shorten_name("verylongfirstpart.second", 10) == "verylon..."
+def test_try_parse_timestamp() -> None:
+    """Test parsing timestamps from various formats."""
+    # ISO 8601 string.
+    result = try_parse_timestamp("2023-01-01T12:00:00")
+    assert isinstance(result, datetime)
+    assert (result.year, result.month, result.day) == (2023, 1, 1)
+    assert (result.hour, result.minute, result.second) == (12, 0, 0)
 
-    def test_shorten_name_custom_abbreviation(self):
-        """Test shortening a name with custom abbreviation."""
-        assert shorten_name("part1.part2.part3", 10, "***") == "part1.***"
-
-        # Test with empty abbreviation
-        assert shorten_name("part1.part2.part3", 10, "") == "part1"
-
-    def test_shorten_name_different_delimiters(self):
-        """Test shortening a name with different types of delimiters."""
-        # Test with a space delimiter
-        assert shorten_name("word1 word2 word3", 12) == "word1 ..."
-
-        # Test with a slash delimiter
-        assert shorten_name("path/to/file", 8) == "path/..."
-
-        # Test with mixed delimiters
-        assert shorten_name("user.name@example.com", 12) == "user..."
-
-        # Test with a delimiter not in the default list
-        # Since '-' is not in the default delimiters list, it's treated as part of the string
-        result = shorten_name("part1-part2-part3", 10)
-        assert result.startswith("part1-")
-        assert result.endswith("...")
-        assert len(result) == 10
-
-        # Test with a question mark delimiter
-        assert shorten_name("api/endpoint?param=value", 15) == "api/..."
-
-    def test_long_url_regression(self):
-        # Test for a modified version of the URL which caused failed traces due to op_name length
-        actual = shorten_name(
-            "GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig?batch=1&input=%8A%220%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%221%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%222%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%223%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%8D",
-            128,
-        )
-        # The new implementation shortens the URL differently, so we check that it has the correct format
-        # and doesn't exceed the maximum length
-        assert actual.startswith("GET /")
-        assert actual.endswith("...")
-        assert len(actual) <= 128
-
-    def test_try_parse_timestamp(self):
-        """Test parsing timestamps from various formats."""
-        from datetime import datetime
-
-        # Test parsing ISO 8601 format string
-        iso_timestamp = "2023-01-01T12:00:00"
-        result = try_parse_timestamp(iso_timestamp)
+    # Nanoseconds since epoch (int) and seconds since epoch (float).
+    # Hour is not checked due to timezone differences.
+    for ts in (1672574400000000000, 1672574400.0):
+        result = try_parse_timestamp(ts)
         assert isinstance(result, datetime)
-        assert result.year == 2023
-        assert result.month == 1
-        assert result.day == 1
-        assert result.hour == 12
-        assert result.minute == 0
-        assert result.second == 0
+        assert (result.year, result.month, result.day) == (2023, 1, 1)
 
-        # Test parsing nanoseconds since epoch (int)
-        ns_timestamp = 1672574400000000000  # 2023-01-01T12:00:00 in nanoseconds
-        result = try_parse_timestamp(ns_timestamp)
-        assert isinstance(result, datetime)
-        assert result.year == 2023
-        assert result.month == 1
-        assert result.day == 1
-        # Hour may vary based on timezone, so we don't check it
-
-        # Test parsing seconds since epoch (float)
-        seconds_timestamp = 1672574400.0  # 2023-01-01T12:00:00 in seconds
-        result = try_parse_timestamp(seconds_timestamp)
-        assert isinstance(result, datetime)
-        assert result.year == 2023
-        assert result.month == 1
-        assert result.day == 1
-        # Hour may vary based on timezone, so we don't check it
-
-        # Test with invalid string format
-        invalid_string = "not-a-timestamp"
-        assert try_parse_timestamp(invalid_string) is None
-
-        # Test with other types
-        assert try_parse_timestamp(None) is None
-        assert try_parse_timestamp({}) is None
-        assert try_parse_timestamp([]) is None
+    # Invalid string and unsupported types return None.
+    assert try_parse_timestamp("not-a-timestamp") is None
+    assert try_parse_timestamp(None) is None
+    assert try_parse_timestamp({}) is None
+    assert try_parse_timestamp([]) is None
 
 
-class TestSpanOverrides:
-    """Test the functionality for span overrides in opentelemetry attributes."""
-
-    def test_get_span_overrides(self):
-        """Test extracting span overrides from attributes."""
-        # Create attribute dictionary with timestamp overrides in ISO format
-        iso_start = "2023-01-01T10:00:00"
-        iso_end = "2023-01-01T10:01:30"
-        attributes = expand_attributes(
+def test_get_span_overrides() -> None:
+    """get_span_overrides parses ISO + epoch timestamps and tolerates missing ones."""
+    # ISO format timestamps round-trip exactly.
+    iso_start = "2023-01-01T10:00:00"
+    iso_end = "2023-01-01T10:01:30"
+    overrides = get_span_overrides(
+        expand_attributes(
             [
                 ("langfuse.startTime", iso_start),
                 ("langfuse.endTime", iso_end),
                 ("other.attribute", "value"),
             ]
         )
+    )
+    assert len(overrides) == 2
+    assert isinstance(overrides["start_time"], datetime)
+    assert isinstance(overrides["end_time"], datetime)
+    assert overrides["start_time"].isoformat() == iso_start
+    assert overrides["end_time"].isoformat() == iso_end
 
-        # Test extracting the overrides
-        overrides = get_span_overrides(attributes)
-        assert len(overrides) == 2
-        assert isinstance(overrides["start_time"], datetime)
-        assert isinstance(overrides["end_time"], datetime)
-        assert overrides["start_time"].isoformat() == iso_start
-        assert overrides["end_time"].isoformat() == iso_end
-
-    def test_get_span_overrides_with_timestamps(self):
-        """Test extracting span overrides with different timestamp formats."""
-        from datetime import datetime
-
-        # Create attribute dictionary with epoch timestamps
-        start_ns = 1672574400000000000  # 2023-01-01T12:00:00 in nanoseconds
-        end_seconds = 1672574460.0  # 2023-01-01T12:01:00 in seconds
-
-        attributes = expand_attributes(
+    # Epoch timestamps (nanoseconds int + seconds float). Hour is timezone-dependent.
+    overrides = get_span_overrides(
+        expand_attributes(
             [
-                ("langfuse.startTime", start_ns),
-                ("langfuse.endTime", end_seconds),
+                ("langfuse.startTime", 1672574400000000000),
+                ("langfuse.endTime", 1672574460.0),
             ]
         )
+    )
+    assert len(overrides) == 2
+    assert isinstance(overrides["start_time"], datetime)
+    assert isinstance(overrides["end_time"], datetime)
+    assert (overrides["start_time"].year, overrides["start_time"].month) == (2023, 1)
+    assert overrides["start_time"].day == 1
+    assert (overrides["end_time"].year, overrides["end_time"].month) == (2023, 1)
+    assert overrides["end_time"].day == 1
+    delta = overrides["end_time"] - overrides["start_time"]
+    assert abs(delta.total_seconds() - 60) < 1
 
-        # Test extracting the overrides
-        overrides = get_span_overrides(attributes)
-        assert len(overrides) == 2
-        assert isinstance(overrides["start_time"], datetime)
-        assert isinstance(overrides["end_time"], datetime)
-
-        # Check the year/month/day to ensure timestamps were parsed correctly
-        # (not checking hour due to timezone differences)
-        assert overrides["start_time"].year == 2023
-        assert overrides["start_time"].month == 1
-        assert overrides["start_time"].day == 1
-
-        assert overrides["end_time"].year == 2023
-        assert overrides["end_time"].month == 1
-        assert overrides["end_time"].day == 1
-
-        # End time should be 60 seconds after start time
-        delta = overrides["end_time"] - overrides["start_time"]
-        assert (
-            abs(delta.total_seconds() - 60) < 1
-        )  # Allow small difference due to float precision
-
-    def test_get_span_overrides_with_missing_attributes(self):
-        """Test get_span_overrides when no override attributes are present."""
-        # Create attribute dictionary without overrides
-        attributes = expand_attributes(
-            [
-                ("some.attribute", "value"),
-                ("other.attribute", 123),
-            ]
+    # No override attributes -> empty dict.
+    assert (
+        get_span_overrides(
+            expand_attributes(
+                [
+                    ("some.attribute", "value"),
+                    ("other.attribute", 123),
+                ]
+            )
         )
-
-        # Test extracting the overrides
-        overrides = get_span_overrides(attributes)
-        assert overrides == {}
+        == {}
+    )
 
 
 def test_otel_export_partial_success_on_attribute_conflict(

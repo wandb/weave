@@ -175,6 +175,32 @@ def _usage_totals(
     return (prompt_tokens, completion_tokens, total_tokens, requests)
 
 
+def _query_usage(
+    client: weave_client.WeaveClient,
+    api: str,
+    trace_id: str,
+    call_ids: list[str],
+    include_costs: bool = False,
+) -> tsi.TraceUsageRes | tsi.CallsUsageRes:
+    if api == "trace_usage":
+        return client.server.trace_usage(
+            tsi.TraceUsageReq(
+                project_id=client.project_id,
+                filter=tsi.CallsFilter(trace_ids=[trace_id]),
+                include_costs=include_costs,
+            )
+        )
+    if api == "calls_usage":
+        return client.server.calls_usage(
+            tsi.CallsUsageReq(
+                project_id=client.project_id,
+                call_ids=call_ids,
+                include_costs=include_costs,
+            )
+        )
+    raise ValueError(f"unknown usage api: {api}")
+
+
 def test_aggregate_usage_with_descendants_rolls_up() -> None:
     root_id = "root"
     child_a_id = "child-a"
@@ -494,8 +520,8 @@ def test_trace_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
     assert child_usage.total_tokens == 7
 
 
-def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
-    project_id = client.project_id
+@pytest.mark.parametrize("api", ["trace_usage", "calls_usage"])
+def test_usage_include_costs_flag(client: weave_client.WeaveClient, api: str) -> None:
     trace_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
 
@@ -509,38 +535,28 @@ def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
         {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
     )
 
-    res_no_costs = client.server.trace_usage(
-        tsi.TraceUsageReq(
-            project_id=project_id,
-            filter=tsi.CallsFilter(trace_ids=[trace_id]),
-            include_costs=False,
-        )
-    )
+    res_no_costs = _query_usage(client, api, trace_id, [call_id], include_costs=False)
     usage_no_costs = res_no_costs.call_usage[call_id]["gpt-4"]
     assert usage_no_costs.prompt_tokens_total_cost is None
     assert usage_no_costs.completion_tokens_total_cost is None
 
-    res_with_costs = client.server.trace_usage(
-        tsi.TraceUsageReq(
-            project_id=project_id,
-            filter=tsi.CallsFilter(trace_ids=[trace_id]),
-            include_costs=True,
-        )
-    )
+    res_with_costs = _query_usage(client, api, trace_id, [call_id], include_costs=True)
     usage_with_costs = res_with_costs.call_usage[call_id]["gpt-4"]
     assert usage_with_costs.prompt_tokens_total_cost is not None
     assert usage_with_costs.completion_tokens_total_cost is not None
 
 
-def test_trace_usage_returns_unfinished_call_ids(
-    client: weave_client.WeaveClient,
+@pytest.mark.parametrize("api", ["trace_usage", "calls_usage"])
+def test_usage_returns_unfinished_call_ids(
+    client: weave_client.WeaveClient, api: str
 ) -> None:
-    project_id = client.project_id
     trace_id = str(uuid.uuid4())
+    trace_id_two = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
 
     root_id = str(uuid.uuid4())
     unfinished_child_id = str(uuid.uuid4())
+    root_id_two = str(uuid.uuid4())
 
     _create_call(
         client,
@@ -557,13 +573,17 @@ def test_trace_usage_returns_unfinished_call_ids(
         root_id,
         now + datetime.timedelta(seconds=2),
     )
-
-    res = client.server.trace_usage(
-        tsi.TraceUsageReq(
-            project_id=project_id,
-            filter=tsi.CallsFilter(trace_ids=[trace_id]),
-        )
+    # calls_usage queries by call_ids, so include a second finished root to query.
+    _create_call(
+        client,
+        root_id_two,
+        trace_id_two,
+        None,
+        now + datetime.timedelta(seconds=4),
+        {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
     )
+
+    res = _query_usage(client, api, trace_id, [root_id, root_id_two])
 
     assert set(res.unfinished_call_ids) == {unfinished_child_id}
 
@@ -628,90 +648,6 @@ def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
     assert root_two_usage.prompt_tokens == 2
     assert root_two_usage.completion_tokens == 1
     assert root_two_usage.total_tokens == 3
-
-
-def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
-    project_id = client.project_id
-    trace_id = str(uuid.uuid4())
-    now = datetime.datetime.now(datetime.timezone.utc)
-
-    call_id = str(uuid.uuid4())
-    _create_call(
-        client,
-        call_id,
-        trace_id,
-        None,
-        now,
-        {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
-    )
-
-    res_no_costs = client.server.calls_usage(
-        tsi.CallsUsageReq(
-            project_id=project_id,
-            call_ids=[call_id],
-            include_costs=False,
-        )
-    )
-    usage_no_costs = res_no_costs.call_usage[call_id]["gpt-4"]
-    assert usage_no_costs.prompt_tokens_total_cost is None
-    assert usage_no_costs.completion_tokens_total_cost is None
-
-    res_with_costs = client.server.calls_usage(
-        tsi.CallsUsageReq(
-            project_id=project_id,
-            call_ids=[call_id],
-            include_costs=True,
-        )
-    )
-    usage_with_costs = res_with_costs.call_usage[call_id]["gpt-4"]
-    assert usage_with_costs.prompt_tokens_total_cost is not None
-    assert usage_with_costs.completion_tokens_total_cost is not None
-
-
-def test_calls_usage_returns_unfinished_call_ids(
-    client: weave_client.WeaveClient,
-) -> None:
-    project_id = client.project_id
-    trace_id = str(uuid.uuid4())
-    trace_id_two = str(uuid.uuid4())
-    now = datetime.datetime.now(datetime.timezone.utc)
-
-    root_id = str(uuid.uuid4())
-    unfinished_child_id = str(uuid.uuid4())
-    root_id_two = str(uuid.uuid4())
-
-    _create_call(
-        client,
-        root_id,
-        trace_id,
-        None,
-        now,
-        {"gpt-4": {"prompt_tokens": 5, "completion_tokens": 5, "total_tokens": 10}},
-    )
-    _create_unfinished_call(
-        client,
-        unfinished_child_id,
-        trace_id,
-        root_id,
-        now + datetime.timedelta(seconds=2),
-    )
-    _create_call(
-        client,
-        root_id_two,
-        trace_id_two,
-        None,
-        now + datetime.timedelta(seconds=4),
-        {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
-    )
-
-    res = client.server.calls_usage(
-        tsi.CallsUsageReq(
-            project_id=project_id,
-            call_ids=[root_id, root_id_two],
-        )
-    )
-
-    assert set(res.unfinished_call_ids) == {unfinished_child_id}
 
 
 @pytest.mark.parametrize(

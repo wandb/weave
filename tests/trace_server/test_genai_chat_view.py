@@ -232,8 +232,13 @@ def test_full_agent_turn() -> None:
     assert _assistant_payload(by_type["assistant_message"]).output_tokens == 105
 
 
-def test_agent_start_uses_agent_id_when_name_missing() -> None:
-    messages = build_chat_messages(
+def test_agent_start_emission_rules() -> None:
+    """agent_start identity falls back to agent_id; it still emits (anonymous)
+    when only model/instructions/tools metadata is present; and it is skipped
+    entirely for an anonymous invoke_agent carrying no useful metadata.
+    """
+    # agent_id stands in for a missing agent_name on both messages.
+    by_id = build_chat_messages(
         [
             _span(
                 span_id="agent",
@@ -243,15 +248,14 @@ def test_agent_start_uses_agent_id_when_name_missing() -> None:
             )
         ]
     )
+    assert next(m for m in by_id if m.type == "agent_start").agent_name == "agent-123"
+    assert (
+        next(m for m in by_id if m.type == "assistant_message").agent_name
+        == "agent-123"
+    )
 
-    agent_start = next(m for m in messages if m.type == "agent_start")
-    assistant = next(m for m in messages if m.type == "assistant_message")
-    assert agent_start.agent_name == "agent-123"
-    assert assistant.agent_name == "agent-123"
-
-
-def test_agent_start_emits_useful_metadata_without_agent_identity() -> None:
-    messages = build_chat_messages(
+    # No identity but useful metadata -> anonymous agent_start still emitted.
+    meta = build_chat_messages(
         [
             _span(
                 span_id="agent",
@@ -263,17 +267,15 @@ def test_agent_start_emits_useful_metadata_without_agent_identity() -> None:
             )
         ]
     )
-
-    assert [m.type for m in messages] == ["agent_start"]
-    assert messages[0].agent_name is None
-    agent_start = _agent_start_payload(messages[0])
+    assert [m.type for m in meta] == ["agent_start"]
+    assert meta[0].agent_name is None
+    agent_start = _agent_start_payload(meta[0])
     assert agent_start.model == "gpt-4o"
     assert agent_start.system_instructions == "You are helpful."
     assert agent_start.tool_definitions == '[{"name":"search"}]'
 
-
-def test_anonymous_invoke_without_metadata_skips_empty_agent_start() -> None:
-    messages = build_chat_messages(
+    # No identity and no metadata -> empty agent_start is skipped.
+    anon = build_chat_messages(
         [
             _span(
                 span_id="agent",
@@ -283,9 +285,8 @@ def test_anonymous_invoke_without_metadata_skips_empty_agent_start() -> None:
             )
         ]
     )
-
-    assert [m.type for m in messages] == ["assistant_message"]
-    assert messages[0].agent_name is None
+    assert [m.type for m in anon] == ["assistant_message"]
+    assert anon[0].agent_name is None
 
 
 def test_build_span_tree_handles_null_started_at() -> None:
@@ -393,13 +394,10 @@ def test_build_trace_chat_uses_latest_ended_span_when_root_missing() -> None:
     assert res.provider == "openai"
 
 
-def test_invoke_agent_mirrors_child_llm_output_messages() -> None:
-    """When an invoke_agent span and its inner LLM span both carry the same
-    final `output_messages` (OpenAI Agents SDK / Google ADK single-call
-    turn), we should emit exactly one `assistant_message`, not two.
-
-    The inner LLM span is the canonical content source; the parent
-    invoke_agent only emits if no descendant did.
+def test_invoke_agent_assistant_message_dedup_guard() -> None:
+    """The assistant_message guard is "did a descendant already emit?": when an
+    inner LLM span mirrors the parent's final output we emit once (from the
+    child), but a solo invoke_agent with no descendant LLM span still emits.
     """
 
     def at(seconds: int) -> datetime.datetime:
@@ -407,64 +405,51 @@ def test_invoke_agent_mirrors_child_llm_output_messages() -> None:
             2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
         )
 
+    # Parent + inner LLM carry the same final output -> exactly one message,
+    # sourced from the child chat span (not duplicated from invoke_agent).
     final_text = [{"role": "assistant", "content": "It's 72°F."}]
+    mirrored = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                agent_name="my-bot",
+                input_messages=[{"role": "user", "content": "What's the weather?"}],
+                output_messages=final_text,  # mirrored onto the parent
+                input_tokens=10,
+                output_tokens=5,
+                started_at=at(0),
+            ),
+            _span(
+                span_id="llm",
+                parent_span_id="agent",
+                operation_name="chat",
+                output_messages=final_text,  # same text on the inner LLM call
+                input_tokens=200,
+                output_tokens=100,
+                started_at=at(1),
+            ),
+        ]
+    )
+    mirrored_assistant = [m for m in mirrored if m.type == "assistant_message"]
+    assert len(mirrored_assistant) == 1
+    assert _assistant_payload(mirrored_assistant[0]).text == "It's 72°F."
 
-    spans = [
-        _span(
-            span_id="agent",
-            operation_name="invoke_agent",
-            agent_name="my-bot",
-            input_messages=[{"role": "user", "content": "What's the weather?"}],
-            output_messages=final_text,  # mirrored onto the parent
-            input_tokens=10,
-            output_tokens=5,
-            started_at=at(0),
-        ),
-        _span(
-            span_id="llm",
-            parent_span_id="agent",
-            operation_name="chat",
-            output_messages=final_text,  # same text on the inner LLM call
-            input_tokens=200,
-            output_tokens=100,
-            started_at=at(1),
-        ),
-    ]
-
-    messages = build_chat_messages(spans)
-    agent_messages = [m for m in messages if m.type == "assistant_message"]
-
-    # Exactly one assistant_message, sourced from the child chat span (not
-    # duplicated from the parent invoke_agent).
-    assert len(agent_messages) == 1
-    assert _assistant_payload(agent_messages[0]).text == "It's 72°F."
-
-
-def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
-    """If an invoke_agent has output_messages but no descendant LLM span
-    carries them, the parent still emits — the guard is "child emitted
-    already?", not a blanket "never emit from invoke_agent".
-    """
-
-    def at(seconds: int) -> datetime.datetime:
-        return datetime.datetime(
-            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
-        )
-
-    spans = [
-        _span(
-            span_id="agent",
-            operation_name="invoke_agent",
-            agent_name="solo-bot",
-            output_messages=[{"role": "assistant", "content": "hi there"}],
-            started_at=at(0),
-        ),
-    ]
-
-    messages = build_chat_messages(spans)
-    agent_messages = [m for m in messages if m.type == "assistant_message"]
-    assert len(agent_messages) == 1
-    assert _assistant_payload(agent_messages[0]).text == "hi there"
+    # Solo invoke_agent with no descendant LLM span -> parent still emits.
+    solo = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                agent_name="solo-bot",
+                output_messages=[{"role": "assistant", "content": "hi there"}],
+                started_at=at(0),
+            ),
+        ]
+    )
+    solo_assistant = [m for m in solo if m.type == "assistant_message"]
+    assert len(solo_assistant) == 1
+    assert _assistant_payload(solo_assistant[0]).text == "hi there"
 
 
 def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:
@@ -528,132 +513,128 @@ def test_system_message_not_used_as_user_prompt_fallback() -> None:
     assert [m.type for m in messages] == ["assistant_message"]
 
 
-def test_input_media_attaches_to_user_message_not_assistant() -> None:
-    """Regression: media supplied with the user prompt renders on the user
-    bubble, not the assistant.
-
-    Mirrors the session SDK shape — `attach_media` records media on the
-    LLM/chat span as a `uri` part on the user input message (external form)
-    and, separately, in the span-level `content_refs` (internal,
-    int<->ext-convertible form). The user text comes from the enclosing
-    invoke_agent span. The ref *value* surfaced is the internal `content_refs`
-    one (so the response's int->ext adapter can round-trip it); its *direction*
-    comes from the input part, matched by digest. So the audio lands on the
-    user message and the assistant stays clean.
+def test_media_content_refs_attach_by_part_direction() -> None:
+    """A `content_refs` ref surfaces the internal (round-trippable) value but
+    its direction is matched by digest to an inline message part: input media
+    lands on the user bubble, output media on the assistant bubble, and an
+    orphan ref with no matching part attaches to neither.
     """
+    # Input media: audio on the user prompt -> user bubble, assistant clean.
     audio_internal = "weave-trace-internal:///PID/object/Content:AUDIODIGEST"
     audio_external = "weave:///e/p/object/Content:AUDIODIGEST"
-    spans = [
-        _span(
-            span_id="agent",
-            operation_name="invoke_agent",
-            agent_name="audio-agent",
-            input_messages=[
-                {"role": "user", "content": _parts(_text_part("Describe the audio."))}
-            ],
-        ),
-        _span(
-            span_id="chat",
-            parent_span_id="agent",
-            operation_name="chat",
-            input_messages=[
-                {
-                    "role": "user",
-                    "content": _parts(
-                        _text_part("Describe the audio."), _uri_part(audio_external)
-                    ),
-                }
-            ],
-            output_messages=[
-                {"role": "assistant", "content": _parts(_text_part("Chiptune music."))}
-            ],
-            # Round-trippable internal-form ref; same object digest as the part.
-            content_refs=[audio_internal],
-        ),
-    ]
-
-    messages = build_chat_messages(spans)
-    user = next(m for m in messages if m.type == "user_message")
-    assistant = next(m for m in messages if m.type == "assistant_message")
-
-    # Value is the internal (convertible) ref; direction is from the input part.
+    input_msgs = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                agent_name="audio-agent",
+                input_messages=[
+                    {
+                        "role": "user",
+                        "content": _parts(_text_part("Describe the audio.")),
+                    }
+                ],
+            ),
+            _span(
+                span_id="chat",
+                parent_span_id="agent",
+                operation_name="chat",
+                input_messages=[
+                    {
+                        "role": "user",
+                        "content": _parts(
+                            _text_part("Describe the audio."),
+                            _uri_part(audio_external),
+                        ),
+                    }
+                ],
+                output_messages=[
+                    {
+                        "role": "assistant",
+                        "content": _parts(_text_part("Chiptune music.")),
+                    }
+                ],
+                # Round-trippable internal-form ref; same object digest as the part.
+                content_refs=[audio_internal],
+            ),
+        ]
+    )
+    user = next(m for m in input_msgs if m.type == "user_message")
+    assistant = next(m for m in input_msgs if m.type == "assistant_message")
     assert _user_payload(user).content_refs == [audio_internal]
     assert _assistant_payload(assistant).content_refs == []
 
-
-def test_output_media_attaches_to_assistant_message() -> None:
-    """Model-generated media is a part on the output message and renders on
-    the assistant bubble (mirror image of the input case).
-    """
+    # Output media: model-generated image on the output -> assistant bubble.
     image_internal = "weave-trace-internal:///PID/object/Content:GENIMG"
     image_external = "weave:///e/p/object/Content:GENIMG"
-    spans = [
-        _span(
-            span_id="agent",
-            operation_name="invoke_agent",
-            agent_name="image-gen",
-            input_messages=[
-                {"role": "user", "content": _parts(_text_part("Draw a cat."))}
-            ],
-        ),
-        _span(
-            span_id="chat",
-            parent_span_id="agent",
-            operation_name="chat",
-            input_messages=[
-                {"role": "user", "content": _parts(_text_part("Draw a cat."))}
-            ],
-            output_messages=[
-                {
-                    "role": "assistant",
-                    "content": _parts(
-                        _text_part("Here you go."),
-                        _uri_part(
-                            image_external, mime_type="image/png", modality="image"
+    output_msgs = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                agent_name="image-gen",
+                input_messages=[
+                    {"role": "user", "content": _parts(_text_part("Draw a cat."))}
+                ],
+            ),
+            _span(
+                span_id="chat",
+                parent_span_id="agent",
+                operation_name="chat",
+                input_messages=[
+                    {"role": "user", "content": _parts(_text_part("Draw a cat."))}
+                ],
+                output_messages=[
+                    {
+                        "role": "assistant",
+                        "content": _parts(
+                            _text_part("Here you go."),
+                            _uri_part(
+                                image_external,
+                                mime_type="image/png",
+                                modality="image",
+                            ),
                         ),
-                    ),
-                }
-            ],
-            content_refs=[image_internal],
-        ),
-    ]
-
-    messages = build_chat_messages(spans)
-    user = next(m for m in messages if m.type == "user_message")
-    assistant = next(m for m in messages if m.type == "assistant_message")
-
+                    }
+                ],
+                content_refs=[image_internal],
+            ),
+        ]
+    )
+    user = next(m for m in output_msgs if m.type == "user_message")
+    assistant = next(m for m in output_msgs if m.type == "assistant_message")
     assert _user_payload(user).content_refs == []
     assert _assistant_payload(assistant).content_refs == [image_internal]
 
-
-def test_content_ref_without_inline_part_is_not_attached() -> None:
-    """A `content_refs` entry with no matching inline message part has no
-    direction signal, so it attaches to neither bubble — only refs anchored to
-    an input/output part are surfaced (documents the deliberate pre-GA break
-    away from the undirected flat list).
-    """
-    spans = [
-        _span(
-            span_id="agent",
-            operation_name="invoke_agent",
-            agent_name="bot",
-            input_messages=[{"role": "user", "content": "hello"}],
-            output_messages=[{"role": "assistant", "content": "hi"}],
-            content_refs=["weave-trace-internal:///PID/object/Content:ORPHAN"],
-        ),
-    ]
-
-    messages = build_chat_messages(spans)
-    user = next(m for m in messages if m.type == "user_message")
-    assistant = next(m for m in messages if m.type == "assistant_message")
+    # Orphan ref with no matching inline part attaches to neither bubble.
+    orphan_msgs = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                agent_name="bot",
+                input_messages=[{"role": "user", "content": "hello"}],
+                output_messages=[{"role": "assistant", "content": "hi"}],
+                content_refs=["weave-trace-internal:///PID/object/Content:ORPHAN"],
+            ),
+        ]
+    )
+    user = next(m for m in orphan_msgs if m.type == "user_message")
+    assistant = next(m for m in orphan_msgs if m.type == "assistant_message")
     assert _user_payload(user).content_refs == []
     assert _assistant_payload(assistant).content_refs == []
 
 
-def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
-    """Siblings with equal started_at must sort deterministically by span_id."""
+def test_build_span_tree_sort_tiebreakers() -> None:
+    """Equal-started siblings sort by latest end first (enclosing spans lead),
+    then deterministically by span_id when end times also tie.
+    """
     t0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
-    spans = [
+    t1 = datetime.datetime(2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc)
+    t2 = datetime.datetime(2026, 1, 1, 0, 0, 2, tzinfo=datetime.timezone.utc)
+
+    # Equal started_at and equal ended_at -> deterministic span_id order.
+    equal_end = [
         AgentSpanSchema(
             project_id="p1",
             trace_id="t1",
@@ -666,16 +647,10 @@ def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
         # Intentionally out of order to exercise the tiebreaker.
         for sid in ("c", "a", "b")
     ]
-    roots = build_span_tree(spans)
-    assert [r.span.span_id for r in roots] == ["a", "b", "c"]
+    assert [r.span.span_id for r in build_span_tree(equal_end)] == ["a", "b", "c"]
 
-
-def test_build_span_tree_sorts_equal_starts_by_latest_end_first() -> None:
-    """Enclosing spans often share child start times and should sort first."""
-    t0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
-    t1 = datetime.datetime(2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc)
-    t2 = datetime.datetime(2026, 1, 1, 0, 0, 2, tzinfo=datetime.timezone.utc)
-    spans = [
+    # Equal started_at, differing ended_at -> latest end first.
+    mixed_end = [
         AgentSpanSchema(
             project_id="p1",
             trace_id="t1",
@@ -704,5 +679,8 @@ def test_build_span_tree_sorts_equal_starts_by_latest_end_first() -> None:
             ended_at=t1,
         ),
     ]
-    roots = build_span_tree(spans)
-    assert [r.span.span_id for r in roots] == ["z-long", "a-short", "b-short"]
+    assert [r.span.span_id for r in build_span_tree(mixed_end)] == [
+        "z-long",
+        "a-short",
+        "b-short",
+    ]

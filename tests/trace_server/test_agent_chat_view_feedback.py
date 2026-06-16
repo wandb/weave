@@ -20,47 +20,10 @@ from weave.trace_server.agents.types import (
 )
 
 
-def _make_span(
-    project_id: str,
-    trace_id: str,
-    span_id: str,
-    **overrides: object,
-) -> AgentSpanCHInsertable:
-    defaults = {
-        "project_id": project_id,
-        "trace_id": trace_id,
-        "span_id": span_id,
-        "span_name": "test-span",
-        "started_at": datetime.datetime.now(tz=datetime.timezone.utc),
-        "ended_at": datetime.datetime.now(tz=datetime.timezone.utc),
-        "status_code": "OK",
-        "operation_name": "invoke_agent",
-        "agent_name": "test-agent",
-        "provider_name": "openai",
-        "request_model": "gpt-4o",
-    }
-    defaults.update(overrides)
-    return AgentSpanCHInsertable(**defaults)
-
-
-def _insert_spans(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
-    rows = [genai_span_to_row(s) for s in spans]
-    ch_client.insert("spans", data=rows, column_names=ALL_SPAN_INSERT_COLUMNS)
-
-
-def _create_reaction(ch_server, project_id: str, weave_ref: str, emoji: str) -> None:
-    ch_server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=weave_ref,
-            feedback_type="reaction",
-            payload={"emoji": emoji},
-            wb_user_id="test-user",
-        )
-    )
-
-
-def test_agent_traces_chat_folds_turn_and_step_feedback(ch_server):
+def test_agent_traces_chat_feedback_fold_in_and_opt_out(ch_server):
+    """include_feedback=True folds turn + step reactions; the default leaves
+    every feedback field None for the same underlying spans/reactions.
+    """
     project_id = _make_project_id("feedback")
     trace_id = uuid.uuid4().hex
     root_span_id = uuid.uuid4().hex[:16]
@@ -103,28 +66,11 @@ def test_agent_traces_chat_folds_turn_and_step_feedback(ch_server):
     assert step_msgs[0].feedback is not None
     assert step_msgs[0].feedback[0]["payload"] == {"emoji": "🔥"}
 
-
-def test_agent_traces_chat_include_feedback_false_leaves_feedback_fields_none(
-    ch_server,
-):
-    project_id = _make_project_id("feedback_off")
-    trace_id = uuid.uuid4().hex
-    root_span_id = uuid.uuid4().hex[:16]
-
-    _insert_spans(
-        ch_server.ch_client,
-        [_make_span(project_id, trace_id, root_span_id, operation_name="invoke_agent")],
-    )
-
-    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
-    _create_reaction(ch_server, project_id, turn_ref, "👍")
-
-    res = ch_server.agent_traces_chat(
+    off = ch_server.agent_traces_chat(
         AgentTraceChatReq(project_id=project_id, trace_id=trace_id)
     )
-
-    assert res.feedback is None
-    for m in res.messages:
+    assert off.feedback is None
+    for m in off.messages:
         assert m.feedback is None
 
 
@@ -186,3 +132,43 @@ def test_agent_conversation_chat_folds_conversation_turn_and_step_feedback(ch_se
     assert len(step_msgs) == 1
     assert step_msgs[0].feedback is not None
     assert step_msgs[0].feedback[0]["payload"] == {"emoji": "🔥"}
+
+
+def _make_span(
+    project_id: str,
+    trace_id: str,
+    span_id: str,
+    **overrides: object,
+) -> AgentSpanCHInsertable:
+    defaults = {
+        "project_id": project_id,
+        "trace_id": trace_id,
+        "span_id": span_id,
+        "span_name": "test-span",
+        "started_at": datetime.datetime.now(tz=datetime.timezone.utc),
+        "ended_at": datetime.datetime.now(tz=datetime.timezone.utc),
+        "status_code": "OK",
+        "operation_name": "invoke_agent",
+        "agent_name": "test-agent",
+        "provider_name": "openai",
+        "request_model": "gpt-4o",
+    }
+    defaults.update(overrides)
+    return AgentSpanCHInsertable(**defaults)
+
+
+def _insert_spans(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
+    rows = [genai_span_to_row(s) for s in spans]
+    ch_client.insert("spans", data=rows, column_names=ALL_SPAN_INSERT_COLUMNS)
+
+
+def _create_reaction(ch_server, project_id: str, weave_ref: str, emoji: str) -> None:
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type="reaction",
+            payload={"emoji": emoji},
+            wb_user_id="test-user",
+        )
+    )

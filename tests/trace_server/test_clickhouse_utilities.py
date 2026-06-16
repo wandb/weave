@@ -47,38 +47,30 @@ def test_sanitize_invalid_utf8_surrogates_replaces_lone_surrogates() -> None:
     str(sanitized).encode("utf-8")
 
 
-def test_insert_does_not_sanitize_successful_clean_clickhouse_write() -> None:
-    # Clean inserts should stay on the old hot path: no recursive sanitation
-    # unless clickhouse_connect first reports an encoding failure.
-    data = [["valid \U0001f600"]]
-    mock_ch_client = MagicMock()
-    mock_ch_client.insert.return_value = MagicMock()
+def test_insert_sanitizes_only_after_encode_error() -> None:
+    # Clean inserts stay on the hot path with no sanitation; a UnicodeEncodeError
+    # (direct string columns like `exception`/`display_name` bypass JSON dumps)
+    # triggers exactly one sanitized retry of the same batch.
+    clean_data = [["valid \U0001f600"]]
+    clean_client = MagicMock()
+    clean_client.insert.return_value = MagicMock()
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.ClickHouseTraceServer, "_mint_client", return_value=clean_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
-        server._insert(
-            "call_parts",
-            data=data,
-            column_names=["valid"],
-        )
+        server._insert("call_parts", data=clean_data, column_names=["valid"])
 
-    inserted_data = mock_ch_client.insert.call_args.kwargs["data"]
-    assert inserted_data is data
+    assert clean_client.insert.call_args.kwargs["data"] is clean_data
 
-
-def test_insert_sanitizes_invalid_utf8_surrogates_after_encode_error() -> None:
-    # Direct string columns like `exception` or `display_name` bypass JSON dumps,
-    # so a UnicodeEncodeError should trigger one sanitized retry of the same batch.
-    mock_ch_client = MagicMock()
-    mock_ch_client.insert.side_effect = [
+    retry_client = MagicMock()
+    retry_client.insert.side_effect = [
         UnicodeEncodeError("utf-8", "broken \ud83d", 7, 8, "surrogates not allowed"),
         MagicMock(),
     ]
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.ClickHouseTraceServer, "_mint_client", return_value=retry_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._insert(
@@ -87,10 +79,9 @@ def test_insert_sanitizes_invalid_utf8_surrogates_after_encode_error() -> None:
             column_names=["valid", "broken"],
         )
 
-    first_insert = mock_ch_client.insert.call_args_list[0].kwargs["data"]
-    retried_insert = mock_ch_client.insert.call_args_list[1].kwargs["data"]
+    first_insert = retry_client.insert.call_args_list[0].kwargs["data"]
+    retried_insert = retry_client.insert.call_args_list[1].kwargs["data"]
     assert first_insert == [["valid \U0001f600", "broken \ud83d"]]
     assert retried_insert is not first_insert
-    inserted_data = retried_insert
-    assert inserted_data == [["valid \U0001f600", "broken \ufffd"]]
-    str(inserted_data).encode("utf-8")
+    assert retried_insert == [["valid \U0001f600", "broken \ufffd"]]
+    str(retried_insert).encode("utf-8")

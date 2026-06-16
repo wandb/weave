@@ -17,14 +17,16 @@ SENTENCE_TONES = f"The {EMOJI_JUDGE_TONE} had us {EMOJI_HANDSHAKE_TONES}."
 SENTENCE_NO_TONES = f"The {EMOJI_JUDGE_NO_TONE} had us {EMOJI_HANDSHAKE_NO_TONES}."
 
 
-def test_detone_shortcode() -> None:
+def test_detone_shortcode_and_emojis() -> None:
+    """Skin-tone removal across both surfaces: shortcodes (no-tone passthrough,
+    single tone, ZWJ single/multi tones) and raw emoji (no-tone passthrough,
+    single tone, ZWJ single/multi tones, and tones embedded in a sentence).
+    """
     assert detone_shortcode(SHORTCODE_NO_ZWJ_NO_TONE) == ":pool_8_ball:"
     assert detone_shortcode(SHORTCODE_NO_ZWJ_TONE) == ":thumbs_up:"
     assert detone_shortcode(SHORTCODE_ZWJ_ONE_TONE) == ":judge:"
     assert detone_shortcode(SHORTCODE_ZWJ_MULTIPLE_TONES) == ":handshake:"
 
-
-def test_detone_emoji() -> None:
     assert detone_emojis(EMOJI_8_BALL) == EMOJI_8_BALL
     assert detone_emojis(EMOJI_THUMBS_UP_TONE) == EMOJI_THUMBS_UP_NO_TONE
     assert detone_emojis(EMOJI_JUDGE_TONE) == EMOJI_JUDGE_NO_TONE

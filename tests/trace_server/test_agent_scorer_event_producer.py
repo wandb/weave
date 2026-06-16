@@ -13,6 +13,47 @@ from weave.trace_server.agents.kafka_events import (
 from weave.trace_server.kafka import KafkaProducer
 
 
+def test_event_topic_and_round_trip() -> None:
+    """Topic constant is stable and a fully-populated event round-trips through JSON."""
+    assert SCORE_AGENT_SPANS_TOPIC == "weave.score_agent_spans"
+
+    event = _make_event(
+        project_id="proj-1",
+        trace_id="trace-1",
+        span_id="span-root",
+        conversation_id="conv-1",
+        operation_name="invoke_agent",
+    )
+    parsed = ScoreAgentSpansEvent.model_validate_json(event.model_dump_json())
+    assert parsed == event
+
+
+@pytest.mark.disable_logging_error_check
+@pytest.mark.parametrize(
+    ("max_buffer_size", "buffer_len", "expect_publish"),
+    [
+        (2, 5, False),  # buffer full -> drop
+        (100, 0, True),  # under limit -> publish
+    ],
+    ids=["buffer_full_drops", "under_limit_publishes"],
+)
+def test_producer_buffer_pressure(
+    max_buffer_size: int, buffer_len: int, expect_publish: bool
+) -> None:
+    producer = MagicMock(spec=KafkaProducer)
+    producer.max_buffer_size = max_buffer_size
+    producer.__len__ = MagicMock(return_value=buffer_len)
+    _bind_real_methods(producer, "produce_score_agent_spans", "_check_buffer_pressure")
+
+    producer.produce_score_agent_spans(_make_event())
+
+    if expect_publish:
+        producer.produce.assert_called_once()
+        assert producer.produce.call_args.kwargs["topic"] == "weave.score_agent_spans"
+    else:
+        producer.produce.assert_not_called()
+
+
 def _make_event(**overrides) -> ScoreAgentSpansEvent:
     """Minimal valid ScoreAgentSpansEvent for tests; override any field."""
     base = {
@@ -29,49 +70,7 @@ def _make_event(**overrides) -> ScoreAgentSpansEvent:
     return ScoreAgentSpansEvent(**base)
 
 
-def test_topic_constant_value() -> None:
-    assert SCORE_AGENT_SPANS_TOPIC == "weave.score_agent_spans"
-
-
-def test_event_round_trip() -> None:
-    event = _make_event(
-        project_id="proj-1",
-        trace_id="trace-1",
-        span_id="span-root",
-        conversation_id="conv-1",
-        operation_name="invoke_agent",
-    )
-    payload = event.model_dump_json()
-    parsed = ScoreAgentSpansEvent.model_validate_json(payload)
-    assert parsed == event
-
-
 def _bind_real_methods(producer: MagicMock, *names: str) -> None:
     """Replace MagicMock auto-stubs with real `KafkaProducer` methods bound to the mock."""
     for name in names:
         setattr(producer, name, getattr(KafkaProducer, name).__get__(producer))
-
-
-@pytest.mark.disable_logging_error_check
-def test_producer_drops_when_buffer_full() -> None:
-    producer = MagicMock(spec=KafkaProducer)
-    producer.max_buffer_size = 2
-    producer.__len__ = MagicMock(return_value=5)  # buffer full
-    _bind_real_methods(producer, "produce_score_agent_spans", "_check_buffer_pressure")
-
-    producer.produce_score_agent_spans(_make_event())
-
-    producer.produce.assert_not_called()
-
-
-def test_producer_publishes_under_buffer_limit() -> None:
-    producer = MagicMock(spec=KafkaProducer)
-    producer.max_buffer_size = 100
-    producer.__len__ = MagicMock(return_value=0)
-    _bind_real_methods(producer, "produce_score_agent_spans", "_check_buffer_pressure")
-
-    producer.produce_score_agent_spans(_make_event())
-
-    producer.produce.assert_called_once()
-    call_kwargs = producer.produce.call_args.kwargs
-    assert call_kwargs["topic"] == "weave.score_agent_spans"

@@ -159,11 +159,12 @@ def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
     )
 
 
-def test_call_stats_date_range_limit_validation():
-    """Reject CallStatsReq with a date range exceeding 31 days."""
+def test_call_stats_date_range_limit(client: weave_client.WeaveClient):
+    """Reject a >31-day range at both the constructor and the query layer."""
     end_time = _BASE_TIME
     start_time = end_time - datetime.timedelta(days=32)
 
+    # Constructor validation rejects the oversized range up front.
     with pytest.raises(ValidationError):
         tsi.CallStatsReq(
             project_id="entity/project",
@@ -172,6 +173,18 @@ def test_call_stats_date_range_limit_validation():
             granularity=3600,
             usage_metrics=[tsi.UsageMetricSpec(metric="total_tokens")],
         )
+
+    # Query layer re-validates a request that bypassed the constructor.
+    req = tsi.CallStatsReq.model_construct(
+        project_id=client.project_id,
+        start=start_time,
+        end=end_time,
+        granularity=3600,
+        usage_metrics=[tsi.UsageMetricSpec(metric="total_tokens")],
+        timezone="UTC",
+    )
+    with pytest.raises(ValidationError):
+        client.server.call_stats(req)
 
 
 def test_call_stats_multiple_models(client: weave_client.WeaveClient):
@@ -466,69 +479,38 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     )
 
 
-def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
-    """Test op_names filter works correctly."""
+def test_call_stats_filters(client: weave_client.WeaveClient):
+    """Test op_names, trace_roots_only, and trace_ids filters each narrow results."""
     project_id = client.project_id
-    model_name = "gpt-4o-filter-test"
-
     start_time = _BASE_TIME
 
+    # op_names: op1 (100) vs op2 (200); filtering to op1 yields 100
+    op_model = "gpt-4o-filter-test"
     op1 = f"weave:///{project_id}/op/openai.chat:v1"
     op2 = f"weave:///{project_id}/op/anthropic.messages:v1"
-
     create_call_with_usage(
         client,
         op1,
-        {model_name: {"prompt_tokens": 100, "total_tokens": 100, "requests": 1}},
+        {op_model: {"prompt_tokens": 100, "total_tokens": 100, "requests": 1}},
         started_at=start_time + datetime.timedelta(minutes=1),
     )
-
     create_call_with_usage(
         client,
         op2,
-        {model_name: {"prompt_tokens": 200, "total_tokens": 200, "requests": 1}},
+        {op_model: {"prompt_tokens": 200, "total_tokens": 200, "requests": 1}},
         started_at=start_time + datetime.timedelta(minutes=2),
     )
 
-    force_merge_calls(client)
-    result = client.server.call_stats(
-        CallStatsReq(
-            project_id=project_id,
-            start=start_time - datetime.timedelta(minutes=1),
-            end=start_time + datetime.timedelta(hours=1),
-            granularity=3600,
-            usage_metrics=[
-                UsageMetricSpec(
-                    metric="input_tokens",
-                    aggregations=[AggregationType.SUM],
-                ),
-            ],
-            filter=CallsFilter(op_names=[op1]),
-        )
-    )
-    model_buckets = [b for b in result.usage_buckets if b.get("model") == model_name]
-    total_sum = sum(b.get("sum_input_tokens", 0) for b in model_buckets)
-
-    assert total_sum == 100, f"Expected 100 (only op1), got {total_sum}"
-
-
-def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
-    """Test trace_roots_only filter excludes child calls."""
-    project_id = client.project_id
-    model_name = "gpt-4o-roots-test"
-
-    start_time = _BASE_TIME
-
-    # Create a root call
+    # trace_roots_only: root (100) + child (200); roots-only yields 100
+    roots_model = "gpt-4o-roots-test"
     root_call_id = str(uuid.uuid4())
-    trace_id = str(uuid.uuid4())
-
+    roots_trace_id = str(uuid.uuid4())
     client.server.call_start(
         tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id=project_id,
                 id=root_call_id,
-                trace_id=trace_id,
+                trace_id=roots_trace_id,
                 started_at=start_time,
                 op_name=f"weave:///{project_id}/op/root_op:v1",
                 parent_id=None,
@@ -544,20 +526,18 @@ def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
                 id=root_call_id,
                 ended_at=start_time + datetime.timedelta(seconds=1),
                 summary={
-                    "usage": {model_name: {"prompt_tokens": 100, "total_tokens": 100}}
+                    "usage": {roots_model: {"prompt_tokens": 100, "total_tokens": 100}}
                 },
             )
         )
     )
-
-    # Create a child call
     child_call_id = str(uuid.uuid4())
     client.server.call_start(
         tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id=project_id,
                 id=child_call_id,
-                trace_id=trace_id,
+                trace_id=roots_trace_id,
                 started_at=start_time + datetime.timedelta(seconds=2),
                 op_name=f"weave:///{project_id}/op/child_op:v1",
                 parent_id=root_call_id,
@@ -573,47 +553,16 @@ def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
                 id=child_call_id,
                 ended_at=start_time + datetime.timedelta(seconds=3),
                 summary={
-                    "usage": {model_name: {"prompt_tokens": 200, "total_tokens": 200}}
+                    "usage": {roots_model: {"prompt_tokens": 200, "total_tokens": 200}}
                 },
             )
         )
     )
 
-    # Query with trace_roots_only=True should only get root call (100 tokens)
-    force_merge_calls(client)
-    result = client.server.call_stats(
-        CallStatsReq(
-            project_id=project_id,
-            start=start_time - datetime.timedelta(minutes=1),
-            end=start_time + datetime.timedelta(hours=1),
-            granularity=3600,
-            usage_metrics=[
-                UsageMetricSpec(
-                    metric="input_tokens", aggregations=[AggregationType.SUM]
-                ),
-            ],
-            filter=CallsFilter(trace_roots_only=True),
-        )
-    )
-
-    model_buckets = [b for b in result.usage_buckets if b.get("model") == model_name]
-    total_sum = sum(b.get("sum_input_tokens", 0) for b in model_buckets)
-
-    assert total_sum == 100, f"Expected 100 (root only), got {total_sum}"
-
-
-def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
-    """Test trace_ids filter limits to specific traces."""
-    project_id = client.project_id
-    model_name = "gpt-4o-trace-filter-test"
-
-    start_time = _BASE_TIME
-
-    # Create two traces
+    # trace_ids: trace_1 (100) vs trace_2 (200); filtering to trace_1 yields 100
+    trace_model = "gpt-4o-trace-filter-test"
     trace_id_1 = str(uuid.uuid4())
     trace_id_2 = str(uuid.uuid4())
-
-    # Call in trace 1
     call_id_1 = str(uuid.uuid4())
     client.server.call_start(
         tsi.CallStartReq(
@@ -635,13 +584,11 @@ def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
                 id=call_id_1,
                 ended_at=start_time + datetime.timedelta(seconds=1),
                 summary={
-                    "usage": {model_name: {"prompt_tokens": 100, "total_tokens": 100}}
+                    "usage": {trace_model: {"prompt_tokens": 100, "total_tokens": 100}}
                 },
             )
         )
     )
-
-    # Call in trace 2
     call_id_2 = str(uuid.uuid4())
     client.server.call_start(
         tsi.CallStartReq(
@@ -663,33 +610,23 @@ def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
                 id=call_id_2,
                 ended_at=start_time + datetime.timedelta(minutes=1, seconds=1),
                 summary={
-                    "usage": {model_name: {"prompt_tokens": 200, "total_tokens": 200}}
+                    "usage": {trace_model: {"prompt_tokens": 200, "total_tokens": 200}}
                 },
             )
         )
     )
 
-    # Query for only trace_1 should get 100 tokens
     force_merge_calls(client)
-    result = client.server.call_stats(
-        CallStatsReq(
-            project_id=project_id,
-            start=start_time - datetime.timedelta(minutes=1),
-            end=start_time + datetime.timedelta(hours=1),
-            granularity=3600,
-            usage_metrics=[
-                UsageMetricSpec(
-                    metric="input_tokens", aggregations=[AggregationType.SUM]
-                ),
-            ],
-            filter=CallsFilter(trace_ids=[trace_id_1]),
-        )
+
+    assert _filtered_input_sum(client, op_model, CallsFilter(op_names=[op1])) == 100
+    assert (
+        _filtered_input_sum(client, roots_model, CallsFilter(trace_roots_only=True))
+        == 100
     )
-
-    model_buckets = [b for b in result.usage_buckets if b.get("model") == model_name]
-    total_sum = sum(b.get("sum_input_tokens", 0) for b in model_buckets)
-
-    assert total_sum == 100, f"Expected 100 (trace_1 only), got {total_sum}"
+    assert (
+        _filtered_input_sum(client, trace_model, CallsFilter(trace_ids=[trace_id_1]))
+        == 100
+    )
 
 
 def test_call_stats_call_metrics(client: weave_client.WeaveClient):
@@ -827,18 +764,28 @@ def test_call_stats_call_metrics(client: weave_client.WeaveClient):
     assert total_error_count == 1, f"Expected 1 error, got {total_error_count}"
 
 
-def test_call_stats_date_range_limit_query_layer(client: weave_client.WeaveClient):
-    """Ensure call_stats rejects max date range during request handling."""
-    end_time = _BASE_TIME
-    start_time = end_time - datetime.timedelta(days=32)
-    req = tsi.CallStatsReq.model_construct(
-        project_id=client.project_id,
-        start=start_time,
-        end=end_time,
-        granularity=3600,
-        usage_metrics=[tsi.UsageMetricSpec(metric="total_tokens")],
-        timezone="UTC",
+def _filtered_input_sum(
+    client: weave_client.WeaveClient,
+    model_name: str,
+    call_filter: CallsFilter,
+) -> int:
+    """Sum input_tokens for one model under a call_stats filter."""
+    project_id = client.project_id
+    start_time = _BASE_TIME
+    result = client.server.call_stats(
+        CallStatsReq(
+            project_id=project_id,
+            start=start_time - datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(hours=1),
+            granularity=3600,
+            usage_metrics=[
+                UsageMetricSpec(
+                    metric="input_tokens",
+                    aggregations=[AggregationType.SUM],
+                ),
+            ],
+            filter=call_filter,
+        )
     )
-
-    with pytest.raises(ValidationError):
-        client.server.call_stats(req)
+    model_buckets = [b for b in result.usage_buckets if b.get("model") == model_name]
+    return sum(b.get("sum_input_tokens", 0) for b in model_buckets)

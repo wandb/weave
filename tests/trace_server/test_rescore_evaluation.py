@@ -30,11 +30,12 @@ from weave.utils.project_id import from_project_id
 # ---------------------------------------------------------------------------
 
 
-def test_evaluation_run_create_stores_source_evaluation_run_id(client):
-    """source_evaluation_run_id written at create time must survive a read."""
+def test_evaluation_run_source_id_round_trip(client):
+    """source_evaluation_run_id written at create time survives a read; a run
+    created without one reads back None.
+    """
     project_id = client.project_id
 
-    # Create the source run
     source_run = client.server.evaluation_run_create(
         EvaluationRunCreateReq(
             project_id=project_id,
@@ -42,8 +43,7 @@ def test_evaluation_run_create_stores_source_evaluation_run_id(client):
             model="model://source",
         )
     )
-
-    # Create a new run that is a rescore of the source
+    # A run that is a rescore of the source preserves the link.
     rescore_run = client.server.evaluation_run_create(
         EvaluationRunCreateReq(
             project_id=project_id,
@@ -52,35 +52,22 @@ def test_evaluation_run_create_stores_source_evaluation_run_id(client):
             source_evaluation_run_id=source_run.evaluation_run_id,
         )
     )
-
-    # Read back and verify source_evaluation_run_id is preserved
-    read_res = client.server.evaluation_run_read(
+    rescore_read = client.server.evaluation_run_read(
         EvaluationRunReadReq(
             project_id=project_id,
             evaluation_run_id=rescore_run.evaluation_run_id,
         )
     )
-    assert read_res.source_evaluation_run_id == source_run.evaluation_run_id
+    assert rescore_read.source_evaluation_run_id == source_run.evaluation_run_id
 
-
-def test_evaluation_run_without_source_has_none(client):
-    """evaluation_run_read returns source_evaluation_run_id=None for normal runs."""
-    project_id = client.project_id
-
-    run = client.server.evaluation_run_create(
-        EvaluationRunCreateReq(
-            project_id=project_id,
-            evaluation="eval://plain",
-            model="model://plain",
-        )
-    )
-    read_res = client.server.evaluation_run_read(
+    # The source run itself has no source -> None on read.
+    source_read = client.server.evaluation_run_read(
         EvaluationRunReadReq(
             project_id=project_id,
-            evaluation_run_id=run.evaluation_run_id,
+            evaluation_run_id=source_run.evaluation_run_id,
         )
     )
-    assert read_res.source_evaluation_run_id is None
+    assert source_read.source_evaluation_run_id is None
 
 
 # ---------------------------------------------------------------------------
@@ -189,8 +176,10 @@ def test_rescore_without_wb_user_id_raises(client):
 # ---------------------------------------------------------------------------
 
 
-def test_prediction_list_filters_by_evaluation_run_id(client):
-    """prediction_list(evaluation_run_id=X) must return only predictions for run X."""
+def test_prediction_list_filters_by_run_and_paginates(client):
+    """prediction_list returns only the requested run's predictions and honors
+    limit/offset (non-overlapping pages) within that run.
+    """
     project_id = client.project_id
 
     run_a = client.server.evaluation_run_create(
@@ -208,110 +197,74 @@ def test_prediction_list_filters_by_evaluation_run_id(client):
         )
     )
 
-    # 2 predictions for run_a, 1 for run_b
-    for i in range(2):
-        pred = client.server.prediction_create(
-            PredictionCreateReq(
-                project_id=project_id,
-                model="model://list-a",
-                inputs={"i": i},
-                output=f"out-{i}",
-                evaluation_run_id=run_a.evaluation_run_id,
-            )
+    # 5 predictions for run_a (enough to paginate), 1 for run_b.
+    for i in range(5):
+        _create_finished_prediction(
+            client, project_id, "model://list-a", run_a.evaluation_run_id, i
         )
-        client.server.prediction_finish(
-            PredictionFinishReq(project_id=project_id, prediction_id=pred.prediction_id)
-        )
-
-    pred_b = client.server.prediction_create(
-        PredictionCreateReq(
-            project_id=project_id,
-            model="model://list-b",
-            inputs={"i": 99},
-            output="out-99",
-            evaluation_run_id=run_b.evaluation_run_id,
-        )
-    )
-    client.server.prediction_finish(
-        PredictionFinishReq(project_id=project_id, prediction_id=pred_b.prediction_id)
+    _create_finished_prediction(
+        client, project_id, "model://list-b", run_b.evaluation_run_id, 99
     )
 
+    # Filtering: each run sees only its own predictions.
     preds_a = list(
         client.server.prediction_list(
             PredictionListReq(
-                project_id=project_id,
-                evaluation_run_id=run_a.evaluation_run_id,
+                project_id=project_id, evaluation_run_id=run_a.evaluation_run_id
             )
         )
     )
-    assert len(preds_a) == 2
-    for p in preds_a:
-        assert p.evaluation_run_id == run_a.evaluation_run_id
+    assert len(preds_a) == 5
+    assert all(p.evaluation_run_id == run_a.evaluation_run_id for p in preds_a)
 
     preds_b = list(
         client.server.prediction_list(
             PredictionListReq(
-                project_id=project_id,
-                evaluation_run_id=run_b.evaluation_run_id,
+                project_id=project_id, evaluation_run_id=run_b.evaluation_run_id
             )
         )
     )
     assert len(preds_b) == 1
     assert preds_b[0].evaluation_run_id == run_b.evaluation_run_id
 
-
-def test_prediction_list_pagination(client):
-    """prediction_list respects limit and offset."""
-    project_id = client.project_id
-
-    run = client.server.evaluation_run_create(
-        EvaluationRunCreateReq(
-            project_id=project_id,
-            evaluation="eval://page-test",
-            model="model://page-test",
-        )
-    )
-
-    # Create 5 predictions
-    for i in range(5):
-        pred = client.server.prediction_create(
-            PredictionCreateReq(
-                project_id=project_id,
-                model="model://page-test",
-                inputs={"i": i},
-                output=f"out-{i}",
-                evaluation_run_id=run.evaluation_run_id,
-            )
-        )
-        client.server.prediction_finish(
-            PredictionFinishReq(project_id=project_id, prediction_id=pred.prediction_id)
-        )
-
+    # Pagination over run_a: limit/offset return non-overlapping pages.
     page1 = list(
         client.server.prediction_list(
             PredictionListReq(
                 project_id=project_id,
-                evaluation_run_id=run.evaluation_run_id,
+                evaluation_run_id=run_a.evaluation_run_id,
                 limit=3,
                 offset=0,
             )
         )
     )
     assert len(page1) == 3
-
     page2 = list(
         client.server.prediction_list(
             PredictionListReq(
                 project_id=project_id,
-                evaluation_run_id=run.evaluation_run_id,
+                evaluation_run_id=run_a.evaluation_run_id,
                 limit=3,
                 offset=3,
             )
         )
     )
     assert len(page2) == 2
+    assert {p.prediction_id for p in page1}.isdisjoint({p.prediction_id for p in page2})
 
-    # No overlap between pages
-    ids_page1 = {p.prediction_id for p in page1}
-    ids_page2 = {p.prediction_id for p in page2}
-    assert ids_page1.isdisjoint(ids_page2)
+
+def _create_finished_prediction(
+    client, project_id: str, model: str, evaluation_run_id: str, i: int
+) -> None:
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model=model,
+            inputs={"i": i},
+            output=f"out-{i}",
+            evaluation_run_id=evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(project_id=project_id, prediction_id=pred.prediction_id)
+    )

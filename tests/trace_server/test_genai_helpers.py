@@ -28,7 +28,7 @@ def test_genai_span_to_row_converts_messages_to_named_tuples() -> None:
     assert row[input_messages_idx] == [("user", "hi", "")]
 
 
-def test_normalize_span_row_returns_new_dict() -> None:
+def test_normalize_span_row_expands_tuples_immutably_and_validates_shape() -> None:
     row = {
         "input_messages": [("user", "hi", "")],
         "output_messages": [],
@@ -42,8 +42,6 @@ def test_normalize_span_row_returns_new_dict() -> None:
         {"role": "user", "content": "hi", "finish_reason": ""}
     ]
 
-
-def test_normalize_span_row_rejects_invalid_message_shape() -> None:
     with pytest.raises(ValueError, match="tuple must have 3 values"):
         normalize_span_row({"input_messages": [("user", "hi")]})
 

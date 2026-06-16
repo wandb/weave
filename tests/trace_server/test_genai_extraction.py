@@ -1,17 +1,14 @@
-"""Unit tests for genai_extraction.py — OTel span → schema extraction.
-
-Per griffin's review: the per-helper tests (TestExtractProvider,
-TestExtractOperationName, etc.) duplicated what one comprehensive
-`extract_genai_span` test already covers. Collapsed into a single
-success-path test that exercises every extractor plus one error-status
-test since that's a separate code path (Status object vs attributes).
-"""
+"""Unit tests for genai_extraction.py — OTel span → schema extraction."""
 
 import datetime
 import json
 from typing import Any
 
 from weave.trace_server.agents import semconv
+from weave.trace_server.agents.constants import (
+    MAX_CUSTOM_ATTR_VALUE_CHARS,
+    MAX_CUSTOM_ATTRS_PER_SPAN,
+)
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.python_spans import (
     Resource,
@@ -20,28 +17,6 @@ from weave.trace_server.opentelemetry.python_spans import (
     Status,
     StatusCode,
 )
-
-
-def _make_span(
-    attrs: dict[str, Any] | None = None,
-    name: str = "test-span",
-    events: list | None = None,
-    status: Status | None = None,
-) -> Span:
-    """Build a minimal Span for testing."""
-    now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
-    return Span(
-        resource=Resource(attributes={}),
-        name=name,
-        trace_id="abc123",
-        span_id="def456",
-        start_time_unix_nano=now_ns,
-        end_time_unix_nano=now_ns + 100_000_000,
-        attributes=attrs or {},
-        kind=SpanKind.CLIENT,
-        status=status or Status(code=StatusCode.OK),
-        events=events or [],
-    )
 
 
 def test_extract_genai_span_comprehensive() -> None:
@@ -181,207 +156,101 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.attributes_dump != ""
 
 
-def test_extract_genai_span_error_status() -> None:
-    """ERROR status code comes from the Span's Status object, not attributes —
-    different code path than the OK case.
+def test_extract_genai_span_status_code_variants() -> None:
+    """status_code/message/error_type come from the Span's Status object (a
+    separate code path from attributes): ERROR carries a message + error.type,
+    while UNSET is preserved verbatim.
     """
-    span = _make_span(
-        attrs={"error.type": "RateLimitError"},
-        status=Status(code=StatusCode.ERROR, message="rate limited"),
+    error_result = extract_genai_span(
+        _make_span(
+            attrs={"error.type": "RateLimitError"},
+            status=Status(code=StatusCode.ERROR, message="rate limited"),
+        ),
+        project_id="p1",
     )
-    result = extract_genai_span(span, project_id="p1")
+    assert error_result.status_code == "ERROR"
+    assert error_result.status_message == "rate limited"
+    assert error_result.error_type == "RateLimitError"
 
-    assert result.status_code == "ERROR"
-    assert result.status_message == "rate limited"
-    assert result.error_type == "RateLimitError"
-
-
-def test_extract_genai_span_preserves_unset_status() -> None:
-    span = _make_span(status=Status(code=StatusCode.UNSET))
-    result = extract_genai_span(span, project_id="p1")
-
-    assert result.status_code == "UNSET"
-
-
-def test_normalize_message_missing_role_and_finish_reason() -> None:
-    span = _make_span(
-        attrs={
-            "gen_ai.output.messages": [
-                {"content": "hello", "finish_reason": None},
-            ],
-        },
+    unset_result = extract_genai_span(
+        _make_span(status=Status(code=StatusCode.UNSET)), project_id="p1"
     )
-    result = extract_genai_span(span, project_id="p1")
-
-    assert result.output_messages[0].role == "assistant"
-    assert result.output_messages[0].finish_reason == ""
+    assert unset_result.status_code == "UNSET"
 
 
-def test_normalize_input_messages_without_role_uses_user_role() -> None:
-    result = extract_genai_span(
+def test_message_and_instruction_normalization() -> None:
+    """Message/instruction normalization across forms: missing role/finish_reason
+    defaults (output -> assistant/'', input -> user), the legacy gen_ai.prompt
+    string becomes a user message and is also kept as a custom attr, and
+    system_instructions accept content/text/plain JSON block shapes.
+    """
+    # Output message missing role/finish_reason: defaults to assistant / "".
+    out = extract_genai_span(
+        _make_span(
+            attrs={
+                "gen_ai.output.messages": [{"content": "hello", "finish_reason": None}]
+            }
+        ),
+        project_id="p1",
+    )
+    assert out.output_messages[0].role == "assistant"
+    assert out.output_messages[0].finish_reason == ""
+
+    # Input messages without role default to user, plain string or dict.
+    inp = extract_genai_span(
         _make_span(
             attrs={
                 "gen_ai.input.messages": [
                     "plain prompt",
                     {"content": "structured prompt"},
-                ],
-            },
+                ]
+            }
         ),
         project_id="p1",
     )
-
-    assert [(m.role, m.content) for m in result.input_messages] == [
+    assert [(m.role, m.content) for m in inp.input_messages] == [
         ("user", "plain prompt"),
         ("user", "structured prompt"),
     ]
 
-
-def test_genai_prompt_attr_becomes_user_message() -> None:
-    result = extract_genai_span(
-        _make_span(attrs={"gen_ai.prompt": "hello"}),
-        project_id="p1",
+    # Legacy gen_ai.prompt becomes a user message and stays in custom attrs.
+    prompt = extract_genai_span(
+        _make_span(attrs={"gen_ai.prompt": "hello"}), project_id="p1"
     )
+    assert [(m.role, m.content) for m in prompt.input_messages] == [("user", "hello")]
+    assert prompt.custom_attrs_string["gen_ai.prompt"] == "hello"
 
-    assert [(m.role, m.content) for m in result.input_messages] == [("user", "hello")]
-    assert result.custom_attrs_string["gen_ai.prompt"] == "hello"
-
-
-def test_system_instructions_support_json_blocks() -> None:
-    result = extract_genai_span(
+    # system_instructions support content / text / plain block shapes.
+    sys = extract_genai_span(
         _make_span(
             attrs={
                 "gen_ai.system_instructions": [
                     {"content": "content instruction"},
                     {"text": "text instruction"},
                     "plain instruction",
-                ],
+                ]
             }
         ),
         project_id="p1",
     )
-
-    assert result.system_instructions == [
+    assert sys.system_instructions == [
         "content instruction",
         "text instruction",
         "plain instruction",
     ]
 
 
-def test_extract_custom_attrs_caps_total_entries() -> None:
-    """A span with more than MAX_CUSTOM_ATTRS_PER_SPAN attributes has the
-    excess silently dropped so a single misbehaving client can't blow up the
-    insert.
-    """
-    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTRS_PER_SPAN
-
-    attrs = {
-        f"lorem.key_{i:05d}": f"val_{i}" for i in range(MAX_CUSTOM_ATTRS_PER_SPAN + 500)
-    }
-    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
-
-    total = (
-        len(result.custom_attrs_string)
-        + len(result.custom_attrs_int)
-        + len(result.custom_attrs_float)
-    )
-    assert total == MAX_CUSTOM_ATTRS_PER_SPAN
-
-
-def test_extract_custom_attrs_skips_empty_strings() -> None:
-    result = extract_genai_span(
-        _make_span(attrs={"lorem.empty": "", "lorem.nonempty": "x"}),
-        project_id="p1",
-    )
-
-    assert "lorem.empty" not in result.custom_attrs_string
-    assert result.custom_attrs_string["lorem.nonempty"] == "x"
-
-
-def test_extract_custom_attrs_truncates_large_string_values() -> None:
-    """String values larger than MAX_CUSTOM_ATTR_VALUE_CHARS are truncated
-    with a marker suffix so downstream tools can tell truncation happened.
-    """
-    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_CHARS
-
-    huge = "x" * (MAX_CUSTOM_ATTR_VALUE_CHARS + 50_000)
-    result = extract_genai_span(
-        _make_span(attrs={"lorem.big_string": huge}),
-        project_id="p1",
-    )
-
-    stored = result.custom_attrs_string["lorem.big_string"]
-    assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_CHARS
-    assert stored.endswith("chars]")
-    assert "truncated from" in stored
-
-
-def test_extract_custom_attrs_truncates_large_json_values() -> None:
-    """Non-primitive, non-dict values (e.g. lists) get JSON-encoded then
-    truncated the same way. Dicts get flattened by `_flatten_attrs` so
-    they never hit the JSON-encoding branch.
-    """
-    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_CHARS
-
-    huge_list = ["x" * 100] * 5000  # JSON encoding ~500KB
-    result = extract_genai_span(
-        _make_span(attrs={"lorem.big_list": huge_list}),
-        project_id="p1",
-    )
-
-    stored = result.custom_attrs_string["lorem.big_list"]
-    assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_CHARS
-    assert "truncated from" in stored
-
-
-def test_extract_custom_attrs_routes_bool_to_bool_map() -> None:
-    """Bool values land in custom_attrs_bool, not custom_attrs_string or
-    custom_attrs_int.
-
-    Ordering matters: Python `bool` is a subclass of `int`, so the
-    extractor's bool check must come before the int check (otherwise
-    `isinstance(True, int)` matches first and the value ends up in
-    custom_attrs_int).
-    """
-    result = extract_genai_span(
-        _make_span(
-            attrs={
-                "lorem.is_active": True,
-                "lorem.is_cached": False,
-                "lorem.int_looks_like_bool": 1,
-            }
-        ),
-        project_id="p1",
-    )
-
-    assert result.custom_attrs_bool["lorem.is_active"] is True
-    assert result.custom_attrs_bool["lorem.is_cached"] is False
-    # A plain int stays in custom_attrs_int even though 0/1 look bool-ish.
-    assert result.custom_attrs_int["lorem.int_looks_like_bool"] == 1
-    # Bools don't leak into the other maps.
-    assert "lorem.is_active" not in result.custom_attrs_string
-    assert "lorem.is_active" not in result.custom_attrs_int
-    assert "lorem.is_active" not in result.custom_attrs_float
-
-
-def test_multi_alias_extraction_recognises_every_form() -> None:
-    """For any attribute with multiple OTel aliases, the extractor must
-    populate its column from a span carrying the value under any recognised
-    key — canonical weave.* form, primary OTel alias, or any parallel /
-    historical alias. ``USAGE_REASONING_TOKENS`` is used here as a concrete
-    example; the same contract applies to any multi-alias semconv attribute.
+def test_multi_alias_extraction() -> None:
+    """For a multi-alias semconv attribute (USAGE_REASONING_TOKENS as the
+    example), the column populates from a span carrying the value under any
+    recognised key, and the canonical weave.* key wins over parallel OTel
+    aliases when both are present.
     """
     for key in semconv.USAGE_REASONING_TOKENS.lookup_keys:
         result = extract_genai_span(_make_span(attrs={key: 42}), project_id="p1")
         assert result.reasoning_tokens == 42, f"key {key!r} did not populate column"
 
-
-def test_multi_alias_extraction_canonical_weave_key_wins() -> None:
-    """When a span carries both the canonical weave.* key and parallel OTel
-    aliases, the weave.* value wins (extractor probes lookup_keys in order).
-    ``USAGE_REASONING_TOKENS`` is used here as a concrete example; the same
-    contract applies to any multi-alias semconv attribute.
-    """
-    result = extract_genai_span(
+    both = extract_genai_span(
         _make_span(
             attrs={
                 semconv.USAGE_REASONING_TOKENS.key: 99,
@@ -390,16 +259,23 @@ def test_multi_alias_extraction_canonical_weave_key_wins() -> None:
         ),
         project_id="p1",
     )
-    assert result.reasoning_tokens == 99
+    assert both.reasoning_tokens == 99
 
 
-def test_extract_custom_attrs_skips_non_finite_floats() -> None:
-    """NaN and +/-Inf must not reach custom_attrs_float — they break JSON
-    serialization and have no aggregation semantics.
+def test_extract_custom_attrs_routing_and_limits() -> None:
+    """Custom-attr handling in one span: empty strings dropped; bools route to
+    custom_attrs_bool (checked before int, since bool subclasses int); plain
+    ints stay int; non-finite floats (NaN/+-Inf) skipped while finite floats
+    land in custom_attrs_float.
     """
     result = extract_genai_span(
         _make_span(
             attrs={
+                "lorem.empty": "",
+                "lorem.nonempty": "x",
+                "lorem.is_active": True,
+                "lorem.is_cached": False,
+                "lorem.int_looks_like_bool": 1,
                 "lorem.nan": float("nan"),
                 "lorem.pos_inf": float("inf"),
                 "lorem.neg_inf": float("-inf"),
@@ -409,9 +285,77 @@ def test_extract_custom_attrs_skips_non_finite_floats() -> None:
         project_id="p1",
     )
 
-    assert "lorem.finite" in result.custom_attrs_float
+    assert "lorem.empty" not in result.custom_attrs_string
+    assert result.custom_attrs_string["lorem.nonempty"] == "x"
+
+    assert result.custom_attrs_bool["lorem.is_active"] is True
+    assert result.custom_attrs_bool["lorem.is_cached"] is False
+    assert result.custom_attrs_int["lorem.int_looks_like_bool"] == 1
+    for key in ("lorem.is_active", "lorem.is_cached"):
+        assert key not in result.custom_attrs_string
+        assert key not in result.custom_attrs_int
+        assert key not in result.custom_attrs_float
+
     assert result.custom_attrs_float["lorem.finite"] == 3.14
     for key in ("lorem.nan", "lorem.pos_inf", "lorem.neg_inf"):
         assert key not in result.custom_attrs_float
         assert key not in result.custom_attrs_string
         assert key not in result.custom_attrs_int
+
+
+def test_extract_custom_attrs_caps_and_truncation() -> None:
+    """A span over MAX_CUSTOM_ATTRS_PER_SPAN drops the excess; oversized string
+    and JSON-encoded (list) values are truncated to MAX_CUSTOM_ATTR_VALUE_CHARS
+    with a `truncated from ... chars]` marker. Dicts are flattened by
+    `_flatten_attrs` and never hit the JSON branch.
+    """
+    over_cap = {
+        f"lorem.key_{i:05d}": f"val_{i}" for i in range(MAX_CUSTOM_ATTRS_PER_SPAN + 500)
+    }
+    capped = extract_genai_span(_make_span(attrs=over_cap), project_id="p1")
+    total = (
+        len(capped.custom_attrs_string)
+        + len(capped.custom_attrs_int)
+        + len(capped.custom_attrs_float)
+    )
+    assert total == MAX_CUSTOM_ATTRS_PER_SPAN
+
+    huge_string = "x" * (MAX_CUSTOM_ATTR_VALUE_CHARS + 50_000)
+    huge_list = ["x" * 100] * 5000  # JSON encoding ~500KB
+    truncated = extract_genai_span(
+        _make_span(
+            attrs={"lorem.big_string": huge_string, "lorem.big_list": huge_list}
+        ),
+        project_id="p1",
+    )
+
+    stored_string = truncated.custom_attrs_string["lorem.big_string"]
+    assert len(stored_string) <= MAX_CUSTOM_ATTR_VALUE_CHARS
+    assert stored_string.endswith("chars]")
+    assert "truncated from" in stored_string
+
+    stored_list = truncated.custom_attrs_string["lorem.big_list"]
+    assert len(stored_list) <= MAX_CUSTOM_ATTR_VALUE_CHARS
+    assert "truncated from" in stored_list
+
+
+def _make_span(
+    attrs: dict[str, Any] | None = None,
+    name: str = "test-span",
+    events: list | None = None,
+    status: Status | None = None,
+) -> Span:
+    """Build a minimal Span for testing."""
+    now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
+    return Span(
+        resource=Resource(attributes={}),
+        name=name,
+        trace_id="abc123",
+        span_id="def456",
+        start_time_unix_nano=now_ns,
+        end_time_unix_nano=now_ns + 100_000_000,
+        attributes=attrs or {},
+        kind=SpanKind.CLIENT,
+        status=status or Status(code=StatusCode.OK),
+        events=events or [],
+    )

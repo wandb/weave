@@ -11,63 +11,63 @@ from weave.trace_server.errors import (
 )
 
 
-@pytest.mark.parametrize("code", [400, 401, 403, 404, 429])
-def test_transport_server_error_preserves_4xx_status_code(code: int):
-    """TransportServerError should preserve 4xx HTTP status codes from gorilla."""
+@pytest.mark.parametrize(
+    ("code", "expected_status"),
+    [
+        # 4xx from gorilla is preserved; 5xx or None falls back to 500.
+        (400, 400),
+        (401, 401),
+        (403, 403),
+        (404, 404),
+        (429, 429),
+        (None, 500),
+        (500, 500),
+        (502, 500),
+        (503, 500),
+    ],
+)
+def test_transport_server_error_status_code(code: int | None, expected_status: int):
+    """TransportServerError preserves 4xx codes, falls back to 500 for 5xx/None."""
     exc = TransportServerError(f"{code} Error", code=code)
     result = handle_server_exception(exc)
-    assert result.status_code == code
-    assert result.message == {"reason": f"{code} Error"}
+    assert result.status_code == expected_status
+    if expected_status < 500:
+        assert result.message == {"reason": f"{code} Error"}
 
 
-@pytest.mark.parametrize("code", [None, 500, 502, 503])
-def test_transport_server_error_5xx_or_none_returns_500(code: int | None):
-    """TransportServerError with 5xx or None should fall back to 500."""
-    exc = TransportServerError("Server error", code=code)
-    result = handle_server_exception(exc)
-    assert result.status_code == 500
+def test_exception_status_code_mapping() -> None:
+    """Each domain error maps to its actionable HTTP status, never a bare 500/403.
 
-
-def test_clickhouse_type_mismatch_returns_400() -> None:
-    """TYPE_MISMATCH errors (e.g. wrong date format in filter) should be 400, not 502."""
-    error_msg = (
+    - TYPE_MISMATCH (e.g. bad date filter) -> InvalidRequest -> 400, not 502.
+    - InvalidFieldError (unprocessable input) -> 422, not 403 or 500.
+    - ObjectNameTypeCollision (fixable user error) -> 400 with actionable reason.
+    """
+    type_mismatch_msg = (
         "Code: 53. DB::Exception: Cannot convert string '2026-03-31T15:38:50.164Z' "
         "to type DateTime64(6): while executing 'FUNCTION greaterOrEquals("
         "any(__table1.started_at) : 0, '2026-03-31T15:38:50.164Z'_String :: 1) -> "
         "greaterOrEquals(any(__table1.started_at), '2026-03-31T15:38:50.164Z'_String) "
         "Nullable(UInt8) : 2'. (TYPE_MISMATCH)"
     )
-    exc = CHDatabaseError(error_msg)
-
     with pytest.raises(InvalidRequest, match="Cannot convert"):
-        handle_clickhouse_query_error(exc)
+        handle_clickhouse_query_error(CHDatabaseError(type_mismatch_msg))
+    assert handle_server_exception(InvalidRequest(type_mismatch_msg)).status_code == 400
 
-    result = handle_server_exception(InvalidRequest(error_msg))
-    assert result.status_code == 400
-
-
-def test_invalid_field_error_maps_to_422() -> None:
-    """Unsupported/unselectable fields are well-formed but unprocessable input -> 422,
-    not 403 (Forbidden, which implies an authz failure) or 500.
-    """
-    result = handle_server_exception(InvalidFieldError("Field 'foo' is not allowed"))
-    assert result.status_code == 422
-
-
-def test_object_name_type_collision_maps_to_400() -> None:
-    """Name+type collision is a fixable user error -> 400 with an actionable reason,
-    not 500. The registry matches by exact type, so the InvalidRequest subclass must
-    be registered explicitly.
-    """
-    exc = ObjectNameTypeCollision(
-        object_id="my-object",
-        kind="object",
-        new_base_object_class="Prompt",
-        existing_base_object_classes=[None],
+    field_result = handle_server_exception(
+        InvalidFieldError("Field 'foo' is not allowed")
     )
-    result = handle_server_exception(exc)
-    assert result.status_code == 400
-    assert result.message == {
+    assert field_result.status_code == 422
+
+    collision_result = handle_server_exception(
+        ObjectNameTypeCollision(
+            object_id="my-object",
+            kind="object",
+            new_base_object_class="Prompt",
+            existing_base_object_classes=[None],
+        )
+    )
+    assert collision_result.status_code == 400
+    assert collision_result.message == {
         "reason": (
             "Cannot publish 'my-object' as a Prompt: that name is already used "
             "by a generic (untyped) object in this project. Object versions "

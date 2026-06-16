@@ -14,18 +14,17 @@ def clear_cached_redis_client():
     redis_client.get_redis_client.cache_clear()
 
 
-def test_no_url_returns_none(monkeypatch):
-    redis_client.get_redis_client.cache_clear()
-    monkeypatch.delenv("WEAVE_REDIS_URL", raising=False)
-    assert redis_client.get_redis_client() is None
-
-
 def test_client_resolution_from_url(monkeypatch):
-    """Direct URL -> redis.from_url; ?master= URL -> Sentinel.master_for (port defaults to 26379)."""
+    """No URL -> None; direct URL -> redis.from_url; ?master= URL -> Sentinel.master_for (port defaults to 26379)."""
     timeouts = {
         "socket_connect_timeout": redis_client.REDIS_CONNECT_TIMEOUT_SECS,
         "socket_timeout": redis_client.REDIS_SOCKET_TIMEOUT_SECS,
     }
+
+    # Unset URL path -> no client.
+    redis_client.get_redis_client.cache_clear()
+    monkeypatch.delenv("WEAVE_REDIS_URL", raising=False)
+    assert redis_client.get_redis_client() is None
 
     # Direct URL path.
     with patch.object(redis_client.redis, "from_url") as mock_from_url:

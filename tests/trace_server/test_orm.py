@@ -121,157 +121,59 @@ def test_map_string_float_column_round_trip():
     }
 
 
-def test_select_basic():
-    table = Table(
-        "users",
-        [
-            Column("id", "string"),
-            Column("creator", "string", nullable=True),
-            Column("payload", "json", db_name="payload_dump"),
-        ],
-    )
-    select = table.select()
-    select = select.limit(10)
-    prepared = select.prepare()
+def test_select_basic_and_json_field_projection():
+    """Default select projects all db columns; explicit fields can pull a
+    JSON path, which compiles to JSON_VALUE with a parameterized path.
+    """
+    basic = _users_table().select().limit(10).prepare()
     assert (
-        prepared.sql
+        basic.sql
         == """SELECT id, creator, payload_dump
 FROM users
 LIMIT {limit:UInt64}"""
     )
-    assert prepared.parameters == {"limit": 10}
-    assert prepared.fields == ["id", "creator", "payload_dump"]
+    assert basic.parameters == {"limit": 10}
+    assert basic.fields == ["id", "creator", "payload_dump"]
 
-
-def test_select_fields():
-    table = Table(
-        "users",
-        [
-            Column("id", "string"),
-            Column("creator", "string", nullable=True),
-            Column("payload", "json", db_name="payload_dump"),
-        ],
-    )
-    select = table.select()
-    select = select.fields(["id", "payload.address"])
-
+    select = _users_table().select().fields(["id", "payload.address"])
     # More complicated than normal usage to fix the ParamBuilder prefix.
-    pb = ParamBuilder(prefix="pb")
-    prepared = select.prepare(param_builder=pb)
+    fielded = select.prepare(param_builder=ParamBuilder(prefix="pb"))
     assert (
-        prepared.sql
+        fielded.sql
         == """SELECT id, toString(JSON_VALUE(payload_dump, {pb_0:String}))
 FROM users"""
     )
-    assert prepared.parameters == {"pb_0": '$."address"'}
-    assert prepared.fields == ["id", "payload.address"]
+    assert fielded.parameters == {"pb_0": '$."address"'}
+    assert fielded.fields == ["id", "payload.address"]
 
 
-def test_join():
-    table1 = Table(
-        "users",
-        [
-            Column("id", "string"),
-            Column("creator", "string", nullable=True),
-            Column("payload", "json", db_name="payload_dump"),
-        ],
+@pytest.mark.parametrize(
+    ("join_type", "join_clause"),
+    [
+        (None, "JOIN roles ON (table1.id = table2.id)"),
+        ("inner", "inner JOIN roles ON (table1.id = table2.id)"),
+    ],
+)
+def test_join(join_type, join_clause):
+    """Join emits the default `JOIN` or a typed join prefix when one is given."""
+    table1 = _users_table()
+    table2 = Table("roles", [Column("id", "string"), Column("name", "string")])
+    join_cond = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "table1.id"}, {"$getField": "table2.id"}]}}
     )
-    table2 = Table(
-        "roles",
-        [
-            Column("id", "string"),
-            Column("name", "string"),
-        ],
+    join_args = (
+        (table2, join_cond) if join_type is None else (table2, join_cond, join_type)
     )
-
-    select = (
-        table1.select()
-        .fields(["id", "name"])
-        .join(
-            table2,
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "table1.id"},
-                            {"$getField": "table2.id"},
-                        ]
-                    }
-                }
-            ),
-        )
-    )
-
+    select = table1.select().fields(["id", "name"]).join(*join_args)
     prepared = select.prepare()
-
-    assert (
-        prepared.sql
-        == """SELECT id, name
-FROM users
-JOIN roles ON (table1.id = table2.id)"""
-    )
-
-
-def test_join_with_join_type():
-    table1 = Table(
-        "users",
-        [
-            Column("id", "string"),
-            Column("creator", "string", nullable=True),
-            Column("payload", "json", db_name="payload_dump"),
-        ],
-    )
-    table2 = Table(
-        "roles",
-        [
-            Column("id", "string"),
-            Column("name", "string"),
-        ],
-    )
-
-    select = (
-        table1.select()
-        .fields(["id", "name"])
-        .join(
-            table2,
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "table1.id"},
-                            {"$getField": "table2.id"},
-                        ]
-                    }
-                }
-            ),
-            "inner",
-        )
-    )
-
-    prepared = select.prepare()
-
-    assert (
-        prepared.sql
-        == """SELECT id, name
-FROM users
-inner JOIN roles ON (table1.id = table2.id)"""
-    )
+    assert prepared.sql == f"SELECT id, name\nFROM users\n{join_clause}"
 
 
 def test_group_by():
-    table = Table(
-        "users",
-        [
-            Column("id", "string"),
-            Column("creator", "string", nullable=True),
-            Column("payload", "json", db_name="payload_dump"),
-        ],
+    select = (
+        _users_table().select().fields(["id", "creator"]).group_by(["id", "creator"])
     )
-
-    select = table.select().fields(["id", "creator"]).group_by(["id", "creator"])
-
     prepared = select.prepare()
-
     assert (
         prepared.sql
         == """SELECT id, creator
@@ -320,6 +222,17 @@ def test_split_escaped_field_path() -> None:
 
     # Edge case: leading dot (unescaped)
     assert split_escaped_field_path(".output") == ["", "output"]
+
+
+def _users_table() -> Table:
+    return Table(
+        "users",
+        [
+            Column("id", "string"),
+            Column("creator", "string", nullable=True),
+            Column("payload", "json", db_name="payload_dump"),
+        ],
+    )
 
 
 def _feedback_table() -> Table:
@@ -411,125 +324,69 @@ def test_feedback_query_infers_cast_from_literal(
     }
 
 
-def test_feedback_query_string_literal_keeps_uncast_path() -> None:
-    """String literals must keep the existing toString(JSON_VALUE(...)) path.
-
-    Inferring a cast for strings would break legitimate JSON-string
-    comparisons (e.g. category fields).
+@pytest.mark.parametrize(
+    ("expr", "expected_where"),
+    [
+        # String literals keep the existing toString(JSON_VALUE(...)) path;
+        # inferring a cast would break legitimate JSON-string comparisons.
+        (
+            {"$eq": [{"$getField": "payload.label"}, {"$literal": "ok"}]},
+            "(toString(JSON_VALUE(payload_dump, {pb_0:String})) = {pb_1:String})",
+        ),
+        # An explicit $convert wins over inference and is not double-cast: the
+        # inferred field cast is a no-op so the outer toUInt8OrNull wins.
+        (
+            {
+                "$eq": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "payload.is_positive"},
+                            "to": "bool",
+                        }
+                    },
+                    {"$literal": True},
+                ]
+            },
+            "(toUInt8OrNull(toString(JSON_VALUE(payload_dump, {pb_0:String}))) = {pb_1:Bool})",
+        ),
+        # Inference works regardless of which side carries the literal.
+        (
+            {"$gt": [{"$literal": 3}, {"$getField": "payload.score"}]},
+            "({pb_0:Int64} > toInt64OrNull(JSON_VALUE(payload_dump, {pb_1:String})))",
+        ),
+        # $in with a homogeneous numeric list infers a single cast for the field.
+        (
+            {
+                "$in": [
+                    {"$getField": "payload.score"},
+                    [{"$literal": 1}, {"$literal": 2}, {"$literal": 3}],
+                ]
+            },
+            "(toInt64OrNull(JSON_VALUE(payload_dump, {pb_0:String})) "
+            "IN ({pb_1:Int64},{pb_2:Int64},{pb_3:Int64}))",
+        ),
+        # A heterogeneous $in list cannot share a single cast and falls back.
+        (
+            {
+                "$in": [
+                    {"$getField": "payload.value"},
+                    [{"$literal": 1}, {"$literal": "two"}],
+                ]
+            },
+            "(toString(JSON_VALUE(payload_dump, {pb_0:String})) "
+            "IN ({pb_1:Int64},{pb_2:String}))",
+        ),
+    ],
+)
+def test_feedback_query_cast_inference_paths(expr, expected_where) -> None:
+    """The peer literal's type drives the field-side cast (or the uncast
+    fallback) across eq/gt/in shapes and explicit $convert.
     """
     select = (
-        _feedback_table()
-        .select()
-        .fields(["id"])
-        .where(
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "payload.label"},
-                            {"$literal": "ok"},
-                        ]
-                    }
-                }
-            )
-        )
+        _feedback_table().select().fields(["id"]).where(tsi.Query(**{"$expr": expr}))
     )
     prepared = _prepare_clickhouse(select)
-    assert prepared.sql == (
-        "SELECT id\n"
-        "FROM feedback\n"
-        "WHERE (toString(JSON_VALUE(payload_dump, {pb_0:String})) = {pb_1:String})"
-    )
-
-
-def test_feedback_query_explicit_convert_overrides_inference() -> None:
-    """An explicit $convert wins over inference and is not double-cast."""
-    select = (
-        _feedback_table()
-        .select()
-        .fields(["id"])
-        .where(
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {
-                                "$convert": {
-                                    "input": {"$getField": "payload.is_positive"},
-                                    "to": "bool",
-                                },
-                            },
-                            {"$literal": True},
-                        ]
-                    }
-                }
-            )
-        )
-    )
-    prepared = _prepare_clickhouse(select)
-    # ConvertOperation runs after process_operand for the field, so the cast
-    # we infer for the field side has no effect (the inner JSON_VALUE
-    # already wears toString from the default), and the outer cast wins.
-    assert prepared.sql == (
-        "SELECT id\n"
-        "FROM feedback\n"
-        "WHERE (toUInt8OrNull(toString(JSON_VALUE(payload_dump, {pb_0:String}))) = {pb_1:Bool})"
-    )
-
-
-def test_feedback_query_literal_on_lhs_casts_field_on_rhs() -> None:
-    """Inference works regardless of which side carries the literal."""
-    select = (
-        _feedback_table()
-        .select()
-        .fields(["id"])
-        .where(
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$gt": [
-                            {"$literal": 3},
-                            {"$getField": "payload.score"},
-                        ]
-                    }
-                }
-            )
-        )
-    )
-    prepared = _prepare_clickhouse(select)
-    assert prepared.sql == (
-        "SELECT id\n"
-        "FROM feedback\n"
-        "WHERE ({pb_0:Int64} > toInt64OrNull(JSON_VALUE(payload_dump, {pb_1:String})))"
-    )
-
-
-def test_feedback_query_in_homogeneous_literal_list_casts_field() -> None:
-    """$in with a homogeneous numeric list infers a single cast for the field."""
-    select = (
-        _feedback_table()
-        .select()
-        .fields(["id"])
-        .where(
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$in": [
-                            {"$getField": "payload.score"},
-                            [{"$literal": 1}, {"$literal": 2}, {"$literal": 3}],
-                        ]
-                    }
-                }
-            )
-        )
-    )
-    prepared = _prepare_clickhouse(select)
-    assert prepared.sql == (
-        "SELECT id\n"
-        "FROM feedback\n"
-        "WHERE (toInt64OrNull(JSON_VALUE(payload_dump, {pb_0:String})) "
-        "IN ({pb_1:Int64},{pb_2:Int64},{pb_3:Int64}))"
-    )
+    assert prepared.sql == f"SELECT id\nFROM feedback\nWHERE {expected_where}"
 
 
 def test_feedback_query_inference_threads_through_and_or_not() -> None:
@@ -593,34 +450,6 @@ def test_feedback_query_inference_threads_through_and_or_not() -> None:
         f"WHERE (({bool_field} = {{pb_1:Bool}}) "
         f"AND (({score_field} > {{pb_3:Float64}}) "
         f"OR (NOT (({rank_field} = {{pb_5:Int64}})))))"
-    )
-
-
-def test_feedback_query_in_mixed_literal_list_keeps_uncast_path() -> None:
-    """A heterogeneous $in list cannot share a single cast and falls back."""
-    select = (
-        _feedback_table()
-        .select()
-        .fields(["id"])
-        .where(
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$in": [
-                            {"$getField": "payload.value"},
-                            [{"$literal": 1}, {"$literal": "two"}],
-                        ]
-                    }
-                }
-            )
-        )
-    )
-    prepared = _prepare_clickhouse(select)
-    assert prepared.sql == (
-        "SELECT id\n"
-        "FROM feedback\n"
-        "WHERE (toString(JSON_VALUE(payload_dump, {pb_0:String})) "
-        "IN ({pb_1:Int64},{pb_2:String}))"
     )
 
 

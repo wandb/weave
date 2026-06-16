@@ -171,14 +171,14 @@ def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
     assert result == []
 
 
-def test_clickhouse_storage_size_schema_conversion():
-    """Test that storage size fields are correctly converted in ClickHouse schema."""
-    # Test data with proper datetime structures
+def test_ch_call_dict_to_call_schema_dict_conversions():
+    """ch_call_dict_to_call_schema_dict at the API boundary: storage-size
+    fields pass through populated, are preserved as None, and the far-future
+    expire_at sentinel is hidden as None.
+    """
     started_at = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     ended_at = datetime(2024, 1, 1, 0, 1, 0, tzinfo=timezone.utc)
-    test_data = {
-        "storage_size_bytes": 1000,
-        "total_storage_size_bytes": 2000,
+    base = {
         "id": "test_id",
         "name": "test_name",
         "project_id": "test_project",
@@ -197,66 +197,28 @@ def test_clickhouse_storage_size_schema_conversion():
         "wb_user_id": None,
     }
 
-    # Test ClickHouse conversion
-    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
-    assert ch_schema["storage_size_bytes"] == 1000
-    assert ch_schema["total_storage_size_bytes"] == 2000
+    populated = chts.ch_call_dict_to_call_schema_dict(
+        {**base, "storage_size_bytes": 1000, "total_storage_size_bytes": 2000}
+    )
+    assert populated["storage_size_bytes"] == 1000
+    assert populated["total_storage_size_bytes"] == 2000
 
+    nulled = chts.ch_call_dict_to_call_schema_dict(
+        {**base, "storage_size_bytes": None, "total_storage_size_bytes": None}
+    )
+    assert nulled["storage_size_bytes"] is None
+    assert nulled["total_storage_size_bytes"] is None
 
-def test_clickhouse_storage_size_null_handling():
-    """Test that NULL values in storage size fields are handled correctly in ClickHouse."""
-    # Test data with NULL values and proper datetime structures
-    started_at = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-    ended_at = datetime(2024, 1, 1, 0, 1, 0, tzinfo=timezone.utc)
-    test_data = {
-        "storage_size_bytes": None,
-        "total_storage_size_bytes": None,
-        "id": "test_id",
-        "name": "test_name",
-        "project_id": "test_project",
-        "trace_id": "test_trace",
-        "parent_id": None,
-        "started_at": started_at,
-        "ended_at": ended_at,
-        "inputs": {},
-        "outputs": {},
-        "error": None,
-        "summary": None,
-        "summary_dump": None,
-        "cost": None,
-        "wb_run_id": None,
-        "wb_run_step": None,
-        "wb_user_id": None,
-    }
-
-    # Test ClickHouse conversion
-    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
-    assert ch_schema["storage_size_bytes"] is None
-    assert ch_schema["total_storage_size_bytes"] is None
-
-
-def test_clickhouse_expire_at_sentinel_converts_to_none():
-    """The DB far-future expire_at sentinel is hidden at the API boundary."""
-    started_at = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-    test_data = {
-        "storage_size_bytes": None,
-        "total_storage_size_bytes": None,
-        "id": "test_id",
-        "project_id": "test_project",
-        "trace_id": "test_trace",
-        "parent_id": None,
-        "started_at": started_at,
-        "ended_at": None,
-        "summary_dump": None,
-        "wb_run_id": None,
-        "wb_run_step": None,
-        "wb_user_id": None,
-        "expire_at": EXPIRE_AT_NEVER,
-    }
-
-    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
-
-    assert ch_schema["expire_at"] is None
+    sentinel = chts.ch_call_dict_to_call_schema_dict(
+        {
+            **base,
+            "ended_at": None,
+            "storage_size_bytes": None,
+            "total_storage_size_bytes": None,
+            "expire_at": EXPIRE_AT_NEVER,
+        }
+    )
+    assert sentinel["expire_at"] is None
 
 
 def test_ch_call_to_row_sentinelizes_expire_at_for_v1_insert_paths():

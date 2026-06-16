@@ -2,36 +2,37 @@
 
 from __future__ import annotations
 
+import pytest
+
 from weave.trace_server.fake_service import FakeService
 from weave.trace_server.service_interface import (
     ProjectsInfoReq,
 )
 
 
-def test_server_info() -> None:
+def test_server_info_and_ensure_project_exists() -> None:
     svc = FakeService()
-    res = svc.server_info()
-    assert res.min_required_weave_python_version == "0.0.0"
-    assert res.trace_server_version == "test"
+
+    info = svc.server_info()
+    assert info.min_required_weave_python_version == "0.0.0"
+    assert info.trace_server_version == "test"
+
+    ensured = svc.ensure_project_exists("my-entity", "my-project")
+    assert ensured.project_name == "my-project"
 
 
-def test_ensure_project_exists() -> None:
+@pytest.mark.parametrize(
+    ("project_ids", "expected"),
+    [
+        (
+            ["entity-a/project-a", "entity-b/project-b"],
+            ["entity-a/project-a", "entity-b/project-b"],
+        ),
+        ([], []),
+    ],
+    ids=["populated", "empty"],
+)
+def test_projects_info(project_ids: list[str], expected: list[str]) -> None:
     svc = FakeService()
-    res = svc.ensure_project_exists("my-entity", "my-project")
-    assert res.project_name == "my-project"
-
-
-def test_projects_info() -> None:
-    svc = FakeService()
-    req = ProjectsInfoReq(project_ids=["entity-a/project-a", "entity-b/project-b"])
-    res = svc.projects_info(req)
-    assert len(res) == 2
-    assert res[0].external_project_id == "entity-a/project-a"
-    assert res[1].external_project_id == "entity-b/project-b"
-
-
-def test_projects_info_empty() -> None:
-    svc = FakeService()
-    req = ProjectsInfoReq(project_ids=[])
-    res = svc.projects_info(req)
-    assert res == []
+    res = svc.projects_info(ProjectsInfoReq(project_ids=project_ids))
+    assert [p.external_project_id for p in res] == expected

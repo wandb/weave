@@ -234,47 +234,60 @@ def _ref_attr_values(
     raise AssertionError(f"no values for {attr_key}")
 
 
-def test_genai_otel_export_rewrites_flat_ref_attrs() -> None:
-    """Flat-dotted `weave.object_refs` array values are rewritten to
-    internal form before reaching the inner trace server.
+def test_genai_otel_export_rewrites_ref_attrs() -> None:
+    """ext->int rewriting of typed `weave.*_refs` OTel arrays: flat-dotted keys
+    (object_refs + content_refs) and the nested `weave` kvlist form both get
+    rewritten, while non-external array elements (already-internal, non-ref
+    strings) pass through unchanged.
     """
     internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
-    req = _make_otel_export_req_with_ref_attrs(
-        {
-            "weave.object_refs": [
-                "weave:///ent/proj/object/a:v1",
-                "weave:///ent/proj/object/b:v1",
-            ],
-            "weave.content_refs": ["weave:///ent/proj/content/c"],
-        }
+
+    flat = _capture_genai_otel_export_req(
+        _make_otel_export_req_with_ref_attrs(
+            {
+                "weave.object_refs": [
+                    "weave:///ent/proj/object/a:v1",
+                    "weave:///ent/proj/object/b:v1",
+                ],
+                "weave.content_refs": ["weave:///ent/proj/content/c"],
+            }
+        )
     )
-
-    forwarded = _capture_genai_otel_export_req(req)
-
-    assert _ref_attr_values(forwarded, "weave.object_refs") == [
+    assert _ref_attr_values(flat, "weave.object_refs") == [
         f"weave-trace-internal:///{internal_proj}/object/a:v1",
         f"weave-trace-internal:///{internal_proj}/object/b:v1",
     ]
-    assert _ref_attr_values(forwarded, "weave.content_refs") == [
+    assert _ref_attr_values(flat, "weave.content_refs") == [
         f"weave-trace-internal:///{internal_proj}/content/c"
     ]
 
-
-def test_genai_otel_export_rewrites_nested_kvlist_ref_attrs() -> None:
-    """The nested `weave` → `object_refs` kvlist form is rewritten too;
-    the walker descends through kvlist children and matches the dotted
-    full key.
-    """
-    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
-    req = _make_otel_export_req_with_ref_attrs(
-        {"object_refs": ["weave:///ent/proj/object/a:v1"]},
-        nest_under_kvlist=True,
+    # Nested `weave` -> `object_refs` kvlist: walker descends and matches the dotted key.
+    nested = _capture_genai_otel_export_req(
+        _make_otel_export_req_with_ref_attrs(
+            {"object_refs": ["weave:///ent/proj/object/a:v1"]},
+            nest_under_kvlist=True,
+        )
     )
-
-    forwarded = _capture_genai_otel_export_req(req)
-
-    assert _ref_attr_values(forwarded, "weave.object_refs") == [
+    assert _ref_attr_values(nested, "weave.object_refs") == [
         f"weave-trace-internal:///{internal_proj}/object/a:v1"
+    ]
+
+    # Only matching external `weave:///` prefixes convert; others pass through.
+    mixed = _capture_genai_otel_export_req(
+        _make_otel_export_req_with_ref_attrs(
+            {
+                "weave.object_refs": [
+                    "weave:///ent/proj/object/a:v1",
+                    "weave-trace-internal:///already-internal/object/b:v1",
+                    "not-a-ref-at-all",
+                ]
+            }
+        )
+    )
+    assert _ref_attr_values(mixed, "weave.object_refs") == [
+        f"weave-trace-internal:///{internal_proj}/object/a:v1",
+        "weave-trace-internal:///already-internal/object/b:v1",
+        "not-a-ref-at-all",
     ]
 
 
@@ -291,29 +304,6 @@ def test_genai_otel_export_leaves_non_ref_attrs_untouched() -> None:
     span = forwarded.processed_spans[0].resource_spans.scope_spans[0].spans[0]
     dump_kv = next(kv for kv in span.attributes if kv.key == "weave.raw_span_dump")
     assert dump_kv.value.string_value == "weave:///should/not/be/rewritten"
-
-
-def test_genai_otel_export_skips_non_external_refs_in_array() -> None:
-    """Array elements that aren't on the external `weave:///` scheme pass
-    through unchanged; only matching prefixes are converted.
-    """
-    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
-    req = _make_otel_export_req_with_ref_attrs(
-        {
-            "weave.object_refs": [
-                "weave:///ent/proj/object/a:v1",
-                "weave-trace-internal:///already-internal/object/b:v1",
-                "not-a-ref-at-all",
-            ]
-        }
-    )
-
-    forwarded = _capture_genai_otel_export_req(req)
-    assert _ref_attr_values(forwarded, "weave.object_refs") == [
-        f"weave-trace-internal:///{internal_proj}/object/a:v1",
-        "weave-trace-internal:///already-internal/object/b:v1",
-        "not-a-ref-at-all",
-    ]
 
 
 def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
