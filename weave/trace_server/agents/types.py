@@ -972,20 +972,21 @@ class AgentTraceChatRes(BaseModel):
     feedback: list[dict[str, Any]] | None = None
 
 
-class AgentTraceMessagesReq(BaseModel):
-    """Request for the role-tagged messages of a single trace.
+MAX_TRACE_MESSAGES_LIMIT = 100
 
-    Fallback source for agent scoring when a root span carries no message
-    content of its own.
-    """
+
+class AgentTraceMessagesReq(BaseModel):
+    """Request for the messages of a single trace."""
 
     project_id: str
     trace_id: str
-    limit: int = 100
+    limit: int = Field(
+        default=MAX_TRACE_MESSAGES_LIMIT, gt=0, le=MAX_TRACE_MESSAGES_LIMIT
+    )
 
 
 class AgentTraceMessagesRes(BaseModel):
-    """Role-tagged messages for a trace, ordered by ingest time."""
+    """The messages of a single trace."""
 
     messages: list[NormalizedMessage] = Field(default_factory=list)
 

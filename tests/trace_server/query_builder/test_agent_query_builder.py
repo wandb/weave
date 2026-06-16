@@ -13,6 +13,7 @@ import sqlparse
 from pydantic import ValidationError
 
 from weave.trace_server.agents.types import (
+    MAX_TRACE_MESSAGES_LIMIT,
     AgentConversationChatReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
@@ -25,6 +26,7 @@ from weave.trace_server.agents.types import (
     AgentSpanValueRef,
     AgentsQueryFilters,
     AgentsQueryReq,
+    AgentTraceMessagesReq,
     AgentVersionsQueryReq,
 )
 from weave.trace_server.interface import query as tsi_query
@@ -1064,13 +1066,13 @@ class TestMakeTraceMessagesQuery:
         expected = """
             SELECT role,
                    any(content) AS content,
-                   min(created_at) AS ordered_at
+                   min(created_at) AS min_created_at
             FROM messages
             WHERE project_id = {genai_0:String}
               AND trace_id = {genai_1:String}
               AND role IN ('user', 'assistant', 'system')
             GROUP BY role, content_digest
-            ORDER BY ordered_at ASC
+            ORDER BY min_created_at ASC
             LIMIT {genai_2:UInt64}
         """
         assert_sql(
@@ -1079,6 +1081,15 @@ class TestMakeTraceMessagesQuery:
             query,
             pb.get_params(),
         )
+
+    def test_limit_is_bounded(self) -> None:
+        AgentTraceMessagesReq(project_id="p1", trace_id="t1", limit=1)
+        AgentTraceMessagesReq(
+            project_id="p1", trace_id="t1", limit=MAX_TRACE_MESSAGES_LIMIT
+        )
+        for bad in (0, MAX_TRACE_MESSAGES_LIMIT + 1):
+            with pytest.raises(ValidationError):
+                AgentTraceMessagesReq(project_id="p1", trace_id="t1", limit=bad)
 
 
 # ============================================================================

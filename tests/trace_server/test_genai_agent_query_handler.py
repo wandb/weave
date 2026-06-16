@@ -245,7 +245,7 @@ def test_grouped_rows_hydrate_message_previews() -> None:
 
 def test_trace_messages_maps_rows_to_normalized_messages() -> None:
     result = _FakeQueryResult(
-        column_names=["role", "content", "ordered_at"],
+        column_names=["role", "content", "min_created_at"],
         result_rows=[
             ("system", "be helpful", None),
             ("user", "hi", None),
