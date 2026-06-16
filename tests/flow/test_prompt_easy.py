@@ -5,39 +5,35 @@ import pytest
 from weave import EasyPrompt
 
 
-def iter_equal(items1, items2):
-    """`True` if iterators `items1` and `items2` contain equal items."""
-    return (items1 is items2) or all(
-        a == b for a, b in itertools.zip_longest(items1, items2, fillvalue=object())
-    )
-
-
-def test_prompt_message_constructor_str():
-    prompt = EasyPrompt("What's 23 * 42")
-    assert prompt() == [{"role": "user", "content": "What's 23 * 42"}]
-
-
-def test_prompt_message_constructor_prefix_str():
-    prompt = EasyPrompt("system: you are a pirate")
-    assert prompt() == [{"role": "system", "content": "you are a pirate"}]
-
-
-def test_prompt_message_constructor_role_arg():
-    prompt = EasyPrompt("You're a calculator.", role="system")
-    assert prompt() == [{"role": "system", "content": "You're a calculator."}]
-
-
-def test_prompt_message_constructor_array():
-    prompt = EasyPrompt(
-        [
-            {"role": "system", "content": "You're a calculator."},
-            {"role": "user", "content": "What's 23 * 42"},
-        ]
-    )
-    assert prompt() == [
-        {"role": "system", "content": "You're a calculator."},
-        {"role": "user", "content": "What's 23 * 42"},
-    ]
+@pytest.mark.parametrize(
+    ("args", "kwargs", "expected"),
+    [
+        ("What's 23 * 42", {}, [{"role": "user", "content": "What's 23 * 42"}]),
+        (
+            "system: you are a pirate",
+            {},
+            [{"role": "system", "content": "you are a pirate"}],
+        ),
+        (
+            "You're a calculator.",
+            {"role": "system"},
+            [{"role": "system", "content": "You're a calculator."}],
+        ),
+        (
+            [
+                {"role": "system", "content": "You're a calculator."},
+                {"role": "user", "content": "What's 23 * 42"},
+            ],
+            {},
+            [
+                {"role": "system", "content": "You're a calculator."},
+                {"role": "user", "content": "What's 23 * 42"},
+            ],
+        ),
+    ],
+)
+def test_prompt_message_constructor(args, kwargs, expected):
+    assert EasyPrompt(args, **kwargs)() == expected
 
 
 def test_prompt_message_constructor_obj():
@@ -92,11 +88,9 @@ def test_prompt_append() -> None:
         {"role": "user", "content": "What's the capital of Brazil?"},
     ]
 
-
-def test_prompt_append_with_role() -> None:
-    prompt = EasyPrompt()
-    prompt.append("system: who knows a lot about geography", role="asdf")
-    assert prompt() == [
+    explicit_role = EasyPrompt()
+    explicit_role.append("system: who knows a lot about geography", role="asdf")
+    assert explicit_role() == [
         {"role": "asdf", "content": "system: who knows a lot about geography"},
     ]
 
@@ -138,23 +132,35 @@ def test_prompt_parameter_default() -> None:
     assert list(prompt()) == [{"role": "user", "content": "23 * 42"}]
 
 
-def test_prompt_parameter_validation_int() -> None:
-    prompt = EasyPrompt("{A} + {B}")
-    prompt.require("A", min=10, max=100)
-    with pytest.raises(ValueError, match="is less than min") as e:
-        prompt.bind(A=0)
-    assert str(e.value) == "A (0) is less than min (10)"
-
-
-def test_prompt_parameter_validation_oneof() -> None:
-    prompt = EasyPrompt("{flavor}")
-    prompt.require("flavor", oneof=("vanilla", "strawberry", "chocolate"))
-    with pytest.raises(ValueError, match="must be one of") as e:
-        prompt.bind(flavor="mint chip")
-    assert (
-        str(e.value)
-        == "flavor (mint chip) must be one of vanilla, strawberry, chocolate"
-    )
+@pytest.mark.parametrize(
+    ("template", "name", "require_kwargs", "bind_kwargs", "match", "message"),
+    [
+        (
+            "{A} + {B}",
+            "A",
+            {"min": 10, "max": 100},
+            {"A": 0},
+            "is less than min",
+            "A (0) is less than min (10)",
+        ),
+        (
+            "{flavor}",
+            "flavor",
+            {"oneof": ("vanilla", "strawberry", "chocolate")},
+            {"flavor": "mint chip"},
+            "must be one of",
+            "flavor (mint chip) must be one of vanilla, strawberry, chocolate",
+        ),
+    ],
+)
+def test_prompt_parameter_validation(
+    template, name, require_kwargs, bind_kwargs, match, message
+):
+    prompt = EasyPrompt(template)
+    prompt.require(name, **require_kwargs)
+    with pytest.raises(ValueError, match=match) as e:
+        prompt.bind(**bind_kwargs)
+    assert str(e.value) == message
 
 
 def test_prompt_bind_iteration() -> None:
@@ -218,25 +224,6 @@ def test_prompt_as_dict():
             },
         ],
     }
-
-
-def test_prompt_as_pydantic_dict():
-    prompt = EasyPrompt(
-        model="gpt-4o",
-        messages=[
-            {
-                "role": "system",
-                "content": "You will be provided with text, and your task is to translate it into emojis. Do not use any regular text. Do your best with emojis only.",
-            },
-            {
-                "role": "user",
-                "content": "Artificial intelligence is a technology with great promise.",
-            },
-        ],
-        temperature=0.8,
-        max_tokens=64,
-        top_p=1,
-    )
     assert prompt.as_pydantic_dict() == {
         "name": None,
         "description": None,
@@ -259,3 +246,10 @@ def test_prompt_as_pydantic_dict():
         ],
         "requirements": {},
     }
+
+
+def iter_equal(items1, items2):
+    """`True` if iterators `items1` and `items2` contain equal items."""
+    return (items1 is items2) or all(
+        a == b for a, b in itertools.zip_longest(items1, items2, fillvalue=object())
+    )

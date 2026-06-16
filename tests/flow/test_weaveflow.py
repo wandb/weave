@@ -7,25 +7,29 @@ from pydantic import Field
 import weave
 
 
-def test_weaveflow_op_wandb(weave_active):
+def test_weaveflow_basic_ops(weave_active):
+    """Plain ops, list-returning ops, and nested op composition."""
+
     @weave.op
     def custom_adder(a: int, b: int) -> int:
         return a + b
 
-    res = custom_adder(1, 2)
-    assert res == 3
-
-
-def test_weaveflow_op_wandb_return_list(weave_active):
     @weave.op
-    def custom_adder(a: int, b: int) -> list[int]:
+    def custom_adder_list(a: int, b: int) -> list[int]:
         return [a + b]
 
-    res = custom_adder(1, 2)
-    assert res == [3]
+    @weave.op
+    def double_adder(a: int, b: int) -> int:
+        return custom_adder(a, a) + custom_adder(b, b)
+
+    assert custom_adder(1, 2) == 3
+    assert custom_adder_list(1, 2) == [3]
+    assert double_adder(1, 2) == 6
 
 
-def test_weaveflow_object_wandb_with_opmethod(weave_active):
+def test_weaveflow_op_methods(weave_active):
+    """Op methods on weave.Object: call result and qualified op name."""
+
     class ATestObj(weave.Object):
         a: int
 
@@ -34,21 +38,11 @@ def test_weaveflow_object_wandb_with_opmethod(weave_active):
             return self.a + b
 
     x = ATestObj(a=1)
-    res = x.a_test_add(2)
-    assert res == 3
+    assert x.a_test_add(2) == 3
 
-
-def test_weaveflow_nested_op(weave_active):
-    @weave.op
-    def adder(a: int, b: int) -> int:
-        return a + b
-
-    @weave.op
-    def double_adder(a: int, b: int) -> int:
-        return adder(a, a) + adder(b, b)
-
-    res = double_adder(1, 2)
-    assert res == 6
+    model = MyModel(a=1)
+    assert model.predict.name == "MyModel.predict"
+    assert MyModel.predict.name == "MyModel.predict"
 
 
 @pytest.mark.asyncio
@@ -75,45 +69,42 @@ def test_weaveflow_publish_numpy(weave_active):
     ref = weave.publish(v, "dict-with-numpy")
 
 
-def test_weaveflow_unknown_type_op_param_undeclared():
+@pytest.mark.parametrize("declaration", ["undeclared", "declared", "closure"])
+def test_weaveflow_unknown_type_op_param(declaration):
+    """Ops accept an unknown-typed param whether undeclared, declared, or closed over."""
+
     @dataclass
     class SomeUnknownObject:
         x: int
 
-    @weave.op
-    def op_with_unknown_param(v) -> int:
-        return v.x + 2
+    if declaration == "undeclared":
 
-    assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
+        @weave.op
+        def op_with_unknown_param(v) -> int:
+            return v.x + 2
 
+        assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
+    elif declaration == "declared":
 
-def test_weaveflow_unknown_type_op_param_declared():
-    @dataclass
-    class SomeUnknownObject:
-        x: int
+        @weave.op
+        def op_with_unknown_param(v: SomeUnknownObject) -> int:
+            return v.x + 2
 
-    @weave.op
-    def op_with_unknown_param(v: SomeUnknownObject) -> int:
-        return v.x + 2
+        assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
+    elif declaration == "closure":
+        v = SomeUnknownObject(x=10)
 
-    assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
+        @weave.op
+        def op_with_unknown_param() -> int:
+            return v.x + 2
 
-
-def test_weaveflow_unknown_type_op_param_closure():
-    @dataclass
-    class SomeUnknownObject:
-        x: int
-
-    v = SomeUnknownObject(x=10)
-
-    @weave.op
-    def op_with_unknown_param() -> int:
-        return v.x + 2
-
-    assert op_with_unknown_param() == 12
+        assert op_with_unknown_param() == 12
+    else:
+        raise ValueError(f"unhandled declaration: {declaration}")
 
 
-def test_subobj_ref_passing(client):
+def test_dataset_save_and_ref_flows(client):
+    """Saved dataset: subobj-ref passing into an op and ref round-trip into Evaluation."""
     dataset = client.save(
         weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
     )
@@ -125,20 +116,10 @@ def test_subobj_ref_passing(client):
     res = get_item(dataset.rows[0])
     assert res == {"in": 1, "out": 1}
 
-
-class MyModel(weave.Model):
-    a: int
-
-    @weave.op
-    def predict(self, x: int) -> int:
-        return x + 1
-
-
-def test_op_method_name():
-    model = MyModel(a=1)
-
-    assert model.predict.name == "MyModel.predict"
-    assert MyModel.predict.name == "MyModel.predict"
+    ref = dataset.ref
+    assert ref is not None
+    dataset2 = weave.ref(ref.uri).get()
+    weave.Evaluation(dataset=dataset2)
 
 
 def test_agent_has_tools(client):
@@ -155,16 +136,6 @@ def test_agent_has_tools(client):
     saved = client.save(agent, "agent")
 
     assert len(saved.tools) == 1
-
-
-def test_construct_eval_with_dataset_get(client):
-    dataset = client.save(
-        weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
-    )
-    ref = dataset.ref
-    assert ref is not None
-    dataset2 = weave.ref(ref.uri).get()
-    weave.Evaluation(dataset=dataset2)
 
 
 def test_weave_op_mutates_and_returns_same_object(weave_active):
@@ -188,3 +159,11 @@ def test_weave_op_mutates_and_returns_same_object(weave_active):
     thing.append_tool(lambda: 2)
     assert len(thing.tools) == 2
     assert thing.tools is thing.tools
+
+
+class MyModel(weave.Model):
+    a: int
+
+    @weave.op
+    def predict(self, x: int) -> int:
+        return x + 1
