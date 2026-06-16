@@ -248,6 +248,53 @@ def test_agent_name_override_wins_over_native(
     assert _attrs(agent)["gen_ai.agent.name"] == "research_agent"
 
 
+def test_descendant_spans_inherit_agent_name(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """Tool/chat children inherit gen_ai.agent.name from the enclosing agent.
+
+    Without this, descendants land with `agent_name = ''` and the `agents`
+    MV's `WHERE agent_name != ''` filter drops their token rows from the
+    per-agent rollup — see migration 030_add_agent_tables.up.sql.
+    """
+    processor = WeaveOtelTracingProcessor()
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_i"
+    trace.name = "wf"
+    trace.group_id = None
+
+    agent_span = Mock(spec=Span)
+    agent_span.trace_id = "trace_i"
+    agent_span.span_id = "agent_i"
+    agent_span.parent_id = None
+    agent_span.span_data = AgentSpanData(name="Assistant")
+    agent_span.started_at = None
+    agent_span.ended_at = None
+    agent_span.error = None
+
+    fn_span = Mock(spec=Span)
+    fn_span.trace_id = "trace_i"
+    fn_span.span_id = "fn_i"
+    fn_span.parent_id = "agent_i"
+    fn_span.span_data = FunctionSpanData(name="get_weather", input="", output="")
+    fn_span.started_at = None
+    fn_span.ended_at = None
+    fn_span.error = None
+
+    processor.on_trace_start(trace)
+    processor.on_span_start(agent_span)
+    processor.on_span_start(fn_span)
+    processor.on_span_end(fn_span)
+    processor.on_span_end(agent_span)
+    processor.on_trace_end(trace)
+
+    spans = otel_spans.get_finished_spans()
+    tool = next(
+        s for s in spans if _attrs(s).get("gen_ai.operation.name") == "execute_tool"
+    )
+    assert _attrs(tool)["gen_ai.agent.name"] == "Assistant"
+
+
 def test_response_span_emits_chat_with_messages(
     client: WeaveClient, otel_spans: InMemorySpanExporter
 ) -> None:

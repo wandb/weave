@@ -498,6 +498,14 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         # almost never match LIFO. Lets the sweep handle spans the SDK never
         # closed without leaking state across Runner.run calls.
         self._trace_spans: dict[str, dict[str, None]] = {}
+        # Resolved gen_ai.agent.name per openai span_id. AgentSpan resolves
+        # its own name (with override); descendant chat/tool/turn spans
+        # inherit the name from their nearest enclosing invoke_agent
+        # ancestor so the `agents` MV (WHERE agent_name != '') captures
+        # their token usage in the per-agent rollup. Populated in
+        # on_span_start so children that start under this one see the
+        # value; cleared in on_span_end.
+        self._agent_name: dict[str, str] = {}
 
     def _tracer(self) -> Any:
         return otel_trace.get_tracer(_TRACER_NAME)
@@ -525,6 +533,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         leftover = self._trace_spans.pop(trace.trace_id, {})
         # Detach in LIFO order — see comment on ``self._trace_spans``.
         for span_id in reversed(leftover):
+            self._agent_name.pop(span_id, None)
             token = self._span_tokens.pop(span_id, None)
             if token is not None:
                 otel_context.detach(token)
@@ -534,6 +543,20 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         self._conversation_ids.pop(trace.trace_id, None)
 
     def on_span_start(self, span: Span) -> None:
+        # Resolve the agent_name to attribute to this span *before* any
+        # children start under it — they read this entry by parent_id.
+        # AgentSpan: own name (override-aware). Anything else: inherit from
+        # the nearest enclosing invoke_agent ancestor so the agents MV
+        # (WHERE agent_name != '') sees descendant chat/tool tokens.
+        sd = span.span_data
+        if isinstance(sd, AgentSpanData):
+            agent_name = resolve_agent_name(sd.name or "")
+        elif span.parent_id:
+            agent_name = self._agent_name.get(span.parent_id, "")
+        else:
+            agent_name = ""
+        self._agent_name[span.span_id] = agent_name
+
         parent_ctx = self._parent_context(span)
         otel_span = self._tracer().start_span(
             _otel_span_name(span),
@@ -554,6 +577,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
 
     def on_span_end(self, span: Span) -> None:
         otel_span = self._span_otel.pop(span.span_id, None)
+        agent_name = self._agent_name.pop(span.span_id, "")
         if otel_span is None:
             return
         trace_spans = self._trace_spans.get(span.trace_id)
@@ -576,6 +600,13 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
 
             conversation_id = self._conversation_ids.get(span.trace_id, "")
             attrs = _attrs_for_span(span, conversation_id)
+            # Inherit gen_ai.agent.name from the nearest enclosing
+            # invoke_agent ancestor so descendant chat/tool spans satisfy
+            # the agents MV filter and their tokens roll up under the
+            # right agent. AgentSpan's _agent_attrs already set this key
+            # (and may carry an override), so don't clobber.
+            if agent_name and "gen_ai.agent.name" not in attrs:
+                attrs["gen_ai.agent.name"] = agent_name
             _set_attrs(otel_span, attrs)
 
             if span.error:
@@ -619,6 +650,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         self._span_otel.clear()
         self._conversation_ids.clear()
         self._trace_spans.clear()
+        self._agent_name.clear()
 
 
 def _otel_span_name(span: Span) -> str:

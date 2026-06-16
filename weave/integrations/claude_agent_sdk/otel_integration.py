@@ -231,6 +231,10 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             reasoning=output.reasoning if output.reasoning.content else None,
         )
         chat_attrs.update(_INTEGRATION_OTEL_ATTRS)
+        # Stamp the enclosing agent's name so the chat span lands in the
+        # agents MV (WHERE agent_name != '') and its token usage rolls up
+        # under the right agent in the agents-list query.
+        chat_attrs["gen_ai.agent.name"] = state.agent_name
         state.pending_chat = _PendingChat(span=chat, attrs=chat_attrs)
         state.accumulated.append(output.message)
 
@@ -263,6 +267,8 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
                 tool_call_id=block.tool_use_id,
             )
             attrs.update(_INTEGRATION_OTEL_ATTRS)
+            # See the chat span for why this stamps gen_ai.agent.name.
+            attrs["gen_ai.agent.name"] = state.agent_name
             for key, value in attrs.items():
                 open_tool.span.set_attribute(key, value)
             if block.is_error:

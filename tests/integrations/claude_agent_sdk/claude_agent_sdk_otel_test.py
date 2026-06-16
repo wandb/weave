@@ -144,6 +144,10 @@ async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
     chat_span = chat_spans[0]
     assert check_integration_and_strip(get_attrs(chat_span)) == {
         "gen_ai.operation.name": "chat",
+        # Inherited from the enclosing invoke_agent so the chat span lands
+        # in the agents MV (WHERE agent_name != '') and its token usage
+        # rolls up under the right agent.
+        "gen_ai.agent.name": "claude_agent_sdk",
         "gen_ai.provider.name": "anthropic",
         "gen_ai.conversation.id": "s-abc123",
         "gen_ai.request.model": "claude-sonnet-4-6",
@@ -180,6 +184,12 @@ async def test_tool_use_query_otel(otel_spans: InMemorySpanExporter) -> None:
     assert "ls -la" in tool_attrs["gen_ai.tool.call.arguments"]
     assert "file1.py" in tool_attrs["gen_ai.tool.call.result"]
     assert tool_span.parent.span_id == agent_span.context.span_id
+
+    # Descendants inherit gen_ai.agent.name from the enclosing invoke_agent
+    # so the agents MV picks them up and tokens roll up under the agent.
+    assert tool_attrs["gen_ai.agent.name"] == "claude_agent_sdk"
+    for chat_span in chat_spans:
+        assert get_attrs(chat_span)["gen_ai.agent.name"] == "claude_agent_sdk"
 
     # Aggregate usage lands on exactly one (the final) chat span.
     chats_with_usage = [
