@@ -24,11 +24,7 @@ from weave.trace.serialization.serialize import to_json
 from weave.trace.weave_client import WeaveClient, map_to_refs
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
-    ALLOWED_CALL_FIELDS,
-)
-from weave.trace_server.calls_query_builder.monitor_query_validation import (
-    _DUMP_SUFFIX,
-    ALLOWED_DYNAMIC_FIELD_PREFIXES,
+    _invalid_field_message,
 )
 from weave.trace_server.errors import (
     InvalidFieldError,
@@ -1192,16 +1188,8 @@ def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
     with pytest.raises(InvalidFieldError) as exc_info:
         _create_monitor(client, "bad-monitor", bad_query)
 
-    allowed = ", ".join(
-        sorted(k for k in ALLOWED_CALL_FIELDS if not k.endswith(_DUMP_SUFFIX))
-    )
-    expected_message = (
-        "Field operation_name is not allowed. "
-        f"Allowed fields: {allowed}. "
-        f"Allowed dynamic field prefixes: {', '.join(ALLOWED_DYNAMIC_FIELD_PREFIXES)}"
-    )
-    assert str(exc_info.value) == expected_message
-    assert _DUMP_SUFFIX not in str(exc_info.value)
+    assert str(exc_info.value) == _invalid_field_message("operation_name")
+    assert "_dump" not in str(exc_info.value)
 
     # A structurally invalid query (empty $and) is a bad request, not a field error.
     with pytest.raises(InvalidRequest):
