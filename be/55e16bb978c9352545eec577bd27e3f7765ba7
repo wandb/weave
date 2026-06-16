@@ -40,3 +40,27 @@ MECHANICS / GOTCHAS for a future agent:
   branch's tip SUBJECT against the new chain (subjects are unique).
 - Verified: ruff PASS on all 17 HEADs; the 2 tests SKIP on --trace-server=fake
   and still run on ClickHouse (skipif condition unchanged).
+
+## ADDENDUM: full lint story (3 CI cycles to green)
+
+The lint fix took 3 push cycles because each local check was NARROWER than CI's
+ruff pipeline, and a zsh bug hid it:
+- CI lint = nox -e lint = prek pre-push = ty + pyright + mypy + ruff-check + ruff-format.
+- ZSH BUG: `uvx ruff check $files` where $files is a plain VARIABLE does NOT
+  word-split in zsh -> ruff received one garbage arg, checked nothing, and
+  printed "All checks passed!" (false green). Must use command substitution
+  `uvx ruff check $(git diff --name-only B..H | grep '\.py$')` which DOES split.
+- Cycle 1: fixed I001 (unsorted FAKE imports) in PR1 + propagated. PR1 went green.
+- Cycle 2: real failure was F401 (unused imports) — un-gating left orphaned
+  `FAKE_NOT_IMPLEMENTED`/`pytest` imports (accumulating 1->43 up the stack).
+  Fixed via `git rebase be55e16bb9 --exec '<ruff check --fix>'` amending each commit.
+- Cycle 3: ruff FORMAT failed — import removal left leading blank lines at file
+  tops. Fixed via rebase --exec running BOTH `ruff check --fix` AND `ruff format`.
+- FINAL verification that actually matched CI: ran full `nox --no-install -e lint`
+  on PR4 (failure boundary) and PR17 (superset) — both Passed — PLUS per-branch
+  ruff check + ruff format --check on all 17 (command-substitution splitting).
+RESULT: lint=pass + fake-trace=pass (both shards) on all 17 PRs. Remaining
+non-green: codecov/patch (coverage, soft) + isolated flaky CLAAssistant (7149)
+and Validate PR title (7170) bot checks (titles are valid feat(weave): format).
+For a future agent: ALWAYS reproduce the EXACT CI lint command; never trust a
+local `ruff check $var` (zsh non-split) as proof of green.
