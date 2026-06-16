@@ -38,7 +38,6 @@ import type {
   LinkAssetToRegistryRes,
 } from './traceServerBindings/linkAssetToRegistry';
 import {packageVersion} from './utils/userAgent';
-import {type WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
 import {type Call, CallState, InternalCall} from './call';
 import {CallRef} from './refs';
@@ -175,7 +174,6 @@ type CallEndParams = EndedCallSchemaForInsert;
 
 // We count characters item by item, and try to limit batches to about this size.
 const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
-
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private attributesContext = new AsyncLocalStorage<Record<string, any>>();
@@ -186,13 +184,23 @@ export class WeaveClient {
   private readonly BATCH_INTERVAL: number = 200;
   private errorCount = 0;
   private readonly MAX_ERRORS = 10;
+  public traceServerApi: TraceServerApi<any>;
+  public projectId: string;
+  public settings: Settings;
 
-  constructor(
-    public traceServerApi: TraceServerApi<any>,
-    private wandbServerApi: WandbServerApi,
-    public projectId: string,
-    public settings: Settings = new Settings()
-  ) {}
+  constructor({
+    traceServerApi,
+    projectId,
+    settings = new Settings(),
+  }: {
+    traceServerApi: TraceServerApi<any>;
+    projectId: string;
+    settings?: Settings;
+  }) {
+    this.traceServerApi = traceServerApi;
+    this.projectId = projectId;
+    this.settings = settings;
+  }
 
   private scheduleBatchProcessing() {
     if (this.batchProcessTimeout || this.isBatchProcessing) return;

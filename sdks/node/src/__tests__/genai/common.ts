@@ -7,7 +7,6 @@ import {
 import {setGlobalClient} from '../../clientApi';
 import {type Api as TraceServerApi} from '../../generated/traceServerApi';
 import {Settings, type SettingsInit} from '../../settings';
-import {type WandbServerApi} from '../../wandb/wandbServerApi';
 import {WeaveClient} from '../../weaveClient';
 import state from 'weave/state';
 
@@ -16,16 +15,15 @@ export const TEST_PROJECT = 'test-entity/test-project';
 
 export function installFakeClient(settings: SettingsInit = {}): WeaveClient {
   const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
-  const client = new WeaveClient(
+  const client = new WeaveClient({
     traceServerApi,
-    {} as WandbServerApi,
-    TEST_PROJECT,
-    new Settings(
+    projectId: TEST_PROJECT,
+    settings: new Settings(
       settings.printCallLink ?? true,
       settings.globalAttributes ?? {},
       settings.genai ?? {}
-    )
-  );
+    ),
+  });
   setGlobalClient(client);
   return client;
 }

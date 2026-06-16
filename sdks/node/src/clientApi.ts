@@ -127,12 +127,11 @@ export async function init(
       customFetch: concurrencyLimitedFetch,
     });
 
-    const client = new WeaveClient(
+    const client = new WeaveClient({
       traceServerApi,
-      wandbServerApi,
       projectId,
-      resolvedSettings
-    );
+      settings: resolvedSettings,
+    });
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerEvalLinkSpanProcessor(getGlobalClient);

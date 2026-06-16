@@ -8,11 +8,10 @@ const mockProjectId = 'test-project-id';
 
 jest.mock('weave/clientApi', () => ({
   getGlobalClient: jest.fn(() => {
-    const weaveClient = new WeaveClient(
-      null as any,
-      null as any,
-      mockProjectId
-    );
+    const weaveClient = new WeaveClient({
+      traceServerApi: null as any,
+      projectId: mockProjectId,
+    });
 
     Object.assign(weaveClient, {
       pushNewCall: () => ({
