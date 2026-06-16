@@ -10,7 +10,6 @@ from weave.integrations.integration_utilities import op_name_from_ref
 model = "meta/llama-3.1-8b-instruct"
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -27,6 +26,18 @@ def test_chatnvidia_quickstart(client: weave.trace.weave_client.WeaveClient) -> 
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
+
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    # The langchain integration also logs a call, which carries its own metadata,
+    # so filter to the nvidia-stamped calls before asserting their shape.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    nvidia = [i for i in stamped if i["name"] == "langchain_nvidia_ai_endpoints"]
+    assert nvidia, "expected >=1 call to carry langchain_nvidia_ai_endpoints metadata"
+    assert all(
+        i["meta"]["package_name"] == "langchain-nvidia-ai-endpoints" for i in nvidia
+    )
 
     assert response.content is not None
 
@@ -54,7 +65,6 @@ def test_chatnvidia_quickstart(client: weave.trace.weave_client.WeaveClient) -> 
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_chatnvidia_async_quickstart(
@@ -99,7 +109,6 @@ async def test_chatnvidia_async_quickstart(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -150,7 +159,6 @@ def test_chatnvidia_stream_quickstart(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_chatnvidia_async_stream_quickstart(
@@ -199,7 +207,6 @@ async def test_chatnvidia_async_stream_quickstart(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_chatnvidia_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
@@ -281,7 +288,6 @@ def test_chatnvidia_tool_call(client: weave.trace.weave_client.WeaveClient) -> N
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_chatnvidia_tool_call_async(
@@ -366,7 +372,6 @@ async def test_chatnvidia_tool_call_async(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_chatnvidia_tool_call_stream(
     client: weave.trace.weave_client.WeaveClient,
@@ -455,7 +460,6 @@ def test_chatnvidia_tool_call_stream(
     assert inputs["top_p"] == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_chatnvidia_tool_call_async_stream(

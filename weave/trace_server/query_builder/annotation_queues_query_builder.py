@@ -8,13 +8,12 @@ import datetime
 
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     ReadTable,
-    _format_table_name_with_cluster,
 )
 from weave.trace_server.common_interface import (
     AnnotationQueueItemsFilter,
     SortBy,
 )
-from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.orm import ParamBuilder, _format_table_name_with_cluster
 
 # Valid sort fields for annotation queues
 VALID_QUEUE_SORT_FIELDS = {

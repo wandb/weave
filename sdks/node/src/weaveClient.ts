@@ -5,27 +5,27 @@ import {uuidv7} from 'uuidv7';
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
-  CallSchema,
-  CallsQueryReq,
-  CallsFilter,
-  EndedCallSchemaForInsert,
-  Query,
-  SortBy,
-  StartedCallSchemaForInsert,
-  Api as TraceServerApi,
+  type CallSchema,
+  type CallsQueryReq,
+  type CallsFilter,
+  type EndedCallSchemaForInsert,
+  type Query,
+  type SortBy,
+  type StartedCallSchemaForInsert,
+  type Api as TraceServerApi,
 } from './generated/traceServerApi';
 import {
-  AudioType,
+  type AudioType,
   DEFAULT_AUDIO_TYPE,
   DEFAULT_IMAGE_TYPE,
-  ImageType,
+  type ImageType,
   isWeaveAudio,
   isWeaveImage,
 } from './media';
 import {
-  Op,
+  type Op,
   OpRef,
-  ParameterNamesOption,
+  type ParameterNamesOption,
   getOpName,
   getOpWrappedFunction,
   isOp,
@@ -38,9 +38,9 @@ import type {
   LinkAssetToRegistryRes,
 } from './traceServerBindings/linkAssetToRegistry';
 import {packageVersion} from './utils/userAgent';
-import {WandbServerApi} from './wandb/wandbServerApi';
+import {type WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
-import {Call, CallState, InternalCall} from './call';
+import {type Call, CallState, InternalCall} from './call';
 import {CallRef} from './refs';
 import type {Prompt} from './prompt';
 

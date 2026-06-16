@@ -158,7 +158,7 @@ def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
 
     When run with --trace-server=clickhouse (and ClickHouse available), uses the real
     server. The query builder emits thread_id IN ([]) which ClickHouse accepts and
-    returns no rows. Skips when trace_server is SQLite.
+    returns no rows.
     """
     req = tsi.CallsQueryReq(
         project_id="test_project",

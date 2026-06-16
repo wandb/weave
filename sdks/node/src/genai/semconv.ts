@@ -28,7 +28,18 @@ export const ATTR_GEN_AI_OPERATION_NAME = 'gen_ai.operation.name';
 export const ATTR_GEN_AI_OUTPUT_MESSAGES = 'gen_ai.output.messages';
 export const ATTR_GEN_AI_OUTPUT_TYPE = 'gen_ai.output.type';
 export const ATTR_GEN_AI_PROVIDER_NAME = 'gen_ai.provider.name';
+export const ATTR_GEN_AI_REQUEST_CHOICE_COUNT = 'gen_ai.request.choice.count';
+export const ATTR_GEN_AI_REQUEST_FREQUENCY_PENALTY =
+  'gen_ai.request.frequency_penalty';
+export const ATTR_GEN_AI_REQUEST_MAX_TOKENS = 'gen_ai.request.max_tokens';
 export const ATTR_GEN_AI_REQUEST_MODEL = 'gen_ai.request.model';
+export const ATTR_GEN_AI_REQUEST_PRESENCE_PENALTY =
+  'gen_ai.request.presence_penalty';
+export const ATTR_GEN_AI_REQUEST_SEED = 'gen_ai.request.seed';
+export const ATTR_GEN_AI_REQUEST_STOP_SEQUENCES =
+  'gen_ai.request.stop_sequences';
+export const ATTR_GEN_AI_REQUEST_TEMPERATURE = 'gen_ai.request.temperature';
+export const ATTR_GEN_AI_REQUEST_TOP_P = 'gen_ai.request.top_p';
 export const ATTR_GEN_AI_RESPONSE_FINISH_REASONS =
   'gen_ai.response.finish_reasons';
 export const ATTR_GEN_AI_RESPONSE_ID = 'gen_ai.response.id';

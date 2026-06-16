@@ -11,6 +11,10 @@ from typing import Any, TypeVar
 
 import weave
 from weave.integrations.autogen.config import get_module_patch_configs
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import (
     MultiPatcher,
     NoOpPatcher,
@@ -24,6 +28,9 @@ from weave.trace.op_protocol import Op, OpKind, ProcessedInputs
 logger = logging.getLogger(__name__)
 
 _autogen_patcher: MultiPatcher | None = None
+AUTOGEN_INTEGRATION = library_integration(
+    "autogen", distribution_name="autogen-agentchat"
+)
 
 
 T = TypeVar("T")
@@ -596,7 +603,9 @@ def get_autogen_patcher(
         # Preload autogen-ext modules to ensure subclasses are properly discovered
         _preload_autogen_extensions()
 
-        base_settings = settings.op_settings
+        base_settings = with_integration_metadata(
+            settings.op_settings, AUTOGEN_INTEGRATION
+        )
         op_patch_settings = base_settings.model_copy(
             update={"name": base_settings.name or "autogen.component"}
         )

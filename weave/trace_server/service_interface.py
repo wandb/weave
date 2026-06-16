@@ -34,7 +34,7 @@ class ProjectsInfoRes(BaseModel):
 
 class ServiceInterface(Protocol):
     """Protocol for service-level operations that are orthogonal to the
-    storage backend (ClickHouse/SQLite).
+    storage backend.
 
     These methods handle concerns like project management and server metadata
     that don't vary by tracing backend.

@@ -9,11 +9,15 @@ from typing import TYPE_CHECKING, Any
 import boto3
 
 import weave
+from weave.integrations.integration_metadata import library_integration
 from weave.trace.call import Call
 from weave.trace.op import _add_accumulator, _IteratorWrapper
 
 if TYPE_CHECKING:
     from botocore.client import BaseClient
+
+# Bedrock is accessed through the AWS SDK (boto3); track its version in meta.
+BEDROCK_INTEGRATION = library_integration("bedrock", distribution_name="boto3")
 
 
 def bedrock_on_finish_converse(
@@ -298,6 +302,7 @@ def _patch_converse(bedrock_client: "BaseClient") -> None:
         name="BedrockRuntime.converse",
         postprocess_inputs=postprocess_inputs_converse,
         kind="llm",
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
     )
     op._set_on_finish_handler(bedrock_on_finish_converse)
     bedrock_client.converse = op
@@ -310,6 +315,7 @@ def _patch_invoke(bedrock_client: "BaseClient") -> None:
         postprocess_inputs=postprocess_inputs_invoke,
         postprocess_output=postprocess_output_invoke,
         kind="llm",
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
     )
     op._set_on_finish_handler(bedrock_on_finish_invoke)
     bedrock_client.invoke_model = op
@@ -320,6 +326,7 @@ def _patch_apply_guardrail(bedrock_client: "BaseClient") -> None:
         bedrock_client.apply_guardrail,
         name="BedrockRuntime.apply_guardrail",
         postprocess_inputs=postprocess_inputs_apply_guardrail,
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
     )
     bedrock_client.apply_guardrail = op
 
@@ -331,6 +338,7 @@ def _patch_invoke_agent(bedrock_agent_client: "BaseClient") -> None:
         name="BedrockAgentRuntime.invoke_agent",
         postprocess_inputs=postprocess_inputs_invoke_agent,
         postprocess_output=postprocess_output_invoke_agent,
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
     )
     op._set_on_finish_handler(bedrock_agent_on_finish_invoke_agent)
     bedrock_agent_client.invoke_agent = op
@@ -342,9 +350,13 @@ def bedrock_stream_accumulator(
 ) -> dict:
     """Accumulates streaming events into a final response dictionary."""
     if acc is None:
+        # Flat accumulation shape (not the Converse message.content block list);
+        # tool_calls[].input is the raw partial-JSON arg string, not a dict.
         acc = {
             "role": None,
             "content": "",
+            "reasoning": "",
+            "tool_calls": [],
             "stop_reason": None,
             "usage": {
                 "inputTokens": 0,
@@ -358,9 +370,32 @@ def bedrock_stream_accumulator(
     if "messageStart" in value:
         acc["role"] = value["messageStart"]["role"]
 
-    # Handle 'contentBlockDelta' event
+    # A tool-use block opens with its id and name; the args arrive as deltas.
+    if "contentBlockStart" in value:
+        start = value["contentBlockStart"].get("start", {})
+        if "toolUse" in start:
+            tool_use = start["toolUse"]
+            acc["tool_calls"].append(
+                {
+                    "toolUseId": tool_use.get("toolUseId"),
+                    "name": tool_use.get("name"),
+                    "input": "",
+                }
+            )
+
+    # Converse streams text, tool-use args, and reasoning as distinct delta
+    # shapes. Unknown shapes are ignored so a new delta type cannot break the
+    # caller's stream.
     if "contentBlockDelta" in value:
-        acc["content"] += value["contentBlockDelta"]["delta"]["text"]
+        delta = value["contentBlockDelta"]["delta"]
+        if "text" in delta:
+            acc["content"] += delta["text"]
+        elif "toolUse" in delta and acc["tool_calls"]:
+            # Args always follow their opening contentBlockStart.
+            acc["tool_calls"][-1]["input"] += delta["toolUse"].get("input", "")
+        elif "reasoningContent" in delta:
+            # Only human-readable text; signature/redactedContent are dropped.
+            acc["reasoning"] += delta["reasoningContent"].get("text", "")
 
     # Handle 'messageStop' event
     if "messageStop" in value:
@@ -383,7 +418,11 @@ def create_stream_wrapper(
     name: str,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(postprocess_inputs=postprocess_inputs_converse, kind="llm")(fn)
+        op = weave.op(
+            postprocess_inputs=postprocess_inputs_converse,
+            kind="llm",
+            attributes=BEDROCK_INTEGRATION.as_attributes(),
+        )(fn)
         op.name = name  # type: ignore
         op._set_on_finish_handler(bedrock_on_finish_converse)
 

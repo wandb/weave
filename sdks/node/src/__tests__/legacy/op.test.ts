@@ -1,6 +1,6 @@
 import * as weave from 'weave';
 import {getGlobalClient} from 'weave/clientApi';
-import {Op} from 'weave/opType';
+import {type Op} from 'weave/opType';
 
 // Mock the client to capture callDisplayName
 let capturedDisplayName: string | undefined;

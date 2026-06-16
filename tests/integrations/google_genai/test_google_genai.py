@@ -37,7 +37,6 @@ class Recipe(BaseModel):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 def test_content_generation_sync(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_content(
@@ -49,6 +48,11 @@ def test_content_generation_sync(client):
 
     call = next(iter(client.get_calls()))
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "google_genai"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "google-genai"
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.Models.generate_content"
     assert call.output is not None
@@ -65,7 +69,6 @@ def test_content_generation_sync(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 async def test_content_generation_async(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = await google_client.aio.models.generate_content(
@@ -90,7 +93,6 @@ async def test_content_generation_async(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 def test_content_generation_sync_stream(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_content_stream(
@@ -125,7 +127,6 @@ def test_content_generation_sync_stream(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 async def test_content_generation_async_stream(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response_text = ""
@@ -158,7 +159,6 @@ async def test_content_generation_async_stream(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 def test_chat_session_sync(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     system_instruction = """
@@ -195,7 +195,6 @@ You are able to generate high-quality code in the Python programming language.""
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 async def test_chat_session_async(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = await google_client.aio.chats.create(
@@ -227,7 +226,6 @@ You are able to generate high-quality code in the Python programming language.""
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 def test_function_calling(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     get_destination = genai.types.FunctionDeclaration(
@@ -281,7 +279,6 @@ def test_function_calling(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 def test_system_instruction_extracted_from_config(client):
     """Test that system_instruction is extracted from config and surfaced at top level of inputs."""
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
@@ -316,7 +313,6 @@ def test_system_instruction_extracted_from_config(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 def test_image_generation_sync(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_images(
@@ -337,7 +333,6 @@ def test_image_generation_sync(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.asyncio
 async def test_image_generation_async(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
@@ -945,7 +940,6 @@ def test_postprocess_inputs_leaves_text_only_contents_unchanged():
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
 )
-@pytest.mark.skip_clickhouse_client
 def test_content_generation_with_image_bytes(client):
     """Image bytes passed to generate_content are stored as Content in the Weave trace."""
     from google.genai import types

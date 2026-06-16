@@ -1,10 +1,16 @@
+import type {ReadableSpan} from '@opentelemetry/sdk-trace-base';
+
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
 } from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
-import {setupExporterPerTest, setupGenAITestEnvironment} from './common';
+import {
+  expectSpanTimesToMatch,
+  setupExporterPerTest,
+  setupGenAITestEnvironment,
+} from './common';
 
 describe('SubAgent', () => {
   setupGenAITestEnvironment();
@@ -32,5 +38,72 @@ describe('SubAgent', () => {
     expect(parentTurnSpan).toBeDefined();
     expect(subSpan!.parentSpanId).toBe(parentTurnSpan!.spanContext().spanId);
     expect(subSpan!.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
+  });
+
+  const findSub = (spans: ReadableSpan[]) => {
+    const found = spans.find(
+      s =>
+        s.name === 'invoke_agent' &&
+        s.attributes[ATTR_GEN_AI_AGENT_NAME] === 'researcher'
+    );
+    if (!found) throw new Error('no researcher invoke_agent span found');
+    return found;
+  };
+
+  it('setAttributes records attributes on the subagent span; warns + no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const turn = Turn.create({});
+    const sub = turn.startSubagent({name: 'researcher'});
+    sub.setAttributes({
+      'weave.claude_code.display_name': 'Agent: research-bot',
+      'weave.tag': 'enterprise',
+    });
+    sub.end();
+    sub.setAttributes({'after.end': 'x'});
+    turn.end();
+
+    const subSpan = findSub(getExporter().getFinishedSpans());
+    expect(subSpan.attributes['weave.claude_code.display_name']).toBe(
+      'Agent: research-bot'
+    );
+    expect(subSpan.attributes['weave.tag']).toBe('enterprise');
+    expect(subSpan.attributes['after.end']).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('SubAgent.setAttributes() called after end()')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('addEvent records a span event on the subagent span; warns + no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const turn = Turn.create({});
+    const sub = turn.startSubagent({name: 'researcher'});
+    sub.addEvent('weave.lifecycle', {state: 'spawned'});
+    sub.end();
+    sub.addEvent('after.end');
+    turn.end();
+
+    const subSpan = findSub(getExporter().getFinishedSpans());
+    expect(subSpan.events).toHaveLength(1);
+    expect(subSpan.events[0].name).toBe('weave.lifecycle');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('SubAgent.addEvent() called after end()')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('startTime/endTime backdate the invoke_agent span window', () => {
+    const startedAt = new Date('2026-01-01T00:00:00Z');
+    const endedAt = new Date('2026-01-01T00:00:05Z');
+    const turn = Turn.create({});
+    const sub = turn.startSubagent({name: 'researcher', startTime: startedAt});
+    sub.end({endTime: endedAt});
+    turn.end();
+
+    expectSpanTimesToMatch(
+      findSub(getExporter().getFinishedSpans()),
+      startedAt,
+      endedAt
+    );
   });
 });

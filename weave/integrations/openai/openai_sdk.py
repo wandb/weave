@@ -26,6 +26,10 @@ from openai.types.chat.chat_completion_message_tool_call import (
 )
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
@@ -45,6 +49,8 @@ if TYPE_CHECKING:
     from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
+
+OPENAI_INTEGRATION = library_integration("openai")
 
 logger = logging.getLogger(__name__)
 
@@ -786,7 +792,7 @@ def get_openai_patcher(
     if _openai_patcher is not None:
         return _openai_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, OPENAI_INTEGRATION)
 
     completions_create_settings = base.model_copy(
         update={

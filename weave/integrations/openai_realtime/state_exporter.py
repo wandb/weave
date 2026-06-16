@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
+from weave.integrations.integration_metadata import library_integration
 from weave.integrations.openai_realtime.audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime.encoding import pcm_to_wav
 from weave.trace.context.call_context import get_thread_id, set_thread_id
@@ -20,6 +21,9 @@ from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
 
 FIFO_TIMER_INTERVAL_SECONDS = 0.05
+OPENAI_REALTIME_INTEGRATION = library_integration(
+    "openai_realtime", distribution_name="openai"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +64,11 @@ class SessionSpan(BaseModel):
         root_call = None
         if session:
             wc = require_weave_client()
-            root_call = wc.create_call("realtime.session", inputs=session)
+            root_call = wc.create_call(
+                "realtime.session",
+                inputs=session,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
+            )
         inst = cls(session=session, root_call=root_call)
         return inst
 
@@ -70,7 +78,11 @@ class SessionSpan(BaseModel):
             self.session = {}
         wc = require_weave_client()
         if not self.root_call:
-            self.root_call = wc.create_call("realtime.session", inputs=self.session)
+            self.root_call = wc.create_call(
+                "realtime.session",
+                inputs=self.session,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
+            )
 
     def on_updated(self, msg: dict) -> None:
         """This function runs when we receive a session.updated message
@@ -87,7 +99,11 @@ class SessionSpan(BaseModel):
 
         # If we never ran on_created then we initialize the root call here
         if not self.root_call:
-            self.root_call = wc.create_call("realtime.session", inputs=self.session)
+            self.root_call = wc.create_call(
+                "realtime.session",
+                inputs=self.session,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
+            )
 
         # Return after confirming initialization if we can't properly complete
         if not self.last_update:
@@ -123,6 +139,7 @@ class SessionSpan(BaseModel):
                     "realtime.session.update",
                     inputs=msg.get("session", {}),
                     parent=root_call,
+                    attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
                 )
 
             self.last_update = update_cb
@@ -131,6 +148,7 @@ class SessionSpan(BaseModel):
                 "realtime.session.update",
                 inputs=msg.get("session", {}),
                 parent=self.root_call,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
             )
 
 
@@ -346,6 +364,7 @@ class StateExporter(BaseModel):
                 op="realtime.conversation",
                 inputs={"id": conv_id},
                 parent=session_call,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
             )
             self.conversation_calls[conv_id] = conv_call
 
@@ -643,6 +662,7 @@ class StateExporter(BaseModel):
                 op="realtime.conversation",
                 inputs={"id": conv_id},
                 parent=session_call,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
             )
             self.conversation_calls[conv_id] = conv_call
             response_parent = conv_call
@@ -697,6 +717,7 @@ class StateExporter(BaseModel):
                     inputs=inputs,
                     parent=response_parent,
                     started_at=created_at,
+                    attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
                 )
         else:
             call = client.create_call(
@@ -704,6 +725,7 @@ class StateExporter(BaseModel):
                 inputs=inputs,
                 parent=response_parent,
                 started_at=created_at,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
             )
 
         output_dict = dict(response)

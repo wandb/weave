@@ -16,7 +16,6 @@ const KILL_GRACE_MS = 2000;
 const STATE_SENTINEL = path.join(os.tmpdir(), 'weave-hostapps-state.json');
 
 function log(msg) {
-  // eslint-disable-next-line no-console
   console.log(`[hostApps:teardown] ${msg}`);
 }
 

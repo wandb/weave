@@ -1,13 +1,17 @@
 import {init, login} from '../../clientApi';
 import {Dataset} from '../../dataset';
+import {getWandbConfigs} from '../../wandb/settings';
+import {vcrTest} from '../helpers/vcrTest';
 
-describe.skip('Dataset', () => {
+describe('Dataset', () => {
   beforeEach(async () => {
-    await login(process.env.WANDB_API_KEY ?? '');
+    const {apiKey} = getWandbConfigs();
+    await login(apiKey ?? '');
   });
 
-  test('should save a dataset', async () => {
-    const client = await init('test-project');
+  vcrTest('should save a dataset', async () => {
+    await init('test-project');
+
     const data = [
       {id: 1, value: 2},
       {id: 2, value: 3},
@@ -17,7 +21,7 @@ describe.skip('Dataset', () => {
     const dataset = new Dataset({rows: data});
     const ref = await dataset.save();
 
-    const [entity, project] = ref.projectId.split('/') ?? [];
+    const [_entity, project] = ref.projectId.split('/') ?? [];
     expect(project).toBe('test-project');
 
     // Dataset has same rows as the original data

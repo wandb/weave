@@ -108,6 +108,12 @@ class Op(Protocol[P, R]):
     # The color for the kind icon in the UI. Overrides the default color for the kind.
     color: OpColor | None
 
+    # Default attributes merged into every call created by this op, at the lowest
+    # precedence (a `weave.attributes()` context or explicit per-call attributes
+    # override them). The reserved "weave" key may not be set here. Integrations
+    # use this to stamp `attributes["integration"]` provenance onto their calls.
+    attributes: dict[str, Any] | None
+
     # Whether this op's call start should be sent eagerly (immediately rather than batched).
     # Useful for long-running operations that need to be visible in the UI immediately,
     # like evaluation runs. Flipping this will incur a heavy cost at call-end time, only use
