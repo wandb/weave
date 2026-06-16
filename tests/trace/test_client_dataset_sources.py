@@ -37,6 +37,7 @@ import pytest
 
 import weave
 from tests.trace.server_utils import find_server_layer
+from tests.trace.util import client_is_clickhouse
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
@@ -49,6 +50,18 @@ from weave.trace_server.errors import Error as TraceServerError
 # Internal (base64) project_id the `client` fixture uses: b64("shawn/test-project").
 # Used only for direct ClickHouse `spans` inserts in span-kind tests.
 INTERNAL_PROJECT_ID = "c2hhd24vdGVzdC1wcm9qZWN0"
+
+
+@pytest.fixture(autouse=True)
+def _require_clickhouse(client):
+    """dataset_sources is implemented for the ClickHouse backend only.
+
+    The provenance layer is raw ClickHouse SQL (ReplacingMergeTree + argMax +
+    bloom skip indexes) and the span-kind tests insert directly into the CH
+    `spans` table, so these tests can't run on the in-memory fake backend.
+    """
+    if not client_is_clickhouse(client):
+        pytest.skip("dataset_sources is ClickHouse-only (not on the in-memory fake)")
 
 
 class CallsFixture(NamedTuple):
@@ -841,8 +854,7 @@ def _insert_span(client, *, span_id: str, trace_id: str, span_name: str) -> None
 
 
 def test_dataset_sources_link_span_source_forward_query(client):
-    """Span-kind source link + forward query (spans live in the `spans` table).
-    """
+    """Span-kind source link + forward query (spans live in the `spans` table)."""
     span_id = uuid.uuid4().hex
     trace_id = uuid.uuid4().hex
     _insert_span(client, span_id=span_id, trace_id=trace_id, span_name="my-span")
@@ -934,9 +946,7 @@ def test_dataset_sources_same_span_id_distinct_traces_yield_distinct_links(clien
             client,
             dataset_object_id=ds_obj,
             links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest, sources=[src_a, src_b]
-                )
+                tsi.DatasetSourceLinkPayload(row_digest=digest, sources=[src_a, src_b])
             ],
         )
     )
@@ -971,9 +981,7 @@ def test_dataset_sources_conversation_link_round_trip_both_directions(client):
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(row_digest=digest, sources=[conv_src])
-            ],
+            links=[tsi.DatasetSourceLinkPayload(row_digest=digest, sources=[conv_src])],
         )
     )
     assert len(res.entries) == 1
@@ -1016,9 +1024,7 @@ def test_dataset_sources_conversation_link_rejects_non_empty_trace(client):
                 client,
                 dataset_object_id=ds_obj,
                 links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest=digest, sources=[bad_conv]
-                    )
+                    tsi.DatasetSourceLinkPayload(row_digest=digest, sources=[bad_conv])
                 ],
             )
         )

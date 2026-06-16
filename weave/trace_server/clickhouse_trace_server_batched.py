@@ -3749,8 +3749,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     missing.append((source.source_kind.value, source.source_id))
         if missing:
             # Dedup while preserving order.
-            seen: set[tuple[str, str]] = set()
-            unique_missing = [m for m in missing if not (m in seen or seen.add(m))]
+            unique_missing = list(dict.fromkeys(missing))
             raise InvalidRequest(
                 "dataset_sources_link: the following sources were not found in "
                 f"project {req.project_id!r}: {unique_missing}"
@@ -3817,10 +3816,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     started_at,
                     display_name,
                     link_metadata_str,
-                    req.wb_user_id,
+                    req.wb_user_id or "",
                     created_at,
                     now,
-                    None,  # deleted_at
+                    SENTINEL_EPOCH,  # deleted_at sentinel (epoch = live)
                 ]
             )
             entries.append(
@@ -3922,9 +3921,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             {(row_digest, source.source_id) for row_digest, source, _meta in flat}
         )
         pb = ParamBuilder()
-        query = make_link_state_query(
-            project_id, dataset_object_id, logical_keys, pb
-        )
+        query = make_link_state_query(project_id, dataset_object_id, logical_keys, pb)
         result = self._query(query, parameters=pb.get_params())
         out: dict[tuple[str, str, str, str], dict[str, Any]] = {}
         for row in result.named_results():
@@ -3966,12 +3963,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         entries: list[tsi.DatasetSourcesLinkDeleteResEntry] = []
         for link_id in req.link_ids:
             row = by_id[link_id]
-            if row["deleted_at"] is not None:
-                # Already soft-deleted: no write.
+            if ensure_datetimes_have_tz(row["deleted_at"]) != SENTINEL_EPOCH:
+                # Already soft-deleted (deleted_at past the sentinel epoch).
                 entries.append(
-                    tsi.DatasetSourcesLinkDeleteResEntry(
-                        link_id=link_id, deleted=False
-                    )
+                    tsi.DatasetSourcesLinkDeleteResEntry(link_id=link_id, deleted=False)
                 )
                 continue
             # Tombstone version: same logical key + id, carry forward created_at
@@ -7951,6 +7946,9 @@ def _dataset_source_link_from_row(row: dict[str, Any]) -> tsi.DatasetSourceLinkS
     """
     raw_metadata = row.get("link_metadata") or ""
     link_metadata = json.loads(raw_metadata) if raw_metadata else None
+    # Sentinels map back to None: '' added_by and the 1970 epoch deleted_at are
+    # the non-nullable stand-ins for "no user" / "live".
+    deleted_at = ensure_datetimes_have_tz(row["deleted_at"])
     return tsi.DatasetSourceLinkSchema(
         id=row["id"],
         row_digest=row["row_digest"],
@@ -7960,10 +7958,10 @@ def _dataset_source_link_from_row(row: dict[str, Any]) -> tsi.DatasetSourceLinkS
         source_started_at=row["source_started_at"],
         source_display_name=row["source_display_name"],
         link_metadata=link_metadata,
-        added_by=row["added_by"],
+        added_by=row["added_by"] or None,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
-        deleted_at=row["deleted_at"],
+        deleted_at=None if deleted_at == SENTINEL_EPOCH else deleted_at,
     )
 
 
