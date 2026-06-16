@@ -1,0 +1,42 @@
+## Conversation
+After validating the Python skill, the user said: "This instrumentation needs to
+work for the TS SDK too. You can make TS the second part of the stack."
+
+## Codebase discoveries (TS SDK, sdks/node, verified)
+- FULL agent-OTEL parity in src/genai/: startSession/startTurn/startLLM/startTool/
+  startSubagent (functions) + OO startTurn()/startLLM()/etc. Same gen_ai spans to
+  the SAME endpoint /agents/otel/v1/traces (provider.ts GENAI_OTLP_PATH). TS DOES
+  send a project_id header (Python uses Resource attrs instead).
+- init is ASYNC (await it). With entity/project form it does NO network (skips
+  defaultEntityName + does not health-check, unlike login()). If init is never
+  called, all start* are no-ops (AlwaysOffSampler).
+- WEAVE_USE_OTEL_V2 defaults FALSE in TS (OPPOSITE of Python's true). Native
+  @openai/agents emits legacy calls unless it's set true; then a
+  WeaveOtelTracingProcessor (registered via instrumentOpenAIAgents() or the
+  --import=weave/instrument hook) emits agent spans. pi-coding-agent is OTel-only.
+- Provider/Anthropic/Google/Realtime TS integrations emit legacy calls only.
+
+## Hints for future agents (verification)
+- OFFLINE VERIFY (public path): await weave.init('entity/project',
+  {genai:{spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter())}})
+  -> run agent -> await weave.flushOTel() -> exporter.getFinishedSpans(). The
+  spanProcessor override bypasses OTLP; dummy WANDB_API_KEY is enough. Proven.
+- Module resolution: TS resolves 'weave' from the nearest node_modules, so the
+  shipped examples can't self-resolve from .claude/skills. I verified by running
+  the EXACT shipped files inside the sdks/node package context (self-reference to
+  'weave' via the exports map after `npm run build`; @opentelemetry from
+  node_modules). examples/ts/README.md documents running from a project that has
+  weave installed.
+- Native path proven by the SDK's OWN suite:
+  `node_modules/.bin/jest src/__tests__/integrations/openaiAgent.test.ts -t OTEL`
+  (5 passed) — exercises weave-otel-tracing-processor.ts. NOTE: must NOT pass
+  --selectProjects modern (the file isn't in that project -> whole suite skips);
+  run without project selection.
+- Env setup used: pnpm install in sdks/node; npm run build (creates dist for
+  self-ref); @openai/agents 0.11.4 + zod were installed by pnpm install.
+
+## Stack / status
+- Stack: part 1 = andrew/weave-instrument-skill-v1 (Python); part 2 =
+  andrew/weave-instrument-skill-ts (this, TS). gt-tracked. NOT pushed.
+- Both TS example files prettier-clean (sdks/node prettier) + tsc-clean; manual
+  example offline-verified (4 spans: chat/execute_tool/chat/invoke_agent).
