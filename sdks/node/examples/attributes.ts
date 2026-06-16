@@ -13,7 +13,7 @@ const parentOp = op(async function parentOp(input: string) {
 async function main() {
   // Replace with your entity/project
   await init('your-entity/your-project', {
-    globalAttributes: {tenant: 'acme-co', env: 'prod'},
+    attributes: {tenant: 'acme-co', env: 'prod'},
   });
 
   const result = await withAttributes(
