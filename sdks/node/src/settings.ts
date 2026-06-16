@@ -1,7 +1,19 @@
 import type {BufferConfig, SpanProcessor} from '@opentelemetry/sdk-trace-base';
 
 export type Settings = {
-  genai: {
+  /**
+   * Prints links in terminal to Weave UI for ops.
+   *
+   * @default `true`
+   */
+  readonly printCallLink: boolean;
+
+  /**
+   * A map of attributes applied to every trace produced by this client.
+   */
+  readonly attributes: Record<string, any>;
+
+  readonly genai: {
     /**
      * How GenAI spans are exported.
      *
@@ -16,21 +28,11 @@ export type Settings = {
      */
     spanProcessor?: 'batch' | 'simple' | SpanProcessor;
 
-    /** `BatchSpanProcessor` configuration. Ignored unless `spanProcessor === 'batch'`. */
+    /**
+     * `BatchSpanProcessor` configuration. Ignored unless `spanProcessor === 'batch'`.
+     */
     batchOptions?: BufferConfig;
   };
-
-  /**
-   * Prints links in terminal to Weave UI for ops.
-   *
-   * @default `true`
-   */
-  readonly printCallLink: boolean;
-
-  /**
-   * A map of attributes applied to every trace produced by this client.
-   */
-  readonly attributes: Record<string, any>;
 };
 
 export function makeSettings(settings: Partial<Settings> = {}): Settings {
