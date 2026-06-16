@@ -1,4 +1,6 @@
 * @wandb/weave-team
 /docs/ @wandb/docs-team @wandb/weave-team
 /sdks/node/ @wandb/weave-sdk @wandb/weave-team
+/weave/ @wandb/weave-sdk @wandb/weave-team
+/weave/trace_server/ @wandb/weave-team
 /weave/trace_server/migrations @tssweeney @gtarpenning @neutralino1
