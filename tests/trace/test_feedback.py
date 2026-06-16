@@ -4,6 +4,7 @@ import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -1346,6 +1347,10 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
         )
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="ClickHouse-only: executes the built SQL directly via server._query",
+)
 def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> None:
     """Functional checks (ClickHouse-only) that the WHERE filters match precisely.
 

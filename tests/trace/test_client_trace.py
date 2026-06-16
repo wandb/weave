@@ -22,6 +22,7 @@ import weave
 import weave.trace.call
 from tests.trace.server_utils import find_server_layer
 from tests.trace.util import (
+    NOT_CLICKHOUSE_BACKEND,
     AnyIntMatcher,
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
@@ -31,7 +32,7 @@ from tests.trace.util import (
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
-from tests.trace_server.helpers import force_optimize
+from tests.trace_server.helpers import force_optimize, force_optimize_if_clickhouse
 from weave import Thread, ThreadPoolExecutor
 from weave.shared.refs_internal import extra_value_quoter
 from weave.shared.trace_server_interface_util import (
@@ -3738,8 +3739,11 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="ClickHouse-only: stripping triggers via patched _insert_call_batch",
+)
 def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
-
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
     max_size = 10 * 1024
 
@@ -4199,7 +4203,7 @@ def test_calls_len(client):
     assert len(client.get_calls()) == 2
 
 
-def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
+def test_calls_query_multiple_dupe_select_columns(client):
     @weave.op
     def test():
         return {"a": {"b": {"c": {"d": 1}}}}
@@ -4224,7 +4228,21 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
     assert calls[0].output["a"]["b"]["c"] == {"d": 1}
     assert calls[0].output["a"]["b"]["c"]["d"] == 1
 
-    # now make sure we don't make duplicate selects
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: asserts the emitted SQL"
+)
+def test_calls_query_dupe_select_columns_no_duplicate_sql(client, caplog):
+    @weave.op
+    def test():
+        return {"a": {"b": {"c": {"d": 1}}}}
+
+    test()
+
+    # Consume the (lazy) calls iterator so the SELECT actually executes.
+    calls = client.get_calls(columns=["output", "output.a", "output.a.b"])
+    assert len(list(calls)) == 1
+
     select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[0]
     assert (
         select_query["query"].count("any(calls_merged.output_dump) AS output_dump") == 1
@@ -4406,7 +4424,7 @@ def clickhouse_client(client):
     return ch_server.ch_client
 
 
-def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
+def test_calls_query_with_storage_size_clickhouse(client):
     """Test querying calls with storage size information."""
 
     @weave.op
@@ -4420,7 +4438,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with storage size
     calls = list(
@@ -4439,7 +4457,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     assert call.storage_size_bytes is not None
 
 
-def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
+def test_calls_query_with_total_storage_size_clickhouse(client):
     """Test querying calls with total storage size."""
 
     @weave.op
@@ -4457,7 +4475,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4490,7 +4508,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     )  # Child should not have total size
 
 
-def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
+def test_calls_query_with_both_storage_sizes_clickhouse(client):
     """Test querying calls with total storage size."""
 
     @weave.op
@@ -4508,7 +4526,7 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4630,7 +4648,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
     assert queried_obj_without_size.size_bytes is None
 
 
-def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
+def test_call_query_stream_with_costs_and_storage_size(client):
     @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
         return {
@@ -4650,8 +4668,8 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged")
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
@@ -5091,7 +5109,7 @@ def test_calls_query_thread_ids_filter_returns_matching_thread(client):
     assert res.calls[0].thread_id == thread_2
 
 
-def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
+def test_calls_query_stats_total_storage_size_clickhouse(client):
     """Test querying calls with total storage size."""
 
     @weave.op
@@ -5109,7 +5127,7 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with total storage size
     result = client.server.calls_query_stats(
@@ -5127,8 +5145,10 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     assert result.total_storage_size_bytes is not None
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: requires raw stats-table inserts"
+)
 def test_project_stats_clickhouse(client, clickhouse_client):
-
     project_id = get_client_project_id(client)
     internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
 

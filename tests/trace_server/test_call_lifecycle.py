@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
@@ -81,6 +82,9 @@ def test_call_update_out_of_order(client: weave_client.WeaveClient):
 
 
 @pytest.mark.parametrize("end_arrives_first", [False, True])
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_merged columns"
+)
 def test_call_end_started_at_anchors_sortable_datetime(
     client: weave_client.WeaveClient, end_arrives_first: bool
 ) -> None:

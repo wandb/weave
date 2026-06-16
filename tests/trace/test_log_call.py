@@ -1,5 +1,6 @@
 """Tests for the log_call function."""
 
+
 import weave
 from weave.trace.weave_client import WeaveClient
 

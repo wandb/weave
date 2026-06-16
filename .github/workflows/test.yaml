@@ -232,6 +232,46 @@ jobs:
           name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+  fake-trace-tests:
+    name: Fake (in-memory) trace server tests
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    # The in-memory fake needs no ClickHouse/wandb services — it is a pure
+    # in-process backend. Tests it cannot satisfy yet are skipped via
+    # per-test @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, ...) decorators
+    # (see tests/trace/util.py); the rest must match ClickHouse.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ["13"]
+        nox-shard: ["trace", "trace_server"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run nox (Fake trace server)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "trace_server" --trace-server=fake
   trace-server-migrator-1s1r:
     name: Trace server migrator tests (1s1r)
     timeout-minutes: 10
