@@ -244,6 +244,50 @@ async def test_declarative_eval_marks_child_calls_with_eval_meta(client):
     assert "_weave_eval_meta" not in root.attributes
 
 
+@pytest.mark.asyncio
+async def test_declarative_eval_meta_merges_with_existing(client):
+    # An outer wrapper (e.g. the evaluate_model_worker) may already set
+    # `_weave_eval_meta`. The declarative marker must merge into it, not overwrite
+    # it, so both keys survive on every child call.
+    examples = [{"question": "What is the capital of France?", "expected": "Paris"}]
+
+    @weave.op
+    def match_score(expected: str, output: dict) -> dict:
+        return {"match": expected == output["generated_text"]}
+
+    model = MyModel(prompt="World")
+    evaluation = Evaluation(dataset=examples, scorers=[match_score])
+    with weave.attributes({"_weave_eval_meta": {"evaluate_model_worker": True}}):
+        await evaluation.evaluate(model)
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client.project_id)
+    ).calls
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in calls:
+        by_op[op_name_from_ref(c.op_name)].append(c)
+
+    # Children carry both the pre-existing key and the declarative marker.
+    expected_meta = {"evaluate_model_worker": True, "declarative": True}
+    for op_name in (
+        "Evaluation.predict_and_score",
+        "MyModel.predict",
+        "match_score",
+        "Evaluation.summarize",
+    ):
+        for c in by_op[op_name]:
+            assert c.attributes.get("_weave_eval_meta") == expected_meta, (
+                op_name,
+                c.attributes,
+            )
+
+    # The root keeps only the outer key (its attributes are read before the
+    # wrapper body adds `declarative`).
+    (root,) = by_op["Evaluation.evaluate"]
+    assert root.attributes["_weave_eval_meta"] == {"evaluate_model_worker": True}
+
+
 @weave.op
 def gpt_mocker(question: str):
     return {
