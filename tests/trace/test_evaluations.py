@@ -276,6 +276,7 @@ async def test_declarative_eval_meta_merges_with_existing(client):
         "match_score",
         "Evaluation.summarize",
     ):
+        assert by_op[op_name], op_name
         for c in by_op[op_name]:
             assert c.attributes.get("_weave_eval_meta") == expected_meta, (
                 op_name,
