@@ -66,6 +66,7 @@ async def test_hallucination_scorer_score(hallucination_scorer):
 
 @pytest.mark.asyncio
 async def test_hallucination_scorer_eval(hallucination_scorer):
+    """Covers eval with the default `context` column and with a column_map remap."""
     dataset = [
         {"context": "John likes various types of cheese."},
         {"context": "Pepe likes various types of cheese."},
@@ -75,21 +76,14 @@ async def test_hallucination_scorer_eval(hallucination_scorer):
     def model():
         return "John's favorite cheese is cheddar."
 
-    evaluation = weave.Evaluation(
-        dataset=dataset,
-        scorers=[hallucination_scorer],
-    )
+    evaluation = weave.Evaluation(dataset=dataset, scorers=[hallucination_scorer])
     result = await evaluation.evaluate(model)
     assert result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
     assert (
         result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
     )
 
-
-@pytest.mark.asyncio
-async def test_hallucination_scorer_eval2(hallucination_scorer):
-    """Test that the hallucination scorer can be used with a column map in an evaluation."""
-    dataset = [
+    mapped_dataset = [
         {
             "input": "John likes various types of cheese.",
             "other_col": "John's favorite cheese is cheddar.",
@@ -101,17 +95,19 @@ async def test_hallucination_scorer_eval2(hallucination_scorer):
     ]
 
     @weave.op
-    def model(input):
+    def mapped_model(input):
         return "The person's favorite cheese is cheddar."
 
     hallucination_scorer.column_map = {"context": "input"}
 
-    evaluation = weave.Evaluation(
-        dataset=dataset,
-        scorers=[hallucination_scorer],
+    mapped_evaluation = weave.Evaluation(
+        dataset=mapped_dataset, scorers=[hallucination_scorer]
     )
-    result = await evaluation.evaluate(model)
-    assert result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
+    mapped_result = await mapped_evaluation.evaluate(mapped_model)
     assert (
-        result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
+        mapped_result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
+    )
+    assert (
+        mapped_result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"]
+        == 1.0
     )

@@ -47,48 +47,39 @@ def summarization_scorer(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_summarization_scorer_evaluate_summary(summarization_scorer):
-    input_text = "This is the original text."
-    summary_text = "This is the summary."
-    result = await summarization_scorer._evaluate_summary(
-        input=input_text, summary=summary_text
-    )
-    assert isinstance(result, SummarizationEvaluationResponse)
-    assert result.summarization_evaluation == "excellent"
-    assert result.think_step_by_step == "This is some reasoning."
-
-
-@pytest.mark.asyncio
-async def test_summarization_scorer_score(summarization_scorer):
-    input_text = "This is the original text."
-    output_text = "This is the summary."
-    result = await summarization_scorer.score(input=input_text, output=output_text)
-    assert isinstance(result, dict)
-    assert "summarization_eval_score" in result
-    assert result["summarization_eval_score"] == 1.0  # "excellent" maps to 1.0
-    assert "llm_eval_reasoning" in result
-    assert result["llm_eval_reasoning"] == "This is some reasoning."
-    assert "is_entity_dense" in result
-    assert isinstance(result["is_entity_dense"], bool)
-    assert "entity_density" in result
-    assert isinstance(result["entity_density"], float)
-
-
-def test_summarization_scorer_initialization(summarization_scorer):
+async def test_summarization_scorer_init_and_methods(summarization_scorer):
     assert isinstance(summarization_scorer, SummarizationScorer)
     assert summarization_scorer.model_id == "gpt-4o"
     assert summarization_scorer.temperature == 0.7
     assert summarization_scorer.max_tokens == 1024
 
+    eval_result = await summarization_scorer._evaluate_summary(
+        input="This is the original text.", summary="This is the summary."
+    )
+    assert isinstance(eval_result, SummarizationEvaluationResponse)
+    assert eval_result.summarization_evaluation == "excellent"
+    assert eval_result.think_step_by_step == "This is some reasoning."
 
-@pytest.mark.asyncio
-async def test_summarization_scorer_extract_entities(summarization_scorer):
-    text = "This is a sample text with entities."
-    entities = await summarization_scorer._extract_entities(text)
+    entities = await summarization_scorer._extract_entities(
+        "This is a sample text with entities."
+    )
     assert isinstance(entities, list)
     assert len(entities) == 2
     assert "entity1" in entities
     assert "entity2" in entities
+
+    score = await summarization_scorer.score(
+        input="This is the original text.", output="This is the summary."
+    )
+    assert isinstance(score, dict)
+    assert "summarization_eval_score" in score
+    assert score["summarization_eval_score"] == 1.0  # "excellent" maps to 1.0
+    assert "llm_eval_reasoning" in score
+    assert score["llm_eval_reasoning"] == "This is some reasoning."
+    assert "is_entity_dense" in score
+    assert isinstance(score["is_entity_dense"], bool)
+    assert "entity_density" in score
+    assert isinstance(score["entity_density"], float)
 
 
 @pytest.mark.asyncio
