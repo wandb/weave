@@ -154,6 +154,7 @@ def test_llm_as_a_judge_scorer_record_excludes_op_methods():
     assert "summarize" in plain_record.__dict__
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_llm_as_a_judge_scorer_publish_has_no_op_refs(client):
     """The published payload must carry no op refs, so the scoring worker accepts it.
 
