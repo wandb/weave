@@ -12,11 +12,12 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY
-from tests.trace.util import NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_filter_calls_by_queue_inner_join_behavior(client):
     """Test that INNER JOIN correctly filters calls by queue membership.
 
@@ -84,6 +85,7 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
     assert returned_ids.isdisjoint(excluded_ids)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_filter_calls_by_multiple_distinct_queues(client):
     """Test that queue filtering correctly isolates calls by queue_id.
 
@@ -182,6 +184,7 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     assert {call.id for call in res1.calls}.isdisjoint({call.id for call in res2.calls})
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_filter_calls_by_queue_combined_with_other_filters(client):
     """Test queue filter works correctly when combined with other query conditions.
 
@@ -263,6 +266,7 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
     assert {call.id for call in res.calls} == set(include_ids[:2])
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_filter_calls_by_nonexistent_queue(client):
     """Test that filtering by a non-existent queue returns empty results.
 

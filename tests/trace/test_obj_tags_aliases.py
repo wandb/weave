@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -220,6 +221,7 @@ def test_digest_is_content_hash(digest: str, expected: bool):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_tag_crud(client: WeaveClient):
     """Full tag lifecycle via server API: add, remove, re-add, idempotent, remove nonexistent."""
     object_id, digest = _publish_obj(client, "srv_tag_crud")
@@ -339,6 +341,7 @@ def test_server_tag_crud(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_alias_crud(client: WeaveClient):
     """Full alias lifecycle via server API: set, reassign, remove, remove nonexistent."""
     object_id, digest = _publish_obj(client, "srv_alias_crud")
@@ -432,6 +435,7 @@ def test_server_alias_crud(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_tag_errors(client: WeaveClient):
     """Tags on nonexistent or deleted objects raise NotFoundError.
 
@@ -450,6 +454,7 @@ def test_server_tag_errors(client: WeaveClient):
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_alias_errors(client: WeaveClient):
     """Aliases on nonexistent or deleted objects raise NotFoundError."""
     # Nonexistent object
@@ -464,6 +469,7 @@ def test_server_alias_errors(client: WeaveClient):
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_tag_on_deleted_object(client: WeaveClient):
     """Tags on deleted objects raise NotFoundError."""
     oid, digest = _publish_obj(client, "srv_err_deleted")
@@ -485,6 +491,7 @@ def test_server_tag_on_deleted_object(client: WeaveClient):
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_alias_on_deleted_object(client: WeaveClient):
     """Aliases on deleted objects raise NotFoundError."""
     oid, digest = _publish_obj(client, "srv_err_deleted2")
@@ -511,6 +518,7 @@ def test_server_alias_on_deleted_object(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_enrichment(client: WeaveClient):
     """Enrichment toggle: None when off, populated when on, empty lists for untagged objects."""
     oid, digest = _publish_obj(client, "srv_enrich")
@@ -630,6 +638,7 @@ def test_server_enrichment(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_obj_read_digest_types(client: WeaveClient):
     """obj_read with real digest, alias, 'latest', and nonexistent alias."""
     oid, digest = _publish_obj(client, "srv_read_digest")
@@ -724,6 +733,7 @@ def test_server_obj_read_digest_types(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_filter_by_tags(client: WeaveClient):
     """Filter by tags: single, multiple, nonexistent, empty list."""
     oid1, d1 = _publish_obj(client, "srv_ftag_a")
@@ -785,6 +795,7 @@ def test_server_filter_by_tags(client: WeaveClient):
     assert len(res.objs) >= 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_filter_by_aliases(client: WeaveClient):
     """Filter by aliases: custom alias, 'latest', nonexistent, specific version only."""
     oid, digest = _publish_obj(client, "srv_falias")
@@ -865,6 +876,7 @@ def test_server_filter_by_aliases(client: WeaveClient):
     assert len(res.objs) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
     """Filtering with both tags and aliases simultaneously ANDs the conditions."""
     oid1, d1 = _publish_obj(client, "srv_combo1")
@@ -927,6 +939,7 @@ def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_version_and_object_isolation(client: WeaveClient):
     """Tags scoped to version, aliases across versions, latest virtual, cross-object isolation."""
     # Tags scoped to version
@@ -1024,6 +1037,7 @@ def test_server_version_and_object_isolation(client: WeaveClient):
     assert "only-on-b" not in (objs_by_id[oid_a].aliases or [])
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_batch_enrichment(client: WeaveClient):
     """Enrichment of 3+ distinct objects in one objs_query call."""
     oid1, d1 = _publish_obj(client, "srv_batch_a")
@@ -1090,6 +1104,7 @@ def test_server_batch_enrichment(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_list_endpoints(client: WeaveClient):
     """List tags and aliases: empty project, distinct sorted, excludes removed."""
     # Empty project
@@ -1176,6 +1191,7 @@ def test_server_list_endpoints(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sdk_tag_lifecycle(client: WeaveClient):
     """SDK client tag operations: add, remove, get, idempotent, re-add, scoped, multiple, list."""
     ref = weave.publish({"data": "test"}, name="sdk_tags")
@@ -1235,6 +1251,7 @@ def test_sdk_tag_lifecycle(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sdk_alias_lifecycle(client: WeaveClient):
     """SDK client alias operations: set, remove, get, reassign, list, string/list variants."""
     ref = weave.publish({"data": "test"}, name="sdk_aliases")
@@ -1304,6 +1321,7 @@ def test_sdk_alias_lifecycle(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sdk_uri_strings(client: WeaveClient):
     """All SDK tag/alias methods accept weave:/// URI strings alongside ObjectRef."""
     ref = weave.publish({"data": "test"}, name="sdk_uri")
@@ -1341,6 +1359,7 @@ def test_sdk_uri_strings(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sdk_add_tags_error_nonexistent(client: WeaveClient):
     """SDK add_tags raises NotFoundError on fake ref."""
     fake_ref = ObjectRef(
@@ -1353,6 +1372,7 @@ def test_sdk_add_tags_error_nonexistent(client: WeaveClient):
         client.add_tags(fake_ref, ["tag"])
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sdk_set_aliases_error_nonexistent(client: WeaveClient):
     """SDK set_aliases raises NotFoundError on fake ref."""
     fake_ref = ObjectRef(
@@ -1370,6 +1390,7 @@ def test_sdk_set_aliases_error_nonexistent(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_weave_tag_functions(weave_active):
     """weave.add_tags, remove_tags, get_tags, list_tags — full lifecycle."""
     ref = weave.publish({"data": "test"}, name="tl_tags")
@@ -1440,6 +1461,7 @@ def test_weave_tag_functions(weave_active):
     assert all_tags.count("only-on-a") == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_weave_alias_functions(client: WeaveClient):
     """weave.set_aliases, remove_aliases, get_aliases, list_aliases — full lifecycle."""
     ref = weave.publish({"data": "test"}, name="tl_aliases")
@@ -1509,6 +1531,7 @@ def test_weave_alias_functions(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_alias_resolution(client: WeaveClient):
     """Resolve by alias: latest, custom, reassignment, publish-time, implicit, nonexistent, digest check."""
     # latest alias
@@ -1562,6 +1585,7 @@ def test_alias_resolution(client: WeaveClient):
         assert weave.ref(f"resolve_multi:{alias}").get()["v"] == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_aliases_list_contains_latest_after_publish(client: WeaveClient):
     """A fresh project's aliases_list must include 'latest' after a single publish.
 
@@ -1575,6 +1599,7 @@ def test_aliases_list_contains_latest_after_publish(client: WeaveClient):
     assert "latest" in res.aliases
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_republish_promotes_to_latest(client: WeaveClient, monkeypatch):
     """Re-publishing existing content (dedup hit) should move 'latest' to that digest.
 
@@ -1711,6 +1736,7 @@ def _resolve_latest_digest(client: WeaveClient, object_id: str) -> str | None:
     return digest
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_hybrid_latest_full_lifecycle(client: WeaveClient, monkeypatch):
     """Walk the full hybrid lifecycle: linear publish/delete, dedup-republish-
     then-delete, terminal delete-all, and self-heal on the next publish.
@@ -1771,6 +1797,7 @@ def test_hybrid_latest_full_lifecycle(client: WeaveClient, monkeypatch):
     assert _resolve_latest_digest(client, "hybrid_obj") == ref_d.digest
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_hybrid_latest_multi_object_query(client: WeaveClient, monkeypatch):
     """objs_query with latest_only=True and aliases=["latest"|"prod"] across
     multiple objects where one object uses the alias path and another uses
@@ -1846,6 +1873,7 @@ def test_hybrid_latest_multi_object_query(client: WeaveClient, monkeypatch):
     assert len(mixed_digests) == 4, f"unexpected rows: {sorted(mixed_digests)}"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_non_current_version_leaves_latest_unchanged(
     client: WeaveClient, monkeypatch
 ):
@@ -1906,6 +1934,7 @@ def test_delete_non_current_version_leaves_latest_unchanged(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_full_lifecycle(weave_active):
     """Comprehensive lifecycle: publish, tag, alias, resolve, reassign, remove, verify lists."""
     ref_v0 = weave.publish({"v": 0}, name="lifecycle_obj")
@@ -1945,6 +1974,7 @@ def test_full_lifecycle(weave_active):
     assert "reviewed" in all_tags
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_publish_with_tags_and_aliases(weave_active):
     """Tags and aliases set at publish time work with resolution."""
     weave.publish({"v": 0}, name="pub_resolve")
@@ -1965,6 +1995,7 @@ def test_publish_with_tags_and_aliases(weave_active):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_cross_project_isolation(client: WeaveClient):
     """Tags, aliases, lists, and resolution are all scoped to their project."""
     server = client.server
@@ -2066,6 +2097,7 @@ def test_cross_project_isolation(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deletion_cascades(client: WeaveClient):
     """Deleting versions cleans up tags/aliases; surviving versions keep theirs."""
     # Specific version cleanup — tags

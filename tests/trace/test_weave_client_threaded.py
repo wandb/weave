@@ -7,6 +7,7 @@ import pytest
 from flask import Flask
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 
 
 @pytest.fixture
@@ -33,6 +34,7 @@ def flask_server(weave_active):
     return url
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_flask_server(flask_server):
     url = flask_server
     with httpx.Client() as client:
@@ -41,6 +43,7 @@ def test_flask_server(flask_server):
     assert response.text == "FkWFKCRcl9wsGp3yclN7v1IIAICTPenpZYrWo0otI4Y"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_weave_client_global_accessible_in_thread(weave_active):
     def thread_func(q: queue.Queue):
         try:

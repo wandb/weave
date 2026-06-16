@@ -9,6 +9,7 @@ from spec import SerializationTestCase
 from test_cases import cases
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface import (
     CallReadReq,
@@ -46,6 +47,7 @@ def set_weave_logger_to_debug():
         logger.setLevel(current_level)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize(
     "case",
     cases,

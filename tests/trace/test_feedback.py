@@ -4,7 +4,7 @@ import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
-from tests.trace.util import NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -28,6 +28,7 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_client_feedback(client) -> None:
     feedbacks = client.get_feedback()
     assert len(feedbacks) == 0
@@ -64,6 +65,7 @@ def test_client_feedback(client) -> None:
     assert len(feedbacks) == 2
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_custom_feedback(client) -> None:
     feedbacks = client.get_feedback()
     assert len(feedbacks) == 0
@@ -91,6 +93,7 @@ def test_custom_feedback(client) -> None:
         trace_object.feedback.add("wandb.trying_to_use_reserved_prefix", value=1)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_feedback(client: WeaveClient) -> None:
     project_id = client.project_id
     column_name = "column_name"
@@ -214,6 +217,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_runnable_feedback(client: WeaveClient) -> None:
     """Test feedback creation with runnable references."""
     project_id = client.project_id
@@ -416,6 +420,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
     assert typed_row["scorer_rating_confidences"] == {"_rating_": 0.88}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_agent_monitor_feedback(client: WeaveClient) -> None:
     """End-to-end create/query for wandb.agent_monitor feedback with typed scorer columns."""
     project_id = client.project_id
@@ -518,6 +523,7 @@ def test_agent_monitor_feedback(client: WeaveClient) -> None:
     assert row["span_status_code"] == "OK"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     """A minimal agent_monitor row (no typed scorer fields) round-trips with empty defaults."""
     project_id = client.project_id
@@ -553,6 +559,7 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     assert query_res.result[0]["span_status_code"] == "UNSET"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_agent_user_feedback(client: WeaveClient) -> None:
     """A human agent score's value is a tag in scorer_tags (e.g. an emoji
     glyph), carrying no scorer refs. Non-emoji tags are allowed too.
@@ -591,6 +598,7 @@ def test_agent_user_feedback(client: WeaveClient) -> None:
     assert row["span_status_code"] == "OK"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
     """Filter agent_monitor rows by typed scorer columns.
 
@@ -734,6 +742,7 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
     assert matches == []
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_aggregate(client: WeaveClient) -> None:
     """Aggregate scorer feedback, asserting the entire FeedbackAggregateRes shape.
 
@@ -1050,6 +1059,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
     """Sorting by a map-column key (e.g. `scorer_ratings._rating_`) must work.
 
@@ -1155,6 +1165,7 @@ async def populate_feedback(client: WeaveClient) -> None:
     return ids, my_scorer, my_model
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test sorting by feedback."""
@@ -1216,6 +1227,7 @@ async def test_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test filtering by feedback."""
@@ -1426,6 +1438,7 @@ class MatchAnyDatetime:  # noqa: PLW1641
         return isinstance(other, datetime.datetime)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_filter_and_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test filtering and sorting by feedback."""
@@ -1459,6 +1472,7 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient, no_autoflush) ->
     assert [c.id for c in calls] == [ids[2], ids[0]]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_filter_by_wildcard_feedback_with_multiple_items(
     client: WeaveClient,
@@ -1566,6 +1580,7 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_replace(client) -> None:
     # Create initial feedback
     create_req = FeedbackCreateReq(
@@ -1643,6 +1658,7 @@ def test_feedback_replace(client) -> None:
     assert new_feedback["payload"] == {"emoji": "👍"}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_replace_validates_before_purge(client) -> None:
     """Replace must reject invalid payloads BEFORE deleting the existing row."""
     project_id = client.project_id
@@ -1681,6 +1697,7 @@ def test_feedback_replace_validates_before_purge(client) -> None:
     assert [r["id"] for r in query_res.result] == [initial.id]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_feedback_with_dict_query(client) -> None:
     """Test that get_feedback works with dict queries as shown in the docstring example."""
     # Create some test feedback using the server API
@@ -1761,6 +1778,7 @@ def test_get_feedback_with_dict_query(client) -> None:
     assert len(list(no_results)) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_query_bad_json_path(client) -> None:
     """Test that querying for nonexistent JSON paths raises appropriate error."""
     # Create some test feedback
@@ -1794,6 +1812,7 @@ def test_feedback_query_bad_json_path(client) -> None:
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_query_contains_numeric_literal(client) -> None:
     """Test that $contains works with numeric literals on JSON fields.
 
@@ -1860,6 +1879,7 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     assert res.result[0]["payload"]["dataset_id_str"] == "94"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     """Regression for WB-33832: /feedback/query 500s on typed payload literals.
 
@@ -1928,6 +1948,7 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     assert rows[0]["payload"] == {"is_positive": False, "score": 0.1, "rank": 2}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
     project_id = client.project_id
@@ -1979,6 +2000,7 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
     assert no_queue_feedback["queue_id"] is None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with invalid queue_id."""
     project_id = client.project_id
@@ -1998,6 +2020,7 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
     """Test feedback creation with queue_id from a different project."""
     project_id = client.project_id
@@ -2028,6 +2051,7 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     """Test querying feedback filtered by queue_id."""
     project_id = client.project_id
@@ -2166,6 +2190,7 @@ def _seed_numeric_feedback(
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_stats(client: WeaveClient) -> None:
     """End-to-end: seed feedback, query aggregated stats, verify buckets and window_stats."""
     project_id = client.project_id
@@ -2214,6 +2239,7 @@ def test_feedback_stats(client: WeaveClient) -> None:
     assert ws["avg"] == pytest.approx(sum(scores) / len(scores), abs=1e-6)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_payload_schema(client: WeaveClient) -> None:
     """End-to-end: seed varied feedback, discover payload schema paths."""
     project_id = client.project_id
@@ -2258,6 +2284,7 @@ def test_feedback_payload_schema(client: WeaveClient) -> None:
     assert path_map["label"] == "categorical"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
     """Empty metrics list returns empty buckets without error."""
     project_id = client.project_id
@@ -2275,6 +2302,7 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
     assert res.granularity == 3600
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None:
     """Ensure `feedback_query` returns tz-aware `created_at`."""
     project_id = client.project_id

@@ -1,6 +1,9 @@
 import random
 from collections.abc import Iterator
 
+import pytest
+
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -40,6 +43,7 @@ def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
     return digest, row_digests, data
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
@@ -59,6 +63,7 @@ def test_table_query(client: WeaveClient):
     assert result_indices == list(range(len(data)))
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_stream(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
@@ -83,6 +88,7 @@ def test_table_query_stream(client: WeaveClient):
     assert result_indices == list(range(len(data)))
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_invalid_digest(client: WeaveClient):
     res = client.server.table_query(
         tsi.TableQueryReq(
@@ -94,6 +100,7 @@ def test_table_query_invalid_digest(client: WeaveClient):
     assert res.rows == []
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_filter_by_row_digests(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
@@ -114,6 +121,7 @@ def test_table_query_filter_by_row_digests(client: WeaveClient):
     assert result_indices == [2, 3, 4]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_invalid_row_digest(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
     res = client.server.table_query(
@@ -127,6 +135,7 @@ def test_table_query_invalid_row_digest(client: WeaveClient):
     assert res.rows == []
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_limit(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
@@ -145,6 +154,7 @@ def test_table_query_limit(client: WeaveClient):
     assert result_indices == list(range(limit))
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_offset(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
@@ -163,6 +173,7 @@ def test_table_query_offset(client: WeaveClient):
     assert result_indices == list(range(offset, len(data)))
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_sort_by_column(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
@@ -189,6 +200,7 @@ def test_table_query_sort_by_column(client: WeaveClient):
     assert result_indices == expected_indices
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_sort_by_nested_column(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
@@ -211,6 +223,7 @@ def test_table_query_sort_by_nested_column(client: WeaveClient):
     assert result_indices == expected_indices
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_combined(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 20, 5)
 
@@ -239,6 +252,7 @@ def test_table_query_combined(client: WeaveClient):
     assert result_indices == expected_indices
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_multiple_sort_criteria(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 20, 5)
 
@@ -263,6 +277,7 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
     assert result_indices == expected_indices
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_stats(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
@@ -276,6 +291,7 @@ def test_table_query_stats(client: WeaveClient):
     assert stats_res.tables[0].count == len(data)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_stats_empty(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 0, 0)
 
@@ -289,6 +305,7 @@ def test_table_query_stats_empty(client: WeaveClient):
     assert stats_res.tables[0].count == len(data)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_stats_missing(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
@@ -302,6 +319,7 @@ def test_table_query_stats_missing(client: WeaveClient):
     assert len(stats_res.tables) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_stats_legacy_missing(client: WeaveClient):
     # The legacy single-digest endpoint must not IndexError when the digest
     # doesn't exist; it should report count=0.
@@ -335,6 +353,7 @@ def generate_duplication_simple_table_data(
     return {"digest": digest, "row_digests": row_digests, "data": data}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     res1 = generate_duplication_simple_table_data(client, 10, 1)
     res2 = generate_duplication_simple_table_data(client, 10, 2)
@@ -422,6 +441,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     assert [r.original_index for r in res.rows] == [0, 1, 2]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_duplicate_table_with_identical_rows(client: WeaveClient):
     data = [{"val": i} for i in range(10)]
 
@@ -462,6 +482,7 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
     assert [r.original_index for r in res.rows] == list(range(10))
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_stats_with_storage_size(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 

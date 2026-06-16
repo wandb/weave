@@ -18,6 +18,7 @@ import pytest
 from PIL import Image
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.durability.wal_client_id import compute_client_id
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
@@ -103,6 +104,7 @@ def wal_client_with_sender(client_creator, tmp_path):
 class TestWALClientWrites:
     """Verify that client operations produce WAL records when enabled."""
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_obj_create(self, wal_client):
         weave.publish({"model": "gpt-4", "temp": 0.7}, name="my_obj")
         wal_client._flush()
@@ -143,6 +145,7 @@ class TestWALClientWrites:
             },
         }
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_file_create(self, wal_client):
         img = Image.new("RGB", (2, 2), color="red")
         weave.publish(img, name="my_image")
@@ -167,6 +170,7 @@ class TestWALClientWrites:
             "type": "PIL.Image.Image"
         }
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_call_start(self, wal_client):
         """Calling an op should produce a call_start WAL record with all fields."""
 
@@ -193,6 +197,7 @@ class TestWALClientWrites:
         assert isinstance(start["attributes"], dict)
         assert start["parent_id"] is None  # root call
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_call_end(self, wal_client):
         """Calling an op should produce a call_end WAL record with all fields."""
 
@@ -217,6 +222,7 @@ class TestWALClientWrites:
         assert end["exception"] is None
         assert isinstance(end["summary"], dict)
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_call_with_exception(self, wal_client):
         """A failing op should record the exception in call_end."""
 
@@ -234,6 +240,7 @@ class TestWALClientWrites:
         assert len(call_ends) == 1
         assert "boom" in call_ends[0]["req"]["end"]["exception"]
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_nested_calls(self, wal_client):
         """Nested op calls should produce parent-child call_start records."""
 
@@ -288,6 +295,7 @@ class TestWALClientWrites:
         assert inner_end["req"]["end"]["output"] == 10
         assert outer_end["req"]["end"]["output"] == 10
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_wal_records_are_json_serializable(self, wal_client):
         """Ensure WAL records round-trip through JSON without loss."""
         weave.publish({"nested": {"list": [1, 2, 3]}}, name="json_obj")
@@ -298,6 +306,7 @@ class TestWALClientWrites:
         roundtripped = json.loads(json.dumps(records[0]))
         assert roundtripped == records[0]
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_flush_fsyncs_wal(self, wal_client):
         """flush() should fsync the WAL so records survive a process crash."""
         weave.publish({"a": 1}, name="fsync_obj")
@@ -315,17 +324,20 @@ class TestWALDisabled:
         """Default client should have _wal=None."""
         assert client._wal is None
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_publish_works_without_wal(self, weave_active):
         """publish() should succeed and return a ref when WAL is disabled."""
         ref = weave.publish({"key": "value"}, name="no_wal_obj")
         assert ref is not None
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_dataset_publish_works_without_wal(self, weave_active):
         """Dataset publish should succeed when WAL is disabled."""
         ds = weave.Dataset(name="no_wal_ds", rows=[{"x": 1}])
         ref = weave.publish(ds, name="no_wal_ds")
         assert ref is not None
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_flush_works_without_wal(self, client):
         """flush() should not raise when WAL is disabled."""
         weave.publish({"a": 1}, name="flush_obj")
@@ -335,6 +347,7 @@ class TestWALDisabled:
 class TestWALSender:
     """Verify that the in-process sender drains WAL records automatically."""
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_sender_drains_on_close(self, wal_client_with_sender):
         """After close(), the sender's final drain should consume all records."""
         weave.publish({"k": "v"}, name="sender_obj")
@@ -345,6 +358,7 @@ class TestWALSender:
         remaining = list(wal_dir.glob("*.jsonl"))
         assert len(remaining) == 0
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_sender_drains_table_create(self, wal_client_with_sender):
         """Table-create records should be drained and files cleaned up."""
         ds = weave.Dataset(name="sender_ds", rows=[{"x": 1}])

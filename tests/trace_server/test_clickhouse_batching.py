@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.trace.util import NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
@@ -438,6 +438,7 @@ def test_obj_batch_different_key_order_deduplicates(trace_server, client):
     assert len(res.objs) == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_create_different_key_order_same_digest(trace_server):
     """Rows with different key ordering produce the same digest in table_create."""
     server = trace_server._internal_trace_server

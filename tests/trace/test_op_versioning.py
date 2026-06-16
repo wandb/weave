@@ -7,6 +7,7 @@ import pytest
 
 import weave
 import weave as wv
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.op import as_op
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.op_type import save_instance
@@ -41,6 +42,7 @@ def solo_versioned_op(a: int) -> float:
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_solo_op_versioning(client):
     from tests.trace import op_versioning_solo
 
@@ -64,6 +66,7 @@ def versioned_op(self, a: int) -> float:
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_object_op_versioning(client):
     from tests.trace import op_versioning_obj
 
@@ -88,6 +91,7 @@ def versioned_op_importfrom(a: int) -> float:
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_versioning_importfrom(client):
     from tests.trace import op_versioning_importfrom
 
@@ -133,6 +137,7 @@ def versioned_op_closure_constant(a: int) -> float:
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_versioning_closure_constant(client):
     x = 10
 
@@ -162,6 +167,7 @@ def versioned_op_closure_constant(a: int) -> float:
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_versioning_closure_dict_simple(client):
     x = {"a": 5, "b": 10}
 
@@ -332,6 +338,7 @@ def test_op_versioning_exception():
         return x
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_versioning_2ops(client):
     @weave.op
     def dog():
@@ -362,6 +369,7 @@ def some_d(v: int) -> SomeDict:
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_typeddict_annotation(
     client,
 ):
@@ -401,6 +409,7 @@ def some_d(v: int):
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_return_custom_class(
     client,
 ):
@@ -437,6 +446,7 @@ def some_d(v: int):
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_nested_function(
     client,
 ):
@@ -460,6 +470,7 @@ def test_op_nested_function(
     assert weave.ref(ref.uri).get()(2) == 5
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_basic_execution(weave_active):
     @weave.op
     def adder(v: int) -> int:
@@ -500,6 +511,7 @@ def some_d(v):
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_no_repeats(client):
     @weave.op
     def some_d(v):
@@ -528,6 +540,7 @@ def t(text: str):
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_instance(client):
     class MyClass:
         _version: str
@@ -569,6 +582,7 @@ def func(data: dict) -> str:
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_import_as(client):
     import json as js
 
@@ -596,6 +610,7 @@ def func(data: dict) -> str:
 """
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_import_from_as(client):
     from json import dumps as ds
 

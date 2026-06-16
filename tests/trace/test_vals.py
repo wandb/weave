@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.shared.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -10,6 +11,7 @@ from weave.shared.refs_internal import (
 from weave.trace.refs import ObjectRef
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dict_refs(client):
     d = client.save({"a": 1, "b": 2}, name="d")
 
@@ -24,6 +26,7 @@ def test_dict_refs(client):
     assert d["b"].ref.extra == (DICT_KEY_EDGE_NAME, "b")
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dict_iter(client):
     d_orig = client.save({"a": 1, "b": 2, "c": 3}, name="d")
     d = dict(d_orig)
@@ -41,6 +44,7 @@ def test_dict_iter(client):
     assert d["b"].ref.extra == (DICT_KEY_EDGE_NAME, "b")
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_list_refs(client):
     l = client.save([1, 2], name="l")
 
@@ -55,6 +59,7 @@ def test_list_refs(client):
     assert l[1].ref.extra == (LIST_INDEX_EDGE_NAME, "1")
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_list_iter(client):
     l_orig = client.save([1, 2], name="l")
     l = list(l_orig)
@@ -70,6 +75,7 @@ def test_list_iter(client):
     assert isinstance(l[1].ref, ObjectRef)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_row_ref_inside_dict(client):
     """Test the case where a Weave object has a value that is a ref to a row within a Dataset.
 
