@@ -1070,7 +1070,7 @@ class TestMakeTraceMessagesQuery:
             FROM messages
             WHERE project_id = {genai_0:String}
               AND trace_id = {genai_1:String}
-              AND role IN ('user', 'assistant', 'system')
+              AND role IN ('assistant', 'system', 'user')
             GROUP BY role, content_digest
             ORDER BY min_created_at ASC
             LIMIT {genai_2:UInt64}
