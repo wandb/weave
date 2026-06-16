@@ -909,7 +909,7 @@ class AgentChatMessage(BaseModel):
     span_id: str | None = None
     agent_name: str | None = None
     agent_version: str | None = None
-    status_code: str | None = None
+    status_code: StatusCodeLiteral | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None
@@ -964,7 +964,7 @@ class AgentTraceChatRes(BaseModel):
     root_span_name: str | None = None
     agent_name: str | None = None
     agent_version: str | None = None
-    status_code: str | None = None
+    status_code: StatusCodeLiteral | None = None
     provider: str | None = None
     total_duration_ms: int | None = Field(
         default=None,
