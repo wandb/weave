@@ -1,0 +1,113 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 20:55:20 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Wed, 17 Jun 2026 20:55:21 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: 9a472f0c13e4a882f673f73368a02094
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/search
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+    body: '{"project_id":"drtangible-mocha/example","query":"Liverpool"}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "5938"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 20:55:20 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"results":[{"conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","conversation_name":"","agent_name":"","matched_messages":[{"span_id":"53fc733e2f6b3417","trace_id":"86cc8e5a64b3bb1fbbf80cb377155950","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"When was the last time Liverpool won the
+      EPL?\"}]","content_digest":"32cce4db16007e3f5c876c1a4b91e930","started_at":"2026-06-16T22:10:34.631000"},{"span_id":"53fc733e2f6b3417","trace_id":"86cc8e5a64b3bb1fbbf80cb377155950","role":"assistant","content_preview":"[{\"type\":
+      \"text\", \"content\": \"Liverpool last won the English Premier League in
+      the **2019\\u201320 season**, clinching the title on **25 June
+      2020**.\"}]","content_digest":"95fbc841becb3025395d9f997712ad53","started_at":"2026-06-16T22:10:34.631000"}],"last_activity":"2026-06-16T22:10:34.631000"},{"conversation_id":"trace_a6fe0c92ca474ed0bd068c531f7af12c","conversation_name":"","agent_name":"","matched_messages":[{"span_id":"46b56d77a8411c2d","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"assistant","content_preview":"[{\"type\":
+      \"text\", \"content\": \"Liverpool: Clear, 20\\u00b0C  \\nSan Francisco:
+      Foggy,
+      18\\u00b0C\"}]","content_digest":"da504931273624ca2625eddf0089b5a4","started_at":"2026-06-16T22:10:16.373000"},{"span_id":"46b56d77a8411c2d","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"assistant","content_preview":"[{\"type\":
+      \"tool_call\", \"toolName\": \"get_weather\", \"arguments\":
+      \"{\\\"city\\\":\\\"Liverpool\\\",\\\"unit\\\":\\\"celsius\\\"}\"},
+      {\"type\": \"tool_call\", \"toolName\": \"get_weather\", \"arguments\":
+      \"{\\\"city\\\":\\\"San
+      Francisco\\\",\\\"unit\\\":\\\"celsius\\\"}\"}]","content_digest":"f284331b6c45990fa0f3eee18d32dcb6","started_at":"2026-06-16T22:10:16.373000"},{"span_id":"46b56d77a8411c2d","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"What is the weather like in Liverpool and San
+      Francisco?\"}]","content_digest":"24b3dbc9126b55b3f896198f125ba7b8","started_at":"2026-06-16T22:10:16.373000"},{"span_id":"00a5ca1e03e154e5","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"assistant","content_preview":"[{\"type\":
+      \"text\", \"content\": \"Liverpool: Clear, 20\\u00b0C  \\nSan Francisco:
+      Foggy,
+      18\\u00b0C\"}]","content_digest":"da504931273624ca2625eddf0089b5a4","started_at":"2026-06-16T22:10:15.298000"},{"span_id":"00a5ca1e03e154e5","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"assistant","content_preview":"[{\"type\":
+      \"tool_call\", \"toolName\": \"get_weather\", \"arguments\":
+      \"{\\\"city\\\":\\\"Liverpool\\\",\\\"unit\\\":\\\"celsius\\\"}\"},
+      {\"type\": \"tool_call\", \"toolName\": \"get_weather\", \"arguments\":
+      \"{\\\"city\\\":\\\"San
+      Francisco\\\",\\\"unit\\\":\\\"celsius\\\"}\"}]","content_digest":"f284331b6c45990fa0f3eee18d32dcb6","started_at":"2026-06-16T22:10:15.298000"},{"span_id":"00a5ca1e03e154e5","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"What is the weather like in Liverpool and San
+      Francisco?\"}]","content_digest":"24b3dbc9126b55b3f896198f125ba7b8","started_at":"2026-06-16T22:10:15.298000"}],"last_activity":"2026-06-16T22:10:16.373000"},{"conversation_id":"trace_a6bb4573d88e432487fd686bcea07fdd","conversation_name":"","agent_name":"","matched_messages":[{"span_id":"b1204f4125fa14a3","trace_id":"9f4808bfd047f16e362618f2efe5f813","role":"assistant","content_preview":"[{\"type\":
+      \"text\", \"content\": \"Liverpool: Clear, 20\\u00b0C  \\nSan Francisco:
+      Foggy,
+      18\\u00b0C\"}]","content_digest":"da504931273624ca2625eddf0089b5a4","started_at":"2026-06-16T22:10:13.921000"},{"span_id":"b1204f4125fa14a3","trace_id":"9f4808bfd047f16e362618f2efe5f813","role":"assistant","content_preview":"[{\"type\":
+      \"tool_call\", \"toolName\": \"get_weather\", \"arguments\":
+      \"{\\\"city\\\":\\\"Liverpool\\\",\\\"unit\\\":\\\"celsius\\\"}\"},
+      {\"type\": \"tool_call\", \"toolName\": \"get_weather\", \"arguments\":
+      \"{\\\"city\\\":\\\"San
+      Francisco\\\",\\\"unit\\\":\\\"celsius\\\"}\"}]","content_digest":"f284331b6c45990fa0f3eee18d32dcb6","started_at":"2026-06-16T22:10:13.921000"},{"span_id":"b1204f4125fa14a3","trace_id":"9f4808bfd047f16e362618f2efe5f813","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"What is the weather like in Liverpool and San
+      Francisco?\"}]","content_digest":"24b3dbc9126b55b3f896198f125ba7b8","started_at":"2026-06-16T22:10:13.921000"},{"span_id":"4cc40d210fb97a8f","trace_id":"9f4808bfd047f16e362618f2efe5f813","role":"tool_result","content_preview":"Liverpool:
+      Clear,
+      20°C","content_digest":"f9b958f7699f0fb3376ef72833b3a537","started_at":"2026-06-16T22:10:13.918000"},{"span_id":"4cc40d210fb97a8f","trace_id":"9f4808bfd047f16e362618f2efe5f813","role":"tool_call","content_preview":"{\"city\":
+      \"Liverpool\", \"unit\":
+      \"celsius\"}","content_digest":"824ba0a05444bfeed43610d6e6d7e4ec","started_at":"2026-06-16T22:10:13.918000"},{"span_id":"38bad9c2d8bb3a1f","trace_id":"9f4808bfd047f16e362618f2efe5f813","role":"assistant","content_preview":"[{\"type\":
+      \"tool_call\", \"toolCallId\": \"call_ejpNlstlWsztFSMBNzjSUJHy\",
+      \"toolName\": \"get_weather\", \"arguments\":
+      \"{\\\"city\\\":\\\"Liverpool\\\",\\\"unit\\\":\\\"celsius\\\"}\"},
+      {\"type\": \"tool_call\", \"toolCallId\":
+      \"call_SPuh3HQgVJzEYXffdkE0TTdQ\", \"toolName\": \"get_weather\",
+      \"arguments\": \"{\\\"city\\\":\\\"San
+      Francisco\\\",\\\"unit\\\":\\\"celsius\\\"}\"}]","content_digest":"5046fc9aeb351fb8fdef9a24d687e36c","started_at":"2026-06-16T22:10:12.529000"},{"span_id":"38bad9c2d8bb3a1f","trace_id":"9f4808bfd047f16e362618f2efe5f813","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"What is the weather like in Liverpool and San
+      Francisco?\"}]","content_digest":"24b3dbc9126b55b3f896198f125ba7b8","started_at":"2026-06-16T22:10:12.529000"}],"last_activity":"2026-06-16T22:10:13.921000"}],"total_conversations":3}'

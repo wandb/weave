@@ -23,6 +23,7 @@ export type {
   AgentSpan,
   AgentTraceChat,
   AgentVersion,
+  AgentConversationSearchResult,
   GetAgentsOptions,
   GetAgentsResult,
   GetAgentConversationChatOptions,
@@ -34,6 +35,8 @@ export type {
   GetAgentVersionsOptions,
   GetAgentVersionsResult,
   GetCallsOptions,
+  SearchAgentConversationsOptions,
+  SearchAgentConversationsResult,
   Response,
   WeaveClient,
 } from './weaveClient';

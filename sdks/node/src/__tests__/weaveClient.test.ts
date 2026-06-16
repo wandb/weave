@@ -671,6 +671,83 @@ describe('WeaveClient', () => {
     });
   });
 
+  describe('searchAgentConversations', () => {
+    it('searches agent conversations on the server', async () => {
+      const results = [
+        {
+          conversation_id: 'conv-1',
+          conversation_name: 'Conv 1',
+          agent_name: 'Assistant',
+          matched_messages: [],
+          last_activity: '2026-06-15T20:37:39.749000',
+        },
+      ];
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockResolvedValue({
+        data: {results, total_conversations: 1},
+      } as any);
+
+      const result = await client.searchAgentConversations({
+        query: 'refund policy',
+        limit: 20,
+        offset: 5,
+        filters: {
+          agent_name: 'Assistant',
+          provider_name: 'openai',
+          conversation_id: 'conv-1',
+          request_model: 'gpt-4',
+          started_after: '2026-06-01T00:00:00Z',
+          started_before: '2026-06-30T00:00:00Z',
+          roles: ['user', 'assistant'],
+        },
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSearchAgentsSearchPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: 'refund policy',
+        limit: 20,
+        offset: 5,
+        agent_name: 'Assistant',
+        provider_name: 'openai',
+        conversation_id: 'conv-1',
+        request_model: 'gpt-4',
+        started_after: '2026-06-01T00:00:00Z',
+        started_before: '2026-06-30T00:00:00Z',
+        roles: ['user', 'assistant'],
+      });
+
+      expect(result).toEqual({data: {results, total_conversations: 1}});
+    });
+
+    it('omits filter fields when filters is not provided', async () => {
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockResolvedValue({
+        data: {results: [], total_conversations: 0},
+      } as any);
+
+      await client.searchAgentConversations({query: 'hello'});
+
+      expect(
+        mockTraceServerApi.agents.genaiSearchAgentsSearchPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: 'hello',
+        limit: undefined,
+        offset: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(
+        client.searchAgentConversations({query: 'hello'})
+      ).rejects.toThrow('boom');
+    });
+  });
+
   describe('linkPromptToRegistry', () => {
     let client: WeaveClient;
     let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;

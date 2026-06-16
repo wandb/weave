@@ -7,6 +7,7 @@ import {computeDigest} from './digest';
 import {
   type AgentChatMessage as AgentChatMessageSchema,
   type AgentSchema,
+  type AgentSearchConversationResult,
   type AgentSpanSchema,
   type AgentVersionSchema,
   type CallSchema,
@@ -96,6 +97,7 @@ export type Agent = AgentSchema;
 export type AgentChatMessage = AgentChatMessageSchema;
 export type AgentSpan = AgentSpanSchema;
 export type AgentVersion = AgentVersionSchema;
+export type AgentConversationSearchResult = AgentSearchConversationResult;
 
 export type AgentTraceChat = {
   trace_id: string;
@@ -221,6 +223,49 @@ export type GetAgentConversationChatResult = {
   limit?: number;
   offset?: number;
   feedback?: Record<string, any>[] | null;
+};
+
+/**
+ * Options for {@link WeaveClient.searchAgentConversations}.
+ */
+export interface SearchAgentConversationsOptions {
+  query: string;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 20
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[] | null;
+  filters?: {
+    roles?: (
+      | 'user'
+      | 'assistant'
+      | 'system'
+      | 'tool'
+      | 'tool_call'
+      | 'tool_result'
+    )[];
+    conversation_id?: string | null;
+    agent_name?: string | null;
+    provider_name?: string | null;
+    request_model?: string | null;
+    started_after?: string | null;
+    started_before?: string | null;
+  };
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.searchAgentConversations}.
+ */
+export type SearchAgentConversationsResult = {
+  results: AgentConversationSearchResult[];
+  total_conversations?: number;
 };
 
 /**
@@ -519,6 +564,34 @@ export class WeaveClient {
         include_feedback: options.includeFeedback,
       }
     );
+  }
+
+  /**
+   * Search for conversations with messages with content or metadata matching `query`.
+   *
+   * const resp = await client.searchAgentConversations({
+   *   query: 'refund policy',
+   *   limit: 20,
+   *   filters: {agent_name: 'my-agent', roles: ['user', 'assistant']},
+   * });
+   *
+   * for (const result of resp.data.results) {
+   *   console.log(result.conversation_id, result.matched_messages);
+   * }
+   *
+   * console.log(`total conversations: ${resp.data.total_conversations}`)
+   * ```
+   */
+  public searchAgentConversations(
+    options: SearchAgentConversationsOptions
+  ): Promise<Response<SearchAgentConversationsResult>> {
+    return this.traceServerApi.agents.genaiSearchAgentsSearchPost({
+      project_id: this.projectId,
+      query: options.query,
+      limit: options.limit,
+      offset: options.offset,
+      ...options.filters,
+    });
   }
 
   private scheduleBatchProcessing() {

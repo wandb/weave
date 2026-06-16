@@ -1694,4 +1694,353 @@ describe('WeaveClient', () => {
       });
     });
   });
+
+  describe('searchAgentConversations', () => {
+    vcrTest('searches agent conversations matching a query', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.searchAgentConversations({
+        query: 'Liverpool',
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "",
+              "conversation_id": "trace_c50312356de3487fa90e381c9399b5b4",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:34.631000",
+              "matched_messages": [
+                {
+                  "content_digest": "32cce4db16007e3f5c876c1a4b91e930",
+                  "content_preview": "[{"type": "text", "content": "When was the last time Liverpool won the EPL?"}]",
+                  "role": "user",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+                {
+                  "content_digest": "95fbc841becb3025395d9f997712ad53",
+                  "content_preview": "[{"type": "text", "content": "Liverpool last won the English Premier League in the **2019\\u201320 season**, clinching the title on **25 June 2020**."}]",
+                  "role": "assistant",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+              ],
+            },
+            {
+              "agent_name": "",
+              "conversation_id": "trace_a6fe0c92ca474ed0bd068c531f7af12c",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:16.373000",
+              "matched_messages": [
+                {
+                  "content_digest": "da504931273624ca2625eddf0089b5a4",
+                  "content_preview": "[{"type": "text", "content": "Liverpool: Clear, 20\\u00b0C  \\nSan Francisco: Foggy, 18\\u00b0C"}]",
+                  "role": "assistant",
+                  "span_id": "46b56d77a8411c2d",
+                  "started_at": "2026-06-16T22:10:16.373000",
+                  "trace_id": "67648280e1e0dffe7e560df171d99ddc",
+                },
+                {
+                  "content_digest": "f284331b6c45990fa0f3eee18d32dcb6",
+                  "content_preview": "[{"type": "tool_call", "toolName": "get_weather", "arguments": "{\\"city\\":\\"Liverpool\\",\\"unit\\":\\"celsius\\"}"}, {"type": "tool_call", "toolName": "get_weather", "arguments": "{\\"city\\":\\"San Francisco\\",\\"unit\\":\\"celsius\\"}"}]",
+                  "role": "assistant",
+                  "span_id": "46b56d77a8411c2d",
+                  "started_at": "2026-06-16T22:10:16.373000",
+                  "trace_id": "67648280e1e0dffe7e560df171d99ddc",
+                },
+                {
+                  "content_digest": "24b3dbc9126b55b3f896198f125ba7b8",
+                  "content_preview": "[{"type": "text", "content": "What is the weather like in Liverpool and San Francisco?"}]",
+                  "role": "user",
+                  "span_id": "46b56d77a8411c2d",
+                  "started_at": "2026-06-16T22:10:16.373000",
+                  "trace_id": "67648280e1e0dffe7e560df171d99ddc",
+                },
+                {
+                  "content_digest": "da504931273624ca2625eddf0089b5a4",
+                  "content_preview": "[{"type": "text", "content": "Liverpool: Clear, 20\\u00b0C  \\nSan Francisco: Foggy, 18\\u00b0C"}]",
+                  "role": "assistant",
+                  "span_id": "00a5ca1e03e154e5",
+                  "started_at": "2026-06-16T22:10:15.298000",
+                  "trace_id": "67648280e1e0dffe7e560df171d99ddc",
+                },
+                {
+                  "content_digest": "f284331b6c45990fa0f3eee18d32dcb6",
+                  "content_preview": "[{"type": "tool_call", "toolName": "get_weather", "arguments": "{\\"city\\":\\"Liverpool\\",\\"unit\\":\\"celsius\\"}"}, {"type": "tool_call", "toolName": "get_weather", "arguments": "{\\"city\\":\\"San Francisco\\",\\"unit\\":\\"celsius\\"}"}]",
+                  "role": "assistant",
+                  "span_id": "00a5ca1e03e154e5",
+                  "started_at": "2026-06-16T22:10:15.298000",
+                  "trace_id": "67648280e1e0dffe7e560df171d99ddc",
+                },
+                {
+                  "content_digest": "24b3dbc9126b55b3f896198f125ba7b8",
+                  "content_preview": "[{"type": "text", "content": "What is the weather like in Liverpool and San Francisco?"}]",
+                  "role": "user",
+                  "span_id": "00a5ca1e03e154e5",
+                  "started_at": "2026-06-16T22:10:15.298000",
+                  "trace_id": "67648280e1e0dffe7e560df171d99ddc",
+                },
+              ],
+            },
+            {
+              "agent_name": "",
+              "conversation_id": "trace_a6bb4573d88e432487fd686bcea07fdd",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:13.921000",
+              "matched_messages": [
+                {
+                  "content_digest": "da504931273624ca2625eddf0089b5a4",
+                  "content_preview": "[{"type": "text", "content": "Liverpool: Clear, 20\\u00b0C  \\nSan Francisco: Foggy, 18\\u00b0C"}]",
+                  "role": "assistant",
+                  "span_id": "b1204f4125fa14a3",
+                  "started_at": "2026-06-16T22:10:13.921000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+                {
+                  "content_digest": "f284331b6c45990fa0f3eee18d32dcb6",
+                  "content_preview": "[{"type": "tool_call", "toolName": "get_weather", "arguments": "{\\"city\\":\\"Liverpool\\",\\"unit\\":\\"celsius\\"}"}, {"type": "tool_call", "toolName": "get_weather", "arguments": "{\\"city\\":\\"San Francisco\\",\\"unit\\":\\"celsius\\"}"}]",
+                  "role": "assistant",
+                  "span_id": "b1204f4125fa14a3",
+                  "started_at": "2026-06-16T22:10:13.921000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+                {
+                  "content_digest": "24b3dbc9126b55b3f896198f125ba7b8",
+                  "content_preview": "[{"type": "text", "content": "What is the weather like in Liverpool and San Francisco?"}]",
+                  "role": "user",
+                  "span_id": "b1204f4125fa14a3",
+                  "started_at": "2026-06-16T22:10:13.921000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+                {
+                  "content_digest": "f9b958f7699f0fb3376ef72833b3a537",
+                  "content_preview": "Liverpool: Clear, 20°C",
+                  "role": "tool_result",
+                  "span_id": "4cc40d210fb97a8f",
+                  "started_at": "2026-06-16T22:10:13.918000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+                {
+                  "content_digest": "824ba0a05444bfeed43610d6e6d7e4ec",
+                  "content_preview": "{"city": "Liverpool", "unit": "celsius"}",
+                  "role": "tool_call",
+                  "span_id": "4cc40d210fb97a8f",
+                  "started_at": "2026-06-16T22:10:13.918000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+                {
+                  "content_digest": "5046fc9aeb351fb8fdef9a24d687e36c",
+                  "content_preview": "[{"type": "tool_call", "toolCallId": "call_ejpNlstlWsztFSMBNzjSUJHy", "toolName": "get_weather", "arguments": "{\\"city\\":\\"Liverpool\\",\\"unit\\":\\"celsius\\"}"}, {"type": "tool_call", "toolCallId": "call_SPuh3HQgVJzEYXffdkE0TTdQ", "toolName": "get_weather", "arguments": "{\\"city\\":\\"San Francisco\\",\\"unit\\":\\"celsius\\"}"}]",
+                  "role": "assistant",
+                  "span_id": "38bad9c2d8bb3a1f",
+                  "started_at": "2026-06-16T22:10:12.529000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+                {
+                  "content_digest": "24b3dbc9126b55b3f896198f125ba7b8",
+                  "content_preview": "[{"type": "text", "content": "What is the weather like in Liverpool and San Francisco?"}]",
+                  "role": "user",
+                  "span_id": "38bad9c2d8bb3a1f",
+                  "started_at": "2026-06-16T22:10:12.529000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 3,
+        }
+      `);
+    });
+
+    vcrTest('supports limit and offset', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      const first = await client.searchAgentConversations({
+        query: 'Liverpool',
+        limit: 1,
+      });
+      expect(first.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "",
+              "conversation_id": "trace_c50312356de3487fa90e381c9399b5b4",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:34.631000",
+              "matched_messages": [
+                {
+                  "content_digest": "32cce4db16007e3f5c876c1a4b91e930",
+                  "content_preview": "[{"type": "text", "content": "When was the last time Liverpool won the EPL?"}]",
+                  "role": "user",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 1,
+        }
+      `);
+
+      const second = await client.searchAgentConversations({
+        query: 'Liverpool',
+        limit: 1,
+        offset: 1,
+      });
+      expect(second.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "",
+              "conversation_id": "trace_c50312356de3487fa90e381c9399b5b4",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:34.631000",
+              "matched_messages": [
+                {
+                  "content_digest": "95fbc841becb3025395d9f997712ad53",
+                  "content_preview": "[{"type": "text", "content": "Liverpool last won the English Premier League in the **2019\\u201320 season**, clinching the title on **25 June 2020**."}]",
+                  "role": "assistant",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 1,
+        }
+      `);
+    });
+
+    vcrTest('filters by agent name', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      const resp = await client.searchAgentConversations({
+        query: 'Liverpool',
+        filters: {agent_name: 'my-cool-agent'},
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [],
+          "total_conversations": 0,
+        }
+      `);
+    });
+
+    vcrTest('filters by role', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      const resp = await client.searchAgentConversations({
+        query: 'Liverpool',
+        filters: {roles: ['user']},
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "",
+              "conversation_id": "trace_c50312356de3487fa90e381c9399b5b4",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:34.631000",
+              "matched_messages": [
+                {
+                  "content_digest": "32cce4db16007e3f5c876c1a4b91e930",
+                  "content_preview": "[{"type": "text", "content": "When was the last time Liverpool won the EPL?"}]",
+                  "role": "user",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+              ],
+            },
+            {
+              "agent_name": "",
+              "conversation_id": "trace_a6fe0c92ca474ed0bd068c531f7af12c",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:16.373000",
+              "matched_messages": [
+                {
+                  "content_digest": "24b3dbc9126b55b3f896198f125ba7b8",
+                  "content_preview": "[{"type": "text", "content": "What is the weather like in Liverpool and San Francisco?"}]",
+                  "role": "user",
+                  "span_id": "46b56d77a8411c2d",
+                  "started_at": "2026-06-16T22:10:16.373000",
+                  "trace_id": "67648280e1e0dffe7e560df171d99ddc",
+                },
+                {
+                  "content_digest": "24b3dbc9126b55b3f896198f125ba7b8",
+                  "content_preview": "[{"type": "text", "content": "What is the weather like in Liverpool and San Francisco?"}]",
+                  "role": "user",
+                  "span_id": "00a5ca1e03e154e5",
+                  "started_at": "2026-06-16T22:10:15.298000",
+                  "trace_id": "67648280e1e0dffe7e560df171d99ddc",
+                },
+              ],
+            },
+            {
+              "agent_name": "",
+              "conversation_id": "trace_a6bb4573d88e432487fd686bcea07fdd",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:13.921000",
+              "matched_messages": [
+                {
+                  "content_digest": "24b3dbc9126b55b3f896198f125ba7b8",
+                  "content_preview": "[{"type": "text", "content": "What is the weather like in Liverpool and San Francisco?"}]",
+                  "role": "user",
+                  "span_id": "b1204f4125fa14a3",
+                  "started_at": "2026-06-16T22:10:13.921000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+                {
+                  "content_digest": "24b3dbc9126b55b3f896198f125ba7b8",
+                  "content_preview": "[{"type": "text", "content": "What is the weather like in Liverpool and San Francisco?"}]",
+                  "role": "user",
+                  "span_id": "38bad9c2d8bb3a1f",
+                  "started_at": "2026-06-16T22:10:12.529000",
+                  "trace_id": "9f4808bfd047f16e362618f2efe5f813",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 3,
+        }
+      `);
+    });
+
+    vcrTest('returns no results for an unmatched query', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      const resp = await client.searchAgentConversations({
+        query: 'asdkfjhasdkjfhakjsdhfkjasdh',
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [],
+          "total_conversations": 0,
+        }
+      `);
+    });
+
+    vcrTest('errors with invalid project id', async () => {
+      await authenticate();
+      const client = await init('nonexistent-project');
+
+      expect(
+        client.searchAgentConversations({query: 'Liverpool'})
+      ).rejects.toMatchObject({
+        data: null,
+        error: {
+          detail: 'Project not found',
+        },
+      });
+    });
+  });
 });
