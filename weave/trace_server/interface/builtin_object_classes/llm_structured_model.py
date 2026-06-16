@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field
 
@@ -121,6 +121,12 @@ LLMStructuredModelParamsLike = Annotated[
 
 
 class LLMStructuredCompletionModel(Model):
+    # Don't serialize predict() as an op ref on publish: nested inside a
+    # published LLMAsAJudgeScorer it embeds a CustomWeaveType(Op) payload the
+    # scoring worker's safety guard rejects, and nothing reads the ref (the @op
+    # still wraps the live method). See WB-35184.
+    _weave_exclude_ops_from_record: ClassVar[bool] = True
+
     # <provider>/<model> or ref to a provider model
     llm_model_id: str | base_object_def.RefStr
 
