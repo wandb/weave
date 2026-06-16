@@ -6,10 +6,17 @@ from functools import wraps
 from typing import Any
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 _cerebras_patcher: MultiPatcher | None = None
+CEREBRAS_INTEGRATION = library_integration(
+    "cerebras", distribution_name="cerebras-cloud-sdk"
+)
 
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -50,7 +57,7 @@ def get_cerebras_patcher(
     if _cerebras_patcher is not None:
         return _cerebras_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, CEREBRAS_INTEGRATION)
 
     create_settings = base.model_copy(
         update={

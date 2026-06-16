@@ -27,7 +27,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import Callable, KeysView, Sequence
+from collections.abc import Callable, Collection, KeysView, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
@@ -73,6 +73,7 @@ from weave.trace_server.interface.query import (
 )
 from weave.trace_server.orm import (
     ParamBuilder,
+    _format_table_name_with_cluster,
     clickhouse_cast,
     combine_conditions,
     maybe_convert_datetime_operands,
@@ -95,14 +96,6 @@ CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 # without a `limit` still get an exact count. Flip this on when we see real
 # >>1M-count requests in the wild.
 DEFAULT_STATS_MAX_LIMIT = 1_000_000
-
-# Per-row payload size sum, the inner expression behind storage_size_bytes /
-# total_storage_size_bytes wherever a stats table is read. Single source so a new
-# size column can't silently desync one path's storage number from another's.
-STORAGE_SIZE_BYTES_SUM = (
-    "COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) "
-    "+ COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)"
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -928,7 +921,7 @@ class CallsQuery(BaseModel):
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
         if field in DISALLOWED_FILTERING_FIELDS:
-            raise ValueError(f"Field {field} is not allowed in ORDER BY")
+            raise InvalidFieldError(_disallowed_filter_message(field))
         direction = direction.upper()
         if direction not in {"ASC", "DESC"}:
             raise ValueError(f"Direction {direction} is not allowed")
@@ -1514,7 +1507,7 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT
                     id,
-                    sum({STORAGE_SIZE_BYTES_SUM}) AS storage_size_bytes
+                    sum({config.storage_size_bytes_sum}) AS storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY id
@@ -1545,7 +1538,7 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT
                     trace_id,
-                    sum({STORAGE_SIZE_BYTES_SUM}) AS total_storage_size_bytes
+                    sum({config.storage_size_bytes_sum}) AS total_storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 {trace_id_filter}
@@ -1919,6 +1912,16 @@ ALLOWED_CALL_FIELDS = {
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
+# Dotted prefixes routed to special handlers in `get_field_by_name`.
+ALLOWED_DYNAMIC_FIELD_PREFIXES = (
+    "feedback.*",
+    "annotation_queue_items.*",
+    "summary.weave.*",
+)
+
+# Resolvable but internal; not advertised in `field not allowed` messages.
+_HIDDEN_MESSAGE_FIELDS = {"project_id", "deleted_at", "expire_at"}
+
 # Fields that are stored as DateTime64 columns in ClickHouse. When comparing
 # these fields with numeric unix timestamps, the value must be converted to a
 # datetime string so ClickHouse can properly use primary key / ORDER BY indexes.
@@ -1951,8 +1954,35 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
                 return field
-            raise InvalidFieldError(f"Field {name} is not allowed")
+            raise InvalidFieldError(_invalid_field_message(name))
     return ALLOWED_CALL_FIELDS[name]
+
+
+def _invalid_field_message(name: str) -> str:
+    """`field not allowed` message for an unrecognized field."""
+    return f"Field {name} is not allowed. {_allowed_fields_clause()}"
+
+
+def _disallowed_filter_message(name: str) -> str:
+    """`field not filterable/sortable` message for a recognized-but-blocked field."""
+    return (
+        f"Field {name} cannot be used for filtering or sorting. "
+        f"{_allowed_fields_clause(exclude=DISALLOWED_FILTERING_FIELDS)}"
+    )
+
+
+def _allowed_fields_clause(exclude: Collection[str] = ()) -> str:
+    """Render the advertised `Allowed fields` + `Allowed dynamic prefixes` lists."""
+    hidden = _HIDDEN_MESSAGE_FIELDS.union(exclude)
+    names = [name for name in ALLOWED_CALL_FIELDS if name not in hidden]
+    dotted_prefixes = tuple(
+        f"{name.removesuffix('_dump')}.*"
+        for name in names
+        if isinstance(ALLOWED_CALL_FIELDS[name], CallsMergedDynamicField)
+    )
+    allowed = ", ".join(sorted(name.removesuffix("_dump") for name in names))
+    prefixes = ", ".join(sorted(ALLOWED_DYNAMIC_FIELD_PREFIXES + dotted_prefixes))
+    return f"Allowed fields: {allowed}. Allowed dynamic prefixes: {prefixes}."
 
 
 def _field_as_sql_maybe_agg(
@@ -2174,7 +2204,7 @@ def process_query_to_conditions(
             if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
                 return None
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+                raise InvalidFieldError(_disallowed_filter_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
             if isinstance(structured_field, CallsMergedDynamicField):
@@ -2325,7 +2355,7 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+                raise InvalidFieldError(_disallowed_filter_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
 
@@ -3222,7 +3252,7 @@ def _optimized_unfiltered_storage_query(
         {count_expr} AS count,
         toUInt8(0) AS has_more,
         coalesce(
-            (SELECT sum({STORAGE_SIZE_BYTES_SUM})
+            (SELECT sum({config.storage_size_bytes_sum})
              FROM {config.stats_table_name}
              WHERE project_id = {project_id_slot}),
             0
@@ -3455,21 +3485,6 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.thread_ids is None
         and filter.turn_ids is None
     )
-
-
-def _format_table_name_with_cluster(
-    table_name: str,
-    cluster_name: str | None,
-) -> str:
-    """Format a table name with ON CLUSTER clause if cluster_name is provided.
-
-    Callers are responsible for passing the correct table name (e.g.
-    calls_complete_local in distributed mode). This function only appends the
-    ON CLUSTER clause.
-    """
-    if cluster_name:
-        return f"{table_name} ON CLUSTER {cluster_name}"
-    return table_name
 
 
 def build_calls_complete_update_end_query(

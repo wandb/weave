@@ -16,6 +16,7 @@ import {
 import {Turn} from '../../genai/turn';
 
 import {
+  expectSpanTimesToMatch,
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
@@ -276,6 +277,18 @@ describe('LLM (via Turn.startLLM)', () => {
       turn.end();
     });
 
+    it('startTime/endTime backdate the chat span window', () => {
+      const turn = Turn.create({});
+      const startedAt = new Date('2026-01-01T00:00:00Z');
+      const endedAt = new Date('2026-01-01T00:00:05Z');
+      const llm = turn.startLLM({model: 'gpt-4o', startTime: startedAt});
+      llm.end({endTime: endedAt});
+      turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
+    });
+
     it('setAttributes records attributes on the chat span; warns + no-op after end()', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const turn = Turn.create({});
@@ -333,8 +346,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.attachMediaUrl('https://example.com/x', {modality: 'image'});
       llm.record({inputMessages: [{role: 'user', content: 'after end'}]});
 
-      // One warning per method (warnOnce dedupes per key process-wide; each
-      // method uses a distinct key).
+      // One warning per method.
       expect(warnSpy).toHaveBeenCalledTimes(5);
       for (const method of [
         'output',

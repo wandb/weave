@@ -55,11 +55,10 @@ describe('OpenAI Integration', () => {
       },
     } as any;
     mockWandbServerApi = {} as any;
-    weaveClient = new WeaveClient(
-      mockTraceServerApi,
-      mockWandbServerApi,
-      'test-project'
-    );
+    weaveClient = new WeaveClient({
+      traceServerApi: mockTraceServerApi,
+      projectId: 'test-project',
+    });
 
     wrappedOpenAI = wrapOpenAI(mockOpenAI);
   });

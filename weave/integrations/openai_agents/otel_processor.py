@@ -62,6 +62,7 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
 
 from weave.integrations.openai_agents.openai_agents import (
+    OPENAI_AGENTS_INTEGRATION,
     _call_name,
     _is_task_span_data,
     _is_turn_span_data,
@@ -71,6 +72,7 @@ from weave.session.adapters.openai import (
     reasoning_from_openai_responses,
     usage_from_openai_responses,
 )
+from weave.session.agent_context import resolve_agent_name
 from weave.session.session_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
@@ -139,7 +141,8 @@ def _agent_attrs(span: Span[AgentSpanData], conversation_id: str) -> dict[str, A
     """
     sd = span.span_data
     attrs = invoke_agent_attributes(
-        agent_name=sd.name or "",
+        # An explicit ambient override wins over the SDK-native agent name.
+        agent_name=resolve_agent_name(sd.name or ""),
         conversation_id=conversation_id,
         provider_name=_PROVIDER_NAME,
     )
@@ -539,6 +542,8 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         )
         otel_span.set_attribute(f"{_WEAVE_ATTR_PREFIX}.span_id", span.span_id)
         otel_span.set_attribute(f"{_WEAVE_ATTR_PREFIX}.trace_id", span.trace_id)
+        # Stamp integration provenance on every span (flattened for OTel).
+        _set_attrs(otel_span, OPENAI_AGENTS_INTEGRATION.as_otel_attributes())
         self._span_otel[span.span_id] = otel_span
         self._trace_spans.setdefault(span.trace_id, {})[span.span_id] = None
         # Attach so any span the user creates inside an Agents-SDK span nests
@@ -626,7 +631,9 @@ def _otel_span_name(span: Span) -> str:
     sd = span.span_data
     name = _call_name(span)
     if isinstance(sd, AgentSpanData):
-        return f"invoke_agent {name}"
+        # Keep the span name aligned with gen_ai.agent.name in _agent_attrs:
+        # an explicit ambient override wins over the SDK-native name.
+        return f"invoke_agent {resolve_agent_name(name)}"
     if _is_task_span_data(sd):
         # Structural span — NOT invoke_agent, since a Task wraps a workflow
         # not an agent. See _task_attrs.

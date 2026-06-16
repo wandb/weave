@@ -24,15 +24,14 @@ def test_server_functionality(trace_server: TestOnlyUserInjectingExternalTraceSe
 
 ### Configuration:
 
-The trace server backend can be configured via pytest flags:
-- `--trace-server=sqlite`: Use SQLite backend (in-memory)
+The trace server backend is ClickHouse. The backend can be selected via pytest flags:
 - `--trace-server=clickhouse`: Use ClickHouse backend (default)
 - `--ch` or `--clickhouse`: Shorthand for ClickHouse backend
 
 ### Architecture:
 
 The fixture automatically:
-- Sets up the appropriate backend (SQLite or ClickHouse)
+- Sets up the ClickHouse backend
 - Injects a test user entity (`shawn`) for all operations
 - Handles database setup/teardown
 - Provides ID conversion between external and internal formats
@@ -43,9 +42,8 @@ Tests in this directory should focus on trace server functionality only. Client-
 
 ### CI Integration:
 
-The CI pipeline runs tests in three segments:
-1. **Non Trace Server**: Tests that don't depend on a trace server
-2. **ClickHouse Trace Server**: Trace server tests with ClickHouse backend  
-3. **SQLite Trace Server**: Trace server tests with SQLite backend
+The CI pipeline runs tests in these segments:
+- **Non Trace Server**: Tests that don't depend on a trace server
+- **ClickHouse Trace Server**: Trace server tests with ClickHouse backend
 
-This ensures comprehensive coverage across both backend implementations. 
+This ensures comprehensive coverage of the ClickHouse backend. 

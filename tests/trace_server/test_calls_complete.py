@@ -27,7 +27,6 @@ from weave.trace_server.project_version.types import (
     ReadTable,
     WriteTarget,
 )
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 @pytest.fixture
@@ -44,8 +43,6 @@ def clickhouse_trace_server(trace_server):
         >>> internal = clickhouse_trace_server
     """
     internal_server = trace_server._internal_trace_server
-    if isinstance(internal_server, SqliteTraceServer):
-        pytest.skip("ClickHouse-only test")
     internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return internal_server
 

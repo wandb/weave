@@ -19,7 +19,6 @@ def patch_cerebras() -> Generator[None, None, None]:
     patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("CEREBRAS_API_KEY", "DUMMY_API_KEY")
@@ -39,6 +38,11 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
 
     assert call.exception is None
     assert call.ended_at is not None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "cerebras"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "cerebras-cloud-sdk"
     output = call.output
     assert output.choices[0].message.content.strip() == exp
     assert output.choices[0].finish_reason == "stop"
@@ -53,7 +57,6 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     assert output.usage.total_tokens == model_usage["total_tokens"]
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_cerebras_async(client: weave.trace.weave_client.WeaveClient) -> None:

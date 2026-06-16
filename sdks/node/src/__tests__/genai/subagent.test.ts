@@ -6,7 +6,11 @@ import {
 } from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
-import {setupExporterPerTest, setupGenAITestEnvironment} from './common';
+import {
+  expectSpanTimesToMatch,
+  setupExporterPerTest,
+  setupGenAITestEnvironment,
+} from './common';
 
 describe('SubAgent', () => {
   setupGenAITestEnvironment();
@@ -86,5 +90,20 @@ describe('SubAgent', () => {
       expect.stringContaining('SubAgent.addEvent() called after end()')
     );
     warnSpy.mockRestore();
+  });
+
+  it('startTime/endTime backdate the invoke_agent span window', () => {
+    const startedAt = new Date('2026-01-01T00:00:00Z');
+    const endedAt = new Date('2026-01-01T00:00:05Z');
+    const turn = Turn.create({});
+    const sub = turn.startSubagent({name: 'researcher', startTime: startedAt});
+    sub.end({endTime: endedAt});
+    turn.end();
+
+    expectSpanTimesToMatch(
+      findSub(getExporter().getFinishedSpans()),
+      startedAt,
+      endedAt
+    );
   });
 });

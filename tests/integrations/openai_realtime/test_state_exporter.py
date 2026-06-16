@@ -9,12 +9,14 @@ class DummyWeaveClient:
         self.created: list[str] = []
         self.finished: list[str] = []
         self.thread_ids: list[str | None] = []
+        self.created_attributes: list[dict | None] = []
 
     def create_call(self, op, inputs=None, parent=None, **kwargs):
         from weave.trace.call import Call
         from weave.trace.context.call_context import get_thread_id
 
         self.created.append(op)
+        self.created_attributes.append(kwargs.get("attributes"))
         self.thread_ids.append(get_thread_id())
         return Call(
             _op_name=op,
@@ -293,6 +295,14 @@ def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
     time.sleep(0.08)
 
     assert_calls_with_thread_id(client, "realtime.response", None)
+
+    # Integration-tracking metadata is stamped on the calls this exporter creates.
+    stamped = [
+        a["integration"] for a in client.created_attributes if a and "integration" in a
+    ]
+    assert stamped, "expected >=1 created call to carry integration metadata"
+    assert all(i["name"] == "openai_realtime" for i in stamped)
+    assert all(i["meta"]["package_name"] == "openai" for i in stamped)
 
 
 def test_transcripts_not_required_when_text_modality_absent(monkeypatch):

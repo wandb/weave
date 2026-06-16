@@ -225,7 +225,6 @@ filterwarnings = [
 ]
 addopts = "-v"
 markers = [
-  "skip_clickhouse_client: marks tests as requiring clickhouse client to be skipped",
   "trace_server: alias for `trace_server` fixture used for CI dispatching. Do not use directly in code.",
   "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
   "timeout: marks tests with a timeout in seconds (via pytest-timeout)",
@@ -366,7 +365,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.43-dev0"
+current_version = "0.52.44-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

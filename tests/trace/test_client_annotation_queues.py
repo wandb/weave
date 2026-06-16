@@ -13,13 +13,11 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 class CallsFixture(NamedTuple):
@@ -146,9 +144,6 @@ def create_queue_with_calls(
 
 def test_annotation_queue_create_and_read(client):
     """Test creating and reading an annotation queue."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create a queue
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
@@ -182,9 +177,6 @@ def test_annotation_queue_create_and_read(client):
 
 def test_annotation_queue_multiple_scorer_refs(client):
     """Test creating a queue with multiple scorer refs."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name="Multi Scorer Queue",
@@ -219,9 +211,6 @@ def test_annotation_queue_multiple_scorer_refs(client):
 
 def test_annotation_queue_update_all_fields(client):
     """Test updating all fields of an annotation queue."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create a queue
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
@@ -271,9 +260,6 @@ def test_annotation_queue_update_all_fields(client):
 
 def test_annotation_queue_update_partial(client):
     """Test updating only some fields (partial update)."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create a queue
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
@@ -306,9 +292,6 @@ def test_annotation_queue_update_partial(client):
 
 def test_annotation_queue_update_nonexistent(client):
     """Test updating a non-existent queue raises NotFoundError."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Try to update a non-existent queue
     update_req = tsi.AnnotationQueueUpdateReq(
         project_id=client.project_id,
@@ -323,9 +306,6 @@ def test_annotation_queue_update_nonexistent(client):
 
 def test_annotation_queue_update_no_fields(client):
     """Test updating with no fields provided returns existing queue."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create a queue
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
@@ -359,9 +339,6 @@ def test_annotation_queue_update_no_fields(client):
 
 def test_annotation_queues_query_stream_all(client):
     """Test querying all annotation queues for a project."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create multiple queues
     for i in range(3):
         req = tsi.AnnotationQueueCreateReq(
@@ -390,9 +367,6 @@ def test_annotation_queues_query_stream_all(client):
 
 def test_annotation_queues_query_stream_with_name_filter(client):
     """Test querying queues with name filter."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queues with different names
     req1 = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
@@ -427,9 +401,6 @@ def test_annotation_queues_query_stream_with_name_filter(client):
 
 def test_annotation_queues_query_stream_with_pagination(client):
     """Test querying queues with limit and offset."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create 5 queues
     for i in range(5):
         req = tsi.AnnotationQueueCreateReq(
@@ -466,8 +437,6 @@ def test_annotation_queues_query_stream_with_pagination(client):
 
 def test_annotation_queue_add_calls(client):
     """Test adding calls to an annotation queue."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
 
     # Create some test calls
     @weave.op
@@ -510,9 +479,6 @@ def test_annotation_queue_add_calls(client):
 
 def test_annotation_queue_add_calls_duplicate_prevention(client):
     """Test that adding duplicate calls is handled correctly."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     project_id = client.project_id
 
     # Create a test call
@@ -562,8 +528,6 @@ def test_annotation_queue_add_calls_duplicate_prevention(client):
 
 def test_annotation_queue_add_calls_batch(client):
     """Test adding multiple calls in batch."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
 
     # Create many test calls
     @weave.op
@@ -603,8 +567,6 @@ def test_annotation_queue_add_calls_batch(client):
 
 def test_annotation_queue_add_calls_partial_duplicates(client):
     """Test adding calls where some are duplicates and some are new."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
 
     # Create test calls
     @weave.op
@@ -654,8 +616,6 @@ def test_annotation_queue_add_calls_partial_duplicates(client):
 
 def test_annotation_queues_stats(client):
     """Test getting stats for multiple annotation queues with partial completion."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
 
     # Create test calls
     @weave.op
@@ -828,9 +788,6 @@ def test_annotation_queues_stats(client):
 
 def test_annotation_queues_stats_empty_queues(client):
     """Test getting stats for queues with no items."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create two empty queues
     queue_ids = []
     for i in range(2):
@@ -859,9 +816,6 @@ def test_annotation_queues_stats_empty_queues(client):
 
 def test_annotation_queues_stats_no_queue_ids(client):
     """Test getting stats with empty queue_ids list."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Request stats with no queue IDs
     stats_req = tsi.AnnotationQueuesStatsReq(
         project_id=client.project_id,
@@ -875,9 +829,6 @@ def test_annotation_queues_stats_no_queue_ids(client):
 
 def test_annotation_queue_items_query_basic(client):
     """Test basic querying of annotation queue items."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Items Query Test Queue"
@@ -905,9 +856,6 @@ def test_annotation_queue_items_query_basic(client):
 
 def test_annotation_queue_items_query_with_pagination(client):
     """Test querying queue items with limit and offset."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 10 calls
     fixture = create_queue_with_calls(
         client, num_calls=10, queue_name="Items Pagination Queue"
@@ -941,9 +889,6 @@ def test_annotation_queue_items_query_with_pagination(client):
 
 def test_annotation_queue_items_query_with_sorting(client):
     """Test querying queue items with different sort orders."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 3 calls
     fixture = create_queue_with_calls(
         client,
@@ -980,9 +925,6 @@ def test_annotation_queue_items_query_with_sorting(client):
 
 def test_annotation_queue_items_query_empty_queue(client):
     """Test querying items from an empty queue."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create an empty queue
     queue_id = create_annotation_queue(client, name="Empty Items Queue")
 
@@ -999,9 +941,6 @@ def test_annotation_queue_items_query_empty_queue(client):
 
 def test_annotation_queue_items_query_with_multiple_sort_fields(client):
     """Test querying with multiple sort fields."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Multi Sort Queue"
@@ -1024,9 +963,6 @@ def test_annotation_queue_items_query_with_multiple_sort_fields(client):
 
 def test_annotation_queue_items_query_filter_by_call_id(client):
     """Test filtering queue items by call_id."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Filter By Call ID Queue"
@@ -1050,9 +986,6 @@ def test_annotation_queue_items_query_filter_by_call_id(client):
 
 def test_annotation_queue_items_query_filter_by_call_op_name(client):
     """Test filtering queue items by call_op_name."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create two different sets of calls with different op names
     fixture1 = create_queue_with_calls(
         client, num_calls=3, queue_name="Filter Op Name Queue A"
@@ -1087,9 +1020,6 @@ def test_annotation_queue_items_query_filter_by_call_op_name(client):
 
 def test_annotation_queue_items_query_filter_by_call_trace_id(client):
     """Test filtering queue items by call_trace_id."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Filter By Trace ID Queue"
@@ -1121,9 +1051,6 @@ def test_annotation_queue_items_query_filter_by_call_trace_id(client):
 
 def test_annotation_queue_items_query_filter_by_added_by(client):
     """Test filtering queue items by added_by."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls added by test_user
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Filter By Added By Queue"
@@ -1161,9 +1088,6 @@ def test_annotation_queue_items_query_filter_by_annotation_states(client):
     Tests for other states (in_progress, completed, skipped) will be added
     once the queue item progress update API is available.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Filter By States Queue"
@@ -1196,9 +1120,6 @@ def test_annotation_queue_items_query_filter_by_annotation_states(client):
 
 def test_annotation_queue_items_query_filter_combined(client):
     """Test filtering queue items with multiple filters combined."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Filter Combined Queue"
@@ -1249,9 +1170,6 @@ def test_annotation_queue_items_query_filter_combined(client):
 
 def test_annotation_queue_items_query_filter_empty_results(client):
     """Test filtering queue items that returns no results."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Filter Empty Results Queue"
@@ -1282,9 +1200,6 @@ def test_annotation_queue_items_query_filter_empty_results(client):
 
 def test_annotation_queue_items_query_filter_with_pagination(client):
     """Test filtering with pagination."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 10 calls
     fixture = create_queue_with_calls(
         client, num_calls=10, queue_name="Filter With Pagination Queue"
@@ -1322,9 +1237,6 @@ def test_annotation_queue_items_query_filter_with_pagination(client):
 
 def test_annotation_queue_items_query_filter_with_sorting(client):
     """Test filtering with sorting."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Filter With Sorting Queue"
@@ -1351,9 +1263,6 @@ def test_annotation_queue_items_query_filter_with_sorting(client):
 
 def test_annotation_queue_items_query_with_position_basic(client):
     """Test querying queue items with position tracking enabled."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Position Basic Queue"
@@ -1382,9 +1291,6 @@ def test_annotation_queue_items_query_with_position_basic(client):
 
 def test_annotation_queue_items_query_without_position(client):
     """Test that position_in_queue is None when include_position=False."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 3 calls
     fixture = create_queue_with_calls(
         client, num_calls=3, queue_name="No Position Queue"
@@ -1405,9 +1311,6 @@ def test_annotation_queue_items_query_without_position(client):
 
 def test_annotation_queue_items_query_position_with_sorting(client):
     """Test that position respects custom sort order."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Position With Sort Queue"
@@ -1441,9 +1344,6 @@ def test_annotation_queue_items_query_position_with_filter_unstarted(client):
     then the filter is applied. This allows users to see the true
     position of items in the queue even when viewing a filtered subset.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Position With Filter Queue"
@@ -1472,9 +1372,6 @@ def test_annotation_queue_items_query_position_with_filter_unstarted(client):
 
 def test_annotator_queue_items_progress_update_completed(client):
     """Test updating queue item state to 'completed'."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="Progress Update Completed Queue"
@@ -1525,9 +1422,6 @@ def test_annotator_queue_items_progress_update_completed(client):
 
 def test_annotator_queue_items_progress_update_skipped(client):
     """Test updating queue item state to 'skipped'."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="Progress Update Skipped Queue"
@@ -1559,9 +1453,6 @@ def test_annotator_queue_items_progress_update_skipped(client):
 
 def test_annotator_queue_items_progress_update_invalid_state(client):
     """Test that updating to invalid state raises error."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="Invalid State Queue"
@@ -1591,9 +1482,6 @@ def test_annotator_queue_items_progress_update_invalid_state(client):
 
 def test_annotator_queue_items_progress_update_nonexistent_item(client):
     """Test that updating nonexistent item raises error."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create an empty queue
     queue_id = create_annotation_queue(client, name="Nonexistent Item Queue")
 
@@ -1613,9 +1501,6 @@ def test_annotator_queue_items_progress_update_nonexistent_item(client):
 
 def test_annotator_queue_items_progress_update_no_user_id(client):
     """Test that updating without user_id raises error."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="No User ID Queue"
@@ -1645,9 +1530,6 @@ def test_annotator_queue_items_progress_update_no_user_id(client):
 
 def test_annotator_queue_items_progress_update_transition_from_in_progress(client):
     """Test valid state transition from in_progress to completed."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="Transition From In Progress Queue"
@@ -1699,9 +1581,6 @@ def test_annotator_queue_items_progress_update_invalid_transition_from_completed
     client,
 ):
     """Test invalid state transition from completed to skipped."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="Invalid Transition Queue"
@@ -1746,9 +1625,6 @@ def test_annotator_queue_items_progress_update_idempotent(client, state):
     This simulates retry scenarios where the first request succeeded but the
     response was lost (e.g., network timeout).
     """
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call - use unique queue name without state name
     # to avoid any potential name-based issues
     fixture = create_queue_with_calls(
@@ -1791,9 +1667,6 @@ def test_annotator_queue_items_progress_update_idempotent(client, state):
 
 def test_annotator_queue_items_progress_update_stats_integration(client):
     """Test that progress updates correctly affect queue stats."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
         client, num_calls=5, queue_name="Stats Integration Queue"
@@ -1851,9 +1724,6 @@ def test_annotator_queue_items_progress_update_stats_integration(client):
 
 def test_annotator_queue_items_progress_update_in_progress_new(client):
     """Test updating queue item state to 'in_progress' for a new record."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="In Progress New Queue"
@@ -1898,9 +1768,6 @@ def test_annotator_queue_items_progress_update_in_progress_new(client):
 
 def test_annotator_queue_items_progress_update_in_progress_existing(client):
     """Test that in_progress -> in_progress is idempotent (no-op, succeeds)."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="In Progress Existing Queue"
@@ -1942,9 +1809,6 @@ def test_annotator_queue_items_progress_update_in_progress_existing(client):
 
 def test_annotator_queue_items_progress_update_in_progress_from_completed(client):
     """Test that completed -> in_progress fails (can't restart a finished item)."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="In Progress From Completed Queue"
@@ -1987,9 +1851,6 @@ def test_annotator_queue_items_progress_update_in_progress_from_completed(client
 
 def test_annotator_queue_items_progress_in_progress_to_completed(client):
     """Test transitioning from 'in_progress' to 'completed'."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 1 call
     fixture = create_queue_with_calls(
         client, num_calls=1, queue_name="In Progress to Completed Queue"
@@ -2040,9 +1901,6 @@ def test_annotator_queue_items_progress_in_progress_to_completed(client):
 
 def test_annotator_queue_items_progress_in_progress_workflow(client):
     """Test the full workflow: mark in_progress, then complete."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 3 calls
     fixture = create_queue_with_calls(
         client, num_calls=3, queue_name="In Progress Workflow Queue"
@@ -2147,9 +2005,6 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
 
 def test_annotator_queue_items_progress_update_returns_correct_item(client):
     """Test that progress update returns the specific item that was updated."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create queue with 3 items - we need multiple items to expose the bug
     fixture = create_queue_with_calls(
         client, num_calls=3, queue_name="Returns Correct Item Queue"
@@ -2200,13 +2055,6 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     4. Verify items are correctly added with proper display_data
     5. Query items back to confirm correct data population
     """
-    try:
-        find_server_layer(trace_server, SqliteTraceServer)
-    except TypeError:
-        pass
-    else:
-        pytest.skip("ClickHouse-only test")
-
     project_id = f"{TEST_ENTITY}/test_queue_add_calls_complete"
 
     # Step 1: Seed project with calls_complete data
@@ -2332,9 +2180,6 @@ def test_annotation_queue_read_nonexistent(client):
     an empty result set (iterator with no items) correctly raises NotFoundError
     instead of raising StopIteration.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     project_id = client.project_id
     nonexistent_queue_id = "00000000-0000-0000-0000-000000000000"
 
@@ -2355,9 +2200,6 @@ def test_annotation_queue_read_nonexistent(client):
 
 def test_annotation_queue_delete_basic(client):
     """Test complete deletion lifecycle: delete, verify response, verify cannot read/delete again."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create a queue
     queue_id = create_annotation_queue(
         client, name="Delete Test Queue", description="Queue to be deleted"
@@ -2417,9 +2259,6 @@ def test_annotation_queue_delete_basic(client):
 
 def test_annotation_queue_delete_not_in_query(client):
     """Test that deleted queues don't appear in query results."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     # Create two queues
     queue1_id = create_annotation_queue(client, name="Queue 1")
     queue2_id = create_annotation_queue(client, name="Queue 2")
@@ -2453,9 +2292,6 @@ def test_annotation_queue_delete_not_in_query(client):
 
 def test_annotation_queue_delete_nonexistent(client):
     """Test that deleting a non-existent queue raises NotFoundError."""
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
-
     nonexistent_queue_id = "00000000-0000-0000-0000-000000000000"
 
     # Try to delete non-existent queue

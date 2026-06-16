@@ -22,6 +22,10 @@ from anthropic.types.beta import (
 )
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
@@ -31,6 +35,8 @@ if TYPE_CHECKING:
     from anthropic.lib.streaming import MessageStream
 
 _anthropic_patcher: MultiPatcher | None = None
+
+ANTHROPIC_INTEGRATION = library_integration("anthropic")
 
 
 def anthropic_accumulator(
@@ -233,7 +239,7 @@ def get_anthropic_patcher(
     if _anthropic_patcher is not None:
         return _anthropic_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, ANTHROPIC_INTEGRATION)
 
     messages_create_settings = base.model_copy(
         update={

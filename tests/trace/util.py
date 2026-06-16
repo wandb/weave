@@ -7,17 +7,6 @@ import re
 import time
 from contextlib import contextmanager
 
-from tests.trace.server_utils import find_server_layer
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-
-
-def client_is_sqlite(client):
-    try:
-        find_server_layer(client.server, SqliteTraceServer)
-    except TypeError:
-        return False
-    return True
-
 
 class AnyStrMatcher:  # noqa: PLW1641
     """Matches any string."""

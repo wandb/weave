@@ -1,5 +1,6 @@
 import io
 import json
+from collections.abc import Callable
 from unittest.mock import patch
 
 import boto3
@@ -97,6 +98,108 @@ MOCK_STREAM_EVENTS = [
         "metadata": {
             "usage": {"inputTokens": 55, "outputTokens": 30, "totalTokens": 85},
             "metrics": {"latencyMs": 926},
+        }
+    },
+]
+
+# Converse stream emitting a reasoning block followed by a tool-use block.
+# A reasoning-capable, tool-bound Claude model produces these non-text deltas,
+# which the accumulator must not choke on.
+MOCK_STREAM_EVENTS_TOOL_USE = [
+    {"messageStart": {"role": "assistant"}},
+    {
+        "contentBlockDelta": {
+            "delta": {"reasoningContent": {"text": "Let me check"}},
+            "contentBlockIndex": 0,
+        }
+    },
+    {
+        "contentBlockDelta": {
+            "delta": {"reasoningContent": {"text": " the weather."}},
+            "contentBlockIndex": 0,
+        }
+    },
+    {
+        "contentBlockDelta": {
+            "delta": {"reasoningContent": {"signature": "c2lnbmF0dXJl"}},
+            "contentBlockIndex": 0,
+        }
+    },
+    {"contentBlockStop": {"contentBlockIndex": 0}},
+    {
+        "contentBlockStart": {
+            "start": {
+                "toolUse": {"toolUseId": "tooluse_abc123", "name": "get_weather"}
+            },
+            "contentBlockIndex": 1,
+        }
+    },
+    {
+        "contentBlockDelta": {
+            "delta": {"toolUse": {"input": '{"city":'}},
+            "contentBlockIndex": 1,
+        }
+    },
+    {
+        "contentBlockDelta": {
+            "delta": {"toolUse": {"input": ' "Paris"}'}},
+            "contentBlockIndex": 1,
+        }
+    },
+    {"contentBlockStop": {"contentBlockIndex": 1}},
+    {"messageStop": {"stopReason": "tool_use"}},
+    {
+        "metadata": {
+            "usage": {"inputTokens": 60, "outputTokens": 25, "totalTokens": 85},
+            "metrics": {"latencyMs": 500},
+        }
+    },
+]
+
+# A turn with a leading text block followed by two tool-use blocks: exercises
+# text/tool interleaving and arg routing across multiple contentBlockStart events.
+MOCK_STREAM_EVENTS_TEXT_AND_TOOLS = [
+    {"messageStart": {"role": "assistant"}},
+    {"contentBlockDelta": {"delta": {"text": "Checking"}, "contentBlockIndex": 0}},
+    {"contentBlockDelta": {"delta": {"text": " both."}, "contentBlockIndex": 0}},
+    {"contentBlockStop": {"contentBlockIndex": 0}},
+    {
+        "contentBlockStart": {
+            "start": {"toolUse": {"toolUseId": "tool_1", "name": "get_weather"}},
+            "contentBlockIndex": 1,
+        }
+    },
+    {
+        "contentBlockDelta": {
+            "delta": {"toolUse": {"input": '{"city": "Paris"}'}},
+            "contentBlockIndex": 1,
+        }
+    },
+    {"contentBlockStop": {"contentBlockIndex": 1}},
+    {
+        "contentBlockStart": {
+            "start": {"toolUse": {"toolUseId": "tool_2", "name": "get_time"}},
+            "contentBlockIndex": 2,
+        }
+    },
+    {
+        "contentBlockDelta": {
+            "delta": {"toolUse": {"input": '{"tz":'}},
+            "contentBlockIndex": 2,
+        }
+    },
+    {
+        "contentBlockDelta": {
+            "delta": {"toolUse": {"input": ' "CET"}'}},
+            "contentBlockIndex": 2,
+        }
+    },
+    {"contentBlockStop": {"contentBlockIndex": 2}},
+    {"messageStop": {"stopReason": "tool_use"}},
+    {
+        "metadata": {
+            "usage": {"inputTokens": 70, "outputTokens": 40, "totalTokens": 110},
+            "metrics": {"latencyMs": 700},
         }
     },
 ]
@@ -246,6 +349,22 @@ def mock_converse_make_api_call(self, operation_name: str, api_params: dict) -> 
     return orig(self, operation_name, api_params)
 
 
+def converse_stream_make_api_call(events: list[dict]) -> Callable:
+    """Build a _make_api_call that streams the given events for ConverseStream."""
+
+    def mock(self, operation_name: str, api_params: dict) -> dict:
+        if operation_name == "ConverseStream":
+
+            class MockStream:
+                def __iter__(self):
+                    yield from events
+
+            return {"stream": MockStream()}
+        return orig(self, operation_name, api_params)
+
+    return mock
+
+
 def mock_invoke_make_api_call(self, operation_name: str, api_params: dict) -> dict:
     if operation_name == "InvokeModel":
         return MOCK_INVOKE_RESPONSE
@@ -293,7 +412,6 @@ def mock_invoke_agent_make_api_call(
     return orig(self, operation_name, api_params)
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
 def test_bedrock_converse(
@@ -326,6 +444,12 @@ def test_bedrock_converse(
     assert call.exception is None
     assert call.ended_at is not None
 
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "bedrock"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "boto3"
+
     # Inspect the captured output if desired
     output = call.output
 
@@ -348,7 +472,6 @@ def test_bedrock_converse(
     assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 70
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
 def test_bedrock_converse_stream(
@@ -403,7 +526,107 @@ def test_bedrock_converse_stream(
     assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 85
 
 
-@pytest.mark.skip_clickhouse_client
+@mock_aws
+def test_bedrock_converse_stream_tool_use(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """Tool-use and reasoning deltas must not raise KeyError mid-stream (issue #7215)."""
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=converse_stream_make_api_call(MOCK_STREAM_EVENTS_TOOL_USE),
+    ):
+        response = bedrock_client.converse_stream(
+            modelId=model_id,
+            system=[{"text": system_message}],
+            messages=messages,
+            inferenceConfig={"maxTokens": 100},
+        )
+        stream = response.get("stream")
+        assert stream is not None, "Stream not found in response"
+
+        # The user must receive every event unchanged: non-text deltas previously
+        # crashed the wrapper and terminated this loop.
+        consumed = list(stream)
+        assert consumed == MOCK_STREAM_EVENTS_TOOL_USE
+
+    calls = client.get_calls()
+    assert len(calls) == 1, "Expected exactly one trace call for the stream test"
+    call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
+
+    output = call.output
+    assert output["role"] == "assistant"
+    assert output["content"] == ""
+    assert output["reasoning"] == "Let me check the weather."
+    assert output["tool_calls"] == [
+        {
+            "toolUseId": "tooluse_abc123",
+            "name": "get_weather",
+            "input": '{"city": "Paris"}',
+        }
+    ]
+    assert output["stop_reason"] == "tool_use"
+
+    summary = call.summary
+    assert summary is not None, "Summary should not be None"
+    model_usage = summary["usage"][model_id]
+    assert model_usage["requests"] == 1
+    assert output["usage"]["inputTokens"] == model_usage["prompt_tokens"] == 60
+    assert output["usage"]["outputTokens"] == model_usage["completion_tokens"] == 25
+    assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 85
+
+
+@mock_aws
+def test_bedrock_converse_stream_text_and_tools(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """Leading text plus two tool calls: args route to the right tool block."""
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=converse_stream_make_api_call(MOCK_STREAM_EVENTS_TEXT_AND_TOOLS),
+    ):
+        response = bedrock_client.converse_stream(
+            modelId=model_id,
+            system=[{"text": system_message}],
+            messages=messages,
+            inferenceConfig={"maxTokens": 100},
+        )
+        stream = response.get("stream")
+        assert stream is not None, "Stream not found in response"
+        consumed = list(stream)
+        assert consumed == MOCK_STREAM_EVENTS_TEXT_AND_TOOLS
+
+    calls = client.get_calls()
+    assert len(calls) == 1, "Expected exactly one trace call for the stream test"
+    call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
+
+    output = call.output
+    assert output["content"] == "Checking both."
+    assert output["reasoning"] == ""
+    assert output["tool_calls"] == [
+        {"toolUseId": "tool_1", "name": "get_weather", "input": '{"city": "Paris"}'},
+        {"toolUseId": "tool_2", "name": "get_time", "input": '{"tz": "CET"}'},
+    ]
+    assert output["stop_reason"] == "tool_use"
+
+    summary = call.summary
+    assert summary is not None, "Summary should not be None"
+    model_usage = summary["usage"][model_id]
+    assert model_usage["requests"] == 1
+    assert output["usage"]["inputTokens"] == model_usage["prompt_tokens"] == 70
+    assert output["usage"]["outputTokens"] == model_usage["completion_tokens"] == 40
+    assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 110
+
+
 @mock_aws
 def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
@@ -455,7 +678,6 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
     assert model_usage["requests"] == 1
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -> None:
     from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
@@ -531,7 +753,6 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         assert result.metadata["usage"]["totalTokens"] == 55
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_invoke_exception_handling(
     client: weave.trace.weave_client.WeaveClient,
@@ -581,7 +802,6 @@ def test_bedrock_invoke_exception_handling(
     assert call.output is None
 
 
-@pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_agent_invoke_agent(
     client: weave.trace.weave_client.WeaveClient,

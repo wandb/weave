@@ -10,7 +10,7 @@ This module tests the V2 API endpoints for:
 - Predictions (create, read, list, delete)
 - Scores (create, read, list, delete)
 
-The tests run against both SQLite and ClickHouse backends.
+The tests run against the ClickHouse backend.
 """
 
 import datetime
