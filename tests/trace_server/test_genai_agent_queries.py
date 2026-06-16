@@ -372,14 +372,14 @@ def test_trace_messages_reads_and_dedups_child_span_messages(ch_server):
         AgentTraceMessagesReq(project_id=project_id, trace_id=trace_id, limit=100)
     )
 
-    by_role: dict[str, list[str]] = {}
-    for m in res.messages:
-        by_role.setdefault(m.role, []).append(m.content)
-
-    assert by_role.get("user") == ["hi"]  # deduped across the two spans
-    assert by_role.get("assistant") == ["hello"]
-    assert by_role.get("system") == ["be helpful"]
-    assert "tool_result" not in by_role  # tool roles excluded by the query
+    # Entire payload: the user echo is deduped to one, tool_result is excluded,
+    # and the three scoring roles come back. Sorted by (role, content) because
+    # ordering is by ingest time, which ties within a single insert batch.
+    assert sorted(res.messages, key=lambda m: (m.role, m.content)) == [
+        NormalizedMessage(role="assistant", content="hello"),
+        NormalizedMessage(role="system", content="be helpful"),
+        NormalizedMessage(role="user", content="hi"),
+    ]
 
 
 def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):
