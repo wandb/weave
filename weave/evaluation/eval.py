@@ -379,12 +379,8 @@ class Evaluation(Object):
 
     @op(call_display_name=default_evaluation_display_name, eager_call_start=True)
     async def evaluate(self, model: Op | Model) -> dict:
-        # Mark every child call (predict_and_score, model, scorers, summarize)
-        # so server-side ingest sampling can identify eval calls from their own
-        # attributes; children are ingested before the root, so its op_name is
-        # not yet known. Merge into any existing _weave_eval_meta (e.g. set by
-        # evaluate_model_worker) rather than overwriting it. The literal mirrors
-        # eval_imperative.EVAL_META_KEY (importing it here would be circular).
+        # Tag every eval child call (mirrors the imperative path); merge into any
+        # existing _weave_eval_meta (e.g. evaluate_model_worker), don't overwrite.
         prev_eval_meta = call_context.call_attributes.get().get("_weave_eval_meta", {})
         with attributes({"_weave_eval_meta": {**prev_eval_meta, "declarative": True}}):
             eval_results = await self.get_eval_results(model)
