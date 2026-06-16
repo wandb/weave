@@ -70,29 +70,26 @@ def test_object_query_builder_basic():
     assert builder.parameters["project_id"] == "test_project"
 
 
-def test_object_query_builder_add_digest_condition():
+def test_object_query_builder_mutators():
+    """Each mutator lands its fragment in the right builder part plus any param."""
+    # latest digest -> is_latest condition, no param
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
-
-    # Test latest digest
     builder.add_digests_conditions("latest")
     assert "is_latest = 1" in builder.conditions_part
 
-    # Test specific digest
+    # specific digest -> digest condition + param
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_digests_conditions("abc123")
     assert "digest = {version_digest_0: String}" in builder.conditions_part
     assert builder.parameters["version_digest_0"] == "abc123"
 
-
-def test_object_query_builder_add_object_ids_condition():
+    # single object id -> equality + param
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
-
-    # Test single object ID
     builder.add_object_ids_condition(["obj1"])
     assert "object_id = {object_id: String}" in builder.object_id_conditions_part
     assert builder.parameters["object_id"] == "obj1"
 
-    # Test multiple object IDs
+    # multiple object ids -> IN + param
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_object_ids_condition(["obj1", "obj2"])
     assert (
@@ -100,8 +97,7 @@ def test_object_query_builder_add_object_ids_condition():
     )
     assert builder.parameters["object_ids"] == ["obj1", "obj2"]
 
-
-def test_object_query_builder_add_is_op_condition():
+    # is_op -> is_op condition
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_is_op_condition(True)
     assert "is_op = 1" in builder.conditions_part
@@ -234,79 +230,74 @@ def assert_sql(exp_query, actual_query):
     assert exp_formatted == actual_formatted
 
 
-def test_object_query_builder_metadata_query_basic():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+def _build_metadata_basic(builder: ObjectMetadataQueryBuilder) -> None:
     builder.add_digests_conditions("latest")
 
-    query = builder.make_metadata_query()
-    parameters = builder.parameters
 
-    expected_query = _expected_metadata_query(
-        "ov.project_id = {project_id: String}",
-        """WHERE ((is_latest = 1) AND (deleted_at IS NULL))
-ORDER BY created_at ASC""",
-    )
-
-    assert_sql(query, expected_query)
-    assert parameters == {"project_id": "test_project"}
-
-
-def test_object_query_builder_metadata_query_with_limit_offset_sort():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-
-    limit = 10
-    offset = 5
-
-    builder.set_limit(limit)
-    builder.set_offset(offset)
+def _build_metadata_limit_offset_sort(builder: ObjectMetadataQueryBuilder) -> None:
+    builder.set_limit(10)
+    builder.set_offset(5)
     builder.add_order("created_at", "desc")
     builder.add_object_ids_condition(["object_1"])
     builder.add_digests_conditions("digestttttttttttttttt", "another-one", "v2")
     builder.add_base_object_classes_condition(["Model", "Model2"])
 
-    query = builder.make_metadata_query()
-    parameters = builder.parameters
 
-    expected_query = _expected_metadata_query(
-        "ov.project_id = {project_id: String} AND object_id = {object_id: String}",
-        """WHERE ((((digest = {version_digest_0: String}) OR (digest = {version_digest_1: String}) OR (version_index = {version_index_2: Int64}))) AND (base_object_class IN {base_object_classes: Array(String)}) AND (deleted_at IS NULL))
-ORDER BY created_at DESC
-LIMIT 10
-OFFSET 5""",
-    )
-
-    assert_sql(query, expected_query)
-    assert parameters == {
-        "project_id": "test_project",
-        "object_id": "object_1",
-        "version_digest_0": "digestttttttttttttttt",
-        "version_digest_1": "another-one",
-        "version_index_2": 2,
-        "base_object_classes": ["Model", "Model2"],
-    }
-
-
-def test_objects_query_metadata_op():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+def _build_metadata_op(builder: ObjectMetadataQueryBuilder) -> None:
     builder.add_is_op_condition(True)
     builder.add_object_ids_condition(["my_op"])
     builder.add_digests_conditions("v3")
 
-    query = builder.make_metadata_query()
-    parameters = builder.parameters
 
-    expected_query = _expected_metadata_query(
-        "ov.project_id = {project_id: String} AND object_id = {object_id: String}",
-        """WHERE ((is_op = 1) AND (version_index = {version_index_0: Int64}) AND (deleted_at IS NULL))
+@pytest.mark.parametrize(
+    ("configure", "where_clause", "outer_clauses", "expected_params"),
+    [
+        (
+            _build_metadata_basic,
+            "ov.project_id = {project_id: String}",
+            """WHERE ((is_latest = 1) AND (deleted_at IS NULL))
 ORDER BY created_at ASC""",
-    )
+            {"project_id": "test_project"},
+        ),
+        (
+            _build_metadata_limit_offset_sort,
+            "ov.project_id = {project_id: String} AND object_id = {object_id: String}",
+            """WHERE ((((digest = {version_digest_0: String}) OR (digest = {version_digest_1: String}) OR (version_index = {version_index_2: Int64}))) AND (base_object_class IN {base_object_classes: Array(String)}) AND (deleted_at IS NULL))
+ORDER BY created_at DESC
+LIMIT 10
+OFFSET 5""",
+            {
+                "project_id": "test_project",
+                "object_id": "object_1",
+                "version_digest_0": "digestttttttttttttttt",
+                "version_digest_1": "another-one",
+                "version_index_2": 2,
+                "base_object_classes": ["Model", "Model2"],
+            },
+        ),
+        (
+            _build_metadata_op,
+            "ov.project_id = {project_id: String} AND object_id = {object_id: String}",
+            """WHERE ((is_op = 1) AND (version_index = {version_index_0: Int64}) AND (deleted_at IS NULL))
+ORDER BY created_at ASC""",
+            {
+                "project_id": "test_project",
+                "object_id": "my_op",
+                "version_index_0": 3,
+            },
+        ),
+    ],
+)
+def test_object_query_builder_metadata_query(
+    configure, where_clause, outer_clauses, expected_params
+):
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    configure(builder)
 
-    assert_sql(query, expected_query)
-    assert parameters == {
-        "project_id": "test_project",
-        "object_id": "my_op",
-        "version_index_0": 3,
-    }
+    query = builder.make_metadata_query()
+
+    assert_sql(query, _expected_metadata_query(where_clause, outer_clauses))
+    assert builder.parameters == expected_params
 
 
 def test_make_objects_val_query_and_parameters():

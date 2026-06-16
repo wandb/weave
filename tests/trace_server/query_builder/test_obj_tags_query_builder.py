@@ -1,3 +1,6 @@
+from collections.abc import Callable
+
+import pytest
 import sqlparse
 
 from weave.trace_server.query_builder.obj_tags_query_builder import (
@@ -11,23 +14,6 @@ from weave.trace_server.query_builder.obj_tags_query_builder import (
 from weave.trace_server.query_builder.objects_query_builder import (
     ObjectMetadataQueryBuilder,
 )
-
-
-def _assert_sql(
-    expected_query: str,
-    expected_params: dict,
-    actual_query: str,
-    actual_params: dict,
-) -> None:
-    expected_formatted = sqlparse.format(expected_query, reindent=True).strip()
-    actual_formatted = sqlparse.format(actual_query, reindent=True).strip()
-    assert expected_formatted == actual_formatted, (
-        f"\nExpected:\n{expected_formatted}\n\nGot:\n{actual_formatted}"
-    )
-    assert expected_params == actual_params, (
-        f"\nExpected params: {expected_params}\n\nGot params: {actual_params}"
-    )
-
 
 # --- obj_tags_query_builder functions ---
 
@@ -115,14 +101,55 @@ def test_make_resolve_alias_query():
     _assert_sql(expected_query, expected_params, query, params)
 
 
+# --- list queries ---
+
+
+@pytest.mark.parametrize(
+    ("make_query", "expected_query"),
+    [
+        pytest.param(
+            make_list_tags_query,
+            """
+        SELECT tag
+        FROM tags
+        PREWHERE project_id = {project_id: String}
+        GROUP BY project_id, tag
+        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY tag
+    """,
+            id="list_tags",
+        ),
+        pytest.param(
+            make_list_aliases_query,
+            """
+        SELECT alias
+        FROM aliases
+        PREWHERE project_id = {project_id: String}
+        GROUP BY project_id, alias
+        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY alias
+    """,
+            id="list_aliases",
+        ),
+    ],
+)
+def test_make_list_query(
+    make_query: Callable[[str], tuple[str, dict]], expected_query: str
+) -> None:
+    query, params = make_query("proj")
+    _assert_sql(expected_query, {"project_id": "proj"}, query, params)
+
+
 # --- ObjectMetadataQueryBuilder tag/alias conditions ---
 
 
-def test_add_tags_condition():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_tags_condition(["reviewed", "staging"])
-
-    expected_query = """
+@pytest.mark.parametrize(
+    ("method_name", "names", "expected_query", "expected_params"),
+    [
+        pytest.param(
+            "add_tags_condition",
+            ["reviewed", "staging"],
+            """
 WHERE (((main.project_id,
          main.object_id,
          main.digest) IN
@@ -137,22 +164,14 @@ WHERE (((main.project_id,
                     tag
            HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)))
        AND (deleted_at IS NULL))
-    """
-    expected_params = {
-        "project_id": "test_project",
-        "filter_tags": ["reviewed", "staging"],
-    }
-
-    _assert_sql(
-        expected_query, expected_params, builder.conditions_part, builder.parameters
-    )
-
-
-def test_add_aliases_condition():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_aliases_condition(["production", "canary"])
-
-    expected_query = """
+    """,
+            {"project_id": "test_project", "filter_tags": ["reviewed", "staging"]},
+            id="tags",
+        ),
+        pytest.param(
+            "add_aliases_condition",
+            ["production", "canary"],
+            """
 WHERE (((main.project_id,
          main.object_id,
          main.digest) IN
@@ -166,87 +185,27 @@ WHERE (((main.project_id,
                     alias
            HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)))
        AND (deleted_at IS NULL))
-    """
-    expected_params = {
-        "project_id": "test_project",
-        "filter_aliases": ["production", "canary"],
-    }
-
-    _assert_sql(
-        expected_query, expected_params, builder.conditions_part, builder.parameters
-    )
-
-
-def test_add_aliases_condition_latest_only():
-    """Filtering by 'latest' alone routes through the hybrid `is_latest` column.
-
-    The CTE-derived `is_latest` covers both the explicit "latest" alias row
-    and the computed most-recent-surviving fallback for objects whose alias
-    row was tombstoned by obj_delete.
-    """
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_aliases_condition(["latest"])
-
-    expected_query = """
+    """,
+            {"project_id": "test_project", "filter_aliases": ["production", "canary"]},
+            id="aliases",
+        ),
+        # 'latest' alone routes through the hybrid `is_latest` column: no subquery,
+        # no filter_aliases param.
+        pytest.param(
+            "add_aliases_condition",
+            ["latest"],
+            """
 WHERE ((is_latest = 1)
    AND (deleted_at IS NULL))
-    """
-    expected_params = {
-        "project_id": "test_project",
-    }
-
-    _assert_sql(
-        expected_query, expected_params, builder.conditions_part, builder.parameters
-    )
-
-
-# --- list queries ---
-
-
-def test_make_list_tags_query():
-    query, params = make_list_tags_query("proj")
-
-    expected_query = """
-        SELECT tag
-        FROM tags
-        PREWHERE project_id = {project_id: String}
-        GROUP BY project_id, tag
-        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-        ORDER BY tag
-    """
-    expected_params = {
-        "project_id": "proj",
-    }
-
-    _assert_sql(expected_query, expected_params, query, params)
-
-
-def test_make_list_aliases_query():
-    query, params = make_list_aliases_query("proj")
-
-    expected_query = """
-        SELECT alias
-        FROM aliases
-        PREWHERE project_id = {project_id: String}
-        GROUP BY project_id, alias
-        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-        ORDER BY alias
-    """
-    expected_params = {
-        "project_id": "proj",
-    }
-
-    _assert_sql(expected_query, expected_params, query, params)
-
-
-def test_add_aliases_condition_with_latest():
-    """Filtering by both 'latest' and a real alias ORs the hybrid `is_latest`
-    column with the aliases-table subquery for the non-latest names.
-    """
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_aliases_condition(["latest", "production"])
-
-    expected_query = """
+    """,
+            {"project_id": "test_project"},
+            id="aliases_latest_only",
+        ),
+        # 'latest' plus a real alias ORs the hybrid column with the aliases subquery.
+        pytest.param(
+            "add_aliases_condition",
+            ["latest", "production"],
+            """
 WHERE (((is_latest = 1
          OR (main.project_id,
              main.object_id,
@@ -261,12 +220,36 @@ WHERE (((is_latest = 1
                      alias
             HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3))))
        AND (deleted_at IS NULL))
-    """
-    expected_params = {
-        "project_id": "test_project",
-        "filter_aliases": ["production"],
-    }
-
+    """,
+            {"project_id": "test_project", "filter_aliases": ["production"]},
+            id="aliases_with_latest",
+        ),
+    ],
+)
+def test_metadata_builder_condition(
+    method_name: str,
+    names: list[str],
+    expected_query: str,
+    expected_params: dict,
+) -> None:
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    getattr(builder, method_name)(names)
     _assert_sql(
         expected_query, expected_params, builder.conditions_part, builder.parameters
+    )
+
+
+def _assert_sql(
+    expected_query: str,
+    expected_params: dict,
+    actual_query: str,
+    actual_params: dict,
+) -> None:
+    expected_formatted = sqlparse.format(expected_query, reindent=True).strip()
+    actual_formatted = sqlparse.format(actual_query, reindent=True).strip()
+    assert expected_formatted == actual_formatted, (
+        f"\nExpected:\n{expected_formatted}\n\nGot:\n{actual_formatted}"
+    )
+    assert expected_params == actual_params, (
+        f"\nExpected params: {expected_params}\n\nGot params: {actual_params}"
     )

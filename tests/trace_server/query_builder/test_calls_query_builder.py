@@ -863,57 +863,96 @@ def test_calls_query_with_predicate_filters() -> None:
     )
 
 
-def test_query_with_summary_weave_status_sort() -> None:
-    """Test sorting by summary.weave.status field."""
-    cq = CallsQuery(project_id="project")
+@pytest.mark.parametrize(
+    ("read_table", "extra_fields", "expected_sql", "expected_params"),
+    [
+        (
+            ReadTable.CALLS_MERGED,
+            ["exception", "ended_at"],
+            """
+            SELECT
+                calls_merged.id AS id,
+                any(calls_merged.exception) AS exception,
+                any(calls_merged.ended_at) AS ended_at
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_5:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((
+                    any(calls_merged.deleted_at) IS NULL
+                ))
+                AND
+                ((
+                   NOT ((
+                      any(calls_merged.op_name) IS NULL
+                   ))
+                ))
+            )
+            ORDER BY CASE
+                WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
+                WHEN IFNULL(
+                    toInt64OrNull(
+                        coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')
+                    ),
+                    0
+                ) > 0 THEN {pb_4:String}
+                WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+                ELSE {pb_3:String}
+                END ASC
+            """,
+            {
+                "pb_0": '$."status_counts"."error"',
+                "pb_1": "error",
+                "pb_2": "running",
+                "pb_3": "success",
+                "pb_4": "descendant_error",
+                "pb_5": "project",
+            },
+        ),
+        (
+            ReadTable.CALLS_COMPLETE,
+            [],
+            """
+            SELECT calls_complete.id AS id
+            FROM calls_complete PREWHERE calls_complete.project_id = {pb_8:String}
+            WHERE 1
+              AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+            ORDER BY CASE
+                         WHEN calls_complete.exception != {pb_6:String} THEN {pb_2:String}
+                         WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_1:String}), 'null'), '')), 0) > 0 THEN {pb_5:String}
+                         WHEN calls_complete.ended_at = {pb_7:DateTime64(6)} THEN {pb_3:String}
+                         ELSE {pb_4:String}
+                     END ASC
+            """,
+            {
+                "pb_0": SENTINEL_EPOCH,
+                "pb_1": '$."status_counts"."error"',
+                "pb_2": "error",
+                "pb_3": "running",
+                "pb_4": "success",
+                "pb_5": "descendant_error",
+                "pb_6": "",
+                "pb_7": SENTINEL_EPOCH,
+                "pb_8": "project",
+            },
+        ),
+    ],
+)
+def test_status_sort_by_table(
+    read_table: ReadTable,
+    extra_fields: list[str],
+    expected_sql: str,
+    expected_params: dict,
+) -> None:
+    """Sorting by summary.weave.status: calls_merged uses any()-CASE over a GROUP BY,
+    calls_complete uses sentinel checks (exception != '', ended_at = sentinel) on flat rows.
+    """
+    cq = CallsQuery(project_id="project", read_table=read_table)
     cq.add_field("id")
-    cq.add_field("exception")
-    cq.add_field("ended_at")
+    for field in extra_fields:
+        cq.add_field(field)
     cq.add_order("summary.weave.status", "asc")
-
-    # Assert that the query orders by the computed status field
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id,
-            any(calls_merged.exception) AS exception,
-            any(calls_merged.ended_at) AS ended_at
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            ((
-                any(calls_merged.deleted_at) IS NULL
-            ))
-            AND
-            ((
-               NOT ((
-                  any(calls_merged.op_name) IS NULL
-               ))
-            ))
-        )
-        ORDER BY CASE
-            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-            WHEN IFNULL(
-                toInt64OrNull(
-                    coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')
-                ),
-                0
-            ) > 0 THEN {pb_4:String}
-            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
-            ELSE {pb_3:String}
-            END ASC
-        """,
-        {
-            "pb_0": '$."status_counts"."error"',
-            "pb_1": "error",
-            "pb_2": "running",
-            "pb_3": "success",
-            "pb_4": "descendant_error",
-            "pb_5": "project",
-        },
-    )
+    assert_sql(cq, expected_sql, expected_params)
 
 
 def test_query_with_summary_weave_status_sort_and_filter() -> None:
@@ -1200,244 +1239,189 @@ def test_calls_query_with_complex_heavy_filters() -> None:
     )
 
 
-def test_calls_query_with_like_optimization() -> None:
-    """Test that simple JSON field equality checks use LIKE optimization."""
+_LIKE_EQ_CONDITION = tsi_query.EqOperation.model_validate(
+    {"$eq": [{"$getField": "inputs.param"}, {"$literal": "hello"}]}
+)
+_LIKE_CONTAINS_CONDITION = tsi_query.ContainsOperation.model_validate(
+    {
+        "$contains": {
+            "input": {"$getField": "inputs.param"},
+            "substr": {"$literal": "hello"},
+            "case_insensitive": True,
+        }
+    }
+)
+_LIKE_IN_CONDITION = tsi_query.InOperation.model_validate(
+    {
+        "$in": [
+            {"$getField": "inputs.param"},
+            [{"$literal": "hello"}, {"$literal": "world"}],
+        ]
+    }
+)
+
+
+@pytest.mark.parametrize(
+    ("condition", "expected_sql", "expected_params"),
+    [
+        (
+            _LIKE_EQ_CONDITION,
+            """
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_3:String}
+            WHERE ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+            """,
+            {
+                "pb_3": "project",
+                "pb_2": '%"hello"%',
+                "pb_1": "hello",
+                "pb_0": '$."param"',
+            },
+        ),
+        (
+            _LIKE_CONTAINS_CONDITION,
+            """
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_3:String}
+            WHERE ((lower(calls_merged.inputs_dump) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+            """,
+            {
+                "pb_0": '$."param"',
+                "pb_3": "project",
+                "pb_2": '%"%hello%"%',
+                "pb_1": "hello",
+            },
+        ),
+        (
+            _LIKE_IN_CONDITION,
+            """
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_5:String}
+            WHERE (((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump LIKE {pb_4:String})
+                    OR calls_merged.inputs_dump IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+            """,
+            {
+                "pb_0": '$."param"',
+                "pb_1": "hello",
+                "pb_2": "world",
+                "pb_5": "project",
+                "pb_3": '%"hello"%',
+                "pb_4": '%"world"%',
+            },
+        ),
+    ],
+    ids=["eq", "contains", "in"],
+)
+def test_calls_query_with_like_optimization_calls_merged(
+    condition: object, expected_sql: str, expected_params: dict
+) -> None:
+    """On calls_merged the LIKE prefilter carries `OR ... IS NULL` (unmerged parts)."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
+    cq.add_condition(condition)
+    assert_sql(cq, expected_sql, expected_params)
+
+
+@pytest.mark.parametrize(
+    ("condition", "expected_sql", "expected_params"),
+    [
+        (
+            _LIKE_EQ_CONDITION,
+            """
+            SELECT
+                calls_complete.id AS id
+            FROM calls_complete
+            PREWHERE calls_complete.project_id = {pb_4:String}
+            WHERE (calls_complete.inputs_dump LIKE {pb_3:String})
+            AND
+                (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') = {pb_1:String}))
+                     AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+            """,
             {
-                "$eq": [
-                    {"$getField": "inputs.param"},
-                    {"$literal": "hello"},
-                ]
-            }
-        )
-    )
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
-            AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
-        )
-        """,
-        {
-            "pb_3": "project",
-            "pb_2": '%"hello"%',
-            "pb_1": "hello",
-            "pb_0": '$."param"',
-        },
-    )
-
-
-def test_calls_query_with_like_optimization_contains() -> None:
-    """Test that contains operations on JSON fields use LIKE optimization."""
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.ContainsOperation.model_validate(
+                "pb_0": '$."param"',
+                "pb_1": "hello",
+                "pb_2": SENTINEL_EPOCH,
+                "pb_3": '%"hello"%',
+                "pb_4": "project",
+            },
+        ),
+        (
+            _LIKE_CONTAINS_CONDITION,
+            """
+            SELECT
+                calls_complete.id AS id
+            FROM calls_complete
+            PREWHERE calls_complete.project_id = {pb_4:String}
+            WHERE (lower(calls_complete.inputs_dump) LIKE {pb_3:String})
+            AND
+                ((positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+                     AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+            """,
             {
-                "$contains": {
-                    "input": {"$getField": "inputs.param"},
-                    "substr": {"$literal": "hello"},
-                    "case_insensitive": True,
-                }
-            }
-        )
-    )
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((lower(calls_merged.inputs_dump) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
-            AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
-        )
-        """,
-        {
-            "pb_0": '$."param"',
-            "pb_3": "project",
-            "pb_2": '%"%hello%"%',
-            "pb_1": "hello",
-        },
-    )
-
-
-def test_query_with_json_value_in_condition() -> None:
-    """Test that in operations on JSON fields use JSON_VALUE with IN."""
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.InOperation.model_validate(
+                "pb_0": '$."param"',
+                "pb_1": "hello",
+                "pb_2": SENTINEL_EPOCH,
+                "pb_3": '%"%hello%"%',
+                "pb_4": "project",
+            },
+        ),
+        (
+            _LIKE_IN_CONDITION,
+            """
+            SELECT
+                calls_complete.id AS id
+            FROM calls_complete
+            PREWHERE calls_complete.project_id = {pb_6:String}
+            WHERE ((calls_complete.inputs_dump LIKE {pb_4:String} OR calls_complete.inputs_dump LIKE {pb_5:String}))
+            AND
+                (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
+                     AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
+            """,
             {
-                "$in": [
-                    {"$getField": "inputs.param"},
-                    [{"$literal": "hello"}, {"$literal": "world"}],
-                ]
-            }
-        )
-    )
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
-        WHERE (((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump LIKE {pb_4:String})
-                OR calls_merged.inputs_dump IS NULL))
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
-            AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
-        )
-        """,
-        {
-            "pb_0": '$."param"',
-            "pb_1": "hello",
-            "pb_2": "world",
-            "pb_5": "project",
-            "pb_3": '%"hello"%',
-            "pb_4": '%"world"%',
-        },
-    )
-
-
-def test_calls_query_with_like_optimization_calls_complete() -> None:
-    """Test that LIKE optimization on calls_complete does NOT include null checks.
-
-    For calls_complete, every row is a complete call, so there are no unmerged
-    call parts with NULL fields. The LIKE condition should be tighter without
-    the OR IS NULL clause.
-    """
+                "pb_0": '$."param"',
+                "pb_1": "hello",
+                "pb_2": "world",
+                "pb_3": SENTINEL_EPOCH,
+                "pb_4": '%"hello"%',
+                "pb_5": '%"world"%',
+                "pb_6": "project",
+            },
+        ),
+    ],
+    ids=["eq", "contains", "in"],
+)
+def test_calls_query_with_like_optimization_calls_complete(
+    condition: object, expected_sql: str, expected_params: dict
+) -> None:
+    """On calls_complete every row is complete, so the LIKE prefilter has no `OR IS NULL`."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {
-                "$eq": [
-                    {"$getField": "inputs.param"},
-                    {"$literal": "hello"},
-                ]
-            }
-        )
-    )
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_complete.id AS id
-        FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_4:String}
-        WHERE (calls_complete.inputs_dump LIKE {pb_3:String})
-        AND
-            (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') = {pb_1:String}))
-                 AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
-        """,
-        {
-            "pb_0": '$."param"',
-            "pb_1": "hello",
-            "pb_2": SENTINEL_EPOCH,
-            "pb_3": '%"hello"%',
-            "pb_4": "project",
-        },
-    )
-
-
-def test_calls_query_with_like_optimization_contains_calls_complete() -> None:
-    """Test that contains LIKE optimization on calls_complete does NOT include null checks."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.ContainsOperation.model_validate(
-            {
-                "$contains": {
-                    "input": {"$getField": "inputs.param"},
-                    "substr": {"$literal": "hello"},
-                    "case_insensitive": True,
-                }
-            }
-        )
-    )
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_complete.id AS id
-        FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_4:String}
-        WHERE (lower(calls_complete.inputs_dump) LIKE {pb_3:String})
-        AND
-            ((positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
-                 AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
-        """,
-        {
-            "pb_0": '$."param"',
-            "pb_1": "hello",
-            "pb_2": SENTINEL_EPOCH,
-            "pb_3": '%"%hello%"%',
-            "pb_4": "project",
-        },
-    )
-
-
-def test_calls_query_with_like_optimization_in_calls_complete() -> None:
-    """Test that IN LIKE optimization on calls_complete does NOT include null checks."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.InOperation.model_validate(
-            {
-                "$in": [
-                    {"$getField": "inputs.param"},
-                    [{"$literal": "hello"}, {"$literal": "world"}],
-                ]
-            }
-        )
-    )
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_complete.id AS id
-        FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_6:String}
-        WHERE ((calls_complete.inputs_dump LIKE {pb_4:String} OR calls_complete.inputs_dump LIKE {pb_5:String}))
-        AND
-            (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
-                 AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
-        """,
-        {
-            "pb_0": '$."param"',
-            "pb_1": "hello",
-            "pb_2": "world",
-            "pb_3": SENTINEL_EPOCH,
-            "pb_4": '%"hello"%',
-            "pb_5": '%"world"%',
-            "pb_6": "project",
-        },
-    )
+    cq.add_condition(condition)
+    assert_sql(cq, expected_sql, expected_params)
 
 
 def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
@@ -2120,57 +2104,56 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
     )
 
 
-def test_unsupported_summary_field_raises_invalid_field_error() -> None:
-    """Filtering by an unknown summary.weave.* field must surface as InvalidFieldError
-    (mapped to HTTP 403) rather than NotImplementedError (HTTP 500). Regression for
-    WB-34835: clients hitting /calls/query_stats with summary.weave.duration_ms were
-    getting 500s for what is actually invalid input.
-    """
+def _select_field_as_sql(field: str) -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field(field)
+    cq.as_sql(ParamBuilder())
+
+
+def _filter_summary_duration_ms_as_sql() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_condition(
         tsi_query.GtOperation.model_validate(
-            {
-                "$gt": [
-                    {"$getField": "summary.weave.duration_ms"},
-                    {"$literal": 0},
-                ]
-            }
+            {"$gt": [{"$getField": "summary.weave.duration_ms"}, {"$literal": 0}]}
         )
     )
-    with pytest.raises(InvalidFieldError, match="duration_ms"):
-        cq.as_sql(ParamBuilder())
+    cq.as_sql(ParamBuilder())
 
 
-def test_unselectable_columns_raise_invalid_field_error() -> None:
-    """Selecting columns that the SQL builder can't materialize as a select expression
-    must surface as InvalidFieldError (403), not NotImplementedError (500). Regression
-    for WB-34836: dynamic, feedback, and annotation-queue-item paths all hit the same
-    "implement me!" raise.
-    """
-    # Nested dynamic field (e.g. inputs.foo) - routed through CallsMergedDynamicField
-    cq = CallsQuery(project_id="project")
-    cq.add_field("inputs.foo")
-    with pytest.raises(InvalidFieldError, match="cannot be selected directly"):
-        cq.as_sql(ParamBuilder())
-
-    # Feedback payload column - routed through CallsMergedFeedbackPayloadField
-    cq = CallsQuery(project_id="project")
-    cq.add_field("feedback.[wandb.note].payload.note")
-    with pytest.raises(InvalidFieldError, match="Feedback fields"):
-        cq.as_sql(ParamBuilder())
-
-    # Annotation queue item column - routed through CallsMergedQueueItemField
-    cq = CallsQuery(project_id="project")
-    cq.add_field("annotation_queue_items.queue_id")
-    with pytest.raises(InvalidFieldError, match="queue item fields"):
-        cq.as_sql(ParamBuilder())
-
-    # QueryBuilderDynamicField with extra_path (used by table_query, not CallsQuery,
-    # so we have to construct and select directly).
+def _select_dynamic_field_with_extra_path() -> None:
+    # QueryBuilderDynamicField with extra_path is used by table_query, not CallsQuery,
+    # so construct and select directly.
     field = QueryBuilderDynamicField(field="val_dump", extra_path=["foo", "bar"])
-    with pytest.raises(InvalidFieldError, match="val_dump.foo.bar"):
-        field.as_select_sql(ParamBuilder(), "table")
+    field.as_select_sql(ParamBuilder(), "table")
+
+
+@pytest.mark.parametrize(
+    ("trigger", "match_substr"),
+    [
+        (lambda: _select_field_as_sql("inputs.foo"), "cannot be selected directly"),
+        (
+            lambda: _select_field_as_sql("feedback.[wandb.note].payload.note"),
+            "Feedback fields",
+        ),
+        (
+            lambda: _select_field_as_sql("annotation_queue_items.queue_id"),
+            "queue item fields",
+        ),
+        (_select_dynamic_field_with_extra_path, "val_dump.foo.bar"),
+        (_filter_summary_duration_ms_as_sql, "duration_ms"),
+    ],
+)
+def test_unsupported_field_raises_invalid_field_error(
+    trigger: object, match_substr: str
+) -> None:
+    """Unselectable/unfilterable columns surface as InvalidFieldError (403), not a 500.
+
+    Regression for WB-34835/WB-34836: dynamic, feedback, queue-item, extra-path, and
+    unknown summary.weave.* paths must raise InvalidFieldError rather than NotImplementedError.
+    """
+    with pytest.raises(InvalidFieldError, match=match_substr):
+        trigger()
 
 
 def test_build_calls_complete_update_end_query() -> None:
@@ -2636,50 +2619,54 @@ def test_datetime_optimization_invalid_field() -> None:
     )
 
 
-def test_maybe_convert_datetime_operands() -> None:
-    """Test that _maybe_convert_datetime_operands converts numeric timestamps to datetime strings
-    for DateTime column fields (started_at, ended_at, deleted_at), and leaves other fields unchanged.
+@pytest.mark.parametrize(
+    ("field", "literal_in", "field_first", "expected_literal"),
+    [
+        # numeric int/float against a datetime column -> converted
+        ("started_at", 1709251200, True, "2024-03-01 00:00:00.000000"),
+        ("ended_at", 1709251200.5, True, "2024-03-01 00:00:00.500000"),
+        # numeric/None against a non-datetime column or null -> unchanged
+        ("wb_user_id", 1709251200, True, 1709251200),
+        ("deleted_at", None, True, None),
+        # CH-shaped string unchanged; ISO 8601 + bare-second forms map to CH format
+        (
+            "started_at",
+            "2024-03-01 00:00:00.000000",
+            True,
+            "2024-03-01 00:00:00.000000",
+        ),
+        ("started_at", "2024-03-01 00:00:00", True, "2024-03-01 00:00:00.000000"),
+        ("started_at", "2024-03-01T00:00:00Z", True, "2024-03-01 00:00:00.000000"),
+        # bare date for each datetime column -> midnight CH format
+        ("started_at", "2024-03-01", True, "2024-03-01 00:00:00.000000"),
+        ("ended_at", "2024-03-01", True, "2024-03-01 00:00:00.000000"),
+        ("deleted_at", "2024-03-01", True, "2024-03-01 00:00:00.000000"),
+        # literal-before-field ordering still converts the literal operand
+        ("started_at", "2024-03-01T12:00:00Z", False, "2024-03-01 12:00:00.000000"),
+        # non-datetime field or unparseable string -> unchanged
+        ("display_name", "2024-03-01", True, "2024-03-01"),
+        ("started_at", "not-a-timestamp", True, "not-a-timestamp"),
+    ],
+)
+def test_maybe_convert_datetime_operands(
+    field: str, literal_in: object, field_first: bool, expected_literal: object
+) -> None:
+    """_maybe_convert_datetime_operands canonicalizes numeric/string literals against
+    DateTime columns (started_at, ended_at, deleted_at) and leaves other fields untouched.
     """
-    # Test: numeric int literal compared to started_at → should convert
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-            tsi_query.LiteralOperation(**{"$literal": 1709251200}),
-        ]
-    )
-    assert isinstance(ops[1], tsi_query.LiteralOperation)
-    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
+    field_op = tsi_query.GetFieldOperator(**{"$getField": field})
+    literal_op = tsi_query.LiteralOperation(**{"$literal": literal_in})
+    operands = [field_op, literal_op] if field_first else [literal_op, field_op]
+    literal_index = 1 if field_first else 0
 
-    # Test: numeric float literal compared to ended_at → should convert
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "ended_at"}),
-            tsi_query.LiteralOperation(**{"$literal": 1709251200.5}),
-        ]
-    )
-    assert isinstance(ops[1], tsi_query.LiteralOperation)
-    assert isinstance(ops[1].literal_, str)
-    assert ops[1].literal_.startswith("2024-03-01 00:00:00")
+    ops = _maybe_convert_datetime_operands(operands)
 
-    # Test: numeric literal compared to non-datetime field → should NOT convert
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "wb_user_id"}),
-            tsi_query.LiteralOperation(**{"$literal": 1709251200}),
-        ]
-    )
-    assert ops[1].literal_ == 1709251200
+    assert isinstance(ops[literal_index], tsi_query.LiteralOperation)
+    assert ops[literal_index].literal_ == expected_literal
 
-    # Test: None literal compared to deleted_at → should NOT convert
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "deleted_at"}),
-            tsi_query.LiteralOperation(**{"$literal": None}),
-        ]
-    )
-    assert ops[1].literal_ is None
 
-    # Test: original operands are NOT mutated
+def test_maybe_convert_datetime_operands_does_not_mutate_input() -> None:
+    """Conversion returns new operands; the caller's LiteralOperation is left intact."""
     original_lit = tsi_query.LiteralOperation(**{"$literal": 1709251200})
     _maybe_convert_datetime_operands(
         [
@@ -2688,75 +2675,6 @@ def test_maybe_convert_datetime_operands() -> None:
         ]
     )
     assert original_lit.literal_ == 1709251200
-
-
-@pytest.mark.parametrize(
-    ("literal_in", "expected_literal"),
-    [
-        (
-            "2024-03-01 00:00:00.000000",
-            "2024-03-01 00:00:00.000000",
-        ),
-        (
-            "2024-03-01 00:00:00",
-            "2024-03-01 00:00:00.000000",
-        ),
-        (
-            "2024-03-01T00:00:00Z",
-            "2024-03-01 00:00:00.000000",
-        ),
-    ],
-)
-def test_maybe_convert_string_literal_to_ch_format(
-    literal_in: str, expected_literal: str
-) -> None:
-    """CH-shaped literals are unchanged; ISO 8601 literals map to canonical CH format."""
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-            tsi_query.LiteralOperation(**{"$literal": literal_in}),
-        ]
-    )
-    assert ops[1].literal_ == expected_literal
-
-
-@pytest.mark.parametrize("field", ["started_at", "ended_at", "deleted_at"])
-def test_maybe_convert_string_date_for_datetime_columns(field: str) -> None:
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": field}),
-            tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
-        ]
-    )
-    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
-
-
-def test_maybe_convert_literal_before_field() -> None:
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.LiteralOperation(**{"$literal": "2024-03-01T12:00:00Z"}),
-            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-        ]
-    )
-    assert ops[0].literal_ == "2024-03-01 12:00:00.000000"
-
-
-def test_maybe_convert_skips_non_datetime_string_field() -> None:
-    original = [
-        tsi_query.GetFieldOperator(**{"$getField": "display_name"}),
-        tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
-    ]
-    ops = _maybe_convert_datetime_operands(original)
-    assert ops == original
-
-
-def test_maybe_convert_skips_unparseable_string() -> None:
-    original = [
-        tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-        tsi_query.LiteralOperation(**{"$literal": "not-a-timestamp"}),
-    ]
-    ops = _maybe_convert_datetime_operands(original)
-    assert ops == original
 
 
 def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
@@ -3175,76 +3093,31 @@ def test_all_optimization_filters():
     )
 
 
-def test_filter_length_validation():
-    """Test that filter length validation works."""
-    pb = ParamBuilder()
+@pytest.mark.parametrize(
+    ("filter_key", "value"),
+    [
+        ("op_names", "weave-trace-internal:///%"),
+        ("input_refs", "weave-trace-internal:///%"),
+        ("output_refs", "weave-trace-internal:///%"),
+        ("parent_ids", "weave-trace-internal:///%"),
+        ("trace_ids", "weave-trace-internal:///%"),
+        ("call_ids", "weave-trace-internal:///%"),
+        ("thread_ids", "thread_123"),
+        ("turn_ids", "turn_123"),
+        ("wb_run_ids", "wb_run_123"),
+    ],
+)
+def test_filter_length_validation(filter_key: str, value: str) -> None:
+    """Every length-capped filter key rejects an over-max (1001-element) list."""
     cq = CallsQuery(project_id="test/project")
     cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"op_names": ["weave-trace-internal:///%"] * 1001}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={filter_key: [value] * 1001})
     with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
+        cq.as_sql(ParamBuilder())
 
-    cq = CallsQuery(project_id="test/project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"input_refs": ["weave-trace-internal:///%"] * 1001}
-    )
-    with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
 
-    cq = CallsQuery(project_id="test/project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"output_refs": ["weave-trace-internal:///%"] * 1001}
-    )
-    with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
-
-    cq = CallsQuery(project_id="test/project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"parent_ids": ["weave-trace-internal:///%"] * 1001}
-    )
-    with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
-
-    cq = CallsQuery(project_id="test/project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"trace_ids": ["weave-trace-internal:///%"] * 1001}
-    )
-    with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
-
-    cq = CallsQuery(project_id="test/project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"call_ids": ["weave-trace-internal:///%"] * 1001}
-    )
-    with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
-
-    cq = CallsQuery(project_id="test/project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123"] * 1001})
-    with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
-
-    cq = CallsQuery(project_id="test/project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"] * 1001})
-    with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
-
-    cq = CallsQuery(project_id="test/project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(filter={"wb_run_ids": ["wb_run_123"] * 1001})
-    with pytest.raises(ValueError, match="request length is greater than max length"):
-        cq.as_sql(pb)
-
-    # Test with too many conditions
+def test_filter_too_many_object_reference_conditions() -> None:
+    """Exceeding MAX_CTES_PER_QUERY object-ref conditions raises a distinct error."""
     cq = CallsQuery(project_id="test/project")
     complex_conditions = {
         "$and": [
@@ -3256,182 +3129,128 @@ def test_filter_length_validation():
     cq.add_condition(complex_conditions)
     cq.set_expand_columns(["inputs"])
     with pytest.raises(ValueError, match="Too many object reference conditions"):
-        s = cq.as_sql(pb)
+        cq.as_sql(ParamBuilder())
 
 
-def test_disallowed_fields():
+def test_disallowed_order_fields() -> None:
+    """Storage-size fields are not orderable; a bogus direction is also rejected."""
     cq = CallsQuery(project_id="test/project")
-    # allowed order field
-    cq.add_order("id", "ASC")
+    cq.add_order("id", "ASC")  # allowed, must not raise
     with pytest.raises(ValueError, match="not allowed in ORDER BY"):
         cq.add_order("storage_size_bytes", "ASC")
     with pytest.raises(ValueError, match="not allowed in ORDER BY"):
         cq.add_order("total_storage_size_bytes", "DESC")
-    # with bogus direction
     with pytest.raises(ValueError, match="not allowed"):
         cq.add_order("storage_size_bytes", "ASCDESC")
-    # now try filtering with disallowed
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GtOperation.model_validate(
-            {
-                "$gt": [
-                    {"$getField": "storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
 
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GteOperation.model_validate(
-            {
-                "$gte": [
-                    {"$getField": "total_storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
 
-    cq = CallsQuery(project_id="test/project")  # reset
+@pytest.mark.parametrize(
+    ("op_key", "op_class", "field"),
+    [
+        ("$gt", tsi_query.GtOperation, "storage_size_bytes"),
+        ("$gte", tsi_query.GteOperation, "total_storage_size_bytes"),
+        ("$lt", tsi_query.LtOperation, "storage_size_bytes"),
+        ("$lte", tsi_query.LteOperation, "total_storage_size_bytes"),
+    ],
+)
+def test_disallowed_storage_fields_in_filter(
+    op_key: str, op_class: type, field: str
+) -> None:
+    """Storage-size fields cannot be filtered on, across every comparison operator."""
+    cq = CallsQuery(project_id="test/project")
     cq.add_field("id")
     cq.add_condition(
-        tsi_query.LtOperation.model_validate(
-            {
-                "$lt": [
-                    {"$getField": "storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
-
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.LteOperation.model_validate(
-            {
-                "$lte": [
-                    {"$getField": "total_storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
+        op_class.model_validate({op_key: [{"$getField": field}, {"$literal": 1}]})
     )
     with pytest.raises(InvalidFieldError, match="not allowed"):
         cq.as_sql(ParamBuilder())
 
 
-def test_thread_id_filter_eq():
-    """Test thread_id filter with single thread ID."""
+@pytest.mark.parametrize(
+    ("filter_dict", "expected_sql", "expected_params"),
+    [
+        (
+            {"thread_ids": ["thread_123"]},
+            """
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.thread_id = {pb_1:String}
+                    OR calls_merged.thread_id IS NULL)
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
+            """,
+            {"pb_0": ["thread_123"], "pb_1": "thread_123", "pb_2": "project"},
+        ),
+        (
+            {"thread_ids": ["thread_123", "thread_456"]},
+            """
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.thread_id IN {pb_1:Array(String)}
+                    OR calls_merged.thread_id IS NULL)
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
+            """,
+            {
+                "pb_0": ["thread_123", "thread_456"],
+                "pb_1": ["thread_123", "thread_456"],
+                "pb_2": "project",
+            },
+        ),
+        (
+            {"turn_ids": ["turn_123"]},
+            """
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.turn_id = {pb_1:String}
+                    OR calls_merged.turn_id IS NULL)
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                AND (any(calls_merged.turn_id) IN {pb_0:Array(String)}))
+            """,
+            {"pb_0": ["turn_123"], "pb_1": "turn_123", "pb_2": "project"},
+        ),
+        (
+            {"turn_ids": ["turn_123", "turn_456"]},
+            """
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.turn_id IN {pb_1:Array(String)}
+                    OR calls_merged.turn_id IS NULL)
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                AND (any(calls_merged.turn_id) IN {pb_0:Array(String)}))
+            """,
+            {
+                "pb_0": ["turn_123", "turn_456"],
+                "pb_1": ["turn_123", "turn_456"],
+                "pb_2": "project",
+            },
+        ),
+    ],
+)
+def test_thread_turn_id_filter(
+    filter_dict: dict, expected_sql: str, expected_params: dict
+) -> None:
+    """thread_ids/turn_ids hardcoded filters render `=` for one value and `IN` for many."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123"]})
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.thread_id = {pb_1:String}
-                OR calls_merged.thread_id IS NULL)
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
-            AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
-        """,
-        {"pb_0": ["thread_123"], "pb_1": "thread_123", "pb_2": "project"},
-    )
-
-
-def test_thread_id_filter_in():
-    """Test thread_id filter with multiple thread IDs."""
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"thread_ids": ["thread_123", "thread_456"]}
-    )
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.thread_id IN {pb_1:Array(String)}
-                OR calls_merged.thread_id IS NULL)
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
-            AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
-        """,
-        {
-            "pb_0": ["thread_123", "thread_456"],
-            "pb_1": ["thread_123", "thread_456"],
-            "pb_2": "project",
-        },
-    )
-
-
-def test_turn_id_filter_eq():
-    """Test turn_id filter with single turn ID."""
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"]})
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.turn_id = {pb_1:String}
-                OR calls_merged.turn_id IS NULL)
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
-            AND (any(calls_merged.turn_id) IN {pb_0:Array(String)}))
-        """,
-        {"pb_0": ["turn_123"], "pb_1": "turn_123", "pb_2": "project"},
-    )
-
-
-def test_turn_id_filter_in():
-    """Test turn_id filter with multiple turn IDs."""
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123", "turn_456"]})
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
-        WHERE (calls_merged.turn_id IN {pb_1:Array(String)}
-                OR calls_merged.turn_id IS NULL)
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
-            AND (any(calls_merged.turn_id) IN {pb_0:Array(String)}))
-        """,
-        {
-            "pb_0": ["turn_123", "turn_456"],
-            "pb_1": ["turn_123", "turn_456"],
-            "pb_2": "project",
-        },
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter=filter_dict)
+    assert_sql(cq, expected_sql, expected_params)
 
 
 def test_thread_id_and_turn_id_filter_combined():
@@ -3936,101 +3755,140 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
     )
 
 
-def test_build_calls_complete_delete_query() -> None:
-    """Ensure the delete helper builds the expected query."""
+@pytest.mark.parametrize(
+    ("cluster_name", "expected_query"),
+    [
+        (
+            None,
+            """
+            DELETE FROM calls_complete
+            WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
+            """,
+        ),
+        (
+            "my_cluster",
+            """
+            DELETE FROM calls_complete ON CLUSTER my_cluster
+            WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
+            """,
+        ),
+    ],
+)
+def test_build_calls_complete_delete_query(
+    cluster_name: str | None, expected_query: str
+) -> None:
+    """The delete helper adds `ON CLUSTER` only when a cluster name is supplied."""
     query = build_calls_complete_delete_query(
         table_name="calls_complete",
         project_id_param="project_id",
         call_ids_param="call_ids",
+        cluster_name=cluster_name,
     )
-
-    expected = sqlparse.format(
-        """
-        DELETE FROM calls_complete
-        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
-        """,
-        reindent=True,
-    )
-
+    expected = sqlparse.format(expected_query, reindent=True)
     assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
 
 
-def test_build_calls_complete_delete_query_with_cluster() -> None:
-    """Ensure the delete helper builds the expected query with cluster name.
-
-    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
-    responsible for passing the correct table name (e.g. calls_complete_local
-    in distributed mode via _get_calls_complete_table_name).
-    """
-    query = build_calls_complete_delete_query(
-        table_name="calls_complete",
-        project_id_param="project_id",
-        call_ids_param="call_ids",
-        cluster_name="my_cluster",
-    )
-
-    expected = sqlparse.format(
-        """
-        DELETE FROM calls_complete ON CLUSTER my_cluster
-        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
-        """,
-        reindent=True,
-    )
-
-    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
-
-
-def test_build_calls_complete_update_query() -> None:
-    """Ensure the update helper builds the expected query."""
+@pytest.mark.parametrize(
+    ("cluster_name", "expected_query"),
+    [
+        (
+            None,
+            """
+            UPDATE calls_complete
+            SET display_name = {display_name:String}
+            WHERE project_id = {project_id:String} AND id = {id:String}
+            """,
+        ),
+        (
+            "my_cluster",
+            """
+            UPDATE calls_complete ON CLUSTER my_cluster
+            SET display_name = {display_name:String}
+            WHERE project_id = {project_id:String} AND id = {id:String}
+            """,
+        ),
+    ],
+)
+def test_build_calls_complete_update_query(
+    cluster_name: str | None, expected_query: str
+) -> None:
+    """The update helper adds `ON CLUSTER` only when a cluster name is supplied."""
     query = build_calls_complete_update_query(
         table_name="calls_complete",
         project_id_param="project_id",
         id_param="id",
         display_name_param="display_name",
+        cluster_name=cluster_name,
     )
-
-    expected = sqlparse.format(
-        """
-        UPDATE calls_complete
-        SET display_name = {display_name:String}
-        WHERE project_id = {project_id:String} AND id = {id:String}
-        """,
-        reindent=True,
-    )
-
+    expected = sqlparse.format(expected_query, reindent=True)
     assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
 
 
-def test_build_calls_complete_update_query_with_cluster() -> None:
-    """Ensure the update helper builds the expected query with cluster name.
-
-    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
-    responsible for passing the correct table name (e.g. calls_complete_local
-    in distributed mode via _get_calls_complete_table_name).
-    """
-    query = build_calls_complete_update_query(
-        table_name="calls_complete",
-        project_id_param="project_id",
-        id_param="id",
-        display_name_param="display_name",
-        cluster_name="my_cluster",
-    )
-
-    expected = sqlparse.format(
-        """
-        UPDATE calls_complete ON CLUSTER my_cluster
-        SET display_name = {display_name:String}
-        WHERE project_id = {project_id:String} AND id = {id:String}
-        """,
-        reindent=True,
-    )
-
-    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
-
-
-def test_query_with_queue_filter_calls_merged() -> None:
-    """Test queue filtering with calls_merged table - should use aggregate functions."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_MERGED)
+@pytest.mark.parametrize(
+    ("read_table", "expected_sql", "expected_params"),
+    [
+        (
+            ReadTable.CALLS_MERGED,
+            """
+            SELECT
+                calls_merged.id AS id
+            FROM
+                calls_merged
+            INNER JOIN (
+                SELECT * FROM annotation_queue_items
+                WHERE annotation_queue_items.project_id = {pb_1:String}
+                  AND annotation_queue_items.deleted_at IS NULL
+                  AND annotation_queue_items.queue_id = {pb_0:String}
+            ) AS annotation_queue_items ON (
+                annotation_queue_items.project_id = calls_merged.project_id
+                AND annotation_queue_items.call_id = calls_merged.id)
+            PREWHERE
+                calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(annotation_queue_items.queue_id) = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+            """,
+            {
+                "pb_0": "test_queue_id",
+                "pb_1": "project",
+            },
+        ),
+        (
+            ReadTable.CALLS_COMPLETE,
+            """
+            SELECT
+                calls_complete.id AS id
+            FROM
+                calls_complete
+            INNER JOIN (
+                SELECT * FROM annotation_queue_items
+                WHERE annotation_queue_items.project_id = {pb_2:String}
+                  AND annotation_queue_items.deleted_at IS NULL
+                  AND annotation_queue_items.queue_id = {pb_0:String}
+            ) AS annotation_queue_items ON (
+                annotation_queue_items.project_id = calls_complete.project_id
+                AND annotation_queue_items.call_id = calls_complete.id)
+            PREWHERE
+                calls_complete.project_id = {pb_2:String}
+            WHERE 1
+              AND (((annotation_queue_items.queue_id = {pb_0:String}))
+           AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)})))
+            """,
+            {
+                "pb_0": "test_queue_id",
+                "pb_1": SENTINEL_EPOCH,
+                "pb_2": "project",
+            },
+        ),
+    ],
+)
+def test_query_with_queue_filter_by_table(
+    read_table: ReadTable, expected_sql: str, expected_params: dict
+) -> None:
+    """calls_merged aggregates queue membership via any()+HAVING; calls_complete is flat."""
+    cq = CallsQuery(project_id="project", read_table=read_table)
     cq.add_field("id")
     cq.add_condition(
         tsi_query.EqOperation.model_validate(
@@ -4042,79 +3900,7 @@ def test_query_with_queue_filter_calls_merged() -> None:
             }
         )
     )
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM
-            calls_merged
-        INNER JOIN (
-            SELECT * FROM annotation_queue_items
-            WHERE annotation_queue_items.project_id = {pb_1:String}
-              AND annotation_queue_items.deleted_at IS NULL
-              AND annotation_queue_items.queue_id = {pb_0:String}
-        ) AS annotation_queue_items ON (
-            annotation_queue_items.project_id = calls_merged.project_id
-            AND annotation_queue_items.call_id = calls_merged.id)
-        PREWHERE
-            calls_merged.project_id = {pb_1:String}
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            ((any(annotation_queue_items.queue_id) = {pb_0:String}))
-            AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
-        """,
-        {
-            "pb_0": "test_queue_id",
-            "pb_1": "project",
-        },
-    )
-
-
-def test_query_with_queue_filter_calls_complete() -> None:
-    """Test queue filtering with calls_complete table - should NOT use aggregate functions."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {
-                "$eq": [
-                    {"$getField": "annotation_queue_items.queue_id"},
-                    {"$literal": "test_queue_id"},
-                ]
-            }
-        )
-    )
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_complete.id AS id
-        FROM
-            calls_complete
-        INNER JOIN (
-            SELECT * FROM annotation_queue_items
-            WHERE annotation_queue_items.project_id = {pb_2:String}
-              AND annotation_queue_items.deleted_at IS NULL
-              AND annotation_queue_items.queue_id = {pb_0:String}
-        ) AS annotation_queue_items ON (
-            annotation_queue_items.project_id = calls_complete.project_id
-            AND annotation_queue_items.call_id = calls_complete.id)
-        PREWHERE
-            calls_complete.project_id = {pb_2:String}
-        WHERE 1
-          AND (((annotation_queue_items.queue_id = {pb_0:String}))
-       AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)})))
-        """,
-        {
-            "pb_0": "test_queue_id",
-            "pb_1": SENTINEL_EPOCH,
-            "pb_2": "project",
-        },
-    )
+    assert_sql(cq, expected_sql, expected_params)
 
 
 # -----------------------------------------------------------------------------
@@ -4122,28 +3908,20 @@ def test_query_with_queue_filter_calls_complete() -> None:
 # -----------------------------------------------------------------------------
 
 
-def test_hardcoded_filter_is_useful_thread_ids_only() -> None:
-    """Filter with only thread_ids must be considered useful so set_hardcoded_filter applies it."""
-    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["thread_1"]))
-    assert hcf.is_useful() is True
-
-
-def test_hardcoded_filter_is_useful_empty_thread_ids_only() -> None:
-    """Filter with only thread_ids must be considered useful, even when the list is empty."""
-    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=[]))
-    assert hcf.is_useful() is True
-
-
-def test_hardcoded_filter_is_useful_turn_ids_only() -> None:
-    """Filter with only turn_ids must be considered useful."""
-    hcf = HardCodedFilter(filter=tsi.CallsFilter(turn_ids=["turn_1"]))
-    assert hcf.is_useful() is True
-
-
-def test_hardcoded_filter_is_useful_empty_not_useful() -> None:
-    """Filter with no fields set is not useful."""
-    hcf = HardCodedFilter(filter=tsi.CallsFilter())
-    assert hcf.is_useful() is False
+@pytest.mark.parametrize(
+    ("call_filter", "expected_useful"),
+    [
+        (tsi.CallsFilter(thread_ids=["thread_1"]), True),
+        (tsi.CallsFilter(thread_ids=[]), True),
+        (tsi.CallsFilter(turn_ids=["turn_1"]), True),
+        (tsi.CallsFilter(), False),
+    ],
+)
+def test_hardcoded_filter_is_useful(
+    call_filter: tsi.CallsFilter, expected_useful: bool
+) -> None:
+    """thread_ids/turn_ids (even empty) make a filter useful; a fully-empty filter is not."""
+    assert HardCodedFilter(filter=call_filter).is_useful() is expected_useful
 
 
 def test_hardcoded_filter_set_hardcoded_filter_with_thread_ids_only() -> None:
@@ -4160,35 +3938,24 @@ def test_hardcoded_filter_set_hardcoded_filter_with_thread_ids_only() -> None:
 # -----------------------------------------------------------------------------
 
 
-def test_is_minimal_filter_none() -> None:
-    assert _is_minimal_filter(None) is True
-
-
-def test_is_minimal_filter_empty() -> None:
-    assert _is_minimal_filter(tsi.CallsFilter()) is True
-
-
-def test_is_minimal_filter_thread_ids_not_minimal() -> None:
-    """Filter with thread_ids set must not be considered minimal (optimized path must not apply)."""
-    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=["thread_1"])) is False
-
-
-def test_is_minimal_filter_turn_ids_not_minimal() -> None:
-    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=["turn_1"])) is False
-
-
-def test_is_minimal_filter_wb_user_ids_not_minimal() -> None:
-    assert _is_minimal_filter(tsi.CallsFilter(wb_user_ids=["user_1"])) is False
-
-
-def test_is_minimal_filter_empty_thread_ids_not_minimal() -> None:
-    """thread_ids=[] is still a set filter (not None), so not minimal."""
-    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=[])) is False
-
-
-def test_is_minimal_filter_empty_turn_ids_not_minimal() -> None:
-    """turn_ids=[] is still a set filter (not None), so not minimal."""
-    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=[])) is False
+@pytest.mark.parametrize(
+    ("call_filter", "expected_minimal"),
+    [
+        (None, True),
+        (tsi.CallsFilter(), True),
+        (tsi.CallsFilter(thread_ids=["thread_1"]), False),
+        (tsi.CallsFilter(turn_ids=["turn_1"]), False),
+        (tsi.CallsFilter(wb_user_ids=["user_1"]), False),
+        # an empty list is still a set field (not None), so it is not minimal
+        (tsi.CallsFilter(thread_ids=[]), False),
+        (tsi.CallsFilter(turn_ids=[]), False),
+    ],
+)
+def test_is_minimal_filter(
+    call_filter: tsi.CallsFilter | None, expected_minimal: bool
+) -> None:
+    """None/empty filters are minimal; setting thread/turn/user ids (even empty) is not."""
+    assert _is_minimal_filter(call_filter) is expected_minimal
 
 
 # -----------------------------------------------------------------------------
@@ -4707,78 +4474,81 @@ def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_latency_ms_sort_calls_complete_uses_sentinel_for_ended_at() -> None:
-    """For calls_complete, latency_ms must check ended_at against the sentinel, not IS NULL.
-
-    Bug: _handle_latency_ms_summary_field used `ended_at IS NULL` which never matches in
-    calls_complete (ended_at is non-nullable with epoch-zero sentinel). This caused
-    unfinished calls to compute garbage latency instead of NULL.
-    """
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_field("started_at")
-    cq.add_field("ended_at")
+def _order_by_latency_ms_desc(cq: CallsQuery) -> None:
     cq.add_order("summary.weave.latency_ms", "desc")
 
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_complete.id AS id,
-            calls_complete.started_at AS started_at,
-            calls_complete.ended_at AS ended_at
-        FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_2:String}
-        WHERE 1
-          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
-        ORDER BY CASE
-            WHEN calls_complete.ended_at = {pb_1:DateTime64(6)} THEN NULL
-            ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
-        END DESC
-        """,
-        {
-            "pb_0": SENTINEL_EPOCH,
-            "pb_1": SENTINEL_EPOCH,
-            "pb_2": "project",
-        },
-    )
 
-
-def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
-    """For calls_complete, latency_ms filter must use sentinel check for ended_at."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_field("started_at")
-    cq.add_field("ended_at")
+def _filter_latency_ms_gt_1000(cq: CallsQuery) -> None:
     cq.add_condition(
         tsi_query.GtOperation.model_validate(
             {"$gt": [{"$getField": "summary.weave.latency_ms"}, {"$literal": 1000}]}
         )
     )
 
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_complete.id AS id,
-            calls_complete.started_at AS started_at,
-            calls_complete.ended_at AS ended_at
-        FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_3:String}
-        WHERE 1
-          AND (((CASE
-              WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
-              ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
-          END > {pb_1:Int64}))
-       AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
-        """,
-        {
-            "pb_0": SENTINEL_EPOCH,
-            "pb_1": 1000,
-            "pb_2": SENTINEL_EPOCH,
-            "pb_3": "project",
-        },
-    )
+
+@pytest.mark.parametrize(
+    ("apply_latency", "expected_sql", "expected_params"),
+    [
+        (
+            _order_by_latency_ms_desc,
+            """
+            SELECT
+                calls_complete.id AS id,
+                calls_complete.started_at AS started_at,
+                calls_complete.ended_at AS ended_at
+            FROM calls_complete
+            PREWHERE calls_complete.project_id = {pb_2:String}
+            WHERE 1
+              AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+            ORDER BY CASE
+                WHEN calls_complete.ended_at = {pb_1:DateTime64(6)} THEN NULL
+                ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
+            END DESC
+            """,
+            {
+                "pb_0": SENTINEL_EPOCH,
+                "pb_1": SENTINEL_EPOCH,
+                "pb_2": "project",
+            },
+        ),
+        (
+            _filter_latency_ms_gt_1000,
+            """
+            SELECT
+                calls_complete.id AS id,
+                calls_complete.started_at AS started_at,
+                calls_complete.ended_at AS ended_at
+            FROM calls_complete
+            PREWHERE calls_complete.project_id = {pb_3:String}
+            WHERE 1
+              AND (((CASE
+                  WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
+                  ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
+              END > {pb_1:Int64}))
+           AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+            """,
+            {
+                "pb_0": SENTINEL_EPOCH,
+                "pb_1": 1000,
+                "pb_2": SENTINEL_EPOCH,
+                "pb_3": "project",
+            },
+        ),
+    ],
+    ids=["order", "filter"],
+)
+def test_latency_ms_calls_complete_uses_sentinel_for_ended_at(
+    apply_latency: object, expected_sql: str, expected_params: dict
+) -> None:
+    """On calls_complete, latency_ms checks ended_at against the sentinel (not IS NULL),
+    whether latency is applied as an ORDER BY or as a `> 1000` filter.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("ended_at")
+    apply_latency(cq)
+    assert_sql(cq, expected_sql, expected_params)
 
 
 def test_trace_roots_only_filter_calls_complete() -> None:
@@ -4929,39 +4699,6 @@ def test_hardcoded_filters_calls_complete() -> None:
             "pb_12": "",
             "pb_13": ["call_aaa"],
             "pb_14": "project",
-        },
-    )
-
-
-def test_status_sort_calls_complete_uses_sentinels() -> None:
-    """Verify status computation sort uses sentinel checks on calls_complete."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_order("summary.weave.status", "asc")
-    assert_sql(
-        cq,
-        """
-        SELECT calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_8:String}
-        WHERE 1
-          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
-        ORDER BY CASE
-                     WHEN calls_complete.exception != {pb_6:String} THEN {pb_2:String}
-                     WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_1:String}), 'null'), '')), 0) > 0 THEN {pb_5:String}
-                     WHEN calls_complete.ended_at = {pb_7:DateTime64(6)} THEN {pb_3:String}
-                     ELSE {pb_4:String}
-                 END ASC
-        """,
-        {
-            "pb_0": SENTINEL_EPOCH,
-            "pb_1": '$."status_counts"."error"',
-            "pb_2": "error",
-            "pb_3": "running",
-            "pb_4": "success",
-            "pb_5": "descendant_error",
-            "pb_6": "",
-            "pb_7": SENTINEL_EPOCH,
-            "pb_8": "project",
         },
     )
 

@@ -1,4 +1,5 @@
 import datetime
+from collections.abc import Callable
 
 import pytest
 import sqlparse
@@ -20,29 +21,18 @@ from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
 )
 
-
-def assert_sql(
-    expected_query: str,
-    expected_params: dict,
-    query: str,
-    params: dict,
-) -> None:
-    expected_formatted = sqlparse.format(expected_query, reindent=True).strip()
-    found_formatted = sqlparse.format(query, reindent=True).strip()
-
-    assert expected_formatted == found_formatted, (
-        f"\nExpected:\n{expected_formatted}\n\nGot:\n{found_formatted}"
-    )
-    assert expected_params == params, (
-        f"\nExpected params: {expected_params}\n\nGot params: {params}"
-    )
+_START = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+_END = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
+_AGENT_NAME_FILTER = Query.model_validate(
+    {"$expr": {"$eq": [{"$getField": "agent.name"}, {"$literal": "agent-a"}]}}
+)
 
 
 def _req(**kwargs) -> AgentSpanStatsReq:
     defaults = {
         "project_id": "p1",
-        "start": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "end": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "start": _START,
+        "end": _END,
         "granularity": 3600,
         "metrics": [
             AgentSpanStatsMetricSpec(
@@ -63,16 +53,7 @@ def _req(**kwargs) -> AgentSpanStatsReq:
 def test_ungrouped_stats_query_full_sql_shape() -> None:
     pb = ParamBuilder("genai")
     req = _req(
-        query=Query.model_validate(
-            {
-                "$expr": {
-                    "$eq": [
-                        {"$getField": "agent.name"},
-                        {"$literal": "agent-a"},
-                    ]
-                }
-            }
-        ),
+        query=_AGENT_NAME_FILTER,
         metrics=[
             AgentSpanStatsMetricSpec(
                 alias="duration_ms",
@@ -158,8 +139,8 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
     """
     expected_params = {
         "genai_0": "p1",
-        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_1": _START,
+        "genai_2": _END,
         "genai_3": "agent-a",
         "genai_4": 1767225600.0,
         "genai_5": 1767312000.0,
@@ -175,8 +156,18 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
     ]
 
 
-def test_grouped_stats_query_full_sql_shape() -> None:
+@pytest.mark.parametrize(
+    ("group_limit", "expected_group_limit_param"),
+    [
+        pytest.param(1000, 400, id="group_limit_capped"),
+        pytest.param(None, 50, id="group_limit_default"),
+    ],
+)
+def test_grouped_stats_query_full_sql_shape(
+    group_limit: int | None, expected_group_limit_param: int
+) -> None:
     pb = ParamBuilder("genai")
+    extra = {} if group_limit is None else {"group_limit": group_limit}
     req = _req(
         group_by=[
             AgentGroupByRef(
@@ -196,7 +187,7 @@ def test_grouped_stats_query_full_sql_shape() -> None:
                 aggregations=["avg", "count"],
             )
         ],
-        group_limit=1000,
+        **extra,
     )
 
     result = build_agent_span_stats_query(req, pb)
@@ -270,126 +261,38 @@ def test_grouped_stats_query_full_sql_shape() -> None:
     """
     expected_params = {
         "genai_0": "p1",
-        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_1": _START,
+        "genai_2": _END,
         "genai_3": "env",
         "genai_4": "score",
         "genai_5": 1767225600.0,
         "genai_6": 1767312000.0,
         "genai_7": "UTC",
         "genai_8": 3600,
-        "genai_9": 400,
+        "genai_9": expected_group_limit_param,
     }
     assert_sql(expected_sql, expected_params, result.sql, result.parameters)
     assert result.columns == ["timestamp", "env", "avg_score", "count_score"]
 
 
-def test_basic_stats_query_uses_query_filter_and_bucket() -> None:
-    pb = ParamBuilder("genai")
-    req = _req(
-        query=Query.model_validate(
-            {
-                "$expr": {
-                    "$eq": [
-                        {"$getField": "agent.name"},
-                        {"$literal": "agent-a"},
-                    ]
-                }
-            }
-        ),
-        metrics=[
-            AgentSpanStatsMetricSpec(
-                alias="duration_ms",
-                value_type="number",
+@pytest.mark.parametrize(
+    ("bucket_by", "metrics", "expected_sql", "extra_params", "expected_columns"),
+    [
+        pytest.param(
+            AgentSpanStatsNumericBucketSpec(
+                type="number",
                 value=AgentSpanValueRef(source="derived", key="duration_ms"),
-                aggregations=["avg"],
-                percentiles=[95],
+                bins=4,
             ),
-            AgentSpanStatsMetricSpec(
-                alias="errors",
-                value_type="boolean",
-                value=AgentSpanValueRef(source="derived", key="is_error"),
-                aggregations=["count_true"],
-            ),
-        ],
-    )
-
-    result = build_agent_span_stats_query(req, pb)
-
-    expected_sql = """
-        WITH all_buckets AS
-          (SELECT toStartOfInterval(toDateTime({genai_4:Float64}, {genai_6:String}), INTERVAL 3600 SECOND, {genai_6:String}) + toIntervalSecond(number * {genai_7:Int64}) AS bucket
-           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_5:Float64}, {genai_6:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_4:Float64}, {genai_6:String}), INTERVAL 3600 SECOND, {genai_6:String}))) / {genai_7:Float64})))
-           WHERE bucket < toDateTime({genai_5:Float64}, {genai_6:String}) ),
-             filtered_spans AS
-          (SELECT *
-           FROM spans s
-           WHERE s.project_id = {genai_0:String}
-             AND s.started_at >= {genai_1:DateTime64(6)}
-             AND s.started_at < {genai_2:DateTime64(6)}
-           AND (s.agent_name = {genai_3:String}) ),
-             aggregated_data AS
-          (SELECT bucket,
-                  avgOrNull(if(v_duration_ms, m_duration_ms, NULL)) AS avg_duration_ms,
-                  quantileOrNull(0.95)(if(v_duration_ms, m_duration_ms, NULL)) AS p95_duration_ms,
-                  countIf(v_errors
-                          AND m_errors = 1) AS count_true_errors
-           FROM
-             (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_6:String}) AS bucket,
-                     if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL) AS m_duration_ms,
-                     toUInt8(s.ended_at > s.started_at) AS v_duration_ms,
-                     s.status_code = 'ERROR' AS m_errors,
-                     toUInt8(1) AS v_errors
-              FROM filtered_spans s)
-           GROUP BY bucket)
-        SELECT all_buckets.bucket AS timestamp,
-               aggregated_data.avg_duration_ms AS avg_duration_ms,
-               aggregated_data.p95_duration_ms AS p95_duration_ms,
-               COALESCE(aggregated_data.count_true_errors, 0) AS count_true_errors
-        FROM all_buckets
-        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
-        ORDER BY timestamp
-    """
-    expected_params = {
-        "genai_0": "p1",
-        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
-        "genai_3": "agent-a",
-        "genai_4": 1767225600.0,
-        "genai_5": 1767312000.0,
-        "genai_6": "UTC",
-        "genai_7": 3600,
-    }
-    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
-    assert result.columns == [
-        "timestamp",
-        "avg_duration_ms",
-        "p95_duration_ms",
-        "count_true_errors",
-    ]
-
-
-def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
-    pb = ParamBuilder("genai")
-    req = _req(
-        bucket_by=AgentSpanStatsNumericBucketSpec(
-            type="number",
-            value=AgentSpanValueRef(source="derived", key="duration_ms"),
-            bins=4,
-        ),
-        metrics=[
-            AgentSpanStatsMetricSpec(
-                alias="spans",
-                value_type="boolean",
-                value=AgentSpanValueRef(source="derived", key="is_error"),
-                aggregations=["count"],
-            )
-        ],
-    )
-
-    result = build_agent_span_stats_query(req, pb)
-
-    expected_sql = """
+            [
+                AgentSpanStatsMetricSpec(
+                    alias="spans",
+                    value_type="boolean",
+                    value=AgentSpanValueRef(source="derived", key="is_error"),
+                    aggregations=["count"],
+                )
+            ],
+            """
         WITH filtered_spans AS
           (SELECT *
            FROM spans s
@@ -432,44 +335,25 @@ def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
           AND (bounds.bucket_max_bound > bounds.bucket_min_bound
                OR all_buckets.bucket = 0)
         ORDER BY bucket_index
-    """
-    expected_params = {
-        "genai_0": "p1",
-        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
-        "genai_3": 4,
-    }
-    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
-    assert result.columns == [
-        "bucket_index",
-        "bucket_min",
-        "bucket_max",
-        "count_spans",
-    ]
-    assert result.granularity_seconds is None
-    assert result.bucket_type == "number"
-
-
-def test_numeric_bucket_stats_query_groups_custom_attr_measure() -> None:
-    pb = ParamBuilder("genai")
-    req = _req(
-        bucket_by=AgentSpanStatsNumericBucketSpec(
-            type="number",
-            bins=8,
-            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
-            measure=AgentSpanMeasureSpec(
-                alias="avg_score",
-                aggregation="avg",
-                value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
-                value_type="number",
-            ),
+    """,
+            {"genai_3": 4},
+            ["bucket_index", "bucket_min", "bucket_max", "count_spans"],
+            id="value_buckets",
         ),
-        metrics=[],
-    )
-
-    result = build_agent_span_stats_query(req, pb)
-
-    expected_sql = """
+        pytest.param(
+            AgentSpanStatsNumericBucketSpec(
+                type="number",
+                bins=8,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measure=AgentSpanMeasureSpec(
+                    alias="avg_score",
+                    aggregation="avg",
+                    value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+                    value_type="number",
+                ),
+            ),
+            [],
+            """
         WITH filtered_spans AS
           (SELECT *
            FROM spans s
@@ -508,16 +392,34 @@ def test_numeric_bucket_stats_query_groups_custom_attr_measure() -> None:
           AND (bounds.bucket_max_bound > bounds.bucket_min_bound
                OR all_buckets.bucket = 0)
         ORDER BY bucket_index
-    """
+    """,
+            {"genai_3": 8, "genai_4": "score"},
+            ["bucket_index", "bucket_min", "bucket_max", "count"],
+            id="groups_custom_attr_measure",
+        ),
+    ],
+)
+def test_numeric_bucket_stats_query(
+    bucket_by: AgentSpanStatsNumericBucketSpec,
+    metrics: list[AgentSpanStatsMetricSpec],
+    expected_sql: str,
+    extra_params: dict,
+    expected_columns: list[str],
+) -> None:
+    pb = ParamBuilder("genai")
+    req = _req(bucket_by=bucket_by, metrics=metrics)
+
+    result = build_agent_span_stats_query(req, pb)
+
     expected_params = {
         "genai_0": "p1",
-        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
-        "genai_3": 8,
-        "genai_4": "score",
+        "genai_1": _START,
+        "genai_2": _END,
+        **extra_params,
     }
     assert_sql(expected_sql, expected_params, result.sql, result.parameters)
-    assert result.columns == ["bucket_index", "bucket_min", "bucket_max", "count"]
+    assert result.columns == expected_columns
+    assert result.granularity_seconds is None
     assert result.bucket_type == "number"
 
 
@@ -550,109 +452,6 @@ def test_numeric_bucket_group_filter_rejects_mismatched_group_by() -> None:
         match="numeric bucket group_filters must use the same group_by",
     ):
         build_agent_span_stats_query(req, pb)
-
-
-def test_request_validation_rejects_grouped_numeric_bucket_metrics() -> None:
-    with pytest.raises(
-        ValidationError,
-        match="grouped numeric bucket stats do not support explicit metrics",
-    ):
-        _req(
-            bucket_by=AgentSpanStatsNumericBucketSpec(
-                type="number",
-                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
-                measure=AgentSpanMeasureSpec(alias="spans", aggregation="count"),
-            ),
-            metrics=[
-                AgentSpanStatsMetricSpec(
-                    alias="input_tokens",
-                    value_type="number",
-                    value=AgentSpanValueRef(source="field", key="usage.input_tokens"),
-                    aggregations=["sum"],
-                )
-            ],
-        )
-
-
-def test_group_by_custom_attr_and_metric_custom_attr() -> None:
-    pb = ParamBuilder("genai")
-    req = _req(
-        group_by=[
-            AgentGroupByRef(
-                source="custom_attrs_string",
-                key="env",
-                alias="env",
-            )
-        ],
-        metrics=[
-            AgentSpanStatsMetricSpec(
-                alias="score",
-                value_type="number",
-                value=AgentSpanValueRef(
-                    source="custom_attrs_float",
-                    key="score",
-                ),
-                aggregations=["avg", "count"],
-            )
-        ],
-    )
-
-    result = build_agent_span_stats_query(req, pb)
-
-    expected_sql = """
-        WITH all_buckets AS
-          (SELECT toStartOfInterval(toDateTime({genai_5:Float64}, {genai_7:String}), INTERVAL 3600 SECOND, {genai_7:String}) + toIntervalSecond(number * {genai_8:Int64}) AS bucket
-           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_6:Float64}, {genai_7:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_5:Float64}, {genai_7:String}), INTERVAL 3600 SECOND, {genai_7:String}))) / {genai_8:Float64})))
-           WHERE bucket < toDateTime({genai_6:Float64}, {genai_7:String}) ),
-             filtered_spans AS
-          (SELECT *
-           FROM spans s
-           WHERE s.project_id = {genai_0:String}
-             AND s.started_at >= {genai_1:DateTime64(6)}
-             AND s.started_at < {genai_2:DateTime64(6)} ),
-             top_groups AS
-          (SELECT if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env
-           FROM filtered_spans s
-           GROUP BY env
-           ORDER BY count() DESC
-           LIMIT {genai_9:UInt64}),
-             aggregated_data AS
-          (SELECT bucket,
-                  env,
-                  avgOrNull(if(v_score, m_score, NULL)) AS avg_score,
-                  countIf(v_score) AS count_score
-           FROM
-             (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_7:String}) AS bucket,
-                     if(mapContains(s.custom_attrs_string, {genai_3:String}), s.custom_attrs_string[{genai_3:String}], NULL) AS env,
-                     toFloat64(s.custom_attrs_float[{genai_4:String}]) AS m_score,
-                     toUInt8(mapContains(s.custom_attrs_float, {genai_4:String})) AS v_score
-              FROM filtered_spans s)
-           GROUP BY bucket,
-                    env)
-        SELECT all_buckets.bucket AS timestamp,
-               top_groups.env AS env,
-               aggregated_data.avg_score AS avg_score,
-               COALESCE(aggregated_data.count_score, 0) AS count_score
-        FROM all_buckets
-        CROSS JOIN top_groups
-        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
-        AND top_groups.env = aggregated_data.env
-        ORDER BY timestamp, env
-    """
-    expected_params = {
-        "genai_0": "p1",
-        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
-        "genai_3": "env",
-        "genai_4": "score",
-        "genai_5": 1767225600.0,
-        "genai_6": 1767312000.0,
-        "genai_7": "UTC",
-        "genai_8": 3600,
-        "genai_9": 50,
-    }
-    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
-    assert result.columns == ["timestamp", "env", "avg_score", "count_score"]
 
 
 def test_time_stats_apply_group_filters() -> None:
@@ -720,8 +519,8 @@ def test_time_stats_apply_group_filters() -> None:
     """
     expected_params = {
         "genai_0": "p1",
-        "genai_1": datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        "genai_2": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        "genai_1": _START,
+        "genai_2": _END,
         "genai_3": 1767225600.0,
         "genai_4": 1767312000.0,
         "genai_5": "UTC",
@@ -762,68 +561,118 @@ def test_request_validation_normalizes_naive_datetimes() -> None:
     assert req.end is None
 
 
-def test_metric_validation_rejects_invalid_type_aggregation() -> None:
-    with pytest.raises(ValidationError):
-        AgentSpanStatsMetricSpec(
-            alias="agent",
-            value_type="string",
-            value=AgentSpanValueRef(source="field", key="agent.name"),
-            aggregations=["sum"],
-        )
-
-
-def test_request_validation_rejects_duplicate_aliases() -> None:
-    with pytest.raises(ValidationError):
-        _req(
-            metrics=[
-                AgentSpanStatsMetricSpec(
-                    alias="tokens",
-                    value_type="number",
-                    value=AgentSpanValueRef(
-                        source="field",
-                        key="usage.input_tokens",
-                    ),
-                    aggregations=["sum"],
+@pytest.mark.parametrize(
+    ("build", "match"),
+    [
+        pytest.param(
+            lambda: _req(
+                bucket_by=AgentSpanStatsNumericBucketSpec(
+                    type="number",
+                    group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                    measure=AgentSpanMeasureSpec(alias="spans", aggregation="count"),
                 ),
-                AgentSpanStatsMetricSpec(
-                    alias="tokens",
-                    value_type="number",
-                    value=AgentSpanValueRef(
-                        source="field",
-                        key="usage.output_tokens",
-                    ),
-                    aggregations=["sum"],
-                ),
-            ]
-        )
-
-
-def test_numeric_bucket_validation_rejects_non_numeric_derived_field() -> None:
-    with pytest.raises(ValidationError):
-        AgentSpanStatsNumericBucketSpec(
-            type="number",
-            value=AgentSpanValueRef(source="derived", key="is_error"),
-        )
-
-
-def test_request_validation_rejects_numeric_bucket_group_by() -> None:
-    with pytest.raises(ValidationError):
-        _req(
-            bucket_by=AgentSpanStatsNumericBucketSpec(
-                type="number",
-                value=AgentSpanValueRef(source="derived", key="duration_ms"),
+                metrics=[
+                    AgentSpanStatsMetricSpec(
+                        alias="input_tokens",
+                        value_type="number",
+                        value=AgentSpanValueRef(
+                            source="field", key="usage.input_tokens"
+                        ),
+                        aggregations=["sum"],
+                    )
+                ],
             ),
-            group_by=[
-                AgentGroupByRef(
-                    source="field",
-                    key="agent.name",
-                )
-            ],
-        )
+            "grouped numeric bucket stats do not support explicit metrics",
+            id="grouped_numeric_bucket_with_metrics",
+        ),
+        pytest.param(
+            lambda: AgentSpanStatsMetricSpec(
+                alias="agent",
+                value_type="string",
+                value=AgentSpanValueRef(source="field", key="agent.name"),
+                aggregations=["sum"],
+            ),
+            None,
+            id="invalid_type_aggregation",
+        ),
+        pytest.param(
+            lambda: _req(
+                metrics=[
+                    AgentSpanStatsMetricSpec(
+                        alias="tokens",
+                        value_type="number",
+                        value=AgentSpanValueRef(
+                            source="field",
+                            key="usage.input_tokens",
+                        ),
+                        aggregations=["sum"],
+                    ),
+                    AgentSpanStatsMetricSpec(
+                        alias="tokens",
+                        value_type="number",
+                        value=AgentSpanValueRef(
+                            source="field",
+                            key="usage.output_tokens",
+                        ),
+                        aggregations=["sum"],
+                    ),
+                ]
+            ),
+            None,
+            id="duplicate_aliases",
+        ),
+        pytest.param(
+            lambda: AgentSpanStatsNumericBucketSpec(
+                type="number",
+                value=AgentSpanValueRef(source="derived", key="is_error"),
+            ),
+            None,
+            id="non_numeric_derived_field",
+        ),
+        pytest.param(
+            lambda: _req(
+                bucket_by=AgentSpanStatsNumericBucketSpec(
+                    type="number",
+                    value=AgentSpanValueRef(source="derived", key="duration_ms"),
+                ),
+                group_by=[
+                    AgentGroupByRef(
+                        source="field",
+                        key="agent.name",
+                    )
+                ],
+            ),
+            None,
+            id="numeric_bucket_with_group_by",
+        ),
+        pytest.param(
+            lambda: _req(
+                end=datetime.datetime(2026, 2, 15, tzinfo=datetime.timezone.utc),
+            ),
+            None,
+            id="large_range",
+        ),
+    ],
+)
+def test_request_validation_errors(
+    build: Callable[[], object], match: str | None
+) -> None:
+    with pytest.raises(ValidationError, match=match):
+        build()
 
 
-def test_request_validation_rejects_large_range() -> None:
-    with pytest.raises(ValidationError):
-        _req(
-            end=datetime.datetime(2026, 2, 15, tzinfo=datetime.timezone.utc),
-        )
+def assert_sql(
+    expected_query: str,
+    expected_params: dict,
+    query: str,
+    params: dict,
+) -> None:
+    expected_formatted = sqlparse.format(expected_query, reindent=True).strip()
+    found_formatted = sqlparse.format(query, reindent=True).strip()
+
+    assert expected_formatted == found_formatted, (
+        f"\nExpected:\n{expected_formatted}\n\nGot:\n{found_formatted}"
+    )
+    assert expected_params == params, (
+        f"\nExpected params: {expected_params}\n\nGot params: {params}"
+    )
