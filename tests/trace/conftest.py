@@ -41,6 +41,9 @@ def failing_serializer():
 # handling, retry decorators, and the `if_generation_match=0` skip path.
 # ---------------------------------------------------------------------------
 
+# Safety net so a barrier never deadlocks if fewer uploads arrive than expected.
+_BARRIER_TIMEOUT_SECONDS = 30.0
+
 
 @dataclass
 class GCSMockState:
@@ -50,6 +53,9 @@ class GCSMockState:
       `fail_paths` - inject `PreconditionFailed`-style failures by GCS path.
       `delay`      - sleep inside upload_from_string so parallel tests can
                      assert wall-time savings + concurrent peak.
+      `expected_concurrency` - when set, uploads block on a barrier until this
+                     many are simultaneously in-flight, making `concurrent_peak`
+                     deterministic instead of dependent on scheduler timing.
 
     Read-back:
       `blob_data`        - the in-memory backing store, keyed by full path.
@@ -62,6 +68,7 @@ class GCSMockState:
     concurrent_peak: int = 0
     fail_paths: set[str] = field(default_factory=set)
     delay: float = 0.0
+    expected_concurrency: int | None = None
 
 
 @pytest.fixture
@@ -114,6 +121,7 @@ def gcs():
     state = GCSMockState()
     state_lock = threading.Lock()
     inflight = {"n": 0}
+    barrier: dict[str, threading.Barrier | None] = {"b": None}
 
     def make_blob(path: str):
         blob = mock.MagicMock()
@@ -127,7 +135,16 @@ def gcs():
             with state_lock:
                 inflight["n"] += 1
                 state.concurrent_peak = max(state.concurrent_peak, inflight["n"])
+                if state.expected_concurrency and barrier["b"] is None:
+                    barrier["b"] = threading.Barrier(state.expected_concurrency)
             try:
+                # Block until expected_concurrency uploads are in-flight so the
+                # peak is deterministic; timeout avoids hanging on under-count.
+                if barrier["b"] is not None:
+                    try:
+                        barrier["b"].wait(timeout=_BARRIER_TIMEOUT_SECONDS)
+                    except threading.BrokenBarrierError:
+                        pass
                 if state.delay:
                     time.sleep(state.delay)
                 with state_lock:
