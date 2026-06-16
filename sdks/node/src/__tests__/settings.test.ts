@@ -20,7 +20,6 @@ describe('makeSettings', () => {
         attributes: {},
         genai: {},
         printCallLink: true,
-        useOTelV2: true,
       });
     });
 
@@ -30,7 +29,6 @@ describe('makeSettings', () => {
         attributes: {},
         genai: {},
         printCallLink: true,
-        useOTelV2: true,
       });
     });
   });
