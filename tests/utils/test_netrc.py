@@ -22,18 +22,17 @@ def temp_netrc(tmp_path):
 
 
 # Tests for Netrc class
-def test_netrc_init_default_path():
-    """Test initialization with default path."""
-    netrc = Netrc()
-    expected_path = Path.home() / ".netrc"
-    assert netrc.path == expected_path
-
-
-def test_netrc_init_custom_path():
-    """Test initialization with custom path."""
-    custom_path = "/custom/path/.netrc"
-    netrc = Netrc(custom_path)
-    assert netrc.path == Path(custom_path)
+@pytest.mark.parametrize(
+    ("arg", "expected"),
+    [
+        (None, Path.home() / ".netrc"),
+        ("/custom/path/.netrc", Path("/custom/path/.netrc")),
+    ],
+)
+def test_netrc_init_path(arg, expected):
+    """Init resolves both the default and a custom path."""
+    netrc = Netrc() if arg is None else Netrc(arg)
+    assert netrc.path == expected
 
 
 def test_netrc_read_nonexistent_file(temp_netrc):
@@ -148,196 +147,130 @@ def test_netrc_write_permission_error(mock_chmod, temp_netrc):
         temp_netrc.write(credentials)
 
 
-def test_netrc_add_or_update_entry_new_file(temp_netrc):
-    """Test adding entry to a new netrc file."""
+def test_netrc_add_or_update_entry(temp_netrc):
+    """add_or_update creates a new file, appends to an existing one, and updates in place."""
+    # New file: full entry incl. account.
     temp_netrc.add_or_update_entry("example.com", "testuser", "testpass", "testaccount")
-
-    credentials = temp_netrc.read()
-    assert len(credentials) == 1
-    assert credentials["example.com"]["login"] == "testuser"
-    assert credentials["example.com"]["password"] == "testpass"
-    assert credentials["example.com"]["account"] == "testaccount"
-
-
-def test_netrc_add_or_update_entry_existing_file(temp_netrc):
-    """Test adding entry to an existing netrc file."""
-    # Create initial file
-    initial_credentials = {
-        "example.com": {"login": "olduser", "account": "", "password": "oldpass"}
-    }
-    temp_netrc.write(initial_credentials)
-
-    # Add new entry
-    temp_netrc.add_or_update_entry("api.example.com", "apiuser", "apipass")
-
-    credentials = temp_netrc.read()
-    assert len(credentials) == 2
-    assert credentials["example.com"]["login"] == "olduser"
-    assert credentials["api.example.com"]["login"] == "apiuser"
-
-
-def test_netrc_add_or_update_entry_update_existing(temp_netrc):
-    """Test updating an existing entry."""
-    # Create initial file
-    initial_credentials = {
-        "example.com": {"login": "olduser", "account": "", "password": "oldpass"}
-    }
-    temp_netrc.write(initial_credentials)
-
-    # Update existing entry
-    temp_netrc.add_or_update_entry("example.com", "newuser", "newpass", "newaccount")
-
-    credentials = temp_netrc.read()
-    assert len(credentials) == 1
-    assert credentials["example.com"]["login"] == "newuser"
-    assert credentials["example.com"]["password"] == "newpass"
-    assert credentials["example.com"]["account"] == "newaccount"
-
-
-def test_netrc_delete_entry_existing(temp_netrc):
-    """Test deleting an existing entry."""
-    # Create initial file with multiple entries
-    initial_credentials = {
-        "example.com": {"login": "user1", "account": "", "password": "pass1"},
-        "api.example.com": {"login": "user2", "account": "", "password": "pass2"},
-    }
-    temp_netrc.write(initial_credentials)
-
-    # Delete one entry
-    result = temp_netrc.delete_entry("example.com")
-
-    assert result is True
-    credentials = temp_netrc.read()
-    assert len(credentials) == 1
-    assert "example.com" not in credentials
-    assert "api.example.com" in credentials
-
-
-def test_netrc_delete_entry_nonexistent(temp_netrc):
-    """Test deleting a non-existent entry."""
-    # Create initial file
-    initial_credentials = {
-        "example.com": {"login": "user1", "account": "", "password": "pass1"}
-    }
-    temp_netrc.write(initial_credentials)
-
-    # Try to delete non-existent entry
-    result = temp_netrc.delete_entry("nonexistent.com")
-
-    assert result is False
-    credentials = temp_netrc.read()
-    assert len(credentials) == 1
-    assert "example.com" in credentials
-
-
-def test_netrc_delete_entry_no_file(temp_netrc):
-    """Test deleting entry when netrc file doesn't exist."""
-    result = temp_netrc.delete_entry("example.com")
-    assert result is False
-
-
-def test_netrc_get_credentials_existing(temp_netrc):
-    """Test getting credentials for an existing machine."""
-    credentials = {
+    assert temp_netrc.read() == {
         "example.com": {
             "login": "testuser",
             "account": "testaccount",
             "password": "testpass",
         }
     }
-    temp_netrc.write(credentials)
 
-    result = temp_netrc.get_credentials("example.com")
-
-    assert result is not None
-    assert result["login"] == "testuser"
-    assert result["account"] == "testaccount"
-    assert result["password"] == "testpass"
-
-
-def test_netrc_get_credentials_nonexistent(temp_netrc):
-    """Test getting credentials for a non-existent machine."""
-    credentials = {
-        "example.com": {"login": "testuser", "account": "", "password": "testpass"}
+    # Append a second machine (no account) to the existing file.
+    temp_netrc.add_or_update_entry("api.example.com", "apiuser", "apipass")
+    credentials = temp_netrc.read()
+    assert len(credentials) == 2
+    assert credentials["example.com"]["login"] == "testuser"
+    assert credentials["api.example.com"] == {
+        "login": "apiuser",
+        "account": "",
+        "password": "apipass",
     }
-    temp_netrc.write(credentials)
 
-    result = temp_netrc.get_credentials("nonexistent.com")
-    assert result is None
-
-
-def test_netrc_get_credentials_no_file(temp_netrc):
-    """Test getting credentials when netrc file doesn't exist."""
-    result = temp_netrc.get_credentials("example.com")
-    assert result is None
-
-
-def test_netrc_list_machines_with_entries(temp_netrc):
-    """Test listing machines when netrc file has entries."""
-    credentials = {
-        "example.com": {"login": "user1", "account": "", "password": "pass1"},
-        "api.example.com": {"login": "user2", "account": "", "password": "pass2"},
+    # Update the existing machine in place.
+    temp_netrc.add_or_update_entry("example.com", "newuser", "newpass", "newaccount")
+    credentials = temp_netrc.read()
+    assert len(credentials) == 2
+    assert credentials["example.com"] == {
+        "login": "newuser",
+        "account": "newaccount",
+        "password": "newpass",
     }
-    temp_netrc.write(credentials)
 
+
+def test_netrc_delete_entry(temp_netrc):
+    """delete_entry removes a present machine, no-ops on a missing one, and no-ops with no file."""
+    # No file yet -> False.
+    assert temp_netrc.delete_entry("example.com") is False
+
+    temp_netrc.write(
+        {
+            "example.com": {"login": "user1", "account": "", "password": "pass1"},
+            "api.example.com": {"login": "user2", "account": "", "password": "pass2"},
+        }
+    )
+
+    # Delete a present machine -> True, others retained.
+    assert temp_netrc.delete_entry("example.com") is True
+    credentials = temp_netrc.read()
+    assert "example.com" not in credentials
+    assert "api.example.com" in credentials
+
+    # Delete a missing machine -> False, nothing changed.
+    assert temp_netrc.delete_entry("nonexistent.com") is False
+    credentials = temp_netrc.read()
+    assert len(credentials) == 1
+    assert "api.example.com" in credentials
+
+
+def test_netrc_get_credentials(temp_netrc):
+    """get_credentials returns the entry for a present machine, None otherwise."""
+    # No file yet -> None.
+    assert temp_netrc.get_credentials("example.com") is None
+
+    temp_netrc.write(
+        {
+            "example.com": {
+                "login": "testuser",
+                "account": "testaccount",
+                "password": "testpass",
+            }
+        }
+    )
+
+    assert temp_netrc.get_credentials("example.com") == {
+        "login": "testuser",
+        "account": "testaccount",
+        "password": "testpass",
+    }
+    assert temp_netrc.get_credentials("nonexistent.com") is None
+
+
+def test_netrc_list_machines(temp_netrc):
+    """list_machines reflects file entries, empty file, and a missing file."""
+    # No file yet -> empty.
+    assert temp_netrc.list_machines() == []
+
+    temp_netrc.write(
+        {
+            "example.com": {"login": "user1", "account": "", "password": "pass1"},
+            "api.example.com": {"login": "user2", "account": "", "password": "pass2"},
+        }
+    )
     machines = temp_netrc.list_machines()
-
     assert len(machines) == 2
     assert "example.com" in machines
     assert "api.example.com" in machines
 
-
-def test_netrc_list_machines_empty_file(temp_netrc):
-    """Test listing machines when netrc file is empty."""
+    # Empty file -> empty.
     temp_netrc.write({})
-
-    machines = temp_netrc.list_machines()
-    assert len(machines) == 0
-
-
-def test_netrc_list_machines_no_file(temp_netrc):
-    """Test listing machines when netrc file doesn't exist."""
-    machines = temp_netrc.list_machines()
-    assert len(machines) == 0
+    assert temp_netrc.list_machines() == []
 
 
 # Tests for netrc permission checking
-def test_check_netrc_access_nonexistent_file(tmp_path):
-    """Test checking access for a non-existent file."""
+@pytest.mark.parametrize(
+    ("mode", "exists", "read_access", "write_access"),
+    [
+        (None, False, True, True),  # missing file: can create -> read/write True
+        (0o600, True, True, True),  # read-write file
+        (0o400, True, True, False),  # read-only file
+    ],
+)
+def test_check_netrc_access(tmp_path, mode, exists, read_access, write_access):
+    """check_netrc_access reports existence and read/write for missing, rw, and ro files."""
     netrc_path = tmp_path / ".netrc"
-    permissions = check_netrc_access(str(netrc_path))
-
-    assert permissions.exists is False
-    assert permissions.read_access is True  # Can create
-    assert permissions.write_access is True  # Can create
-
-
-def test_check_netrc_access_existing_file(tmp_path):
-    """Test checking access for an existing file."""
-    # Create a test file with specific permissions
-    netrc_path = tmp_path / ".netrc"
-    netrc_path.write_text("test content")
-    os.chmod(netrc_path, 0o600)
-
-    permissions = check_netrc_access(str(netrc_path))
-
-    assert permissions.exists is True
-    assert permissions.read_access is True
-    assert permissions.write_access is True
-
-
-def test_check_netrc_access_read_only_file(tmp_path):
-    """Test checking access for a read-only file."""
-    # Create a test file with read-only permissions
-    netrc_path = tmp_path / ".netrc"
-    netrc_path.write_text("test content")
-    os.chmod(netrc_path, 0o400)
+    if mode is not None:
+        netrc_path.write_text("test content")
+        os.chmod(netrc_path, mode)
 
     permissions = check_netrc_access(str(netrc_path))
 
-    assert permissions.exists is True
-    assert permissions.read_access is True
-    assert permissions.write_access is False
+    assert permissions.exists is exists
+    assert permissions.read_access is read_access
+    assert permissions.write_access is write_access
 
 
 @pytest.mark.disable_logging_error_check(
@@ -357,24 +290,22 @@ def test_check_netrc_access_os_error(mock_stat, tmp_path):
 
 
 # Tests for get_netrc_file_path function
-@patch.dict(os.environ, {"NETRC": "/custom/netrc/path"})
-def test_get_netrc_file_path_from_env():
-    """Test getting netrc file path from environment variable."""
-    path = get_netrc_file_path()
-    assert Path(path) == Path("/custom/netrc/path")
-
-
-@patch.dict(os.environ, {"NETRC": "~/custom/netrc"})
-def test_get_netrc_file_path_expanduser():
-    """Test getting netrc file path with user expansion."""
-    path = get_netrc_file_path()
-    expected = str(Path("~/custom/netrc").expanduser())
-    assert path == expected
+@pytest.mark.parametrize(
+    ("env_value", "expected"),
+    [
+        ("/custom/netrc/path", Path("/custom/netrc/path")),  # literal env path
+        ("~/custom/netrc", Path("~/custom/netrc").expanduser()),  # tilde expansion
+    ],
+)
+def test_get_netrc_file_path_from_env(env_value, expected):
+    """NETRC env var wins and is user-expanded."""
+    with patch.dict(os.environ, {"NETRC": env_value}):
+        assert Path(get_netrc_file_path()) == expected
 
 
 @patch.dict(os.environ, {}, clear=True)
 def test_get_netrc_file_path_existing_file(tmp_path):
-    """Test getting netrc file path when file exists."""
+    """With no env var, an existing home .netrc is returned."""
     netrc_path = tmp_path / ".netrc"
     netrc_path.write_text("test")
 
@@ -383,19 +314,18 @@ def test_get_netrc_file_path_existing_file(tmp_path):
         assert path == str(netrc_path)
 
 
-@patch.dict(os.environ, {}, clear=True)
-@patch("platform.system", return_value="Linux")
-def test_get_netrc_file_path_default_unix(mock_system):
-    """Test getting default netrc file path on Unix systems."""
-    with patch("pathlib.Path.home", return_value=Path("/home/user")):
-        path = get_netrc_file_path()
-        assert Path(path) == Path("/home/user/.netrc")
-
-
-@patch.dict(os.environ, {}, clear=True)
-@patch("platform.system", return_value="Windows")
-def test_get_netrc_file_path_default_windows(mock_system):
-    """Test getting default netrc file path on Windows systems."""
-    with patch("pathlib.Path.home", return_value=Path("C:/Users/user")):
-        path = get_netrc_file_path()
-        assert Path(path) == Path("C:/Users/user/_netrc")
+@pytest.mark.parametrize(
+    ("system", "home", "expected"),
+    [
+        ("Linux", Path("/home/user"), Path("/home/user/.netrc")),
+        ("Windows", Path("C:/Users/user"), Path("C:/Users/user/_netrc")),
+    ],
+)
+def test_get_netrc_file_path_default(system, home, expected):
+    """With no env var and no existing file, the platform default name is used."""
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("platform.system", return_value=system),
+        patch("pathlib.Path.home", return_value=home),
+    ):
+        assert Path(get_netrc_file_path()) == expected
