@@ -7,8 +7,7 @@ import {
 import {setGlobalClient} from '../../clientApi';
 import {type Api as TraceServerApi} from '../../generated/traceServerApi';
 import {Settings, type SettingsInit} from '../../settings';
-import {type WandbServerApi} from '../../wandb/wandbServerApi';
-import {createWeaveClient, WeaveClient} from '../../weaveClient';
+import {WeaveClient} from '../../weaveClient';
 import state from 'weave/state';
 
 export const TEST_BASE_URL = 'http://localhost:8080';
@@ -16,7 +15,7 @@ export const TEST_PROJECT = 'test-entity/test-project';
 
 export function installFakeClient(settings: SettingsInit = {}): WeaveClient {
   const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
-  const client = createWeaveClient({
+  const client = new WeaveClient({
     traceServerApi,
     projectId: TEST_PROJECT,
     settings: new Settings(

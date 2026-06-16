@@ -6,7 +6,7 @@ import {
 } from '../../integrations/openai';
 import {isWeaveImage} from '../../media';
 import {type WandbServerApi} from '../../wandb/wandbServerApi';
-import {createWeaveClient, WeaveClient} from '../../weaveClient';
+import {WeaveClient} from '../../weaveClient';
 import {makeAPIPromiseShim} from '../openaiMock';
 
 // Mock WeaveClient dependencies
@@ -55,7 +55,7 @@ describe('OpenAI Integration', () => {
       },
     } as any;
     mockWandbServerApi = {} as any;
-    weaveClient = createWeaveClient({
+    weaveClient = new WeaveClient({
       traceServerApi: mockTraceServerApi,
       projectId: 'test-project',
     });

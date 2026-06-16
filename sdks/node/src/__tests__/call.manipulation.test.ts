@@ -1,5 +1,4 @@
-import {createWeaveClient, WeaveClient} from '../weaveClient';
-import {op, Op} from 'weave';
+import {WeaveClient} from '../weaveClient';
 import {CallState, InternalCall} from 'weave/call';
 import {getGlobalClient} from 'weave/clientApi';
 
@@ -10,7 +9,7 @@ const mockUpdateCall = jest.fn();
 
 jest.mock('weave/clientApi', () => ({
   getGlobalClient: jest.fn(() => {
-    const weaveClient = createWeaveClient({
+    const weaveClient = new WeaveClient({
       traceServerApi: null as any,
       projectId: mockProjectId,
     });

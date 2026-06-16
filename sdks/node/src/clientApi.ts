@@ -7,11 +7,7 @@ import {Netrc} from './utils/netrc';
 import {createFetchWithRetry} from './utils/retry';
 import {getWandbConfigs} from './wandb/settings';
 import {WandbServerApi} from './wandb/wandbServerApi';
-import {
-  type CallStackEntry,
-  createWeaveClient,
-  WeaveClient,
-} from './weaveClient';
+import {type CallStackEntry, WeaveClient} from './weaveClient';
 import {globalSingleton} from './utils/globalSingleton';
 
 // Held behind a globalThis-backed container so that a dual-package-hazard load
@@ -139,7 +135,7 @@ export async function init(
       customFetch: concurrencyLimitedFetch,
     });
 
-    const client = createWeaveClient({
+    const client = new WeaveClient({
       traceServerApi,
       projectId,
       settings: resolvedSettings,

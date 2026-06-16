@@ -3,7 +3,7 @@ import {type Api as TraceServerApi} from '../generated/traceServerApi';
 import {StringPrompt} from '../prompt';
 import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
 import {type WandbServerApi} from '../wandb/wandbServerApi';
-import {createWeaveClient, WeaveClient} from '../weaveClient';
+import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
 
 // Mock the TraceServerApi and WandbServerApi
@@ -46,7 +46,7 @@ describe('WeaveClient', () => {
       },
     } as any;
     mockWandbServerApi = {} as any;
-    client = createWeaveClient({
+    client = new WeaveClient({
       traceServerApi: mockTraceServerApi,
       projectId: 'test-project',
     });
@@ -197,7 +197,7 @@ describe('WeaveClient', () => {
         },
       } as any;
       mockWandbServerApi = {} as any;
-      client = createWeaveClient({
+      client = new WeaveClient({
         traceServerApi: mockTraceServerApi,
         projectId: 'test-project',
       });
@@ -370,7 +370,7 @@ describe('WeaveClient', () => {
         request: jest.fn(),
       } as any;
       mockWandbServerApi = {} as any;
-      client = createWeaveClient({
+      client = new WeaveClient({
         traceServerApi: mockTraceServerApi,
         projectId: 'current-entity/current-project',
       });
@@ -471,7 +471,7 @@ describe('WeaveClient', () => {
     });
 
     it('rejects projectId without entity scope', async () => {
-      const unscopedClient = createWeaveClient({
+      const unscopedClient = new WeaveClient({
         traceServerApi: mockTraceServerApi,
         projectId: 'project-only',
       });
