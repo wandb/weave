@@ -351,4 +351,30 @@ describe('Op Flow', () => {
       expect(call.trace_id).toBe(traceId);
     });
   });
+
+  test('call-end carries the same trace_id as the call-start', async () => {
+    // Inspect the raw upsert batch instead of reading calls back: the in-memory
+    // server merges end fields onto the start record, and the start already
+    // carries trace_id, so a merged read would pass even without the fix.
+    const batchSpy = jest.spyOn(
+      inMemoryTraceServer.call,
+      'callStartBatchCallUpsertBatchPost'
+    );
+
+    const myOp = op((x: number) => x * 2, {name: 'myOp'});
+    await myOp(21);
+
+    await inMemoryTraceServer.waitForPendingOperations();
+
+    const items = batchSpy.mock.calls.flatMap(([batchReq]) => batchReq.batch);
+    const startItem = items.find(item => item.mode === 'start');
+    const endItem = items.find(item => item.mode === 'end');
+
+    expect(startItem).toBeDefined();
+    expect(endItem).toBeDefined();
+
+    const startTraceId = startItem!.req.start.trace_id;
+    expect(startTraceId).toBeTruthy();
+    expect(endItem!.req.end.trace_id).toBe(startTraceId);
+  });
 });

@@ -11238,6 +11238,17 @@
             "type": "string",
             "title": "Id"
           },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          },
           "ended_at": {
             "type": "string",
             "format": "date-time",

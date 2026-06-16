@@ -1072,6 +1072,7 @@ export class WeaveClient {
     this.saveCallEnd({
       project_id: this.projectId,
       id: currentCall.callId,
+      trace_id: currentCall.traceId,
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1108,6 +1109,7 @@ export class WeaveClient {
     this.saveCallEnd({
       project_id: this.projectId,
       id: currentCall.callId,
+      trace_id: currentCall.traceId,
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
