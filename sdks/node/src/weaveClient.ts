@@ -1015,7 +1015,7 @@ export class WeaveClient {
 
     // Merge custom attributes with default weave attributes
     const combinedAttributes = {
-      ...this.settings.globalAttributes,
+      ...this.settings.attributes,
       ...this.getCurrentAttributes(),
       ...(attributes || {}),
     };

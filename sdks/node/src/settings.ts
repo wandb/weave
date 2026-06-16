@@ -27,15 +27,9 @@ export type Settings = {
    */
   readonly printCallLink: boolean;
 
-  /** @deprecated Use `printCallLink` instead. */
-  readonly shouldPrintCallLink: boolean;
-
   /**
    * A map of attributes applied to every trace produced by this client.
    */
-  readonly globalAttributes: Record<string, any>;
-
-  /** @deprecated Use `globalAttributes` instead. */
   readonly attributes: Record<string, any>;
 };
 
@@ -46,18 +40,10 @@ export function makeSettings(settings: Partial<Settings> = {}): Settings {
     settings.printCallLink ??
     true;
 
-  const globalAttributes = settings.globalAttributes ?? {};
-
   return {
     printCallLink,
-    globalAttributes,
+    attributes: settings.attributes ?? {},
     genai: settings.genai ?? {},
-
-    /** @deprecated Use `printCallLink` instead. */
-    shouldPrintCallLink: printCallLink,
-
-    /** @deprecated Use `globalAttributes` instead. */
-    attributes: globalAttributes,
   };
 }
 
