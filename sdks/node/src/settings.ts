@@ -1,55 +1,52 @@
 import type {BufferConfig, SpanProcessor} from '@opentelemetry/sdk-trace-base';
 
-export interface GenAISettingsInit {
+export type Settings = {
   /**
-   * How GenAI spans are exported.
+   * Prints links in terminal to Weave UI for ops.
    *
-   * - `'batch'` (default): `BatchSpanProcessor`, suitable for production
-   *   agents and long-lived processes.
-   * - `'simple'`: `SimpleSpanProcessor`, one HTTP POST per span. Useful for
-   *   tests and short-lived CLIs where deterministic flush matters more than
-   *   throughput.
-   * - `SpanProcessor` instance: a user-supplied processor. The caller owns
-   *   its lifecycle; the Weave OTLP exporter targeting `/agents/otel/v1/traces`
-   *   is not used.
+   * @default `true`
    */
-  spanProcessor?: 'batch' | 'simple' | SpanProcessor;
+  readonly printCallLink: boolean;
 
-  /** `BatchSpanProcessor` configuration. Ignored unless `spanProcessor === 'batch'`. */
-  batchOptions?: BufferConfig;
-}
+  /**
+   * A map of attributes applied to every trace produced by this client.
+   */
+  readonly attributes: Record<string, any>;
 
-export interface SettingsInit {
-  printCallLink?: boolean;
-  globalAttributes?: Record<string, any>;
-  genai?: GenAISettingsInit;
-}
+  readonly genai: {
+    /**
+     * How GenAI spans are exported.
+     *
+     * - `'batch'` (default): `BatchSpanProcessor`, suitable for production
+     *   agents and long-lived processes.
+     * - `'simple'`: `SimpleSpanProcessor`, one HTTP POST per span. Useful for
+     *   tests and short-lived CLIs where deterministic flush matters more than
+     *   throughput.
+     * - `SpanProcessor` instance: a user-supplied processor. The caller owns
+     *   its lifecycle; the Weave OTLP exporter targeting `/agents/otel/v1/traces`
+     *   is not used.
+     */
+    spanProcessor?: 'batch' | 'simple' | SpanProcessor;
 
-export class Settings {
-  constructor(
-    private printCallLink: boolean = true,
-    private globalAttributes: Record<string, any> = {},
-    public readonly genai: GenAISettingsInit = {}
-  ) {}
+    /**
+     * `BatchSpanProcessor` configuration. Ignored unless `spanProcessor === 'batch'`.
+     */
+    batchOptions?: BufferConfig;
+  };
+};
 
-  get shouldPrintCallLink(): boolean {
-    return parseEnvVar(process.env.WEAVE_PRINT_CALL_LINK) ?? this.printCallLink;
-  }
+export function makeSettings(settings: Partial<Settings> = {}): Settings {
+  // Env vars take precedence over provided settings.
+  const printCallLink =
+    parseEnvVar(process.env.WEAVE_PRINT_CALL_LINK) ??
+    settings.printCallLink ??
+    true;
 
-  get attributes(): Record<string, any> {
-    return this.globalAttributes;
-  }
-}
-
-export function makeSettings(settings?: SettingsInit): Settings {
-  if (!settings) {
-    return new Settings();
-  }
-  return new Settings(
-    settings.printCallLink ?? true,
-    settings.globalAttributes ?? {},
-    settings.genai ?? {}
-  );
+  return {
+    printCallLink,
+    attributes: settings.attributes ?? {},
+    genai: settings.genai ?? {},
+  };
 }
 
 export function shouldUseOtelV2(): boolean {

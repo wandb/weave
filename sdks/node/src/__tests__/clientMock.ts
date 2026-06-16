@@ -7,7 +7,7 @@ import {WeaveClient} from '../weaveClient';
 export function initWithCustomTraceServer(
   projectId: string,
   customTraceServer: InMemoryTraceServer,
-  settings: Settings = new Settings(true)
+  settings: Partial<Settings> = {}
 ) {
   const client = new WeaveClient({
     traceServerApi: customTraceServer as unknown as TraceServerApi<any>,
