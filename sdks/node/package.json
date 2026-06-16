@@ -177,6 +177,7 @@
     "uuidv7": "^1.0.1"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.178",
     "@eslint/js": "^10.0.1",
     "@openai/agents": "^0.11.4",
     "@openai/agents-realtime": "^0.11.5",

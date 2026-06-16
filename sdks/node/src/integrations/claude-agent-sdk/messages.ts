@@ -1,0 +1,194 @@
+/**
+ * Pure helpers and local types for the Claude Agent SDK integration: a minimal
+ * mirror of the `@anthropic-ai/claude-agent-sdk` message shapes we consume, and
+ * display-name formatting for the calls produced from streamed `query()`
+ * messages.
+ *
+ * We deliberately avoid depending on `@anthropic-ai/claude-agent-sdk` for these
+ * types — the integration patches the SDK's exported `query()` at runtime, the
+ * same way `anthropic.ts` patches `@anthropic-ai/sdk` without importing it — so
+ * only the subset of fields used below is modelled here. Display-name helpers
+ * are ported from the Python integration's `display_utils.py` so both SDKs
+ * produce consistent call names.
+ */
+
+// ── Message shapes (subset of the SDK's `SDKMessage` union) ─────────────
+
+export interface TextBlock {
+  type: 'text';
+  text: string;
+}
+
+export interface ThinkingBlock {
+  type: 'thinking';
+  thinking: string;
+}
+
+export interface ToolUseBlock {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface ToolResultBlock {
+  type: 'tool_result';
+  tool_use_id: string;
+  content?: unknown;
+  is_error?: boolean;
+}
+
+export type ContentBlock =
+  | TextBlock
+  | ThinkingBlock
+  | ToolUseBlock
+  | ToolResultBlock
+  | {type: string; [k: string]: unknown};
+
+/** The raw Anthropic (`BetaMessage`) payload nested under an assistant message. */
+export interface AssistantAPIMessage {
+  id?: string;
+  model?: string;
+  content: ContentBlock[];
+  stop_reason?: string | null;
+  usage?: Record<string, unknown>;
+  [k: string]: unknown;
+}
+
+export interface SDKAssistantMessage {
+  type: 'assistant';
+  message: AssistantAPIMessage;
+  parent_tool_use_id?: string | null;
+  session_id?: string;
+}
+
+export interface SDKUserMessage {
+  type: 'user';
+  message: {
+    role?: string;
+    content: string | ContentBlock[];
+    [k: string]: unknown;
+  };
+  parent_tool_use_id?: string | null;
+  session_id?: string;
+}
+
+export interface SDKSystemMessage {
+  type: 'system';
+  message: string;
+  session_id?: string;
+}
+
+export interface SDKResultMessage {
+  type: 'result';
+  subtype: string;
+  session_id?: string;
+  duration_ms?: number;
+  duration_api_ms?: number;
+  num_turns?: number;
+  total_cost_usd?: number;
+  is_error?: boolean;
+  result?: string;
+  errors?: string[];
+  usage?: Record<string, unknown>;
+  modelUsage?: Record<string, Record<string, unknown>>;
+  stop_reason?: string | null;
+}
+
+export type SDKMessage =
+  | SDKAssistantMessage
+  | SDKUserMessage
+  | SDKSystemMessage
+  | SDKResultMessage
+  | {type: string; [k: string]: unknown};
+
+/**
+ * Normalize a streamed message into a plain, role-tagged object for use as call
+ * inputs/outputs and in the accumulated message history. Mirrors the Python
+ * integration's `_serialize_msg`: the nested API `message` is lifted to the top
+ * level and a `role` is derived from the message `type`.
+ */
+export function serializeMessage(msg: SDKMessage): Record<string, unknown> {
+  switch (msg.type) {
+    case 'assistant':
+      return {role: 'assistant', ...(msg as SDKAssistantMessage).message};
+    case 'user':
+      return {role: 'user', ...(msg as SDKUserMessage).message};
+    case 'system':
+      return {role: 'system', content: (msg as SDKSystemMessage).message};
+    default: {
+      const {type, ...rest} = msg as {type: string} & Record<string, unknown>;
+      return {role: type, ...rest};
+    }
+  }
+}
+
+// ── Display-name helpers ────────────────────────────────────────────────
+
+const MAX_ABBREVIATION_WORDS = 8;
+
+/** Abbreviate text to its first `maxWords` words, appending "..." when longer. */
+function abbreviate(
+  text: string,
+  maxWords: number = MAX_ABBREVIATION_WORDS
+): string {
+  const allWords = text.split(/\s+/).filter(Boolean);
+  let name = allWords.slice(0, maxWords).join(' ');
+  if (allWords.length > maxWords) {
+    name += '...';
+  }
+  return name;
+}
+
+/** Capitalize each run of letters (TS analog of Python's `str.title()`). */
+function titleCase(s: string): string {
+  return s.replace(
+    /[A-Za-z]+/g,
+    w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  );
+}
+
+/** Format tool input params as `k="v", k=v` (strings quoted, others bare). */
+function formatParams(params: Record<string, unknown>): string {
+  return Object.entries(params)
+    .map(([k, v]) => (typeof v === 'string' ? `${k}="${v}"` : `${k}=${v}`))
+    .join(', ');
+}
+
+/**
+ * Display name for a tool-use child call.
+ *
+ * MCP tools:  `mcp__math__add` + {a:3,b:7} -> `Math MCP: Add(a=3, b=7)`
+ * Built-ins:  `Bash` + {command:'ls'}       -> `Bash(command="ls")`
+ */
+export function toolUseDisplayName(
+  toolName: string,
+  toolInput: Record<string, unknown>
+): string {
+  if (toolName.startsWith('mcp__')) {
+    const parts = toolName.split('__');
+    if (parts.length === 3) {
+      const [, server, tool] = parts;
+      return `${titleCase(server)} MCP: ${titleCase(tool)}(${formatParams(toolInput)})`;
+    }
+  }
+  return `${toolName}(${formatParams(toolInput)})`;
+}
+
+/** Display name for a thinking-block child call. */
+export function thinkingDisplayName(thinking: string): string {
+  return `Thinking: ${abbreviate(thinking)}`;
+}
+
+/** Display name for a text-block child call. */
+export function textDisplayName(text: string): string {
+  return `Text: ${abbreviate(text)}`;
+}
+
+/** Display name for the root `query`/turn call, from the first words of the prompt. */
+export function turnDisplayName(prompt: string | null | undefined): string {
+  if (!prompt) {
+    return 'Turn';
+  }
+  return abbreviate(prompt);
+}
