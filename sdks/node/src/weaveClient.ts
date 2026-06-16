@@ -6,6 +6,7 @@ import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
   type AgentSchema,
+  type AgentVersionSchema,
   type CallSchema,
   type CallsQueryReq,
   type CallsFilter,
@@ -90,6 +91,7 @@ export interface GetCallsOptions {
 }
 
 export type Agent = AgentSchema;
+export type AgentVersion = AgentVersionSchema;
 
 /**
  * Options for {@link WeaveClient.getAgents}.
@@ -106,6 +108,33 @@ export interface GetAgentsOptions {
  */
 export type GetAgentsResult = {
   agents: Agent[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentVersions}.
+ */
+export interface GetAgentVersionsOptions {
+  agentName: string;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 100
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentVersions}.
+ */
+export type GetAgentVersionsResult = {
+  versions: AgentVersion[];
   total_count?: number;
 };
 
@@ -259,6 +288,35 @@ export class WeaveClient {
     }
 
     return this.traceServerApi.agents.genaiAgentsQueryAgentsQueryPost(params);
+  }
+
+  /**
+   * List versions for a given agent.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentVersions({agentName: 'my-agent', limit: 20});
+   *
+   * for (const version of resp.data.versions) {
+   *   console.log(version.agent_version, version.total_input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public getAgentVersions(
+    options: GetAgentVersionsOptions
+  ): Promise<Response<GetAgentVersionsResult>> {
+    return this.traceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost(
+      {
+        project_id: this.projectId,
+        agent_name: options.agentName,
+        sort_by: options.sortBy,
+        limit: options.limit,
+        offset: options.offset,
+      }
+    );
   }
 
   private scheduleBatchProcessing() {

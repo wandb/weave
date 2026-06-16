@@ -37,7 +37,11 @@ function mockStreamResponse(
 
 type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
   calls: {callsQueryStreamCallsStreamQueryPost: jest.Mock};
-  agents: {genaiAgentsQueryAgentsQueryPost: jest.Mock};
+  agents: {
+    genaiAgentsQueryAgentsQueryPost: jest.Mock;
+    genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.Mock;
+    genaiSearchAgentsSearchPost: jest.Mock;
+  };
 };
 
 describe('WeaveClient', () => {
@@ -52,6 +56,8 @@ describe('WeaveClient', () => {
       },
       agents: {
         genaiAgentsQueryAgentsQueryPost: jest.fn(),
+        genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.fn(),
+        genaiSearchAgentsSearchPost: jest.fn(),
       },
     } as any;
     mockWandbServerApi = {} as any;
@@ -421,6 +427,48 @@ describe('WeaveClient', () => {
       );
 
       await expect(client.getAgents()).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentVersions', () => {
+    it('gets agent versions from the server', async () => {
+      const versions = [
+        {agent_version: 'v1', total_input_tokens: 42},
+        {agent_version: 'v2', total_input_tokens: 99},
+      ];
+      mockTraceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost.mockResolvedValue(
+        {data: {versions, total_count: 2}} as any
+      );
+
+      const result = await client.getAgentVersions({
+        agentName: 'Assistant',
+        limit: 50,
+        offset: 10,
+        sortBy: [{field: 'last_seen', direction: 'desc'}],
+      });
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiAgentVersionsQueryAgentsAgentVersionsQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        agent_name: 'Assistant',
+        sort_by: [{field: 'last_seen', direction: 'desc'}],
+        limit: 50,
+        offset: 10,
+      });
+
+      expect(result).toEqual({data: {versions, total_count: 2}});
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(
+        client.getAgentVersions({agentName: 'Assistant'})
+      ).rejects.toThrow('boom');
     });
   });
 
