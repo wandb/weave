@@ -30,3 +30,6 @@ This note was copied from pre-origin-master-rebase commit 66e5d8440a65. The user
 
 ## Stack Correction Context
 After the origin/master rebase and push, the user noticed that unrelated LLM-judge test gating had landed in the call-writes PR because the old skeleton gating commit became part of the first live branch when the merged skeleton PR was reparented away. This stack rewrite removes `tests/trace/test_llm_as_a_judge_scorer.py` from `andrew/fake-ts-02-call-writes`, removes the compensating unskip hunk from the tables/files PR, and applies the intended LLM-judge ungate only in `andrew/fake-ts-09-completions`.
+
+## Stack Correction Context
+The user pointed out that call-lifecycle test changes should not be in the root call-writes PR because that PR does not own the call lifecycle test enablement. This rewrite removes `tests/trace_server/test_call_lifecycle.py` from `andrew/fake-ts-02-call-writes` and moves `test_call_end_v2_requires_existing_start` plus its `NotFoundError` import into `andrew/fake-ts-calls-read`, the same branch that already ungates `test_call_update_out_of_order`. Future agents should verify per-PR diffs against each Graphite parent, not just the final stack diff.
