@@ -5,6 +5,7 @@ import {uuidv7} from 'uuidv7';
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
+  type AgentChatMessage as AgentChatMessageSchema,
   type AgentSchema,
   type AgentSpanSchema,
   type AgentVersionSchema,
@@ -92,6 +93,7 @@ export interface GetCallsOptions {
 }
 
 export type Agent = AgentSchema;
+export type AgentChatMessage = AgentChatMessageSchema;
 export type AgentSpan = AgentSpanSchema;
 export type AgentVersion = AgentVersionSchema;
 
@@ -166,6 +168,26 @@ export type GetAgentSpansResult = {
   spans: AgentSpan[];
   total_count?: number;
 };
+
+/**
+ * Options for {@link WeaveClient.getAgentTraceChat}.
+ */
+export interface GetAgentTraceChatOptions {
+  traceId: string;
+  includeFeedback?: boolean;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentTraceChat}.
+ */
+export type GetAgentTraceChatResult = {
+  trace_id: string;
+  root_span_name?: string | null;
+  provider?: string | null;
+  total_duration_ms?: number | null;
+  messages?: AgentChatMessage[];
+  feedback?: Record<string, any>[] | null;
+}
 
 /**
  * Distinguishes the object-based getCalls options form from the legacy
@@ -394,6 +416,37 @@ export class WeaveClient {
         spans: resp.data.spans ?? [],
       },
     };
+  }
+
+  /**
+   * Get the structured chat view for a single trace.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentTraceChat({
+   *   traceId: '01997b8a-2c89-7c4d-9d0e-2f7e5b9a1b2c',
+   *   includeFeedback: true,
+   * });
+   *
+   * console.log(resp.data.root_span_name, resp.data.total_duration_ms);
+   *
+   * for (const message of resp.data.messages ?? []) {
+   *   if (message.user_message) console.log('user:', message.user_message);
+   *   if (message.assistant_message) console.log('assistant:', message.assistant_message);
+   * }
+   * ```
+   */
+  public getAgentTraceChat(
+    options: GetAgentTraceChatOptions
+  ): Promise<Response<GetAgentTraceChatResult>> {
+    return this.traceServerApi.agents.genaiTracesChatAgentsTracesChatPost(
+      {
+        project_id: this.projectId,
+        trace_id: options.traceId,
+        include_feedback: options.includeFeedback
+      }
+    );
   }
 
   private scheduleBatchProcessing() {

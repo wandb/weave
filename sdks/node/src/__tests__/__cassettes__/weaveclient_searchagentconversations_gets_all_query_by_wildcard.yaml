@@ -1,0 +1,98 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 21:02:45 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Wed, 17 Jun 2026 21:02:45 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: 707144c3dae2ec220327c21fcf4e74d6
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/search
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+    body: '{"project_id":"drtangible-mocha/example","query":"*"}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "4360"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 21:02:45 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"results":[{"conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","conversation_name":"","agent_name":"","matched_messages":[{"span_id":"53fc733e2f6b3417","trace_id":"86cc8e5a64b3bb1fbbf80cb377155950","role":"assistant","content_preview":"[{\"type\":
+      \"text\", \"content\": \"Liverpool last won the English Premier League in
+      the **2019\\u201320 season**, clinching the title on **25 June
+      2020**.\"}]","content_digest":"95fbc841becb3025395d9f997712ad53","started_at":"2026-06-16T22:10:34.631000"}],"last_activity":"2026-06-16T22:10:34.631000"},{"conversation_id":"trace_a6fe0c92ca474ed0bd068c531f7af12c","conversation_name":"","agent_name":"","matched_messages":[{"span_id":"46b56d77a8411c2d","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"assistant","content_preview":"[{\"type\":
+      \"tool_call\", \"toolName\": \"calculate\", \"arguments\":
+      \"{\\\"expression\\\":\\\"(17 * 4) +
+      93\\\"}\"}]","content_digest":"6eeb22f6a15d0bde7701fb1788261ed9","started_at":"2026-06-16T22:10:16.373000"},{"span_id":"46b56d77a8411c2d","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"What is (17 * 4) +
+      93?\"}]","content_digest":"47023b151742ce5a5875efc8bba23ca4","started_at":"2026-06-16T22:10:16.373000"},{"span_id":"054c43c9f804e63e","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"tool_result","content_preview":"(17
+      * 4) + 93 =
+      161","content_digest":"f42e9ede1fff406859e70154464f6dc7","started_at":"2026-06-16T22:10:16.371000"},{"span_id":"054c43c9f804e63e","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"tool_call","content_preview":"{\"expression\":
+      \"(17 * 4) +
+      93\"}","content_digest":"d8bc400f3f9d19e91e8ee16df152bf21","started_at":"2026-06-16T22:10:16.371000"},{"span_id":"00a5ca1e03e154e5","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"assistant","content_preview":"[{\"type\":
+      \"tool_call\", \"toolCallId\": \"call_0WVGj8E4Pyp7ioza0JSWRFFF\",
+      \"toolName\": \"calculate\", \"arguments\": \"{\\\"expression\\\":\\\"(17
+      * 4) +
+      93\\\"}\"}]","content_digest":"558b3dcea9feed77762dc7fd0bf9231f","started_at":"2026-06-16T22:10:15.298000"},{"span_id":"00a5ca1e03e154e5","trace_id":"67648280e1e0dffe7e560df171d99ddc","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"What is (17 * 4) +
+      93?\"}]","content_digest":"47023b151742ce5a5875efc8bba23ca4","started_at":"2026-06-16T22:10:15.298000"}],"last_activity":"2026-06-16T22:10:16.373000"},{"conversation_id":"trace_a286608a865445df89818d7f01db254e","conversation_name":"","agent_name":"","matched_messages":[{"span_id":"f192bf6cc13fd609","trace_id":"4a4688fe60b5587257a230faec8e6db7","role":"assistant","content_preview":"[{\"type\":
+      \"tool_call\", \"toolName\": \"calculate\", \"arguments\":
+      \"{\\\"expression\\\":\\\"(17 * 4) +
+      93\\\"}\"}]","content_digest":"6eeb22f6a15d0bde7701fb1788261ed9","started_at":"2026-06-16T22:06:01.588000"},{"span_id":"f192bf6cc13fd609","trace_id":"4a4688fe60b5587257a230faec8e6db7","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"What is (17 * 4) +
+      93?\"}]","content_digest":"47023b151742ce5a5875efc8bba23ca4","started_at":"2026-06-16T22:06:01.588000"},{"span_id":"739a467a3476977e","trace_id":"4a4688fe60b5587257a230faec8e6db7","role":"tool_call","content_preview":"{\"expression\":
+      \"(17 * 4) +
+      93\"}","content_digest":"d8bc400f3f9d19e91e8ee16df152bf21","started_at":"2026-06-16T22:06:01.587000"},{"span_id":"739a467a3476977e","trace_id":"4a4688fe60b5587257a230faec8e6db7","role":"tool_result","content_preview":"(17
+      * 4) + 93 =
+      161","content_digest":"f42e9ede1fff406859e70154464f6dc7","started_at":"2026-06-16T22:06:01.587000"},{"span_id":"dd789eccb66f150f","trace_id":"4a4688fe60b5587257a230faec8e6db7","role":"assistant","content_preview":"[{\"type\":
+      \"tool_call\", \"toolCallId\": \"call_3IPsKEYINgT1mtA7kZrmZBtt\",
+      \"toolName\": \"calculate\", \"arguments\": \"{\\\"expression\\\":\\\"(17
+      * 4) +
+      93\\\"}\"}]","content_digest":"8140b3036f8319a5bf0313e99ec12256","started_at":"2026-06-16T22:06:00.579000"},{"span_id":"dd789eccb66f150f","trace_id":"4a4688fe60b5587257a230faec8e6db7","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"What is (17 * 4) +
+      93?\"}]","content_digest":"47023b151742ce5a5875efc8bba23ca4","started_at":"2026-06-16T22:06:00.579000"}],"last_activity":"2026-06-16T22:06:01.588000"}],"total_conversations":3}'
