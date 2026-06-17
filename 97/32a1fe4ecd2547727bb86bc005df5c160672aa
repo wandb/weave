@@ -58,3 +58,12 @@ Found and fixed two classes of problems:
 3. _calls keying (@gtarpenning): re-keyed self._calls from {id: rec} to {(project_id, id): rec} to mirror ClickHouse scoping. Applied consistently down the whole stack via a deterministic idempotent transform run at every commit (git rebase d69777541a --exec /tmp/fix_all.py). Writes use no-paren subscript self._calls[rec.project_id, rec.id] (RUF031); reads use .get((project_id, id)) with project_id from req.start/req.end/req.project_id; .values() iterations unchanged (already filter rec.project_id). The redundant `rec.project_id == req.project_id` check at annotation_queue_add_calls is now always-true but left in place (harmless, minimal diff).
 4. subclassing FullTraceServerInterface (@gtarpenning): KEPT. It's a Protocol; ClickHouseTraceServer subclasses it identically; inheriting makes pyright/mypy verify the full interface is implemented. No change.
 Verified: re-key correct on fake (test_client_trace 124p + annotation_queues 57p, 177 total post-rebase); ruff check+format clean on all 17; consistency sweep old-key=0/new-decl=1 across the stack.
+
+## ADDENDUM: rebased onto origin/master e8c9cb6662 (+13 commits)
+Conflicts (master changed files the stack gates):
+- test_base_object_classes.py: master refactored monitor tests to a `_invalid_field_message` helper (tests still exist). Merged master's refactor + the stack's monitor gating; monitor pair stays gated on the fake.
+- test_feedback.py: master ADDED test_agent_user_feedback. Gated on the fake (conservative, like monitor-accepts); it PASSES on the fake once feedback lands (verified), so it could be un-gated at PR8 (sibling test_agent_monitor_feedback_filters un-gates there) — left gated per push-as-is.
+- test_llm_as_a_judge_scorer.py: import merge (master's Scorer + FAKE); FAKE removed at the PR4 un-gate.
+The recurring FAKE-import add/remove churn at un-gate commits was auto-resolved by /tmp/resolve_imports.py (defers non-import conflicts to manual).
+TRAP for future agents: a NEW master test in a file the stack FULLY un-gates creates an import-persistence bug — the still-gated new test needs the FAKE import, but the un-gate's ruff --fix removes it as F401 -> NameError. Fix: a rebase --exec re-adding the FAKE import wherever a FAKE skipif remains (idempotent), OR un-gate the new test where its feature lands.
+Verified: ruff check+format clean on all 17; conflict files + call CRUD pass/skip on the fake (168 passed, 10 skipped); PR1 descends origin/master.
