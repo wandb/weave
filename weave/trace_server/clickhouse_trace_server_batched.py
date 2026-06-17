@@ -319,6 +319,7 @@ from weave.trace_server.trace_server_interface import (
     EvaluateModelArgs,
     RescoringArgs,
 )
+from weave.trace_server.tracing import traced, traced_generator
 from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
     get_project_retention_days,
@@ -327,7 +328,6 @@ from weave.trace_server.ttl_settings import (
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelDispatcher,
 )
-from weave.trace_server.tracing import traced, traced_generator
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
