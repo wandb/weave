@@ -58,8 +58,7 @@ def _resolve_dogstatsd_addr() -> tuple[str, int]:
                 return parsed.hostname, parsed.port or 8125
         except ValueError:
             logger.warning(
-                "Could not parse DD_DOGSTATSD_URL=%r; falling back to "
-                "localhost:8125",
+                "Could not parse DD_DOGSTATSD_URL=%r; falling back to localhost:8125",
                 url,
             )
     host = os.environ.get("DD_AGENT_HOST", "localhost")
@@ -87,9 +86,7 @@ def _emit_statsd(metric: str, value: int, tags: list[str]) -> None:
             _SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             _SOCK.setblocking(False)
         except OSError:
-            logger.warning(
-                "DogStatsD socket creation failed; metric emission disabled"
-            )
+            logger.warning("DogStatsD socket creation failed; metric emission disabled")
             _SOCK_FAILED = True
             return
     tag_suffix = f"|#{','.join(tags)}" if tags else ""
