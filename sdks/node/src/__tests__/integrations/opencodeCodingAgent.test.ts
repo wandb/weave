@@ -11,7 +11,9 @@ import {OpenCodeCodingAgentOtelAdapter} from '../../integrations/opencodeCodingA
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function makeAdapter(opts: {captureContent?: boolean; agentName?: string} = {}): {
+function makeAdapter(
+  opts: {captureContent?: boolean; agentName?: string} = {}
+): {
   exporter: InMemorySpanExporter;
   adapter: OpenCodeCodingAgentOtelAdapter;
 } {
@@ -204,9 +206,7 @@ describe('OpenCodeCodingAgentOtelAdapter', () => {
     it('sets gen_ai.system_instructions when provided', () => {
       const {exporter, adapter} = makeAdapter();
       startInvoke(adapter);
-      adapter.setSystemInstructions([
-        'You are a helpful coding assistant.',
-      ]);
+      adapter.setSystemInstructions(['You are a helpful coding assistant.']);
       adapter.endInvokeAgentSpan();
 
       const invoke = exporter
@@ -621,33 +621,30 @@ describe('OpenCodeCodingAgentOtelAdapter', () => {
       ['bedrock', 'aws.bedrock'],
     ];
 
-    test.each(testCases)(
-      'maps %s to %s',
-      (providerID, expected) => {
-        const {exporter, adapter} = makeAdapter();
-        adapter.onEvent({
-          type: 'session.created',
-          properties: {
-            ...TEST_SESSION,
-            providerID,
-          } as any,
-        });
-        adapter.onEvent({
-          type: 'message.updated',
-          properties: {
-            id: `msg-${providerID}`,
-            role: 'user',
-            sessionID: TEST_SESSION.id,
-            createdAt: new Date().toISOString(),
-          },
-        });
-        adapter.endInvokeAgentSpan();
+    test.each(testCases)('maps %s to %s', (providerID, expected) => {
+      const {exporter, adapter} = makeAdapter();
+      adapter.onEvent({
+        type: 'session.created',
+        properties: {
+          ...TEST_SESSION,
+          providerID,
+        } as any,
+      });
+      adapter.onEvent({
+        type: 'message.updated',
+        properties: {
+          id: `msg-${providerID}`,
+          role: 'user',
+          sessionID: TEST_SESSION.id,
+          createdAt: new Date().toISOString(),
+        },
+      });
+      adapter.endInvokeAgentSpan();
 
-        const invoke = exporter
-          .getFinishedSpans()
-          .find(s => s.name === 'invoke_agent opencode')!;
-        expect(invoke.attributes['gen_ai.provider.name']).toBe(expected);
-      }
-    );
+      const invoke = exporter
+        .getFinishedSpans()
+        .find(s => s.name === 'invoke_agent opencode')!;
+      expect(invoke.attributes['gen_ai.provider.name']).toBe(expected);
+    });
   });
 });

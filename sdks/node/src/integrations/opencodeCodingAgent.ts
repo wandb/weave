@@ -211,10 +211,7 @@ function mapOpenCodeParts(parts: OpenCodePart[]): WeaveMessagePart[] {
 /**
  * Build a WeaveMessage from an OpenCode message and its parts.
  */
-function mapOpenCodeMessage(
-  role: string,
-  parts: OpenCodePart[]
-): WeaveMessage {
+function mapOpenCodeMessage(role: string, parts: OpenCodePart[]): WeaveMessage {
   const textParts = parts.filter(p => p.type === 'text');
   const mappedParts = mapOpenCodeParts(parts);
 
@@ -224,9 +221,7 @@ function mapOpenCodeMessage(
   // Fallback: concatenate text parts
   return {
     role,
-    content: textParts
-      .map(p => (p as {text: string}).text)
-      .join('\n'),
+    content: textParts.map(p => (p as {text: string}).text).join('\n'),
   };
 }
 
@@ -260,7 +255,10 @@ export class OpenCodeCodingAgentOtelAdapter {
   private chatSpan: Span | null = null;
 
   // Per-tool spans keyed by a synthetic tool call ID
-  private readonly toolSpans = new Map<string, {span: Span; startTime: number}>();
+  private readonly toolSpans = new Map<
+    string,
+    {span: Span; startTime: number}
+  >();
   private toolCallCounter = 0;
 
   // Tracks which messages we've already seen so we can detect new ones
@@ -303,10 +301,7 @@ export class OpenCodeCodingAgentOtelAdapter {
   // Event routing
   // ---------------------------------------------------------------------------
 
-  onEvent(event: {
-    type: string;
-    properties: Record<string, unknown>;
-  }): void {
+  onEvent(event: {type: string; properties: Record<string, unknown>}): void {
     switch (event.type) {
       case 'session.created':
         this.onSessionCreated(event.properties as unknown as OpenCodeSession);

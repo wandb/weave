@@ -156,13 +156,14 @@ export interface OpenCodePluginContext {
 export interface OpenCodeSDKClient {
   event: {
     subscribe(): Promise<{
-      stream: AsyncIterable<{type: string; properties: Record<string, unknown>}>;
+      stream: AsyncIterable<{
+        type: string;
+        properties: Record<string, unknown>;
+      }>;
     }>;
   };
   session: {
-    messages(opts: {
-      path: {id: string};
-    }): Promise<{
+    messages(opts: {path: {id: string}}): Promise<{
       data: Array<{
         info: OpenCodeMessage;
         parts: OpenCodePart[];
