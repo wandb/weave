@@ -4,7 +4,6 @@ Runs actual SQL against a single-node ClickHouse with embedded Keeper.
 """
 
 import os
-import time
 import uuid
 
 import pytest
@@ -63,19 +62,6 @@ def _get_latest_migration_version(migration_dir: str) -> int:
     ]
     assert versions, f"No up migrations found in {migration_dir}"
     return max(versions)
-
-
-def _sync_mutations(ch_client, db_name: str, table_name: str) -> None:
-    """Wait for all pending mutations to complete on a table."""
-    for _ in range(50):
-        result = ch_client.query(
-            "SELECT count() FROM system.mutations "
-            f"WHERE database = '{db_name}' AND table = '{table_name}' AND is_done = 0"
-        )
-        if result.result_rows[0][0] == 0:
-            return
-        time.sleep(0.1)
-    raise TimeoutError(f"Mutations on {db_name}.{table_name} did not complete")
 
 
 def _table_exists(ch_client, db_name: str, table_name: str) -> bool:
@@ -413,15 +399,12 @@ def test_recent_production_upgrade_path(
     # Seed a real old schema using production migrations, not hand-written DDL.
     seed_migrator = make_migrator(mgmt_db=mgmt_db, use_distributed=use_distributed)
     seed_migrator.apply_migrations(target_db, target_version=seed_version)
-    _sync_mutations(ch_client, mgmt_db, "migrations")
     assert _get_migration_version(ch_client, mgmt_db, target_db) == seed_version
     assert _get_db_engine(ch_client, target_db) == expected_engine
 
     # A new init container starts with an empty engine cache, then upgrades.
     upgrade_migrator = make_migrator(mgmt_db=mgmt_db, use_distributed=use_distributed)
     upgrade_migrator.apply_migrations(target_db)
-    _sync_mutations(ch_client, mgmt_db, "migrations")
-
     assert _get_migration_version(ch_client, mgmt_db, target_db) == latest_version
     assert _get_db_engine(ch_client, target_db) == expected_engine
     assert _table_exists(ch_client, target_db, "object_version_first_seen")
@@ -518,9 +501,6 @@ def test_all_production_down_migrations_replicated(ch_client):
     migrator.apply_migrations(target_db)
     assert _get_db_engine(ch_client, target_db) == "Atomic"
 
-    # ALTER TABLE UPDATE mutations are async; wait for them to settle
-    _sync_mutations(ch_client, mgmt_db, "migrations")
-
     # Migrate all the way back down
     migrator.apply_migrations(target_db, target_version=0)
 
@@ -547,9 +527,6 @@ def test_all_production_down_migrations_distributed(ch_client):
     migrator.apply_migrations(target_db)
     assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
     assert _get_db_engine(ch_client, target_db) == "Atomic"
-
-    # ALTER TABLE UPDATE mutations are async; wait for them to settle
-    _sync_mutations(ch_client, mgmt_db, "migrations")
 
     # Migrate all the way back down
     migrator.apply_migrations(target_db, target_version=0)

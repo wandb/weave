@@ -577,12 +577,15 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self, target_db: str, target_version: int, is_start: bool = True
     ) -> None:
         """Update the migration status in management database migrations table."""
+        # mutations_sync=2 makes the status write durable on every replica before we
+        # return; the async default can leave a finished migration marked partial.
+        sync = {"mutations_sync": 2}
         if is_start:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
-            self._run_ddl_with_retry(command)
+            self._run_ddl_with_retry(command, settings=sync)
         else:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
-            self._run_ddl_with_retry(command)
+            self._run_ddl_with_retry(command, settings=sync)
 
     @staticmethod
     def _is_safe_identifier(value: str) -> bool:
@@ -595,7 +598,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
         retry=retry_if_exception(_is_transient_ch_error),
         reraise=True,
     )
-    def _run_ddl_with_retry(self, command: str) -> None:
+    def _run_ddl_with_retry(
+        self, command: str, settings: dict[str, int | str] | None = None
+    ) -> None:
         """Execute a DDL command with retry for transient replication errors.
 
         Retries with exponential backoff for known-transient codes:
@@ -603,7 +608,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         and 999 (KEEPER_EXCEPTION) when ON CLUSTER DDL hits a transient Keeper
         coordination error.
         """
-        self.ch_client.command(command)
+        self.ch_client.command(command, settings=settings)
 
 
 class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):
