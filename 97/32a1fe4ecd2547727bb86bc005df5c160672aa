@@ -51,10 +51,3 @@ Found and fixed two classes of problems:
 - mypy narrowing does not survive list comprehensions or closures over
   Optionals; the threads/feedback_aggregate restructures exist for the
   type checker, keep the explicit is-not-None filters.
-
-## ADDENDUM: addressed 4 PR-review comments (#7145)
-1. test.yaml (@drtangible): stale "tests/fake_unimplemented.txt" ref (file never existed; design uses per-test skipif decorators) -> comment corrected.
-2. util.py (@gtarpenning): FAKE_NOT_IMPLEMENTED copy-pasted NOT_CLICKHOUSE_BACKEND's condition -> aliased `FAKE_NOT_IMPLEMENTED = NOT_CLICKHOUSE_BACKEND` (distinct name kept; explanatory comment kept).
-3. _calls keying (@gtarpenning): re-keyed self._calls from {id: rec} to {(project_id, id): rec} to mirror ClickHouse scoping. Applied consistently down the whole stack via a deterministic idempotent transform run at every commit (git rebase d69777541a --exec /tmp/fix_all.py). Writes use no-paren subscript self._calls[rec.project_id, rec.id] (RUF031); reads use .get((project_id, id)) with project_id from req.start/req.end/req.project_id; .values() iterations unchanged (already filter rec.project_id). The redundant `rec.project_id == req.project_id` check at annotation_queue_add_calls is now always-true but left in place (harmless, minimal diff).
-4. subclassing FullTraceServerInterface (@gtarpenning): KEPT. It's a Protocol; ClickHouseTraceServer subclasses it identically; inheriting makes pyright/mypy verify the full interface is implemented. No change.
-Verified: re-key correct on fake (test_client_trace 124p + annotation_queues 57p, 177 total post-rebase); ruff check+format clean on all 17; consistency sweep old-key=0/new-decl=1 across the stack.
