@@ -198,7 +198,6 @@ def test_object(server):
     assert server._resolve_object("my-obj", "latest2") is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_save_load(client):
     saved_val = client.save({"a": [1, 2, 3]}, "my-obj")
     val = client.get(saved_val.ref)
@@ -267,7 +266,6 @@ def test_obj_with_table(client):
     assert row_vals[2]["a"] == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_pydantic(client):
     class A(pydantic.BaseModel):
         a: int
@@ -1109,7 +1107,6 @@ def test_saveload_customtype(client):
     assert obj2.b == "x"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_save_unknown_type(client):
     class SomeUnknownThing:
         def __init__(self, a):
@@ -1318,7 +1315,6 @@ def test_nested_ref_is_inner(client):
     assert saved.dataset.rows.ref.name == "Dataset"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_obj_dedupe(client):
     client._save_object({"a": 1}, "my-obj")
     client._save_object({"a": 1}, "my-obj")
@@ -1435,7 +1431,6 @@ def test_server_file(client):
     assert f_bytes == read_res.content
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_isinstance_checks(client):
     class PydanticObjA(weave.Object):
         x: dict
@@ -1959,7 +1954,6 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
             )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_ref_in_dict(client):
     ref = client._save_object({"a": 5}, "d1")
 
@@ -4791,7 +4785,6 @@ def test_calls_query_with_dotted_field_keys(client):
     assert any(o.get("triple.nested.dot") == "universe" for o in outputs)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     """Test that LLMStructuredCompletionModel correctly passes prompt and template_vars in evaluation context.
 

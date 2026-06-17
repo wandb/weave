@@ -80,7 +80,6 @@ class TestFileCreateExpectedDigest:
 
 @pytest.mark.trace_server
 class TestObjCreateExpectedDigest:
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_no_expected_digest(self, client) -> None:
         """obj_create without expected_digest succeeds (fallback path)."""
         req = ObjCreateReq(
@@ -93,7 +92,6 @@ class TestObjCreateExpectedDigest:
         res = client.server.obj_create(req)
         assert res.digest is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_wrong_expected_digest(self, client) -> None:
         """obj_create with wrong expected_digest raises DigestMismatchError."""
         req = ObjCreateReq(

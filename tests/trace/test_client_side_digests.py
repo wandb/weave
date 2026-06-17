@@ -68,7 +68,6 @@ def fast_path(client: WeaveClient):
 class TestClientServerDigestConsistency:
     """Client-side and server-side digests must agree for the same data."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_object(self, client: WeaveClient):
         obj = {"model": "gpt-4", "temperature": 0.7, "tags": ["a", "b"]}
 
@@ -93,7 +92,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_nested_object(self, client: WeaveClient):
         obj = {
             "config": {"a": 1, "b": [2, 3]},
@@ -122,7 +120,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_empty_dict(self, client: WeaveClient):
         obj: dict = {}
 
@@ -131,7 +128,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_unicode_content(self, client: WeaveClient):
         obj = {
             "emoji": "\U0001f680\U0001f30d",
@@ -167,7 +163,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_object_with_ref(self, client: WeaveClient):
         """Object containing a ref to another object."""
         inner = {"inner_key": "inner_value"}
@@ -223,7 +218,6 @@ class TestClientServerDigestConsistency:
 class TestDataCorrectness:
     """Publish (client-side and server-side), read back, verify data is intact."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_object(self, client: WeaveClient, fast_path: None):
         obj = {"key": "value", "number": 42, "list": [1, 2, 3]}
         ref = weave.publish(obj, name="round_trip_obj")
@@ -248,7 +242,6 @@ class TestDataCorrectness:
             assert row["a"] == i
             assert row["b"] == i * 2
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_nested_object(self, client: WeaveClient, fast_path: None):
         obj = {
             "config": {"a": 1, "b": [2, 3]},
@@ -273,13 +266,11 @@ class TestDataCorrectness:
         got = ref.get()
         assert got(3) == 4
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_empty_dict(self, client: WeaveClient, fast_path: None):
         ref = weave.publish({}, name="empty_rt")
         client._flush()
         assert ref.get() == {}
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_unicode_content(self, client: WeaveClient, fast_path: None):
         obj = {"emoji": "\U0001f680", "cjk": "\u4f60\u597d"}
         ref = weave.publish(obj, name="unicode_rt")
@@ -300,7 +291,6 @@ class TestDataCorrectness:
         assert got.size == (32, 32)
         assert got.getpixel((0, 0)) == (255, 0, 0)
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_get_without_explicit_flush(self, weave_active, fast_path: None):
         """ref.get() must work without an explicit _flush() call.
 
@@ -319,7 +309,6 @@ class TestDataCorrectness:
 class TestServerDigestValidation:
     """Server must reject wrong expected_digest and accept correct ones."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
     def test_object(self, client: WeaveClient, correct: bool):
         val = {"hello": "world"}
@@ -422,7 +411,6 @@ class TestConvertRefsToInternal:
         with pytest.raises(CrossProjectRefError):
             client._convert_refs_to_internal(json_val)
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_cross_project_ref_skips_expected_digest(
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
@@ -466,7 +454,6 @@ class TestDigestMismatchAutoDisable:
     and disables client-side digests for the rest of the session.
     """
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.disable_logging_error_check
     def test_object_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch
@@ -534,7 +521,6 @@ class TestDigestMismatchAutoDisable:
         got_rows = list(got.rows)
         assert len(got_rows) == 2
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.disable_logging_error_check
     def test_file_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch

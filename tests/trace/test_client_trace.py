@@ -1651,7 +1651,6 @@ def test_ops_with_default_params(client):
     assert inner_res.calls[5].inputs == {"a": 1, "b": 5}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_root_type(client):
     class BaseTypeA(weave.Object):
         a: int
@@ -2057,7 +2056,6 @@ def test_unknown_input_and_output_types(client):
     assert inner_res.calls[0].output == repr(res)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_unknown_attribute(weave_active):
     class MyUnknownClass:
         val: int
@@ -3477,7 +3475,6 @@ class Custom(weave.Object):
     val: dict
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_object_with_disallowed_keys(client):
     name = "thing % with / disallowed : keys"
     obj = Custom(name=name, val={"1": 1})
@@ -3503,7 +3500,6 @@ def test_object_with_disallowed_keys(client):
 CHAR_LIMIT = 128
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_object_with_char_limit(client):
     name = "l" * CHAR_LIMIT
     obj = Custom(name=name, val={"1": 1})
@@ -3528,7 +3524,6 @@ def test_object_with_char_limit(client):
     client.server.obj_create(create_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_object_with_char_over_limit(client):
     name = "l" * (CHAR_LIMIT + 1)
     obj = Custom(name=name, val={"1": 1})
@@ -3740,7 +3735,6 @@ def test_inline_dataclass_generates_no_refs_in_function(client):
     assert len(output_object_version_refs) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_inline_dataclass_generates_no_refs_in_object(client):
     @dataclasses.dataclass
     class A:
@@ -3788,7 +3782,6 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_function(client):
     assert len(output_object_version_refs) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     class A(BaseModel):
         b: int

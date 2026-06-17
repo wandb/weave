@@ -28,7 +28,6 @@ def _obj_delete(client: WeaveClient, object_id: str, digests: list[str]) -> int:
     ).num_deleted
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_object_versions(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     v1 = weave.publish({"i": 2}, name="obj_1")
@@ -56,7 +55,6 @@ def test_delete_object_versions(client: WeaveClient):
     assert len(objs) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_all_object_versions(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -72,7 +70,6 @@ def test_delete_all_object_versions(client: WeaveClient):
         _obj_delete(client, "obj_1", None)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_version_correctness(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     v1 = weave.publish({"i": 2}, name="obj_1")
@@ -112,7 +109,6 @@ def test_delete_version_correctness(client: WeaveClient):
     assert objs[1].version_index == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_object_max_limit(client: WeaveClient):
     # Create more than MAX_OBJECTS_TO_DELETE objects
     max_objs = 100
@@ -126,13 +122,11 @@ def test_delete_object_max_limit(client: WeaveClient):
         _obj_delete(client, "obj_1", digests)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_nonexistent_object_id(client: WeaveClient):
     with pytest.raises(weave.trace_server.errors.NotFoundError):
         _obj_delete(client, "nonexistent_obj", None)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_mixed_valid_invalid_digests(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     v1 = weave.publish({"i": 2}, name="obj_1")
@@ -145,7 +139,6 @@ def test_delete_mixed_valid_invalid_digests(client: WeaveClient):
         _obj_delete(client, "obj_1", invalid_digests)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_duplicate_digests(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
 
@@ -153,7 +146,6 @@ def test_delete_duplicate_digests(client: WeaveClient):
     assert num_deleted == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_with_digest_aliases(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -173,7 +165,6 @@ def test_delete_with_digest_aliases(client: WeaveClient):
     assert len(objs) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_and_recreate_object(client: WeaveClient):
     # Create and delete initial object
     v0 = weave.publish({"i": 1}, name="obj_1")
@@ -198,7 +189,6 @@ def _latest_objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchem
     return objs.objs
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize("republish_val", [{"i": 1}, {"i": 99}])
 def test_republish_after_deleting_all_versions(
     client: WeaveClient, republish_val: dict[str, int]
@@ -312,7 +302,6 @@ def test_read_deleted_op(client: WeaveClient):
     assert ref_res.vals[0] is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_all_object_versions_api(client: WeaveClient):
     """Test the public API for deleting all versions of an object."""
     v0 = weave.publish({"i": 1}, name="obj_test_all")
@@ -366,7 +355,6 @@ def test_delete_all_op_versions_api(client: WeaveClient):
         client.delete_all_op_versions("test_op")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_delete_object_versions_api(client: WeaveClient):
     """Test the public API for deleting multiple specific versions of an object."""
     v0 = weave.publish({"i": 1}, name="obj_multi_delete")
