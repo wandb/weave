@@ -578,7 +578,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
     ) -> None:
         """Update the migration status in management database migrations table."""
         # mutations_sync=2 makes the status write durable on every replica before we
-        # return; the async default can leave a finished migration marked partial.
+        # return; the async default can leave a finished migration marked partial (WB-35755).
         sync = {"mutations_sync": 2}
         if is_start:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
