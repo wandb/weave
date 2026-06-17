@@ -497,6 +497,41 @@ def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
     assert _assistant_payload(agent_messages[0]).text == "hi there"
 
 
+def test_reasoning_part_not_duplicated_in_assistant_text() -> None:
+    """A reasoning part in output_messages surfaces only as `reasoning_content`,
+    never concatenated into the assistant body text.
+
+    `_serialize_output_messages` folds reasoning into the assistant message's
+    parts as a ReasoningPart (so downstream extraction can populate
+    `reasoning_content`). The chat view must render that reasoning solely in the
+    Reasoning block — otherwise the same text renders twice: once in the
+    collapsible and again as body text.
+    """
+    reasoning = "Investigating scenario counts"
+    answer = "There are 17 scenarios, not 16."
+    span = _span(
+        operation_name="chat",
+        output_messages=[
+            {
+                "role": "assistant",
+                "content": _parts(
+                    {"type": "reasoning", "content": reasoning},
+                    _text_part(answer),
+                ),
+            }
+        ],
+        reasoning_content=reasoning,
+    )
+
+    messages = build_chat_messages([span])
+    assistant = next(m for m in messages if m.type == "assistant_message")
+    payload = _assistant_payload(assistant)
+
+    assert payload.text == answer
+    assert reasoning not in payload.text
+    assert payload.reasoning_content == reasoning
+
+
 def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:
     def at(seconds: int) -> datetime.datetime:
         return datetime.datetime(
