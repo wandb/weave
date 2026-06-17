@@ -61,3 +61,9 @@ Copied from prior rewritten commit 0c32041a5ce2 after the NotFoundError import f
 'other-project-call') as call ids. ClickHouse requires call ids to be UUIDs
 (require_uuid -> CHValidationError: Invalid UUID), so the test failed on the real
 backend (passed on the fake which skips UUID validation). Switched to str(uuid.uuid4()).
+
+## Review follow-up (readability)
+Added high-level '# ----' block comments and concise docstrings to the complex
+function(s) in this commit, per a review request to group complex funcs into
+logical chunks (same lean style as feedback_stats: no phase terms, no line-level
+comments). Comments/docstrings only; behavior unchanged. Applied via 'gt absorb'.
