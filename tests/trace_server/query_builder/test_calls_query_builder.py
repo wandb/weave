@@ -2421,6 +2421,71 @@ def test_datetime_optimization_simple() -> None:
     )
 
 
+def test_datetime_optimization_string_literal_window() -> None:
+    """ISO/string started_at bounds must still emit the sortable_datetime prefilter.
+
+    Regression (PR #6570): the HAVING path learned to parse ISO / string
+    datetime literals, but the WHERE prefilter stayed numeric-only, so a string
+    started_at range produced a valid HAVING with no granule prune. On
+    calls_merged that forces a full-project GROUP BY and OOMs. Mirrors the
+    scoring-worker "earliest call in window" probe.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$gte": [
+                            {"$getField": "started_at"},
+                            {"$literal": "2024-03-01T00:00:00Z"},
+                        ]
+                    },
+                    {
+                        "$lt": [
+                            {"$getField": "started_at"},
+                            {"$literal": "2024-03-01T01:00:00Z"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "asc")
+    cq.set_limit(1)
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.started_at) AS started_at
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_4:String}
+        WHERE (calls_merged.sortable_datetime >= {pb_2:String}
+            AND calls_merged.sortable_datetime < {pb_3:String})
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) >= {pb_0:String}))
+            AND ((any(calls_merged.started_at) < {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+        )
+        ORDER BY any(calls_merged.started_at) ASC
+        LIMIT 1
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-01 01:00:00.000000",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-01 01:05:00.000000",
+            "pb_4": "project",
+        },
+    )
+
+
 def test_datetime_optimization_lt_simple() -> None:
     """Test basic datetime optimization with a single LT timestamp condition."""
     cq = CallsQuery(project_id="project")
