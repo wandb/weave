@@ -13,6 +13,7 @@ import pytest
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from tests.trace.server_utils import find_server_layer
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace import weave_client
 from weave.trace_server.service_interface import EnsureProjectExistsRes
 from weave.trace_server.trace_server_interface import (
@@ -89,6 +90,7 @@ def test_weave_client_init_with_caching_middleware():
     mock_server.ensure_project_exists.assert_called_once_with("entity", "project")
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_server_caching(client):
     os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
@@ -242,6 +244,7 @@ def test_server_cache_latency():
         assert added_latency < 0.003
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_file_create_caching(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     file_bytes = b"hello"
@@ -300,6 +303,7 @@ def test_file_create_caching(client):
     assert read_0.content == read_1.content == file_bytes
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_obj_create_caching(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     val = {"hello": "world"}
@@ -558,6 +562,7 @@ def test_cache_directory_creation(tmp_path):
     cache_server.close()
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_cache_invalidation_on_add_tags(client):
     """obj_read cache should be invalidated when tags are added."""
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
@@ -605,6 +610,7 @@ def test_cache_invalidation_on_add_tags(client):
     assert res2.obj.tags == ["new-tag"]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_cache_invalidation_on_remove_tags(client):
     """obj_read cache should be invalidated when tags are removed."""
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
@@ -641,6 +647,7 @@ def test_cache_invalidation_on_remove_tags(client):
     assert res2.obj.tags == []
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_cache_invalidation_on_set_alias(client):
     """obj_read cache should be invalidated when an alias is set."""
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
@@ -676,6 +683,7 @@ def test_cache_invalidation_on_set_alias(client):
     assert "prod" in res2.obj.aliases
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_cache_invalidation_on_remove_aliases(client):
     """obj_read cache should be invalidated when aliases are removed."""
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)

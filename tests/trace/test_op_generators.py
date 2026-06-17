@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator, Generator
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.context import call_context
 
 
@@ -52,6 +53,7 @@ async def deeply_nested_async_generator(x: int) -> AsyncGenerator[int, None]:
             yield j
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_basic_gen(client):
     res = basic_gen(3)
     assert list(res) == [0, 1, 2]
@@ -60,6 +62,7 @@ def test_basic_gen(client):
     assert len(calls) == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_nested_generator(client):
     res = nested_generator(3)
     assert list(res) == [1, 2, 3]
@@ -74,6 +77,7 @@ def test_nested_generator(client):
         assert call.inputs["x"] == i
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deeply_nested_generator(client):
     res = deeply_nested_generator(4)
     # basic_gen(0) -> nothing
@@ -94,6 +98,7 @@ def test_deeply_nested_generator(client):
             assert call2.inputs["x"] == j
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_basic_async_gen(client):
     lst = []
@@ -107,6 +112,7 @@ async def test_basic_async_gen(client):
     assert len(calls) == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_nested_async_generator(client):
     lst = []
@@ -126,6 +132,7 @@ async def test_nested_async_generator(client):
         assert call.inputs["x"] == i
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_deeply_nested_async_generator(client):
     lst = []
@@ -163,6 +170,7 @@ def basic_gen_with_accumulator(x: int) -> Generator[int, None, None]:
     yield from range(x)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_generator_with_custom_accumulator(client):
     # Call the generator with the accumulator from the decorator
     res = basic_gen_with_accumulator(3)
@@ -189,6 +197,7 @@ async def basic_async_gen_with_accumulator(x: int) -> AsyncGenerator[int, None]:
         yield i
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_async_generator_with_custom_accumulator(client):
     # Call the generator with the accumulator from the decorator
@@ -203,6 +212,7 @@ async def test_async_generator_with_custom_accumulator(client):
     assert calls[0].output == [0, 1, 2]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_nested_generator_multiple_iterations(client):
     """Test that nested generators work correctly when called multiple times.
 
@@ -251,6 +261,7 @@ def test_nested_generator_multiple_iterations(client):
         assert "inner_gen" in children[0].op_name
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_nested_async_generator_multiple_iterations(client):
     """Test that nested async generators work correctly when called multiple times.

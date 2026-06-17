@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
@@ -90,6 +91,9 @@ def count_queries(ch_client):
     ],
 )
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_version_resolution_by_table_contents(
     client,
     trace_server,
@@ -138,7 +142,11 @@ def test_version_resolution_by_table_contents(
         )
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_caching_behavior(client, trace_server):
+
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
     resolver._mode = CallsStorageServerMode.AUTO
@@ -166,7 +174,11 @@ def test_caching_behavior(client, trace_server):
         assert get_count() == 2
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_mode_off_and_force_legacy(client, trace_server):
+
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
 
@@ -191,7 +203,11 @@ def test_mode_off_and_force_legacy(client, trace_server):
     assert table == ReadTable.CALLS_COMPLETE
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_clickhouse_provider_directly(client, trace_server):
+
     ch_server = trace_server._internal_trace_server
     project_id = make_project_id("provider_direct")
     insert_call(ch_server.ch_client, "calls_merged", project_id)
@@ -201,6 +217,9 @@ def test_clickhouse_provider_directly(client, trace_server):
     assert residence == ProjectDataResidence.MERGED_ONLY
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_resolver_as_trace_server_member(client, trace_server):
     """Test that the resolver is properly integrated as a trace server member."""
     ch_server = trace_server._internal_trace_server

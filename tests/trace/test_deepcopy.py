@@ -4,6 +4,7 @@ from copy import deepcopy
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.box import (
     BoxedDatetime,
     BoxedFloat,
@@ -44,6 +45,7 @@ def test_deepcopy_weavelist(client):
     assert id(res) != id(lst)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deepcopy_weavelist_e2e(weave_active):
     lst = [1, 2, 3]
     ref = weave.publish(lst)
@@ -60,6 +62,7 @@ def test_deepcopy_weavedict(client):
     assert id(res) != id(d)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deepcopy_weavedict_e2e(weave_active):
     d = {"a": 1, "b": 2}
     ref = weave.publish(d)
@@ -83,6 +86,7 @@ def test_deepcopy_weaveobject(client, example_class):
     assert id(res) != id(o)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deepcopy_weaveobject_e2e(weave_active, example_class):
     cls, expected_record = example_class
 
@@ -110,6 +114,7 @@ def test_deepcopy_boxed(boxed_val):
     assert id(res) != id(boxed_val)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deepcopy_boxed_model_e2e(weave_active):
     class Model(weave.Model):
         system_prompt: str = "You are a helpful assistant."  # this will get boxed

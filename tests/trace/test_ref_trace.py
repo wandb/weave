@@ -3,6 +3,7 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.refs import (
     AgentConversationRef,
     AgentSpanRef,
@@ -87,6 +88,7 @@ def test_leaderboard_column_accepts_str_of_ref():
     assert col.evaluation_object_ref.startswith("weave:///")
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_ref_hashable(weave_active):
     class Thing(weave.Object):
         val: int
@@ -106,6 +108,7 @@ def test_ref_hashable(weave_active):
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_ref_immutable(weave_active):
     class Thing(weave.Object):
         val: int

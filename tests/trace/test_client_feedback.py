@@ -1,10 +1,12 @@
 import pytest
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_apis(client):
     project_id = client.project_id
 
@@ -199,6 +201,7 @@ def test_feedback_apis(client):
         client.server.feedback_purge(req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_payload(client):
     project_id = client.project_id
 
@@ -225,6 +228,7 @@ def test_feedback_payload(client):
     assert payload["emoji"] == "🎱"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_create_too_large(client):
     project_id = client.project_id
 
@@ -240,6 +244,7 @@ def test_feedback_create_too_large(client):
         client.server.feedback_create(req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_query_created_at_filter(client):
     """created_at filters accept ISO-8601 strings (regression for WB-34897).
 

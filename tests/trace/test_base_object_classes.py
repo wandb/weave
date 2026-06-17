@@ -18,6 +18,7 @@ import pytest
 from pydantic import ValidationError
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.serialize import to_json
@@ -56,6 +57,7 @@ def with_base_object_class_annotations(
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_pythonic_creation(client: WeaveClient):
     # First, let's use the high-level pythonic creation API.
     nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
@@ -185,6 +187,7 @@ def test_pythonic_creation(client: WeaveClient):
     assert inherited_obj_result.val == expected_inherited_val
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3)
 def test_interface_creation(client):
     # Now we will do the equivant operation using low-level interface.
@@ -314,6 +317,7 @@ def test_interface_creation(client):
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_digest_equality(client):
     # Next, let's make sure that the digests are all equivalent
     nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
@@ -377,6 +381,7 @@ def test_digest_equality(client):
     assert top_level_pythonic_digest == top_level_interface_style_digest
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_schema_validation(client):
     # Test that we can't create an object with the wrong schema
     with pytest.raises(ValidationError):
@@ -454,6 +459,7 @@ def test_schema_validation(client):
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_leaf_object_class_from_builtin_object_class(client: WeaveClient):
     """Test that when builtin_object_class is set, leaf_object_class is correctly set on stored object."""
     # Create an object using builtin_object_class parameter
@@ -515,6 +521,7 @@ def test_leaf_object_class_from_builtin_object_class(client: WeaveClient):
     assert read_top_obj_res.obj.leaf_object_class == "TestOnlyExample"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     """Test that leaf_object_class filtering works correctly with builtin objects created via builtin_object_class."""
     # Create several objects with different builtin_object_classes
@@ -687,6 +694,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     assert len(empty_res.objs) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_base_and_leaf_object_class_combined_filtering_builtin_objects(
     client: WeaveClient,
 ):
@@ -759,6 +767,7 @@ def test_base_and_leaf_object_class_combined_filtering_builtin_objects(
     assert len(mismatched_res.objs) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     """Test that inheritance between builtin objects works correctly with base_object_class and leaf_object_class."""
     # Create base object
@@ -927,6 +936,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_exclude_base_object_classes(client: WeaveClient):
     """Test that exclude_base_object_classes filter correctly excludes objects by their base classes."""
     # Create several objects with different base classes
@@ -1008,6 +1018,7 @@ def test_exclude_base_object_classes(client: WeaveClient):
     assert len(exclude_nonexistent_res.objs) >= 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_exclude_base_object_classes_with_include_filter(client: WeaveClient):
     """Test that exclude_base_object_classes works correctly when combined with base_object_classes."""
     # Create objects with different base classes
@@ -1049,6 +1060,7 @@ def test_exclude_base_object_classes_with_include_filter(client: WeaveClient):
     assert len(combined_res.objs) >= 3  # nested_obj1, nested_obj2, inherited_obj
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_exclude_base_object_classes_with_inherited_objects(client: WeaveClient):
     """Test that exclude_base_object_classes correctly handles inherited objects."""
     # Create base and inherited objects
@@ -1083,6 +1095,7 @@ def test_exclude_base_object_classes_with_inherited_objects(client: WeaveClient)
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_obj_create_rejects_name_type_collision(client: WeaveClient):
     """WB-30574: object_id is bound to one base_object_class per project.
 
@@ -1180,6 +1193,7 @@ def _create_monitor(client: WeaveClient, name: str, query: dict | None):
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
     """A Monitor query on an unknown field is rejected with the complete allowed-field list."""
     bad_query = {
@@ -1207,6 +1221,7 @@ def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
     assert objs_res.objs == []
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_monitor_create_accepts_valid_query_fields(client: WeaveClient):
     """Static, dynamic, and absent monitor queries all create successfully."""
     valid_query = {

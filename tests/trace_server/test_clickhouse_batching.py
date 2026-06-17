@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
@@ -236,6 +237,7 @@ def _internal_wb_user_id() -> str:
     return base64.b64encode(b"test_user").decode()
 
 
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: insert batching")
 def test_obj_batch_same_object_id_different_hash(trace_server, client):
     """Two versions for same object_id with different digests."""
     server = trace_server._internal_trace_server
@@ -265,6 +267,7 @@ def test_obj_batch_same_object_id_different_hash(trace_server, client):
     assert sum(o.is_latest for o in res.objs) == 1
 
 
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: insert batching")
 def test_obj_batch_same_hash_different_object_ids(trace_server, client):
     """Same digest payload uploaded under different object_ids yields distinct objects."""
     server = trace_server._internal_trace_server
@@ -289,6 +292,7 @@ def test_obj_batch_same_hash_different_object_ids(trace_server, client):
     assert {o.object_id for o in res.objs} == {"obj_1", "obj_2"}
 
 
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: insert batching")
 def test_obj_batch_identical_same_id_same_hash_deduplicates(trace_server, client):
     """Duplicate rows (same object_id and digest) are represented once in metadata view."""
     server = trace_server._internal_trace_server
@@ -312,6 +316,7 @@ def test_obj_batch_identical_same_id_same_hash_deduplicates(trace_server, client
     assert res.objs[0].digest == str_digest(json.dumps(val))
 
 
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: insert batching")
 def test_obj_batch_four_versions_and_read_path(trace_server, client):
     """Batch upload 4 versions and verify reads over all and latest work."""
     server = trace_server._internal_trace_server
@@ -348,6 +353,7 @@ def test_obj_batch_four_versions_and_read_path(trace_server, client):
     assert latest.obj.is_latest == 1
 
 
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: insert batching")
 def test_obj_batch_delete_version_preserves_indices(trace_server, client):
     """Delete one version and ensure indices remain intact and deletion is reflected."""
     server = trace_server._internal_trace_server
@@ -404,6 +410,7 @@ def test_str_digest_is_key_order_independent():
     assert str_digest(json.dumps(val_a)) != str_digest(json.dumps(val_b))
 
 
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: insert batching")
 def test_obj_batch_different_key_order_deduplicates(trace_server, client):
     """Objects with identical values but different key ordering share the same digest."""
     server = trace_server._internal_trace_server
@@ -431,6 +438,7 @@ def test_obj_batch_different_key_order_deduplicates(trace_server, client):
     assert len(res.objs) == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_create_different_key_order_same_digest(trace_server):
     """Rows with different key ordering produce the same digest in table_create."""
     server = trace_server._internal_trace_server
@@ -506,6 +514,7 @@ def test_call_start_batch_invalid_trace_id_returns_400():
             assert "Invalid UUID" in error_with_status.message["reason"]
 
 
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: insert batching")
 def test_obj_batch_mixed_projects_errors(trace_server, client):
     """Uploading objects to different projects in one batch should error."""
     server = trace_server._internal_trace_server

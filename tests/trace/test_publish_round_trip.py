@@ -1,11 +1,14 @@
+import pytest
 from pydantic import BaseModel
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.objectify import register_object
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import RefsReadBatchReq
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_publish_round_trip_query_object(client) -> None:
     query_raw = {
         "$expr": {
@@ -26,6 +29,7 @@ def test_publish_round_trip_query_object(client) -> None:
     assert query_2 == query
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_publish_round_trip_register_object_nested(weave_active) -> None:
     class Inner(BaseModel):
         name: str
@@ -47,6 +51,7 @@ def test_publish_round_trip_register_object_nested(weave_active) -> None:
     assert outer == outer_gotten
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_round_trip_unwrap(weave_active) -> None:
     data = {
         "a": 1,

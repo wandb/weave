@@ -1,10 +1,12 @@
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import Evaluation
 from weave.trace_server.common_interface import SortBy
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_filter_calls_by_ref_properties(client, no_autoflush):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
     nested1 = {"nested key with spaces": {"one": "1"}}
@@ -342,6 +344,7 @@ def test_filter_calls_by_ref_properties(client, no_autoflush):
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_filter_calls_by_ref_properties_with_table_rows_simple(
     client, no_autoflush
@@ -493,6 +496,7 @@ async def test_filter_calls_by_ref_properties_with_table_rows_simple(
     # assert calls[4].inputs["example"]["object"]["a"] == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_mixed_objects_and_refs(client):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
 

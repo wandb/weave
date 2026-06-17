@@ -19,6 +19,7 @@ from typing import Any, NamedTuple
 import pytest
 from pydantic import BaseModel
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.flow.scorer import WeaveScorerResult
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef
@@ -259,6 +260,7 @@ def test_encode_weave_scorer_result_non_scorer_returns_miss(value: Any) -> None:
 # ---------- _encode_custom_obj ----------
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_encode_custom_obj_registered_type(client: Any) -> None:
     # datetime has a built-in registered serializer; encoding produces a
     # CustomWeaveType payload with the inline value format.
@@ -436,6 +438,7 @@ def test_to_json_weave_scorer_result_emits_plain_dict() -> None:
     assert encoded == {"passed": True, "metadata": {"score": 1.0}}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_to_json_custom_obj_datetime_roundtrips_via_registry(client: Any) -> None:
     dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     encoded = to_json(dt, client.project_id, client)

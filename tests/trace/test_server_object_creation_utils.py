@@ -5,7 +5,10 @@ as the SDK.  Ideally they would be placed next to the trace_server tests, but
 the client serialization requires a client object to serialize.
 """
 
+import pytest
+
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.evaluation.eval import Evaluation
 from weave.flow.scorer import Scorer
 from weave.trace.object_record import pydantic_object_record
@@ -14,6 +17,7 @@ from weave.trace.weave_client import WeaveClient, map_to_refs
 from weave.trace_server import object_creation_utils
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_helper_serializes_op_same_way_as_sdk(client: WeaveClient) -> None:
     """Test that helpers serialize an Op the same way as SDK."""
 
@@ -29,6 +33,7 @@ def test_helper_serializes_op_same_way_as_sdk(client: WeaveClient) -> None:
     assert helper_val == sdk_val
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_helper_serializes_dataset_same_way_as_sdk(client: WeaveClient) -> None:
     """Test that helpers serialize a Dataset the same way as SDK."""
     # Create a test dataset
@@ -71,6 +76,7 @@ def test_helper_serializes_dataset_same_way_as_sdk(client: WeaveClient) -> None:
     assert helper_val == sdk_val
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_helper_serializes_scorer_same_way_as_sdk(client: WeaveClient) -> None:
     """Test that helpers serialize a Scorer with the correct structure.
 
@@ -121,6 +127,7 @@ def test_helper_serializes_scorer_same_way_as_sdk(client: WeaveClient) -> None:
     assert helper_val == sdk_val
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_helper_serializes_evaluation_same_way_as_sdk(client: WeaveClient) -> None:
     """Test that helpers serialize an Evaluation with the correct structure.
     Note: The helper creates base Evaluation objects (not custom subclasses),

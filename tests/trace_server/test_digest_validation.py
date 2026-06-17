@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import DigestMismatchError
 from weave.trace_server.trace_server_interface import (
@@ -37,6 +38,7 @@ def test_validate_expected_digest_mismatch_raises() -> None:
 
 @pytest.mark.trace_server
 class TestFileCreateExpectedDigest:
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_no_expected_digest(self, client) -> None:
         """file_create without expected_digest succeeds (fallback path)."""
         req = FileCreateReq(
@@ -47,6 +49,7 @@ class TestFileCreateExpectedDigest:
         res = client.server.file_create(req)
         assert res.digest is not None
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_correct_expected_digest(self, client) -> None:
         """file_create with correct expected_digest succeeds."""
         from weave.shared.digest import compute_file_digest
@@ -62,6 +65,7 @@ class TestFileCreateExpectedDigest:
         res = client.server.file_create(req)
         assert res.digest == digest
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_wrong_expected_digest(self, client) -> None:
         """file_create with wrong expected_digest raises DigestMismatchError."""
         req = FileCreateReq(
@@ -76,6 +80,7 @@ class TestFileCreateExpectedDigest:
 
 @pytest.mark.trace_server
 class TestObjCreateExpectedDigest:
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_no_expected_digest(self, client) -> None:
         """obj_create without expected_digest succeeds (fallback path)."""
         req = ObjCreateReq(
@@ -88,6 +93,7 @@ class TestObjCreateExpectedDigest:
         res = client.server.obj_create(req)
         assert res.digest is not None
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_wrong_expected_digest(self, client) -> None:
         """obj_create with wrong expected_digest raises DigestMismatchError."""
         req = ObjCreateReq(
@@ -104,6 +110,7 @@ class TestObjCreateExpectedDigest:
 
 @pytest.mark.trace_server
 class TestTableCreateExpectedDigest:
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_no_expected_digest(self, client) -> None:
         """table_create without expected_digest succeeds (fallback path)."""
         req = TableCreateReq(
@@ -115,6 +122,7 @@ class TestTableCreateExpectedDigest:
         res = client.server.table_create(req)
         assert res.digest is not None
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_wrong_expected_digest(self, client) -> None:
         """table_create with wrong expected_digest raises DigestMismatchError."""
         req = TableCreateReq(

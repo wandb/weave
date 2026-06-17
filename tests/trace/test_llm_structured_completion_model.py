@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from pydantic import ValidationError
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import publish
 from weave.prompt.prompt import MessagesPrompt
 from weave.trace import object_record, vals
@@ -22,6 +23,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_llm_structured_completion_model_creation_and_class_assignment(
     client: WeaveClient,
 ):
@@ -114,6 +116,7 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
     assert reconstructed_model.llm_model_id == "gpt-4"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_llm_structured_completion_model_filtering(client: WeaveClient):
     """Test querying LLMStructuredCompletionModel objects by leaf/base object classes."""
     # Create multiple models
@@ -655,6 +658,7 @@ def test_cast_to_message():
         cast_to_message(123)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @patch(
     "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
@@ -732,6 +736,7 @@ def test_llm_structured_completion_model_predict_with_prompt(
     assert call_args.inputs.messages == expected_messages
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @patch(
     "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
@@ -790,6 +795,7 @@ def test_llm_structured_completion_model_prompt_takes_precedence(
     assert call_args.inputs.messages == []
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
     """Test schema validation for LLMStructuredCompletionModel."""
     # Test missing required field

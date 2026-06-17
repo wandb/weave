@@ -1,4 +1,7 @@
+import pytest
+
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.context.weave_client_context import set_weave_client_global
 from weave.trace.vals import WeaveObject
 
@@ -13,6 +16,7 @@ def test_weaveobject_properties():
     assert to.x == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_weaveobject_access_after_init_termination(weave_active):
     my_obj = None
 

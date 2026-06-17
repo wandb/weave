@@ -8,7 +8,7 @@ from PIL import Image
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import AnyIntMatcher, AnyStrMatcher
+from tests.trace.util import FAKE_NOT_IMPLEMENTED, AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
@@ -89,6 +89,7 @@ async def do_quickstart():
     return await evaluation.evaluate(model)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_basic_evaluation(client):
     res = await do_quickstart()
@@ -324,6 +325,7 @@ def with_empty_feedback(obj: Any) -> Any:
     return obj
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_data_topology(client):
     """We support a number of different types of scorers, and we want to ensure that
@@ -635,6 +637,7 @@ def make_test_eval():
     return evaluation
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_supports_model_as_op(weave_active):
     @weave.op
@@ -657,6 +660,7 @@ class MyTestModel(Model):
         return ""
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_supports_model_class(weave_active):
     evaluation = make_test_eval()
@@ -670,6 +674,7 @@ async def test_eval_supports_model_class(weave_active):
     assert res is not None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_supports_non_op_funcs(weave_active):
     def function_model(sentence: str) -> dict:
@@ -701,6 +706,7 @@ async def test_eval_supports_non_op_funcs(weave_active):
     # assert shouldBeModelRef.startswith("weave:///")
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_is_robust_to_missing_values(weave_active):
     # At least 1 None
@@ -738,6 +744,7 @@ async def test_eval_is_robust_to_missing_values(weave_active):
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_with_complex_types(client):
     client.project = "test_eval_with_complex_types"
@@ -990,6 +997,7 @@ async def test_evaluation_with_multiple_column_maps():
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_feedback_is_correctly_linked(client):
     @weave.op
@@ -1030,6 +1038,7 @@ async def test_feedback_is_correctly_linked(client):
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     @weave.op
@@ -1092,6 +1101,7 @@ def test_scorers_with_output_and_model_output_raise_error():
         evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_with_custom_name(client):
     dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
@@ -1110,6 +1120,7 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_evaluate_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
@@ -1129,6 +1140,7 @@ def test_get_evaluate_calls(client, make_evals):
     assert call2.inputs["model"].name == "ghi"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_score_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
@@ -1150,6 +1162,7 @@ def test_get_score_calls(client, make_evals):
     assert score_calls2[3].output == 7878
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_scores(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
