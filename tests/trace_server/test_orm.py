@@ -295,7 +295,7 @@ def test_join_global():
         )
     )
 
-    prepared = select.prepare(database_type="clickhouse")
+    prepared = select.prepare()
 
     assert (
         prepared.sql
