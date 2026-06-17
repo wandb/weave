@@ -1,0 +1,26 @@
+## Conversation
+The user asked to fix review findings in the appropriate PR in the fake trace-server stack. This commit owns the in-memory fake's v2 call write path. The specific finding was that `call_end_v2` silently accepted an unknown call id by delegating to `call_end`, which creates end-only v1-style rows for out-of-order ingestion. ClickHouse `call_end_v2` instead raises `NotFoundError` when no start row exists, so the fake could hide production failures.
+
+## Actions
+- Inspected the stack with `gt status`, `gt log`, and `git blame` to map the finding to `andrew/fake-ts-02-call-writes` / the call ingestion commit.
+- Updated `weave/trace_server/in_memory_trace_server.py` so `call_end_v2` checks `(project_id, id)` under the server lock before delegating to `call_end`.
+- The check rejects missing records or records without a `started_at`, raising `NotFoundError` with the same scenario wording as the ClickHouse implementation.
+- Added `tests/trace_server/test_call_lifecycle.py::test_call_end_v2_requires_existing_start` to assert that an unknown v2 end raises and does not create an orphan call.
+- Amended this branch with `gt modify --into andrew/fake-ts-02-call-writes --all --no-interactive --no-verify`; Graphite restacked descendants.
+
+## Errors & Mistakes
+- No code mistake in this patch. The first nox trace invocation selected zero tests because nox injected `-m trace_server`, xdist, and shard behavior; reran the targeted nodes directly with the nox Python plus `--num-shards=1 --shard-id=0`.
+- `nox --no-install -e lint` initially failed because `ruff-format` reformatted two files. The formatting deltas were split back into their owning stack branches and lint was rerun successfully.
+
+## Dead Ends
+- Did not reuse the ClickHouse-only `test_calls_complete.py` coverage for this because that file is intentionally skipped on the fake backend; the regression needs fake-backend coverage.
+
+## Hints for Future Agents
+- Keep v1 `call_end` permissive for out-of-order start/end ingestion; only v2 `call_end_v2` should require an existing start row.
+- `call_end_v2` should tolerate mismatched `started_at` when the id exists, matching ClickHouse's fallback lookup by `(project_id, id)`.
+
+## Codebase Discoveries
+- The fake stores calls in one `(project_id, id)` map, so v2's missing-start behavior must be enforced explicitly before calling the v1-compatible `call_end` helper.
+
+## Open Questions
+None.
