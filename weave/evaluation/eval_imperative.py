@@ -24,7 +24,7 @@ from weave.evaluation.eval import (
     _active_eval_prediction_context,
     default_evaluation_display_name,
 )
-from weave.evaluation.eval_meta import EVAL_META_KEY, EvalMeta
+from weave.evaluation.eval_meta import EVAL_META_KEY
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
@@ -85,8 +85,8 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
     "current_predict_call", default=None
 )
 
-IMPERATIVE_EVAL_META_MARKER: EvalMeta = {"imperative": True}
-IMPERATIVE_SCORE_META_MARKER: EvalMeta = {"imperative": True, "score": True}
+IMPERATIVE_EVAL_META_MARKER = {"imperative": True}
+IMPERATIVE_SCORE_META_MARKER = {"imperative": True, "score": True}
 
 
 def _as_call_attributes(eval_meta: dict[str, Any]) -> dict[str, Any]:
