@@ -18,3 +18,6 @@ Graphite may skip restacking a branch marked merged even when descendants still 
 
 ## Open Questions
 None.
+
+## Stack Correction Context
+After the origin/master rebase and push, the user noticed that unrelated LLM-judge test gating had landed in the call-writes PR because the old skeleton gating commit became part of the first live branch when the merged skeleton PR was reparented away. This stack rewrite removes `tests/trace/test_llm_as_a_judge_scorer.py` from `andrew/fake-ts-02-call-writes`, removes the compensating unskip hunk from the tables/files PR, and applies the intended LLM-judge ungate only in `andrew/fake-ts-09-completions`.
