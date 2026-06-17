@@ -1,0 +1,26 @@
+## Conversation
+The user asked to fix review findings in the appropriate PR in the fake trace-server stack. This commit owns the in-memory fake's calls read path. The specific finding was that `include_total_storage_size` snapshotted every call in the fake, then aggregated by `trace_id` only, so a trace id reused in another project polluted the current project's total storage size. ClickHouse filters the storage stats subquery by `project_id`.
+
+## Actions
+- Used `git blame` to map the `calls_query` total-storage snapshot to `andrew/fake-ts-calls-read`.
+- Updated `calls_query` so the `all_records` snapshot used for total trace storage includes only live calls from `req.project_id`.
+- Added `tests/trace/test_client_trace.py::test_total_storage_size_is_project_scoped`, which writes two calls with the same trace id into different projects and asserts the queried project's root total equals only its own storage size.
+- Amended this branch with `gt modify --into andrew/fake-ts-calls-read --all --no-interactive --no-verify`; Graphite restacked descendants.
+- After `ruff-format` changed wrapping in the new test, split that formatting-only delta back into this same branch with another `gt modify --into andrew/fake-ts-calls-read`.
+
+## Errors & Mistakes
+- The first nox trace invocation selected zero tests because of shard/marker behavior; reran targeted tests directly with the nox Python and explicit shard options.
+- `nox --no-install -e lint` initially failed because `ruff-format` modified files; accepted and amended the formatting changes into their owning branches, then reran lint successfully.
+
+## Dead Ends
+- Did not broaden this into a larger storage-size rewrite; the discrete bug was the missing project predicate in the fake's total-storage aggregation snapshot.
+
+## Hints for Future Agents
+- `trace_id` is not globally unique across projects. Any fake aggregation keyed by trace id must include a project scope, matching ClickHouse queries.
+- For ClickHouse consistency in tests that assert storage stats, continue using `force_optimize_if_clickhouse(client, "calls_merged_stats")` before reading stats.
+
+## Codebase Discoveries
+- The fake's root-call total storage is computed from in-memory call record lengths, while ClickHouse reads from project-filtered stats tables. The observable contract is project-scoped totals.
+
+## Open Questions
+None.
