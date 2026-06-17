@@ -11,6 +11,7 @@ from weave.trace_server.environment import (
     VALID_CALLS_SHARD_KEYS,
     kafka_producer_max_buffer_size,
     wf_clickhouse_calls_shard_key,
+    wf_kafka_project_id_bucket_count,
     wf_scoring_worker_check_cancellation,
     wf_scoring_worker_debounced_scoring_max_call_history,
     wf_scoring_worker_debounced_scoring_max_sampling_rate,
@@ -271,6 +272,27 @@ def test_wf_scoring_worker_remote_scorer_allow_insecure_http(monkeypatch):
     assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
     monkeypatch.setenv(key, "1")
     assert wf_scoring_worker_remote_scorer_allow_insecure_http() is False
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_kafka_project_id_bucket_count(monkeypatch):
+    """Bucket count defaults to 1, parses ints, floors at 1, falls back on garbage."""
+    key = "WF_KAFKA_PROJECT_ID_BUCKET_COUNT"
+    monkeypatch.delenv(key, raising=False)
+    assert wf_kafka_project_id_bucket_count() == 1
+
+    monkeypatch.setenv(key, "4")
+    assert wf_kafka_project_id_bucket_count() == 4
+    monkeypatch.setenv(key, "1")
+    assert wf_kafka_project_id_bucket_count() == 1
+    monkeypatch.setenv(key, "0")
+    assert wf_kafka_project_id_bucket_count() == 1
+    monkeypatch.setenv(key, "-3")
+    assert wf_kafka_project_id_bucket_count() == 1
+    monkeypatch.setenv(key, "not-a-number")
+    assert wf_kafka_project_id_bucket_count() == 1
+    monkeypatch.setenv(key, "")
+    assert wf_kafka_project_id_bucket_count() == 1
 
 
 @pytest.mark.disable_logging_error_check

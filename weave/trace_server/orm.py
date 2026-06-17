@@ -581,6 +581,27 @@ def parse_string_to_utc_timestamp(value: str) -> float | None:
     return dt.timestamp()
 
 
+def datetime_literal_to_timestamp(
+    literal: tsi_query.LiteralOperation,
+) -> float | None:
+    """Resolve a datetime filter literal to a UTC unix timestamp (seconds).
+
+    Single source of truth for the literal shapes a datetime comparison accepts,
+    shared by the post-aggregation HAVING (`maybe_convert_datetime_operands`) and
+    the `sortable_datetime` pre-filter so the two never diverge. Numeric unix
+    timestamps pass through; ISO / `YYYY-MM-DD` strings are parsed; bool (an int
+    subclass) and non-scalar / unparsable values return None.
+    """
+    value = literal.literal_
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        return parse_string_to_utc_timestamp(value)
+    return None
+
+
 def clickhouse_cast(inner_sql: str, cast: tsi_query.CastTo | None = None) -> str:
     """Helper function to cast a sql expression to a clickhouse type."""
     if cast is None:
@@ -781,19 +802,10 @@ def maybe_convert_datetime_operands(
         ):
             field_idx = i
         elif isinstance(op, tsi_query.LiteralOperation):
-            lit = op.literal_
-            # bool is a subclass of int, but comparing a datetime to a bool is
-            # nonsensical -> leave it untouched.
-            if isinstance(lit, bool):
-                continue
-            if isinstance(lit, (int, float)):
+            parsed = datetime_literal_to_timestamp(op)
+            if parsed is not None:
                 literal_idx = i
-                timestamp = float(lit)
-            elif isinstance(lit, str):
-                parsed = parse_string_to_utc_timestamp(lit)
-                if parsed is not None:
-                    literal_idx = i
-                    timestamp = parsed
+                timestamp = parsed
 
     if field_idx is None or literal_idx is None or timestamp is None:
         return operands

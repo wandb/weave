@@ -1,6 +1,7 @@
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace_server import trace_server_interface as tsi
 
 # This file tests the different argument variations that can be passed to an op.
@@ -52,6 +53,7 @@ from weave.trace_server import trace_server_interface as tsi
 # added or removed.
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize(
     ("fn", "arg_variations"),
     [
@@ -433,6 +435,7 @@ def test_general_arg_variations(client, fn, arg_variations):
 # a bit easier to read and understand (technically, the above test is more comprehensive and should be enough)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_no_args(client):
     @weave.op
     def my_op() -> int:
@@ -450,6 +453,7 @@ def test_no_args(client):
     assert res.calls[0].inputs == {}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_args_concrete(client):
     @weave.op
     def my_op(val):
@@ -468,6 +472,7 @@ def test_args_concrete(client):
     assert res.calls[0].output == [1]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_args_concrete_splat(client):
     @weave.op
     def my_op(val, *args):
@@ -490,6 +495,7 @@ def test_args_concrete_splat(client):
     assert res.calls[1].output == [1, [2, 3]]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_args_concrete_splats(client):
     @weave.op
     def my_op(val, *args, **kwargs):
@@ -520,6 +526,7 @@ def test_args_concrete_splats(client):
     assert res.calls[3].output == [1, [2, 3], {"a": 4, "b": 5}]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_args_concrete_splat_concrete(client):
     @weave.op
     def my_op(val, *args, a=0):
@@ -546,6 +553,7 @@ def test_args_concrete_splat_concrete(client):
     assert res.calls[2].output == [1, [2, 3], 4]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_args_concrete_splat_concrete_splat(client):
     @weave.op
     def my_op(val, *args, a=0, **kwargs):

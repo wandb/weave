@@ -22,7 +22,11 @@ from weave.trace_server.calls_query_builder.utils import (
     param_slot,
 )
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import clickhouse_cast, timestamp_to_datetime_str
+from weave.trace_server.orm import (
+    clickhouse_cast,
+    datetime_literal_to_timestamp,
+    timestamp_to_datetime_str,
+)
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 if TYPE_CHECKING:
@@ -680,13 +684,11 @@ def _create_datetime_optimization_sql(
     if not _can_optimize_datetime_field(field_name):
         return None
 
-    literal_value = literal_operand.literal_
-
-    if not literal_value or not isinstance(literal_value, (int, float)):
+    timestamp_seconds = datetime_literal_to_timestamp(literal_operand)
+    if timestamp_seconds is None:
         return None
 
-    # convert timestamp to datetime_str
-    timestamp = int(literal_value)
+    timestamp = int(timestamp_seconds)
 
     # Apply buffer in appropriate direction based on context and operator.
     # For normal context:

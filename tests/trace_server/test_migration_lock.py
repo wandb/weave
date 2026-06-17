@@ -5,6 +5,7 @@ import clickhouse_connect
 import pytest
 from clickhouse_connect.driver.exceptions import OperationalError
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace_server.migration_lock import (
     MigrationLockError,
     _active_owner,
@@ -342,6 +343,7 @@ def real_ch_lock(ensure_clickhouse_db):
     client.close()
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_lock_acquire_release_real_clickhouse(real_ch_lock):
     """Two holders race on a real ClickHouse — only one wins at a time."""
     client, mgmt_db = real_ch_lock

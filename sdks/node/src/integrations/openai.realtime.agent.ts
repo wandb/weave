@@ -429,6 +429,7 @@ export class WeaveRealtimeTracingAdapter {
     client.saveCallEnd({
       project_id: client.projectId,
       id: this.sessionCallId,
+      trace_id: this.sessionTraceId,
       ended_at: new Date().toISOString(),
       output: {},
       summary: {},
@@ -464,6 +465,7 @@ export class WeaveRealtimeTracingAdapter {
     client.saveCallEnd({
       project_id: client.projectId,
       id: callId,
+      trace_id: this.sessionTraceId,
       ended_at: now,
       output: {},
       summary: {},
@@ -506,6 +508,7 @@ export class WeaveRealtimeTracingAdapter {
     if (!client || !callId) return;
 
     const endedAt = new Date().toISOString();
+    const traceId = this.sessionTraceId;
     this.voiceInputCalls.delete(itemId);
     const chunks = this.audioInputChunks.get(itemId);
     this.audioInputChunks.delete(itemId);
@@ -524,6 +527,7 @@ export class WeaveRealtimeTracingAdapter {
       client.saveCallEnd({
         project_id: client.projectId,
         id: callId,
+        trace_id: traceId,
         ended_at: endedAt,
         output,
         summary: {},
@@ -557,6 +561,7 @@ export class WeaveRealtimeTracingAdapter {
     client.saveCallEnd({
       project_id: client.projectId,
       id: callId,
+      trace_id: this.sessionTraceId,
       ended_at: now,
       output: sessionData,
       summary: {},
@@ -606,6 +611,7 @@ export class WeaveRealtimeTracingAdapter {
     client.saveCallEnd({
       project_id: client.projectId,
       id: callId,
+      trace_id: this.sessionTraceId,
       ended_at: new Date().toISOString(),
       output: response,
       summary,
@@ -652,6 +658,7 @@ export class WeaveRealtimeTracingAdapter {
     const callId = this.audioCallId;
     const responseId = this.audioResponseId;
     const endedAt = new Date().toISOString();
+    const traceId = this.sessionTraceId;
     this.audioCallId = null;
     this.audioResponseId = null;
 
@@ -672,6 +679,7 @@ export class WeaveRealtimeTracingAdapter {
       client.saveCallEnd({
         project_id: client.projectId,
         id: callId,
+        trace_id: traceId,
         ended_at: endedAt,
         output: finalOutput,
         summary: {},
@@ -716,6 +724,7 @@ export class WeaveRealtimeTracingAdapter {
     client.saveCallEnd({
       project_id: client.projectId,
       id: callId,
+      trace_id: this.sessionTraceId,
       ended_at: new Date().toISOString(),
       output,
       summary: {},

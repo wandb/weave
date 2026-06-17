@@ -1,5 +1,6 @@
 import logging
 import socket
+import zlib
 from typing import Any
 
 import ddtrace
@@ -25,6 +26,7 @@ from weave.trace_server.environment import (
     kafka_client_password,
     kafka_client_user,
     kafka_producer_max_buffer_size,
+    wf_kafka_project_id_bucket_count,
 )
 
 CALL_ENDED_TOPIC = "weave.call_ended"
@@ -96,13 +98,10 @@ class KafkaProducer(ConfluentKafkaProducer):
         ):
             return
 
-        # The scoring worker assumes that events for each project all route to the same worker instance.
-        # Before changing the partition key, ensure the scoring worker has been updated to support this.
-        publish_key = call_end.project_id
         self.produce(
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
-            key=publish_key,
+            key=_bucketed_project_key(call_end.project_id, call_end.id),
         )
 
         if flush_immediately:
@@ -143,7 +142,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             self.produce(
                 topic=SCORE_CALLS_TOPIC,
                 value=req.model_copy(update={"call_ids": chunk}).model_dump_json(),
-                key=req.project_id,
+                key=_bucketed_project_key(req.project_id, chunk[0]),
             )
 
         if flush_immediately:
@@ -307,6 +306,17 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             # Async commit failure is non-fatal: the messages will be
             # redelivered on the next rebalance and reprocessed.
             logger.warning("Async batch commit failed", exc_info=True)
+
+
+def _bucketed_project_key(project_id: str, bucket_seed: str) -> str:
+    """Partition key with optional bucket suffix for spreading hot projects."""
+    bucket_count = wf_kafka_project_id_bucket_count()
+    if bucket_count <= 1:
+        return project_id
+    # crc32 picks the bucket; the murmur2 partitioner re-hashes the composite key,
+    # so bucket_count caps (not equals) the partitions a project spreads across.
+    bucket = zlib.crc32(bucket_seed.encode()) % bucket_count
+    return f"{project_id}:{bucket}"
 
 
 def _make_broker_host() -> str:

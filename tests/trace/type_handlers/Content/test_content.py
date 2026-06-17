@@ -7,6 +7,7 @@ import pytest
 from util import generate_media
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import Dataset
 from weave.trace.table import Table
 from weave.type_wrappers.Content.content import Content
@@ -366,6 +367,7 @@ class TestWeaveContent:
         content2 = Content.from_bytes(file_bytes, extension="txt", encoding="latin-1")
         assert content2.encoding == "latin-1"
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_content_save_and_retrieve(self, image_file, weave_active):
         """Test publishing and retrieving Content objects."""
         content = Content.from_path(image_file)
@@ -382,6 +384,7 @@ class TestWeaveContent:
         assert retrieved.mimetype == content.mimetype
         assert retrieved.size == content.size
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_content_in_dataset(
         self, image_file, audio_file, video_file, pdf_file, weave_active
     ):

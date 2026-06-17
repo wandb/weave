@@ -2,6 +2,7 @@ import pytest
 
 import weave
 from tests.trace.util import (
+    FAKE_NOT_IMPLEMENTED,
     capture_output,
     flush_and_wait_for_output,
     flush_output,
@@ -58,6 +59,7 @@ async def test_async_call_doesnt_print_link_if_failed(client_with_throwing_serve
     assert captured.getvalue().count(TRACE_CALL_EMOJI) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_nested_calls_print_single_link(client):
     @weave.op
     def inner(a, b):

@@ -408,8 +408,9 @@ def _display_text(content: str) -> str:
     """Extract human-readable text from a message content field.
 
     Content is either plain text (legacy) or a JSON-serialized parts array
-    (multimodal messages).  For parts arrays, concatenate text and reasoning
-    parts; for plain text, return as-is.
+    (multimodal messages).  For parts arrays, concatenate the text parts;
+    reasoning parts are excluded (they surface separately via
+    `reasoning_content`).  For plain text, return as-is.
     """
     if not content or not content.startswith("["):
         return content
@@ -422,6 +423,10 @@ def _display_text(content: str) -> str:
     texts: list[str] = []
     for p in parts:
         if isinstance(p, dict) and isinstance(p.get("content"), str):
+            # Reasoning is rendered separately via `reasoning_content`;
+            # concatenating it here would duplicate it in the message body.
+            if p.get("type") == "reasoning":
+                continue
             texts.append(p["content"])
         elif isinstance(p, str):
             texts.append(p)
