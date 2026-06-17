@@ -20,7 +20,9 @@ from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE_NAME,
     PRICING_LEVELS,
 )
+from weave.trace_server.usage_utils import _safe_float, _safe_int
 
+# Subset of token_costs.LLM_TOKEN_PRICES_COLUMNS that the Python cost math needs.
 PRICE_COLUMNS = (
     "llm_id",
     "pricing_level",
@@ -35,7 +37,7 @@ PRICE_COLUMNS = (
 
 def prices_query(pb: ParamBuilder, project_id: str, models: list[str]) -> str:
     """Fetch project + default prices for the given models (one cheap query)."""
-    models_param = pb.add_param(sorted(models))
+    models_param = pb.add_param(models)
     project_param = pb.add_param(project_id)
     default_param = pb.add_param(DEFAULT_PRICING_LEVEL_ID)
     project_level = PRICING_LEVELS["PROJECT"]
@@ -62,12 +64,12 @@ def index_prices(rows: list[tuple[Any, ...]]) -> dict[str, ModelPrices]:
         model = str(record["llm_id"])
         price = _Price(
             effective_ts=_to_ts(record["effective_date"]),
-            prompt_token_cost=_to_float(record["prompt_token_cost"]),
-            completion_token_cost=_to_float(record["completion_token_cost"]),
-            cache_read_input_token_cost=_to_float(
+            prompt_token_cost=_safe_float(record["prompt_token_cost"]),
+            completion_token_cost=_safe_float(record["completion_token_cost"]),
+            cache_read_input_token_cost=_safe_float(
                 record["cache_read_input_token_cost"]
             ),
-            cache_creation_input_token_cost=_to_float(
+            cache_creation_input_token_cost=_safe_float(
                 record["cache_creation_input_token_cost"]
             ),
         )
@@ -90,7 +92,12 @@ def costs_for_usage(
     started_at: datetime.datetime,
     index: dict[str, ModelPrices],
 ) -> dict[str, dict[str, float]]:
-    """Per-model cost totals, keyed as the rollup's `summary.weave.costs` expects."""
+    """Per-model cost totals, keyed as the rollup's `summary.weave.costs` expects.
+
+    Per-model by design: an unpriced model is skipped while its priced siblings
+    are still costed. The CH CTE instead gates the whole call's costs on one
+    arbitrary `any(llm_token_prices.id)`, so a mixed call could lose all costs.
+    """
     started_ts = _to_ts(started_at)
     costs: dict[str, dict[str, float]] = {}
     for model_name, usage in usage_map.items():
@@ -99,14 +106,14 @@ def costs_for_usage(
         price = _select_price(index.get(str(model_name)), started_ts)
         if price is None:
             continue
-        prompt_tokens = _to_int(usage.get("prompt_tokens")) + _to_int(
+        prompt_tokens = _safe_int(usage.get("prompt_tokens")) + _safe_int(
             usage.get("input_tokens")
         )
-        completion_tokens = _to_int(usage.get("completion_tokens")) + _to_int(
+        completion_tokens = _safe_int(usage.get("completion_tokens")) + _safe_int(
             usage.get("output_tokens")
         )
-        cache_read = _to_int(usage.get("cache_read_input_tokens"))
-        cache_creation = _to_int(usage.get("cache_creation_input_tokens"))
+        cache_read = _safe_int(usage.get("cache_read_input_tokens"))
+        cache_creation = _safe_int(usage.get("cache_creation_input_tokens"))
         costs[str(model_name)] = {
             "prompt_tokens_total_cost": (prompt_tokens - cache_read - cache_creation)
             * price.prompt_token_cost,
@@ -168,17 +175,3 @@ def _to_ts(value: datetime.datetime | str) -> float:
     if value.tzinfo is None:
         value = value.replace(tzinfo=datetime.timezone.utc)
     return value.timestamp()
-
-
-def _to_int(value: Any) -> int:
-    try:
-        return int(value) if value is not None else 0
-    except (TypeError, ValueError):
-        return 0
-
-
-def _to_float(value: Any) -> float:
-    try:
-        return float(value) if value is not None else 0.0
-    except (TypeError, ValueError):
-        return 0.0

@@ -587,6 +587,56 @@ def test_trace_usage_costs_use_latest_on_or_before_project_price(
 
 
 @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_trace_usage_costs_priced_model_unaffected_by_unpriced_sibling(
+    client: weave_client.WeaveClient,
+) -> None:
+    """A priced model is still costed when a sibling model in the same call has no price."""
+    project_id = client.project_id
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc)
+
+    call_id = str(uuid.uuid4())
+    _create_call(
+        client,
+        call_id,
+        trace_id,
+        None,
+        now,
+        {
+            "priced-model-abc": {"prompt_tokens": 10, "completion_tokens": 4},
+            "unpriced-model-xyz": {"prompt_tokens": 5, "completion_tokens": 2},
+        },
+    )
+    client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs={
+                "priced-model-abc": tsi.CostCreateInput(
+                    prompt_token_cost=2.0,
+                    completion_token_cost=3.0,
+                    effective_date=now - datetime.timedelta(days=1),
+                )
+            },
+        )
+    )
+
+    res = client.server.trace_usage(
+        tsi.TraceUsageReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(trace_ids=[trace_id]),
+            include_costs=True,
+        )
+    )
+
+    usage = res.call_usage[call_id]
+    assert usage["priced-model-abc"].prompt_tokens_total_cost == 20.0
+    assert usage["priced-model-abc"].completion_tokens_total_cost == 12.0
+    # The unpriced sibling is still reported, just with zero cost (not dropped).
+    assert usage["unpriced-model-xyz"].prompt_tokens == 5
+    assert usage["unpriced-model-xyz"].prompt_tokens_total_cost == 0.0
+
+
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_usage_returns_unfinished_call_ids(
     client: weave_client.WeaveClient,
 ) -> None:
