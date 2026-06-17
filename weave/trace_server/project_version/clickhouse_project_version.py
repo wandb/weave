@@ -49,7 +49,9 @@ def get_project_data_residence(
         has_complete = row[0]
         has_merged = row[1]
 
-        set_current_span_dd_tags({"has_complete": has_complete, "has_merged": has_merged})
+        set_current_span_dd_tags(
+            {"has_complete": has_complete, "has_merged": has_merged}
+        )
 
         if has_complete and has_merged:
             return ProjectDataResidence.BOTH

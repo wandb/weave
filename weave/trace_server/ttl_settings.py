@@ -67,7 +67,9 @@ def get_project_retention_days(
         set_current_span_dd_tags({"ttl.cache_hit": "L1"})
         return cached
 
-    with _tracer.start_as_current_span("ttl_settings.get_project_retention_days") as span:
+    with _tracer.start_as_current_span(
+        "ttl_settings.get_project_retention_days"
+    ) as span:
         redis_client = get_redis_client()
         if redis_client is not None:
             redis_val = _l2_get(redis_client, project_id)
