@@ -19,12 +19,15 @@ export type {
 export type {Settings} from './settings';
 export type {
   Agent,
+  AgentChatMessage,
   AgentSpan,
   AgentVersion,
   GetAgentsOptions,
   GetAgentsResult,
   GetAgentSpansOptions,
   GetAgentSpansResult,
+  GetAgentTraceChatOptions,
+  GetAgentTraceChatResult,
   GetAgentVersionsOptions,
   GetAgentVersionsResult,
   GetCallsOptions,
