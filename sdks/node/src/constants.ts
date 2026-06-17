@@ -12,6 +12,15 @@ export const EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES = [
   EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
 ] as const;
 
+/**
+ * Call-attribute key for evaluation metadata. Reserved internal Weave key:
+ * user ops must not write to it. Both eval paths — declarative
+ * `Evaluation.evaluate` and imperative `EvaluationLogger` — tag their calls
+ * with it so consumers (eval-results rendering, server-side ingest sampling)
+ * can recognize eval calls.
+ */
+export const EVAL_META_KEY = '_weave_eval_meta';
+
 export const WEAVE_ATTRIBUTES_NAMESPACE = 'weave';
 export const GENAI_SPAN_REF_ATTR_KEY = 'genai_span_ref';
 
