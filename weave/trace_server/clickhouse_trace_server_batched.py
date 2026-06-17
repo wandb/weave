@@ -172,7 +172,6 @@ from weave.trace_server.constants import (
 from weave.trace_server.datadog import (
     record_db_insert,
     set_current_span_dd_tags,
-    set_root_span_dd_tags,
     tag_db_insert_path,
 )
 from weave.trace_server.dataset_sources import DatasetSourcesHandler
@@ -2245,7 +2244,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         obj_schema = ch_obj_to_obj_schema(obj)
         if req.include_tags_and_aliases:
-            set_root_span_dd_tags({"include_tags_and_aliases": True})
+            set_current_span_dd_tags({"include_tags_and_aliases": True})
             self._enrich_objs_with_tags_and_aliases(req.project_id, [obj_schema])
         return tsi.ObjReadRes(obj=obj_schema)
 
@@ -2293,7 +2292,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         objs = self._select_objs_query(object_query_builder, metadata_only)
         obj_schemas = [ch_obj_to_obj_schema(obj) for obj in objs]
         if req.include_tags_and_aliases:
-            set_root_span_dd_tags({"include_tags_and_aliases": True})
+            set_current_span_dd_tags({"include_tags_and_aliases": True})
             self._enrich_objs_with_tags_and_aliases(req.project_id, obj_schemas)
         return tsi.ObjQueryRes(objs=obj_schemas)
 
@@ -6100,12 +6099,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._file_create_clickhouse(req, digest)
         else:
             self._file_create_clickhouse(req, digest)
-        set_root_span_dd_tags({"write_bytes": len(req.content)})
+        set_current_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @traced(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
-        set_root_span_dd_tags({"storage_provider": "clickhouse"})
+        set_current_span_dd_tags({"storage_provider": "clickhouse"})
         self._insert_file_chunks(file_chunks_for(req, digest))
 
     @traced(name="clickhouse_trace_server_batched._file_create_bucket")
@@ -6121,7 +6120,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # tag matches where the bytes actually land.
             self._bucket_uploads.stage(req, digest)
             return
-        set_root_span_dd_tags({"storage_provider": "bucket"})
+        set_current_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
         )
@@ -6272,14 +6271,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             else:
                 chunk_bytes = result_row[1]
                 bytes += chunk_bytes
-                set_root_span_dd_tags({"storage_provider": "clickhouse"})
+                set_current_span_dd_tags({"storage_provider": "clickhouse"})
 
-        set_root_span_dd_tags({"read_bytes": len(bytes)})
+        set_current_span_dd_tags({"read_bytes": len(bytes)})
         return tsi.FileContentReadRes(content=bytes)
 
     @traced(name="clickhouse_trace_server_batched._file_read_bucket")
     def _file_read_bucket(self, file_storage_uri: FileStorageURI) -> bytes:
-        set_root_span_dd_tags({"storage_provider": "bucket"})
+        set_current_span_dd_tags({"storage_provider": "bucket"})
         client = self.file_storage_client
         if client is None:
             raise FileStorageReadError("File storage client is not configured")
@@ -6428,7 +6427,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         rows_to_insert = []
         results = []
 
-        set_root_span_dd_tags({"feedback_create_batch.count": len(req.batch)})
+        set_current_span_dd_tags({"feedback_create_batch.count": len(req.batch)})
 
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
@@ -7348,7 +7347,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "clickhouse_trace_server_batched._insert.table": table,
             }
         )
-        set_root_span_dd_tags(
+        set_current_span_dd_tags(
             {
                 "weave_trace_server.insert.table": table,
                 "weave_trace_server.insert.row_count": len(data),
