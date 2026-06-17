@@ -26,3 +26,6 @@ None.
 
 ## Rebase / Push Context
 This note was copied from pre-origin-master-rebase commit 1a3c96db4ce7. The user then explicitly asked to rebase onto origin/master and push. During the rebase, the already-merged fake trace-server skeleton commit was skipped because origin/master contains it as 0caf63ee7e. The stack was restored from reflog after an interrupted/aborted rebase reset visible branch refs to their remote tips, then branch pointers were restored to the rebased refs with origin/master as ancestor.
+
+## Stack Correction Context
+After the origin/master rebase and push, the user noticed that unrelated LLM-judge test gating had landed in the call-writes PR because the old skeleton gating commit became part of the first live branch when the merged skeleton PR was reparented away. This stack rewrite removes `tests/trace/test_llm_as_a_judge_scorer.py` from `andrew/fake-ts-02-call-writes`, removes the compensating unskip hunk from the tables/files PR, and applies the intended LLM-judge ungate only in `andrew/fake-ts-09-completions`.
