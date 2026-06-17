@@ -136,7 +136,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
 
     const {currentCall, parentCall, newStack} = client.pushNewCall();
     const startTime = new Date();
-    if (client.settings.shouldPrintCallLink && parentCall == null) {
+    if (client.settings.printCallLink && parentCall == null) {
       const domain = getGlobalDomain();
       console.log(
         `${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`

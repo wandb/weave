@@ -35,6 +35,7 @@ import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
 import state from 'weave/state';
 
 describe('OpenAI Agents Integration', () => {
+  withEnv({WEAVE_USE_OTEL_V2: false});
   withOpenAITracingEnabled();
 
   let inMemoryTraceServer: InMemoryTraceServer;
@@ -243,11 +244,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     inMemoryTraceServer = new InMemoryTraceServer();
     exporter = new InMemorySpanExporter();
 
-    initWithCustomTraceServer(
-      testProjectName,
-      inMemoryTraceServer,
-      new Settings(true, {}, {spanProcessor: new SimpleSpanProcessor(exporter)})
-    );
+    initWithCustomTraceServer(testProjectName, inMemoryTraceServer, {
+      genai: {spanProcessor: new SimpleSpanProcessor(exporter)},
+    });
 
     clearWeaveTracerProvider();
     setTraceProcessors([]);

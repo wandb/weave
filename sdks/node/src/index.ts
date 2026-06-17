@@ -14,6 +14,7 @@ export type {
   Query,
   SortBy,
 } from './generated/traceServerApi';
+export type {Settings} from './settings';
 export type {GetCallsOptions, WeaveClient} from './weaveClient';
 export {
   wrapOpenAI,
