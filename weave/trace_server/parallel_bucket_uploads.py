@@ -44,7 +44,6 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import FileChunkCreateCHInsertable

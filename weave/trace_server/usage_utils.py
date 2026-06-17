@@ -5,7 +5,6 @@ from collections import deque
 from collections.abc import Iterable
 from typing import Any
 
-
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.tracing import traced
 

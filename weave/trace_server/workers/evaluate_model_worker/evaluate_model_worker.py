@@ -1,7 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
 
-
 import weave
 from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer

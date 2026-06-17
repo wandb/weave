@@ -17,7 +17,7 @@ from weave.trace_server.project_version.types import (
     ReadTable,
     WriteTarget,
 )
-from weave.trace_server.tracing import _tracer  # noqa: PLC2701
+from weave.trace_server.tracing import _tracer
 
 logger = logging.getLogger(__name__)
 

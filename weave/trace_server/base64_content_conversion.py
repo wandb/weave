@@ -9,7 +9,6 @@ import logging
 import re
 from typing import Any, TypeVar
 
-
 from weave.trace_server.content.content import Content
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
