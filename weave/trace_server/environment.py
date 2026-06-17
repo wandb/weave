@@ -60,7 +60,7 @@ def wf_kafka_project_id_bucket_count() -> int:
             "WF_KAFKA_PROJECT_ID_BUCKET_COUNT value '%s' is not a valid int", raw
         )
         return 1
-    return value if value >= 1 else 1
+    return max(1, value)
 
 
 # Scoring worker settings

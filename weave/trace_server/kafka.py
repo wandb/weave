@@ -308,12 +308,14 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             logger.warning("Async batch commit failed", exc_info=True)
 
 
-def _bucketed_project_key(project_id: str, salt: str) -> str:
+def _bucketed_project_key(project_id: str, bucket_seed: str) -> str:
     """Partition key with optional bucket suffix for spreading hot projects."""
     bucket_count = wf_kafka_project_id_bucket_count()
     if bucket_count <= 1:
         return project_id
-    bucket = zlib.crc32(salt.encode()) % bucket_count
+    # crc32 picks the bucket; the murmur2 partitioner re-hashes the composite key,
+    # so bucket_count caps (not equals) the partitions a project spreads across.
+    bucket = zlib.crc32(bucket_seed.encode()) % bucket_count
     return f"{project_id}:{bucket}"
 
 
