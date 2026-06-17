@@ -22,3 +22,6 @@ None.
 ## Stack Correction Context
 After the origin/master rebase and push, the user noticed that unrelated LLM-judge test gating had landed in the call-writes PR because the old skeleton gating commit became part of the first live branch when the merged skeleton PR was reparented away. This stack rewrite removes `tests/trace/test_llm_as_a_judge_scorer.py` from `andrew/fake-ts-02-call-writes`, removes the compensating unskip hunk from the tables/files PR, and applies the intended LLM-judge ungate only in `andrew/fake-ts-09-completions`.
 Copied from prior rewritten commit c092595838b8 while correcting per-PR test placement.Copied from prior rewritten commit 092fdc50c09b while correcting call-lifecycle test placement.
+
+## PR Description / Lint Follow-up Context
+The user asked to update PR descriptions to match the corrected test ownership. While doing that, `nox --no-install -e lint` exposed that `weave/trace_server/in_memory_trace_server.py` used `NotFoundError` without importing it after the previous stack rewrite. The missing import was amended into `andrew/fake-ts-02-call-writes`, and descendants were restacked. This preserves the corrected PR boundary: the root PR owns the implementation import and write behavior, while call lifecycle test coverage remains in `andrew/fake-ts-calls-read`.
