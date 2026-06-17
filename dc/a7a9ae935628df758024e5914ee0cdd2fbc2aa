@@ -1,0 +1,28 @@
+## Conversation
+During a review-fix pass, the user asked to fix four findings in the appropriate PRs of the fake trace-server stack. This commit was restacked by Graphite as a descendant or ancestor in that stack while applying those fixes. The original implementation intent is represented by the commit subject: feat(weave): in-memory trace server eval-subtree stream and thread queries.
+
+## Actions
+- Ran stack discovery with `gt status`, `gt log`, and `git blame`.
+- Applied the actual content fixes to the owning branches: call writes, tables/files/refs, calls read, and evaluation run lifecycle.
+- Graphite restacked this commit while keeping the stack coherent after downstack amendments.
+- No intentional content-specific edit was made to this commit during this review-fix turn unless its subject is one of the explicitly fixed branches documented separately.
+
+## Errors & Mistakes
+- The first nox trace invocation selected zero tests because of marker/shard behavior; targeted tests were rerun directly with the nox Python and explicit `--num-shards=1 --shard-id=0`.
+- `nox --no-install -e lint` initially failed because `ruff-format` modified two files; those formatting deltas were split into their owning branches and lint then passed.
+
+## Dead Ends
+None for this restacked commit.
+
+## Hints for Future Agents
+- If investigating the substantive review fixes, inspect the notes on `andrew/fake-ts-02-call-writes`, `andrew/fake-ts-tables-files`, `andrew/fake-ts-calls-read`, and `andrew/fake-ts-07-eval-apis`.
+- This note primarily records the Graphite restack context so the rewritten SHA is not note-less.
+
+## Codebase Discoveries
+- The fake trace-server stack is split by capability, so review fixes should be amended into the capability branch that introduced the affected code rather than piled onto the top branch.
+
+## Open Questions
+None.
+
+## Rebase / Push Context
+This note was copied from pre-origin-master-rebase commit 49d88e836966. The user then explicitly asked to rebase onto origin/master and push. During the rebase, the already-merged fake trace-server skeleton commit was skipped because origin/master contains it as 0caf63ee7e. The stack was restored from reflog after an interrupted/aborted rebase reset visible branch refs to their remote tips, then branch pointers were restored to the rebased refs with origin/master as ancestor.
