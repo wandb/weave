@@ -13,6 +13,7 @@ from pydantic import PrivateAttr
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
+from weave.evaluation.eval_meta import EVAL_META_KEY, EvalMeta
 from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
 from weave.flow.model import (
@@ -381,8 +382,9 @@ class Evaluation(Object):
     async def evaluate(self, model: Op | Model) -> dict:
         # Tag every eval child call (mirrors the imperative path); merge into any
         # existing _weave_eval_meta (e.g. evaluate_model_worker), don't overwrite.
-        prev_eval_meta = call_context.call_attributes.get().get("_weave_eval_meta", {})
-        with attributes({"_weave_eval_meta": {**prev_eval_meta, "declarative": True}}):
+        prev_eval_meta = call_context.call_attributes.get().get(EVAL_META_KEY, {})
+        declarative_meta: EvalMeta = {"declarative": True}
+        with attributes({EVAL_META_KEY: {**prev_eval_meta, **declarative_meta}}):
             eval_results = await self.get_eval_results(model)
             summary = await self.summarize(eval_results)
 

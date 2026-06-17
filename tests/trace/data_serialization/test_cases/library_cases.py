@@ -110,7 +110,7 @@ library_cases = [
             "trials": 1,
             "metadata": None,
             "evaluation_name": None,
-            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:R1uv1KcKTPKfQSrXKDQxq08ucuYDd5vG9X1zJaepehw",
+            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:cxDBvbYWzWkgNFoYzJogSAzxhSWzlL3wd4nnis0A2SE",
             "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
             "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
             "_class_name": "Evaluation",
@@ -131,12 +131,12 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.evaluate",
-                "digest": "R1uv1KcKTPKfQSrXKDQxq08ucuYDd5vG9X1zJaepehw",
+                "digest": "cxDBvbYWzWkgNFoYzJogSAzxhSWzlL3wd4nnis0A2SE",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
                     # Regenerated: declarative evaluate now tags child calls with _weave_eval_meta
-                    "files": {"obj.py": "tSXma8p9442MvcXhGGMOfuXVP25iYFL3Yszx1WECRe8"},
+                    "files": {"obj.py": "wjQ3fexYGMuUi1mJcXPkUnZO7t6govV8hOFkyE7wyYw"},
                 },
             },
             {
@@ -251,8 +251,8 @@ library_cases = [
         ],
         exp_files=[
             {
-                "digest": "tSXma8p9442MvcXhGGMOfuXVP25iYFL3Yszx1WECRe8",
-                "exp_content": b'from weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport weave.trace.context.call_context as call_context\nfrom weave.trace.api import attributes\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@call_context.op\n@op(call_display_name=default_evaluation_display_name, eager_call_start=True)\nasync def evaluate(self, model: Op | Model) -> dict:\n    # Tag every eval child call (mirrors the imperative path); merge into any\n    # existing _weave_eval_meta (e.g. evaluate_model_worker), don\'t overwrite.\n    prev_eval_meta = call_context.call_attributes.get().get("_weave_eval_meta", {})\n    with attributes({"_weave_eval_meta": {**prev_eval_meta, "declarative": True}}):\n        eval_results = await self.get_eval_results(model)\n        summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info("Evaluation summary %s", summary_str)\n\n    return summary\n',
+                "digest": "wjQ3fexYGMuUi1mJcXPkUnZO7t6govV8hOFkyE7wyYw",
+                "exp_content": b'from weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport weave.trace.context.call_context as call_context\nfrom weave.evaluation.eval_meta import EvalMeta\nfrom weave.trace.api import attributes\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\nEVAL_META_KEY = "_weave_eval_meta"\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@call_context.op\n@op(call_display_name=default_evaluation_display_name, eager_call_start=True)\nasync def evaluate(self, model: Op | Model) -> dict:\n    # Tag every eval child call (mirrors the imperative path); merge into any\n    # existing _weave_eval_meta (e.g. evaluate_model_worker), don\'t overwrite.\n    prev_eval_meta = call_context.call_attributes.get().get(EVAL_META_KEY, {})\n    declarative_meta: EvalMeta = {"declarative": True}\n    with attributes({EVAL_META_KEY: {**prev_eval_meta, **declarative_meta}}):\n        eval_results = await self.get_eval_results(model)\n        summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info("Evaluation summary %s", summary_str)\n\n    return summary\n',
             },
             {
                 "digest": "Y7lSNR7UXFYVtxWyD8GOE3CFXRWfdLX2n1mcYfbSErs",
