@@ -158,3 +158,6 @@ gen_ai.agent.description/id + gen_ai.tool.definitions.
 
 ## Session addendum — rebase onto master
 Rebased onto origin/master (ba337cff57), clean (no conflicts). Inherited branch 01's assertion shape-refactor + Settings-API migration. Verified 22/22 jest, prettier + eslint clean.
+
+## Session addendum — use semconv constants
+Inherited branch 01's conversion. Restack hit an import-block conflict (branch 01's added semconv import vs this branch's expanded googleAdk import adding commonPatchGoogleADK) — resolved keeping both. prettier rewrapped the merged googleAdk import. No new gen_ai literals in the auto-instrument test. Verified 22/22 jest, prettier + eslint clean.
