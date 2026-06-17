@@ -2544,6 +2544,8 @@ export interface EndedCallSchemaForInsert {
   project_id: string;
   /** Id */
   id: string;
+  /** Trace Id */
+  trace_id?: string | null;
   /**
    * Ended At
    * @format date-time

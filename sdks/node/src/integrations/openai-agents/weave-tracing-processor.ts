@@ -258,6 +258,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
     const callEnd = {
       project_id: client.projectId,
       id: callData.callId,
+      trace_id: callData.traceId,
       ended_at: new Date().toISOString(),
       output: {
         status: 'completed',
@@ -398,6 +399,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
     const callEnd = {
       project_id: client.projectId,
       id: callData.callId,
+      trace_id: callData.traceId,
       ended_at: new Date().toISOString(),
       output: {
         output: spanData.output,
@@ -466,6 +468,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       const callEnd = {
         project_id: client.projectId,
         id: callData.callId,
+        trace_id: callData.traceId,
         ended_at: now,
         output: {status},
         summary: {},
@@ -478,6 +481,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       const callEnd = {
         project_id: client.projectId,
         id: callData.callId,
+        trace_id: callData.traceId,
         ended_at: now,
         output: {status},
         summary: {},
