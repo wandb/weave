@@ -556,8 +556,10 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
     collapses to one upload, and every stored object lands under the
     expected project prefix.
     """
-    gcs.state.delay = 0.1
     # 4 unique blobs + 2 duplicates of the first => 4 GCS uploads after dedup.
+    # Barrier makes the peak deterministic so it can't flake under CI scheduler
+    # jitter (each upload blocks until all 4 are simultaneously in-flight).
+    gcs.state.expected_concurrency = 4
     payload_size = 50_000
     payloads = [
         _unique_payload("alpha", payload_size),
@@ -577,10 +579,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
                 )
             )
 
-    # Pool defaults to 8 workers, so all 4 unique uploads should run
-    # concurrently. concurrent_peak is the load-bearing parallelism signal;
-    # wall-time assertions on top would flake on contended CI runners.
-    assert gcs.state.concurrent_peak >= 4, (
+    # Pool defaults to 8 workers, so all 4 unique uploads run concurrently;
+    # the upload barrier guarantees the peak reaches 4.
+    assert gcs.state.concurrent_peak == 4, (
         f"expected 4 concurrent uploads, peak={gcs.state.concurrent_peak}"
     )
 

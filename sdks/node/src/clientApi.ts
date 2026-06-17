@@ -1,6 +1,6 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
-import {makeSettings, type SettingsInit} from './settings';
+import {makeSettings, Settings} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
@@ -81,7 +81,7 @@ export async function login(apiKey: string, host?: string) {
  */
 export async function init(
   project: string,
-  settings?: SettingsInit
+  settings?: Partial<Settings>
 ): Promise<WeaveClient> {
   const {apiKey, baseUrl, traceBaseUrl, domain} = getWandbConfigs();
   try {
