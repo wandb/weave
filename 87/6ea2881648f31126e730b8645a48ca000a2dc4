@@ -1,0 +1,78 @@
+## Conversation
+Task (from an orchestrating agent, task #11 "Apply lean readability comments
+to complex funcs across the stack"): add HIGH-LEVEL comments only to five
+named functions in weave/trace_server/in_memory_trace_server.py —
+compile_operand, _calls_filter_matches, calls_query, _bucket_ts, calls_usage.
+Style: `# ---- <desc> ----` chunk separators for genuinely multi-chunk funcs,
+short 1-2 line docstrings, mention "mirrors ClickHouse" where relevant.
+HARD CONSTRAINT: comments/docstrings ONLY; every non-comment line byte-identical.
+
+## Actions
+- The starting git-status banner said branch andrew/fake-ts-05-calls-query,
+  but the actual checked-out branch was worktree-agent-a4484f9becad394e4 (HEAD
+  ba337cff57). That branch's in_memory_trace_server.py is only 1594 lines and
+  contains NONE of the five assigned functions (it ends at otel_export /
+  project_ttl_*). The task's line hints (~1850-2600) did not match.
+- `git log --all -S "def calls_query" -- <file>` showed the calls funcs are
+  added by later stack commits ("calls read path" 4530f063a9/6bdea970ad,
+  "costs and usage rollups" 0f34d13d35/fe24a6d817). `git branch --contains`
+  confirmed these live on downstream stack branches, not the checked-out one.
+- All five functions coexist on andrew/fake-ts-costs-usage (tip 0f34d13d35) at
+  lines 1780/1860/1967/2257/2383 — matches the hints offset by ~100. That
+  branch was NOT checked out in any other worktree. Switched this worktree to
+  it (working tree was clean) and did the edits there.
+- Read the enclosing context: compile_operand is a nested closure inside
+  _compile_calls_query (1567); _bucket_ts is a nested closure inside call_stats
+  (2226), NOT calls_usage. Verified there is exactly one _bucket_ts.
+- Edits made (comment/docstring only):
+  - compile_operand: 1-line docstring (AST-dispatch value getter). No `# ----`
+    (it is a flat elif dispatch, single concern).
+  - _calls_filter_matches: 1-line docstring (mirrors CH WHERE clauses). No
+    `# ----` (flat list of guards; chunking would clutter).
+  - calls_query: docstring + 6 `# ----` blocks (load/filter, column select,
+    sort, paginate, assemble row, hydrate costs/feedback). Converted 3 existing
+    inline section comments (# Column selection / # Sorting / # LIMIT/OFFSET)
+    into `# ----` form. Left the two local inline comments inside the assembly
+    loop (# Ref expansion..., # For backwards/future compatibility...) as-is —
+    they are line-level notes within one chunk, not chunk headers.
+  - _bucket_ts: 1-line docstring only (6-line pure helper).
+  - calls_usage: docstring + 3 `# ----` blocks (resolve traces, fetch trace
+    calls + aggregate, project back onto roots).
+- Verified diff is comment-only (only `-` lines are the 3 upgraded inline
+  comments). `uvx ruff check <file>` -> "All checks passed!". Committed with
+  the exact message the task specified. Did NOT push (per user rules).
+
+## Errors & Mistakes
+- Initial Read at offset 1880 errored: file is 1594 lines on the original
+  branch. First Bash grep returned no output (empty Bash-grep is suspect per
+  memory); /usr/bin/grep exit 1 confirmed the funcs were genuinely absent.
+
+## Dead Ends
+- None. Considered making a fresh commit vs. absorbing into the stack commit
+  (the #9/#10 pattern). The task explicitly dictated a standalone commit with a
+  fixed message, so honored that rather than inventing a restack/absorb flow
+  (which also risks orphaning notes per the gt-track footgun in prior notes).
+
+## Hints for Future Agents
+- The five calls-query/usage functions live on the DOWNSTREAM stack branches
+  (first introduced on andrew/fake-ts-calls-read; all five present together on
+  andrew/fake-ts-costs-usage), NOT on the upstream skeleton branches. A task
+  pointing at in_memory_trace_server.py with line hints in the 1800-2600 range
+  is targeting a costs-usage-era revision.
+- This commit (876ea28816) sits on andrew/fake-ts-costs-usage which has
+  DIVERGED from origin (3 local / 3 remote). It is a Graphite stack; a restack
+  may move this SHA and (per prior notes) the clean no-conflict gt path drops
+  notes — migrate with `git notes copy -f <old> <new>` if so.
+
+## Codebase Discoveries
+- compile_operand and compile_operation are sibling closures inside
+  _compile_calls_query; _bucket_ts is local to call_stats and reused by both
+  the usage and call-metric bucket loops.
+- calls_query already carried good inline section comments; the task's
+  "REPLACE inline section comment with `# ----` block" rule applied cleanly to
+  three of them.
+
+## Open Questions
+- Whether this should ultimately be absorbed into 0f34d13d35 (the costs-usage
+  feature commit) to match the stack's one-commit-per-feature shape, rather
+  than living as a separate docs commit. Left as the task specified.
