@@ -2,7 +2,8 @@ import sys
 
 import weave
 from tests.trace.data_serialization.spec import SerializationTestCase
-from weave.scorers import LLMAsAJudgeScorer
+from weave.scorers import LLMAsAJudgeScorer, RemoteScorer
+from weave.scorers.remote_scorer import OAuthClientCredentialsConfig
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     LLMStructuredCompletionModel,
 )
@@ -56,6 +57,23 @@ def make_evaluation():
 
 def make_model():
     return MyModel(prompt=weave.StringPrompt("Hello {user_input}"))
+
+
+def make_remote_scorer():
+    # RemoteScorer is scored by the Weave scoring worker (it POSTs to endpoint_url),
+    # so its score/summarize ops are excluded from the record. This case locks in
+    # that op-free shape, plus the nested auth_config discriminated union.
+    return RemoteScorer(
+        endpoint_url="https://scoring.example.com/v1/score",
+        config={"threshold": 0.9},
+        auth_config=OAuthClientCredentialsConfig(
+            mode="oauth_client_credentials",
+            token_endpoint_url="https://idp.example.com/oauth2/token",
+            client_id="weave-remote-scorer",
+            client_secret_name="REMOTE_SCORER_CLIENT_SECRET",
+            scope="remote-score",
+        ),
+    )
 
 
 def evaluation_equality_check(a, b):
@@ -1581,6 +1599,39 @@ library_cases = [
         ],
         # Sad ... equality is really a pain to assert here (and is broken)
         # TODO: Write a good equality check and make it work
+        equality_check=lambda a, b: True,
+    ),
+    SerializationTestCase(
+        id="Library Objects - RemoteScorer",
+        runtime_object_factory=make_remote_scorer,
+        inline_call_param=False,
+        is_legacy=False,
+        # No score/summarize op refs: RemoteScorer sets _weave_exclude_ops_from_record,
+        # so the published shape carries no captured op code (hence no exp_objects/exp_files).
+        exp_json={
+            "_type": "RemoteScorer",
+            "name": None,
+            "description": None,
+            "column_map": None,
+            "endpoint_url": "https://scoring.example.com/v1/score",
+            "config": {"threshold": 0.9},
+            "auth_config": {
+                "_type": "OAuthClientCredentialsConfig",
+                "mode": "oauth_client_credentials",
+                "token_endpoint_url": "https://idp.example.com/oauth2/token",
+                "client_id": "weave-remote-scorer",
+                "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+                "scope": "remote-score",
+                "_class_name": "OAuthClientCredentialsConfig",
+                "_bases": ["BaseModel"],
+            },
+            "_class_name": "RemoteScorer",
+            "_bases": ["Scorer", "Object", "BaseModel"],
+        },
+        exp_objects=[],
+        exp_files=[],
+        # Round-trip correctness is covered by tests/scorers/test_remote_scorer.py;
+        # this case only pins the serialized format.
         equality_check=lambda a, b: True,
     ),
 ]
