@@ -7,43 +7,37 @@ they don't depend on (or interfere with) any process-global tracer state.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Generator, Iterator
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 from opentelemetry.trace.status import StatusCode
 
-from weave.trace_server.tracing import reset_tracer_cache, traced, traced_generator
+from weave.trace_server import tracing
+from weave.trace_server.tracing import traced, traced_generator
 
 
 @pytest.fixture
-def exporter() -> Generator[InMemorySpanExporter, None, None]:
+def exporter(monkeypatch: pytest.MonkeyPatch) -> InMemorySpanExporter:
     """Install an isolated TracerProvider + in-memory exporter for the test.
 
-    Swaps the global TracerProvider for the duration of the test, then drops
-    the module-level cached ProxyTracer reference via `reset_tracer_cache()`
-    so the next span open re-resolves against our new provider.
+    Swaps the module-level `_tracer` binding directly so the decorators
+    under test emit through our isolated provider. No process-global state
+    is mutated.
     """
-    previous = trace._TRACER_PROVIDER  # noqa: SLF001
     provider = TracerProvider()
     exp = InMemorySpanExporter()
     provider.add_span_processor(SimpleSpanProcessor(exp))
-    trace._TRACER_PROVIDER = provider  # noqa: SLF001
-    reset_tracer_cache()
-    try:
-        yield exp
-    finally:
-        trace._TRACER_PROVIDER = previous  # noqa: SLF001
-        reset_tracer_cache()
+    monkeypatch.setattr(tracing, "_tracer", provider.get_tracer("test"))
+    return exp
 
 
-def _single_span(exporter: InMemorySpanExporter) -> Any:
+def _single_span(exporter: InMemorySpanExporter) -> ReadableSpan:
     spans = exporter.get_finished_spans()
     assert len(spans) == 1, f"expected one span, got {len(spans)}: {spans!r}"
     return spans[0]
@@ -85,9 +79,7 @@ def test_sync_function_marks_error_and_reraises(
     assert "exception" in event_names
 
 
-def test_sync_function_preserves_metadata(
-    exporter: InMemorySpanExporter,  # noqa: ARG001
-) -> None:
+def test_sync_function_preserves_metadata() -> None:
     """`functools.wraps` should preserve __name__, __doc__, __module__."""
 
     @traced(name="span_name_unrelated_to_fn_name")
@@ -207,12 +199,6 @@ def test_traced_generator_client_disconnect_not_marked_error(
     """A consumer abandoning the generator (e.g. HTTP client disconnect)
     raises `GeneratorExit` inside the generator. The wrapper must NOT mark
     the span as errored.
-
-    This locks the behavior depended on by upstream's `generator_trace`
-    callers (which were originally added to suppress ddtrace's
-    auto-error-on-GeneratorExit). With OTel, the auto-mark doesn't happen,
-    but we still want this test to pin the contract so a future "let's
-    catch GeneratorExit and set status ERROR" regression is caught.
     """
 
     @traced_generator(name="abandoned_op")
@@ -246,6 +232,15 @@ def test_traced_generator_marks_error_on_exception(
     span = _single_span(exporter)
     assert span.status.status_code == StatusCode.ERROR
     assert span.status.description == "RuntimeError: stream-boom"
+
+
+def test_traced_generator_refuses_async_generator_function() -> None:
+    """`yield from` does not work on async generators; refuse at decoration."""
+    with pytest.raises(TypeError, match="async generator function"):
+
+        @traced_generator(name="bad")
+        async def agen_fn() -> Any:
+            yield 1
 
 
 # ---------------------------------------------------------------------------
