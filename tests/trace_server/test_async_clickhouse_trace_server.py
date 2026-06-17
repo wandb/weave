@@ -107,6 +107,41 @@ async def test_tracking_routes_through_log_completion_call(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("_mock_secret_fetcher")
+async def test_span_sink_defers_insert_to_caller() -> None:
+    """With a `span_sink`, the traced-call span is appended for a later bulk
+    insert instead of inserted per call; the per-call insert path is skipped.
+    """
+    ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
+    srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
+    fake_span = object()
+    buffered = tsi.CompletionsCreateRes(response={"ok": True}, weave_call_id="call-1")
+    sink: list[object] = []
+    try:
+        with (
+            patch(
+                LITELLM_ACOMPLETION_PATCH,
+                new=AsyncMock(
+                    return_value=tsi.CompletionsCreateRes(response={"ok": True})
+                ),
+            ),
+            patch.object(
+                srv, "_build_completion_call_span", return_value=(fake_span, buffered)
+            ) as build_mock,
+            patch.object(srv, "_log_completion_call") as log_mock,
+        ):
+            res = await srv.acompletions_create(
+                _make_req(track_llm_call=True), span_sink=sink
+            )
+        assert res is buffered
+        assert sink == [fake_span]
+        assert build_mock.call_count == 1
+        assert log_mock.call_count == 0
+    finally:
+        ch_executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
 async def test_prep_short_circuit_returns_without_calling_litellm(
     server: AsyncClickHouseTraceServer,
 ) -> None:

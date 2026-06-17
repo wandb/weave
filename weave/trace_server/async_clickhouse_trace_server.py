@@ -8,7 +8,12 @@ from concurrent.futures import Executor
 from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.agents.clickhouse import AgentWriteHandler
+from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ClickHouseTraceServer,
+    CompletionPrepResult,
+)
 from weave.trace_server.datadog import tag_db_insert_path
 from weave.trace_server.llm_completion import lite_llm_acompletion
 
@@ -24,9 +29,17 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
 
     @tag_db_insert_path("completions_create")
     async def acompletions_create(
-        self, req: tsi.CompletionsCreateReq
+        self,
+        req: tsi.CompletionsCreateReq,
+        *,
+        span_sink: list[AgentSpanCHInsertable] | None = None,
     ) -> tsi.CompletionsCreateRes:
-        """Async twin of `completions_create`."""
+        """Async twin of `completions_create`.
+
+        When `span_sink` is given, the traced-call span is appended to it
+        instead of inserted, so a batch caller can bulk-write all spans in one
+        round-trip (see `AgentWriteHandler.insert_spans`).
+        """
         prep = await asyncio.to_thread(self._prepare_completion_request, req)
         if isinstance(prep, tsi.CompletionsCreateRes):
             return prep
@@ -47,9 +60,41 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        if span_sink is not None:
+            return await self._run_ch_insert(
+                self._buffer_completion_call,
+                span_sink,
+                req,
+                prep,
+                res,
+                start_time,
+                end_time,
+            )
         return await self._run_ch_insert(
             self._log_completion_call, req, prep, res, start_time, end_time
         )
+
+    def _buffer_completion_call(
+        self,
+        span_sink: list[AgentSpanCHInsertable],
+        req: tsi.CompletionsCreateReq,
+        prep: CompletionPrepResult,
+        res: tsi.CompletionsCreateRes,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+    ) -> tsi.CompletionsCreateRes:
+        """Build the traced-call span and append it to `span_sink` (no insert).
+
+        Runs on `_ch_executor`; `list.append` is atomic under the GIL so
+        concurrent judges can share one sink safely.
+        """
+        if not req.track_llm_call:
+            return tsi.CompletionsCreateRes(response=res.response)
+        span, result = self._build_completion_call_span(
+            req, prep, res, start_time, end_time
+        )
+        span_sink.append(span)
+        return result
 
     async def _run_ch_insert(
         self,
@@ -61,3 +106,22 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         ctx = contextvars.copy_context()
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._ch_executor, lambda: ctx.run(fn, *args))
+
+    async def ainsert_completion_spans(
+        self, spans: list[AgentSpanCHInsertable]
+    ) -> None:
+        """Bulk-insert spans collected via `span_sink` in one CH round-trip.
+
+        Runs on `_ch_executor` so `self.ch_client` resolves to that thread's
+        client (it is thread-local).
+        """
+        if not spans:
+            return
+        ctx = contextvars.copy_context()
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self._ch_executor, lambda: ctx.run(self._insert_spans_sync, spans)
+        )
+
+    def _insert_spans_sync(self, spans: list[AgentSpanCHInsertable]) -> None:
+        AgentWriteHandler(self.ch_client).insert_spans(spans)
