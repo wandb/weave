@@ -810,9 +810,9 @@ class AgentSearchReq(BaseModel):
     agent_name: str | None = None
     provider_name: str | None = None
     request_model: str | None = None
-    # Return full message content instead of a truncated preview. Off by default
-    # to keep search-UI payloads small.
-    full_content: bool = False
+    # Truncate message content to a preview (default) to keep search-UI payloads
+    # small; set False to return full content (e.g. for structured retrieval).
+    truncate_content: bool = True
     started_after: datetime.datetime | None = None
     started_before: datetime.datetime | None = None
 

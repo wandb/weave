@@ -1655,7 +1655,7 @@ def test_message_search_trace_id_full_content(ch_server):
             query="",
             trace_id=trace_id,
             roles=["user", "assistant", "system"],
-            full_content=True,
+            truncate_content=False,
         )
     )
     by_role: dict[str, list[str]] = {}

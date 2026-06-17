@@ -1510,12 +1510,12 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     # enforced on AgentSearchReq.
     limit_slot = pb.add(req.limit, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
-    # Full content for structured retrieval (e.g. agent scoring); the truncated
-    # preview keeps search-UI payloads small by default.
+    # Truncated preview keeps search-UI payloads small by default; full content
+    # is for structured retrieval (e.g. agent scoring).
     content_expr = (
-        "content"
-        if req.full_content
-        else f"substring(content, 1, {SEARCH_CONTENT_PREVIEW_CHARS})"
+        f"substring(content, 1, {SEARCH_CONTENT_PREVIEW_CHARS})"
+        if req.truncate_content
+        else "content"
     )
     # content_digest is stored raw as FixedString(16); hex-encode here so
     # the Python API surface (AgentSearchMatchedMessage.content_digest: str)

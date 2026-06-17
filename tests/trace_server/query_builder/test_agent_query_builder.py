@@ -1405,7 +1405,7 @@ class TestMakeMessageSearchQuery:
                 query="",
                 trace_id="t1",
                 roles=["user", "assistant", "system"],
-                full_content=True,
+                truncate_content=False,
             ),
         )
 
