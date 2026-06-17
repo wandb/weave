@@ -22,7 +22,11 @@ from weave.trace_server.calls_query_builder.utils import (
     param_slot,
 )
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import clickhouse_cast, timestamp_to_datetime_str
+from weave.trace_server.orm import (
+    clickhouse_cast,
+    parse_string_to_utc_timestamp,
+    timestamp_to_datetime_str,
+)
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 if TYPE_CHECKING:
@@ -680,13 +684,11 @@ def _create_datetime_optimization_sql(
     if not _can_optimize_datetime_field(field_name):
         return None
 
-    literal_value = literal_operand.literal_
-
-    if not literal_value or not isinstance(literal_value, (int, float)):
+    timestamp_seconds = _resolve_datetime_literal_to_timestamp(literal_operand)
+    if timestamp_seconds is None:
         return None
 
-    # convert timestamp to datetime_str
-    timestamp = int(literal_value)
+    timestamp = int(timestamp_seconds)
 
     # Apply buffer in appropriate direction based on context and operator.
     # For normal context:
@@ -708,6 +710,26 @@ def _create_datetime_optimization_sql(
     return (
         f"{table_alias}.sortable_datetime {op_str} {param_slot(param_name, 'String')}"
     )
+
+
+def _resolve_datetime_literal_to_timestamp(
+    literal: tsi_query.LiteralOperation,
+) -> float | None:
+    """Resolve a datetime filter literal to a unix timestamp in seconds.
+
+    Mirrors `maybe_convert_datetime_operands` so the sortable_datetime prefilter
+    matches every literal shape the post-aggregation HAVING accepts: numeric
+    unix timestamps pass through and ISO / `YYYY-MM-DD` strings are parsed. bool
+    (an int subclass) and unparsable values are rejected.
+    """
+    value = literal.literal_
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        return parse_string_to_utc_timestamp(value)
+    return None
 
 
 def _maybe_use_null_check(
