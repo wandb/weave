@@ -56,3 +56,23 @@ the conftest fixture change is flag-based.
 ## PR Description / Lint Follow-up Context
 The user asked to update PR descriptions to match the corrected test ownership. While doing that, `nox --no-install -e lint` exposed that `weave/trace_server/in_memory_trace_server.py` used `NotFoundError` without importing it after the previous stack rewrite. The missing import was amended into `andrew/fake-ts-02-call-writes`, and descendants were restacked. This preserves the corrected PR boundary: the root PR owns the implementation import and write behavior, while call lifecycle test coverage remains in `andrew/fake-ts-calls-read`.
 Copied from prior rewritten commit 07686a35f490 after the NotFoundError import fix/restack.
+
+## Review follow-up (rename + const placement)
+Addressed two local Conductor review comments on in_memory_trace_server.py:
+1. Moved _CH_INT64_RE from a mid-file definition into the top constants block
+   (just after _SUMMARY_FIELD_HANDLERS).
+2. Renamed the un-prefixed ClickHouse-compat helpers to the file's existing
+   _ch_ convention so they read as ClickHouse impl details:
+   _to_int64_or_null  -> _ch_to_int64_or_null
+   _to_float64_or_null-> _ch_to_float64_or_null
+   _to_uint8_or_null  -> _ch_to_uint8_or_null
+   _to_ch_string      -> _ch_to_string
+   Reviewer suggested a _clickhouse prefix or a clickhouse_compat module; chose
+   _ch_ for consistency with the sibling _ch_json_value/_ch_cast_json_value/
+   _ch_compare helpers already in the file (smallest, most consistent change).
+Distributed across the introducing commits via 'gt absorb' so each commit is
+born with the final names (no introduce-then-rename churn). Call sites also
+live in the compilation commit (#7171), the feedback APIs commit (#7148), and
+the eval-results commit (#7176); each got its hunks via absorb.
+Verified: tests/trace_server on fake 1216 passed/117 skipped/0 failed; full
+nox lint (ty/pyright/mypy/ruff) green; no external references to the old names.
