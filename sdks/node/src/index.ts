@@ -19,9 +19,12 @@ export type {
 export type {Settings} from './settings';
 export type {
   Agent,
+  AgentSpan,
   AgentVersion,
   GetAgentsOptions,
   GetAgentsResult,
+  GetAgentSpansOptions,
+  GetAgentSpansResult,
   GetAgentVersionsOptions,
   GetAgentVersionsResult,
   GetCallsOptions,

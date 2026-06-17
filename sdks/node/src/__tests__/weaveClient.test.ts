@@ -41,6 +41,7 @@ type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
     genaiAgentsQueryAgentsQueryPost: jest.Mock;
     genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.Mock;
     genaiSearchAgentsSearchPost: jest.Mock;
+    genaiSpansQueryAgentsSpansQueryPost: jest.Mock;
   };
 };
 
@@ -58,6 +59,7 @@ describe('WeaveClient', () => {
         genaiAgentsQueryAgentsQueryPost: jest.fn(),
         genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.fn(),
         genaiSearchAgentsSearchPost: jest.fn(),
+        genaiSpansQueryAgentsSpansQueryPost: jest.fn(),
       },
     } as any;
     mockWandbServerApi = {} as any;
@@ -469,6 +471,76 @@ describe('WeaveClient', () => {
       await expect(
         client.getAgentVersions({agentName: 'Assistant'})
       ).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentSpans', () => {
+    it('gets agent spans from the server filtered by agent name', async () => {
+      const spans = [
+        {span_id: 's1', span_name: 'invoke_agent', input_tokens: 42},
+        {span_id: 's2', span_name: 'chat_completion', input_tokens: 99},
+      ];
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans, total_count: 2}} as any
+      );
+
+      const result = await client.getAgentSpans({
+        agentName: 'Assistant',
+        limit: 50,
+        offset: 10,
+        sortBy: [{field: 'started_at', direction: 'desc'}],
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        sort_by: [{field: 'started_at', direction: 'desc'}],
+        limit: 50,
+        offset: 10,
+        query: {
+          $expr: {
+            $eq: [{$getField: 'agent_name'}, {$literal: 'Assistant'}],
+          },
+        },
+      });
+
+      expect(result).toEqual({data: {spans, total_count: 2}});
+    });
+
+    it('omits the query when no agent name is provided', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans: [], total_count: 0}} as any
+      );
+
+      await client.getAgentSpans({limit: 5});
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        sort_by: undefined,
+        limit: 5,
+        offset: undefined,
+      });
+    });
+
+    it('defaults spans to an empty array when the server omits them', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {total_count: 0}} as any
+      );
+
+      const result = await client.getAgentSpans({});
+
+      expect(result.data.spans).toEqual([]);
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgentSpans({})).rejects.toThrow('boom');
     });
   });
 

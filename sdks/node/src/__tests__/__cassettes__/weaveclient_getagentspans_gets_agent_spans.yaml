@@ -1,0 +1,70 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 20:34:00 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Wed, 17 Jun 2026 20:34:01 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: afd88cc9bd476de3715af123b3d41c59
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/spans/query
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+    body: '{"project_id":"drtangible-mocha/example","limit":5}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "8264"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 20:34:01 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"spans":[{"project_id":"drtangible-mocha/example","trace_id":"86cc8e5a64b3bb1fbbf80cb377155950","span_id":"53fc733e2f6b3417","parent_span_id":"c6153c0a6dc4010b","span_name":"chat
+      gpt-5.4-mini-2026-03-17","span_kind":"INTERNAL","started_at":"2026-06-16T22:10:34.631000","ended_at":"2026-06-16T22:10:35.663000","status_code":"UNSET","status_message":"","operation_name":"chat","provider_name":"openai","agent_name":"","agent_id":"","agent_description":"","agent_version":"","request_model":"gpt-5.4-mini-2026-03-17","response_model":"gpt-5.4-mini-2026-03-17","response_id":"resp_0657da48080269b2006a31c9dabed48193a73f49a90ca3bf54","input_tokens":133,"output_tokens":33,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"text","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null},{"project_id":"drtangible-mocha/example","trace_id":"86cc8e5a64b3bb1fbbf80cb377155950","span_id":"c6153c0a6dc4010b","parent_span_id":"","span_name":"invoke_agent
+      Assistant","span_kind":"INTERNAL","started_at":"2026-06-16T22:10:34.628000","ended_at":"2026-06-16T22:10:35.668000","status_code":"UNSET","status_message":"","operation_name":"invoke_agent","provider_name":"openai","agent_name":"Assistant","agent_id":"","agent_description":"","agent_version":"","request_model":"","response_model":"","response_id":"","input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null},{"project_id":"drtangible-mocha/example","trace_id":"67648280e1e0dffe7e560df171d99ddc","span_id":"46b56d77a8411c2d","parent_span_id":"5e8f4a2c79a1f294","span_name":"chat
+      gpt-5.4-mini-2026-03-17","span_kind":"INTERNAL","started_at":"2026-06-16T22:10:16.373000","ended_at":"2026-06-16T22:10:17.148000","status_code":"UNSET","status_message":"","operation_name":"chat","provider_name":"openai","agent_name":"","agent_id":"","agent_description":"","agent_version":"","request_model":"gpt-5.4-mini-2026-03-17","response_model":"gpt-5.4-mini-2026-03-17","response_id":"resp_05df0edbb72736f5006a31c9c876a481938cdd07481ee2b33e","input_tokens":315,"output_tokens":5,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"trace_a6fe0c92ca474ed0bd068c531f7af12c","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"text","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null},{"project_id":"drtangible-mocha/example","trace_id":"67648280e1e0dffe7e560df171d99ddc","span_id":"054c43c9f804e63e","parent_span_id":"5e8f4a2c79a1f294","span_name":"execute_tool
+      calculate","span_kind":"INTERNAL","started_at":"2026-06-16T22:10:16.371000","ended_at":"2026-06-16T22:10:16.372000","status_code":"UNSET","status_message":"","operation_name":"execute_tool","provider_name":"","agent_name":"","agent_id":"","agent_description":"","agent_version":"","request_model":"","response_model":"","response_id":"","input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"trace_a6fe0c92ca474ed0bd068c531f7af12c","conversation_name":"","tool_name":"calculate","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null},{"project_id":"drtangible-mocha/example","trace_id":"67648280e1e0dffe7e560df171d99ddc","span_id":"00a5ca1e03e154e5","parent_span_id":"5e8f4a2c79a1f294","span_name":"chat
+      gpt-5.4-mini-2026-03-17","span_kind":"INTERNAL","started_at":"2026-06-16T22:10:15.298000","ended_at":"2026-06-16T22:10:16.371000","status_code":"UNSET","status_message":"","operation_name":"chat","provider_name":"openai","agent_name":"","agent_id":"","agent_description":"","agent_version":"","request_model":"gpt-5.4-mini-2026-03-17","response_model":"gpt-5.4-mini-2026-03-17","response_id":"resp_05df0edbb72736f5006a31c9c767b88193ad36aca93bbe7116","input_tokens":268,"output_tokens":25,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"trace_a6fe0c92ca474ed0bd068c531f7af12c","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"text","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null}],"groups":[],"total_count":146}'
