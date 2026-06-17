@@ -51,3 +51,10 @@ rule), feedback_payload_schema.
 ## PR Description / Lint Follow-up Context
 The user asked to update PR descriptions to match the corrected test ownership. While doing that, `nox --no-install -e lint` exposed that `weave/trace_server/in_memory_trace_server.py` used `NotFoundError` without importing it after the previous stack rewrite. The missing import was amended into `andrew/fake-ts-02-call-writes`, and descendants were restacked. This preserves the corrected PR boundary: the root PR owns the implementation import and write behavior, while call lifecycle test coverage remains in `andrew/fake-ts-calls-read`.
 Copied from prior rewritten commit 01a51b5ee8b0 after the NotFoundError import fix/restack.
+
+## Review follow-up (readability)
+Added brief high-level block comments (---- separators) and a two-line docstring
+to feedback_stats, grouping it into: resolve window/granularity, load + bin
+values, emit per-bucket rows, and window-wide rollup. Per review feedback the
+comments are intentionally high-level -- no per-phase enumeration or line-level
+notes. Comments only, no behavior change. Applied via 'gt absorb'.
