@@ -202,6 +202,29 @@ def test_feedback_apis(client):
 
 
 @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_agent_user_feedback_emoji_tag_is_detoned(client):
+    def create(scorer_tags):
+        return client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=client.project_id,
+                wb_user_id="VXNlcjoxOQ==",
+                weave_ref="weave:///entity/project/object/name:digest",
+                feedback_type="wandb.agent_user_feedback",
+                payload={},
+                scorer_tags=scorer_tags,
+            )
+        )
+
+    # The emoji thumb is detoned (skin-tone variants collapse to one alias).
+    res = create(["👍🏽"])
+    assert res.payload["detoned_alias"] == ":thumbs_up:"
+
+    # A non-emoji tag gets no alias.
+    res = create(["looks-good"])
+    assert "detoned_alias" not in res.payload
+
+
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_payload(client):
     project_id = client.project_id
 

@@ -92,6 +92,13 @@ def process_feedback_payload(
         processed_payload["detoned"] = detoned
         processed_payload["detoned_alias"] = emoji.demojize(detoned)
 
+    # Detone an agent user feedback's emoji scorer tag the same way we already
+    # detone reaction emojis.
+    if feedback_type_is_agent_user_feedback(feedback_req.feedback_type):
+        tag = feedback_req.scorer_tags[0] if feedback_req.scorer_tags else ""
+        if emoji.emoji_count(tag) == 1:
+            processed_payload["detoned_alias"] = emoji.demojize(detone_emojis(tag))
+
     # Validate payload size
     payload = json.dumps(processed_payload)
     if len(payload) > ch_settings.CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE:
