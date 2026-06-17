@@ -1,27 +1,20 @@
-"""Datadog-integration utilities for trace server.
+"""Trace-server observability helpers (DogStatsD counters + OTel span tags).
 
-Historical name kept for backward compatibility — internally this module
-no longer depends on `ddtrace`. The two things it provides are:
+Historical name `datadog.py` kept because 11 internal modules import from
+it; renaming is a mechanical follow-up. The module no longer depends on
+ddtrace — it provides:
 
   1. `db_insert_path` / `tag_db_insert_path` / `record_db_insert` —
      emit DogStatsD counters for trace-server DB inserts. The wire
-     format and metric name (`weave_trace_server.db_inserts`) are
-     preserved so existing DD dashboards keep working.
+     format `weave_trace_server.db_inserts:N|c|#table:T,path:P` and the
+     metric name are preserved so existing DD dashboards keep working.
 
-  2. `set_root_span_dd_tags` / `set_current_span_dd_tags` —
-     thin wrappers that set attributes on the current OTel span.
-     "root span" semantics are NOT preserved exactly — OTel has no
-     built-in current-root-span accessor; we use the currently-active
-     span instead. All historical call sites only need "the span
-     currently active when the helper is called", so this is NOT a
-     semantic regression.
+  2. `set_current_span_dd_tags` — set attributes on the current OTel span.
 
-The DogStatsD client is inline (~30 lines, UDP socket) rather than via
-the `datadog` PyPI package or an OTel Counter. Rationale:
-  - Inline keeps the wire format under our control.
-  - Adds zero new dependencies.
-  - Avoids entangling these counters with the isolated OTel
-    MeterProvider used elsewhere for runtime metrics.
+Why inline DogStatsD instead of the `datadog` PyPI package or an OTel
+Counter: keeps the wire format under our control, adds zero new deps, and
+avoids entangling these counters with the isolated OTel MeterProvider
+used elsewhere for runtime metrics.
 """
 
 from __future__ import annotations
@@ -33,8 +26,9 @@ import os
 import socket
 from collections.abc import Callable, Generator
 from contextvars import ContextVar
-from functools import lru_cache, wraps
+from functools import wraps
 from typing import Any
+from urllib.parse import urlparse
 
 from opentelemetry import trace as _otel_trace
 
@@ -48,73 +42,63 @@ _db_insert_path: ContextVar[str] = ContextVar(
 )
 
 
-class _StatsDClient:
-    """Minimal DogStatsD client over UDP.
-
-    Best-effort, non-blocking. We open the socket lazily so importing
-    this module is side-effect free, and swallow `OSError` on send so a
-    stats hiccup never crashes the request path.
-
-    Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`. One UDP
-    packet per call.
-    """
-
-    def __init__(self, host: str, port: int) -> None:
-        self._addr = (host, port)
-        self._sock: socket.socket | None = None
-
-    def _ensure_socket(self) -> socket.socket | None:
-        if self._sock is None:
-            try:
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                self._sock.setblocking(False)
-            except OSError:
-                logger.debug(
-                    "DogStatsD socket creation failed; metric emission disabled"
-                )
-                return None
-        return self._sock
-
-    def increment(
-        self, metric: str, *, value: int = 1, tags: list[str] | None = None
-    ) -> None:
-        sock = self._ensure_socket()
-        if sock is None:
-            return
-        tag_suffix = f"|#{','.join(tags)}" if tags else ""
-        packet = f"{metric}:{value}|c{tag_suffix}".encode()
-        try:
-            sock.sendto(packet, self._addr)
-        except OSError:
-            # Don't let a transient stats failure interrupt the caller.
-            pass
-
-
 def _resolve_dogstatsd_addr() -> tuple[str, int]:
     """Resolve `DD_DOGSTATSD_URL` / `DD_AGENT_HOST` / defaults to (host, port).
 
     Honors `DD_DOGSTATSD_URL` (e.g. `udp://datadog.datadog:8125`) first,
     then falls back to `DD_AGENT_HOST:DD_DOGSTATSD_PORT`, then
-    `localhost:8125`.
+    `localhost:8125`. A malformed URL falls back to localhost rather than
+    crashing the process at import time.
     """
     url = os.environ.get("DD_DOGSTATSD_URL")
     if url:
-        # Strip optional `udp://` prefix.
-        if url.startswith("udp://"):
-            url = url[len("udp://") :]
-        host, _, port_str = url.partition(":")
-        port = int(port_str) if port_str else 8125
-        return host, port
+        try:
+            parsed = urlparse(url if "://" in url else f"udp://{url}")
+            if parsed.hostname:
+                return parsed.hostname, parsed.port or 8125
+        except ValueError:
+            logger.warning(
+                "Could not parse DD_DOGSTATSD_URL=%r; falling back to "
+                "localhost:8125",
+                url,
+            )
     host = os.environ.get("DD_AGENT_HOST", "localhost")
     port = int(os.environ.get("DD_DOGSTATSD_PORT", "8125"))
     return host, port
 
 
-@lru_cache(maxsize=1)
-def _dogstatsd_client() -> _StatsDClient:
-    """Process-wide DogStatsd client; lazy so import is side-effect free."""
-    host, port = _resolve_dogstatsd_addr()
-    return _StatsDClient(host, port)
+_ADDR: tuple[str, int] = _resolve_dogstatsd_addr()
+_SOCK: socket.socket | None = None
+_SOCK_FAILED: bool = False  # don't retry creation after one failure
+
+
+def _emit_statsd(metric: str, value: int, tags: list[str]) -> None:
+    """Send a single DogStatsD counter packet.
+
+    Best-effort: a socket-creation or send failure never interrupts the
+    caller. We lazy-create the UDP socket on first emission so importing
+    this module has zero side effects.
+    """
+    global _SOCK, _SOCK_FAILED  # noqa: PLW0603 — lazy singleton init
+    if _SOCK_FAILED:
+        return
+    if _SOCK is None:
+        try:
+            _SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            _SOCK.setblocking(False)
+        except OSError:
+            logger.warning(
+                "DogStatsD socket creation failed; metric emission disabled"
+            )
+            _SOCK_FAILED = True
+            return
+    tag_suffix = f"|#{','.join(tags)}" if tags else ""
+    packet = f"{metric}:{value}|c{tag_suffix}".encode()
+    try:
+        _SOCK.sendto(packet, _ADDR)
+    except OSError:
+        # Don't let a transient stats failure interrupt the caller.
+        pass
 
 
 @contextlib.contextmanager
@@ -144,11 +128,9 @@ def tag_db_insert_path(
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator: tag DB inserts done inside `func` with `path:<path>`.
 
-    Convenience over `db_insert_path` for decorating public API methods
-    whose entire body should be attributed to a single ingestion path.
-
     Coroutine-safe (tag spans awaits). `run_in_executor` does NOT carry the
-    contextvar, so a caller handing CH writes to an executor must `copy_context().run`.
+    contextvar, so a caller handing CH writes to an executor must
+    `copy_context().run`.
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -181,38 +163,21 @@ def record_db_insert(*, table: str, count: int, path: str | None = None) -> None
     if count <= 0:
         return
     resolved_path = path if path is not None else _db_insert_path.get()
-    _dogstatsd_client().increment(
+    _emit_statsd(
         DB_INSERT_METRIC,
-        value=count,
-        tags=[f"table:{table}", f"path:{resolved_path}"],
+        count,
+        [f"table:{table}", f"path:{resolved_path}"],
     )
-
-
-def set_root_span_dd_tags(tags: dict[str, str | float | int]) -> None:
-    """Set attributes on the current OTel span.
-
-    Args:
-        tags: Dictionary of attributes to set. Keys are attribute names;
-            values can be strings, floats, or ints.
-
-    Note:
-        "root span" in the original ddtrace sense is not exactly preserved
-        — OTel has no built-in current-root-span accessor. We use the
-        currently-active span, which is correct for all known historical
-        call sites (they all want "the span currently active here", not
-        literal trace-root semantics).
-    """
-    span = _otel_trace.get_current_span()
-    if span.is_recording():
-        span.set_attributes(tags)
 
 
 def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:
     """Set attributes on the current OTel span.
 
-    Args:
-        tags: Dictionary of attributes to set. Keys are attribute names;
-            values can be strings, floats, or ints.
+    No-op if no span is recording. Replaces the historical
+    `ddtrace.tracer.current_span().set_tags(...)` and
+    `ddtrace.tracer.current_root_span().set_tags(...)` — OTel has no
+    built-in root-span accessor, but every historical call site only needs
+    the span currently active when the helper is called.
     """
     span = _otel_trace.get_current_span()
     if span.is_recording():
