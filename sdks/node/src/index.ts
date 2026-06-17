@@ -40,6 +40,7 @@ export type {
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
+  WeaveAdkPlugin,
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
   patchRealtimeSession,
