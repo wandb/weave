@@ -63,3 +63,6 @@ gen_ai.agent.description/id + gen_ai.tool.definitions.
 
 ## Session addendum — rebase onto master
 Rebased onto origin/master (ba337cff57). Restack hit an import conflict in googleAdk.test.ts: branch 01 dropped the now-unused `import {Settings}` (Settings became a type on master) while this branch had added `import {commonPatchGoogleGenAI}`. Resolved by keeping commonPatchGoogleGenAI (used by the genai-exclusion test) and dropping Settings. Inherited branch 01's assertion shape-refactor + Settings-API migration via the shared beforeEach. Verified 19/19 jest, prettier + eslint clean.
+
+## Session addendum — use semconv constants
+Inherited branch 01's gen_ai.* → ATTR_GEN_AI_* conversion + semconv import via restack (clean, no conflict — the genai-exclusion test adds no gen_ai attribute-key literals). Verified 19/19 jest, prettier + eslint clean.
