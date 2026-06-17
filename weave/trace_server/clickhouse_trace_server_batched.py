@@ -46,6 +46,7 @@ from weave.trace_server import (
     ch_sentinel_values,
     constants,
     object_creation_utils,
+    usage_costs,
     usage_utils,
 )
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
@@ -1491,36 +1492,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Compute per-call usage for a trace, with descendant rollup.
 
         Each call's usage = its own metrics + sum of all descendants' metrics.
-        Uses an iterative bottom-up approach to avoid recursion limits.
         """
-        calls = self.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=req.project_id,
-                filter=req.filter,
-                query=req.query,
-                columns=["id", "parent_id", "summary"],
-                include_costs=req.include_costs,
-                limit=req.limit,
-            )
+        usage_calls, unfinished_call_ids = self._stream_usage_calls(
+            req.project_id, req.filter, req.query, req.include_costs, req.limit
         )
-
-        usage_calls: list[usage_utils.UsageCall] = []
-        unfinished_call_ids: set[str] = set()
-        for call in calls:
-            usage_calls.append(
-                usage_utils.UsageCall(
-                    id=call.id,
-                    parent_id=call.parent_id,
-                    summary=call.summary,
-                )
-            )
-            if call.ended_at is None:
-                unfinished_call_ids.add(call.id)
-
         aggregated_usage = usage_utils.aggregate_usage_with_descendants(
             usage_calls, req.include_costs
         )
-
         return tsi.TraceUsageRes(
             call_usage=aggregated_usage,
             unfinished_call_ids=sorted(unfinished_call_ids),
@@ -1535,7 +1513,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.call_ids:
             return tsi.CallsUsageRes(call_usage={}, unfinished_call_ids=[])
 
-        # Resolve trace IDs for requested root calls.
+        # Resolve trace IDs for the requested root calls.
         root_calls = self.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
@@ -1546,49 +1524,110 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         trace_ids = {call.trace_id for call in root_calls}
         if not trace_ids:
-            root_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {
-                call_id: {} for call_id in req.call_ids
-            }
-            return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
-
-        # Stream all calls in those traces with minimal columns for aggregation.
-        calls = self.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=req.project_id,
-                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
-                columns=["id", "parent_id", "summary"],
-                include_costs=req.include_costs,
-                limit=req.limit,
+            return tsi.CallsUsageRes(
+                call_usage={call_id: {} for call_id in req.call_ids},
+                unfinished_call_ids=[],
             )
+
+        usage_calls, unfinished_call_ids = self._stream_usage_calls(
+            req.project_id,
+            tsi.CallsFilter(trace_ids=list(trace_ids)),
+            None,
+            req.include_costs,
+            req.limit,
         )
-
-        usage_calls: list[usage_utils.UsageCall] = []
-        unfinished_call_ids: set[str] = set()
-        for call in calls:
-            usage_calls.append(
-                usage_utils.UsageCall(
-                    id=call.id,
-                    parent_id=call.parent_id,
-                    summary=call.summary,
-                )
-            )
-            if call.ended_at is None:
-                unfinished_call_ids.add(call.id)
-
-        # Aggregate usage bottom-up to include descendants.
         aggregated_usage = usage_utils.aggregate_usage_with_descendants(
             usage_calls, req.include_costs
         )
 
         # Return only the requested root call IDs.
-        root_usage = {
-            call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
-        }
-
         return tsi.CallsUsageRes(
-            call_usage=root_usage,
+            call_usage={
+                call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
+            },
             unfinished_call_ids=sorted(unfinished_call_ids),
         )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._stream_usage_calls")
+    def _stream_usage_calls(
+        self,
+        project_id: str,
+        filter: tsi.CallsFilter | None,
+        query: tsi.Query | None,
+        include_costs: bool,
+        limit: int | None,
+    ) -> tuple[list[usage_utils.UsageCall], set[str]]:
+        """Fetch only the columns the rollup needs (no cost CTE, no full CallSchema).
+
+        Costs are computed in Python from a single prices lookup; see usage_costs.
+        """
+        read_table = self.table_routing_resolver.resolve_read_table(
+            project_id, self.ch_client
+        )
+        cq = CallsQuery(project_id=project_id, read_table=read_table)
+        for col in ("id", "parent_id", "ended_at", "started_at", "summary_dump"):
+            cq.add_field(col)
+        if filter is not None:
+            cq.set_hardcoded_filter(HardCodedFilter(filter=filter))
+        if query is not None:
+            cq.add_condition(query.expr_)
+        cq.add_order("started_at", "asc")
+        cq.add_order("id", "asc")
+        if limit is not None:
+            cq.set_limit(limit)
+
+        settings = None
+        if read_table == ReadTable.CALLS_COMPLETE:
+            settings = ch_settings.update_settings_for_calls_complete_read(settings)
+
+        pb = ParamBuilder()
+        columns = [field.field for field in cq.select_fields]
+        rows = list(
+            self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
+        )
+
+        parsed: list[tuple[str, str | None, datetime.datetime, dict[str, Any]]] = []
+        unfinished_call_ids: set[str] = set()
+        models: set[str] = set()
+        for row in rows:
+            record = dict(zip(columns, row, strict=False))
+            call_id = str(record["id"])
+            if ch_sentinel_values.from_ch_value("ended_at", record["ended_at"]) is None:
+                unfinished_call_ids.add(call_id)
+            parent_id: str | None = ch_sentinel_values.from_ch_value(
+                "parent_id", record["parent_id"]
+            )
+            summary_dump = record["summary_dump"]
+            summary = json.loads(summary_dump) if summary_dump else {}
+            usage_map = summary.get("usage")
+            if include_costs and isinstance(usage_map, dict):
+                models.update(str(model) for model in usage_map)
+            parsed.append((call_id, parent_id, record["started_at"], summary))
+
+        price_index: dict[str, usage_costs.ModelPrices] = {}
+        if include_costs and models:
+            price_pb = ParamBuilder()
+            price_rows = list(
+                self._query_stream(
+                    usage_costs.prices_query(price_pb, project_id, sorted(models)),
+                    price_pb.get_params(),
+                )
+            )
+            price_index = usage_costs.index_prices(price_rows)
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        for call_id, parent_id, started_at, summary in parsed:
+            usage_map = summary.get("usage")
+            if include_costs and isinstance(usage_map, dict) and price_index:
+                call_costs = usage_costs.costs_for_usage(
+                    usage_map, started_at, price_index
+                )
+                if call_costs:
+                    summary.setdefault("weave", {})["costs"] = call_costs
+            usage_calls.append(
+                usage_utils.UsageCall(id=call_id, parent_id=parent_id, summary=summary)
+            )
+        return usage_calls, unfinished_call_ids
 
     @generator_trace("clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:

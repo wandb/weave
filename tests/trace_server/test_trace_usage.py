@@ -536,6 +536,57 @@ def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
 
 
 @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_trace_usage_costs_use_latest_on_or_before_project_price(
+    client: weave_client.WeaveClient,
+) -> None:
+    """Cost selection ranks project over default, latest on-or-before, future excluded."""
+    project_id = client.project_id
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc)
+
+    call_id = str(uuid.uuid4())
+    _create_call(
+        client,
+        call_id,
+        trace_id,
+        None,
+        now,
+        {"gpt-4": {"prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14}},
+    )
+
+    for effective, prompt_cost, completion_cost in (
+        (now - datetime.timedelta(days=2), 2.0, 4.0),
+        (now - datetime.timedelta(days=1), 3.0, 6.0),
+        (now + datetime.timedelta(days=1), 9.0, 9.0),
+    ):
+        client.server.cost_create(
+            tsi.CostCreateReq(
+                project_id=project_id,
+                costs={
+                    "gpt-4": tsi.CostCreateInput(
+                        prompt_token_cost=prompt_cost,
+                        completion_token_cost=completion_cost,
+                        effective_date=effective,
+                    )
+                },
+            )
+        )
+
+    res = client.server.trace_usage(
+        tsi.TraceUsageReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(trace_ids=[trace_id]),
+            include_costs=True,
+        )
+    )
+
+    # The now-1d project price (3.0/6.0) wins over the older, the future, and default.
+    usage = res.call_usage[call_id]["gpt-4"]
+    assert usage.prompt_tokens_total_cost == 30.0
+    assert usage.completion_tokens_total_cost == 24.0
+
+
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_usage_returns_unfinished_call_ids(
     client: weave_client.WeaveClient,
 ) -> None:
