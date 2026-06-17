@@ -1980,6 +1980,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
+            # _ensure_valid_update_field guarantees display_name is not None.
+            assert req.display_name is not None
             self._update_calls_complete(req.project_id, req.call_id, req.display_name)
             return tsi.CallUpdateRes()
 
@@ -3082,7 +3084,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueCreateRes(id=queue_id)
 
-    @traced_generator(name="clickhouse_trace_server_batched.annotation_queues_query_stream")
+    @traced_generator(
+        name="clickhouse_trace_server_batched.annotation_queues_query_stream"
+    )
     def annotation_queues_query_stream(
         self, req: tsi.AnnotationQueuesQueryReq
     ) -> Iterator[tsi.AnnotationQueueSchema]:
@@ -3538,7 +3542,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         raise ValueError(f"Failed to fetch queue item '{item_id}'")
 
-    @traced(name="clickhouse_trace_server_batched.annotator_queue_items_progress_update")
+    @traced(
+        name="clickhouse_trace_server_batched.annotator_queue_items_progress_update"
+    )
     def annotator_queue_items_progress_update(
         self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
     ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
