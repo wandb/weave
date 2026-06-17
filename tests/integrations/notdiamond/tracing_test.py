@@ -21,7 +21,6 @@ def patch_notdiamond() -> Generator[None, None, None]:
     patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_notdiamond_quickstart(
     client: WeaveClient,
@@ -42,6 +41,13 @@ def test_notdiamond_quickstart(
         hash_content=False,
     )
     calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    notdiamond_meta = [i for i in stamped if i["name"] == "notdiamond"]
+    assert notdiamond_meta, "expected >=1 call to carry notdiamond metadata"
+    assert all(i["meta"]["package_name"] == "notdiamond" for i in notdiamond_meta)
     flattened_calls = flattened_calls_to_names(flatten_calls(calls))
     assert len([call for call in flattened_calls if "select_model" in call[0]]) == 1
 

@@ -1,18 +1,16 @@
 import {
   type AttributeValue,
-  type Attributes,
   type Context,
   ROOT_CONTEXT,
   type Span,
   SpanKind,
-  SpanStatusCode,
-  type TimeInput,
   trace,
 } from '@opentelemetry/api';
 
 import {_getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
@@ -23,7 +21,7 @@ import {
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
 
-export interface TurnInit {
+export interface TurnInit extends SpanInitBase {
   agentName?: string;
   model?: string;
 }
@@ -50,16 +48,16 @@ export interface TurnInit {
  *   turn.end();
  * }
  */
-export class Turn {
-  private _ended = false;
-
+export class Turn extends SpanBase {
   private constructor(
-    private readonly span: Span,
+    span: Span,
     private readonly context: Context,
     private readonly conversationId: string,
     public readonly agentName: string,
     public readonly model: string
-  ) {}
+  ) {
+    super(span);
+  }
 
   static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
     const state = _getGenaiState();
@@ -86,7 +84,7 @@ export class Turn {
     // library's active context.
     const span = tracer.startSpan(
       'invoke_agent',
-      {kind: SpanKind.CLIENT, attributes},
+      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       ROOT_CONTEXT
     );
     const turn = new Turn(
@@ -128,47 +126,25 @@ export class Turn {
   }
 
   /**
-   * Set a single attribute on the Turn span. Useful for stamping running
-   * totals (e.g. cumulative cost, token usage) or other metadata that becomes
-   * known mid-turn. No-op after `end()`. Mirrors OTel `Span.setAttribute`.
-   *
-   * @example
-   * turn.setAttribute('gen_ai.usage.input_tokens', totalInputTokens);
+   * @deprecated Use {@link setAttributes} instead, which mirrors the Python
+   * SDK's `set_attributes` and OTel's `Span.setAttributes`. Retained as a thin
+   * alias so existing single-attribute callers keep working. Only `Turn`
+   * carries this — the other emitters never shipped a singular form.
    */
   setAttribute(key: string, value: AttributeValue): this {
-    if (this._ended) return this;
-    this.span.setAttribute(key, value);
-    return this;
+    return this.setAttributes({[key]: value});
   }
 
   /**
-   * Add a named event to the Turn span. Useful for marking non-span moments
-   * such as context compaction, tool-loop detection, or guardrail trips.
-   * No-op after `end()`. Mirrors OTel `Span.addEvent`.
-   *
-   * @example
-   * turn.addEvent('context_compacted', {removedMessages: 12});
+   * Close the Turn span. Idempotent. Pass `error` to mark it as failed; pass
+   * `endTime` to backdate the close.
    */
-  addEvent(name: string, attributes?: Attributes, startTime?: TimeInput): this {
-    if (this._ended) return this;
-    this.span.addEvent(name, attributes, startTime);
-    return this;
-  }
-
-  /** Close the Turn span. Idempotent. Pass `error` to mark it as failed. */
-  end(opts?: {error?: Error}): void {
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
     this._ended = true;
-    if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
-    }
-    this.span.end();
+    this._closeSpan(opts);
     const state = _getGenaiState();
     if (state.turn === this) {
       state.turn = null;

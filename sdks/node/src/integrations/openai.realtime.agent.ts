@@ -32,7 +32,14 @@ import {getGlobalClient} from '../clientApi';
 import {uuidv7} from 'uuidv7';
 import type {RealtimeSession} from '@openai/agents-realtime';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {globalSingleton} from '../utils/globalSingleton';
+import state from '../state';
+import {asAttributes, libraryIntegration} from './integrationMetadata';
+
+// Integration provenance stamped onto every call this integration produces.
+const OPENAI_REALTIME_AGENT_INTEGRATION = libraryIntegration(
+  'openai_agents_realtime',
+  {packageName: '@openai/agents-realtime'}
+);
 
 // ============================================================================
 // Helpers
@@ -404,7 +411,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: null,
       started_at: new Date().toISOString(),
       inputs: sessionData,
-      attributes: {kind: 'agent'},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.sessionCallId = callId;
@@ -419,6 +429,7 @@ export class WeaveRealtimeTracingAdapter {
     client.saveCallEnd({
       project_id: client.projectId,
       id: this.sessionCallId,
+      trace_id: this.sessionTraceId,
       ended_at: new Date().toISOString(),
       output: {},
       summary: {},
@@ -445,12 +456,16 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: now,
       inputs: {text},
-      attributes: {kind: 'agent'},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     client.saveCallEnd({
       project_id: client.projectId,
       id: callId,
+      trace_id: this.sessionTraceId,
       ended_at: now,
       output: {},
       summary: {},
@@ -473,7 +488,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: new Date().toISOString(),
       inputs: {},
-      attributes: {kind: 'agent'},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.voiceInputCalls.set(itemId, callId);
@@ -490,6 +508,7 @@ export class WeaveRealtimeTracingAdapter {
     if (!client || !callId) return;
 
     const endedAt = new Date().toISOString();
+    const traceId = this.sessionTraceId;
     this.voiceInputCalls.delete(itemId);
     const chunks = this.audioInputChunks.get(itemId);
     this.audioInputChunks.delete(itemId);
@@ -508,6 +527,7 @@ export class WeaveRealtimeTracingAdapter {
       client.saveCallEnd({
         project_id: client.projectId,
         id: callId,
+        trace_id: traceId,
         ended_at: endedAt,
         output,
         summary: {},
@@ -532,12 +552,16 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: now,
       inputs: sessionData,
-      attributes: {kind: 'agent'},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     client.saveCallEnd({
       project_id: client.projectId,
       id: callId,
+      trace_id: this.sessionTraceId,
       ended_at: now,
       output: sessionData,
       summary: {},
@@ -561,7 +585,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: new Date().toISOString(),
       inputs: {response_id: responseId},
-      attributes: {kind: 'llm'},
+      attributes: {
+        kind: 'llm',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.generationCalls.set(responseId, callId);
@@ -584,6 +611,7 @@ export class WeaveRealtimeTracingAdapter {
     client.saveCallEnd({
       project_id: client.projectId,
       id: callId,
+      trace_id: this.sessionTraceId,
       ended_at: new Date().toISOString(),
       output: response,
       summary,
@@ -612,7 +640,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: parentCallId,
       started_at: new Date().toISOString(),
       inputs: {},
-      attributes: {kind: 'llm'},
+      attributes: {
+        kind: 'llm',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.audioCallId = callId;
@@ -627,6 +658,7 @@ export class WeaveRealtimeTracingAdapter {
     const callId = this.audioCallId;
     const responseId = this.audioResponseId;
     const endedAt = new Date().toISOString();
+    const traceId = this.sessionTraceId;
     this.audioCallId = null;
     this.audioResponseId = null;
 
@@ -647,6 +679,7 @@ export class WeaveRealtimeTracingAdapter {
       client.saveCallEnd({
         project_id: client.projectId,
         id: callId,
+        trace_id: traceId,
         ended_at: endedAt,
         output: finalOutput,
         summary: {},
@@ -674,7 +707,10 @@ export class WeaveRealtimeTracingAdapter {
       parent_id: this.sessionCallId,
       started_at: new Date().toISOString(),
       inputs,
-      attributes: {kind: 'tool'},
+      attributes: {
+        kind: 'tool',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+      },
     });
 
     this.toolCalls.set(toolCallId, callId);
@@ -688,6 +724,7 @@ export class WeaveRealtimeTracingAdapter {
     client.saveCallEnd({
       project_id: client.projectId,
       id: callId,
+      trace_id: this.sessionTraceId,
       ended_at: new Date().toISOString(),
       output,
       summary: {},
@@ -700,15 +737,6 @@ export class WeaveRealtimeTracingAdapter {
 // ============================================================================
 // Public API
 // ============================================================================
-
-// Internal state shared across CJS/ESM module boundaries via globalThis.
-// Without this, a dual-package hazard (same module loaded as both CJS and ESM
-// in one process) would give each copy its own `patched` flag and could
-// double-patch the `RealtimeSession` class.
-const _openaiAgentsRealtimeState = globalSingleton<{patched: boolean}>(
-  '_weave_openai_agents_realtime_state',
-  () => ({patched: false})
-);
 
 function patchRealtimeSessionCommon(realtimeExports: any): void {
   const OriginalSession = realtimeExports?.RealtimeSession;
@@ -758,8 +786,8 @@ function patchRealtimeSessionCommon(realtimeExports: any): void {
 }
 
 function patchRealtimeExports(exports: any) {
-  if (!_openaiAgentsRealtimeState.patched) {
-    _openaiAgentsRealtimeState.patched = true;
+  if (!state.integrations.openaiAgentsRealtime.patched) {
+    state.integrations.openaiAgentsRealtime.patched = true;
     patchRealtimeSessionCommon(exports);
   }
   return exports;
@@ -806,7 +834,7 @@ export function instrumentOpenAIRealtimeAgent(): void {
  * ```
  */
 export async function patchRealtimeSession(): Promise<boolean> {
-  if (_openaiAgentsRealtimeState.patched) return true;
+  if (state.integrations.openaiAgentsRealtime.patched) return true;
 
   // Dynamic `import()` (not `require()`) so this compiles cleanly to both CJS
   // and ESM output; `require` does not exist in ESM.
@@ -827,8 +855,8 @@ export async function patchRealtimeSession(): Promise<boolean> {
   // Re-check: the dynamic import itself may trigger the ESM hook, which runs
   // patchRealtimeSessionCommon. Without this guard we would double-wrap
   // RealtimeSession.prototype.sendAudio.
-  if (_openaiAgentsRealtimeState.patched) return true;
-  _openaiAgentsRealtimeState.patched = true;
+  if (state.integrations.openaiAgentsRealtime.patched) return true;
+  state.integrations.openaiAgentsRealtime.patched = true;
   patchRealtimeSessionCommon(realtimeExports);
   return true;
 }

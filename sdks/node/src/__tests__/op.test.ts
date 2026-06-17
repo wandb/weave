@@ -20,7 +20,7 @@ const createFreshMockClient = () => ({
   runWithCallStack: jest.fn(async (stack: any, fn: () => any) => fn()),
   finishCall: jest.fn(() => Promise.resolve()),
   finishCallWithException: jest.fn(() => Promise.resolve()),
-  settings: {shouldPrintCallLink: false},
+  settings: {printCallLink: false},
   waitForBatchProcessing: jest.fn(() => Promise.resolve()),
 });
 

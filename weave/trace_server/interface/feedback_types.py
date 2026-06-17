@@ -16,11 +16,19 @@ class FeedbackPayloadNoteReq(BaseModel):
 REACTION_FEEDBACK_TYPE = "wandb.reaction.1"
 NOTE_FEEDBACK_TYPE = "wandb.note.1"
 AGENT_MONITOR_FEEDBACK_TYPE = "wandb.agent_monitor"
+# Human-applied tags on agents (vs scorer-applied wandb.agent_monitor tags),
+# stored in scorer_tags. Covers any human tag, e.g. an emoji reaction or a
+# manual label like "low-quality".
+AGENT_USER_FEEDBACK_TYPE = "wandb.agent_user_feedback"
 
 # Feedback types where multiple entries can exist per call per type.
 # When filtering on these, we use groupArrayIf (collect all values) + has()
 # instead of anyIf (pick one arbitrary value), which could miss matches.
-MULTI_VALUE_FEEDBACK_TYPES = {REACTION_FEEDBACK_TYPE, NOTE_FEEDBACK_TYPE}
+MULTI_VALUE_FEEDBACK_TYPES = {
+    REACTION_FEEDBACK_TYPE,
+    NOTE_FEEDBACK_TYPE,
+    AGENT_USER_FEEDBACK_TYPE,
+}
 
 FEEDBACK_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
     REACTION_FEEDBACK_TYPE: FeedbackPayloadReactionReq,
@@ -53,6 +61,10 @@ def feedback_type_is_runnable(feedback_type: str) -> bool:
 
 def feedback_type_is_agent_monitor(feedback_type: str) -> bool:
     return feedback_type == AGENT_MONITOR_FEEDBACK_TYPE
+
+
+def feedback_type_is_agent_user_feedback(feedback_type: str) -> bool:
+    return feedback_type == AGENT_USER_FEEDBACK_TYPE
 
 
 def runnable_feedback_selector(name: str) -> str:

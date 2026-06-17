@@ -2,8 +2,10 @@ import pytest
 from pydantic import Field
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_object_mutation_saving(weave_active):
     class Thing(weave.Object):
         a: str
@@ -29,6 +31,7 @@ def test_object_mutation_saving(weave_active):
     assert thing3.c == 4.2
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_list_mutation_saving(weave_active):
     lst = [1, 2, 3]
     ref = weave.publish(lst)
@@ -46,6 +49,7 @@ def test_list_mutation_saving(weave_active):
     assert lst3 == [100, 2, 3, 4, 5, 6]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dict_mutation_saving(weave_active):
     # TODO: Today we assume all the keys must be str?
     d = {"a": 1, "b": 2}
@@ -62,6 +66,7 @@ def test_dict_mutation_saving(weave_active):
     assert d3 == {"a": 1, "b": "new_value", "new_key": 3}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_object_mutation_saving_nested(weave_active):
     class A(weave.Object):
         b: int = 1
@@ -89,6 +94,7 @@ def test_object_mutation_saving_nested(weave_active):
     assert d3.c.a.b == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_list_mutation_saving_nested(weave_active):
     lst = [1, 2, 3]
     ref = weave.publish(lst)
@@ -109,6 +115,7 @@ def test_list_mutation_saving_nested(weave_active):
     assert lst5 == [1, 2, 3, [4, 5, 6]]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dict_mutation_saving_nested(weave_active):
     d = {"a": 1, "b": 2}
     ref = weave.publish(d)
@@ -133,6 +140,7 @@ def test_dict_mutation_saving_nested(weave_active):
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_object_mutation_saving_nested_lists_and_dicts(weave_active):
     class A(weave.Object):
         b: int
@@ -185,6 +193,7 @@ def test_object_mutation_saving_nested_lists_and_dicts(weave_active):
     assert g3.b.f == {"d": {"e": "f"}}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_list_mutation_saving_nested_objects(weave_active):
     class A(weave.Object):
         b: int
@@ -203,6 +212,7 @@ def test_list_mutation_saving_nested_objects(weave_active):
     assert lst3[2].b == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_list_mutation_saving_nested_dicts(weave_active):
     lst = [{"a": {"b": 1}}, {"a": {"b": 2}}]
     ref = weave.publish(lst)
@@ -218,6 +228,7 @@ def test_list_mutation_saving_nested_dicts(weave_active):
     assert lst3[2]["a"]["b"] == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dict_mutation_saving_nested_objects(weave_active):
     class A(weave.Object):
         b: int
@@ -235,6 +246,7 @@ def test_dict_mutation_saving_nested_objects(weave_active):
     assert d3["c"].b == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dict_mutation_saving_nested_lists(weave_active):
     d = {"a": [1, 2], "b": [3, 4]}
     ref = weave.publish(d)
@@ -249,6 +261,7 @@ def test_dict_mutation_saving_nested_lists(weave_active):
     assert d3["c"] == [5, 6]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_mutation_saving_append_rows(weave_active):
     t = weave.Table(rows=[{"a": 1, "b": 2}])
     t.append({"a": 3, "b": 4})
@@ -270,6 +283,7 @@ def test_table_mutation_saving_append_rows(weave_active):
     ]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_mutation_saving_pop_rows(weave_active):
     t = weave.Table(
         rows=[
@@ -293,6 +307,7 @@ def test_table_mutation_saving_pop_rows(weave_active):
     assert t3.rows == [{"a": 5, "b": 6}]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_mutation_saving_replace_rows(weave_active):
     t = weave.Table(
         rows=[
@@ -310,6 +325,7 @@ def test_table_mutation_saving_replace_rows(weave_active):
     assert t3.rows == [{"a": 5, "b": 6}]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_cant_append_bad_data(weave_active):
     t = weave.Table(rows=[{"a": 1, "b": 2}])
     with pytest.raises(TypeError):
@@ -325,6 +341,7 @@ def test_table_cant_append_bad_data(weave_active):
         t2.append([1, 2, 3])
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_cant_set_bad_data(weave_active):
     t = weave.Table(rows=[{"a": 1, "b": 2}])
     with pytest.raises(ValueError, match="must be (a list of )?dicts"):

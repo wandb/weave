@@ -3,17 +3,14 @@ import uuid
 
 import pytest
 
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_cost_apis(client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     project_id = client.project_id
 
     costs = {
@@ -142,11 +139,8 @@ def test_cost_apis(client):
     assert len(res) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_purge_only_ids(client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     project_id = client.project_id
     costs = {
         "my_model_to_delete": {
@@ -200,14 +194,12 @@ def test_purge_only_ids(client):
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_costs_streamed_with_all_fields(client):
     """Costs returned by calls_query_stream include extra metadata fields
     (provider_id, effective_date, pricing_level, etc.) and must not fail
     Pydantic validation even when some of those fields are absent.
     """
-    if client_is_sqlite(client):
-        return
-
     project_id = client.project_id
 
     # 1. Create cost entry with optional metadata fields populated

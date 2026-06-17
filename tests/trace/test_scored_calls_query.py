@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import weave
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import Scorer
 from weave.trace.op_protocol import Op
 from weave.trace.weave_client import WeaveClient
@@ -185,11 +185,9 @@ async def perform_scorer_tests(
     assert len(calls_high_level) == len(calls_low_level) == count
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_scorer_query_op(client: WeaveClient):
-    if client_is_sqlite(client):
-        return pytest.skip("SQLite does not support querying feedback")
-
     @weave.op
     def fn0(x, output):
         return x == output
@@ -208,11 +206,9 @@ async def test_scorer_query_op(client: WeaveClient):
     await perform_scorer_tests(client, fn0_v0, fn0, fn1)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_scorer_query_obj(client: WeaveClient):
-    if client_is_sqlite(client):
-        return pytest.skip("SQLite does not support querying feedback")
-
     class MyScorer0(weave.Scorer):
         offset: int
 

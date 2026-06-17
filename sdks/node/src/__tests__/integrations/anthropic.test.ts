@@ -260,6 +260,15 @@ describe('Anthropic Integration', () => {
     const calls = await getCalls(inMemoryTraceServer, testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
+    // Integration-tracking metadata is stamped on every patched call. The
+    // whole `integration` block is asserted to document what we track; `version`
+    // is matched loosely because packageVersion is rewritten on every release
+    // (utils/packageVersion.ts), so pinning it would break the test each bump.
+    expect(calls[0].attributes.integration).toEqual({
+      name: 'anthropic',
+      version: expect.any(String),
+      meta: {package_name: '@anthropic-ai/sdk'},
+    });
     expect(calls[0].inputs).toEqual({arg0: options, self: {}});
     expect(calls[0].output).toMatchObject(result);
     expect(calls[0].summary).toEqual({

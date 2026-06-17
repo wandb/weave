@@ -5,11 +5,13 @@ Tests verify that the Dataset V2 API correctly creates, reads, lists, and delete
 
 import pytest
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_create_basic(trace_server):
     """Test creating a basic dataset object."""
     project_id = f"{TEST_ENTITY}/test_dataset_create_basic"
@@ -33,6 +35,7 @@ def test_dataset_create_basic(trace_server):
     assert create_res.version_index == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_create_without_description(trace_server):
     """Test creating a dataset without providing a description."""
     project_id = f"{TEST_ENTITY}/test_dataset_create_no_desc"
@@ -52,6 +55,7 @@ def test_dataset_create_without_description(trace_server):
     assert create_res.version_index == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_read_basic(trace_server):
     """Test reading a specific dataset object."""
     project_id = f"{TEST_ENTITY}/test_dataset_read_basic"
@@ -88,6 +92,7 @@ def test_dataset_read_basic(trace_server):
     assert read_res.rows.startswith("weave:///")
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_read_not_found(trace_server):
     """Test reading a non-existent dataset raises NotFoundError."""
     project_id = f"{TEST_ENTITY}/test_dataset_read_not_found"
@@ -102,6 +107,7 @@ def test_dataset_read_not_found(trace_server):
         trace_server.dataset_read(read_req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_list_basic(trace_server):
     """Test listing all datasets in a project."""
     project_id = f"{TEST_ENTITY}/test_dataset_list_basic"
@@ -132,6 +138,7 @@ def test_dataset_list_basic(trace_server):
         assert ds.created_at is not None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_list_with_limit(trace_server):
     """Test listing datasets with a limit."""
     project_id = f"{TEST_ENTITY}/test_dataset_list_limit"
@@ -153,6 +160,7 @@ def test_dataset_list_with_limit(trace_server):
     assert len(datasets) == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_list_with_offset(trace_server):
     """Test listing datasets with an offset."""
     project_id = f"{TEST_ENTITY}/test_dataset_list_offset"
@@ -174,6 +182,7 @@ def test_dataset_list_with_offset(trace_server):
     assert len(datasets) == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_list_with_limit_and_offset(trace_server):
     """Test listing datasets with both limit and offset for pagination."""
     project_id = f"{TEST_ENTITY}/test_dataset_list_pagination"
@@ -204,6 +213,7 @@ def test_dataset_list_with_limit_and_offset(trace_server):
     assert len(datasets1_names & datasets2_names) == 0  # No overlap
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_list_empty_project(trace_server):
     """Test listing datasets in a project with no datasets."""
     project_id = f"{TEST_ENTITY}/test_dataset_list_empty"
@@ -214,6 +224,7 @@ def test_dataset_list_empty_project(trace_server):
     assert len(datasets) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_delete_single_version(trace_server):
     """Test deleting a single version of a dataset."""
     project_id = f"{TEST_ENTITY}/test_dataset_delete_single"
@@ -247,6 +258,7 @@ def test_dataset_delete_single_version(trace_server):
         trace_server.dataset_read(read_req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_delete_all_versions(trace_server):
     """Test deleting all versions of a dataset (no digests specified)."""
     project_id = f"{TEST_ENTITY}/test_dataset_delete_all"
@@ -274,6 +286,7 @@ def test_dataset_delete_all_versions(trace_server):
     assert delete_res.num_deleted == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_delete_multiple_versions(trace_server):
     """Test deleting multiple specific versions of a dataset."""
     project_id = f"{TEST_ENTITY}/test_dataset_delete_multiple"
@@ -321,6 +334,7 @@ def test_dataset_delete_multiple_versions(trace_server):
         assert read_res.digest == digest
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_delete_not_found(trace_server):
     """Test deleting a non-existent dataset raises NotFoundError."""
     project_id = f"{TEST_ENTITY}/test_dataset_delete_not_found"
@@ -335,6 +349,7 @@ def test_dataset_delete_not_found(trace_server):
         trace_server.dataset_delete(delete_req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_versioning(trace_server):
     """Test that creating multiple versions of a dataset increments version_index."""
     project_id = f"{TEST_ENTITY}/test_dataset_versioning"
@@ -360,6 +375,7 @@ def test_dataset_versioning(trace_server):
     assert len({v.digest for v in versions}) == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_with_special_characters(trace_server):
     """Test creating and reading a dataset with special characters in data."""
     project_id = f"{TEST_ENTITY}/test_dataset_special_chars"
@@ -393,6 +409,7 @@ def test_dataset_with_special_characters(trace_server):
     assert read_res.rows.startswith("weave:///")
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_with_unicode(trace_server):
     """Test creating and reading a dataset with unicode characters."""
     project_id = f"{TEST_ENTITY}/test_dataset_unicode"
@@ -424,6 +441,7 @@ def test_dataset_with_unicode(trace_server):
     assert "🌍" in read_res.description
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_list_after_deletion(trace_server):
     """Test that deleted datasets don't appear in list results."""
     project_id = f"{TEST_ENTITY}/test_dataset_list_after_deletion"
@@ -458,6 +476,7 @@ def test_dataset_list_after_deletion(trace_server):
     assert "delete_me" not in dataset_names_returned
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_empty_rows(trace_server):
     """Test creating a dataset with empty rows."""
     project_id = f"{TEST_ENTITY}/test_dataset_empty_rows"
@@ -486,6 +505,7 @@ def test_dataset_empty_rows(trace_server):
     assert isinstance(read_res.rows, str)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_large_rows(trace_server):
     """Test creating a dataset with many rows."""
     project_id = f"{TEST_ENTITY}/test_dataset_large_rows"

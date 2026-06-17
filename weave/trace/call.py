@@ -419,7 +419,6 @@ def _make_calls_iterator(
         transform_func=transform_func,
         size_func=size_func,
         limit=limit_override,
-        offset=None,  # Set offset to None since we handle it in fetch_func
         page_size=page_size,
     )
 

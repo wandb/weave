@@ -5,6 +5,7 @@ import wave
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.type_handlers.Audio.audio import Audio
 
@@ -15,6 +16,7 @@ TEST_MP3_FILE = os.path.join(TEST_AUDIO_DIR, "audio.mp3")
 
 
 class TestWaveRead:
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_audio_publish(self, client: WeaveClient) -> None:
         client.project = "test_audio_publish"
         audio = wave.open(TEST_WAV_FILE, "rb")
@@ -25,6 +27,7 @@ class TestWaveRead:
         gotten_audio = weave.ref(ref.uri).get()
         assert audio.readframes(10) == gotten_audio.readframes(10)
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_audio_as_dataset_cell(self, client: WeaveClient) -> None:
         client.project = "test_audio_as_dataset_cell"
         audio = wave.open(TEST_WAV_FILE, "rb")
@@ -37,6 +40,7 @@ class TestWaveRead:
         gotten_dataset = weave.ref(ref.uri).get()
         assert audio.readframes(10) == gotten_dataset.rows[0]["audio"].readframes(10)
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_audio_as_call_io(self, client: WeaveClient) -> None:
         @weave.op
         def audio_as_input_and_output_part(in_audio: wave.Wave_read) -> dict:
@@ -61,6 +65,7 @@ class TestWaveRead:
 
 
 class TestWeaveAudio:
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.parametrize("audio_file", [TEST_MP3_FILE, TEST_WAV_FILE])
     def test_publish_audio_from_path(
         self, client: WeaveClient, audio_file: str
@@ -75,6 +80,7 @@ class TestWeaveAudio:
         # Ensure at least the first 10 bytes are the same
         assert open(audio_file, "rb").read(10) == gotten_audio.data[:10]
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.parametrize(
         "audio_file_and_format", [(TEST_MP3_FILE, "mp3"), (TEST_WAV_FILE, "wav")]
     )
@@ -96,6 +102,7 @@ class TestWeaveAudio:
         # Ensure at least the first 10 bytes are the same
         assert open(audio_file, "rb").read(10) == gotten_audio.data[:10]
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.parametrize(
         "audio_file_and_format", [(TEST_MP3_FILE, "mp3"), (TEST_WAV_FILE, "wav")]
     )
@@ -125,6 +132,7 @@ class TestWeaveAudio:
         with pytest.raises(ValueError, match="data"):
             Audio.from_data(data=b"", format="mp3")
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.parametrize("audio_file", [TEST_MP3_FILE, TEST_WAV_FILE])
     def test_audio_as_dataset_cell(self, client: WeaveClient, audio_file: str) -> None:
         client.project = "test_audio_as_dataset_cell"
@@ -140,6 +148,7 @@ class TestWeaveAudio:
         gotten_dataset = ref.get()
         assert audio.data[:10] == gotten_dataset.rows[0]["audio"].data[:10]
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.parametrize("audio_file", [TEST_MP3_FILE, TEST_WAV_FILE])
     def test_audio_as_call_io(self, client: WeaveClient, audio_file: str) -> None:
         client.project = "test_audio_as_call_io"

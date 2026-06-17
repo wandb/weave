@@ -8,10 +8,15 @@ from typing import Any
 from pydantic import AnyUrl
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 _fastmcp_client_patcher: MultiPatcher | None = None
+FASTMCP_INTEGRATION = library_integration("fastmcp")
 
 
 def fastmcp_client_wrapper(settings: OpSettings) -> Callable:
@@ -131,7 +136,7 @@ def get_fastmcp_client_patcher(
     if _fastmcp_client_patcher is not None:
         return _fastmcp_client_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, FASTMCP_INTEGRATION)
 
     # Settings for core client methods
     call_tool_settings = base.model_copy(

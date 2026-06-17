@@ -20,7 +20,6 @@ def patch_cohere() -> Generator[None, None, None]:
     patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -46,6 +45,11 @@ def test_cohere(
     assert call.exception is None
     assert call.ended_at is not None
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "cohere"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "cohere"
     assert op_name_from_ref(call.op_name) == "cohere.Client.chat"
     output = call.output
     assert output.text == exp
@@ -73,7 +77,6 @@ def test_cohere(
     assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -132,7 +135,6 @@ def test_cohere_stream(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -186,7 +188,6 @@ async def test_cohere_async(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -243,7 +244,6 @@ async def test_cohere_async_stream(
     assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -290,7 +290,6 @@ def test_cohere_v2(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -336,7 +335,6 @@ async def test_cohere_async_v2(
     assert output.usage.tokens.output_tokens == response.usage.tokens.output_tokens
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -386,7 +384,6 @@ def test_cohere_stream_v2(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )

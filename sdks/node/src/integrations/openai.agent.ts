@@ -13,11 +13,12 @@
 
 import type OpenAIAgents from '@openai/agents';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {globalSingleton} from '../utils/globalSingleton';
-import type {TracingProcessor} from './openai.agent.types';
-import {shouldUseOtelV2} from '../settings';
+import type {SpanData, TracingProcessor} from '@openai/agents';
+import {getGlobalClient} from '../clientApi';
+import {defaultSettings} from '../settings';
 import {WeaveOtelTracingProcessor} from './openai-agents/weave-otel-tracing-processor';
 import {WeaveTracingProcessor} from './openai-agents/weave-tracing-processor';
+import state from '../state';
 
 // ============================================================================
 // Agent Context Provider
@@ -45,22 +46,18 @@ import {WeaveTracingProcessor} from './openai-agents/weave-tracing-processor';
 // and the functions come from the CJS instance.
 // ============================================================================
 
-/** Internal store — shared across module boundaries via globalThis. */
-const _agentContextProvider = globalSingleton<{
-  getCurrentTrace?: () => OpenAIAgents.Trace | null;
-  getCurrentSpan?: () => OpenAIAgents.Span<any> | null;
-}>('_weave_agent_context_provider', () => ({}));
-
 /**
  * Register the OpenAI Agents context functions.
  * Called during instrumentation when @openai/agents is loaded (via CJS or ESM hook).
  */
 function registerAgentContextProvider(agentExports: typeof OpenAIAgents): void {
   if (typeof agentExports.getCurrentTrace === 'function') {
-    _agentContextProvider.getCurrentTrace = agentExports.getCurrentTrace;
+    state.integrations.openaiAgents.contextProvider.getCurrentTrace =
+      agentExports.getCurrentTrace;
   }
   if (typeof agentExports.getCurrentSpan === 'function') {
-    _agentContextProvider.getCurrentSpan = agentExports.getCurrentSpan;
+    state.integrations.openaiAgents.contextProvider.getCurrentSpan =
+      agentExports.getCurrentSpan;
   }
 }
 
@@ -69,7 +66,9 @@ function registerAgentContextProvider(agentExports: typeof OpenAIAgents): void {
  * Returns null when not inside an agent run or when @openai/agents is not instrumented.
  */
 export function getCurrentTrace(): OpenAIAgents.Trace | null {
-  return _agentContextProvider.getCurrentTrace?.() ?? null;
+  return (
+    state.integrations.openaiAgents.contextProvider.getCurrentTrace?.() ?? null
+  );
 }
 
 /**
@@ -77,7 +76,9 @@ export function getCurrentTrace(): OpenAIAgents.Trace | null {
  * Returns null when not inside an agent run or when @openai/agents is not instrumented.
  */
 export function getCurrentSpan(): OpenAIAgents.Span<any> | null {
-  return _agentContextProvider.getCurrentSpan?.() ?? null;
+  return (
+    state.integrations.openaiAgents.contextProvider.getCurrentSpan?.() ?? null
+  );
 }
 
 // ============================================================================
@@ -99,7 +100,8 @@ export function getCurrentSpan(): OpenAIAgents.Span<any> | null {
  * ```
  */
 export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
-  if (shouldUseOtelV2()) {
+  const settings = getGlobalClient()?.settings ?? defaultSettings();
+  if (settings.useOTelV2) {
     return new WeaveOtelTracingProcessor();
   }
 
@@ -167,7 +169,7 @@ export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
 export async function instrumentOpenAIAgents(): Promise<boolean> {
   try {
     // Use dynamic import() which works in both CommonJS and ESM
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
     // @ts-ignore - Dynamic import of optional peer dependency
     const agents = await import('@openai/agents');
     return await instrumentOpenAIAgentsCommon(agents);
@@ -182,26 +184,18 @@ export async function instrumentOpenAIAgents(): Promise<boolean> {
   }
 }
 
-// Shared across CJS/ESM module copies via globalThis so both resolve the
-// "already instrumented" decision identically. Without this, each copy would
-// track its own flag and double-instrument the SDK.
-export const agentsInstrumentedHolder = globalSingleton<{value: boolean}>(
-  '_weave_agents_instrumented',
-  () => ({value: false})
-);
-
 function instrumentOpenAIAgentsCommon(agentExports: any): boolean {
   // Always capture context functions when available — even if already instrumented,
   // because a later module load may provide fresh references after a processor reset.
   registerAgentContextProvider(agentExports);
 
-  if (agentsInstrumentedHolder.value) {
+  if (state.integrations.openaiAgents.instrumented) {
     return true;
   }
   if (typeof agentExports.addTraceProcessor === 'function') {
     const processor = createOpenAIAgentsTracingProcessor();
     agentExports.addTraceProcessor(processor);
-    agentsInstrumentedHolder.value = true;
+    state.integrations.openaiAgents.instrumented = true;
     return true;
   } else {
     console.warn(

@@ -577,12 +577,15 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self, target_db: str, target_version: int, is_start: bool = True
     ) -> None:
         """Update the migration status in management database migrations table."""
+        # mutations_sync=2 makes the status write durable on every replica before we
+        # return; the async default can leave a finished migration marked partial (WB-35755).
+        sync = {"mutations_sync": 2}
         if is_start:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
-            self._run_ddl_with_retry(command)
+            self._run_ddl_with_retry(command, settings=sync)
         else:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
-            self._run_ddl_with_retry(command)
+            self._run_ddl_with_retry(command, settings=sync)
 
     @staticmethod
     def _is_safe_identifier(value: str) -> bool:
@@ -595,7 +598,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
         retry=retry_if_exception(_is_transient_ch_error),
         reraise=True,
     )
-    def _run_ddl_with_retry(self, command: str) -> None:
+    def _run_ddl_with_retry(
+        self, command: str, settings: dict[str, int | str] | None = None
+    ) -> None:
         """Execute a DDL command with retry for transient replication errors.
 
         Retries with exponential backoff for known-transient codes:
@@ -603,7 +608,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         and 999 (KEEPER_EXCEPTION) when ON CLUSTER DDL hits a transient Keeper
         coordination error.
         """
-        self.ch_client.command(command)
+        self.ch_client.command(command, settings=settings)
 
 
 class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):
@@ -1069,12 +1074,16 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 )
                 return
 
-            # Skip INSERT commands (backfill not supported in distributed mode)
+            # Run INSERT ... VALUES seeds (the Distributed engine fans rows to
+            # shards); skip INSERT ... SELECT backfills, which need per-shard handling.
             if SQLPatterns.INSERT_STMT.search(command_for_match):
-                logger.warning(
-                    "Skipping INSERT command (not supported in distributed mode): %s...",
-                    command[:_COMMAND_PREVIEW_LENGTH],
-                )
+                if SQLPatterns.INSERT_SELECT_STMT.search(command_for_match):
+                    logger.warning(
+                        "Skipping INSERT ... SELECT backfill (not supported in distributed mode): %s...",
+                        command[:_COMMAND_PREVIEW_LENGTH],
+                    )
+                    return
+                self._run_distributed_insert(command)
                 return
 
             # Handle RENAME TABLE (local rename + drop/recreate distributed table)
@@ -1284,6 +1293,10 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             local_command, target_db=self.ch_client.database
         )
         self._run_ddl_with_retry(local_command)
+
+    def _run_distributed_insert(self, command: str) -> None:
+        """Run an INSERT ... VALUES seed against the distributed table synchronously."""
+        self.ch_client.command(command, settings={"distributed_foreground_insert": 1})
 
     def _execute_distributed_rename(self, command: str) -> None:
         """Handle RENAME TABLE in distributed mode.
@@ -1629,6 +1642,9 @@ class SQLPatterns:
     MODIFY_QUERY: Pattern = re.compile(r"\bMODIFY\s+QUERY\b", re.IGNORECASE)
     MATERIALIZE: Pattern = re.compile(r"\bMATERIALIZE\b", re.IGNORECASE)
     INSERT_STMT: Pattern = re.compile(r"\bINSERT\s+INTO\b", re.IGNORECASE)
+    INSERT_SELECT_STMT: Pattern = re.compile(
+        r"\bINSERT\s+INTO\b.*\bSELECT\b", re.IGNORECASE | re.DOTALL
+    )
     LOCAL_ONLY_OPS: Pattern = re.compile(
         r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b|\b(MODIFY|REMOVE)\s+TTL\b",
         re.IGNORECASE,

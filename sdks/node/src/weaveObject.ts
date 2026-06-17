@@ -3,8 +3,6 @@ import {isOp} from './op';
 import {getGlobalDomain} from './urls';
 import {parseWeaveUri} from './uriParser';
 
-export interface Callable {}
-
 export interface WeaveObjectParameters {
   name?: string;
   description?: string;

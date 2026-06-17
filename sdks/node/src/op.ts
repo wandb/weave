@@ -1,7 +1,7 @@
-import {Call, InternalCall} from './call';
+import {type Call, InternalCall} from './call';
 import {getGlobalClient} from './clientApi';
 import {TRACE_CALL_EMOJI} from './constants';
-import {Op, OpOptions, OpRef, CallMethod} from './opType';
+import {type Op, type OpOptions, type OpRef, type CallMethod} from './opType';
 import {getGlobalDomain} from './urls';
 import {warnOnce} from './utils/warnOnce';
 
@@ -136,7 +136,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
 
     const {currentCall, parentCall, newStack} = client.pushNewCall();
     const startTime = new Date();
-    if (client.settings.shouldPrintCallLink && parentCall == null) {
+    if (client.settings.printCallLink && parentCall == null) {
       const domain = getGlobalDomain();
       console.log(
         `${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`
@@ -148,15 +148,14 @@ function createOpWrapper<T extends (...args: any[]) => any>(
 
     const opRefForCall: Op<any> | OpRef = opWrapper as Op<any>;
 
-    // Build attributes from opKind and opColor options
-    const attributes: Record<string, any> = {};
-    if (options?.opKind || options?.opColor) {
-      if (options.opKind) {
-        attributes.kind = options.opKind;
-      }
-      if (options.opColor) {
-        attributes.color = options.opColor;
-      }
+    // Build attributes: op-level defaults (e.g. integration provenance) first,
+    // then kind/color which take precedence on collision.
+    const attributes: Record<string, any> = {...(options?.attributes ?? {})};
+    if (options?.opKind) {
+      attributes.kind = options.opKind;
+    }
+    if (options?.opColor) {
+      attributes.color = options.opColor;
     }
 
     const startCallPromise = client.createCall(

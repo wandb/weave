@@ -156,6 +156,14 @@ class NotFoundError(Error):
     pass
 
 
+class RefObjectsNotFoundError(NotFoundError):
+    """Raised when reference objects are not found."""
+
+    def __init__(self, message: str, missing_object_digests: list[str]):
+        self.missing_object_digests = missing_object_digests
+        super().__init__(message)
+
+
 class MissingLLMApiKeyError(Error):
     """Raised when a LLM API key is missing for completion."""
 
@@ -319,6 +327,13 @@ class ErrorRegistry:
 
         # 404
         self.register(NotFoundError, 404)
+        # Exact-type registration (the registry matches by exact type), so the
+        # missing-digest field is surfaced in the response body.
+        self.register(
+            RefObjectsNotFoundError,
+            404,
+            _format_ref_objects_not_found_error,
+        )
         self.register(ProjectNotFound, 404)
         self.register(RunNotFound, 404)
         self.register(ObjectDeletedError, 404, _format_object_deleted_error)
@@ -491,6 +506,14 @@ def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
     extra = {}
     if isinstance(exc, ObjectDeletedError):
         extra["deleted_at"] = exc.deleted_at.isoformat()
+    return _format_error_to_json_with_extra(exc, extra)
+
+
+def _format_ref_objects_not_found_error(exc: Exception) -> dict[str, Any]:
+    """Format RefObjectsNotFoundError with the missing object digests."""
+    extra = {}
+    if isinstance(exc, RefObjectsNotFoundError):
+        extra["missing_object_digests"] = exc.missing_object_digests
     return _format_error_to_json_with_extra(exc, extra)
 
 

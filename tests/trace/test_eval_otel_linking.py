@@ -7,6 +7,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import Evaluation
 from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
 from weave.trace_server import constants
@@ -43,6 +44,7 @@ def _emit_genai_span(model: str = "gpt-4o") -> None:
     span.end()
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_genai_span_ref_attached_to_eval_call(client, otel_setup):
     """A GenAI OTel span emitted during a prediction should produce a
@@ -90,6 +92,7 @@ async def test_genai_span_ref_attached_to_eval_call(client, otel_setup):
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_multiple_genai_span_refs_attached_to_eval_call(client, otel_setup):
     """All GenAI OTel spans emitted during a prediction should be linked."""
@@ -158,6 +161,7 @@ async def test_eval_metadata_injected_onto_spans(client, otel_setup):
     assert constants.EVAL_PROJECT_ID_SPAN_ATTR in span_attrs
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_non_genai_span_gets_eval_metadata_but_no_span_ref(client, otel_setup):
     """Non-GenAI spans during eval get eval metadata (on_start) but no

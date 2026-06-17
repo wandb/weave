@@ -204,7 +204,10 @@ def test_apply_migrations_with_target_version(
     # Verify the actual SQL commands were executed
     assert migrator.ch_client.command.call_count == 2
     migrator.ch_client.command.assert_has_calls(
-        [call("CREATE TABLE test1 (id Int32)"), call("CREATE TABLE test2 (id Int32)")]
+        [
+            call("CREATE TABLE test1 (id Int32)", settings=None),
+            call("CREATE TABLE test2 (id Int32)", settings=None),
+        ]
     )
 
 
@@ -460,14 +463,16 @@ def test_execute_migration_command(migrator):
     assert (
         migrator.ch_client.database == "original_db"
     )  # Should restore original database
-    migrator.ch_client.command.assert_called_once_with("CREATE TABLE test (id Int32)")
+    migrator.ch_client.command.assert_called_once_with(
+        "CREATE TABLE test (id Int32)", settings=None
+    )
 
 
 def test_migration_non_replicated(migrator):
     # Test that non-replicated mode doesn't transform the SQL
     orig = "CREATE TABLE test (id String, project_id String) ENGINE = MergeTree ORDER BY (project_id, id);"
     migrator._execute_migration_command("test_db", orig)
-    migrator.ch_client.command.assert_called_once_with(orig)
+    migrator.ch_client.command.assert_called_once_with(orig, settings=None)
 
 
 def test_update_migration_status(migrator):
@@ -480,13 +485,15 @@ def test_update_migration_status(migrator):
     # Test start of migration
     migrator._update_migration_status("test_db", 2, is_start=True)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'"
+        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'",
+        settings={"mutations_sync": 2},
     )
 
     # Test end of migration
     migrator._update_migration_status("test_db", 2, is_start=False)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'"
+        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'",
+        settings={"mutations_sync": 2},
     )
 
 
@@ -1351,13 +1358,18 @@ def test_skip_materialize_command_distributed(distributed_migrator):
     assert distributed_migrator.ch_client.database == "original_db"
 
 
-def test_skip_insert_command_distributed(distributed_migrator):
-    """Test that INSERT INTO commands are skipped in distributed mode."""
-    insert_command = "INSERT INTO calls_complete_new SELECT * FROM calls_complete"
-
-    distributed_migrator._execute_migration_command("test_db", insert_command)
-
+def test_insert_command_distributed(distributed_migrator):
+    """INSERT ... SELECT backfills are skipped; INSERT ... VALUES seeds run synchronously."""
+    backfill = "INSERT INTO calls_complete_new SELECT * FROM calls_complete"
+    distributed_migrator._execute_migration_command("test_db", backfill)
     assert distributed_migrator.ch_client.command.call_count == 0
+
+    seed = "INSERT INTO llm_token_prices (id, llm_id) VALUES ('a', 'gpt-4')"
+    distributed_migrator._execute_migration_command("test_db", seed)
+    assert distributed_migrator.ch_client.command.call_count == 1
+    args, kwargs = distributed_migrator.ch_client.command.call_args
+    assert args[0] == seed
+    assert kwargs == {"settings": {"distributed_foreground_insert": 1}}
     assert distributed_migrator.ch_client.database == "original_db"
 
 

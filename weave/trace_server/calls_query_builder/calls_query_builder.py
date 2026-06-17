@@ -27,7 +27,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import Callable, KeysView, Sequence
+from collections.abc import Callable, Collection, KeysView, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
@@ -73,6 +73,7 @@ from weave.trace_server.interface.query import (
 )
 from weave.trace_server.orm import (
     ParamBuilder,
+    _format_table_name_with_cluster,
     clickhouse_cast,
     combine_conditions,
     maybe_convert_datetime_operands,
@@ -920,7 +921,7 @@ class CallsQuery(BaseModel):
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
         if field in DISALLOWED_FILTERING_FIELDS:
-            raise ValueError(f"Field {field} is not allowed in ORDER BY")
+            raise InvalidFieldError(_disallowed_filter_message(field))
         direction = direction.upper()
         if direction not in {"ASC", "DESC"}:
             raise ValueError(f"Direction {direction} is not allowed")
@@ -1506,7 +1507,7 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT
                     id,
-                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
+                    sum({config.storage_size_bytes_sum}) AS storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY id
@@ -1514,7 +1515,11 @@ class CallsQuery(BaseModel):
             ON {table_alias}.id = {STORAGE_SIZE_TABLE_NAME}.id
             """
 
-        # Total storage size join
+        # Total storage size join. This (filtered/GROUP BY) path attributes
+        # storage only to non-deleted rows, so it EXCLUDES soft-deleted traces'
+        # bytes. The unfiltered fast path (_optimized_unfiltered_storage_query)
+        # deliberately INCLUDES them (bytes still on disk until TTL/GC). Keep that
+        # divergence in mind if you touch either side.
         total_storage_size_join = ""
         if self.include_total_storage_size:
             # When we have a filtered set of call IDs, restrict the trace_ids
@@ -1533,7 +1538,7 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT
                     trace_id,
-                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+                    sum({config.storage_size_bytes_sum}) AS total_storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 {trace_id_filter}
@@ -1907,6 +1912,16 @@ ALLOWED_CALL_FIELDS = {
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
+# Dotted prefixes routed to special handlers in `get_field_by_name`.
+ALLOWED_DYNAMIC_FIELD_PREFIXES = (
+    "feedback.*",
+    "annotation_queue_items.*",
+    "summary.weave.*",
+)
+
+# Resolvable but internal; not advertised in `field not allowed` messages.
+_HIDDEN_MESSAGE_FIELDS = {"project_id", "deleted_at", "expire_at"}
+
 # Fields that are stored as DateTime64 columns in ClickHouse. When comparing
 # these fields with numeric unix timestamps, the value must be converted to a
 # datetime string so ClickHouse can properly use primary key / ORDER BY indexes.
@@ -1939,8 +1954,35 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
                 return field
-            raise InvalidFieldError(f"Field {name} is not allowed")
+            raise InvalidFieldError(_invalid_field_message(name))
     return ALLOWED_CALL_FIELDS[name]
+
+
+def _invalid_field_message(name: str) -> str:
+    """`field not allowed` message for an unrecognized field."""
+    return f"Field {name} is not allowed. {_allowed_fields_clause()}"
+
+
+def _disallowed_filter_message(name: str) -> str:
+    """`field not filterable/sortable` message for a recognized-but-blocked field."""
+    return (
+        f"Field {name} cannot be used for filtering or sorting. "
+        f"{_allowed_fields_clause(exclude=DISALLOWED_FILTERING_FIELDS)}"
+    )
+
+
+def _allowed_fields_clause(exclude: Collection[str] = ()) -> str:
+    """Render the advertised `Allowed fields` + `Allowed dynamic prefixes` lists."""
+    hidden = _HIDDEN_MESSAGE_FIELDS.union(exclude)
+    names = [name for name in ALLOWED_CALL_FIELDS if name not in hidden]
+    dotted_prefixes = tuple(
+        f"{name.removesuffix('_dump')}.*"
+        for name in names
+        if isinstance(ALLOWED_CALL_FIELDS[name], CallsMergedDynamicField)
+    )
+    allowed = ", ".join(sorted(name.removesuffix("_dump") for name in names))
+    prefixes = ", ".join(sorted(ALLOWED_DYNAMIC_FIELD_PREFIXES + dotted_prefixes))
+    return f"Allowed fields: {allowed}. Allowed dynamic prefixes: {prefixes}."
 
 
 def _field_as_sql_maybe_agg(
@@ -2162,7 +2204,7 @@ def process_query_to_conditions(
             if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
                 return None
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+                raise InvalidFieldError(_disallowed_filter_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
             if isinstance(structured_field, CallsMergedDynamicField):
@@ -2308,12 +2350,12 @@ def process_query_to_conditions(
     def process_operand(operand: "tsi_query.Operand") -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
             return param_slot(
-                param_builder.add_param(operand.literal_),  # type: ignore
+                param_builder.add_param(operand.literal_),
                 python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+                raise InvalidFieldError(_disallowed_filter_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
 
@@ -2888,6 +2930,14 @@ def build_calls_stats_query(
         aggregated_columns["total_storage_size_bytes"] = (
             "sum(coalesce(total_storage_size_bytes, 0))"
         )
+        # Pattern 5: unfiltered count + total storage. Replaces the stats-table
+        # rollup JOIN (and calls_merged's per-id GROUP BY, which OOMs on large
+        # projects) with two single-table scans.
+        if _is_unfiltered_storage_stats_req(req):
+            opt_query = _optimized_unfiltered_storage_query(
+                req.project_id, read_table, param_builder
+            )
+            return (opt_query, aggregated_columns.keys(), settings)
 
     # For calls_complete, use a flat query (10x+ faster, avoids subquery materialization):
     #   Fast:  SELECT count() FROM calls_complete WHERE ...
@@ -3127,34 +3177,90 @@ def _optimized_wb_run_id_not_null_query(
     """
 
 
+def _unfiltered_calls_merged_count_expr(table_name: str) -> str:
+    """Distinct non-deleted started-id count over calls_merged via inclusion-exclusion.
+
+    count(started not deleted) = count(started or deleted) - count(deleted).
+    op_name is start-only and deleted_at is delete-row-only (never on the same
+    row), so this matches the GROUP BY path's `op_name IS NOT NULL AND
+    deleted_at IS NULL` HAVING -- dropping orphaned call-ends -- in one scan.
+    """
+    started = f"isNotNull({table_name}.op_name)"  # op_name is start-only
+    deleted = f"isNotNull({table_name}.deleted_at)"
+    return (
+        f"uniqExactIf({table_name}.id, {started} OR {deleted}) "
+        f"- uniqExactIf({table_name}.id, {deleted})"
+    )
+
+
 def _optimized_unfiltered_calls_merged_count_query(
     project_id: str,
     limit: int | None,
     param_builder: ParamBuilder,
 ) -> str:
-    """Flat distinct-id count for unfiltered calls_merged stats.
-
-    Counts distinct non-deleted started ids in one scan via inclusion-exclusion:
-    count(started not deleted) = count(started or deleted) - count(deleted).
-    op_name is start-only and deleted_at is delete-row-only (never on the same
-    row), so this matches the GROUP BY path's `op_name IS NOT NULL AND
-    deleted_at IS NULL` HAVING -- dropping orphaned call-ends -- without the
-    second scan an anti-set needs.
-    """
+    """Flat distinct-id count for unfiltered calls_merged stats."""
     table_name = get_calls_table_name(ReadTable.CALLS_MERGED)
     project_id_slot = param_slot(param_builder.add_param(project_id), "String")
-    started = f"isNotNull({table_name}.op_name)"  # op_name is start-only
-    deleted = f"isNotNull({table_name}.deleted_at)"
-    raw_count_expr = (
-        f"uniqExactIf({table_name}.id, {started} OR {deleted}) "
-        f"- uniqExactIf({table_name}.id, {deleted})"
-    )
     inner = (
-        f"SELECT {raw_count_expr} AS raw_count "
+        f"SELECT {_unfiltered_calls_merged_count_expr(table_name)} AS raw_count "
         f"FROM {table_name} "
         f"WHERE {table_name}.project_id = {project_id_slot}"
     )
     return _wrap_raw_count_with_limit(inner, limit)
+
+
+def _optimized_unfiltered_storage_query(
+    project_id: str,
+    read_table: ReadTable,
+    param_builder: ParamBuilder,
+) -> str:
+    """Count + total storage for an unfiltered stats request, without the rollup JOIN.
+
+    Replaces the stats-table rollup JOIN (and, for calls_merged, the per-id
+    GROUP BY that OOMs large projects) with two single-table scans: a
+    non-deleted count over the calls table plus a flat size sum over the stats
+    table. The flat sum includes soft-deleted traces' bytes (still on disk until
+    TTL/GC); the JOIN path (used whenever a filter is present) drops them and
+    under-reports consumed storage. Count is unchanged (still excludes deleted).
+    """
+    config = TableConfig.from_read_table(read_table)
+    table_name = config.table_name
+    project_id_slot = param_slot(param_builder.add_param(project_id), "String")
+
+    # project_id in PREWHERE mirrors the filtered/JOIN path's read shape.
+    if read_table == ReadTable.CALLS_MERGED:
+        # Concurrent start/end/delete rows per id -> inclusion-exclusion count.
+        count_expr = _unfiltered_calls_merged_count_expr(table_name)
+        where_clause = f"PREWHERE {table_name}.project_id = {project_id_slot}"
+    elif read_table == ReadTable.CALLS_COMPLETE:
+        # One row per call: count non-deleted rows directly.
+        not_deleted = get_field_by_name("deleted_at").null_check_sql(
+            param_builder, table_name, read_table, use_agg_fn=False
+        )
+        count_expr = "count()"
+        where_clause = (
+            f"PREWHERE {table_name}.project_id = {project_id_slot}\n"
+            f"    WHERE {not_deleted}"
+        )
+    else:
+        raise ValueError(f"Invalid read table: {read_table}")
+
+    # SELECT column order/names must match build_calls_stats_query's
+    # aggregated_columns; the stats SQL snapshot test guards against drift.
+    raw_sql = f"""
+    SELECT
+        {count_expr} AS count,
+        toUInt8(0) AS has_more,
+        coalesce(
+            (SELECT sum({config.storage_size_bytes_sum})
+             FROM {config.stats_table_name}
+             WHERE project_id = {project_id_slot}),
+            0
+        ) AS total_storage_size_bytes
+    FROM {table_name}
+    {where_clause}
+    """
+    return safely_format_sql(raw_sql, logger)
 
 
 def _optimized_time_filtered_calls_merged_count_query(
@@ -3250,6 +3356,21 @@ def _is_unfiltered_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
         (req.limit is None or req.limit > 1)
         and req.query is None
         and not req.include_total_storage_size
+        and not req.expand_columns
+        and _is_minimal_filter(req.filter)
+    )
+
+
+def _is_unfiltered_storage_stats_req(req: tsi.CallsQueryStatsReq) -> bool:
+    """True iff the request is a pure project-scope count + total storage size.
+
+    Gates Pattern 5: same shape as `_is_unfiltered_stats_req` but with storage
+    requested and no limit (the project-usage overview never paginates storage).
+    """
+    return bool(
+        req.limit is None
+        and req.query is None
+        and req.include_total_storage_size
         and not req.expand_columns
         and _is_minimal_filter(req.filter)
     )
@@ -3364,21 +3485,6 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.thread_ids is None
         and filter.turn_ids is None
     )
-
-
-def _format_table_name_with_cluster(
-    table_name: str,
-    cluster_name: str | None,
-) -> str:
-    """Format a table name with ON CLUSTER clause if cluster_name is provided.
-
-    Callers are responsible for passing the correct table name (e.g.
-    calls_complete_local in distributed mode). This function only appends the
-    ON CLUSTER clause.
-    """
-    if cluster_name:
-        return f"{table_name} ON CLUSTER {cluster_name}"
-    return table_name
 
 
 def build_calls_complete_update_end_query(

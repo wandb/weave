@@ -6,10 +6,15 @@ from collections.abc import Callable
 from typing import Any
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 _fastmcp_server_patcher: MultiPatcher | None = None
+FASTMCP_INTEGRATION = library_integration("fastmcp")
 
 
 def fastmcp_server_wrapper(settings: OpSettings) -> Callable:
@@ -73,7 +78,7 @@ def get_fastmcp_server_patcher(
     if _fastmcp_server_patcher is not None:
         return _fastmcp_server_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, FASTMCP_INTEGRATION)
 
     # Settings for core methods
     call_tool_settings = base.model_copy(
