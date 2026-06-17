@@ -23,6 +23,7 @@ export {
   instrumentOpenAIAgents,
   patchRealtimeSession,
   createOtelExtension,
+  createOpenCodePlugin,
 } from './integrations';
 export {
   endLLM,
