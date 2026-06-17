@@ -24,3 +24,6 @@ After the origin/master rebase and push, the user noticed that unrelated LLM-jud
 
 ## Stack Correction Context
 The user pointed out that call-lifecycle test changes should not be in the root call-writes PR because that PR does not own the call lifecycle test enablement. This rewrite removes `tests/trace_server/test_call_lifecycle.py` from `andrew/fake-ts-02-call-writes` and moves `test_call_end_v2_requires_existing_start` plus its `NotFoundError` import into `andrew/fake-ts-calls-read`, the same branch that already ungates `test_call_update_out_of_order`. Future agents should verify per-PR diffs against each Graphite parent, not just the final stack diff.
+
+## PR Description / Lint Follow-up Context
+The user asked to update PR descriptions to match the corrected test ownership. While doing that, `nox --no-install -e lint` exposed that `weave/trace_server/in_memory_trace_server.py` used `NotFoundError` without importing it after the previous stack rewrite. The missing import was amended into `andrew/fake-ts-02-call-writes`, and descendants were restacked. This preserves the corrected PR boundary: the root PR owns the implementation import and write behavior, while call lifecycle test coverage remains in `andrew/fake-ts-calls-read`.
