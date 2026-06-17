@@ -36,3 +36,11 @@ The user pointed out that call-lifecycle test changes should not be in the root 
 
 ## PR Description / Lint Follow-up Context
 The user asked to update PR descriptions to match the corrected test ownership. While doing that, `nox --no-install -e lint` exposed that `weave/trace_server/in_memory_trace_server.py` used `NotFoundError` without importing it after the previous stack rewrite. The missing import was amended into `andrew/fake-ts-02-call-writes`, and descendants were restacked. This preserves the corrected PR boundary: the root PR owns the implementation import and write behavior, while call lifecycle test coverage remains in `andrew/fake-ts-calls-read`.
+
+## CI Fix (fake-ts stack restack)
+Reverted the stray hunk that removed the `@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED)`
+decorator from `test_llm_as_a_judge_scorer_publish_has_no_op_refs`. That premature
+un-gate ran the test on the fake backend here (before obj_create exists), crashing
+with `'NoneType' has no attribute 'digest'`. The test is now re-gated at this PR and
+un-gated at the object-CRUD PR (fake-ts-03-objects-tables) where it passes. This
+commit no longer touches tests/trace/test_llm_as_a_judge_scorer.py.
