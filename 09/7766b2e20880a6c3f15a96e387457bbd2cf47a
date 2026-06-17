@@ -155,3 +155,6 @@ registration order — dangling spans must end before the provider flush);
 tests inject InMemorySpanExporter via settings.genai.spanProcessor +
 clearWeaveTracerProvider between tests; semconv.ts gained
 gen_ai.agent.description/id + gen_ai.tool.definitions.
+
+## Session addendum — rebase onto master
+Rebased onto origin/master (ba337cff57), clean (no conflicts). Inherited branch 01's assertion shape-refactor + Settings-API migration. Verified 22/22 jest, prettier + eslint clean.
