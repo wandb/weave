@@ -100,10 +100,6 @@ def init(
                     This includes connection time, data transfer, and server processing. Increase for
                     slow networks or when working with large payloads.
                     Default: `30.0`
-                - `use_stainless_server` (bool): Uses the Stainless-generated HTTP client which
-                    provides better type safety, automatic retries, and improved error handling. This is
-                    experimental and may become the default in future versions.
-                    Default: `False`
                 - `use_calls_complete` (bool): Uses an optimized write path that batches complete
                     call data (start and end) into a single request instead of separate start/end requests.
                     This reduces server load and improves performance, especially for short-lived ops.

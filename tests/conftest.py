@@ -11,6 +11,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
+from weave_server_sdk import Client as StainlessClient
 
 import weave
 from tests.trace.util import DummyTestException
@@ -20,13 +21,15 @@ from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.settings import replace_settings
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings import stainless_remote_http_trace_server
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
 
 pytest_plugins = ["tests.trace_server.conftest"]
 
@@ -457,7 +460,7 @@ def create_client(
         # Note: this is only for local dev testing and should be removed
         return weave_init.init_weave("dev_testing")
     elif trace_server_flag == "http":
-        server = RemoteHTTPTraceServer(trace_server_flag)
+        server = StainlessRemoteHTTPTraceServer(trace_server_flag)
     else:
         server = trace_server
 
@@ -597,11 +600,11 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
 
 @pytest.fixture
 def network_proxy_client(client, monkeypatch):
-    """This fixture is used to test the `RemoteHTTPTraceServer` class. There is
-    almost no logic in this class, other than a little batching, so we typically
-    skip it for simplicity. However, we can use this fixture to test such logic.
-    It initializes a mini FastAPI app that proxies requests from the
-    `RemoteHTTPTraceServer` to the underlying `client.server` object.
+    """This fixture is used to test the `StainlessRemoteHTTPTraceServer` class.
+    There is almost no logic in this class, other than a little batching, so we
+    typically skip it for simplicity. However, we can use this fixture to test
+    such logic. It initializes a mini FastAPI app that proxies requests from the
+    `StainlessRemoteHTTPTraceServer` to the underlying `client.server` object.
 
     We probably will want to flesh this out more in the future, but this is a
     starting point.
@@ -705,41 +708,49 @@ def network_proxy_client(client, monkeypatch):
         )
         return client.server.obj_read(req)
 
-    with TestClient(app) as c:
+    def make_fast_async_batch_processor(*args, **kwargs):
+        kwargs.setdefault("min_batch_interval", 0)
+        return AsyncBatchProcessor(*args, **kwargs)
 
-        def post(url, data=None, json=None, **kwargs):
-            kwargs.pop("stream", None)
-            return c.post(url, data=data, json=json, **kwargs)
+    def make_fast_call_batch_processor(*args, **kwargs):
+        kwargs.setdefault("min_batch_interval", 0)
+        return CallBatchProcessor(*args, **kwargs)
 
-        orig_post = weave.utils.http_requests.post
-        weave.utils.http_requests.post = post
+    monkeypatch.setattr(
+        stainless_remote_http_trace_server,
+        "AsyncBatchProcessor",
+        make_fast_async_batch_processor,
+    )
+    monkeypatch.setattr(
+        stainless_remote_http_trace_server,
+        "CallBatchProcessor",
+        make_fast_call_batch_processor,
+    )
 
-        def make_fast_async_batch_processor(*args, **kwargs):
-            kwargs.setdefault("min_batch_interval", 0)
-            return AsyncBatchProcessor(*args, **kwargs)
+    remote_client = StainlessRemoteHTTPTraceServer(
+        trace_server_url="http://testserver",
+        should_batch=True,
+    )
+    # The stainless client talks to the server through the SDK's httpx client,
+    # not weave.utils.http_requests, so point that client at the in-process
+    # proxy app. FastAPI's TestClient is a sync httpx.Client backed by the ASGI
+    # app, which the SDK accepts as its http_client. No-op the header refresh so
+    # it does not .copy() (and discard) this client mid-request.
+    remote_client._stainless_client = StainlessClient(
+        base_url="http://testserver",
+        username="api",
+        password="x",
+        http_client=TestClient(app),
+    )
+    remote_client._update_client_headers = lambda: None
 
-        def make_fast_call_batch_processor(*args, **kwargs):
-            kwargs.setdefault("min_batch_interval", 0)
-            return CallBatchProcessor(*args, **kwargs)
-
-        monkeypatch.setattr(
-            remote_http_trace_server,
-            "AsyncBatchProcessor",
-            make_fast_async_batch_processor,
-        )
-        monkeypatch.setattr(
-            remote_http_trace_server,
-            "CallBatchProcessor",
-            make_fast_call_batch_processor,
-        )
-
-        remote_client = RemoteHTTPTraceServer(
-            trace_server_url="",
-            should_batch=True,
-        )
+    try:
         yield (client, remote_client, records)
-
-        weave.utils.http_requests.post = orig_post
+    finally:
+        if remote_client.call_processor:
+            remote_client.call_processor.stop_accepting_new_work_and_flush_queue()
+        if remote_client.feedback_processor:
+            remote_client.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
 @pytest.fixture(autouse=True)

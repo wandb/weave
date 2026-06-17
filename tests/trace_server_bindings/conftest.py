@@ -7,8 +7,8 @@ import tenacity
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server_bindings.remote_http_trace_server import (
-    RemoteHTTPTraceServer,
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
 )
 
 # =============================================================================
@@ -74,16 +74,9 @@ def success_response():
 
 
 @pytest.fixture
-def server_class(request):
-    """Returns the appropriate server class based on --remote-http-trace-server flag."""
-    flag = request.config.getoption("--remote-http-trace-server", default="remote")
-    if flag == "stainless":
-        from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-            StainlessRemoteHTTPTraceServer,
-        )
-
-        return StainlessRemoteHTTPTraceServer
-    return RemoteHTTPTraceServer
+def server_class():
+    """The remote trace server client class under test."""
+    return StainlessRemoteHTTPTraceServer
 
 
 @pytest.fixture
@@ -114,25 +107,6 @@ def server(request, server_class):
         server_.call_processor.stop_accepting_new_work_and_flush_queue()
     if server_.feedback_processor:
         server_.feedback_processor.stop_accepting_new_work_and_flush_queue()
-
-
-def pytest_ignore_collect(collection_path, config):
-    """Ignore test files based on --remote-http-trace-server flag.
-
-    This runs before collection, preventing files from being imported at all.
-    """
-    if "trace_server_bindings" not in collection_path.parts:
-        return None
-
-    flag = config.getoption("--remote-http-trace-server", default="remote")
-    filename = collection_path.name
-
-    if flag == "remote" and filename.endswith("_stainless.py"):
-        return True
-    if flag == "stainless" and filename.endswith("_remote.py"):
-        return True
-
-    return None
 
 
 def pytest_collection_modifyitems(config, items):
