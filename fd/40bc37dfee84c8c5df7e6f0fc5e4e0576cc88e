@@ -58,3 +58,9 @@ to feedback_stats, grouping it into: resolve window/granularity, load + bin
 values, emit per-bucket rows, and window-wide rollup. Per review feedback the
 comments are intentionally high-level -- no per-phase enumeration or line-level
 notes. Comments only, no behavior change. Applied via 'gt absorb'.
+
+## Review follow-up (readability)
+Added high-level '# ----' block comments and concise docstrings to the complex
+function(s) in this commit, per a review request to group complex funcs into
+logical chunks (same lean style as feedback_stats: no phase terms, no line-level
+comments). Comments/docstrings only; behavior unchanged. Applied via 'gt absorb'.
