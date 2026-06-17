@@ -68,3 +68,6 @@ gen_ai.agent.description/id + gen_ai.tool.definitions.
 
 ## Session addendum — rebase onto master
 Rebased onto origin/master (ba337cff57). Restack hit a conflict in test-1's "root carries the user message" block: branch 01 consolidated it to `expect(root.attributes).toMatchObject({...})`, while this branch had changed `root` to come from `.find()` (hence `root!`). Resolved by merging both into `expect(root!.attributes).toMatchObject({...})`. Inherited branch 01's other assertion consolidations + Settings migration. Verified 21/21 jest, prettier + eslint clean.
+
+## Session addendum — use semconv constants
+Inherited branch 01's conversion; additionally converted this branch's own 'gen_ai.agent.name' literals (in the sub-agent tests) to ATTR_GEN_AI_AGENT_NAME. Restack hit a test-1 conflict (my constant conversion vs this branch's per-agent root!/agentSpan structure) — resolved keeping both (structure + constants). prettier rewrapped two now-longer lines. Verified 21/21 jest, prettier + eslint clean.
