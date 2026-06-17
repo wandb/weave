@@ -229,12 +229,13 @@ describe('Evaluation - declarative eval metadata', () => {
       expect(call.attributes?._weave_eval_meta?.declarative).toBe(true);
     }
 
-    // The root evaluate call is recognized by op_name, so it is not tagged.
-    const rootCall = calls.find(c =>
+    // Exactly one root evaluate call; recognized by op_name, so it is
+    // intentionally not tagged (its attributes are read before the wrapper runs).
+    const rootCalls = calls.filter(c =>
       c.op_name?.includes(EVALUATION_RUN_OP_NAME)
     );
-    expect(rootCall).toBeDefined();
-    expect(rootCall?.attributes?._weave_eval_meta).toBeUndefined();
+    expect(rootCalls).toHaveLength(1);
+    expect(rootCalls[0].attributes?._weave_eval_meta).toBeUndefined();
   });
 
   // A flat overwrite would drop the outer marker; deep-merge keeps both keys.
