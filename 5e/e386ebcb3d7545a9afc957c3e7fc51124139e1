@@ -1,71 +1,53 @@
-## Conversation
-This stack is round 2 of the in-memory fake trace server. Round 1 (PRs
-#7145-#7152 v3) replicated the SQLite trace server. The user then said:
-'It seems like a lot of this stack tries to replicate the sqlite trace
-server, when in reality it should probably replicate the clickhouse trace
-server. Please update the stack accordingly.' Everything here is the
-ClickHouse re-target: the fake now replicates ClickHouse (the production
-backend) at the interface level, client_is_sqlite(client) is False for the
-fake, and a new client_is_clickhouse(client) predicate gates tests that
-assert ClickHouse *internals* (SQL, table routing/residence, batching,
-bucket file storage, raw server._query access).
+## This commit
+Rebuilt for round 10 (lint/type-check pass); see stack-wide context in
+sibling commits' notes.
 
-## Verification protocol (applies to the whole stack)
-ClickHouse baselines: tests/trace_server 1336 passed/2 skipped/1 failed
-(test_skip_clickhouse_client, pre-existing); tests/trace 1679/26/1
-(test_flask_server, pre-existing env). Fake converged runs on this exact
-tree: tests/trace_server 1240 passed/105 skipped/0 failed; tests/trace
-1665 passed/42 skipped/1 failed (same flask test). Every extra fake skip
-was audited with -rs: all are explicit ClickHouse-only gates (the
-internals listed above) plus 26 environment skips identical on both
-backends. The CH-internals skip total in tests/trace is exactly the gate
-flips in the wiring commit. Secondary shards (flow/compat/utils/
-wandb_interface/session/shared/object) pass identically to sqlite
-(2 pre-existing env failures: test_evaluation_invalid_model_name_*,
-test_from_obj_unwraps_nested_weave_object — fail the same on sqlite,
-backend-independent).
+## Round 10 addendum: every PR now passes the repo lint (type checkers included)
+User asked to 'ensure all PRs pass linting'. The repo's CI lint gate
+(nox -e lint -> prek pre-push hooks) effectively runs THREE always_run
+type checkers repo-wide — ty, pyright@1.1.387 (relaxed: attr/call/arg
+checks off, tests excluded), and mypy@1.19.1 (tests excluded, weave.*
+has disallow_untyped_defs/calls) — while the ruff hooks only see staged
+files. So 'passing lint' per PR means every intermediate module state
+must type-check.
 
-## This commit (stage 9/10: completions/image/agent spans — NEW PR this round)
-Mirrors the CH completions path:
-- _prepare_completion_request imports CompletionPrepResult and
-  _setup_completion_model_info from clickhouse_trace_server_batched —
-  backend-agnostic business logic that happens to live in the CH module;
-  imported rather than forked.
-- completions_create: lite_llm_completion, then build_completion_span ->
-  _insert_agent_span (dict keyed by span_id = ReplacingMergeTree
-  replace); res carries weave_call_id == span_id, trace_id,
-  conversation_id (CH parity asserted by
-  tests/integrations/litellm/client_completions_create_test.py via
-  agent_spans_query read-after-write).
-- completions_create_stream: when tracking, writes an OPEN span first
-  (ended_at=SENTINEL_EPOCH, UNSET status), yields a _meta first chunk
-  with ids, accumulates chunks, and in a finally block replaces the span
-  with the completed aggregation (_aggregate_stream_chunks builds the
-  chat.completion shape; stream errors recorded on the span and
-  re-raised).
-- image_create: OPENAI_API_KEY via _secret_fetcher_context,
-  lite_llm_image_generation(trace_server=self), then a call_start/
-  call_end pair (op weave.image_generation_create, usage keyed by model,
-  weave_call_id = call id) — image generation persists a CALL, not a
-  span, exactly like CH.
-- agent_spans_query: minimal project-scoped query (newest first,
-  offset/limit, AgentSpanSchema field intersection, total_count). The
-  full AgentQueryHandler surface (stats/search/chat) remains CH-only;
-  those tests use CH-only fixtures and skip on the fake.
-- _model_to_provider_info_map is a module-level lru_cache(1) function,
-  NOT an __init__ attribute, so this dependency lands in this PR (the
-  first-use rule) instead of stage 1. CH loads it per-instance in
-  __init__; the data is a static file, so sharing the cache is safe.
+Found and fixed two classes of problems:
+1. Stage-ordering forward references: _compile_expanded_field /
+   _resolve_ref_str_for_filter / _expand_refs lived in the late
+   refs-threads stage but were called from the compile/read stages —
+   mypy attr-defined errors on 5 intermediate branches (the Protocol base
+   covers PUBLIC methods, so only private helpers can dangle). Fixed by
+   moving them to their first callers; _compile_calls_sort_field moved
+   into the compilation stage to keep the read stage in size budget.
+   New deltas: compile 573, read 595, eval-subtree+threads 179.
+2. 16 genuine mypy errors in the canonical module (never caught before
+   because an earlier scoped mypy run had silently executed against the
+   skeleton branch — the gt-track HEAD footgun AGAIN): Optional
+   started_at/ended_at flow from the part-merge change (latency, threads
+   aggregation — restructured with explicit non-None narrowing),
+   calls_delete re-binding a comprehension-typed name to an Optional,
+   feedback_aggregate narrowing time_bucket_seconds and reusing 'key'
+   for both a list and tuple, _log_completion_span response now
+   dict | None (open stream spans), _ch_sorted_by_terms terms param
+   widened to Sequence (invariance), _ch_position bool() coercion,
+   _orm_select 'out' no-redef rename.
 
-## Errors & Mistakes
-- tests/trace_server/test_custom_provider.py patched
-  ClickHouseTraceServer.obj_read by class path — a backend hack (the
-  user's success criteria explicitly allow fixing those). The test now
-  has a patch_server_obj_read contextmanager patching BOTH backend
-  classes; verified 7/7 on real clickhouse after the edit.
+## Verification (round 10)
+- mypy@1.19.1 scoped: 0 errors on ALL 17 stage states (loop-verified
+  with each stage written into the tree).
+- ty: clean on full repo and spot stages; pyright@1.1.387: 0 errors on
+  the canonical module; ruff: all stages + tree clean.
+- Suites unchanged: fake tests/trace_server 1203/115/0; tests/trace
+  1664/44/1 (flask, pre-existing).
+- Static per-stage guard added to the process: every self._private call
+  must resolve within its stage (now 0 issues; checked in the splitter
+  workflow).
 
 ## Hints for Future Agents
-- Do NOT 'optimize away' the open-span write in the stream path; tests
-  and the CH wrapper rely on open+replace.
-- litellm.completion is patched globally by
-  tests/trace_server/completions_util.py — works for any backend.
+- The CI lint job runs 'prek run --hook-stage=pre-push' WITHOUT
+  --all-files: only always_run hooks (the type checkers) actually gate
+  PRs; ruff runs against staged files (no-op in CI). Don't assume
+  ruff-clean == lint-clean.
+- mypy narrowing does not survive list comprehensions or closures over
+  Optionals; the threads/feedback_aggregate restructures exist for the
+  type checker, keep the explicit is-not-None filters.
