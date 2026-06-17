@@ -60,3 +60,9 @@ Copied from prior rewritten commit 0b5f0fdc2aaf after the NotFoundError import f
 Renamed call sites of the CH-compat helpers to the _ch_ prefix
 (_ch_to_float64_or_null / _ch_to_string) per a local review comment; see the
 value-layer commit's note for full rationale. Applied via 'gt absorb'.
+
+## Review follow-up (readability)
+Added high-level '# ----' block comments and concise docstrings to the complex
+function(s) in this commit, per a review request to group complex funcs into
+logical chunks (same lean style as feedback_stats: no phase terms, no line-level
+comments). Comments/docstrings only; behavior unchanged. Applied via 'gt absorb'.
