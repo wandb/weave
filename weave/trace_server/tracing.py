@@ -32,13 +32,13 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable, Coroutine, Generator, Iterator
+from collections.abc import Callable, Generator, Iterator
 from functools import wraps
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar, cast
 
 from opentelemetry import trace
 
-T = TypeVar("T")
+F = TypeVar("F", bound=Callable[..., Any])
 
 # Module-scope tracer: re-resolving `get_tracer(...)` per wrapper call costs
 # ~7us/span (measured), and these decorators run on hot CH-query paths with
@@ -69,19 +69,7 @@ def _reject_unsupported_shape(
         )
 
 
-@overload
-def traced(
-    name: str,
-) -> Callable[
-    [Callable[..., Coroutine[Any, Any, T]]], Callable[..., Coroutine[Any, Any, T]]
-]: ...
-
-
-@overload
-def traced(name: str) -> Callable[[Callable[..., T]], Callable[..., T]]: ...
-
-
-def traced(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def traced(name: str) -> Callable[[F], F]:
     """Wrap a function in an OTel span named `name`.
 
     Args:
@@ -94,7 +82,7 @@ def traced(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
             Use `traced_generator` for those.
     """
 
-    def deco(fn: Callable[..., Any]) -> Callable[..., Any]:
+    def deco(fn: F) -> F:
         _reject_unsupported_shape(fn, "@traced", allow="sync, async")
 
         if asyncio.iscoroutinefunction(fn):
@@ -104,14 +92,14 @@ def traced(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
                 with _tracer.start_as_current_span(name):
                     return await fn(*args, **kwargs)
 
-            return awrap
+            return cast(F, awrap)
 
         @wraps(fn)
         def swrap(*args: Any, **kwargs: Any) -> Any:
             with _tracer.start_as_current_span(name):
                 return fn(*args, **kwargs)
 
-        return swrap
+        return cast(F, swrap)
 
     return deco
 
