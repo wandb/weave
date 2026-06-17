@@ -97,6 +97,15 @@ export type AgentChatMessage = AgentChatMessageSchema;
 export type AgentSpan = AgentSpanSchema;
 export type AgentVersion = AgentVersionSchema;
 
+export type AgentTraceChat = {
+  trace_id: string;
+  root_span_name?: string | null;
+  provider?: string | null;
+  total_duration_ms?: number | null;
+  messages?: AgentChatMessage[];
+  feedback?: Record<string, any>[] | null;
+};
+
 /**
  * Options for {@link WeaveClient.getAgents}.
  */
@@ -180,14 +189,39 @@ export interface GetAgentTraceChatOptions {
 /**
  * Result shape returned by {@link WeaveClient.getAgentTraceChat}.
  */
-export type GetAgentTraceChatResult = {
-  trace_id: string;
-  root_span_name?: string | null;
-  provider?: string | null;
-  total_duration_ms?: number | null;
-  messages?: AgentChatMessage[];
-  feedback?: Record<string, any>[] | null;
+export type GetAgentTraceChatResult = AgentTraceChat;
+
+/**
+ * Options for {@link WeaveClient.getAgentConversationChat}.
+ */
+export interface GetAgentConversationChatOptions {
+  conversationId: string;
+  /**
+   * @min 0
+   * @max 50
+   * @default 50
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  includeFeedback?: boolean;
 }
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentConversationChat}.
+ */
+export type GetAgentConversationChatResult = {
+  conversation_id: string;
+  turns?: AgentTraceChat[];
+  total_turns?: number;
+  has_more?: boolean;
+  limit?: number;
+  offset?: number;
+  feedback?: Record<string, any>[] | null;
+};
 
 /**
  * Distinguishes the object-based getCalls options form from the legacy
@@ -440,11 +474,49 @@ export class WeaveClient {
   public getAgentTraceChat(
     options: GetAgentTraceChatOptions
   ): Promise<Response<GetAgentTraceChatResult>> {
-    return this.traceServerApi.agents.genaiTracesChatAgentsTracesChatPost(
+    return this.traceServerApi.agents.genaiTracesChatAgentsTracesChatPost({
+      project_id: this.projectId,
+      trace_id: options.traceId,
+      include_feedback: options.includeFeedback,
+    });
+  }
+
+  /**
+   * Get the multi-turn structured chat view for a conversation.
+   *
+   * Each `turn` is the chat view for one trace_id, in chronological order.
+   * Use `limit` / `offset` to page through turns.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentConversationChat({
+   *   conversationId: 'trace_c50312356de3487fa90e381c9399b5b4',
+   *   limit: 20,
+   *   includeFeedback: true,
+   * });
+   *
+   * for (const turn of resp.data.turns ?? []) {
+   *   console.log(turn.trace_id, turn.root_span_name);
+   *   for (const message of turn.messages ?? []) {
+   *     if (message.user_message) console.log('user:', message.user_message);
+   *     if (message.assistant_message) console.log('assistant:', message.assistant_message);
+   *   }
+   * }
+   *
+   * console.log(`total turns: ${resp.data.total_turns}, has more: ${resp.data.has_more}`);
+   * ```
+   */
+  public getAgentConversationChat(
+    options: GetAgentConversationChatOptions
+  ): Promise<Response<GetAgentConversationChatResult>> {
+    return this.traceServerApi.agents.genaiConversationChatAgentsConversationsChatPost(
       {
         project_id: this.projectId,
-        trace_id: options.traceId,
-        include_feedback: options.includeFeedback
+        conversation_id: options.conversationId,
+        limit: options.limit,
+        offset: options.offset,
+        include_feedback: options.includeFeedback,
       }
     );
   }

@@ -1,0 +1,89 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 21:43:01 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Wed, 17 Jun 2026 21:43:01 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: 79f07a43bac0ff4c4ad93b8246c2ddf4
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/conversations/chat
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+    body: '{"project_id":"drtangible-mocha/example","conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","limit":1}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "1691"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 21:43:01 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","turns":[{"trace_id":"86cc8e5a64b3bb1fbbf80cb377155950","root_span_name":"Assistant","agent_name":"Assistant","agent_version":"","status_code":"UNSET","provider":"openai","total_duration_ms":1040,"messages":[{"type":"user_message","span_id":null,"agent_name":"User","agent_version":null,"status_code":null,"started_at":"2026-06-16T22:10:34.631000","user_message":{"text":"When
+      was the last time Liverpool won the
+      EPL?","content_refs":[]},"assistant_message":null,"tool_call":null,"agent_start":null,"agent_handoff":null,"context_compacted":null,"feedback":null},{"type":"agent_start","span_id":"c6153c0a6dc4010b","agent_name":"Assistant","agent_version":"","status_code":"UNSET","started_at":"2026-06-16T22:10:34.628000","user_message":null,"assistant_message":null,"tool_call":null,"agent_start":{"model":"","system_instructions":null,"tool_definitions":null,"status":"UNSET"},"agent_handoff":null,"context_compacted":null,"feedback":null},{"type":"assistant_message","span_id":"53fc733e2f6b3417","agent_name":"Assistant","agent_version":"","status_code":"UNSET","started_at":"2026-06-16T22:10:34.631000","user_message":null,"assistant_message":{"text":"Liverpool
+      last won the English Premier League in the **2019–20 season**, clinching
+      the title on **25 June
+      2020**.","model":"gpt-5.4-mini-2026-03-17","reasoning_content":"","reasoning_tokens":0,"input_tokens":133,"output_tokens":33,"duration_ms":1032,"status":"UNSET","content_refs":[]},"tool_call":null,"agent_start":null,"agent_handoff":null,"context_compacted":null,"feedback":null}],"feedback":null}],"total_turns":1,"has_more":false,"limit":1,"offset":0,"feedback":null}'
+- request:
+    url: https://trace.wandb.ai/agents/conversations/chat
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+    body: '{"project_id":"drtangible-mocha/example","conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","limit":1,"offset":1}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "141"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 21:43:01 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","turns":[],"total_turns":1,"has_more":false,"limit":1,"offset":1,"feedback":null}'

@@ -43,6 +43,7 @@ type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
     genaiSearchAgentsSearchPost: jest.Mock;
     genaiSpansQueryAgentsSpansQueryPost: jest.Mock;
     genaiTracesChatAgentsTracesChatPost: jest.Mock;
+    genaiConversationChatAgentsConversationsChatPost: jest.Mock;
   };
 };
 
@@ -62,6 +63,7 @@ describe('WeaveClient', () => {
         genaiSearchAgentsSearchPost: jest.fn(),
         genaiSpansQueryAgentsSpansQueryPost: jest.fn(),
         genaiTracesChatAgentsTracesChatPost: jest.fn(),
+        genaiConversationChatAgentsConversationsChatPost: jest.fn(),
       },
     } as any;
     mockWandbServerApi = {} as any;
@@ -599,6 +601,72 @@ describe('WeaveClient', () => {
 
       await expect(
         client.getAgentTraceChat({traceId: 'trace-1'})
+      ).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentConversationChat', () => {
+    it('gets the chat view for a conversation', async () => {
+      const chat = {
+        conversation_id: 'conv-1',
+        turns: [{trace_id: 'trace-1'}],
+        total_turns: 1,
+        has_more: false,
+        limit: 50,
+        offset: 0,
+        feedback: null,
+      };
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockResolvedValue(
+        {data: chat} as any
+      );
+
+      const result = await client.getAgentConversationChat({
+        conversationId: 'conv-1',
+        limit: 25,
+        offset: 5,
+        includeFeedback: true,
+      });
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiConversationChatAgentsConversationsChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        conversation_id: 'conv-1',
+        limit: 25,
+        offset: 5,
+        include_feedback: true,
+      });
+
+      expect(result).toEqual({data: chat});
+    });
+
+    it('passes undefined limit/offset/includeFeedback when omitted', async () => {
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockResolvedValue(
+        {data: {conversation_id: 'conv-1'}} as any
+      );
+
+      await client.getAgentConversationChat({conversationId: 'conv-1'});
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiConversationChatAgentsConversationsChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        conversation_id: 'conv-1',
+        limit: undefined,
+        offset: undefined,
+        include_feedback: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(
+        client.getAgentConversationChat({conversationId: 'conv-1'})
       ).rejects.toThrow('boom');
     });
   });
