@@ -179,3 +179,12 @@ NOT pushed (no push without explicit ask).
 ## Open Questions
 - None. Did not re-run 02/03/04 OWN added tests in isolation, but the tip
   test run exercises the full combined file, which is sufficient.
+
+## Session addendum — rebase onto master + review fixup
+Rebased the google-adk stack onto origin/master (ba337cff57; previously based on 06944e12d5). Two changes folded into this commit's test file (sdks/node/src/__tests__/integrations/googleAdk.test.ts):
+
+1. Review comment (Conductor local, anchored at the bigint/cycle test): "instead of per-line asserts, one assert that shows the entire shape, here and elsewhere in the PR." Consolidated 7 clusters of per-field asserts into single shape asserts: `expect(span.attributes).toMatchObject({...})` using `expect.stringContaining(...)` for substring fields, and `expect(span.status).toMatchObject({code:2, message: stringContaining(...)})` for error status. The bigint/cycle test became `expect(JSON.parse(resultAttr)).toEqual({count:'42', label:'ok', self:'[Circular]'})` — this TIGHTENS the test (exact shape vs three loose toContain substrings).
+
+2. Rebase regression (NOT from the review comment): master refactored settings.ts from a `Settings` CLASS to a `Settings` TYPE + makeSettings()/defaultSettings() factories. The test's `new Settings(true, {}, {spanProcessor})` stopped compiling (TS2693). Migrated to a plain `Partial<Settings>` object literal `{printCallLink:true, attributes:{}, genai:{spanProcessor}}` passed to initWithCustomTraceServer (which already takes Partial<Settings>), and removed the now-unused `import {Settings}`. The integration SOURCE (googleAdk.ts) does not reference Settings, so no production code changed.
+
+Verified: 18/18 jest pass, prettier + eslint clean. Run jest under nvm node v24.16.0 — the PATH `node` is a bun shim that crashes jest.
