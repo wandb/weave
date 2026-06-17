@@ -188,3 +188,10 @@ Rebased the google-adk stack onto origin/master (ba337cff57; previously based on
 2. Rebase regression (NOT from the review comment): master refactored settings.ts from a `Settings` CLASS to a `Settings` TYPE + makeSettings()/defaultSettings() factories. The test's `new Settings(true, {}, {spanProcessor})` stopped compiling (TS2693). Migrated to a plain `Partial<Settings>` object literal `{printCallLink:true, attributes:{}, genai:{spanProcessor}}` passed to initWithCustomTraceServer (which already takes Partial<Settings>), and removed the now-unused `import {Settings}`. The integration SOURCE (googleAdk.ts) does not reference Settings, so no production code changed.
 
 Verified: 18/18 jest pass, prettier + eslint clean. Run jest under nvm node v24.16.0 — the PATH `node` is a bun shim that crashes jest.
+
+## Session addendum — use semconv constants (review comment on byOperation)
+Review comment anchored at byOperation's filter (the hardcoded 'gen_ai.operation.name' key): "dont hardcode these, make sure you use the variable." Replaced every hardcoded 'gen_ai.*' attribute-key string literal in the test with the exported ATTR_GEN_AI_* constants from '../../genai/semconv' — the same constants the integration source (googleAdk.ts) already imports. Added the semconv import block (14 constants).
+
+Handled both syntactic forms: bracket access `attributes['gen_ai.x']` → `attributes[ATTR_GEN_AI_X]`, and toMatchObject object keys `'gen_ai.x':` → computed `[ATTR_GEN_AI_X]:`. Conversion was a deterministic perl transform: constant = 'ATTR_' + key.toUpperCase() with '.'→'_'. All 14 keys verified to map to exported constants before applying.
+
+Scope note: the OPERATION_* span-name values ('invoke_agent','chat','execute_tool') and ATTR_ADK_INTERRUPTED ('weave.google_adk.interrupted') are module-PRIVATE in googleAdk.ts (not exported), so they are not importable variables and stay as literals — converting them would require exporting from the source (left as a separate, optional follow-up). Verified 18/18 jest, prettier + eslint clean.
