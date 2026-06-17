@@ -865,11 +865,15 @@ def _escape_like_pattern(value: str) -> str:
 def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
     """Build WHERE filters for a search against the messages table."""
     pid_slot = pb.add(req.project_id, param_type="String")
-    content_slot = pb.add(f"%{_escape_like_pattern(req.query)}%", param_type="String")
-    conditions = [
-        _project_filter_sql("project_id", pid_slot),
-        f"content LIKE {content_slot}",
-    ]
+    conditions = [_project_filter_sql("project_id", pid_slot)]
+    if req.query:
+        content_slot = pb.add(
+            f"%{_escape_like_pattern(req.query)}%", param_type="String"
+        )
+        conditions.append(f"content LIKE {content_slot}")
+    if req.trace_id:
+        trace_slot = pb.add(req.trace_id, param_type="String")
+        conditions.append(f"trace_id = {trace_slot}")
     if req.roles:
         roles_slot = pb.add(
             _normalize_search_roles(req.roles), param_type="Array(String)"
@@ -1506,13 +1510,20 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     # enforced on AgentSearchReq.
     limit_slot = pb.add(req.limit, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
+    # Full content for structured retrieval (e.g. agent scoring); the truncated
+    # preview keeps search-UI payloads small by default.
+    content_expr = (
+        "content"
+        if req.full_content
+        else f"substring(content, 1, {SEARCH_CONTENT_PREVIEW_CHARS})"
+    )
     # content_digest is stored raw as FixedString(16); hex-encode here so
     # the Python API surface (AgentSearchMatchedMessage.content_digest: str)
     # keeps a portable text representation.
     return f"""
         SELECT conversation_id, conversation_name, agent_name,
                span_id, trace_id, role,
-               substring(content, 1, {SEARCH_CONTENT_PREVIEW_CHARS}) AS content,
+               {content_expr} AS content,
                lower(hex(content_digest)) AS content_digest, started_at
         FROM messages
         WHERE {filters.where}

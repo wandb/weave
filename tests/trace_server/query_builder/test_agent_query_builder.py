@@ -1393,6 +1393,43 @@ class TestMakeMessageSearchQuery:
 
         assert pb.get_params()["genai_1"] == r"%88\%\_off\\sale%"
 
+    def test_trace_id_full_content_no_query(self) -> None:
+        """Empty query drops the content LIKE; trace_id + full_content drive
+        structured retrieval (used by the agent scoring fallback).
+        """
+        pb = ParamBuilder("genai")
+        query = make_message_search_query(
+            pb,
+            AgentSearchReq(
+                project_id="p1",
+                query="",
+                trace_id="t1",
+                roles=["user", "assistant", "system"],
+                full_content=True,
+            ),
+        )
+
+        expected = """
+            SELECT conversation_id, conversation_name, agent_name,
+                   span_id, trace_id, role,
+                   content AS content,
+                   lower(hex(content_digest)) AS content_digest, started_at
+            FROM messages
+            WHERE project_id = {genai_0:String}
+              AND trace_id = {genai_1:String}
+              AND role IN {genai_2:Array(String)}
+            ORDER BY started_at DESC
+            LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "t1",
+            "genai_2": ["user", "assistant", "system"],
+            "genai_3": 20,
+            "genai_4": 0,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
     def test_limit_rejected_when_above_max(self) -> None:
         with pytest.raises(ValidationError):
             AgentSearchReq(project_id="p1", query="x", limit=5000)
