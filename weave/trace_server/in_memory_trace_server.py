@@ -17,7 +17,9 @@
 import copy
 import datetime
 import json
+import logging
 import threading
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -25,7 +27,10 @@ from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
 from weave.shared import refs_internal as ri
 from weave.shared.digest import (
+    compute_file_digest,
     compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
 )
 from weave.shared.trace_server_interface_util import (
     assert_non_null_wb_user_id,
@@ -66,6 +71,9 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
+logger = logging.getLogger(__name__)
+
+MAX_REFS_BATCH_SIZE = 1000
 MAX_OTEL_ERROR_MESSAGES = 20
 
 
@@ -74,6 +82,61 @@ def _ensure_tz(dt: datetime.datetime) -> datetime.datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(datetime.timezone.utc)
+
+
+# ---------------------------------------------------------------------------
+# Generic JSON value helpers (dict-shaped doc traversal + stable ordering)
+# ---------------------------------------------------------------------------
+
+
+def _minify_json(val: Any) -> str:
+    """JSON text with minified separators, as the backends store dumps."""
+    return json.dumps(val, separators=(",", ":"))
+
+
+def _json_extract(parsed: Any, path_parts: list[str] | None) -> tuple[Any, str | None]:
+    """Dot-path traversal over a parsed JSON doc, with a type tag.
+
+    Returns (value, json_type) where json_type is one of:
+    'object', 'array', 'text', 'integer', 'real', 'true', 'false', 'null',
+    or None when the path does not exist. Scalars convert to their stored
+    renderings: true/false -> 1/0, objects/arrays -> minified JSON text.
+    Used by the generic doc sorts (table rows) and ref expansion.
+    """
+    val = parsed
+    for part in path_parts or []:
+        if isinstance(val, dict):
+            if part not in val:
+                return (None, None)
+            val = val[part]
+        elif isinstance(val, list):
+            try:
+                idx = int(part)
+            except ValueError:
+                return (None, None)
+            if idx < 0 or idx >= len(val):
+                return (None, None)
+            val = val[idx]
+        else:
+            return (None, None)
+
+    if val is None:
+        return (None, "null")
+    if isinstance(val, bool):
+        return (1, "true") if val else (0, "false")
+    if isinstance(val, int):
+        return (val, "integer")
+    if isinstance(val, float):
+        return (val, "real")
+    if isinstance(val, str):
+        return (val, "text")
+    if isinstance(val, dict):
+        return (_minify_json(val), "object")
+    if isinstance(val, list):
+        return (_minify_json(val), "array")
+    # Unknown python type (shouldn't happen for JSON-derived data); treat as
+    # its text rendering.
+    return (str(val), "text")
 
 
 def _value_rank(value: Any) -> int:
@@ -228,9 +291,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         self._objs: dict[tuple[str, str, str, str], _ObjRec] = {}
         # Tables keyed by (project_id, digest) -> ordered row digests.
         self._tables: dict[tuple[str, str], list[str]] = {}
-        # Table rows keyed by digest (content-addressed, first-writer-wins:
-        # first writer wins, reads filter on project_id).
-        self._table_rows: dict[str, _TableRowRec] = {}
+        # Table rows keyed by (project_id, digest), matching ClickHouse's
+        # project-scoped table_rows primary key.
+        self._table_rows: dict[tuple[str, str], _TableRowRec] = {}
         # Files keyed by (project_id, digest).
         self._files: dict[tuple[str, str], bytes] = {}
         # Tags keyed by (project_id, object_id, digest) -> set of tags.
@@ -1088,6 +1151,331 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
         apply_tags_and_synth_latest_in_place(objs, tags_map, aliases_map)
+
+    # ------------------------------------------------------------------
+    # Tables
+    # ------------------------------------------------------------------
+
+    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        insert_rows = []
+        for r in req.table.rows:
+            if not isinstance(r, dict):
+                raise TypeError("All rows must be dictionaries")
+            row_json = json.dumps(r)
+            row_digest = compute_row_digest(r)
+            insert_rows.append((req.table.project_id, row_digest, row_json))
+
+        row_digests = [r[1] for r in insert_rows]
+        digest = compute_table_digest(row_digests)
+        validate_expected_digest(
+            expected=req.table.expected_digest,
+            actual=digest,
+            label=f"table ({len(row_digests)} rows)",
+        )
+
+        with self.lock:
+            for project_id, row_digest, row_json in insert_rows:
+                row_key = (project_id, row_digest)
+                if row_key not in self._table_rows:
+                    self._table_rows[row_key] = _TableRowRec(
+                        project_id=project_id,
+                        val=json.loads(row_json),
+                        val_dump_len=len(row_json),
+                    )
+            self._tables.setdefault((req.table.project_id, digest), list(row_digests))
+
+        return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
+
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        digest = compute_table_digest(req.row_digests)
+        validate_expected_digest(
+            expected=req.expected_digest,
+            actual=digest,
+            label=f"table ({len(req.row_digests)} rows)",
+        )
+
+        with self.lock:
+            self._tables.setdefault((req.project_id, digest), list(req.row_digests))
+
+        return tsi.TableCreateFromDigestsRes(digest=digest)
+
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        with self.lock:
+            base = self._tables.get((req.project_id, req.base_digest))
+            if base is None:
+                raise IndexError("list index out of range")
+            final_row_digests: list[str] = list(base)
+        new_rows_needed_to_insert: list[tuple[str, str, str]] = []
+        known_digests = set(final_row_digests)
+
+        def add_new_row_needed_to_insert(row_data: Any) -> str:
+            if not isinstance(row_data, dict):
+                raise TypeError("All rows must be dictionaries")
+            row_json = json.dumps(row_data)
+            row_digest = compute_row_digest(row_data)
+            if row_digest not in known_digests:
+                new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
+                known_digests.add(row_digest)
+            return row_digest
+
+        updated_digests = []
+        for update in req.updates:
+            if isinstance(update, tsi.TableAppendSpec):
+                new_digest = add_new_row_needed_to_insert(update.append.row)
+                final_row_digests.append(new_digest)
+                updated_digests.append(new_digest)
+            elif isinstance(update, tsi.TablePopSpec):
+                if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
+                    raise ValueError("Index out of range")
+                popped_digest = final_row_digests.pop(update.pop.index)
+                updated_digests.append(popped_digest)
+            elif isinstance(update, tsi.TableInsertSpec):
+                if (
+                    update.insert.index > len(final_row_digests)
+                    or update.insert.index < 0
+                ):
+                    raise ValueError("Index out of range")
+                new_digest = add_new_row_needed_to_insert(update.insert.row)
+                final_row_digests.insert(update.insert.index, new_digest)
+                updated_digests.append(new_digest)
+            else:
+                raise TypeError("Unrecognized update", update)
+
+        with self.lock:
+            for project_id, row_digest, row_json in new_rows_needed_to_insert:
+                row_key = (project_id, row_digest)
+                if row_key not in self._table_rows:
+                    self._table_rows[row_key] = _TableRowRec(
+                        project_id=project_id,
+                        val=json.loads(row_json),
+                        val_dump_len=len(row_json),
+                    )
+
+            digest = compute_table_digest(final_row_digests)
+            self._tables.setdefault((req.project_id, digest), final_row_digests)
+
+        return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
+
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        with self.lock:
+            row_digests = self._tables.get((req.project_id, req.digest)) or []
+            # (original_index, digest, val) tuples; rows are materialized as
+            # schema objects (with copied vals) only for the returned slice.
+            entries: list[tuple[int, str, Any]] = []
+            for original_index, row_digest in enumerate(row_digests):
+                row_rec = self._table_rows.get((req.project_id, row_digest))
+                if row_rec is None:
+                    continue
+                if (
+                    req.filter
+                    and req.filter.row_digests
+                    and row_digest not in req.filter.row_digests
+                ):
+                    continue
+                entries.append((original_index, row_digest, row_rec.val))
+
+        if req.sort_by:
+            sort_terms: list[tuple[str, str]] = []
+            for sort in req.sort_by:
+                field_name = sort.field
+                if not field_name or not field_name.strip():
+                    raise InvalidRequest("Sort field cannot be empty")
+                if (
+                    field_name.startswith(".")
+                    or field_name.endswith(".")
+                    or ".." in field_name
+                ):
+                    raise InvalidRequest(
+                        f"Invalid sort field '{field_name}': field names cannot start/end with dots or contain consecutive dots"
+                    )
+                if "." in field_name:
+                    parts = field_name.split(".")
+                    if any(not component.strip() for component in parts):
+                        raise InvalidRequest(
+                            f"Invalid sort field '{field_name}': field path components cannot be empty"
+                        )
+                sort_terms.append((field_name, sort.direction.upper()))
+
+            def sort_value(entry: tuple[int, str, Any], term: str) -> Any:
+                value, _ = _json_extract(entry[2], term.split("."))
+                return value
+
+            entries = _sorted_by_terms(entries, sort_terms, sort_value)
+
+        if req.offset is not None and req.offset > 0:
+            entries = entries[req.offset :]
+        if req.limit is not None and req.limit >= 0:
+            entries = entries[: req.limit]
+
+        return tsi.TableQueryRes(
+            rows=[
+                tsi.TableRowSchema(
+                    digest=row_digest,
+                    val=copy.deepcopy(val),
+                    original_index=original_index,
+                )
+                for original_index, row_digest, val in entries
+            ]
+        )
+
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
+        results = self.table_query(req)
+        yield from results.rows
+
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        batch_req = tsi.TableQueryStatsBatchReq(
+            project_id=req.project_id, digests=[req.digest]
+        )
+
+        res = self.table_query_stats_batch(batch_req)
+
+        if len(res.tables) == 0:
+            logger.warning("No table_query_stats results for digest %s", req.digest)
+            return tsi.TableQueryStatsRes(count=0)
+
+        count = res.tables[0].count
+        return tsi.TableQueryStatsRes(count=count)
+
+    def table_query_stats_batch(
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
+        tables = []
+        with self.lock:
+            for digest in req.digests or []:
+                row_digests = self._tables.get((req.project_id, digest))
+                if row_digests is None:
+                    continue
+                storage_size: int | None = None
+                if req.include_storage_size:
+                    storage_size = sum(
+                        rec.val_dump_len
+                        for row_digest in row_digests
+                        if (rec := self._table_rows.get((req.project_id, row_digest)))
+                        is not None
+                    )
+                tables.append(
+                    tsi.TableStatsRow(
+                        count=len(row_digests),
+                        digest=digest,
+                        storage_size_bytes=storage_size,
+                    )
+                )
+        return tsi.TableQueryStatsBatchRes(tables=tables)
+
+    def _table_rows_read_batch(
+        self, project_id: str, digests: list[str]
+    ) -> dict[str, Any]:
+        """Batch read table_rows by digest. Returns {digest: parsed_val}."""
+        if not digests:
+            return {}
+        with self.lock:
+            result = {}
+            for digest in digests:
+                rec = self._table_rows.get((project_id, digest))
+                if rec is not None and rec.project_id == project_id:
+                    result[digest] = copy.deepcopy(rec.val)
+            return result
+
+    def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
+        with self.lock:
+            rec = self._table_rows.get((project_id, row_digest))
+            if rec is None or rec.project_id != project_id:
+                raise NotFoundError(f"Row {row_digest} not found")
+            return tsi.TableRowSchema(digest=row_digest, val=copy.deepcopy(rec.val))
+
+    # ------------------------------------------------------------------
+    # Refs
+    # ------------------------------------------------------------------
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        if len(req.refs) > MAX_REFS_BATCH_SIZE:
+            raise ValueError("Too many refs")
+
+        parsed_refs = [ri.parse_internal_uri(r) for r in req.refs]
+        if any(isinstance(r, ri.InternalTableRef) for r in parsed_refs):
+            raise ValueError("Table refs not supported")
+        if any(isinstance(r, ri.InternalCallRef) for r in parsed_refs):
+            raise ValueError("Call refs not supported")
+        parsed_obj_refs = cast(list[ri.InternalObjectRef], parsed_refs)
+
+        return tsi.RefsReadBatchRes(
+            vals=[self._read_internal_obj_ref(r) for r in parsed_obj_refs]
+        )
+
+    def _read_internal_obj_ref(self, r: ri.InternalObjectRef) -> Any:
+        objs = self._select_objs(
+            r.project_id,
+            predicate=lambda rec: rec.object_id == r.name and rec.digest == r.version,
+            include_deleted=True,
+        )
+        if len(objs) == 0:
+            raise NotFoundError(f"Obj {r.name}:{r.version} not found")
+        obj = objs[0]
+        if obj.deleted_at is not None:
+            return None
+        val = obj.val
+        extra = r.extra
+        for extra_index in range(0, len(extra), 2):
+            op, arg = extra[extra_index], extra[extra_index + 1]
+            if op == ri.DICT_KEY_EDGE_NAME:
+                val = val[arg]
+            elif op == ri.OBJECT_ATTR_EDGE_NAME:
+                val = val[arg]
+            elif op == ri.LIST_INDEX_EDGE_NAME:
+                val = val[int(arg)]
+            elif op == ri.TABLE_ROW_ID_EDGE_NAME:
+                weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
+                if isinstance(val, str) and val.startswith(weave_internal_prefix):
+                    table_ref = ri.parse_internal_uri(val)
+                    if not isinstance(table_ref, ri.InternalTableRef):
+                        raise ValueError(
+                            "invalid data layout encountered, expected TableRef when resolving id"
+                        )
+                    row = self._table_row_read(
+                        project_id=table_ref.project_id,
+                        row_digest=arg,
+                    )
+                    val = row.val
+                else:
+                    raise ValueError(
+                        "invalid data layout encountered, expected TableRef when resolving id"
+                    )
+            else:
+                raise ValueError(f"Unknown ref type: {extra[extra_index]}")
+        return val
+
+    # ------------------------------------------------------------------
+    # Files
+    # ------------------------------------------------------------------
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        digest = compute_file_digest(req.content)
+        validate_expected_digest(
+            expected=req.expected_digest, actual=digest, label="file"
+        )
+        with self.lock:
+            self._files.setdefault((req.project_id, digest), req.content)
+        return tsi.FileCreateRes(digest=digest)
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        with self.lock:
+            content = self._files.get((req.project_id, req.digest))
+        if content is None:
+            raise NotFoundError(f"File {req.digest} not found")
+        return tsi.FileContentReadRes(content=content)
+
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        with self.lock:
+            total = sum(
+                len(content)
+                for (project_id, _digest), content in self._files.items()
+                if project_id == req.project_id
+            )
+        return tsi.FilesStatsRes(total_size_bytes=total)
 
     # ------------------------------------------------------------------
     # OTel export

@@ -637,7 +637,6 @@ def make_test_eval():
     return evaluation
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_supports_model_as_op(weave_active):
     @weave.op
@@ -660,7 +659,6 @@ class MyTestModel(Model):
         return ""
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_supports_model_class(weave_active):
     evaluation = make_test_eval()
@@ -674,7 +672,6 @@ async def test_eval_supports_model_class(weave_active):
     assert res is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_eval_supports_non_op_funcs(weave_active):
     def function_model(sentence: str) -> dict:

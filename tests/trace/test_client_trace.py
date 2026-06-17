@@ -1805,7 +1805,6 @@ def test_dataclass_support(client):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_retrieval(weave_active):
     @weave.op
     def my_op(a: int) -> int:
@@ -1817,7 +1816,6 @@ def test_op_retrieval(weave_active):
     assert my_op2(1) == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3)
 def test_bound_op_retrieval(weave_active):
     class CustomType(weave.Object):
@@ -1862,7 +1860,6 @@ def test_bound_op_retrieval_no_self(weave_active):
         my_op2 = my_op_ref.get()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_row_ref(weave_active):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
@@ -1876,7 +1873,6 @@ def test_dataset_row_ref(weave_active):
     assert gotten == 5
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_table_query_empty_sort_field_validation(client):
     """Test that empty or invalid sort fields in table queries are properly validated."""
     # Create a dataset with table data
@@ -1978,7 +1974,6 @@ def test_namedtuple_support(client):
     assert res.calls[0].output == [{"x": 1, "y": 2}, 3]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_named_reuse(client):
     d = weave.Dataset(rows=[{"x": 1}, {"x": 2}])
@@ -3183,7 +3178,6 @@ def test_in_operation(client):
         assert res[i].id == call_ids[i]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_has_client_version(weave_active):
     @weave.op
     def test():
@@ -3194,7 +3188,6 @@ def test_call_has_client_version(weave_active):
     assert "client_version" in c.attributes["weave"]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_user_cannot_modify_call_weave_dict(weave_active):
     @weave.op
     def test():
@@ -3311,7 +3304,6 @@ class BasicModel(weave.Model):
         return {"answer": "42"}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3)
 def test_model_save(client):
     model = BasicModel()
@@ -3549,7 +3541,6 @@ def test_object_with_char_over_limit(client):
 chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_objects_and_keys_with_special_characters(client):
     # make sure to include ":", "/" which are URI-related
 
@@ -4676,7 +4667,6 @@ def test_calls_hydrated(client):
     assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_obj_query_with_storage_size_clickhouse(client):
     """Test querying objects with storage size information."""
     # Create a test object with some data to ensure it has size
@@ -4800,7 +4790,6 @@ def test_call_query_stream_with_invalid_filter_field(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize(
     "obj",
     [
@@ -4815,7 +4804,6 @@ def test_get_object_from_uri(weave_active, obj):
     assert weave.get(uri) == obj
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3)
 def test_get_object_from_uri_non_registered_object(weave_active):
     class MyModel(weave.Model):
@@ -5666,7 +5654,6 @@ def test_get_calls_filter_by_thread_ids_only(client):
     assert all(call.thread_id == f"thread_a_{unique}" for call in calls_thread_a)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_thread_context_error_handling(weave_active):
     """Test that ThreadContext is properly managed even when exceptions occur."""
     import weave

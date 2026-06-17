@@ -294,7 +294,6 @@ def test_video_as_call_io_refs(client: WeaveClient, test_video: VideoClip) -> No
             video_as_input_and_output_part_call.output["out_video"].close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
     client.project = "test_video_as_file"
 

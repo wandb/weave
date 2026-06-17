@@ -163,7 +163,6 @@ def test_image_as_call_io_refs(client: WeaveClient, test_img: Image.Image) -> No
         image_as_input_and_output_part_call.output["out_img"].close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_image_as_file(client: WeaveClient) -> None:
     client.project = "test_image_as_file"
     file_path = Path(__file__).parent.resolve() / "example.jpg"

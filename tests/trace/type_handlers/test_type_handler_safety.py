@@ -14,7 +14,6 @@ from tests.trace.test_utils import FailingSaveType
 from tests.trace.util import FAKE_NOT_IMPLEMENTED
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_output_with_failing_serializer_does_not_raise(
     weave_active, failing_serializer
 ):
@@ -37,7 +36,6 @@ def test_op_output_with_failing_serializer_does_not_raise(
     assert result.value == "hello"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_input_with_failing_serializer_does_not_raise(
     weave_active, failing_serializer
 ):

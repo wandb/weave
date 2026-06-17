@@ -27,7 +27,6 @@ def test_save_object(client):
     assert read_res.obj.val == {"a": 1}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_robust_to_url_sensitive_chars(client):
     project_id = client.project_id
     object_id = "mali_cious-obj.ect"

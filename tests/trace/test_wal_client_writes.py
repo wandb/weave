@@ -329,7 +329,6 @@ class TestWALDisabled:
         ref = weave.publish({"key": "value"}, name="no_wal_obj")
         assert ref is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_dataset_publish_works_without_wal(self, weave_active):
         """Dataset publish should succeed when WAL is disabled."""
         ds = weave.Dataset(name="no_wal_ds", rows=[{"x": 1}])

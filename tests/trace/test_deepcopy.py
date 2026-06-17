@@ -4,7 +4,6 @@ from copy import deepcopy
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.box import (
     BoxedDatetime,
     BoxedFloat,
@@ -111,7 +110,6 @@ def test_deepcopy_boxed(boxed_val):
     assert id(res) != id(boxed_val)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_deepcopy_boxed_model_e2e(weave_active):
     class Model(weave.Model):
         system_prompt: str = "You are a helpful assistant."  # this will get boxed

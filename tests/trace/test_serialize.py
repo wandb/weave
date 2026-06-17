@@ -316,7 +316,6 @@ def test_to_json_pydantic_class(client) -> None:
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_to_json_object_excludes_ref(client) -> None:
     class MyObj(weave.Object):
         @weave.op

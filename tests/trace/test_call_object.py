@@ -1,10 +1,6 @@
-import pytest
-
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_to_dict(weave_active):
     @weave.op
     def greet(name: str, age: int) -> str:

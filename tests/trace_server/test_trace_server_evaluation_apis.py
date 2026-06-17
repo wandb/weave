@@ -388,7 +388,6 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
 
 # The guard raises inside the lazy row-decode threadpool, which logs the failure
 # at ERROR before it propagates out of asyncio.run; that log is the expected path.
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_evaluate_model_rejects_unsafe_dataset_row(client):
     """An Op node in a dataset row must be refused at decode time, not loaded and
@@ -474,7 +473,6 @@ def test_evaluate_model_rejects_unsafe_dataset_row(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize("op_arg", ["evaluation_ref", "model_ref"])
 def test_evaluate_model_rejects_op_ref_as_eval_or_model_ref(client, op_arg):
     """An op ref passed directly as the evaluation_ref/model_ref must be refused at
