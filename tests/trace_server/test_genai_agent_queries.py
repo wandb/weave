@@ -10,6 +10,7 @@ import uuid
 import pytest
 
 from tests.trace_server.helpers import make_project_id as _make_project_id
+from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
@@ -117,6 +118,29 @@ def test_spans_insert_and_query(ch_server):
     )
     assert res_filtered.total_count == 2
     assert all(s.agent_name == "agent-A" for s in res_filtered.spans)
+
+
+def test_insert_spans_bulk_writes_all_in_one_call(ch_server):
+    """`AgentWriteHandler.insert_spans` bulk-writes every span in one insert
+    (the scoring-worker batch path); empty input is a no-op.
+    """
+    project_id = _make_project_id("bulk_spans")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    spans = [
+        _make_span(project_id, agent_name="bulk-A", started_at=now),
+        _make_span(
+            project_id,
+            agent_name="bulk-B",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+    ]
+    handler = AgentWriteHandler(ch_server.ch_client)
+    handler.insert_spans([])  # no-op
+    handler.insert_spans(spans)
+
+    res = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    assert res.total_count == 2
+    assert {s.agent_name for s in res.spans} == {"bulk-A", "bulk-B"}
 
 
 # ---------------------------------------------------------------------------

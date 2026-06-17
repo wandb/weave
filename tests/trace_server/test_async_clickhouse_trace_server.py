@@ -142,6 +142,21 @@ async def test_span_sink_defers_insert_to_caller() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ainsert_completion_spans_bulk_writes_on_executor() -> None:
+    """Collected spans are bulk-written once via the CH executor; empty no-ops."""
+    ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
+    srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
+    spans = [object(), object()]
+    try:
+        with patch.object(srv, "_insert_spans_sync") as insert_mock:
+            await srv.ainsert_completion_spans([])
+            await srv.ainsert_completion_spans(spans)
+        insert_mock.assert_called_once_with(spans)
+    finally:
+        ch_executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
 async def test_prep_short_circuit_returns_without_calling_litellm(
     server: AsyncClickHouseTraceServer,
 ) -> None:
