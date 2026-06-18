@@ -226,7 +226,7 @@ describe('Evaluation - declarative eval metadata', () => {
       ...modelCalls,
       ...scorerCalls,
     ]) {
-      expect(call.attributes?._weave_eval_meta?.declarative).toBe(true);
+      expect(call.attributes?._weave_eval_meta).toEqual({declarative: true});
     }
 
     // Exactly one root evaluate call; recognized by op_name, so it is
@@ -248,16 +248,27 @@ describe('Evaluation - declarative eval metadata', () => {
     });
 
     const calls = await getCalls(traceServer, projectId);
-    const childCalls = calls.filter(
+    const predictAndScoreCalls = calls.filter(c =>
+      c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
+    );
+    const modelCalls = calls.filter(c => c.op_name?.includes('mockPrediction'));
+    const scorerCalls = calls.filter(
       c =>
-        c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS) ||
-        c.op_name?.includes('mockPrediction') ||
         c.op_name?.includes('lengthScorer') ||
         c.op_name?.includes('inclusionScorer')
     );
-    expect(childCalls.length).toBeGreaterThan(0);
 
-    for (const call of childCalls) {
+    // dataset rows (5), and scorers also * scorer count (2).
+    expect(predictAndScoreCalls).toHaveLength(5);
+    expect(modelCalls).toHaveLength(5);
+    expect(scorerCalls).toHaveLength(10);
+
+    // Both the outer marker and ours survive (flat overwrite would drop foo).
+    for (const call of [
+      ...predictAndScoreCalls,
+      ...modelCalls,
+      ...scorerCalls,
+    ]) {
       expect(call.attributes?._weave_eval_meta).toEqual({
         foo: true,
         declarative: true,
