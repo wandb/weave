@@ -28,3 +28,50 @@ Final verification for this branch:
 - PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
 
 No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Conversation
+User asked to scan the entire google-adk TS stack for type precision and fix:
+(1) any/undefined/null that isn't actually true, (2) lazy `?` where upstream
+is required, (3) over-defensive code that hurts readability. Verified every
+duck type against the REAL @google/adk@1.2.0 + @google/genai .d.ts installed in
+node_modules (ground truth), not from memory.
+
+## Actions (slice 01 — owns the core duck types + run lifecycle + helpers)
+googleAdk.types.ts:
+- AdkPart.text: unknown -> string (genai Part.text is string | undefined; kept `?`)
+- Removed dead fields never read by the impl: AdkPart.thought, AdkBlob.data,
+  AdkEvent.id, AdkInvocationContext.branch, AdkCallbackContext.userContent.
+- AdkEvent.content: dropped `| null` (genai/adk Content is never null, only undefined).
+- AdkInvocationContext.agent/session -> required; AdkSession.id/appName/userId
+  -> required (all required upstream; real types stay assignable to the duck
+  types, verified by tsc against the test which drives the plugin with REAL
+  @google/adk objects).
+googleAdk.ts:
+- toJsonSafe(): any -> unknown (all callers stringify / accept unknown).
+- partToWire: String(part.text) -> part.text (text is now string).
+- finishReasonString / contentToOutputMessage param: unknown ->
+  `string | null | undefined`, dropped the now-redundant String() (FinishReason
+  is a genai string enum).
+- beforeRun/onEvent/afterRun: removed gratuitous `?.`/ternary guards on
+  params.invocationContext (ADK-guaranteed) and ic.agent/ic.session (now
+  required). Kept the empty-string `!invocationId` guard.
+
+## Errors & Mistakes
+- After dropping `?.` in onEventCallback the `invocations.get(...)` call became
+  <80 cols; prettier wanted it on one line. Fixed here (it is slice-01 code) and
+  re-restacked; that re-restack was conflict-free.
+
+## Hints for Future Agents
+- The duck types are deliberately structural (no instanceof). Making a field
+  REQUIRED is safe iff the REAL upstream field is also required — a required
+  real field is assignable to a required duck field. Do NOT make a field
+  required when upstream has it optional.
+- The test imports LlmRequest/LlmResponse from the REAL @google/adk, so tsc
+  validates these duck types against reality. Trust tsc here.
+
+## Verified
+tsc esm+cjs PASS, prettier clean, slice-01 jest 5/5.
