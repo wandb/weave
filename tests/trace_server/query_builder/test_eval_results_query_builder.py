@@ -94,7 +94,7 @@ def test_cte_chain_calls_merged() -> None:
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
                     page_digests.row_order AS row_order,
-                    COALESCE(page_resolved_inputs.val_dump, JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
@@ -184,7 +184,7 @@ def test_cte_chain_calls_complete() -> None:
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
                     page_digests.row_order AS row_order,
-                    COALESCE(page_resolved_inputs.val_dump, JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
@@ -322,7 +322,7 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
                     page_digests.row_order AS row_order,
-                    COALESCE(page_resolved_inputs.val_dump, JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
@@ -457,7 +457,7 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
                     page_digests.row_order AS row_order,
-                    COALESCE(page_resolved_inputs.val_dump, JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
@@ -556,7 +556,7 @@ def test_full_query_calls_merged() -> None:
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
                     page_digests.row_order AS row_order,
-                    COALESCE(page_resolved_inputs.val_dump, JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
@@ -682,7 +682,7 @@ def test_full_query_calls_complete() -> None:
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
                     page_digests.row_order AS row_order,
-                    COALESCE(page_resolved_inputs.val_dump, JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
                 LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
