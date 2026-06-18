@@ -4,3 +4,17 @@ See slice 1 (andrew/google-adk-01-plugin-run) and tag bak-adk-old-plugincore for
 Adds: model callbacks (beforeModel/afterModel/onModelError → nested chat spans), setLlmRequest/ResponseAttributes + toolDefinitions + systemInstructionParts, childContext, errorTypeOf/errorMessageOf, closeShortCircuitedModelSpan + modelSpanKeyForEvent, InvocationState.modelSpans + finishInvocation model loop + onEvent short-circuit, semconv +TOOL_DEFINITIONS, model types. Also adds tool-callback NO-OP STUBS (return undefined) so the plugin structurally satisfies ADK's BasePlugin type for the real-runner model tests (records-model-errors, cached) — stub bodies are filled in slice 3.
 
 Built: restore full old plugin-core source, strip ONLY tool code (run+model lines stay byte-identical to the original). Verified 17/17 jest + lint clean.
+
+## Session addendum — move ADK GoogleGenAI exclusion into model slice
+User clarified every PR must be standalone. The ADK-internal GoogleGenAI exclusion originally lived in the later genai-exclusion slice, but model/chat tracing starts in this slice. Without the exclusion here, this PR alone can double-record ADK Gemini model calls: WeaveAdkPlugin emits chat spans with usage while the generic GoogleGenAI wrapper can also wrap ADK's internal GoogleGenAI client and emit orphan/double-counted traces.
+
+Moved the x-goog-api-client google-adk/ marker exclusion from the later genai-exclusion branch into this model slice, along with the fake GoogleGenAI regression test. This makes the first PR that introduces model/chat spans standalone and prevents token double-counting at that point in the stack. The later genai-exclusion branch should become empty/drop after restacking.
+
+This commit also inherits the slice-1 standalone runner test/stubs from the restack conflict resolution.
+
+Verification for this amendment:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (19 passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+
+No push performed. Notes preserved/copied by Graphite where available; this addendum records the stack-boundary change.
