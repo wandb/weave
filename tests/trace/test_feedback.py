@@ -735,7 +735,6 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
     assert matches == []
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_aggregate(client: WeaveClient) -> None:
     """Aggregate scorer feedback, asserting the entire FeedbackAggregateRes shape.
 
@@ -2175,7 +2174,6 @@ def _seed_numeric_feedback(
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_stats(client: WeaveClient) -> None:
     """End-to-end: seed feedback, query aggregated stats, verify buckets and window_stats."""
     project_id = client.project_id
@@ -2224,7 +2222,6 @@ def test_feedback_stats(client: WeaveClient) -> None:
     assert ws["avg"] == pytest.approx(sum(scores) / len(scores), abs=1e-6)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_payload_schema(client: WeaveClient) -> None:
     """End-to-end: seed varied feedback, discover payload schema paths."""
     project_id = client.project_id
@@ -2269,7 +2266,6 @@ def test_feedback_payload_schema(client: WeaveClient) -> None:
     assert path_map["label"] == "categorical"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
     """Empty metrics list returns empty buckets without error."""
     project_id = client.project_id
