@@ -103,3 +103,23 @@ This slice now changes only ADK-related files.
 
 ## Verified
 tsc esm+cjs PASS, eslint clean on ADK files, slice-01 jest 5/5 after the split.
+
+===================================================================
+## ADDENDUM — discriminated union for WirePart (later session)
+===================================================================
+User review comment on partToWire's return: asked for a more precise/idiomatic
+type than the loose object. Replaced `type WirePart = Record<string, unknown>`
+with a discriminated union on `type`:
+  | {type:'text'; content:string}
+  | {type:'blob'; mime_type:string}
+  | {type:'tool_call'; id:string; name:string; arguments:unknown}
+  | {type:'tool_call_response'; id:string; response:unknown}
+partToWire/contentToParts/systemInstructionParts all typecheck against it; the
+compiler now catches a misspelled/missing wire-part field. Verified tsc esm+cjs,
+prettier, slice-01 jest 5/5.
+
+Note: toJsonSafe was deliberately LEFT as-is (robust bigint+cycle+catch
+safe-stringify). User asked whether ADK users hit bigint/cycles; answer: not the
+common path, but reachable via tool RETURN values (cycles realistic, bigint
+rare). The branches aren't crash-protection (the try/catch is) — they preserve a
+degraded value instead of nulling the whole result. User did not ask to simplify.
