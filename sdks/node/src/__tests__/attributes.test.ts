@@ -72,7 +72,7 @@ describe('attributes context', () => {
       await leafOp();
     });
 
-    const calls = await traceServer.getCalls(projectId)
+    const calls = await traceServer.getCalls(projectId);
     const leafCall = calls.find(c => c.op_name?.includes('leafOp'));
     expect(leafCall?.attributes?.tenant).toBe('acme');
     expect(leafCall?.attributes?.base).toBe('local'); // local overrides global
