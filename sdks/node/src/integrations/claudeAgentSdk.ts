@@ -52,6 +52,7 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
 
     async function* traced(): AsyncGenerator<unknown, void> {
       let result: SDKResultMessage | undefined;
+      let streamError: unknown;
       try {
         for await (const msg of realQuery as AsyncIterable<SDKMessage>) {
           if (msg && (msg as SDKMessage).type === 'result') {
@@ -61,8 +62,14 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
           }
           yield msg;
         }
+      } catch (e) {
+        // The underlying query (a spawned subprocess) can fail mid-stream.
+        // Capture the error so the root call is finalized as an error rather
+        // than a successful completion, then re-throw so the caller still sees it.
+        streamError = e;
+        throw e;
       } finally {
-        tracer.finalize(result);
+        tracer.finalize(result, streamError);
       }
     }
 
@@ -79,6 +86,12 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
         return typeof value === 'function'
           ? (value as (...a: unknown[]) => unknown).bind(realQuery)
           : value;
+      },
+      // Keep membership checks (`'streamInput' in query`) consistent with what
+      // `get` actually serves: generator protocol from the traced wrapper, every
+      // other member from the underlying query.
+      has(target, prop) {
+        return prop in target || prop in (realQuery as object);
       },
     });
   };
@@ -114,15 +127,17 @@ export function patchClaudeAgentSdk(exports: any): any {
  * Called once from `integrations/hooks.ts`.
  */
 export function instrumentClaudeAgentSdk(): void {
+  // Floor matches the 0.3.x message/usage shape this integration maps
+  // (nested `message`, camelCase `modelUsage`, result `subtype`).
   addCJSInstrumentation({
     moduleName: '@anthropic-ai/claude-agent-sdk',
     subPath: 'sdk.mjs',
-    version: '>= 0.1.0',
+    version: '>= 0.3.0',
     hook: patchClaudeAgentSdk,
   });
   addESMInstrumentation({
     moduleName: '@anthropic-ai/claude-agent-sdk',
-    version: '>= 0.1.0',
+    version: '>= 0.3.0',
     hook: patchClaudeAgentSdk,
   });
 }

@@ -6,6 +6,7 @@ import {
   textDisplayName,
   thinkingDisplayName,
   toolUseDisplayName,
+  toWeaveUsage,
   turnDisplayName,
 } from '../../integrations/claude-agent-sdk/messages';
 import {initWithCustomTraceServer} from '../clientMock';
@@ -86,6 +87,38 @@ describe('Claude Agent SDK — serializeMessage', () => {
   });
 });
 
+describe('Claude Agent SDK — toWeaveUsage', () => {
+  test('maps the SDK camelCase ModelUsage shape to snake_case usage keys', () => {
+    expect(
+      toWeaveUsage({
+        inputTokens: 10,
+        outputTokens: 5,
+        cacheReadInputTokens: 3,
+        cacheCreationInputTokens: 2,
+        // Non-token fields the rollup does not consume are dropped.
+        costUSD: 0.01,
+        contextWindow: 200000,
+      })
+    ).toEqual({
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_read_input_tokens: 3,
+      cache_creation_input_tokens: 2,
+    });
+  });
+
+  test('passes through fields already in snake_case (aggregate usage)', () => {
+    expect(toWeaveUsage({input_tokens: 7, output_tokens: 9})).toEqual({
+      input_tokens: 7,
+      output_tokens: 9,
+    });
+  });
+
+  test('omits absent token fields rather than emitting nulls', () => {
+    expect(toWeaveUsage({inputTokens: 4})).toEqual({input_tokens: 4});
+  });
+});
+
 describe('Claude Agent SDK — tracer', () => {
   let server: InMemoryTraceServer;
   const project = 'test-project-cas';
@@ -133,7 +166,15 @@ describe('Claude Agent SDK — tracer', () => {
       total_cost_usd: 0.01,
       duration_ms: 1234,
       num_turns: 1,
-      modelUsage: {'claude-x': {input_tokens: 10, output_tokens: 5}},
+      // Real SDK shape: ModelUsage values are camelCase. The tracer must map
+      // them to Weave's snake_case usage keys or token/cost rollup breaks.
+      modelUsage: {
+        'claude-x': {
+          inputTokens: 10,
+          outputTokens: 5,
+          cacheReadInputTokens: 3,
+        },
+      },
     } as any);
 
     const calls = await server.getCalls(project);
@@ -154,7 +195,10 @@ describe('Claude Agent SDK — tracer', () => {
       requests: 1,
       input_tokens: 10,
       output_tokens: 5,
+      cache_read_input_tokens: 3,
     });
+    // camelCase keys must not leak through into the usage summary.
+    expect(root.summary.usage['claude-x'].inputTokens).toBeUndefined();
 
     const thinking = calls.find(
       c => c.op_name === 'claude_agent_sdk.thinking'
@@ -280,7 +324,7 @@ describe('Claude Agent SDK — query() patch', () => {
         subtype: 'success',
         is_error: false,
         result: 'done',
-        modelUsage: {'claude-x': {input_tokens: 1, output_tokens: 2}},
+        modelUsage: {'claude-x': {inputTokens: 1, outputTokens: 2}},
       },
     ]);
     patchClaudeAgentSdk(sdk);
@@ -316,10 +360,50 @@ describe('Claude Agent SDK — query() patch', () => {
     await q.interrupt();
     expect(interrupt).toHaveBeenCalledTimes(1);
 
+    // Membership checks must agree with what `get` actually serves: forwarded
+    // control methods and generator-protocol members both report present.
+    expect('interrupt' in q).toBe(true);
+    expect(Symbol.asyncIterator in q).toBe(true);
+    expect('nonexistent' in q).toBe(false);
+
     // drain so the root call finalizes
     for await (const _msg of q) {
       void _msg;
     }
+  });
+
+  test('records an exception on the root call when the stream throws mid-iteration', async () => {
+    const boom = new Error('subprocess crashed');
+    const sdk = {
+      query: (_args: any) => {
+        async function* gen() {
+          yield {
+            type: 'assistant',
+            message: {
+              model: 'claude-x',
+              content: [{type: 'text', text: 'starting'}],
+            },
+          };
+          throw boom;
+        }
+        return gen() as any;
+      },
+    };
+    patchClaudeAgentSdk(sdk);
+
+    // The error must still propagate to the caller...
+    const drain = (async () => {
+      for await (const _msg of sdk.query({prompt: 'go'})) {
+        void _msg;
+      }
+    })();
+    await expect(drain).rejects.toThrow('subprocess crashed');
+
+    // ...and the root call must be finalized as an error, not a completion.
+    const calls = await server.getCalls(project);
+    const root = calls.find(c => c.op_name === 'claude_agent_sdk.query')!;
+    expect(root.output.status).toBe('error');
+    expect(root.exception).toContain('subprocess crashed');
   });
 
   test('passes through untouched when no weave client is initialized', async () => {

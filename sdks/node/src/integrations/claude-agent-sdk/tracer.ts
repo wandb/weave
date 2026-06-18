@@ -16,6 +16,7 @@ import {
   textDisplayName,
   thinkingDisplayName,
   toolUseDisplayName,
+  toWeaveUsage,
   turnDisplayName,
   type SDKAssistantMessage,
   type SDKMessage,
@@ -94,8 +95,13 @@ export class ClaudeAgentTracer {
     }
   }
 
-  /** Finish any open child calls and the root call, lifting result metadata. */
-  finalize(result?: SDKResultMessage): void {
+  /**
+   * Finish any open child calls and the root call, lifting result metadata.
+   * `error`, when set, is an exception thrown while iterating the stream and
+   * takes precedence over the result message: the root call is recorded as an
+   * error rather than a successful completion.
+   */
+  finalize(result?: SDKResultMessage, error?: unknown): void {
     if (this.finished) {
       return;
     }
@@ -128,21 +134,39 @@ export class ClaudeAgentTracer {
       if (result.modelUsage) {
         const usage: Record<string, unknown> = {};
         for (const [model, u] of Object.entries(result.modelUsage)) {
-          usage[model] = {requests: 1, ...u};
+          usage[model] = {requests: 1, ...toWeaveUsage(u)};
         }
         summary = {usage};
       } else if (this.rootModel && result.usage) {
-        summary = {usage: {[this.rootModel]: {requests: 1, ...result.usage}}};
+        summary = {
+          usage: {
+            [this.rootModel]: {requests: 1, ...toWeaveUsage(result.usage)},
+          },
+        };
       }
 
+      // why: the SDK reports non-success terminal subtypes (e.g.
+      // `error_max_turns`, `error_during_execution`); treat any non-`success`
+      // subtype as an error even if `is_error` is unset, so failed runs surface
+      // as errors. This intentionally broadens the Python integration's
+      // `is_error`-only check.
       if (result.is_error || (result.subtype && result.subtype !== 'success')) {
         output.status = 'error';
+        // `||` (not `??`) so an empty-string `result` falls through to the
+        // joined `errors` / default rather than yielding a blank exception.
         const detail =
-          result.result ??
-          (result.errors && result.errors.join('; ')) ??
+          result.result ||
+          (result.errors && result.errors.join('; ')) ||
           'Conversation ended with error';
         exception = String(detail);
       }
+    }
+
+    // A thrown stream error wins over the result message: the conversation did
+    // not complete, so report the exception (mirrors the WeaveClient pattern).
+    if (error != null) {
+      output.status = 'error';
+      exception = error instanceof Error ? error.message : String(error);
     }
 
     this.endCall(this.callId, output, summary, exception);

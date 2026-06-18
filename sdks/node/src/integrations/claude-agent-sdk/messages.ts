@@ -123,6 +123,40 @@ export function serializeMessage(msg: SDKMessage): Record<string, unknown> {
   }
 }
 
+// ── Usage mapping ───────────────────────────────────────────────────────
+
+/** Token fields mapped from the SDK's camelCase names to Weave's snake_case. */
+const USAGE_FIELDS: ReadonlyArray<readonly [camel: string, snake: string]> = [
+  ['inputTokens', 'input_tokens'],
+  ['outputTokens', 'output_tokens'],
+  ['cacheReadInputTokens', 'cache_read_input_tokens'],
+  ['cacheCreationInputTokens', 'cache_creation_input_tokens'],
+];
+
+/**
+ * Translate a Claude Agent SDK usage object into Weave's snake_case usage shape.
+ *
+ * The per-model values in a result's `modelUsage` use camelCase field names
+ * (`inputTokens`, `outputTokens`, `cacheReadInputTokens`, …), but Weave's
+ * usage/cost rollup keys on snake_case (`input_tokens`, `output_tokens`, …) —
+ * the same shape every other integration emits. Without this translation the
+ * token counts never aggregate (only `requests` survives). Snake_case fields
+ * already present (e.g. the aggregate `result.usage`, which the SDK reports in
+ * snake_case) are passed through unchanged, so this is safe for either shape.
+ */
+export function toWeaveUsage(
+  usage: Record<string, unknown>
+): Record<string, unknown> {
+  const mapped: Record<string, unknown> = {};
+  for (const [camel, snake] of USAGE_FIELDS) {
+    const value = usage[camel] ?? usage[snake];
+    if (value != null) {
+      mapped[snake] = value;
+    }
+  }
+  return mapped;
+}
+
 // ── Display-name helpers ────────────────────────────────────────────────
 
 const MAX_ABBREVIATION_WORDS = 8;
