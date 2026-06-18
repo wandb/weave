@@ -198,13 +198,13 @@ describe('Evaluation - declarative eval metadata', () => {
 
     const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCalls = calls.filter(c =>
-      c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
+      c.op_name.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
     );
-    const modelCalls = calls.filter(c => c.op_name?.includes('mockPrediction'));
+    const modelCalls = calls.filter(c => c.op_name.includes('mockPrediction'));
     const scorerCalls = calls.filter(
       c =>
-        c.op_name?.includes('lengthScorer') ||
-        c.op_name?.includes('inclusionScorer')
+        c.op_name.includes('lengthScorer') ||
+        c.op_name.includes('inclusionScorer')
     );
 
     // nTrials (2) * dataset rows (5), and scorers also * scorer count (2).
@@ -223,7 +223,7 @@ describe('Evaluation - declarative eval metadata', () => {
     // Exactly one root evaluate call; recognized by op_name, so it is
     // intentionally not tagged (its attributes are read before the wrapper runs).
     const rootCalls = calls.filter(c =>
-      c.op_name?.includes(EVALUATION_RUN_OP_NAME)
+      c.op_name.includes(EVALUATION_RUN_OP_NAME)
     );
     expect(rootCalls).toHaveLength(1);
     expect(rootCalls[0].attributes?._weave_eval_meta).toBeUndefined();
@@ -240,13 +240,13 @@ describe('Evaluation - declarative eval metadata', () => {
 
     const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCalls = calls.filter(c =>
-      c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
+      c.op_name.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
     );
-    const modelCalls = calls.filter(c => c.op_name?.includes('mockPrediction'));
+    const modelCalls = calls.filter(c => c.op_name.includes('mockPrediction'));
     const scorerCalls = calls.filter(
       c =>
-        c.op_name?.includes('lengthScorer') ||
-        c.op_name?.includes('inclusionScorer')
+        c.op_name.includes('lengthScorer') ||
+        c.op_name.includes('inclusionScorer')
     );
 
     // dataset rows (5), and scorers also * scorer count (2).
