@@ -266,7 +266,6 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
     assert {call.id for call in res.calls} == set(include_ids[:2])
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_filter_calls_by_nonexistent_queue(client):
     """Test that filtering by a non-existent queue returns empty results.
 

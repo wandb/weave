@@ -2,7 +2,6 @@ import pytest
 
 import weave
 from tests.trace.test_evaluate import Dataset
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.context.tests_context import raise_on_captured_errors
 
 
@@ -121,7 +120,6 @@ def test_published_dataset_laziness(client):
         assert _top_level_logs(log) == ["table_query"] * ((i // 100) + 1)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_from_calls(client):
     @weave.op
     def greet(name: str, age: int) -> str:

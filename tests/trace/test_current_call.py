@@ -120,7 +120,6 @@ def test_set_view_inside_op(client):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_set_view_string_content(client):
     """Verify weave.set_view accepts raw string content."""
 

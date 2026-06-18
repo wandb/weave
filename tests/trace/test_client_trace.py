@@ -159,7 +159,6 @@ def test_simple_op(client):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
     trace_id = generate_id()
@@ -273,7 +272,6 @@ def test_trace_server_call_start_and_end(client):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_read_not_found(client):
     call_id = generate_id()
     res = client.server.call_read(
@@ -421,7 +419,6 @@ def ref_str(op):
     return weave_client.get_ref(op).uri
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_filter_op_version_refs(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
     client.flush()
@@ -504,7 +501,6 @@ def get_all_calls_asserting_finished(
     return res
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_filter_input_object_version_refs(client):
     call_spec = simple_line_call_bootstrap()
 
@@ -563,7 +559,6 @@ def test_trace_call_query_filter_input_object_version_refs(client):
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_wb_run_step_query(client):
     from weave.trace import weave_client
     from weave.trace.wandb_run_context import WandbRunContext
@@ -664,7 +659,6 @@ def test_trace_call_wb_run_step_query(client):
     assert found_steps == exp_steps
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_wb_run_context_override(client):
     """Test that client.set_wandb_run_context() overrides wandb run info."""
     # Set the context with a specific run_id and step
@@ -743,7 +737,6 @@ def test_trace_call_wb_run_context_override(client):
     assert latest_call.wb_run_step is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_filter_output_object_version_refs(client):
     call_spec = simple_line_call_bootstrap()
 
@@ -802,7 +795,6 @@ def test_trace_call_query_filter_output_object_version_refs(client):
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_filter_parent_ids(client):
     call_spec = simple_line_call_bootstrap()
 
@@ -839,7 +831,6 @@ def test_trace_call_query_filter_parent_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_filter_trace_ids(client):
     call_spec = simple_line_call_bootstrap()
 
@@ -867,7 +858,6 @@ def test_trace_call_query_filter_trace_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_filter_call_ids(client):
     call_spec = simple_line_call_bootstrap()
 
@@ -895,7 +885,6 @@ def test_trace_call_query_filter_call_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
     client.flush()
@@ -989,7 +978,6 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
 
 # Flaky against ClickHouse in CI: read-after-write visibility lag means a
 # calls_query right after flush can miss just-written rows. Rerun to absorb it.
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
     call_spec_1 = simple_line_call_bootstrap()
@@ -1029,7 +1017,6 @@ def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush)
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_limit(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
     client.flush()
@@ -1052,7 +1039,6 @@ def test_trace_call_query_limit(client, no_autoflush):
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_offset(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
     client.flush()
@@ -1154,7 +1140,6 @@ def test_trace_call_query_timings(client, no_autoflush):
         assert tids == ids
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_sort(client):
     @weave.op
     def basic_op(in_val: dict, delay) -> dict:
@@ -1186,7 +1171,6 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_sort_with_mixed_types(client):
 
     @weave.op
@@ -1623,7 +1607,6 @@ def test_trace_call_filter(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_ops_with_default_params(client):
     @weave.op
     def op_with_default(a: int, b: int = 10) -> int:
@@ -1698,7 +1681,6 @@ def test_root_type(client):
     assert len(inner_res.objs) == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_attributes_on_ops(client):
     @weave.op
     def op_with_attrs(a: int, b: int) -> int:
@@ -1755,7 +1737,6 @@ def test_dataset_row_type(weave_active):
         d = weave.Dataset(rows=[{"a": 1}, {}])
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataclass_support(client):
     @dataclasses.dataclass
     class MyDataclass:
@@ -1919,7 +1900,6 @@ def test_table_query_empty_sort_field_validation(client):
         assert "jsonpath" not in str(exc_info.value).lower()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_tuple_support(client):
     @weave.op
     def tuple_maker(a, b):
@@ -1949,7 +1929,6 @@ class Point(NamedTuple):
     y: Any
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_namedtuple_support(client):
     @weave.op
     def tuple_maker(a, b):
@@ -2014,7 +1993,6 @@ async def test_named_reuse(client):
     assert len(res.objs) == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_unknown_input_and_output_types(client):
     class MyUnknownClassA:
         a_val: float
@@ -2102,7 +2080,6 @@ def _patched_default_initializer(trace_client: weave_client.WeaveClient):
         weave_init.init_weave_get_server = orig
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_single_primitive_output(client):
     @weave.op
     def single_int_output(a: int) -> int:
@@ -2194,7 +2171,6 @@ def map_with_copying_thread_executor(fn, vals):
 
 
 # TODO: Make an async version of this
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(retries=5)  # <-- Flakes in CI
 @pytest.mark.parametrize(
     "mapper",
@@ -2336,7 +2312,6 @@ def call_structure(calls):
     return found_structure
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stack_order_implicit_depth_first(client):
     # Note: There is a debate going on about if the client should
     # be responsible for enforcing the call stack order (vs having)
@@ -2381,7 +2356,6 @@ def test_call_stack_order_implicit_depth_first(client):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stack_order_explicit_depth_first(client):
     # Note: There is a debate going on about if the client should
     # be responsible for enforcing the call stack order (vs having)
@@ -2428,7 +2402,6 @@ def test_call_stack_order_explicit_depth_first(client):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stack_order_langchain_batch(client):
     # Note: There is a debate going on about if the client should
     # be responsible for enforcing the call stack order (vs having)
@@ -2481,7 +2454,6 @@ def test_call_stack_order_langchain_batch(client):
 POP_REORDERS_STACK = False
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stack_order_out_of_order_pop(client):
     # Note: There is a debate going on about if the client should
     # be responsible for enforcing the call stack order (vs having)
@@ -2554,7 +2526,6 @@ def test_call_stack_order_out_of_order_pop(client):
     assert call_structure(inner_res.calls) == exp
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stack_order_height_ordering(client):
     # Note: There is a debate going on about if the client should
     # be responsible for enforcing the call stack order (vs having)
@@ -2600,7 +2571,6 @@ def test_call_stack_order_height_ordering(client):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stack_order_mixed(client):
     # Note: There is a debate going on about if the client should
     # be responsible for enforcing the call stack order (vs having)
@@ -2644,7 +2614,6 @@ def test_call_stack_order_mixed(client):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_query_stream_equality(client):
     @weave.op
     def calculate(a: int, b: int) -> int:
@@ -2673,7 +2642,6 @@ def test_call_query_stream_equality(client):
     assert i == len(calls.calls)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_query_stream_columns(client):
     @weave.op
     def calculate(a: int, b: int) -> dict[str, Any]:
@@ -2960,7 +2928,6 @@ def test_read_call_start_with_cost(client):
     client.purge_costs(price_id)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_read_with_unkown_llm(client):
     """Tests that if an op reports usage for an LLM ID that has no cost entry
     in the database, the cost calculation handles it gracefully (by not adding cost info).
@@ -3219,7 +3186,6 @@ def test_user_cannot_modify_call_weave_dict(weave_active):
     # but at that point you're on your own :)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_iter_slice(weave_active):
     @weave.op
     def func(x):
@@ -3233,7 +3199,6 @@ def test_calls_iter_slice(weave_active):
     assert len(calls_subset) == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_iter_cached(weave_active):
     @weave.op
     def func(x):
@@ -3261,7 +3226,6 @@ def test_calls_iter_cached(weave_active):
         assert elapsed_times[0] > elapsed_times[2] * 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_iter_different_value_same_page_cached(weave_active):
     @weave.op
     def func(x):
@@ -3330,7 +3294,6 @@ def test_model_save(client):
     assert expected_predict_op.startswith("weave:///")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_stream_column_expansion(client):
     # make an object, and a nested object
     # make an op that accepts the nested object, and returns it
@@ -3429,7 +3392,6 @@ def test_calls_stream_column_expansion(client):
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
 # in clickhouse_trace_server_settings.py, this test verifies that the dynamic
 # increase works as expected
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize("batch_size", [1, 5, 6])
 def test_calls_stream_column_expansion_dynamic_batch_size(
     client, batch_size, monkeypatch
@@ -3697,7 +3659,6 @@ def test_feedback_filter_finds_minority_reaction(client):
     assert results[0].id == calls[0].id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_inline_dataclass_generates_no_refs_in_function(client):
     @dataclasses.dataclass
     class A:
@@ -3745,7 +3706,6 @@ def test_inline_dataclass_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the dataclass
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_inline_pydantic_basemodel_generates_no_refs_in_function(client):
     class A(BaseModel):
         b: int
@@ -4311,7 +4271,6 @@ def test_calls_query_dupe_select_columns_no_duplicate_sql(client, caplog):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_stream_heavy_condition_aggregation_parts(client):
     def _make_query(field: str, value: str) -> tsi.CallsQueryRes:
         query = {
@@ -4366,7 +4325,6 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     assert res[0].output["d"] == 5
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stream_query_heavy_query_batch(client):
     # start 10 calls
     call_ids = []
@@ -4488,7 +4446,6 @@ def clickhouse_client(client):
     return ch_server.ch_client
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_with_storage_size_clickhouse(client):
     """Test querying calls with storage size information."""
 
@@ -4522,7 +4479,6 @@ def test_calls_query_with_storage_size_clickhouse(client):
     assert call.storage_size_bytes is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_with_total_storage_size_clickhouse(client):
     """Test querying calls with total storage size."""
 
@@ -4574,7 +4530,6 @@ def test_calls_query_with_total_storage_size_clickhouse(client):
     )  # Child should not have total size
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_with_both_storage_sizes_clickhouse(client):
     """Test querying calls with total storage size."""
 
@@ -4626,7 +4581,54 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client):
     assert child_call.total_storage_size_bytes is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_total_storage_size_is_project_scoped(client):
+    project_id = get_client_project_id(client)
+    entity, _ = from_project_id(project_id)
+    other_project_id = to_project_id(entity, f"total-storage-other-{uuid.uuid4().hex}")
+    trace_id = str(uuid.uuid4())
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+
+    project_call_id = str(uuid.uuid4())
+    other_project_call_id = str(uuid.uuid4())
+
+    for call_project_id, call_id, payload in (
+        (project_id, project_call_id, "small"),
+        (other_project_id, other_project_call_id, "x" * 1000),
+    ):
+        client.server.calls_complete(
+            tsi.CallsUpsertCompleteReq(
+                batch=[
+                    tsi.CompletedCallSchemaForInsert(
+                        project_id=call_project_id,
+                        id=call_id,
+                        trace_id=trace_id,
+                        op_name="storage_test",
+                        started_at=started_at,
+                        ended_at=started_at + datetime.timedelta(seconds=1),
+                        attributes={},
+                        inputs={"payload": payload},
+                        output=None,
+                        summary={},
+                    )
+                ]
+            )
+        )
+
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(call_ids=[project_call_id]),
+            include_storage_size=True,
+            include_total_storage_size=True,
+        )
+    ).calls
+
+    assert len(calls) == 1
+    assert calls[0].total_storage_size_bytes == calls[0].storage_size_bytes
+
+
 def test_calls_hydrated(client):
     nested = {"hi": {"there": {"foo": "bar"}}}
     nested_ref = weave.publish(nested)
@@ -4716,7 +4718,6 @@ def test_obj_query_with_storage_size_clickhouse(client):
     assert queried_obj_without_size.size_bytes is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_query_stream_with_costs_and_storage_size(client):
     @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
@@ -4769,7 +4770,6 @@ def test_call_query_stream_with_costs_and_storage_size(client):
     assert child_call.storage_size_bytes is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_query_stream_with_invalid_filter_field(client):
 
     with pytest.raises(InvalidFieldError):
@@ -4830,7 +4830,6 @@ def test_get_object_from_uri_non_registered_object(weave_active):
     assert res.predict(5) == 6
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dedupe_ref_in_calls_stream(client):
     nested_obj = {"nested": 123}
     nested_ref = weave.publish(nested_obj)
@@ -5147,7 +5146,6 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
     assert res.count == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_thread_ids_filter_returns_matching_thread(client):
     """Create 3 threads, request the second one, assert the returned call has the correct thread_id."""
     client.set_wandb_run_context(run_id="thread-filter-run", step=0)
@@ -5290,7 +5288,6 @@ def test_project_stats_clickhouse(client, clickhouse_client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_with_descendant_error(client):
     class TestException(Exception):
         pass
@@ -5445,7 +5442,6 @@ def test_thread_context_with_weave_api(client):
     assert call_context.get_thread_id() is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_thread_id_in_calls(client):
     """Test that thread_id is properly captured in call records, including auto-generation."""
     import weave
@@ -5508,7 +5504,6 @@ def test_thread_id_in_calls(client):
     assert no_thread_call.thread_id is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_thread_id_inheritance(client):
     """Test that thread_id is inherited by child calls, demonstrated via ThreadContext."""
     import weave
@@ -5557,7 +5552,6 @@ def test_thread_id_inheritance(client):
     assert child_call.thread_id == "inherited_thread"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_thread_id_query_filtering(client):
     """Test that calls can be filtered by thread_id."""
     import weave
@@ -6103,7 +6097,6 @@ def test_threads_query_aggregation_fields(client):
     assert find_test_thread_in_results(sorted_by_p99) is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_turn_id_functionality(client):
     """Test that turn_id is properly assigned for turn calls and descendants."""
     import weave
@@ -6174,7 +6167,6 @@ def test_turn_id_functionality(client):
         assert child_call.turn_id == parent_turn_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_nested_thread_contexts_turn_lineage(client):
     """Test that nested thread contexts properly cut off turn lineage."""
     import weave
@@ -6263,7 +6255,6 @@ def test_nested_thread_contexts_turn_lineage(client):
         assert child_call.turn_id == parent_turn_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_thread_id_none_turn_id_none(client):
     """Test that when thread_id is None, turn_id is also None."""
     import weave
@@ -6324,7 +6315,6 @@ def test_thread_id_none_turn_id_none(client):
     assert outside_call.turn_id is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_nested_thread_disable_with_none(client):
     """Test that ThreadContext properly shows thread_id=None when threading is disabled."""
     import weave
@@ -6410,7 +6400,6 @@ def test_nested_thread_disable_with_none(client):
     assert turn_a_call.turn_id != turn_c_call.turn_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_thread_api_with_auto_generation(client):
     """Test the thread API with ThreadContext and auto-generation."""
     import weave
@@ -6476,7 +6465,6 @@ def test_thread_api_with_auto_generation(client):
     assert disabled_call.turn_id is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_filter_contains_in_message_array(client):
     @weave.op
     def op1(extra_message: str | None = None):
