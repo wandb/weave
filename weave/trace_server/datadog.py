@@ -32,6 +32,8 @@ from urllib.parse import urlparse
 
 from opentelemetry import trace as _otel_trace
 
+from weave.trace_server.local_root import get_local_root
+
 logger = logging.getLogger(__name__)
 
 DB_INSERT_METRIC = "weave_trace_server.db_inserts"
@@ -168,14 +170,26 @@ def record_db_insert(*, table: str, count: int, path: str | None = None) -> None
 
 
 def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:
-    """Set attributes on the current OTel span.
+    """Set attributes on the currently active OTel span.
 
     No-op if no span is recording. Replaces the historical
-    `ddtrace.tracer.current_span().set_tags(...)` and
-    `ddtrace.tracer.current_root_span().set_tags(...)` — OTel has no
-    built-in root-span accessor, but every historical call site only needs
-    the span currently active when the helper is called.
+    `ddtrace.tracer.current_span().set_tags(...)`.
     """
     span = _otel_trace.get_current_span()
     if span.is_recording():
         span.set_attributes(tags)
+
+
+def set_root_span_dd_tags(tags: dict[str, str | float | int]) -> None:
+    """Set attributes on the local root span — the entry-point span recorded
+    by `local_root_scope` at the request / batch boundary.
+
+    Replaces the historical `ddtrace.tracer.current_root_span().set_tags(...)`.
+    OTel has no built-in current-root-span accessor; the request middleware
+    must call `local_root_scope(request_span)` for `get_local_root()` to
+    return the right span. No-op if no `local_root_scope` is active.
+    """
+    span = get_local_root()
+    if span is None:
+        return
+    span.set_attributes(tags)
