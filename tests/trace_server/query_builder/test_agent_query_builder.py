@@ -962,6 +962,28 @@ class TestResolveGroupBy:
                 pb, [AgentGroupByRef(source="column", key="raw_span_dump")]
             )
 
+    def test_rejects_payload_bearing_custom_attr_keys(self) -> None:
+        """Grouping on a full input/output payload attribute makes the GROUP BY
+        key near-unique and large per span, so ClickHouse builds an enormous
+        aggregation hash table and OOMs. Reject these keys instead.
+        """
+        # The client sends a hashed, identifier-safe alias (e.g.
+        # ``custom_string_mk1e43``), so the raw key reaches the custom-attr
+        # branch; the guard must key off ``ref.key``, not the alias.
+        for key in ("input.value", "output.value"):
+            pb = ParamBuilder("genai")
+            with pytest.raises(ValueError, match="free-form payload"):
+                resolve_group_by(
+                    pb,
+                    [
+                        AgentGroupByRef(
+                            source="custom_attrs_string",
+                            key=key,
+                            alias="custom_string_x",
+                        )
+                    ],
+                )
+
     def test_rejects_duplicate_alias(self) -> None:
         pb = ParamBuilder("genai")
         with pytest.raises(ValueError, match="duplicate group_by alias"):

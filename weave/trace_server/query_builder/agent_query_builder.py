@@ -124,6 +124,18 @@ _IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES)
 _FIELD_GROUP_BY_SOURCES: frozenset[str] = frozenset({"field", "column"})
 
+# Custom-attribute keys that hold a span's full input/output payload
+# (OpenInference `input.value` / `output.value`). Their values are large and
+# near-unique per span, so a GROUP BY on one produces ~one group per row: the
+# aggregation hash table grows with the scan and OOMs ClickHouse. They are never
+# meaningful grouping dimensions, so reject them up front.
+GROUP_BY_DENYLISTED_CUSTOM_ATTR_KEYS: frozenset[str] = frozenset(
+    {
+        "input.value",
+        "output.value",
+    }
+)
+
 _VALUE_TYPE_STRING: AgentSpanStatsValueType = "string"
 _VALUE_TYPE_NUMBER: AgentSpanStatsValueType = "number"
 _VALUE_TYPE_BOOLEAN: AgentSpanStatsValueType = "boolean"
@@ -539,6 +551,11 @@ def resolve_group_by(
                 raise ValueError(f"group_by field {ref.key!r} is not in the allowlist")
             sql_expr = f"{table_alias}.{column}"
         elif ref.source in _CUSTOM_ATTR_SOURCES:
+            if ref.key in GROUP_BY_DENYLISTED_CUSTOM_ATTR_KEYS:
+                raise ValueError(
+                    f"group_by on custom attribute {ref.key!r} is not allowed: it "
+                    "holds a free-form payload whose value is near-unique per span"
+                )
             key_slot = pb.add(str(ref.key), param_type="String")
             sql_expr = custom_attr_value_or_null(table_alias, ref.source, key_slot)
         else:
