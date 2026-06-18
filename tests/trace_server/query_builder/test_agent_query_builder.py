@@ -1,9 +1,9 @@
-"""SQL shape assertions for every ``make_*_query`` function in the agent
+"""SQL shape assertions for every `make_*_query` function in the agent
 query builder.
 
-Each test builds a ``ParamBuilder``, calls the builder, and compares the full
+Each test builds a `ParamBuilder`, calls the builder, and compares the full
 formatted SQL + param dict against an expected value, matching the style of
-``test_annotation_queues_query_builder.py`` etc.
+`test_annotation_queues_query_builder.py` etc.
 """
 
 import datetime
@@ -47,6 +47,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
     make_conversation_previews_query,
+    make_conversation_spans_query,
     make_custom_attrs_schema_query,
     make_message_search_query,
     make_span_group_categorical_distributions_query,
@@ -366,7 +367,7 @@ class TestMakeSpansListQuery:
 
 
 #: The fixed aggregate tail emitted by the grouped list query, as it would
-#: appear after ``SELECT <group_cols>,``. Used to keep test expected SQL
+#: appear after `SELECT <group_cols>,`. Used to keep test expected SQL
 #: readable without duplicating the bundle across every test.
 _GROUPED_AGG_TAIL = """count() AS span_count,
                countIf(s.operation_name = 'invoke_agent') AS invocation_count,
@@ -434,6 +435,59 @@ class TestMakeConversationPreviewsQuery:
             query,
             pb.get_params(),
         )
+
+
+def test_make_conversation_spans_query() -> None:
+    # Scoped to the page's conversation_ids (like the previews query), reading
+    # only narrow scalar columns: an ordered, capped array of per-span tuples
+    # aliased `spans`. Kind is classified from operation_name; ERROR comes from
+    # status_code.
+    pb = ParamBuilder("genai")
+    query = make_conversation_spans_query(pb, "p1", ["conv-a", "conv-b"])
+    expected = """
+        SELECT s.conversation_id AS conversation_id,
+               arraySlice(arraySort(x -> x.1, groupArray(tuple(s.started_at, multiIf(s.operation_name = 'invoke_agent', 'agent', s.operation_name = 'execute_tool', 'tool', 'assistant'), s.trace_id, s.span_id, s.status_code, if(s.ended_at > s.started_at, toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), 0)))), -200) AS spans
+        FROM spans s
+        WHERE s.project_id = {genai_0:String}
+          AND s.conversation_id IN {genai_1:Array(String)}
+        GROUP BY conversation_id
+    """
+    assert_sql(
+        expected,
+        {"genai_0": "p1", "genai_1": ["conv-a", "conv-b"]},
+        query,
+        pb.get_params(),
+    )
+
+
+def test_make_conversation_spans_query_with_time_range() -> None:
+    pb = ParamBuilder("genai")
+    start = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2024, 1, 2, tzinfo=datetime.timezone.utc)
+    query = make_conversation_spans_query(
+        pb, "p1", ["conv-a", "conv-b"], started_after=start, started_before=end
+    )
+    expected = """
+        SELECT s.conversation_id AS conversation_id,
+               arraySlice(arraySort(x -> x.1, groupArray(tuple(s.started_at, multiIf(s.operation_name = 'invoke_agent', 'agent', s.operation_name = 'execute_tool', 'tool', 'assistant'), s.trace_id, s.span_id, s.status_code, if(s.ended_at > s.started_at, toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), 0)))), -200) AS spans
+        FROM spans s
+        WHERE s.project_id = {genai_0:String}
+          AND s.conversation_id IN {genai_1:Array(String)}
+          AND s.started_at >= {genai_2:DateTime64(6)}
+          AND s.started_at < {genai_3:DateTime64(6)}
+        GROUP BY conversation_id
+    """
+    assert_sql(
+        expected,
+        {
+            "genai_0": "p1",
+            "genai_1": ["conv-a", "conv-b"],
+            "genai_2": start,
+            "genai_3": end,
+        },
+        query,
+        pb.get_params(),
+    )
 
 
 class TestMakeGroupedSpansCountQuery:
