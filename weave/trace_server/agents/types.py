@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -548,7 +548,7 @@ class AgentSpanGroupDistributionSpec(BaseModel):
         return self
 
     def custom_attr_source(self) -> AgentCustomAttrSource:
-        """Return ``value.source`` narrowed to ``AgentCustomAttrSource``.
+        """Return `value.source` narrowed to `AgentCustomAttrSource`.
 
         The model validator guarantees this at construction time; this helper
         re-checks each literal so callers avoid `cast()` at use sites.
@@ -608,6 +608,82 @@ class AgentConversationMessagePreview(BaseModel):
 
     role: str = ""
     text: str = ""
+
+
+# Coarse span kind from operation_name / status_code. Distinct from
+# AgentChatMessageType: the classifier only emits agent / tool / assistant
+# (+ unknown), not the full message taxonomy.
+ConversationSpanKind = Literal[
+    "user",
+    "assistant",
+    "tool",
+    "agent",
+    "handoff",
+    "compaction",
+    "unknown",
+]
+
+
+class AgentConversationSpan(BaseModel):
+    """One span in a conversation's trace.
+
+    Returned by `agent_conversation_spans`, which reads span scalar columns
+    only (no message bodies). Spans are ordered by `started_at`, which
+    approximates — but does not exactly match — the detail chat view's
+    parent/child tree-walk order.
+    """
+
+    kind: ConversationSpanKind = "unknown"
+    trace_id: str = ""
+    span_id: str = ""
+    status: StatusCodeLiteral = "UNSET"
+    duration_ms: int = 0
+
+
+class AgentConversationSpanFeedback(BaseModel):
+    """A feedback marker for a conversation's trace.
+
+    Positioned client-side by matching `trace_id` (turn) against the spans.
+    `tags` holds the human tags on this feedback (emoji reactions are tags too).
+    """
+
+    trace_id: str = ""
+    feedback_type: str = ""
+    tags: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Human tags on this feedback, skin-tone-detoned. Emoji tags are the "
+            "glyph itself (e.g. a thumbs-up); empty when it carries none."
+        ),
+        examples=[["\U0001f44d"]],
+    )
+
+
+class AgentConversationSpans(BaseModel):
+    """One conversation's span sequence and its feedback markers."""
+
+    conversation_id: str
+    spans: list[AgentConversationSpan] = Field(default_factory=list)
+    spans_feedback: list[AgentConversationSpanFeedback] = Field(default_factory=list)
+
+
+class AgentConversationSpansReq(BaseModel):
+    """Request the span sequences for an explicit set of conversations.
+
+    Reads span scalar columns only (no message bodies) for the given
+    `conversation_ids`. Powers the conversations-list spans minimap.
+    """
+
+    project_id: str
+    conversation_ids: list[str] = Field(default_factory=list)
+    started_after: AwareDatetime | None = None  # filter started_at >= start
+    started_before: AwareDatetime | None = None  # filter started_at < end
+
+
+class AgentConversationSpansRes(BaseModel):
+    """Span sequences + feedback markers, one entry per requested conversation."""
+
+    conversations: list[AgentConversationSpans] = Field(default_factory=list)
 
 
 class AgentSpanGroupRow(BaseModel):
