@@ -1,0 +1,56 @@
+## Conversation
+PR-A of a 2-PR Graphite stack. User asked to generate a weave-trace Python SDK
+via stlc, publish to test PyPI, depend on it from weave "for now", add
+calls_complete parity, and submit as a stack. This commit prepares the SDK dep
++ brings the Stainless client to parity (PR-B flips the default + deletes the
+hand-rolled impl).
+
+## Actions
+- (Separate, CORE repo, NOT in this PR) extended openapi.stainless.yml to add
+  the ~13 methods the consumer calls + a HTTPBasic securityScheme transform;
+  regenerated; published weave_server_sdk 0.0.2 to test PyPI via twine.
+- pyproject.toml: added weave_server_sdk==0.0.2 + a [tool.uv] `explicit`
+  testpypi index (+ [tool.uv.sources]); uv.lock relocked.
+- stainless_remote_http_trace_server.py: added the calls_complete write path
+  (CallBatchProcessor branch in __init__; _flush_calls_complete /
+  _flush_calls_eager / _send_calls_complete_to_server / _send_call_start_v2 /
+  _send_call_end_v2 / _extract_entity_project / _upgrade_to_calls_complete /
+  _raw_post). Removed the invalid batch_requests= kwarg.
+- test_http_behavior_stainless.py: added calls_complete + eager endpoint tests;
+  forced WEAVE_USE_CALLS_COMPLETE=false for the 2 legacy _send_batch_to_server
+  tests.
+
+## Errors & Mistakes
+- test PyPI 0.0.1 was a broken autoconfig dump (method-name collisions:
+  objects.tags x2, create_remove x2, calls.create_usage x2 → endpoints
+  unreachable). Published a clean 0.0.2 from the curated config instead.
+- First stainless run HUNG: with use_calls_complete defaulting True the impl
+  now builds a CallBatchProcessor, but legacy tests mocked the
+  AsyncBatchProcessor send path and enqueued a lone start → teardown blocked on
+  FLUSH_TIMEOUT_SECONDS (5 min). Fixed by forcing legacy mode in those tests.
+- New calls_complete tests first failed APIConnectionError: the mocked
+  _stainless_client.post was discarded by _update_client_headers' .copy() under
+  @with_retry's retry context. Fixed by no-op'ing _update_client_headers there.
+
+## Dead Ends
+- httpx.ASGITransport is async-only and can't back the SDK's sync httpx.Client
+  (no handle_request) — relevant to PR-B's fixture; used TestClient instead.
+
+## Hints for Future Agents
+- The calls_complete v2 endpoints (/v2/{entity}/{project}/calls/complete,
+  /call/start, /call/end) are include_in_schema=False in
+  services/weave-trace/src/trace_server.py — deliberately hidden from the SDK,
+  so the impl posts to them via the SDK's raw client.post().
+- The dep is on TEST PyPI (interim). Before any weave release: publish the SDK
+  to real PyPI and drop the [tool.uv] testpypi index + source.
+
+## Codebase Discoveries
+- The core openapi.stainless.yml config and the weave consumer had drifted
+  (config missing usage/tags/aliases/batch_create/trace.usage/etc.).
+- should_use_calls_complete() defaults True — calls_complete is the default
+  production write path.
+
+## Open Questions
+- The dedicated "stainless" CI shard (noxfile + test.yaml) is still disabled;
+  PR-B makes the default trace shard exercise the Stainless client. Re-enabling
+  or removing the shard is a follow-up.
