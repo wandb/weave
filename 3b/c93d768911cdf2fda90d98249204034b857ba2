@@ -17,3 +17,15 @@ google-adk-02..06 still carry the inherited section until their next restack ont
 this amended commit (a clean 'gt restack' replays their own commits, which never
 touched AGENTS.md, so the section drops automatically; watch for gt dropping their
 per-commit notes on that restack — migrate with 'git notes copy -f old new').
+
+## Session addendum — make slice 1 standalone for real ADK runners
+User clarified every PR in the stack must be standalone, not merely correct at the final stack tip. Review found slice 1 exported and documented WeaveAdkPlugin but omitted ADK BasePlugin model/tool methods; @google/adk PluginManager calls those methods unconditionally, so slice 1 alone crashed with TypeError in a real LlmAgent run. Added no-op stubs for beforeModelCallback, afterModelCallback, onModelErrorCallback, beforeToolSelection, beforeToolCallback, afterToolCallback, and onToolErrorCallback. These are intentionally placeholders: slice 2 replaces model stubs with chat tracing; slice 3 replaces tool stubs with execute_tool tracing.
+
+Also added a real InMemoryRunner + LlmAgent + ScriptedLlm test to slice 1. This test uses explicit plugins: [new WeaveAdkPlugin()] and verifies the run-only slice no longer crashes under the real ADK PluginManager while still recording the root invoke_agent span with input/output messages.
+
+Verification for this amendment:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (5 passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint src/integrations/googleAdk.ts src/__tests__/integrations/googleAdk.test.ts
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check src/integrations/googleAdk.ts src/__tests__/integrations/googleAdk.test.ts
+
+No push performed. Notes preserved manually because amend creates a new commit SHA.
