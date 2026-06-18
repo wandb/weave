@@ -64,4 +64,17 @@
             </shard>
         </weave_cluster>
     </remote_servers>
+
+    <!-- Disable ReplicatedMergeTree insert block-dedup. CI inserts are
+         synchronous (test_overrides.xml sets async_insert=0 for
+         read-after-write determinism), and a sync re-insert of a
+         byte-identical block is silently dropped by Keeper dedup. Weave
+         legitimately re-inserts identical rows (delete+recreate an object,
+         republish-to-promote "latest", re-tag, re-set a call display_name)
+         because the per-row created_at is a server-side DEFAULT, not part
+         of the insert block. Prod inserts asynchronously, where dedup is
+         off by default, so 0 matches prod's effective behavior. -->
+    <merge_tree>
+        <replicated_deduplication_window>0</replicated_deduplication_window>
+    </merge_tree>
 </clickhouse>
