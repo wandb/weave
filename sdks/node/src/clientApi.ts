@@ -1,6 +1,6 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
-import {makeSettings, Settings} from './settings';
+import {makeSettings, type Settings} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
