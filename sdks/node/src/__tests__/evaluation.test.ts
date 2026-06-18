@@ -217,7 +217,7 @@ describe('Evaluation - declarative eval metadata', () => {
       ...modelCalls,
       ...scorerCalls,
     ]) {
-      expect(call.attributes?._weave_eval_meta).toEqual({declarative: true});
+      expect(call.attributes._weave_eval_meta).toEqual({declarative: true});
     }
 
     // Exactly one root evaluate call; recognized by op_name, so it is
@@ -260,7 +260,7 @@ describe('Evaluation - declarative eval metadata', () => {
       ...modelCalls,
       ...scorerCalls,
     ]) {
-      expect(call.attributes?._weave_eval_meta).toEqual({
+      expect(call.attributes._weave_eval_meta).toEqual({
         foo: true,
         declarative: true,
       });

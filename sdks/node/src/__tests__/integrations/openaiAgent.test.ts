@@ -100,7 +100,7 @@ describe('OpenAI Agents Integration', () => {
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
 
     for (const {id, expectedKind} of spans) {
-      const call = calls.find(c => c.attributes?.agent_span_id === id);
+      const call = calls.find(c => c.attributes.agent_span_id === id);
       expect(call?.attributes?.kind).toBe(expectedKind);
     }
   });
@@ -114,9 +114,7 @@ describe('OpenAI Agents Integration', () => {
     expect(calls).toHaveLength(2);
 
     const traceCall = calls.find(c => c.op_name === 'openai_agent_trace');
-    const spanCall = calls.find(
-      c => c.attributes?.agent_span_id === 'span-123'
-    );
+    const spanCall = calls.find(c => c.attributes.agent_span_id === 'span-123');
 
     expect(spanCall!.parent_id).toBe(traceCall!.id);
     expect(spanCall!.trace_id).toBe(traceCall!.trace_id);
@@ -213,7 +211,7 @@ describe('OpenAI Agents Integration', () => {
     // Integration-tracking metadata is stamped on calls this processor
     // produces. The trace also contains nested OpenAI SDK calls with their
     // own integration block, so match by name rather than by index.
-    const stamped = calls.map(c => c.attributes?.integration).filter(Boolean);
+    const stamped = calls.map(c => c.attributes.integration).filter(Boolean);
     const mine = stamped.filter(i => i.name === 'openai_agents');
     expect(mine.length).toBeGreaterThan(0);
     expect(mine.every(i => i.meta?.package_name === '@openai/agents')).toBe(
