@@ -1,0 +1,55 @@
+## Conversation
+User asked "Do we still use sqlite in this repo? If yes, get rid of it."
+Investigation showed weave's own sqlite *trace server* backend was already
+removed (before this branch); backends are now clickhouse + fake in-memory.
+I found 3 residual sqlite references: a stale pytest.skip message, the
+pyproject `pysqlite3` langchain dep + `fix_chroma_ci` fixture (chromadb), and
+the GHA `libsqlite3-dev` apt step. User clarified "not that [chromadb], I mean
+the testing infra for GHA", then "remove the install sqlite dev package step",
+then "only stage the .github stuff and put up a pr".
+
+## Actions
+- rg -i sqlite across repo; confirmed weave/, docs/, .circleci/, sdks/, Makefile,
+  noxfile.py have ZERO sqlite refs. Only matches: pyproject.toml:138,
+  tests/trace/test_client_trace.py:4961, tests/integrations/langchain/langchain_test.py,
+  and under .github: dependabot.yml + libsqlite3-dev steps in test.yaml,
+  nightly-tests.yaml, nightly-replicated-leg.yaml.
+- git log -S libsqlite3-dev -- test.yaml => commit 6c559b71 "chore(weave): Fix
+  langchain sqlite issue in CI (#3400)" (Andrew Truong, 2025-01-14). Confirms the
+  step was added for langchain/chromadb, NOT the trace server.
+- Removed the "Install SQLite dev package" step from all three workflows.
+  Verified: no libsqlite3-dev/"Install SQLite" left in .github/workflows; all
+  three YAMLs parse via /usr/bin/python3 -c yaml.safe_load (project .venv had no
+  python on PATH; system python3 used).
+- Staged ONLY the 3 workflows (left tests/trace/test_client_trace.py skip-message
+  reword unstaged, per "only stage the .github stuff").
+
+## Errors & Mistakes
+- First YAML validation attempt used `python` which is not on PATH (Conductor
+  workspace .venv is stale/unsynced per prior notes). Fell back to /usr/bin/python3.
+- Initially went down the chromadb/pyproject path; user redirected to GHA infra.
+
+## Dead Ends
+- None substantive.
+
+## Hints for Future Agents
+- libsqlite3-dev in CI is for compiling `pysqlite3` (source-only on PyPI) for the
+  langchain shard's chromadb. Removing it WILL likely break the langchain shard's
+  dependency build. The clean fix to keep it green is `pysqlite3` ->
+  `pysqlite3-binary` (bundles its own sqlite) in pyproject's langchain group;
+  user explicitly scoped that dep change OUT for now ("not that").
+- dependabot.yml still has `pysqlite3*` under the `langchain` group (untouched).
+- The step ran for ALL ~25 shards in test.yaml (not gated to langchain) — was
+  wasteful even before removal.
+
+## Codebase Discoveries
+- Trace-server backends are now exactly clickhouse (default) + fake in-memory;
+  `--trace-server` help text confirms. The old sqlite trace server used stdlib
+  `sqlite3`, so it required no CI apt package — nothing CI-side was its remnant.
+- tests/trace/test_client_trace.py:4441 `clickhouse_client` fixture returns None
+  on the fake backend (find_server_layer(..., ClickHouseTraceServer) raises
+  TypeError) — that's what the stale "sqlite clients" skip was really gating.
+
+## Open Questions
+- Whether to follow up with the pysqlite3 -> pysqlite3-binary swap to keep the
+  langchain shard green, and whether to commit the test_client_trace.py reword.
