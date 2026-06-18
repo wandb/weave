@@ -3449,6 +3449,9 @@ class TraceServerInterface(Protocol):
     def agent_conversation_chat(
         self, req: agent_types.AgentConversationChatReq
     ) -> agent_types.AgentConversationChatRes: ...
+    def agent_conversation_spans(
+        self, req: agent_types.AgentConversationSpansReq
+    ) -> agent_types.AgentConversationSpansRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

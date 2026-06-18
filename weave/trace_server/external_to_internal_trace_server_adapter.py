@@ -1369,6 +1369,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
         )
 
+    def agent_conversation_spans(
+        self, req: tsi.agent_types.AgentConversationSpansReq
+    ) -> tsi.agent_types.AgentConversationSpansRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_conversation_spans,
+            req,
+            req.project_id,
+        )
+
     def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
         req = req.model_copy(deep=True)
         """Resolve external project IDs to internal project IDs."""
