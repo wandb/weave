@@ -63,6 +63,7 @@ except ImportError:
 if TYPE_CHECKING:
     from opentelemetry.context import Token as _OTelToken
     from opentelemetry.trace import Span as _OTelSpan
+    from opentelemetry.util.types import AttributeValue
 
 
 # Re-export types for backwards compatibility with existing imports of
@@ -157,6 +158,12 @@ class _SpanBase(BaseModel):
         self._otel_token = otel_context.attach(
             otel_trace.set_span_in_context(self._otel_span)
         )
+        # Stamp the active session's attributes on every span. Read from the
+        # session contextvar (not OTel context) so they reach the root turn
+        # span too, which starts in a fresh OTel Context to force a new trace.
+        session = get_current_session()
+        if session is not None and session.attributes:
+            self._otel_span.set_attributes(session.attributes)
 
     def _end_otel_span(
         self, attrs: dict[str, Any], *, end_time_ns: int | None = None
@@ -952,6 +959,10 @@ class Session(BaseModel):
     model: str = ""
     include_content: bool = True
     continue_parent_trace: bool = False
+    # Attributes stamped on every span this session emits (e.g. an integration
+    # identity). dict[str, Any] like set_attributes — AttributeValue is a
+    # TYPE_CHECKING-only import, but Pydantic resolves field types at runtime.
+    attributes: dict[str, Any] = Field(default_factory=dict)
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Session | None] | None = PrivateAttr(default=None)
@@ -1036,8 +1047,13 @@ def start_session(
     session_name: str = "",
     include_content: bool = True,
     continue_parent_trace: bool = False,
+    attributes: dict[str, AttributeValue] | None = None,
 ) -> Session:
-    """Create and activate a session. Sets the contextvar for cross-module access."""
+    """Create and activate a session. Sets the contextvar for cross-module access.
+
+    ``attributes`` are stamped on every span this session emits (e.g. an
+    integration identity like ``weave.integration.*``).
+    """
     session = Session(
         agent_name=agent_name,
         model=model,
@@ -1045,6 +1061,7 @@ def start_session(
         session_name=session_name,
         include_content=include_content,
         continue_parent_trace=continue_parent_trace,
+        attributes=attributes or {},
     )
     session._token = _current_session.set(session)
     return session
@@ -1268,6 +1285,7 @@ def log_turn(
     ended_at: datetime | None = None,
     include_content: bool = True,
     continue_parent_trace: bool = False,
+    attributes: dict[str, AttributeValue] | None = None,
 ) -> LogResult:
     """Imperatively emit one turn and its child spans to OTel.
 
@@ -1276,6 +1294,9 @@ def log_turn(
     ``ended_at`` set; the emitted OTel span timestamps come from those fields.
     Falls back to the earliest/latest child timestamp, then ``now()``, when
     the turn doesn't supply its own.
+
+    ``attributes`` are stamped on every emitted span; the streaming path reads
+    these from the active session instead.
     """
     if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(session_id=session_id)
@@ -1301,6 +1322,8 @@ def log_turn(
         session_name=session_name,
         include_content=include_content,
     )
+    if attributes:
+        turn_attrs.update(attributes)
 
     parent_ctx = Context() if not continue_parent_trace else None
     turn_span = _emit_span_now(
@@ -1321,6 +1344,8 @@ def log_turn(
             session_name=session_name,
             include_content=include_content,
         )
+        if attributes:
+            attrs.update(attributes)
         _emit_span_now(
             name,
             parent_ctx=child_ctx,
@@ -1346,11 +1371,14 @@ def log_session(
     model: str = "",
     include_content: bool = True,
     continue_parent_trace: bool = False,
+    attributes: dict[str, AttributeValue] | None = None,
 ) -> LogResult:
     """Imperatively emit a complete session.
 
     Each Turn's ``.spans`` attribute provides its children. Auto-generates
     ``session_id`` if empty. By default each turn gets its own OTel trace.
+
+    ``attributes`` are stamped on every emitted span.
     """
     sid = session_id or str(uuid.uuid4())
     if not _OTEL_AVAILABLE or should_disable_weave():
@@ -1371,6 +1399,7 @@ def log_session(
             ended_at=turn.ended_at,
             include_content=include_content,
             continue_parent_trace=continue_parent_trace,
+            attributes=attributes,
         )
         trace_ids.extend(result.trace_ids)
         root_span_ids.extend(result.root_span_ids)
