@@ -54,3 +54,14 @@ hand-rolled impl).
 - The dedicated "stainless" CI shard (noxfile + test.yaml) is still disabled;
   PR-B makes the default trace shard exercise the Stainless client. Re-enabling
   or removing the shard is a follow-up.
+
+## Rebase note (2026-06-18, onto master a4091018a5)
+Restacked onto master after it advanced to a4091018a5. Hit a pyproject.toml
+conflict with master #7300 ("make weave installable alongside google-adk").
+Resolution: adopted master's decision to STOP pinning
+opentelemetry-semantic-conventions (the >=0.63b0 pin made weave+google-adk an
+unsatisfiable install; ADK now vendors the GenAI keys in
+weave/integrations/google_adk/_semconv.py). Kept this commit's weave_server_sdk==0.0.2
+addition (testpypi interim source). uv.lock auto-merged; verified consistent
+via `uv lock --check` (489 packages, no out-of-date error). default restacked
+cleanly on top with no conflict.
