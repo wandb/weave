@@ -52,7 +52,6 @@ describe('OpenAI Integration', () => {
         callStartBatchCallUpsertBatchPost: jest.fn(),
       },
     } as any;
-    mockWandbServerApi = {} as any;
     _weaveClient = new WeaveClient({
       traceServerApi: mockTraceServerApi,
       projectId: 'test-project',
