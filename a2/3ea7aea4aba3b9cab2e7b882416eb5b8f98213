@@ -161,3 +161,6 @@ Rebased onto origin/master (ba337cff57), clean (no conflicts). Inherited branch 
 
 ## Session addendum — use semconv constants
 Inherited branch 01's conversion. Restack hit an import-block conflict (branch 01's added semconv import vs this branch's expanded googleAdk import adding commonPatchGoogleADK) — resolved keeping both. prettier rewrapped the merged googleAdk import. No new gen_ai literals in the auto-instrument test. Verified 22/22 jest, prettier + eslint clean.
+
+## Session addendum — reparented onto split plugin-core
+Reparented (cherry-pick) onto andrew/google-adk-05-agent-hierarchy after the plugin-core split. Source (googleAdk.ts module hooks, hooks.ts, examples/) + AGENTS.md applied cleanly. Test conflict resolved by taking the reorganized test + re-adding the commonPatchGoogleADK import and the auto-register test. Verified 24/24 jest + lint. Pre-split commit at tag bak-adk-old-auto (4efcea18c7).
