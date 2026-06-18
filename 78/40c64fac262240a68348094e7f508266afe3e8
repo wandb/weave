@@ -30,3 +30,26 @@ Final verification for this branch:
 - PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
 
 No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Actions (slice 03 — owns tool/execute_tool spans)
+googleAdk.ts (beforeToolCallback + endToolSpan):
+- Dropped `ctx ? this.invocations.get(...) : undefined` ternaries and the `?.`
+  on ADK-guaranteed toolContext / tool (toolContext: Context, tool: BaseTool,
+  toolArgs: Record<string,unknown> are all required in ADK's BasePlugin
+  signature).
+- `jsonAttr(params.toolArgs ?? {})` -> `jsonAttr(params.toolArgs)` (toolArgs is
+  framework-built and required/non-null upstream).
+
+## Dead Ends / Deliberately NOT changed
+- KEPT afterToolCallback's `result: Record<string, unknown> | null` and the
+  `params.result ?? null`. A tool's RETURN VALUE is user code that can genuinely
+  be null/undefined, unlike the framework-provided fields — so this `| null` is
+  justified defensiveness, not laziness. Distinguished from the framework-field
+  `?.` removals on purpose.
+
+## Verified
+tsc esm+cjs PASS, prettier clean, slice-03 jest 22/22.
