@@ -71,3 +71,6 @@ Rebased onto origin/master (ba337cff57). Restack hit a conflict in test-1's "roo
 
 ## Session addendum — use semconv constants
 Inherited branch 01's conversion; additionally converted this branch's own 'gen_ai.agent.name' literals (in the sub-agent tests) to ATTR_GEN_AI_AGENT_NAME. Restack hit a test-1 conflict (my constant conversion vs this branch's per-agent root!/agentSpan structure) — resolved keeping both (structure + constants). prettier rewrapped two now-longer lines. Verified 21/21 jest, prettier + eslint clean.
+
+## Session addendum — reparented onto split plugin-core
+Reparented (cherry-pick) onto andrew/google-adk-04-genai-exclusion after the plugin-core split. googleAdk.ts/types applied cleanly (split slice-3 source == old plugin-core). Test conflict resolved by taking the new reorganized test structure + re-applying this branch's two logical changes: the single-agent e2e 1→2-span hierarchy modification, and the two sub-agent tests (nests-sub-agents, agents-outside-tree). Verified 23/23 jest + lint. Pre-split commit at tag bak-adk-old-agent (3c457ed993).
