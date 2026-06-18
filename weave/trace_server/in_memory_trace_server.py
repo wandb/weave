@@ -28,6 +28,7 @@ from operator import attrgetter
 from pathlib import Path
 from typing import Any, cast
 
+from clickhouse_connect.driver.exceptions import DatabaseError
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
 from weave.shared import refs_internal as ri
@@ -63,6 +64,14 @@ from weave.trace_server.errors import (
     ObjectNameTypeCollision,
     RequestTooLarge,
 )
+from weave.trace_server.feedback import (
+    TABLE_FEEDBACK,
+    format_feedback_to_res,
+    format_feedback_to_row,
+    process_feedback_payload,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import (
@@ -70,7 +79,7 @@ from weave.trace_server.interface.feedback_types import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import split_escaped_field_path
+from weave.trace_server.orm import Table, split_escaped_field_path
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
     PRICING_LEVELS,
@@ -467,6 +476,24 @@ class _OrderableOrNone:
             return self.value < other.value
         except TypeError:
             return False
+
+
+def _to_sql_text(value: Any) -> str | None:
+    """Coerce a value to its stored text rendering (bools -> 1/0, floats
+    keep a trailing .0, containers minify). Feeds the generic sorters and
+    the ORM contains path, which only ever see strings in practice.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, float):
+        if value == int(value) and not math.isinf(value) and not math.isnan(value):
+            return f"{value:.1f}"
+        return str(value)
+    if isinstance(value, (int, str)):
+        return str(value)
+    return _minify_json(value)
 
 
 def _value_rank(value: Any) -> int:
@@ -3019,6 +3046,118 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         return tsi.FilesStatsRes(total_size_bytes=total)
 
     # ------------------------------------------------------------------
+    # Feedback
+    # ------------------------------------------------------------------
+
+    def _feedback_row_for_storage(self, row: dict[str, Any]) -> dict[str, Any]:
+        """Normalize a freshly created feedback row for storage: created_at
+        as a tz-aware datetime (ClickHouse returns DateTime64 values) and the
+        payload normalized through JSON serialization.
+        """
+        stored = dict(row)
+        created_at = stored["created_at"]
+        if isinstance(created_at, datetime.datetime):
+            stored["created_at"] = _ensure_tz(created_at)
+        stored["payload"] = json.loads(json.dumps(stored["payload"]))
+        for col in (
+            "scorer_tags",
+            "scorer_tag_reasons",
+            "scorer_tag_confidences",
+            "scorer_ratings",
+            "scorer_rating_reasons",
+            "scorer_rating_confidences",
+        ):
+            stored[col] = json.loads(json.dumps(stored.get(col)))
+        return stored
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        assert_non_null_wb_user_id(req)
+        validate_feedback_create_req(req, self)
+
+        processed_payload = process_feedback_payload(req)
+        row = format_feedback_to_row(req, processed_payload)
+        with self.lock:
+            self._feedback.append(self._feedback_row_for_storage(row))
+
+        return format_feedback_to_res(row)
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        rows_to_insert = []
+        results = []
+
+        for feedback_req in req.batch:
+            assert_non_null_wb_user_id(feedback_req)
+            validate_feedback_create_req(feedback_req, self)
+
+            processed_payload = process_feedback_payload(feedback_req)
+            row = format_feedback_to_row(feedback_req, processed_payload)
+            rows_to_insert.append(row)
+            results.append(format_feedback_to_res(row))
+
+        if rows_to_insert:
+            with self.lock:
+                for row in rows_to_insert:
+                    self._feedback.append(self._feedback_row_for_storage(row))
+
+        return tsi.FeedbackCreateBatchRes(res=results)
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        with self.lock:
+            rows = list(self._feedback)
+        result = _orm_select(
+            TABLE_FEEDBACK,
+            rows,
+            project_id=req.project_id,
+            fields=req.fields,
+            query=req.query,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        return tsi.FeedbackQueryRes(result=result)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        validate_feedback_purge_req(req)
+        with self.lock:
+            keep = []
+            for row in self._feedback:
+                if row["project_id"] == req.project_id and _truthy(
+                    _orm_eval_query(TABLE_FEEDBACK, row, req.query)
+                ):
+                    continue
+                keep.append(row)
+            self._feedback = keep
+        return tsi.FeedbackPurgeRes()
+
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        # Validate the replacement payload before purging — if validation
+        # rejects we want the old row preserved, not destroyed.
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        validate_feedback_create_req(create_req, self)
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            },
+        )
+        self.feedback_purge(purge_request)
+        create_result = self.feedback_create(create_req)
+
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
+
+    # ------------------------------------------------------------------
     # OTel export
     # ------------------------------------------------------------------
 
@@ -3133,3 +3272,383 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             )
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
+
+
+# ---------------------------------------------------------------------------
+# ORM-equivalent row evaluation (feedback + costs tables)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True, frozen=True)
+class _OrmDatetimeLiteral:
+    """Marker operand: a datetime-normalized literal produced by
+    `_orm_maybe_datetime_literal`.
+    """
+
+    value: datetime.datetime
+
+
+def _orm_field_value(
+    table: Table,
+    row: dict[str, Any],
+    field_name: str,
+    cast_to: str | None = None,
+) -> Any:
+    """Resolve a field reference against a stored row, mirroring
+    `_transform_external_field_to_internal_field` (ClickHouse flavor):
+    dotted JSON access goes through JSON_VALUE with a default string cast.
+    """
+    for prefix in (*table.map_string_cols, *table.map_float_cols):
+        if field_name == prefix:
+            return row.get(prefix)
+        if field_name.startswith(prefix + "."):
+            key = field_name[len(prefix) + 1 :]
+            # mapContains-guarded access: absent keys read as NULL.
+            mapping = row.get(prefix) or {}
+            if key not in mapping:
+                return None
+            value = mapping[key]
+            if prefix in table.map_string_cols or cast_to in {None, "string", "exists"}:
+                if cast_to == "exists":
+                    return value is not None
+                return value
+            return value
+    for prefix in table.json_cols:
+        if field_name == prefix or field_name.startswith(prefix + "."):
+            col = row.get(prefix)
+            parts = (
+                split_escaped_field_path(field_name[len(prefix) + 1 :])
+                if field_name != prefix
+                else []
+            )
+            if cast_to == "exists":
+                # JSON_EXISTS: true whenever the path exists (incl. nulls).
+                if col is None:
+                    return False
+                if not parts:
+                    return True
+                value = col
+                for part in parts:
+                    if isinstance(value, dict) and part in value:
+                        value = value[part]
+                    elif isinstance(value, list):
+                        try:
+                            idx = int(part)
+                        except ValueError:
+                            return False
+                        if idx < 0 or idx >= len(value):
+                            return False
+                        value = value[idx]
+                    else:
+                        return False
+                return True
+            if col is None and not parts:
+                return None
+            value = _ch_json_value(col, parts)
+            return _ch_cast_json_value(value, cast_to or "string")
+    if field_name in table.array_string_cols:
+        return row.get(field_name) or []
+    if field_name not in {c.name for c in table.cols}:
+        raise ValueError(f"Unknown field: {field_name}")
+    return row.get(field_name)
+
+
+def _orm_field_exists(table: Table, row: dict[str, Any], field_name: str) -> bool:
+    """JSON_EXISTS-equivalent for dynamic fields (explicit null still exists)."""
+    result = _orm_field_value(table, row, field_name, cast_to="exists")
+    return bool(result)
+
+
+def _orm_literal_value(literal: Any) -> Any:
+    if isinstance(literal, bool):
+        # Bools compare numerically (ClickHouse Bool is UInt8 underneath).
+        return 1 if literal else 0
+    if literal is None or isinstance(literal, (str, int, float)):
+        return literal
+    raise ValueError(f"Unknown value type: {literal}")
+
+
+def _orm_maybe_datetime_literal(table: Table, lhs: Any, rhs: Any) -> tuple[Any, Any]:
+    """Mirror `maybe_convert_datetime_operands`: a literal compared against a
+    DateTime column is normalized to 'YYYY-MM-DD HH:MM:SS.ffffff'.
+    """
+    from weave.trace_server.orm import (
+        parse_string_to_utc_timestamp,
+    )
+
+    operands = [lhs, rhs]
+    field_idx = None
+    literal_idx = None
+    timestamp: float | None = None
+    for i, op in enumerate(operands):
+        if (
+            isinstance(op, tsi_query.GetFieldOperator)
+            and op.get_field_ in table.datetime_cols
+        ):
+            field_idx = i
+        elif isinstance(op, tsi_query.LiteralOperation):
+            lit = op.literal_
+            if isinstance(lit, bool):
+                continue
+            if isinstance(lit, (int, float)):
+                literal_idx = i
+                timestamp = float(lit)
+            elif isinstance(lit, str):
+                parsed = parse_string_to_utc_timestamp(lit)
+                if parsed is not None:
+                    literal_idx = i
+                    timestamp = parsed
+
+    if field_idx is None or literal_idx is None or timestamp is None:
+        return lhs, rhs
+
+    converted = datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
+    operands[literal_idx] = _OrmDatetimeLiteral(converted)
+    return operands[0], operands[1]
+
+
+def _orm_eval_query(table: Table, row: dict[str, Any], query: tsi.Query) -> Any:
+    """Evaluate a Query against a stored row, mirroring the ORM layer's
+    `_process_query_to_conditions` as ClickHouse runs it.
+    """
+
+    def process_operation(operation: tsi_query.Operation) -> Any:
+        if isinstance(operation, tsi_query.AndOperation):
+            if len(operation.and_) == 0:
+                raise ValueError("Empty AND operation")
+            elif len(operation.and_) == 1:
+                return process_operand(operation.and_[0])
+            return all(_truthy(process_operand(op)) for op in operation.and_)
+        elif isinstance(operation, tsi_query.OrOperation):
+            if len(operation.or_) == 0:
+                raise ValueError("Empty OR operation")
+            elif len(operation.or_) == 1:
+                return process_operand(operation.or_[0])
+            return any(_truthy(process_operand(op)) for op in operation.or_)
+        elif isinstance(operation, tsi_query.NotOperation):
+            inner = process_operand(operation.not_[0])
+            if inner is None:
+                return None
+            return not _truthy(inner)
+        elif isinstance(operation, tsi_query.EqOperation):
+            lhs, rhs = process_binary_operands(*operation.eq_)
+            return _ch_compare(lhs, rhs, "eq")
+        elif isinstance(operation, tsi_query.GtOperation):
+            lhs, rhs = process_binary_operands(*operation.gt_)
+            return _ch_compare(lhs, rhs, "gt")
+        elif isinstance(operation, tsi_query.LtOperation):
+            lhs, rhs = process_binary_operands(*operation.lt_)
+            return _ch_compare(lhs, rhs, "lt")
+        elif isinstance(operation, tsi_query.GteOperation):
+            lhs, rhs = process_binary_operands(*operation.gte_)
+            return _ch_compare(lhs, rhs, "gte")
+        elif isinstance(operation, tsi_query.LteOperation):
+            lhs, rhs = process_binary_operands(*operation.lte_)
+            return _ch_compare(lhs, rhs, "lte")
+        elif isinstance(operation, tsi_query.InOperation):
+            in_cast = tsi_query.infer_shared_literal_filter_cast(operation.in_[1])
+            lhs = process_operand(operation.in_[0], cast=in_cast)
+            if lhs is None:
+                return None
+            return any(
+                _truthy(_ch_compare(lhs, process_operand(op), "eq"))
+                for op in operation.in_[1]
+            )
+        elif isinstance(operation, tsi_query.ContainsOperation):
+            input_operand = operation.contains_.input
+            if (
+                isinstance(input_operand, tsi_query.GetFieldOperator)
+                and input_operand.get_field_ in table.array_string_cols
+            ):
+                # Array membership semantics for Array(String) columns.
+                rhs = process_operand(operation.contains_.substr)
+                values = row.get(input_operand.get_field_) or []
+                if operation.contains_.case_insensitive:
+                    rhs_text = _to_sql_text(rhs)
+                    rhs_lower = rhs_text.lower() if rhs_text is not None else None
+                    return any(
+                        isinstance(v, str) and v.lower() == rhs_lower for v in values
+                    )
+                return rhs in values
+            lhs = process_operand(input_operand)
+            rhs = process_operand(operation.contains_.substr)
+            if isinstance(rhs, (bool, int, float)):
+                # ClickHouse position() rejects non-string needles; surface
+                # the same driver error the real backend produces.
+                type_name = "Int64" if isinstance(rhs, int) else "Float64"
+                raise DatabaseError(
+                    f"Illegal type {type_name} of argument of function position"
+                )
+            return _ch_position(lhs, rhs, bool(operation.contains_.case_insensitive))
+        else:
+            raise TypeError(f"Unknown operation type: {operation}")
+
+    def process_binary_operands(
+        lhs_op: tsi_query.Operand, rhs_op: tsi_query.Operand
+    ) -> tuple[Any, Any]:
+        lhs_op, rhs_op = _orm_maybe_datetime_literal(table, lhs_op, rhs_op)
+        lhs_cast = (
+            tsi_query.infer_literal_filter_cast(rhs_op)
+            if isinstance(rhs_op, tsi_query.LiteralOperation)
+            else None
+        )
+        rhs_cast = (
+            tsi_query.infer_literal_filter_cast(lhs_op)
+            if isinstance(lhs_op, tsi_query.LiteralOperation)
+            else None
+        )
+        return (
+            process_operand(lhs_op, cast=lhs_cast),
+            process_operand(rhs_op, cast=rhs_cast),
+        )
+
+    def process_operand(operand: tsi_query.Operand, cast: str | None = None) -> Any:
+        if isinstance(operand, _OrmDatetimeLiteral):
+            return operand.value
+        if isinstance(operand, tsi_query.LiteralOperation):
+            return _orm_literal_value(operand.literal_)
+        elif isinstance(operand, tsi_query.GetFieldOperator):
+            return _orm_field_value(table, row, operand.get_field_, cast_to=cast)
+        elif isinstance(operand, tsi_query.ConvertOperation):
+            value = process_operand(operand.convert_.input)
+            convert_to = operand.convert_.to
+            if convert_to == "exists":
+                return value is not None
+            return _ch_cast_json_value(_ch_to_string(value), convert_to)
+        elif isinstance(
+            operand,
+            (
+                tsi_query.AndOperation,
+                tsi_query.OrOperation,
+                tsi_query.NotOperation,
+                tsi_query.EqOperation,
+                tsi_query.GtOperation,
+                tsi_query.LtOperation,
+                tsi_query.GteOperation,
+                tsi_query.LteOperation,
+                tsi_query.InOperation,
+                tsi_query.ContainsOperation,
+            ),
+        ):
+            return process_operation(operand)
+        else:
+            raise TypeError(f"Unknown operand type: {operand}")
+
+    return process_operation(query.expr_)
+
+
+def _orm_is_dynamic_field(table: Table, field_name: str) -> bool:
+    if field_name in table.json_cols:
+        return True
+    return any(field_name.startswith(col + ".") for col in table.json_cols)
+
+
+def _orm_select(
+    table: Table,
+    rows: list[dict[str, Any]],
+    *,
+    project_id: str | None,
+    fields: list[str] | None,
+    query: tsi.Query | None,
+    sort_by: list[SortBy] | None,
+    limit: int | None,
+    offset: int | None,
+) -> list[dict[str, Any]]:
+    """Mirror `Table.select()....prepare()` + `tuples_to_rows` on stored rows."""
+    if limit is not None and limit < 0:
+        raise ValueError("Limit must be non-negative")
+    if offset is not None and offset < 0:
+        raise ValueError("Offset must be non-negative")
+    if sort_by:
+        for o in sort_by:
+            assert o.direction in {
+                "ASC",
+                "DESC",
+                "asc",
+                "desc",
+            }, f"Invalid order_by direction: {o.direction}"
+
+    matched = rows
+    if project_id is not None:
+        matched = [row for row in matched if row.get("project_id") == project_id]
+    if query is not None:
+        matched = [
+            row for row in matched if _truthy(_orm_eval_query(table, row, query))
+        ]
+
+    if sort_by:
+        # Dynamic (JSON) fields sort with an existence term first, then the
+        # toFloat64OrNull cast, then the raw string — the ClickHouse
+        # dynamic-field sort triple.
+        sort_terms: list[tuple[tuple[str, str], str]] = []
+        for clause in sort_by:
+            if _orm_is_dynamic_field(table, clause.field):
+                sort_terms.append(((clause.field, "exists"), "desc"))
+                sort_terms.append(((clause.field, "double"), clause.direction))
+                sort_terms.append(((clause.field, "value"), clause.direction))
+            else:
+                sort_terms.append(((clause.field, "value"), clause.direction))
+
+        def sort_value(row: dict[str, Any], term: tuple[str, str]) -> Any:
+            field_name, mode = term
+            if mode == "exists":
+                return 1 if _orm_field_exists(table, row, field_name) else 0
+            if mode == "double":
+                value = _orm_field_value(table, row, field_name)
+                return _ch_to_float64_or_null(_ch_to_string(value))
+            return _orm_field_value(table, row, field_name)
+
+        matched = _ch_sorted_by_terms(matched, sort_terms, sort_value)
+
+    # Field selection: default = all columns.
+    fieldnames = fields or [c.name for c in table.cols]
+
+    if any(f.lower() == "count(*)" for f in fieldnames):
+        # Aggregate query: one result row (LIMIT/OFFSET apply to that row,
+        # not the counted rows). count(*) counts every matched row;
+        # non-aggregate fields take the last row's values (permissive
+        # no-GROUP-BY behavior; callers only request count(*) alone);
+        # no rows yields (0, NULL, ...).
+        out: dict[str, Any] = {}
+        last_row = matched[-1] if matched else None
+        for field_name in fieldnames:
+            if field_name.lower() == "count(*)":
+                out[field_name] = len(matched)
+            elif last_row is None:
+                out[field_name] = None
+            else:
+                normalized = (
+                    field_name[:-5] if field_name.endswith("_dump") else field_name
+                )
+                if normalized in table.col_types:
+                    out[normalized] = copy.deepcopy(last_row.get(normalized))
+                else:
+                    out[field_name] = copy.deepcopy(
+                        _orm_field_value(table, last_row, field_name)
+                    )
+        agg_rows = [out]
+        if offset is not None:
+            agg_rows = agg_rows[offset:]
+        if limit is not None:
+            agg_rows = agg_rows[:limit]
+        return agg_rows
+
+    if offset is not None:
+        matched = matched[offset:]
+    if limit is not None:
+        matched = matched[:limit]
+
+    result = []
+    for row in matched:
+        row_out: dict[str, Any] = {}
+        for field_name in fieldnames:
+            normalized = field_name[:-5] if field_name.endswith("_dump") else field_name
+            if normalized in table.col_types:
+                value = row.get(normalized)
+                row_out[normalized] = copy.deepcopy(value)
+            else:
+                row_out[field_name] = copy.deepcopy(
+                    _orm_field_value(table, row, field_name)
+                )
+        result.append(row_out)
+    return result
