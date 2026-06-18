@@ -1,0 +1,73 @@
+## Split of Google ADK plugin-core — slice 2/3 (model/chat spans)
+See slice 1 (andrew/google-adk-01-plugin-run) and tag bak-adk-old-plugincore for context + full original history.
+
+Adds: model callbacks (beforeModel/afterModel/onModelError → nested chat spans), setLlmRequest/ResponseAttributes + toolDefinitions + systemInstructionParts, childContext, errorTypeOf/errorMessageOf, closeShortCircuitedModelSpan + modelSpanKeyForEvent, InvocationState.modelSpans + finishInvocation model loop + onEvent short-circuit, semconv +TOOL_DEFINITIONS, model types. Also adds tool-callback NO-OP STUBS (return undefined) so the plugin structurally satisfies ADK's BasePlugin type for the real-runner model tests (records-model-errors, cached) — stub bodies are filled in slice 3.
+
+Built: restore full old plugin-core source, strip ONLY tool code (run+model lines stay byte-identical to the original). Verified 17/17 jest + lint clean.
+
+## Session addendum — move ADK GoogleGenAI exclusion into model slice
+User clarified every PR must be standalone. The ADK-internal GoogleGenAI exclusion originally lived in the later genai-exclusion slice, but model/chat tracing starts in this slice. Without the exclusion here, this PR alone can double-record ADK Gemini model calls: WeaveAdkPlugin emits chat spans with usage while the generic GoogleGenAI wrapper can also wrap ADK's internal GoogleGenAI client and emit orphan/double-counted traces.
+
+Moved the x-goog-api-client google-adk/ marker exclusion from the later genai-exclusion branch into this model slice, along with the fake GoogleGenAI regression test. This makes the first PR that introduces model/chat spans standalone and prevents token double-counting at that point in the stack. The later genai-exclusion branch should become empty/drop after restacking.
+
+This commit also inherits the slice-1 standalone runner test/stubs from the restack conflict resolution.
+
+Verification for this amendment:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (19 passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+
+No push performed. Notes preserved/copied by Graphite where available; this addendum records the stack-boundary change.
+
+---
+
+## Session addendum - final branch-green verification after base lint cleanup
+The user asked to run each PR in the stack and confirm it is green. Initial stack-owned checks passed, but full sdks/node npm run lint failed on every branch due the same @typescript-eslint/consistent-type-imports errors in unrelated files. A mechanical import-type cleanup was amended into the bottom branch so every surviving PR can pass full package lint. This branch was restacked after that base cleanup and then rerun.
+
+Final verification for this branch:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (19 passed, 19 total)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run build (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
+
+No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Actions (slice 02 — owns LlmRequest/Response, config, model lifecycle)
+googleAdk.types.ts:
+- AdkLlmResponse.content: dropped `| null` (adk LlmResponse.content is
+  `Content | undefined`, never null).
+- AdkLlmResponse.finishReason: unknown -> string (FinishReason string enum).
+- REMOVED phantom fields interactionId + modelVersion. These do NOT exist on
+  the TS @google/adk LlmResponse (nor anywhere in @google/genai —
+  interactionId: 0 hits; modelVersion is on GenerateContentResponse only, not
+  surfaced onto LlmResponse). They were transliterated 1:1 from the Python
+  integration's llm_response.interaction_id / model_version, which DO exist on
+  Python ADK. On the TS surface both read branches were permanently dead (zero
+  test coverage). User approved removal (option 1 of remove / wire-up / keep).
+- Removed dead AdkLlmResponse.turnComplete (impl keys off `partial`, never
+  reads turnComplete; the test sets it on the REAL LlmResponse, unaffected).
+- AdkLlmRequest.contents -> required (adk LlmRequest.contents: Content[]).
+- Removed dead AdkGenerateContentConfig.responseSchema (never read).
+googleAdk.ts:
+- setLlmResponseAttributes: removed the interactionId/modelVersion branches and
+  the now-unused ATTR_GEN_AI_RESPONSE_ID / ATTR_GEN_AI_RESPONSE_MODEL imports.
+- setLlmRequestAttributes: llmRequest?.config -> llmRequest.config; dropped the
+  `Array.isArray(llmRequest?.contents) ? ... : []` guard (contents now required).
+- before/after/onError ModelCallback: dropped `ctx ? ...get... : undefined`
+  ternaries and `?.` on the ADK-guaranteed callbackContext/llmRequest/llmResponse;
+  `params.llmRequest ?? {}` -> `params.llmRequest`; afterModelCallback unwrapped
+  the always-true `if (response != null)`.
+
+## Hints for Future Agents
+- If a future ADK version DOES surface a response id/model on LlmResponse, the
+  correct genai field is `responseId` (on GenerateContentResponse), NOT
+  `interactionId`. Wiring it would require the plugin to receive the underlying
+  GenerateContentResponse, which it currently does not.
+
+## Verified
+tsc esm+cjs PASS, prettier clean, slice-02 jest 19/19.
