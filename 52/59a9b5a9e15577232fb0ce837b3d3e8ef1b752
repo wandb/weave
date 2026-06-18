@@ -60,3 +60,27 @@ Final verification for this branch:
 - PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
 
 No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Actions (slice 05 — owns per-agent span synthesis)
+googleAdk.ts:
+- before/afterAgentCallback: dropped `?.` on ADK-guaranteed callbackContext and
+  agent (agent: BaseAgent, callbackContext: Context are required).
+- InvocationState.rootAgent: `AdkBaseAgent | null` -> `AdkBaseAgent`. It is set
+  only in beforeRunCallback from `ic.agent`, which is now required (slice 01),
+  so it is never null.
+- ensureAgentSpan: removed the now-dead `if (state.rootAgent)` guard around
+  findAgentInTree; `let agent` -> `const agent = findAgentInTree(...)`. agent can
+  still be undefined (out-of-tree agents), so the rest of the parent-resolution
+  logic is unchanged.
+
+## Hints for Future Agents
+- findAgentInTree returning undefined (out-of-tree agent, e.g. AgentTool) is a
+  DIFFERENT nullability from rootAgent — that path (innermostOpenToolSpan
+  fallback) is still live and intentional. Don't conflate the two.
+
+## Verified
+tsc esm+cjs PASS, prettier clean, slice-05 jest 24/24.
