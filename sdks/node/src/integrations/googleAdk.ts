@@ -55,6 +55,7 @@ import type {
 
 import type {
   BaseAgent as AdkBaseAgent,
+  BaseTool as AdkBaseTool,
   Context as AdkCallbackContext,
   Event as AdkEvent,
   InvocationContext as AdkInvocationContext,
@@ -93,7 +94,11 @@ import {
   ATTR_GEN_AI_REQUEST_TOP_P,
   ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
   ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_ID,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_DEFINITIONS,
+  ATTR_GEN_AI_TOOL_NAME,
   ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
@@ -110,6 +115,7 @@ const WEAVE_ATTR_PREFIX = 'weave.google_adk';
 
 const OPERATION_INVOKE_AGENT = 'invoke_agent';
 const OPERATION_CHAT = 'chat';
+const OPERATION_EXECUTE_TOOL = 'execute_tool';
 const OUTPUT_TYPE_TEXT = 'text';
 const TOOL_DEFINITION_TYPE = 'function';
 
@@ -146,11 +152,21 @@ type InvocationState = {
   conversationId: string | undefined;
   /** agentName → in-flight chat span. */
   modelSpans: Map<string, OtelSpan>;
+  /** functionCallId (or synthetic key) → in-flight execute_tool span. */
+  toolSpans: Map<string, OtelSpan>;
+  /** Per-(agent, tool) FIFO of synthetic keys when functionCallId is absent. */
+  syntheticToolKeys: Map<string, string[]>;
   /** Content of the last non-partial event — the root span's output. */
   finalContent: AdkContent | null;
   rootErrorType: string | undefined;
   rootErrorMessage: string | undefined;
+  toolSeq: number;
 };
+
+/** A finished tool call's terminal outcome — exactly one of result or error. */
+type ToolSpanOutcome =
+  | {kind: 'result'; result: Record<string, unknown> | null}
+  | {kind: 'error'; error: Error};
 
 // ---------------------------------------------------------------------------
 // GenAI semconv extractors (mirroring the Python google_adk integration)
@@ -591,9 +607,12 @@ export class WeaveAdkPlugin {
         rootSpan,
         conversationId,
         modelSpans: new Map(),
+        toolSpans: new Map(),
+        syntheticToolKeys: new Map(),
         finalContent: null,
         rootErrorType: undefined,
         rootErrorMessage: undefined,
+        toolSeq: 0,
       });
     });
     return undefined;
@@ -713,7 +732,17 @@ export class WeaveAdkPlugin {
         return;
       }
       const response = params.llmResponse;
-      // Only the final (non-partial) streaming response has content + usage.
+      // Partial streaming chunks accumulate inside ADK; we wait for a
+      // non-partial response, which carries the turn's content + usage.
+      //
+      // KNOWN LIMITATION (non-default SSE streaming): for a turn that emits
+      // BOTH text and a tool call, ADK's NonProgressiveStrategy splits it into
+      // two non-partial responses (text+usage, then the function call). We end
+      // the chat span on the first, so the function call is absent from this
+      // span's gen_ai.output.messages. The call still executes and is captured
+      // as its own execute_tool span, so the trace is complete — only this
+      // span's output list is. The default streamingMode is NONE (one
+      // non-partial per turn), where this does not arise.
       if (response.partial) {
         return;
       }
@@ -769,15 +798,73 @@ export class WeaveAdkPlugin {
     return undefined;
   }
 
-  async beforeToolCallback(_params: unknown): Promise<undefined> {
+  async beforeToolCallback(params: {
+    tool: AdkBaseTool;
+    toolArgs: Record<string, unknown>;
+    toolContext: AdkCallbackContext;
+  }): Promise<undefined> {
+    this.guard(() => {
+      const ctx = params.toolContext;
+      const state = this.invocations.get(ctx.invocationId);
+      if (!state || !ctx.agentName || !params.tool.name) {
+        return;
+      }
+      let key = ctx.functionCallId;
+      if (!key || state.toolSpans.has(key)) {
+        // Missing/duplicate functionCallId: mint a synthetic key, recovered
+        // FIFO per (agent, tool) in afterToolCallback.
+        key = `synthetic-${++state.toolSeq}`;
+        const queueKey = syntheticQueueKey(ctx.agentName, params.tool.name);
+        const queue = state.syntheticToolKeys.get(queueKey) ?? [];
+        queue.push(key);
+        state.syntheticToolKeys.set(queueKey, queue);
+      }
+      const attributes: Attributes = {
+        [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_EXECUTE_TOOL,
+        [ATTR_GEN_AI_PROVIDER_NAME]: providerName(),
+        [ATTR_GEN_AI_TOOL_NAME]: params.tool.name,
+        [ATTR_GEN_AI_AGENT_NAME]: ctx.agentName,
+      };
+      if (state.conversationId) {
+        attributes[ATTR_GEN_AI_CONVERSATION_ID] = state.conversationId;
+      }
+      if (ctx.functionCallId) {
+        attributes[ATTR_GEN_AI_TOOL_CALL_ID] = ctx.functionCallId;
+      }
+      if (captureMessageContent()) {
+        attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = jsonAttr(params.toolArgs);
+      }
+      const span = this.tracer().startSpan(
+        `${OPERATION_EXECUTE_TOOL} ${params.tool.name}`,
+        {attributes},
+        this.childContext(state.rootSpan)
+      );
+      state.toolSpans.set(key, span);
+    });
     return undefined;
   }
 
-  async afterToolCallback(_params: unknown): Promise<undefined> {
+  async afterToolCallback(params: {
+    tool: AdkBaseTool;
+    toolArgs: Record<string, unknown>;
+    toolContext: AdkCallbackContext;
+    result: Record<string, unknown> | null;
+  }): Promise<undefined> {
+    this.guard(() => {
+      this.endToolSpan(params, {kind: 'result', result: params.result ?? null});
+    });
     return undefined;
   }
 
-  async onToolErrorCallback(_params: unknown): Promise<undefined> {
+  async onToolErrorCallback(params: {
+    tool: AdkBaseTool;
+    toolArgs: Record<string, unknown>;
+    toolContext: AdkCallbackContext;
+    error: Error;
+  }): Promise<undefined> {
+    this.guard(() => {
+      this.endToolSpan(params, {kind: 'error', error: params.error});
+    });
     return undefined;
   }
 
@@ -811,6 +898,43 @@ export class WeaveAdkPlugin {
           `(further occurrences suppressed): ${error}`
       );
     }
+  }
+
+  private endToolSpan(
+    params: {
+      tool: AdkBaseTool;
+      toolContext: AdkCallbackContext;
+    },
+    outcome: ToolSpanOutcome
+  ): void {
+    const ctx = params.toolContext;
+    const state = this.invocations.get(ctx.invocationId);
+    if (!state || !ctx.agentName || !params.tool.name) {
+      return;
+    }
+    let key = ctx.functionCallId;
+    if (!key || !state.toolSpans.has(key)) {
+      const queueKey = syntheticQueueKey(ctx.agentName, params.tool.name);
+      key = state.syntheticToolKeys.get(queueKey)?.shift();
+    }
+    // afterToolCallback also fires after a tool error that
+    // onToolErrorCallback already recorded; the lookup misses then and the
+    // late callback is ignored.
+    const span = key ? state.toolSpans.get(key) : undefined;
+    if (!span || !key) {
+      return;
+    }
+    if (outcome.kind === 'error') {
+      span.setAttribute(ATTR_ERROR_TYPE, errorTypeOf(outcome.error));
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: errorMessageOf(outcome.error),
+      });
+    } else if (captureMessageContent()) {
+      span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, jsonAttr(outcome.result));
+    }
+    span.end();
+    state.toolSpans.delete(key);
   }
 
   private recordEventError(state: InvocationState, event: AdkEvent): void {
@@ -899,6 +1023,12 @@ export class WeaveAdkPlugin {
     }
     state.modelSpans.clear();
 
+    for (const span of state.toolSpans.values()) {
+      span.setAttribute(ATTR_ADK_INTERRUPTED, true);
+      span.end();
+    }
+    state.toolSpans.clear();
+
     if (options.interrupted) {
       state.rootSpan.setAttribute(ATTR_ADK_INTERRUPTED, true);
     }
@@ -943,6 +1073,10 @@ function unregisterBeforeExitHookIfUnused(): void {
   }
   process.off('beforeExit', runBeforeExitCleanups);
   beforeExitHookRegistered = false;
+}
+
+function syntheticQueueKey(agentName: string, toolName: string): string {
+  return `${agentName}\0${toolName}`;
 }
 
 function errorTypeOf(error: Error): string {
