@@ -54,7 +54,6 @@ def test_inline_custom_obj(client):
     assert decoded == dt_with_tz
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_inline_custom_obj_needs_load_op(client):
     """Test the condition that the current version of the SDK doesn't know how to load the object.
 

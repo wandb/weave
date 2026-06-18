@@ -195,7 +195,6 @@ def test_log_call_with_combined_params(client: WeaveClient):
     assert child.display_name == "Combined Test"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_preserves_call_data(client: WeaveClient):
     """Test that the returned call object matches fetched data."""
     returned_call = weave.log_call("test_op", {"input": "test"}, {"output": "result"})
@@ -242,7 +241,6 @@ def test_log_call_with_use_stack_false(client: WeaveClient):
     assert current_call is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_with_use_stack_true(client: WeaveClient):
     """Test log_call with use_stack=True adds to and removes from call stack."""
 
@@ -270,7 +268,6 @@ def test_log_call_with_use_stack_true(client: WeaveClient):
     assert inner.parent_id == parent_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_call_use_stack_default_behavior(client: WeaveClient):
     """Test that use_stack defaults to True."""
 
