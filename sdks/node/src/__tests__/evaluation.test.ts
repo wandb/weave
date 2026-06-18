@@ -1,7 +1,23 @@
+import {withAttributes} from '../clientApi';
+import {
+  EVALUATION_RUN_OP_NAME,
+  EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+} from '../constants';
 import {Dataset} from '../dataset';
 import {Evaluation} from '../evaluation';
 import {type ColumnMapping} from '../fn';
 import {op} from '../op';
+import {initWithCustomTraceServer} from './clientMock';
+import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
+
+// Read all recorded calls back from the in-memory trace server (mirrors the
+// helper in evaluationLogger.test.ts).
+async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
+  await traceServer.waitForPendingOperations();
+  return traceServer.calls
+    .callsStreamQueryPost({project_id: projectId})
+    .then(result => result.calls);
+}
 
 const createMockDataset = () =>
   new Dataset({
@@ -167,5 +183,96 @@ describe('Evaluation', () => {
       model_success: {true_count: 0, true_fraction: 0},
       model_latency: {mean: expect.any(Number)},
     });
+  });
+});
+
+describe('Evaluation - declarative eval metadata', () => {
+  let traceServer: InMemoryTraceServer;
+  const projectId = 'test-project';
+
+  beforeEach(() => {
+    traceServer = new InMemoryTraceServer();
+    initWithCustomTraceServer(projectId, traceServer);
+  });
+
+  // Every child of the declarative path must carry the marker, including
+  // children of later examples under concurrency (the marker rides the
+  // AsyncLocalStorage context, so nTrials > 1 + maxConcurrency > 1 is the real
+  // test). Non-failing mocks so every model+scorer call actually runs.
+  test('tags every child call of every example', async () => {
+    const evaluation = createMockEvaluation(false);
+    const model = createMockModel(false);
+
+    await evaluation.evaluate({model, nTrials: 2, maxConcurrency: 2});
+
+    const calls = await getCalls(traceServer, projectId);
+    const predictAndScoreCalls = calls.filter(c =>
+      c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
+    );
+    const modelCalls = calls.filter(c => c.op_name?.includes('mockPrediction'));
+    const scorerCalls = calls.filter(
+      c =>
+        c.op_name?.includes('lengthScorer') ||
+        c.op_name?.includes('inclusionScorer')
+    );
+
+    // nTrials (2) * dataset rows (5), and scorers also * scorer count (2).
+    expect(predictAndScoreCalls).toHaveLength(10);
+    expect(modelCalls).toHaveLength(10);
+    expect(scorerCalls).toHaveLength(20);
+
+    for (const call of [
+      ...predictAndScoreCalls,
+      ...modelCalls,
+      ...scorerCalls,
+    ]) {
+      expect(call.attributes?._weave_eval_meta).toEqual({declarative: true});
+    }
+
+    // Exactly one root evaluate call; recognized by op_name, so it is
+    // intentionally not tagged (its attributes are read before the wrapper runs).
+    const rootCalls = calls.filter(c =>
+      c.op_name?.includes(EVALUATION_RUN_OP_NAME)
+    );
+    expect(rootCalls).toHaveLength(1);
+    expect(rootCalls[0].attributes?._weave_eval_meta).toBeUndefined();
+  });
+
+  // A flat overwrite would drop the outer marker; deep-merge keeps both keys.
+  test('deep-merges declarative meta into an existing _weave_eval_meta', async () => {
+    const evaluation = createMockEvaluation(false);
+    const model = createMockModel(false);
+
+    await withAttributes({_weave_eval_meta: {foo: true}}, async () => {
+      await evaluation.evaluate({model, maxConcurrency: 2});
+    });
+
+    const calls = await getCalls(traceServer, projectId);
+    const predictAndScoreCalls = calls.filter(c =>
+      c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
+    );
+    const modelCalls = calls.filter(c => c.op_name?.includes('mockPrediction'));
+    const scorerCalls = calls.filter(
+      c =>
+        c.op_name?.includes('lengthScorer') ||
+        c.op_name?.includes('inclusionScorer')
+    );
+
+    // dataset rows (5), and scorers also * scorer count (2).
+    expect(predictAndScoreCalls).toHaveLength(5);
+    expect(modelCalls).toHaveLength(5);
+    expect(scorerCalls).toHaveLength(10);
+
+    // Both the outer marker and ours survive (flat overwrite would drop foo).
+    for (const call of [
+      ...predictAndScoreCalls,
+      ...modelCalls,
+      ...scorerCalls,
+    ]) {
+      expect(call.attributes?._weave_eval_meta).toEqual({
+        foo: true,
+        declarative: true,
+      });
+    }
   });
 });

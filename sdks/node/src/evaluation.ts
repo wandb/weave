@@ -1,4 +1,6 @@
 import cliProgress from 'cli-progress';
+import {getGlobalClient, withAttributes} from './clientApi';
+import {EVAL_META_KEY} from './constants';
 import {type Dataset, type DatasetRow} from './dataset';
 import {type ColumnMapping, mapArgs} from './fn';
 import {isMedia} from './media';
@@ -169,63 +171,74 @@ export class Evaluation<
     nTrials?: number;
     maxConcurrency?: number;
   }) {
-    const results: Array<{
-      model_output: M;
-      model_success: boolean;
-      model_latency: number;
-      [key: string]: any;
-    }> = [];
+    // Tag every eval child call (predictAndScore, model, scorers) so a
+    // server-side ingest sampler can recognize eval calls from each child's own
+    // attributes; children reach the server before the root op. Mirrors the
+    // imperative path; merge so an outer _weave_eval_meta is kept, not clobbered.
+    const prevMeta =
+      getGlobalClient()?.getCurrentAttributes()?.[EVAL_META_KEY] ?? {};
+    return withAttributes(
+      {[EVAL_META_KEY]: {...prevMeta, declarative: true}},
+      async () => {
+        const results: Array<{
+          model_output: M;
+          model_success: boolean;
+          model_latency: number;
+          [key: string]: any;
+        }> = [];
 
-    const progressBar = new cliProgress.SingleBar({
-      format:
-        'Evaluating |{bar}| {percentage}% | ETA: {eta}s | {modelErrors} errors | {value}/{total} examples | {running} running',
-      barCompleteChar: '\u2588',
-      barIncompleteChar: '\u2591',
-      hideCursor: true,
-    });
+        const progressBar = new cliProgress.SingleBar({
+          format:
+            'Evaluating |{bar}| {percentage}% | ETA: {eta}s | {modelErrors} errors | {value}/{total} examples | {running} running',
+          barCompleteChar: '\u2588',
+          barIncompleteChar: '\u2591',
+          hideCursor: true,
+        });
 
-    if (PROGRESS_BAR) {
-      progressBar.start(this.dataset.length * nTrials, 0, {
-        running: 0,
-        modelErrors: 0,
-      });
-    }
+        if (PROGRESS_BAR) {
+          progressBar.start(this.dataset.length * nTrials, 0, {
+            running: 0,
+            modelErrors: 0,
+          });
+        }
 
-    let modelErrors = 0;
-    let datasetExamples = this.dataset;
-    if (nTrials > 1) {
-      // @ts-ignore
-      datasetExamples = repeatAsyncIterator(this.dataset, nTrials);
-    }
+        let modelErrors = 0;
+        let datasetExamples = this.dataset;
+        if (nTrials > 1) {
+          // @ts-ignore
+          datasetExamples = repeatAsyncIterator(this.dataset, nTrials);
+        }
 
-    for await (const {result, nRunning, nDone} of asyncParallelMap(
-      datasetExamples,
-      this.predictAndScore,
-      item => [{model, example: item, columnMapping: this.columnMapping}],
-      maxConcurrency
-    )) {
-      const {scores} = result;
-      results.push({
-        model_success: result.model_success,
-        model_output: result.model_output,
-        ...scores,
-        model_latency: result.model_latency,
-      });
-      modelErrors += result.model_success ? 0 : 1;
-      if (PROGRESS_BAR) {
-        progressBar.update(nDone, {running: nRunning, modelErrors});
-      } else {
-        console.log(
-          `Evaluating ${nDone}/${this.dataset.length * nTrials} examples (${nRunning} running, ${modelErrors} errors)`
-        );
+        for await (const {result, nRunning, nDone} of asyncParallelMap(
+          datasetExamples,
+          this.predictAndScore,
+          item => [{model, example: item, columnMapping: this.columnMapping}],
+          maxConcurrency
+        )) {
+          const {scores} = result;
+          results.push({
+            model_success: result.model_success,
+            model_output: result.model_output,
+            ...scores,
+            model_latency: result.model_latency,
+          });
+          modelErrors += result.model_success ? 0 : 1;
+          if (PROGRESS_BAR) {
+            progressBar.update(nDone, {running: nRunning, modelErrors});
+          } else {
+            console.log(
+              `Evaluating ${nDone}/${this.dataset.length * nTrials} examples (${nRunning} running, ${modelErrors} errors)`
+            );
+          }
+        }
+
+        if (PROGRESS_BAR) {
+          progressBar.stop();
+        }
+
+        return this.summarizeResults(results);
       }
-    }
-
-    if (PROGRESS_BAR) {
-      progressBar.stop();
-    }
-
-    return this.summarizeResults(results);
+    );
   }
 
   async predictAndScore({
