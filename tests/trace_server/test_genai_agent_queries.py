@@ -10,6 +10,8 @@ import uuid
 import pytest
 
 from tests.trace_server.helpers import make_project_id as _make_project_id
+from weave.shared import refs_internal as ri
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
@@ -18,6 +20,7 @@ from weave.trace_server.agents.schema import (
 )
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
+    AgentConversationSpansReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
@@ -31,6 +34,10 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsReq,
     AgentSpanValueRef,
     AgentsQueryReq,
+)
+from weave.trace_server.interface.feedback_types import (
+    NOTE_FEEDBACK_TYPE,
+    REACTION_FEEDBACK_TYPE,
 )
 from weave.trace_server.interface.query import Query
 
@@ -325,6 +332,134 @@ def test_group_by_conversation_id_message_previews(ch_server):
     assert row.last_message is not None
     assert row.last_message.role == "assistant_message"
     assert row.last_message.text == "final reply"
+
+
+def _create_feedback(
+    ch_server,
+    project_id: str,
+    weave_ref: str,
+    feedback_type: str,
+    payload: dict,
+) -> None:
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type=feedback_type,
+            payload=payload,
+            wb_user_id="test-user",
+        )
+    )
+
+
+def test_conversation_spans_unknown_id_returns_empty(ch_server):
+    """The endpoint returns one entry per requested conversation; an id with no
+    matching spans comes back with empty sequences rather than being dropped.
+    """
+    project_id = _make_project_id("conv-spans-empty")
+    res = ch_server.agent_conversation_spans(
+        AgentConversationSpansReq(
+            project_id=project_id,
+            conversation_ids=["conv-does-not-exist"],
+        )
+    )
+    assert len(res.conversations) == 1
+    assert res.conversations[0].conversation_id == "conv-does-not-exist"
+    assert res.conversations[0].spans == []
+    assert res.conversations[0].spans_feedback == []
+
+
+def test_conversation_spans_sequence_and_feedback(ch_server):
+    """agent_conversation_spans returns an ordered per-span sequence (kinds from
+    operation_name, ERROR surfaced via status) plus turn-anchored feedback
+    markers carrying the feedback_type and any detoned tags.
+    """
+    project_id = _make_project_id("conv-spans")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conv = f"conv-{uuid.uuid4().hex[:8]}"
+    trace_a = uuid.uuid4().hex
+    trace_b = uuid.uuid4().hex
+    tool_span = uuid.uuid4().hex[:16]
+
+    spans = [
+        # Turn A: an agent invocation, then two tool calls (the second errored).
+        _make_span(
+            project_id,
+            conversation_id=conv,
+            trace_id=trace_a,
+            operation_name="invoke_agent",
+            started_at=now,
+            ended_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv,
+            trace_id=trace_a,
+            span_id=tool_span,
+            operation_name="execute_tool",
+            tool_name="search",
+            started_at=now + datetime.timedelta(seconds=2),
+            ended_at=now + datetime.timedelta(seconds=3),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv,
+            trace_id=trace_a,
+            operation_name="execute_tool",
+            tool_name="broken",
+            status_code="ERROR",
+            started_at=now + datetime.timedelta(seconds=4),
+            ended_at=now + datetime.timedelta(seconds=5),
+        ),
+        # Turn B: a later content span -> classified assistant.
+        _make_span(
+            project_id,
+            conversation_id=conv,
+            trace_id=trace_b,
+            operation_name="chat",
+            started_at=now + datetime.timedelta(seconds=6),
+            ended_at=now + datetime.timedelta(seconds=7),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # Turn-level reaction (👍 -> positive) on turn A; a note on turn B.
+    turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
+    turn_b_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_b).uri
+    _create_feedback(
+        ch_server, project_id, turn_a_ref, REACTION_FEEDBACK_TYPE, {"emoji": "👍"}
+    )
+    _create_feedback(
+        ch_server, project_id, turn_b_ref, NOTE_FEEDBACK_TYPE, {"note": "nice"}
+    )
+
+    res = ch_server.agent_conversation_spans(
+        AgentConversationSpansReq(
+            project_id=project_id,
+            conversation_ids=[conv],
+        )
+    )
+    row = {c.conversation_id: c for c in res.conversations}[conv]
+
+    # Ordered by started_at: agent, tool, tool(ERROR), assistant.
+    assert [(e.kind, e.status) for e in row.spans] == [
+        ("agent", "OK"),
+        ("tool", "OK"),
+        ("tool", "ERROR"),
+        ("assistant", "OK"),
+    ]
+    # Each span carries its turn (trace_id) and its own span_id.
+    assert row.spans[0].trace_id == trace_a
+    assert row.spans[-1].trace_id == trace_b
+    assert any(e.span_id == tool_span for e in row.spans)
+
+    # Feedback markers are keyed by turn (trace_id) and carry the feedback_type
+    # plus any detoned tags (empty for a note). An emoji tag is the glyph itself.
+    by_trace = {f.trace_id: f for f in row.spans_feedback}
+    assert by_trace[trace_a].feedback_type == REACTION_FEEDBACK_TYPE
+    assert by_trace[trace_a].tags == ["\U0001f44d"]
+    assert by_trace[trace_b].feedback_type == NOTE_FEEDBACK_TYPE
+    assert by_trace[trace_b].tags == []
 
 
 def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):

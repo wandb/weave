@@ -62,6 +62,8 @@ from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
+    AgentConversationSpansReq,
+    AgentConversationSpansRes,
     AgentCustomAttrsSchemaReq,
     AgentCustomAttrsSchemaRes,
     AgentSearchReq,
@@ -6939,6 +6941,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: AgentConversationChatReq
     ) -> AgentConversationChatRes:
         return AgentQueryHandler(self._query, self.feedback_query).conversation_chat(
+            req
+        )
+
+    def agent_conversation_spans(
+        self, req: AgentConversationSpansReq
+    ) -> AgentConversationSpansRes:
+        return AgentQueryHandler(self._query, self.feedback_query).conversation_spans(
             req
         )
 
