@@ -75,3 +75,31 @@ googleAdk.ts:
 
 ## Verified
 tsc esm+cjs PASS, prettier clean, slice-01 jest 5/5.
+
+===================================================================
+## ADDENDUM — split out unrelated lint cleanup (later session)
+===================================================================
+
+## Conversation
+User reviewed the stack and noted the consistent-type-imports cleanup was
+unrelated to the ADK integration; asked to split it into a separate PR.
+
+## Actions
+Removed the 6 unrelated import-type files from this slice (reverted to the
+master base a4091018a5): src/state.ts, src/clientApi.ts, src/weaveClient.ts,
+src/utils/urlToMediaPart.ts, src/integrations/openai-agents/messages.ts,
+src/__tests__/clientMock.ts. They now live in the standalone branch
+andrew/weave-ts-consistent-type-imports (off master, NOT in this stack).
+This slice now changes only ADK-related files.
+
+## Hints for Future Agents
+- These consistent-type-imports errors PRE-EXIST on origin/master (verified via
+  eslint on master's file versions: 9 errors). Whole-package `npm run lint` is
+  therefore red on master too, so CI does not gate on it — removing the fix from
+  this stack does not make the ADK PRs red. That's why the cleanup is an
+  independent PR rather than a stack prerequisite.
+- The prior "make full package lint green at stack base" addendum above is now
+  historical: that bundling was undone here.
+
+## Verified
+tsc esm+cjs PASS, eslint clean on ADK files, slice-01 jest 5/5 after the split.
