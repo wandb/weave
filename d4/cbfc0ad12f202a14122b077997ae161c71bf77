@@ -1,0 +1,99 @@
+## Conversation
+User reported: weave 0.52.43 pins opentelemetry-semantic-conventions>=0.63b0
+(otel-sdk>=1.42); google-adk>2.1.0-ish pins otel-sdk<=1.41.1 -> semconv<=0.62b1.
+Disjoint => `pip install weave google-adk` unsatisfiable. They noted ADK 1.14.1
+(last installable w/ old weave) doesn't emit gen_ai fields, only gcp.vertex.agent.
+
+Request evolved across turns:
+1. Diagnose why the pin exists / whether it's server-only ("update the pyproject
+   if so"). Premise was inverted: the SERVER vendors its own strings and needs
+   nothing; the pin was driven solely by the CLIENT google_adk integration.
+2. "how would you fix this ... conditional import?" -> recommended straight
+   vendoring over try/except (you write the literals either way; conditional
+   risks client/server wire-key drift). User: "make that change."
+3. "why wasn't this caught by tests?" -> the integration has ZERO CI footprint
+   (no shard, no extra, not in CI matrix; tests dead because they import
+   google.adk at module top). User: "add those" (error_type fix + shard + extra).
+4. "put this up as draft."
+
+## Actions
+- Vendored ~23 GenAI attr keys + 4 enum-member values into
+  weave/integrations/google_adk/_semconv.py. Got byte-exact values by importing
+  the installed semconv 0.63b1 and dumping; cross-checked every gen_ai.* string
+  against trace_server/agents/semconv.py aliases (all matched).
+- Swapped the two `from opentelemetry.semconv._incubating...` imports to the
+  vendored module; replaced GenAi*Values.X.value reads with plain constants.
+- Dropped the semconv pin from pyproject (left a NOTE so it isn't re-added).
+- error_type fix: ADK 2.2.0 calls trace_tool_call(...) all-keyword incl. new
+  error_type=; wrapper now takes **extra and forwards verbatim. Updated
+  _TraceToolCall alias to Callable[..., None].
+- Added regression tests: TestVendoredSemconv (server lockstep + upstream drift,
+  importorskip-guarded with `name in upstream_names` because reasoning.output_tokens
+  is ABSENT in 0.62b1) and test_trace_tool_call_forwards_added_trailing_kwargs.
+- CI: google_adk added to noxfile shard list, SHARDS_WITHOUT_EXTRAS, a post-sync
+  `uv pip install google-adk>=2.2.0` step (mirrors openai_agents), and the
+  test.yaml matrix.
+- Validated: negative control (old pin + google-adk = uv 'unsatisfiable');
+  full suite 14/14 via the exact shard path (base sync -> uv pip install
+  google-adk -> pytest), semconv downgraded to 0.62b1. ruff+ty+format clean.
+
+## Errors & Mistakes
+- BIG DEAD END: first tried `google_adk` as a real pyproject EXTRA + uv.lock +
+  conflict declarations. This CONTAMINATED the universal lock: google-adk requires
+  fastapi>=0.133 / starlette>=1.0.1 (0->1 MAJOR) / google-auth>=2.47, and because
+  the base resolution is shared with every extra, `uv lock` bumped the BASE
+  (every shard): starlette 0.50->1.3.1, fastapi 0.122->0.137, pillow 12.0->12.2,
+  rsa dropped. Proven by counterfactual: re-locking the ORIGINAL pyproject keeps
+  base unchanged; only adding the extra caused it. Declaring google_adk conflicting
+  with google_genai/langchain/vertexai/crewai did NOT help (base isn't an extra,
+  can't be split away). Reverted the extra+conflicts+lock entirely; switched to
+  the post-sync install approach (option C). LESSON: a heavy framework extra with
+  high transitive floors poisons the shared universal-lock resolution; install it
+  post-sync instead.
+- My first (name,version) churn-diff used a grep that matched inline dep-spec
+  lines, not [[package]] stanzas -- misleading. The `^name =` anchored grep
+  (6 added, 0 removed) was the authoritative one.
+- Initial upstream-drift test would have ERRORed on 0.62b1: importorskip doesn't
+  skip (module imports fine) but GEN_AI_USAGE_REASONING_OUTPUT_TOKENS is absent
+  there -> getattr raises. Fixed to compare only keys present upstream.
+
+## Dead Ends
+- Conditional/try-except import: rejected (still vendor the literals + adds a
+  branch + risks client emit / server extract drift).
+- Pristine-lock (no re-lock): `uv lock --check` says the lock needs updating
+  after the pin removal, so CI --frozen requires a re-lock. Can't avoid it.
+- Pinning google-adk in a universal-lock extra: see BIG DEAD END.
+
+## Hints for Future Agents
+- The integration is import-hook activated (patch.py:490 maps google.adk ->
+  patch_google_adk; lazy module import). It is NOT auto-triggered by
+  `import google.adk` after weave.init() because the hook matches root modules
+  only -- import ADK before init or call patch_google_adk() explicitly.
+- google_adk shard installs google-adk POST-SYNC (noxfile, after session.run(
+  *sync_args)); it is in SHARDS_WITHOUT_EXTRAS so the frozen sync stays base-only.
+- The trace server vendors the SAME gen_ai.* strings (agents/semconv.py); keep
+  client _semconv.py and server in lockstep or extraction silently drops attrs.
+  The TestVendoredSemconv lockstep test guards this.
+- ADK's wrappers must tolerate ADK adding trailing kwargs over releases; that's
+  why _wrap_trace_tool_call uses **extra. The other 3 wrappers still match 2.2.0.
+
+## Codebase Discoveries
+- Only ONE imported symbol was actually missing in 0.62b1:
+  GEN_AI_USAGE_REASONING_OUTPUT_TOKENS. The old pin comment overstated it
+  (gen_ai.tool.call.arguments and cache token names exist in 0.62b1).
+- claude_agent_sdk is ALSO in the noxfile shard list but ABSENT from the CI
+  matrix (test.yaml) -- same silent-gap pattern; not fixed here.
+- nightly-tests.yaml / nightly-replicated-leg.yaml hardcode a TRACE_SERVER_SHARDS
+  string that's already out of sync (missing claude_agent_sdk, fastmcp, verdict,
+  has a 'google_ai_studio' not in noxfile). Left untouched.
+
+## Open Questions
+- uv.lock re-resolve (forced by the pin removal) incidentally FLOATS 4 unrelated
+  content-detection packages: pillow 12.0->12.2 (py<3.14), pdfplumber 0.11.9->
+  0.11.10, pypdfium2 5.1.0->5.10.1, pdfminer-six consolidated. This is stale-lock
+  catch-up, NOT caused by the ADK logic. A prior finding (memory) flagged pillow
+  12.2 as test-breaking, but the Image type-handler tests skip on the fake backend
+  (need ClickHouse) so it couldn't be verified locally. WATCH the trace shard in
+  the draft's CI; if red, pin pillow==12.0.0 (trivial). Did NOT pin proactively to
+  avoid off-topic scope creep on unverified/possibly-stale info.
+- Should claude_agent_sdk also be added to the CI matrix (separate gap)?
