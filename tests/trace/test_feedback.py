@@ -4,7 +4,7 @@ import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -553,7 +553,6 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     assert query_res.result[0]["span_status_code"] == "UNSET"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_agent_user_feedback(client: WeaveClient) -> None:
     """A human agent score's value is a tag in scorer_tags (e.g. an emoji
     glyph), carrying no scorer refs. Non-emoji tags are allowed too.

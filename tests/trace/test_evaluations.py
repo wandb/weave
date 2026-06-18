@@ -9,7 +9,7 @@ from PIL import Image
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import FAKE_NOT_IMPLEMENTED, AnyIntMatcher, AnyStrMatcher
+from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
@@ -192,7 +192,6 @@ async def test_basic_evaluation(client):
     assert len(inputs) == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_declarative_eval_marks_child_calls_with_eval_meta(client):
     # The declarative path must tag every eval call (predict_and_score, model,
@@ -245,7 +244,6 @@ async def test_declarative_eval_marks_child_calls_with_eval_meta(client):
     assert "_weave_eval_meta" not in root.attributes
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_declarative_eval_meta_merges_with_existing(client):
     # An outer wrapper (e.g. the evaluate_model_worker) may already set
