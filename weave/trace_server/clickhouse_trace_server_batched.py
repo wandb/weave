@@ -6561,7 +6561,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             error=error,
             source=req.source,
         )
-        AgentWriteHandler(self.ch_client).insert_span(span)
+        AgentWriteHandler(self.ch_client, self._async_insert_settings()).insert_span(
+            span
+        )
 
         return tsi.CompletionsCreateRes(
             response=res.response,
@@ -6659,7 +6661,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 retention_days=retention_days,
                 source=req.source,
             )
-            AgentWriteHandler(self.ch_client).insert_span(open_span)
+            AgentWriteHandler(
+                self.ch_client, self._async_insert_settings()
+            ).insert_span(open_span)
 
         req.inputs.messages = combined_messages
         api_inputs = req.inputs.model_copy()
@@ -6701,6 +6705,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=req.wb_user_id or "",
             retention_days=retention_days,
             source=req.source,
+            insert_settings=self._async_insert_settings(),
         )
 
     @tag_db_insert_path("image_create")
@@ -6939,7 +6944,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+        res, span_rows = AgentWriteHandler(
+            self.ch_client, self._async_insert_settings()
+        ).insert_otel_spans(req)
 
         # Return early without emitting kafka events if online eval or agent scoring are disabled
         if not wf_env.wf_enable_online_eval() or not wf_env.wf_enable_agent_scoring():
@@ -7315,6 +7322,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 return result
 
+    def _async_insert_settings(self) -> dict[str, Any] | None:
+        """Async insert settings when the server has async inserts enabled, else None."""
+        if not self._use_async_insert:
+            return None
+        return ch_settings.update_settings_for_async_insert()
+
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
@@ -7661,6 +7674,7 @@ def _create_tracked_span_stream_wrapper(
     wb_user_id: str,
     retention_days: int,
     source: str | None = None,
+    insert_settings: dict[str, Any] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Wrap a streaming completion iterator with agent span tracking.
 
@@ -7769,7 +7783,7 @@ def _create_tracked_span_stream_wrapper(
                 error=stream_error,
                 source=source,
             )
-            AgentWriteHandler(ch_client).insert_span(completed_span)
+            AgentWriteHandler(ch_client, insert_settings).insert_span(completed_span)
 
     return _stream_wrapper()
 
