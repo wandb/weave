@@ -39,18 +39,18 @@ from google.adk.telemetry import tracing as adk_tracing
 from google.adk.telemetry.tracing import GenerateContentSpan
 from google.adk.tools.base_tool import BaseTool
 from opentelemetry import trace as otel_trace
-from opentelemetry.semconv._incubating.attributes.gen_ai_attributes import (
+from opentelemetry.trace import Span
+from opentelemetry.util.types import AttributeValue
+
+from weave.integrations.google_adk._semconv import (
     GEN_AI_AGENT_ID,
     GEN_AI_OPERATION_NAME,
     GEN_AI_PROVIDER_NAME,
     GEN_AI_REQUEST_MODEL,
     GEN_AI_TOOL_CALL_ARGUMENTS,
     GEN_AI_TOOL_CALL_RESULT,
-    GenAiOperationNameValues,
+    OPERATION_INVOKE_AGENT,
 )
-from opentelemetry.trace import Span
-from opentelemetry.util.types import AttributeValue
-
 from weave.integrations.google_adk.extractors import (
     _capture_message_content,
     _provider_name,
@@ -65,20 +65,11 @@ from weave.trace.autopatch import IntegrationSettings
 # their signatures as ``TypeAlias`` / ``Protocol``, so we declare local
 # aliases here to type the wrappers below. Each ADK function returns
 # ``None`` — the wrappers capture the return value but never change it.
-# ``_TraceToolCall`` narrows ADK's ``args: dict[str, Any]`` to
-# ``Mapping[str, object]`` because the wrapper only passes ``args`` to
-# ``json.dumps`` — it never indexes or mutates it.
+# ``_TraceToolCall`` is the open ``Callable[..., None]`` because ADK adds
+# trailing optional params to ``trace_tool_call`` across releases
+# (``error_type`` landed in 2.2.0); the wrapper forwards them verbatim.
 _TraceAgentInvocation = Callable[[Span, BaseAgent, InvocationContext], None]
-_TraceToolCall = Callable[
-    [
-        BaseTool,
-        Mapping[str, object],
-        Event | None,
-        Exception | None,
-        Span | None,
-    ],
-    None,
-]
+_TraceToolCall = Callable[..., None]
 _SetCommonGenerateContentAttributes = Callable[
     [Span, LlmRequest, Mapping[str, AttributeValue]], None
 ]
@@ -134,9 +125,7 @@ def _wrap_trace_agent_invocation(
         # layer in the Weave-superset fields it does not emit natively.
         span.set_attribute(GEN_AI_PROVIDER_NAME, _provider_name())
         _set_integration_attrs(span)
-        span.set_attribute(
-            GEN_AI_OPERATION_NAME, GenAiOperationNameValues.INVOKE_AGENT.value
-        )
+        span.set_attribute(GEN_AI_OPERATION_NAME, OPERATION_INVOKE_AGENT)
         if ctx.invocation_id:
             span.set_attribute(GEN_AI_AGENT_ID, str(ctx.invocation_id))
         # ``agent.model`` is either a model name string or a ``BaseLlm``
@@ -155,10 +144,15 @@ def _wrap_trace_tool_call(original: _TraceToolCall) -> _TraceToolCall:
         function_response_event: Event | None,
         error: Exception | None = None,
         span: Span | None = None,
+        **extra: object,
     ) -> None:
-        # Pass ``error`` / ``span`` positionally — the ``Callable`` type
-        # alias is positional-only, and ADK accepts them in this order.
-        original(tool, args, function_response_event, error, span)
+        # Forward verbatim to the same-version original. ``**extra`` absorbs
+        # trailing params ADK adds across releases (it added ``error_type``
+        # in 2.2.0) so a new optional argument enriches rather than breaks the
+        # wrapper — older ADK (>=1.36) simply never passes it. ``error`` /
+        # ``span`` stay named because the body reads ``span`` below; ADK keeps
+        # them in this positional order.
+        original(tool, args, function_response_event, error, span, **extra)
         target = _resolve_optional_span(span)
         target.set_attribute(GEN_AI_PROVIDER_NAME, _provider_name())
         _set_integration_attrs(target)

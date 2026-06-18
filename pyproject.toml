@@ -54,10 +54,11 @@ dependencies = [
   "opentelemetry-api>=1.28.0",
   "opentelemetry-sdk>=1.28.0",
   "opentelemetry-exporter-otlp-proto-http>=1.28.0",
-  # The ADK integration imports GenAI semconv keys
-  # (gen_ai.tool.call.arguments, cache token names,
-  # gen_ai.usage.reasoning.output_tokens) added in 0.63b0.
-  "opentelemetry-semantic-conventions>=0.63b0",
+  # NOTE: do not pin opentelemetry-semantic-conventions. It ships transitively
+  # via opentelemetry-sdk, and pinning >=0.63b0 (sdk>=1.42) makes weave +
+  # google-adk (which pins sdk<=1.41.1) an unsatisfiable install. The ADK
+  # integration vendors the GenAI keys it needs in
+  # weave/integrations/google_adk/_semconv.py instead of importing them.
 ]
 
 [project.optional-dependencies]
