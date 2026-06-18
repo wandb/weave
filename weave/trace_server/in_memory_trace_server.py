@@ -47,6 +47,8 @@ from weave.shared.trace_server_interface_util import (
     wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server import usage_utils
+from weave.trace_server.call_stats_helpers import validate_call_stats_range
 from weave.trace_server.calls_query_builder.stats_query_base import (
     GRANULARITY_1H,
     auto_select_granularity_seconds,
@@ -89,7 +91,9 @@ from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import Table, split_escaped_field_path
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
+    LLM_TOKEN_PRICES_TABLE,
     PRICING_LEVELS,
+    validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
     apply_tags_and_synth_latest_in_place,
@@ -660,6 +664,34 @@ def _load_default_cost_definitions() -> tuple[dict[str, Any], ...]:
             }
         )
     return tuple(default_rows)
+
+
+def _apply_aggregations(
+    bucket: dict[str, Any],
+    metric: str,
+    values: list[float] | list[int],
+    aggregations: list[tsi.AggregationType],
+    percentiles: list[float] | None = None,
+) -> None:
+    """Apply aggregation functions and percentiles to a list of values, writing results into bucket."""
+    for agg in aggregations:
+        if agg == tsi.AggregationType.SUM:
+            bucket[f"sum_{metric}"] = sum(values)
+        elif agg == tsi.AggregationType.AVG:
+            bucket[f"avg_{metric}"] = sum(values) / len(values) if values else 0
+        elif agg == tsi.AggregationType.MIN:
+            bucket[f"min_{metric}"] = min(values) if values else 0
+        elif agg == tsi.AggregationType.MAX:
+            bucket[f"max_{metric}"] = max(values) if values else 0
+        elif agg == tsi.AggregationType.COUNT:
+            bucket[f"count_{metric}"] = len(values)
+    if percentiles:
+        sorted_vals = sorted(values)
+        n = len(sorted_vals)
+        for p in percentiles:
+            idx = int(p / 100 * (n - 1))
+            idx = max(0, min(idx, n - 1))
+            bucket[f"p{int(p)}_{metric}"] = sorted_vals[idx]
 
 
 # Agent-monitor scores land under this scorer_ratings key; the feedback
@@ -2187,6 +2219,248 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
 
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        if req.limit is not None and req.limit < 1:
+            raise ValueError("Limit must be a positive integer")
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                limit=req.limit,
+                include_total_storage_size=req.include_total_storage_size,
+            )
+        ).calls
+        count = len(calls)
+        return tsi.CallsQueryStatsRes(
+            count=count,
+            has_more=req.limit is not None and count >= req.limit,
+            total_storage_size_bytes=sum(
+                call.total_storage_size_bytes
+                for call in calls
+                if call.total_storage_size_bytes is not None
+            ),
+        )
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        validate_call_stats_range(req.start, end)
+
+        granularity = req.granularity or int((end - req.start).total_seconds())
+        if granularity <= 0:
+            granularity = 1
+
+        calls = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=req.filter,
+                )
+            )
+        )
+
+        calls = [
+            c
+            for c in calls
+            if c.started_at is not None
+            and c.started_at >= req.start
+            and c.started_at < end
+        ]
+
+        token_keys_map: dict[str, list[str]] = {
+            "input_tokens": ["prompt_tokens", "input_tokens"],
+            "output_tokens": ["completion_tokens", "output_tokens"],
+            "total_tokens": ["total_tokens"],
+        }
+
+        def _bucket_ts(started_at: datetime.datetime) -> str:
+            """Map a timestamp to the ISO start of its granularity bucket."""
+            offset = int((started_at - req.start).total_seconds())
+            bucket_idx = offset // granularity
+            return (
+                req.start + datetime.timedelta(seconds=bucket_idx * granularity)
+            ).isoformat()
+
+        usage_buckets: list[dict[str, Any]] = []
+        if req.usage_metrics:
+            raw: dict[
+                tuple[str, str], dict[str, list[int]]
+            ] = {}  # (ts, model) -> metric -> values
+
+            for call in calls:
+                if not call.summary or not isinstance(call.summary, dict):
+                    continue
+                usage = call.summary.get("usage")
+                if not isinstance(usage, dict):
+                    continue
+                ts = _bucket_ts(call.started_at)
+                for model, model_usage in usage.items():
+                    if not isinstance(model_usage, dict):
+                        continue
+                    key = (ts, model)
+                    if key not in raw:
+                        raw[key] = {}
+                    for spec in req.usage_metrics:
+                        token_keys = token_keys_map.get(spec.metric, [])
+                        val = 0
+                        for k in token_keys:
+                            raw_val = model_usage.get(k)
+                            if isinstance(raw_val, (int, float, str)):
+                                val += int(raw_val)
+                        raw[key].setdefault(spec.metric, []).append(val)
+
+            for (ts, model), metrics in sorted(raw.items()):
+                bucket: dict[str, Any] = {"timestamp": ts, "model": model}
+                for spec in req.usage_metrics:
+                    values = metrics.get(spec.metric, [])
+                    if not values:
+                        continue
+                    _apply_aggregations(
+                        bucket, spec.metric, values, spec.aggregations, spec.percentiles
+                    )
+                usage_buckets.append(bucket)
+
+        call_buckets: list[dict[str, Any]] = []
+        if req.call_metrics:
+            bucket_data: dict[str, dict[str, list[Any]]] = {}
+
+            for call in calls:
+                ts = _bucket_ts(call.started_at)
+                if ts not in bucket_data:
+                    bucket_data[ts] = {}
+                for cm_spec in req.call_metrics:
+                    if cm_spec.metric == "latency_ms":
+                        if call.ended_at and call.started_at:
+                            ms = (
+                                call.ended_at - call.started_at
+                            ).total_seconds() * 1000
+                            bucket_data[ts].setdefault("latency_ms", []).append(ms)
+                    elif cm_spec.metric == "call_count":
+                        bucket_data[ts].setdefault("call_count", []).append(1)
+                    elif cm_spec.metric == "error_count":
+                        bucket_data[ts].setdefault("error_count", []).append(
+                            1 if call.exception else 0
+                        )
+
+            for ts, metrics in sorted(bucket_data.items()):
+                bucket = {"timestamp": ts}
+                for cm_spec in req.call_metrics:
+                    values = metrics.get(cm_spec.metric, [])
+                    if not values:
+                        continue
+                    _apply_aggregations(
+                        bucket,
+                        cm_spec.metric,
+                        values,
+                        cm_spec.aggregations,
+                        cm_spec.percentiles,
+                    )
+                call_buckets.append(bucket)
+
+        return tsi.CallStatsRes(
+            start=req.start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone or "UTC",
+            usage_buckets=usage_buckets,
+            call_buckets=call_buckets,
+        )
+
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        unfinished_call_ids: set[str] = set()
+        for call in calls:
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=dict(call.summary) if call.summary else None,
+                )
+            )
+            if call.ended_at is None:
+                unfinished_call_ids.add(call.id)
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, req.include_costs
+        )
+
+        return tsi.TraceUsageRes(
+            call_usage=aggregated_usage,
+            unfinished_call_ids=sorted(unfinished_call_ids),
+        )
+
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        """Aggregate per-call usage (including descendants) for the requested
+        root calls, mirroring the ClickHouse trace-scoped usage rollup.
+        """
+        if not req.call_ids:
+            return tsi.CallsUsageRes(call_usage={}, unfinished_call_ids=[])
+
+        # ---- Resolve the traces the requested root calls belong to ----
+        root_calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(call_ids=req.call_ids),
+                columns=["trace_id"],
+                limit=len(req.call_ids),
+            )
+        )
+        trace_ids = {call.trace_id for call in root_calls}
+        if not trace_ids:
+            root_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {
+                call_id: {} for call_id in req.call_ids
+            }
+            return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
+
+        # ---- Fetch every call in those traces and aggregate usage with descendants ----
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        unfinished_call_ids: set[str] = set()
+        for call in calls:
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=dict(call.summary) if call.summary else None,
+                )
+            )
+            if call.ended_at is None:
+                unfinished_call_ids.add(call.id)
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, req.include_costs
+        )
+
+        # ---- Project the aggregated usage back onto the requested root calls ----
+        root_usage = {
+            call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
+        }
+
+        return tsi.CallsUsageRes(
+            call_usage=root_usage,
+            unfinished_call_ids=sorted(unfinished_call_ids),
+        )
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
@@ -3512,6 +3786,110 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         return tsi.FeedbackPayloadSchemaRes(paths=paths)
 
     # ------------------------------------------------------------------
+    # Costs API
+    # ------------------------------------------------------------------
+
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        assert_non_null_wb_user_id(req)
+        created_at = _serialize_cost_datetime(
+            datetime.datetime.now(datetime.timezone.utc)
+        )
+
+        created_costs: list[tuple[str, str]] = []
+        with self.lock:
+            for llm_id, cost in req.costs.items():
+                cost_id = generate_id()
+                row = {
+                    "id": cost_id,
+                    "pricing_level": PRICING_LEVELS["PROJECT"],
+                    "pricing_level_id": req.project_id,
+                    "provider_id": cost.provider_id or "default",
+                    "llm_id": llm_id,
+                    "effective_date": _serialize_cost_datetime(
+                        cost.effective_date
+                        or datetime.datetime.now(datetime.timezone.utc)
+                    ),
+                    "prompt_token_cost": cost.prompt_token_cost,
+                    "completion_token_cost": cost.completion_token_cost,
+                    "prompt_token_cost_unit": cost.prompt_token_cost_unit or "USD",
+                    "completion_token_cost_unit": cost.completion_token_cost_unit
+                    or "USD",
+                    "created_by": req.wb_user_id,
+                    "created_at": created_at,
+                }
+                self._llm_token_prices.append(row)
+                created_costs.append((cost_id, llm_id))
+        return tsi.CostCreateRes(ids=created_costs)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        expr = {
+            "$and": [
+                (
+                    req.query.expr_
+                    if req.query
+                    else {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": req.project_id},
+                        ],
+                    }
+                ),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": PRICING_LEVELS["PROJECT"]},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        with self.lock:
+            rows = [dict(row) for row in self._llm_token_prices]
+        results = _orm_select(
+            LLM_TOKEN_PRICES_TABLE,
+            rows,
+            project_id=None,
+            fields=req.fields,
+            query=query_with_pricing_level,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        return tsi.CostQueryRes(results=results)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        validate_cost_purge_req(req)
+        expr = {
+            "$and": [
+                req.query.expr_,
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": PRICING_LEVELS["PROJECT"]},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        with self.lock:
+            self._llm_token_prices = [
+                row
+                for row in self._llm_token_prices
+                if not _truthy(
+                    _orm_eval_query(
+                        LLM_TOKEN_PRICES_TABLE, row, query_with_pricing_level
+                    )
+                )
+            ]
+        return tsi.CostPurgeRes()
+
+    # ------------------------------------------------------------------
     # OTel export
     # ------------------------------------------------------------------
 
@@ -3592,6 +3970,57 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 )
             )
         return tsi.OTelExportRes()
+
+    # ------------------------------------------------------------------
+    # Project stats / TTL settings
+    # ------------------------------------------------------------------
+
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        def _default_true(val: bool | None) -> bool:
+            return True if val is None else val
+
+        include_trace = _default_true(req.include_trace_storage_size)
+        include_objects = _default_true(req.include_object_storage_size)
+        include_tables = _default_true(req.include_table_storage_size)
+        include_files = _default_true(req.include_file_storage_size)
+        if not any((include_trace, include_objects, include_tables, include_files)):
+            raise ValueError(
+                "At least one of include_trace_storage_size, "
+                "include_objects_storage_size, include_tables_storage_size, or "
+                "include_files_storage_size must be True"
+            )
+
+        kwargs: dict[str, int] = {}
+        with self.lock:
+            if include_trace:
+                kwargs["trace_storage_size_bytes"] = sum(
+                    (rec.attributes_len or 0)
+                    + (rec.inputs_len or 0)
+                    + (rec.output_len or 0)
+                    + (rec.summary_len or 0)
+                    + (rec.otel_dump_len or 0)
+                    for rec in self._calls.values()
+                    if rec.project_id == req.project_id
+                )
+            if include_objects:
+                kwargs["objects_storage_size_bytes"] = sum(
+                    rec.val_dump_len
+                    for rec in self._objs.values()
+                    if rec.project_id == req.project_id
+                )
+            if include_tables:
+                kwargs["tables_storage_size_bytes"] = sum(
+                    rec.val_dump_len
+                    for rec in self._table_rows.values()
+                    if rec.project_id == req.project_id
+                )
+            if include_files:
+                kwargs["files_storage_size_bytes"] = sum(
+                    len(content)
+                    for (project_id, _digest), content in self._files.items()
+                    if project_id == req.project_id
+                )
+        return tsi.ProjectStatsRes(**kwargs)
 
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReadReq

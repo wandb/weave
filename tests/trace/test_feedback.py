@@ -1156,7 +1156,6 @@ async def populate_feedback(client: WeaveClient) -> None:
     return ids, my_scorer, my_model
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test sorting by feedback."""
@@ -1218,7 +1217,6 @@ async def test_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test filtering by feedback."""
@@ -1429,7 +1427,6 @@ class MatchAnyDatetime:  # noqa: PLW1641
         return isinstance(other, datetime.datetime)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_filter_and_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test filtering and sorting by feedback."""

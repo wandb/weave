@@ -8,7 +8,7 @@ import PIL
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED, DummyTestException
+from tests.trace.util import DummyTestException
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -104,7 +104,6 @@ def build_evaluation():
     return evaluation, predict
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_performance(client: WeaveClient):
     client.project = "test_evaluation_performance"

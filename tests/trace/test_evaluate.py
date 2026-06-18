@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import Dataset, Evaluation, Model
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
@@ -167,7 +166,6 @@ async def test_score_with_custom_summarize(weave_active):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("scorers", "expected_output_key"),
@@ -448,7 +446,6 @@ async def test_evaluate_table_lazy_iter(client, monkeypatch):
     assert counts_split_by_table_query == [count, 28, 28, 14 + 5], log
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_table_order(weave_active):
     """Test that evaluation results maintain the original order of the dataset

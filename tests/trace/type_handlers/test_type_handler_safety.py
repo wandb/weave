@@ -7,11 +7,8 @@ affecting the user's program execution.
 
 from __future__ import annotations
 
-import pytest
-
 import weave
 from tests.trace.test_utils import FailingSaveType
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 
 
 def test_op_output_with_failing_serializer_does_not_raise(
@@ -59,7 +56,6 @@ def test_op_input_with_failing_serializer_does_not_raise(
     assert result == "processed: test_input"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_with_multiple_args_one_failing_serializer_does_not_raise(
     client, failing_serializer
 ):
@@ -92,7 +88,6 @@ def test_op_with_multiple_args_one_failing_serializer_does_not_raise(
     assert call.inputs["normal_arg"] == "normal"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_with_failing_serializer_call_is_recorded(client, failing_serializer):
     """Requirement: Calls should still be recorded even when serialization fails (with stringified fallback)
     Interface: @weave.op decorated function and call record retrieval
