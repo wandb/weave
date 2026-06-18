@@ -6,6 +6,7 @@ from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.datadog import (
     set_current_span_dd_tags,
+    set_root_span_dd_tags,
 )
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
@@ -62,7 +63,7 @@ class TableRoutingResolver:
         with _tracer.start_as_current_span("table_routing.fetch_residence"):
             residence = get_project_data_residence(project_id, ch_client)
 
-            set_current_span_dd_tags(
+            set_root_span_dd_tags(
                 {"project_version.fetch_residence": residence.value}
             )
 
@@ -90,7 +91,7 @@ class TableRoutingResolver:
     def resolve_read_table(self, project_id: str, ch_client: CHClient) -> ReadTable:
         """Resolve which table to read from for a given project."""
         result = self._resolve_read_table(project_id, ch_client)
-        set_current_span_dd_tags({"call_project_residence": result.value})
+        set_root_span_dd_tags({"call_project_residence": result.value})
         return result
 
     def _resolve_read_table(self, project_id: str, ch_client: CHClient) -> ReadTable:
@@ -139,7 +140,7 @@ class TableRoutingResolver:
             WriteTarget indicating which table to write to.
         """
         result = self._resolve_v1_write_target(project_id, ch_client)
-        set_current_span_dd_tags({"call_project_residence": result.value})
+        set_root_span_dd_tags({"call_project_residence": result.value})
         return result
 
     def _resolve_v1_write_target(
@@ -188,7 +189,7 @@ class TableRoutingResolver:
             WriteTarget indicating which table to write to.
         """
         result = self._resolve_v2_write_target(project_id, ch_client)
-        set_current_span_dd_tags({"call_project_residence": result.value})
+        set_root_span_dd_tags({"call_project_residence": result.value})
         return result
 
     def _resolve_v2_write_target(
