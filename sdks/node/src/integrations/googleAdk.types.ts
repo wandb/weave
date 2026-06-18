@@ -78,6 +78,74 @@ export interface AdkCallbackContext {
   userContent?: AdkContent;
 }
 
+/** `Context` for tool callbacks — additionally carries `functionCallId`. */
+export interface AdkToolContext extends AdkCallbackContext {
+  functionCallId?: string;
+}
+
+/** `FunctionDeclaration` from `@google/genai` — tool-definition fields. */
+export interface AdkFunctionDeclaration {
+  name?: string;
+  description?: string;
+  parameters?: unknown;
+  parametersJsonSchema?: unknown;
+}
+
+/**
+ * `GenerateContentConfig` from `@google/genai` — the decoding parameters,
+ * system instructions and tool declarations the span extractors read.
+ * All-optional and index-signature-free so the real config stays
+ * structurally assignable.
+ */
+export interface AdkGenerateContentConfig {
+  temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  seed?: number;
+  stopSequences?: string[];
+  candidateCount?: number;
+  systemInstruction?: unknown;
+  tools?: unknown[];
+  responseSchema?: unknown;
+}
+
+/** `LlmRequest` — model + conversation + generate config. */
+export interface AdkLlmRequest {
+  model?: string;
+  contents?: AdkContent[];
+  config?: AdkGenerateContentConfig;
+}
+
+/** `GenerateContentResponseUsageMetadata` from `@google/genai`. */
+export interface AdkUsageMetadata {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+  thoughtsTokenCount?: number;
+  cachedContentTokenCount?: number;
+}
+
+/** `LlmResponse` — one (possibly partial) model response. */
+export interface AdkLlmResponse {
+  content?: AdkContent | null;
+  partial?: boolean;
+  turnComplete?: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+  usageMetadata?: AdkUsageMetadata;
+  finishReason?: unknown;
+  interactionId?: string;
+  modelVersion?: string;
+}
+
+/** `BaseTool` — name/description are all the integration records. */
+export interface AdkBaseTool {
+  name: string;
+  description?: string;
+}
+
 /** `Event` — yielded by the runner; used to capture the final output. */
 export interface AdkEvent {
   id?: string;
