@@ -890,7 +890,6 @@ class MultiVersionModel(weave.Model):
 class TestEvaluationRunsV2API:
     """Tests for Evaluation Runs V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_create(self, client):
         """Test creating an evaluation run via V2 API."""
         project_id = client.project_id
@@ -939,7 +938,6 @@ class EvalRunModel(weave.Model):
         # Verify response
         assert run_res.evaluation_run_id is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_read(self, client):
         """Test reading an evaluation run via V2 API."""
         project_id = client.project_id
@@ -995,7 +993,6 @@ class ReadEvalRunModel(weave.Model):
         assert read_res.evaluation == eval_res.evaluation_ref
         assert read_res.model == model_res.model_ref
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_list(self, client):
         """Test listing evaluation runs via V2 API."""
         project_id = client.project_id
@@ -1021,6 +1018,7 @@ class ReadEvalRunModel(weave.Model):
 
         # Create models and runs
         run_ids = []
+        model_refs = []
         for i in range(3):
             model_req = tsi.ModelCreateReq(
                 project_id=project_id,
@@ -1034,6 +1032,7 @@ class ListEvalRunModel{i}(weave.Model):
 """,
             )
             model_res = client.server.model_create(model_req)
+            model_refs.append(model_res.model_ref)
 
             run_req = tsi.EvaluationRunCreateReq(
                 project_id=project_id,
@@ -1053,7 +1052,34 @@ class ListEvalRunModel{i}(weave.Model):
         for run_id in run_ids:
             assert run_id in returned_ids
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+        eval_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(evaluations=[eval_res.evaluation_ref]),
+        )
+        eval_filtered_ids = {
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(eval_filter_req)
+        }
+        assert set(run_ids).issubset(eval_filtered_ids)
+
+        model_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(models=[model_refs[0]]),
+        )
+        assert [
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(model_filter_req)
+        ] == [run_ids[0]]
+
+        id_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(evaluation_run_ids=[run_ids[1]]),
+        )
+        assert [
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(id_filter_req)
+        ] == [run_ids[1]]
+
     def test_evaluation_run_delete(self, client):
         """Test deleting evaluation runs via V2 API."""
         project_id = client.project_id
@@ -1109,7 +1135,6 @@ class DeleteEvalRunModel(weave.Model):
         # Verify deletion
         assert delete_res.num_deleted == 1
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_evaluation_run_finish(self, client):
         """Test finishing an evaluation run via V2 API."""
         project_id = client.project_id
