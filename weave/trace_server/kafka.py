@@ -18,7 +18,7 @@ from weave.trace_server.agents.kafka_events import (
     SCORE_AGENT_SPANS_TOPIC,
     ScoreAgentSpansEvent,
 )
-from weave.trace_server.datadog import set_current_span_dd_tags
+from weave.trace_server.datadog import set_root_span_dd_tags
 from weave.trace_server.environment import (
     kafka_broker_host,
     kafka_broker_port,
@@ -203,7 +203,7 @@ class KafkaProducer(ConfluentKafkaProducer):
                     **(logging_extra or {}),
                 },
             )
-            set_current_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
+            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
             return True
 
         if buffer_size >= self.max_buffer_size * BUFFER_WARN_THRESHOLD:
@@ -218,7 +218,7 @@ class KafkaProducer(ConfluentKafkaProducer):
                     **(logging_extra or {}),
                 },
             )
-            set_current_span_dd_tags(
+            set_root_span_dd_tags(
                 {
                     "kafka.producer.buffer_size": buffer_size,
                     "kafka.producer.buffer_percentage": buffer_percentage,
