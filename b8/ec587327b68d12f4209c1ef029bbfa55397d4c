@@ -53,3 +53,17 @@ googleAdk.ts (beforeToolCallback + endToolSpan):
 
 ## Verified
 tsc esm+cjs PASS, prettier clean, slice-03 jest 22/22.
+
+===================================================================
+## ADDENDUM — discriminated union for tool outcome (later session)
+===================================================================
+Following the user's "use discriminated unions where they make sense", modeled
+endToolSpan's terminal outcome as a tagged union instead of {result?, error?}:
+  type ToolSpanOutcome =
+    | {kind:'result'; result: Record<string,unknown> | null}
+    | {kind:'error'; error: Error}
+Call sites pass {kind:'result',...} / {kind:'error',...}; the body branches on
+`outcome.kind`. This makes the result-XOR-error contract explicit and rejects
+the previously-representable invalid states (both set / neither set). The
+result `| null` is retained (tool return values can legitimately be null).
+Verified tsc esm+cjs, eslint, prettier, slice-03 jest 22/22.
