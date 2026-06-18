@@ -34,6 +34,12 @@ import {
   ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_ID,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
+  ATTR_GEN_AI_TOOL_NAME,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
 import {WeaveAdkPlugin} from '../../integrations/googleAdk';
@@ -42,11 +48,13 @@ import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 
 import {
   BaseLlm,
+  FunctionTool,
   InMemoryRunner,
   LlmAgent,
   type LlmRequest,
   type LlmResponse,
 } from '@google/adk';
+import {z} from 'zod';
 
 const TEST_PROJECT = 'test-project';
 const TEST_MODEL = 'gemini-test';
@@ -56,6 +64,34 @@ function userMessage(text: string) {
   return {role: 'user', parts: [{text}]};
 }
 
+/** A BaseLlm that replays a per-call script of responses. */
+class ScriptedLlm extends BaseLlm {
+  private callIndex = 0;
+
+  constructor(
+    model: string,
+    private readonly script: LlmResponse[][]
+  ) {
+    super({model});
+  }
+
+  async *generateContentAsync(
+    _llmRequest: LlmRequest,
+    _stream?: boolean
+  ): AsyncGenerator<LlmResponse, void> {
+    const responses =
+      this.script[Math.min(this.callIndex, this.script.length - 1)];
+    this.callIndex++;
+    for (const response of responses) {
+      yield response;
+    }
+  }
+
+  async connect(): Promise<never> {
+    throw new Error('live connections are not supported in tests');
+  }
+}
+
 function textResponse(
   text: string,
   usage?: {prompt: number; completion: number}
@@ -63,6 +99,28 @@ function textResponse(
   return {
     content: {role: 'model', parts: [{text}]},
     turnComplete: true,
+    ...(usage
+      ? {
+          usageMetadata: {
+            promptTokenCount: usage.prompt,
+            candidatesTokenCount: usage.completion,
+            totalTokenCount: usage.prompt + usage.completion,
+          },
+        }
+      : {}),
+  } as LlmResponse;
+}
+
+function functionCallResponse(
+  toolName: string,
+  args: Record<string, unknown>,
+  usage?: {prompt: number; completion: number}
+): LlmResponse {
+  return {
+    content: {
+      role: 'model',
+      parts: [{functionCall: {id: 'fc-1', name: toolName, args}}],
+    },
     ...(usage
       ? {
           usageMetadata: {
@@ -90,6 +148,10 @@ function byOperation(spans: ReadableSpan[], operation: string): ReadableSpan[] {
   return spans.filter(
     span => span.attributes[ATTR_GEN_AI_OPERATION_NAME] === operation
   );
+}
+
+function spanId(span: ReadableSpan): string {
+  return span.spanContext().spanId;
 }
 
 /**
@@ -501,5 +563,201 @@ describe('Google ADK integration', () => {
         );
       }
     );
+  });
+
+  describe('tool spans', () => {
+    test('traces a single-agent tool-using run end to end', async () => {
+      const getWeather = new FunctionTool({
+        name: 'get_weather',
+        description: 'Returns the weather for a city.',
+        parameters: z.object({city: z.string()}),
+        execute: async ({city}: {city: string}) => ({
+          city,
+          weather: 'sunny',
+        }),
+      });
+
+      const model = new ScriptedLlm(TEST_MODEL, [
+        [
+          functionCallResponse(
+            'get_weather',
+            {city: 'Paris'},
+            {prompt: 10, completion: 5}
+          ),
+        ],
+        [textResponse('It is sunny in Paris.', {prompt: 20, completion: 8})],
+      ]);
+
+      const agent = new LlmAgent({
+        name: 'weather_agent',
+        description: 'Answers weather questions.',
+        model,
+        tools: [getWeather],
+      });
+
+      const runner = new InMemoryRunner({
+        agent,
+        appName: 'weave-adk-test',
+        plugins: [new WeaveAdkPlugin()],
+      });
+      const session = await runner.sessionService.createSession({
+        appName: 'weave-adk-test',
+        userId: 'user-1',
+      });
+
+      await runToCompletion(runner, {
+        userId: 'user-1',
+        sessionId: session.id,
+        newMessage: userMessage('What is the weather in Paris?'),
+      });
+
+      const spans = exporter.getFinishedSpans();
+      const invokeAgentSpans = byOperation(spans, 'invoke_agent');
+      const chatSpans = byOperation(spans, 'chat');
+      const toolSpans = byOperation(spans, 'execute_tool');
+
+      expect(invokeAgentSpans).toHaveLength(1);
+      expect(chatSpans).toHaveLength(2);
+      expect(toolSpans).toHaveLength(1);
+
+      const [root] = invokeAgentSpans;
+      const [toolSpan] = toolSpans;
+      expect(root.parentSpanId).toBeUndefined();
+
+      // Every span shares the root's OTel trace and the session id.
+      for (const span of spans) {
+        expect(span.spanContext().traceId).toBe(root.spanContext().traceId);
+        expect(span.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe(session.id);
+        expect(span.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('gemini');
+      }
+
+      // Structure: root invoke_agent → (chat, chat, tool).
+      expect(root.name).toBe('invoke_agent weather_agent');
+      expect(root.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('weather_agent');
+      for (const span of [...chatSpans, ...toolSpans]) {
+        expect(span.parentSpanId).toBe(spanId(root));
+      }
+
+      // Root carries the user message in and the final answer out.
+      expect(root.attributes).toMatchObject({
+        [ATTR_GEN_AI_INPUT_MESSAGES]: expect.stringContaining(
+          'What is the weather in Paris?'
+        ),
+        [ATTR_GEN_AI_OUTPUT_MESSAGES]: expect.stringContaining(
+          'It is sunny in Paris.'
+        ),
+      });
+
+      // Chat spans carry request/response messages and token usage.
+      const firstChat = chatSpans.find(span =>
+        String(span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES]).includes(
+          'tool_call'
+        )
+      );
+      const secondChat = chatSpans.find(span =>
+        String(span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES]).includes(
+          'It is sunny in Paris.'
+        )
+      );
+      expect(firstChat).toBeDefined();
+      expect(secondChat).toBeDefined();
+      expect(firstChat!.name).toBe(`chat ${TEST_MODEL}`);
+      expect(firstChat!.attributes).toMatchObject({
+        [ATTR_GEN_AI_REQUEST_MODEL]: TEST_MODEL,
+        [ATTR_GEN_AI_INPUT_MESSAGES]: expect.stringContaining(
+          'What is the weather in Paris?'
+        ),
+        [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: 10,
+        [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: 5,
+        [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: 15,
+      });
+      expect(secondChat!.attributes).toMatchObject({
+        [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: 20,
+        [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: 8,
+      });
+
+      // Tool span records its name, call id, args and result.
+      expect(toolSpan.name).toBe('execute_tool get_weather');
+      expect(toolSpan.attributes).toMatchObject({
+        [ATTR_GEN_AI_TOOL_NAME]: 'get_weather',
+        [ATTR_GEN_AI_TOOL_CALL_ID]: 'fc-1',
+        [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: expect.stringContaining('Paris'),
+        [ATTR_GEN_AI_TOOL_CALL_RESULT]: expect.stringContaining('sunny'),
+      });
+    });
+
+    test('tool errors record span errors; the late afterToolCallback is ignored', async () => {
+      const plugin = new WeaveAdkPlugin();
+      const tool = {name: 'fails', description: 'always fails'};
+      const toolContext = {
+        invocationId: INVOCATION_ID,
+        agentName: 'agent_a',
+        functionCallId: 'fc-9',
+      } as any;
+
+      await plugin.beforeRunCallback({
+        invocationContext: invocationContext(),
+      });
+      await plugin.beforeToolCallback({tool, toolArgs: {x: 1}, toolContext});
+      await plugin.onToolErrorCallback({
+        tool,
+        toolArgs: {x: 1},
+        toolContext,
+        error: new Error('tool failed'),
+      });
+      // ADK invokes afterToolCallback even after a tool error.
+      await plugin.afterToolCallback({
+        tool,
+        toolArgs: {x: 1},
+        toolContext,
+        result: null,
+      });
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+
+      const toolSpans = byOperation(
+        exporter.getFinishedSpans(),
+        'execute_tool'
+      );
+      expect(toolSpans).toHaveLength(1);
+      // 2 = SpanStatusCode.ERROR
+      expect(toolSpans[0].status).toMatchObject({
+        code: 2,
+        message: expect.stringContaining('tool failed'),
+      });
+      expect(
+        toolSpans[0].attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]
+      ).toBeUndefined();
+    });
+
+    test('tool results with cycles and bigints are sanitized, not dropped', async () => {
+      const plugin = new WeaveAdkPlugin();
+      const tool = {
+        name: 'cyclic_tool',
+        description: 'returns a self-referential object',
+      };
+      const toolContext = {
+        invocationId: INVOCATION_ID,
+        agentName: 'agent_a',
+        functionCallId: 'fc-1',
+      } as any;
+
+      const result: Record<string, unknown> = {count: BigInt(42), label: 'ok'};
+      result.self = result; // cycle — JSON.stringify would otherwise throw
+
+      await plugin.beforeRunCallback({invocationContext: invocationContext()});
+      await plugin.beforeToolCallback({tool, toolArgs: {}, toolContext});
+      await plugin.afterToolCallback({tool, toolArgs: {}, toolContext, result});
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+
+      const [toolSpan] = byOperation(
+        exporter.getFinishedSpans(),
+        'execute_tool'
+      );
+      // bigint stringified to its digits; the cycle replaced with [Circular].
+      const parsed = JSON.parse(
+        String(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT])
+      );
+      expect(parsed).toEqual({count: '42', label: 'ok', self: '[Circular]'});
+    });
   });
 });
