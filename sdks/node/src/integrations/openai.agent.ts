@@ -14,7 +14,8 @@
 import type OpenAIAgents from '@openai/agents';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import type {SpanData, TracingProcessor} from '@openai/agents';
-import {shouldUseOtelV2} from '../settings';
+import {getGlobalClient} from '../clientApi';
+import {defaultSettings} from '../settings';
 import {WeaveOtelTracingProcessor} from './openai-agents/weave-otel-tracing-processor';
 import {WeaveTracingProcessor} from './openai-agents/weave-tracing-processor';
 import state from '../state';
@@ -99,7 +100,8 @@ export function getCurrentSpan(): OpenAIAgents.Span<any> | null {
  * ```
  */
 export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
-  if (shouldUseOtelV2()) {
+  const settings = getGlobalClient()?.settings ?? defaultSettings();
+  if (settings.useOTelV2) {
     return new WeaveOtelTracingProcessor();
   }
 

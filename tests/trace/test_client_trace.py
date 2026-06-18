@@ -22,6 +22,8 @@ import weave
 import weave.trace.call
 from tests.trace.server_utils import find_server_layer
 from tests.trace.util import (
+    FAKE_NOT_IMPLEMENTED,
+    NOT_CLICKHOUSE_BACKEND,
     AnyIntMatcher,
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
@@ -31,7 +33,7 @@ from tests.trace.util import (
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
-from tests.trace_server.helpers import force_optimize
+from tests.trace_server.helpers import force_optimize, force_optimize_if_clickhouse
 from weave import Thread, ThreadPoolExecutor
 from weave.shared.refs_internal import extra_value_quoter
 from weave.shared.trace_server_interface_util import (
@@ -97,6 +99,7 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 ## End hacky interface compatibility helpers
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=2, reruns_delay=0.2)
 def test_simple_op(client):
     @weave.op
@@ -280,6 +283,7 @@ def test_call_read_not_found(client):
     assert res.call is None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_graph_call_ordering(client):
     @weave.op
     def my_op(a: int) -> int:
@@ -905,6 +909,7 @@ def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
 
 # Flaky against ClickHouse in CI: read-after-write visibility lag means a
 # calls_query right after flush can miss just-written rows. Rerun to absorb it.
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
@@ -1056,6 +1061,7 @@ def test_trace_call_query_offset(client, no_autoflush):
         assert len(inner_res.calls) == exp_count
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_query_timings(client, no_autoflush):
     now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
     later = now + datetime.timedelta(seconds=1)
@@ -1206,6 +1212,7 @@ def test_trace_call_sort_with_mixed_types(client):
             assert call.inputs["in_val"].get("prim") == seq[i]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_call_filter(client):
     @weave.op
     def basic_op(in_val: dict, delay) -> dict:
@@ -2695,6 +2702,7 @@ def test_call_query_stream_columns(client):
     assert calls2[0].output is None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_query_stream_columns_with_costs(client):
     @weave.op
     def calculate(a: int, b: int) -> dict[str, Any]:
@@ -2788,6 +2796,7 @@ def test_call_query_stream_columns_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_query_stream_trace_name_column_with_costs(client):
     @weave.op
     def my_traced_op(x: int) -> dict[str, Any]:
@@ -2842,6 +2851,7 @@ def test_call_query_stream_trace_name_column_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is not None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_read_call_start_with_cost(client):
 
     project_id = client.project_id
@@ -3084,6 +3094,7 @@ def test_sort_and_filter_through_refs(client):
         assert inner_res.count == count
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_in_operation(client):
     @weave.op
     def test_op(label, val):
@@ -3543,6 +3554,7 @@ def test_objects_and_keys_with_special_characters(client):
     assert gotten_fn(obj) == "hello world"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_stream_feedback(client):
     batch_size = 10
     num_calls = batch_size + 1
@@ -3603,6 +3615,7 @@ def test_calls_stream_feedback(client):
     } in call2_payloads
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_filter_finds_minority_reaction(client):
     """Regression test-ish: filtering by emoji must check all reactions, not pick one arbitrarily.
 
@@ -3738,8 +3751,11 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="ClickHouse-only: stripping triggers via patched _insert_call_batch",
+)
 def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
-
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
     max_size = 10 * 1024
 
@@ -3883,6 +3899,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert large_calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_weave_finish_unsets_client(client, monkeypatch):
     @weave.op
     def foo():
@@ -3913,6 +3930,7 @@ def test_weave_finish_unsets_client(client, monkeypatch):
     assert get_weave_client() is None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_sampling(client):
     never_traced_calls = 0
     always_traced_calls = 0
@@ -3962,6 +3980,7 @@ def test_op_sampling(client):
     assert num_traces == 38
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_sampling_async(client):
     never_traced_calls = 0
@@ -4011,6 +4030,7 @@ async def test_op_sampling_async(client):
     assert num_traces == 38
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_sampling_inheritance(client):
     parent_calls = 0
     child_calls = 0
@@ -4048,6 +4068,7 @@ def test_op_sampling_inheritance(client):
     assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_sampling_inheritance_async(client):
     parent_calls = 0
@@ -4086,6 +4107,7 @@ async def test_op_sampling_inheritance_async(client):
     assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_sampling_inheritance_generator(client):
     parent_calls = 0
     child_calls = 0
@@ -4111,6 +4133,7 @@ def test_op_sampling_inheritance_generator(client):
     assert len(client.get_calls()) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_sampling_inheritance_async_generator(client):
     parent_calls = 0
@@ -4157,6 +4180,7 @@ def test_op_sampling_invalid_rates(weave_active):
             pass
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_sampling_child_follows_parent(weave_active):
     parent_calls = 0
     child_calls = 0
@@ -4187,6 +4211,7 @@ def test_op_sampling_child_follows_parent(weave_active):
     assert child_traces == num_runs  # Child was traced whenever parent was
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_len(client):
     @weave.op
     def test():
@@ -4199,7 +4224,8 @@ def test_calls_len(client):
     assert len(client.get_calls()) == 2
 
 
-def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_calls_query_multiple_dupe_select_columns(client):
     @weave.op
     def test():
         return {"a": {"b": {"c": {"d": 1}}}}
@@ -4224,7 +4250,21 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
     assert calls[0].output["a"]["b"]["c"] == {"d": 1}
     assert calls[0].output["a"]["b"]["c"]["d"] == 1
 
-    # now make sure we don't make duplicate selects
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: asserts the emitted SQL"
+)
+def test_calls_query_dupe_select_columns_no_duplicate_sql(client, caplog):
+    @weave.op
+    def test():
+        return {"a": {"b": {"c": {"d": 1}}}}
+
+    test()
+
+    # Consume the (lazy) calls iterator so the SELECT actually executes.
+    calls = client.get_calls(columns=["output", "output.a", "output.a.b"])
+    assert len(list(calls)) == 1
+
     select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[0]
     assert (
         select_query["query"].count("any(calls_merged.output_dump) AS output_dump") == 1
@@ -4406,7 +4446,7 @@ def clickhouse_client(client):
     return ch_server.ch_client
 
 
-def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
+def test_calls_query_with_storage_size_clickhouse(client):
     """Test querying calls with storage size information."""
 
     @weave.op
@@ -4420,7 +4460,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with storage size
     calls = list(
@@ -4439,7 +4479,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     assert call.storage_size_bytes is not None
 
 
-def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
+def test_calls_query_with_total_storage_size_clickhouse(client):
     """Test querying calls with total storage size."""
 
     @weave.op
@@ -4457,7 +4497,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4490,7 +4530,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     )  # Child should not have total size
 
 
-def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
+def test_calls_query_with_both_storage_sizes_clickhouse(client):
     """Test querying calls with total storage size."""
 
     @weave.op
@@ -4508,7 +4548,7 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4539,6 +4579,54 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     assert child_call.storage_size_bytes is not None
     # Child should not have total size
     assert child_call.total_storage_size_bytes is None
+
+
+def test_total_storage_size_is_project_scoped(client):
+    project_id = get_client_project_id(client)
+    entity, _ = from_project_id(project_id)
+    other_project_id = to_project_id(entity, f"total-storage-other-{uuid.uuid4().hex}")
+    trace_id = str(uuid.uuid4())
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+
+    project_call_id = str(uuid.uuid4())
+    other_project_call_id = str(uuid.uuid4())
+
+    for call_project_id, call_id, payload in (
+        (project_id, project_call_id, "small"),
+        (other_project_id, other_project_call_id, "x" * 1000),
+    ):
+        client.server.calls_complete(
+            tsi.CallsUpsertCompleteReq(
+                batch=[
+                    tsi.CompletedCallSchemaForInsert(
+                        project_id=call_project_id,
+                        id=call_id,
+                        trace_id=trace_id,
+                        op_name="storage_test",
+                        started_at=started_at,
+                        ended_at=started_at + datetime.timedelta(seconds=1),
+                        attributes={},
+                        inputs={"payload": payload},
+                        output=None,
+                        summary={},
+                    )
+                ]
+            )
+        )
+
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(call_ids=[project_call_id]),
+            include_storage_size=True,
+            include_total_storage_size=True,
+        )
+    ).calls
+
+    assert len(calls) == 1
+    assert calls[0].total_storage_size_bytes == calls[0].storage_size_bytes
 
 
 def test_calls_hydrated(client):
@@ -4630,7 +4718,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
     assert queried_obj_without_size.size_bytes is None
 
 
-def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
+def test_call_query_stream_with_costs_and_storage_size(client):
     @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
         return {
@@ -4650,8 +4738,8 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged")
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
@@ -4820,6 +4908,7 @@ def test_dedupe_ref_in_calls_stream(client):
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_stats_with_limit(client):
     def calls_stats(limit=None, filter=None, include_total_storage_size=False):
         return client.server.calls_query_stats(
@@ -4932,6 +5021,7 @@ def test_calls_query_stats_unfiltered_storage_counts_deleted_bytes(
     assert filtered.total_storage_size_bytes < storage_before
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_stats_started_at_window_excludes_deletes(client):
     """A started_at lower-bound count must exclude soft-deleted calls and
     orphaned call-ends. This exercises the windowed distinct-id fast path,
@@ -4998,6 +5088,7 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
     assert unfiltered_count() == 2
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize(
     "thread_ids",
     [
@@ -5091,7 +5182,8 @@ def test_calls_query_thread_ids_filter_returns_matching_thread(client):
     assert res.calls[0].thread_id == thread_2
 
 
-def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_calls_query_stats_total_storage_size_clickhouse(client):
     """Test querying calls with total storage size."""
 
     @weave.op
@@ -5109,7 +5201,7 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    force_optimize(clickhouse_client, "calls_merged_stats")
+    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with total storage size
     result = client.server.calls_query_stats(
@@ -5127,8 +5219,10 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     assert result.total_storage_size_bytes is not None
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: requires raw stats-table inserts"
+)
 def test_project_stats_clickhouse(client, clickhouse_client):
-
     project_id = get_client_project_id(client)
     internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
 
@@ -5523,6 +5617,7 @@ def test_thread_id_query_filtering(client):
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_calls_filter_by_thread_ids_only(client):
     """Test that get_calls with only CallsFilter(thread_ids=[...]) returns just that thread's calls.
 
@@ -5598,6 +5693,7 @@ def test_thread_context_error_handling(weave_active):
     assert call_context.get_thread_id() is None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_threads_query_endpoint(client):
     """Test the threads_query endpoint (/threads/query) functionality."""
     import datetime
@@ -5844,6 +5940,7 @@ def test_threads_query_endpoint(client):
         assert thread.start_time <= thread.last_updated
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_threads_query_aggregation_fields(client):
     """Test the new aggregation fields in threads query: first_turn_id, last_turn_id, and duration percentiles."""
     import time
@@ -6444,6 +6541,7 @@ def test_calls_query_filter_contains_in_message_array(client):
     # assert len(calls) == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_sort_by_deselected_heavy_field(client):
     @weave.op
     def op1(x: int) -> int:
@@ -6472,6 +6570,7 @@ def test_calls_query_sort_by_deselected_heavy_field(client):
     assert calls[1].id == call_ids[1]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_sort_by_nested_attributes_field_with_costs(client):
     """Test sorting by nested attributes field with cost query and minimal columns."""
 
@@ -6508,6 +6607,7 @@ def test_calls_query_sort_by_nested_attributes_field_with_costs(client):
     assert calls[1].id == call_ids[0]  # call1 has priority 2
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_calls_query_sort_by_feedback_field_with_costs(client):
     """Test sorting by feedback field with cost query and minimal columns."""
@@ -6560,6 +6660,7 @@ async def test_calls_query_sort_by_feedback_field_with_costs(client):
     assert calls[1].id == call_ids[1]  # call2 has score 8
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_sort_by_agg_field_with_costs(client):
     """Test sorting by an aggregate field (display_name) with costs enabled.
 
@@ -6610,6 +6711,7 @@ def test_calls_query_sort_by_agg_field_with_costs(client):
     assert calls[1].id == call_a.id
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_sort_by_trace_name_with_costs(client):
     """Test sorting by summary.weave.trace_name with costs enabled.
 
@@ -6660,6 +6762,7 @@ def test_calls_query_sort_by_trace_name_with_costs(client):
     assert calls[1].id == call_a.id
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
     @weave.op
     def my_op(x: int) -> int:
@@ -6799,6 +6902,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
     assert len(calls) == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sentinel_round_trip_none_values(client):
     """Verify that None values survive the full write→read pipeline without leaking sentinels.
 

@@ -20,6 +20,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
@@ -140,6 +141,7 @@ def create_test_export_request(project_id="test_project") -> tsi.OTelExportReq:
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     """Test the otel_export method."""
     export_req = create_test_export_request()
@@ -202,6 +204,7 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     assert len(res.calls) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_otel_export_multiple_processed_spans(client: weave_client.WeaveClient):
     """Test that exporting multiple ProcessedResourceSpans produces correct calls.
 
@@ -272,6 +275,7 @@ def test_otel_export_multiple_processed_spans(client: weave_client.WeaveClient):
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     """Test the otel_export method with turn and thread attributes."""
     # Create a test export request
@@ -326,6 +330,7 @@ def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
     """Test the otel_export method with is_turn=True but no thread_id."""
     # Create a test export request
@@ -1493,6 +1498,7 @@ class TestSemanticConventionParsing:
         extracted = get_wandb_attributes(attributes)
         assert extracted["thread_id"] == "conv-from-semconv"
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
         """Test that costs are properly calculated for OTEL spans with usage at query time."""
         project_id = client.project_id
@@ -1802,6 +1808,7 @@ class TestSpanOverrides:
         assert overrides == {}
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_otel_export_partial_success_on_attribute_conflict(
     client: weave_client.WeaveClient,
 ):
@@ -1880,6 +1887,7 @@ def test_otel_export_partial_success_on_attribute_conflict(
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_otel_span_wandb_attributes_and_data_routing(
     client: weave_client.WeaveClient,
 ):
@@ -2066,6 +2074,7 @@ def test_otel_span_wandb_attributes_and_data_routing(
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_otel_export_json_string_and_dotted_completion_keys(
     client: weave_client.WeaveClient,
 ):

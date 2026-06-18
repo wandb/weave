@@ -70,11 +70,9 @@ describe('attributes context', () => {
 
   test('applies global attributes from init settings', async () => {
     traceServer = new InMemoryTraceServer();
-    initWithCustomTraceServer(
-      projectId,
-      traceServer,
-      new Settings(true, {tenant: 'acme', base: 'global'})
-    );
+    initWithCustomTraceServer(projectId, traceServer, {
+      attributes: {tenant: 'acme', base: 'global'},
+    });
 
     const leafOp = op(async function leafOp() {
       return 'leaf';

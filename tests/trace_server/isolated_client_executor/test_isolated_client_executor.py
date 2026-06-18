@@ -17,6 +17,7 @@ import pytest
 from pydantic import BaseModel
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.isolated_client_executor.cross_process_trace_server import (
     CrossProcessTraceServerReceiver,
 )
@@ -379,6 +380,7 @@ def log_to_weave(req: SimpleRequest):
     return log_to_weave_op(req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_correct_isolation(client):
     """This test demonstrates successful isolation of function execution, but

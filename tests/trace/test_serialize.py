@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 
+import pytest
 from pydantic import BaseModel
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.object_record import pydantic_object_record
 from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
@@ -144,6 +146,71 @@ def test_dictify_to_dict() -> None:
     }
 
 
+def test_dictify_circular_reference() -> None:
+    # A reference cycle routed through `to_dict` must terminate rather than
+    # recurse forever. This is the CrewAI/litellm hang from issue #5158:
+    # those models expose `to_dict`, and dropping cycle detection at that
+    # boundary made `dictify` loop indefinitely.
+    class Node:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.peer: Node | None = None
+
+        def to_dict(self) -> dict:
+            return {"name": self.name, "peer": self.peer}
+
+    a = Node("a")
+    b = Node("b")
+    a.peer = b
+    b.peer = a
+
+    result = dictify(a)
+    assert result["name"] == "a"
+    assert result["peer"]["name"] == "b"
+    # The hop back to `a` closes the cycle and is broken via stringify.
+    assert isinstance(result["peer"]["peer"], str)
+
+
+def test_dictify_self_reference() -> None:
+    class Box:
+        def __init__(self) -> None:
+            self.me: Box | None = None
+
+        def to_dict(self) -> dict:
+            return {"me": self.me}
+
+    box = Box()
+    box.me = box
+
+    result = dictify(box)
+    assert isinstance(result["me"], str)
+
+
+def test_dictify_shared_reference_traversed_once() -> None:
+    # A shared `to_dict`-bearing child reached by two paths must be expanded
+    # only once. Re-expanding it on every path (the bug behind issue #5158)
+    # turns a shared/diamond graph into exponential work — the practical
+    # symptom of the "hang".
+    class Counter:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def to_dict(self) -> dict:
+            self.calls += 1
+            return {"leaf": 1}
+
+    shared = Counter()
+
+    class Parent:
+        def to_dict(self) -> dict:
+            return {"a": shared, "b": shared}
+
+    result = dictify(Parent())
+    assert result["a"] == {"leaf": 1}
+    assert isinstance(result["b"], str)
+    assert shared.calls == 1
+
+
 def test_stringify_returns_repr() -> None:
     @dataclass
     class Point:
@@ -261,6 +328,7 @@ def test_to_json_object_excludes_ref(client) -> None:
     assert "ref" not in serialized
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_to_json_function_with_memory_address_in_op(weave_active) -> None:
     opaque = object()
 

@@ -373,8 +373,15 @@ class AgentSpanStatsReq(BaseModel):
         end = self.end or datetime.datetime.now(datetime.timezone.utc)
         if end < self.start:
             raise ValueError("AgentSpanStatsReq end must be after start")
+        # Unfiltered, ungrouped requests are not bound by
+        # MAX_AGENT_STATS_RANGE_DAYS.
+        apply_max_range_days = (
+            bool(self.group_by)
+            or bool(self.group_filters)
+            or numeric_bucket is not None
+        )
         max_range = datetime.timedelta(days=MAX_AGENT_STATS_RANGE_DAYS)
-        if end - self.start > max_range:
+        if apply_max_range_days and end - self.start > max_range:
             raise ValueError(
                 "AgentSpanStatsReq date range cannot exceed "
                 f"{MAX_AGENT_STATS_RANGE_DAYS} days"
@@ -908,6 +915,8 @@ class AgentChatMessage(BaseModel):
     type: AgentChatMessageType
     span_id: str | None = None
     agent_name: str | None = None
+    agent_version: str | None = None
+    status_code: StatusCodeLiteral | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None
@@ -960,6 +969,9 @@ class AgentTraceChatRes(BaseModel):
 
     trace_id: str
     root_span_name: str | None = None
+    agent_name: str | None = None
+    agent_version: str | None = None
+    status_code: StatusCodeLiteral | None = None
     provider: str | None = None
     total_duration_ms: int | None = Field(
         default=None,

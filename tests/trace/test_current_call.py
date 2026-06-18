@@ -1,12 +1,14 @@
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
 from weave.trace.weave_client import RESERVED_SUMMARY_STATUS_COUNTS_KEY
 from weave.trace_server import trace_server_interface as tsi
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_attributes_read_only(client):
     @weave.op
     def my_op():
@@ -21,6 +23,7 @@ def test_call_attributes_read_only(client):
     assert "new" not in calls[0].attributes
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_summary_editable(client):
     @weave.op
     def my_op():
@@ -38,6 +41,7 @@ def test_call_summary_editable(client):
     assert summary[RESERVED_SUMMARY_STATUS_COUNTS_KEY][tsi.TraceStatus.SUCCESS] == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_attributes_update_and_delete_forbidden(client):
     @weave.op
     def my_op():
@@ -57,6 +61,7 @@ def test_call_attributes_update_and_delete_forbidden(client):
     assert "extra" not in calls[0].attributes
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_summary_deep_merge(client):
     @weave.op
     def my_op():
@@ -72,6 +77,7 @@ def test_call_summary_deep_merge(client):
     assert summary[RESERVED_SUMMARY_STATUS_COUNTS_KEY][tsi.TraceStatus.SUCCESS] == 1
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_set_view_inside_op(client):
     """Verify weave.set_view stores serialized content on op call summary."""
     markdown_view = weave.Content.from_text("# Report", mimetype="text/markdown")

@@ -5,11 +5,13 @@ Tests verify that the Op V2 API correctly creates, reads, lists, and deletes op 
 
 import pytest
 
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_create_basic(trace_server):
     """Test creating a basic op object."""
     project_id = f"{TEST_ENTITY}/test_op_create_basic"
@@ -28,6 +30,7 @@ def test_op_create_basic(trace_server):
     assert create_res.version_index == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_create_without_source_code(trace_server):
     """Test creating an op without providing source code (uses placeholder)."""
     project_id = f"{TEST_ENTITY}/test_op_create_no_source"
@@ -46,6 +49,7 @@ def test_op_create_without_source_code(trace_server):
     assert create_res.version_index == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_read_basic(trace_server):
     """Test reading a specific op object."""
     project_id = f"{TEST_ENTITY}/test_op_read_basic"
@@ -75,6 +79,7 @@ def test_op_read_basic(trace_server):
     assert read_res.created_at is not None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_read_not_found(trace_server):
     """Test reading a non-existent op raises NotFoundError."""
     project_id = f"{TEST_ENTITY}/test_op_read_not_found"
@@ -89,6 +94,7 @@ def test_op_read_not_found(trace_server):
         trace_server.op_read(read_req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_list_basic(trace_server):
     """Test listing all ops in a project."""
     project_id = f"{TEST_ENTITY}/test_op_list_basic"
@@ -119,6 +125,7 @@ def test_op_list_basic(trace_server):
         assert op.created_at is not None
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_list_with_limit(trace_server):
     """Test listing ops with a limit."""
     project_id = f"{TEST_ENTITY}/test_op_list_limit"
@@ -140,6 +147,7 @@ def test_op_list_with_limit(trace_server):
     assert len(ops) == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_list_with_offset(trace_server):
     """Test listing ops with an offset."""
     project_id = f"{TEST_ENTITY}/test_op_list_offset"
@@ -161,6 +169,7 @@ def test_op_list_with_offset(trace_server):
     assert len(ops) == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_list_with_limit_and_offset(trace_server):
     """Test listing ops with both limit and offset for pagination."""
     project_id = f"{TEST_ENTITY}/test_op_list_pagination"
@@ -191,6 +200,7 @@ def test_op_list_with_limit_and_offset(trace_server):
     assert len(ops1_ids & ops2_ids) == 0  # No overlap
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_list_empty_project(trace_server):
     """Test listing ops in a project with no ops."""
     project_id = f"{TEST_ENTITY}/test_op_list_empty"
@@ -201,6 +211,7 @@ def test_op_list_empty_project(trace_server):
     assert len(ops) == 0
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_delete_single_version(trace_server):
     """Test deleting a single version of an op."""
     project_id = f"{TEST_ENTITY}/test_op_delete_single"
@@ -234,6 +245,7 @@ def test_op_delete_single_version(trace_server):
         trace_server.op_read(read_req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_delete_all_versions(trace_server):
     """Test deleting all versions of an op (no digests specified)."""
     project_id = f"{TEST_ENTITY}/test_op_delete_all"
@@ -261,6 +273,7 @@ def test_op_delete_all_versions(trace_server):
     assert delete_res.num_deleted == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_delete_multiple_versions(trace_server):
     """Test deleting multiple specific versions of an op."""
     project_id = f"{TEST_ENTITY}/test_op_delete_multiple"
@@ -308,6 +321,7 @@ def test_op_delete_multiple_versions(trace_server):
         assert read_res.digest == digest
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_delete_not_found(trace_server):
     """Test deleting a non-existent op raises NotFoundError."""
     project_id = f"{TEST_ENTITY}/test_op_delete_not_found"
@@ -322,6 +336,7 @@ def test_op_delete_not_found(trace_server):
         trace_server.op_delete(delete_req)
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_versioning(trace_server):
     """Test that creating multiple versions of an op increments version_index."""
     project_id = f"{TEST_ENTITY}/test_op_versioning"
@@ -347,6 +362,7 @@ def test_op_versioning(trace_server):
     assert len({v.digest for v in versions}) == 3
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_code_with_special_characters(trace_server):
     """Test creating and reading an op with special characters in source code."""
     project_id = f"{TEST_ENTITY}/test_op_special_chars"
@@ -375,6 +391,7 @@ def test_op_code_with_special_characters(trace_server):
     assert read_res.code == source_code
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_code_with_unicode(trace_server):
     """Test creating and reading an op with unicode characters in source code."""
     project_id = f"{TEST_ENTITY}/test_op_unicode"
@@ -406,6 +423,7 @@ def test_op_code_with_unicode(trace_server):
     assert "café" in read_res.code
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_list_after_deletion(trace_server):
     """Test that deleted ops don't appear in list results."""
     project_id = f"{TEST_ENTITY}/test_op_list_after_deletion"

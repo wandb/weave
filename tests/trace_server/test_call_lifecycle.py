@@ -3,9 +3,11 @@ import uuid
 
 import pytest
 
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.interface import query as tsi_query
 
 
@@ -80,7 +82,34 @@ def test_call_update_out_of_order(client: weave_client.WeaveClient):
     assert len(get_calls()) == 0
 
 
+def test_call_end_v2_requires_existing_start(client: weave_client.WeaveClient) -> None:
+    unknown_call_id = str(uuid.uuid4())
+
+    with pytest.raises(NotFoundError):
+        client.server.call_end_v2(
+            tsi.CallEndV2Req(
+                end=tsi.EndedCallSchemaForInsertWithStartedAt(
+                    project_id=client.project_id,
+                    id=unknown_call_id,
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    summary={},
+                )
+            )
+        )
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client.project_id,
+            filter=tsi.CallsFilter(call_ids=[unknown_call_id]),
+        )
+    )
+    assert res.calls == []
+
+
 @pytest.mark.parametrize("end_arrives_first", [False, True])
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_merged columns"
+)
 def test_call_end_started_at_anchors_sortable_datetime(
     client: weave_client.WeaveClient, end_arrives_first: bool
 ) -> None:

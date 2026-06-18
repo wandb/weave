@@ -1,5 +1,6 @@
 import dataclasses
 import random
+from collections import defaultdict
 from typing import Any
 
 import pydantic
@@ -8,7 +9,7 @@ from PIL import Image
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import AnyIntMatcher, AnyStrMatcher
+from tests.trace.util import FAKE_NOT_IMPLEMENTED, AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
@@ -189,6 +190,105 @@ async def test_basic_evaluation(client):
     for call in predict_and_score_calls:
         inputs.add(call.inputs["example"])
     assert len(inputs) == 3
+
+
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+@pytest.mark.asyncio
+async def test_declarative_eval_marks_child_calls_with_eval_meta(client):
+    # The declarative path must tag every eval call (predict_and_score, model,
+    # scorers, summarize) with `_weave_eval_meta`, mirroring the imperative path,
+    # so server-side ingest sampling can recognize eval calls from their own
+    # attributes. trials=2 proves the marker reaches every example's subtree, not
+    # just the first.
+    examples = [
+        {"question": "What is the capital of France?", "expected": "Paris"},
+        {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    ]
+
+    @weave.op
+    def match_score(expected: str, output: dict) -> dict:
+        return {"match": expected == output["generated_text"]}
+
+    model = MyModel(prompt="World")
+    evaluation = Evaluation(dataset=examples, scorers=[match_score], trials=2)
+    await evaluation.evaluate(model)
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client.project_id)
+    ).calls
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in calls:
+        by_op[op_name_from_ref(c.op_name)].append(c)
+
+    # 2 examples * 2 trials -> 4 of each per-example op; summarize runs once.
+    assert len(by_op["Evaluation.predict_and_score"]) == 4
+    assert len(by_op["MyModel.predict"]) == 4
+    assert len(by_op["match_score"]) == 4
+    assert len(by_op["Evaluation.summarize"]) == 1
+
+    for op_name in (
+        "Evaluation.predict_and_score",
+        "MyModel.predict",
+        "match_score",
+        "Evaluation.summarize",
+    ):
+        for c in by_op[op_name]:
+            assert c.attributes.get("_weave_eval_meta") == {"declarative": True}, (
+                op_name,
+                c.attributes,
+            )
+
+    # The root is recognized by op_name and is intentionally not marked: its own
+    # attributes are read before the wrapper body runs.
+    (root,) = by_op["Evaluation.evaluate"]
+    assert "_weave_eval_meta" not in root.attributes
+
+
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+@pytest.mark.asyncio
+async def test_declarative_eval_meta_merges_with_existing(client):
+    # An outer wrapper (e.g. the evaluate_model_worker) may already set
+    # `_weave_eval_meta`. The declarative marker must merge into it, not overwrite
+    # it, so both keys survive on every child call.
+    examples = [{"question": "What is the capital of France?", "expected": "Paris"}]
+
+    @weave.op
+    def match_score(expected: str, output: dict) -> dict:
+        return {"match": expected == output["generated_text"]}
+
+    model = MyModel(prompt="World")
+    evaluation = Evaluation(dataset=examples, scorers=[match_score])
+    with weave.attributes({"_weave_eval_meta": {"evaluate_model_worker": True}}):
+        await evaluation.evaluate(model)
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client.project_id)
+    ).calls
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in calls:
+        by_op[op_name_from_ref(c.op_name)].append(c)
+
+    # Children carry both the pre-existing key and the declarative marker.
+    expected_meta = {"evaluate_model_worker": True, "declarative": True}
+    for op_name in (
+        "Evaluation.predict_and_score",
+        "MyModel.predict",
+        "match_score",
+        "Evaluation.summarize",
+    ):
+        assert by_op[op_name], op_name
+        for c in by_op[op_name]:
+            assert c.attributes.get("_weave_eval_meta") == expected_meta, (
+                op_name,
+                c.attributes,
+            )
+
+    # The root keeps only the outer key (its attributes are read before the
+    # wrapper body adds `declarative`).
+    (root,) = by_op["Evaluation.evaluate"]
+    assert root.attributes["_weave_eval_meta"] == {"evaluate_model_worker": True}
 
 
 @weave.op
@@ -1092,6 +1192,7 @@ def test_scorers_with_output_and_model_output_raise_error():
         evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_with_custom_name(client):
     dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
@@ -1110,6 +1211,7 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_evaluate_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
@@ -1129,6 +1231,7 @@ def test_get_evaluate_calls(client, make_evals):
     assert call2.inputs["model"].name == "ghi"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_score_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
@@ -1150,6 +1253,7 @@ def test_get_score_calls(client, make_evals):
     assert score_calls2[3].output == 7878
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_get_scores(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()

@@ -8,6 +8,7 @@ the ``langchain_core.messages`` pattern: callers building structured
 messages do ``from weave.session import TextPart, ToolCallPart``.
 """
 
+from weave.session.agent_context import agent_name_override
 from weave.session.session import (
     LLM,
     BlobPart,
@@ -61,6 +62,7 @@ __all__ = [
     "Turn",
     "UriPart",
     "Usage",
+    "agent_name_override",
     "end_llm",
     "end_session",
     "end_turn",
