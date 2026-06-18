@@ -2,7 +2,6 @@ import pytest
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import Dataset, Evaluation, Model
 from weave.scorers import MultiTaskBinaryClassificationF1
 
@@ -38,7 +37,6 @@ def example_to_model_input(example):
     return {"input": example["input"]}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_callable_as_model(weave_active):
     @weave.op
@@ -53,7 +51,6 @@ async def test_evaluate_callable_as_model(weave_active):
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_predict_can_receive_other_params(weave_active):
     @weave.op
@@ -74,7 +71,6 @@ async def test_predict_can_receive_other_params(weave_active):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_can_preprocess_model_input(weave_active):
     @weave.op
@@ -94,7 +90,6 @@ async def test_can_preprocess_model_input(weave_active):
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_rows_only(weave_active):
     evaluation = Evaluation(
@@ -106,7 +101,6 @@ async def test_evaluate_rows_only(weave_active):
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_both_styles(weave_active):
     evaluation = Evaluation(
@@ -139,7 +133,6 @@ async def test_evaluate_other_model_method_names():
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_score_as_class(weave_active):
     class MyScorerOldstyle(weave.Scorer):
@@ -162,7 +155,6 @@ async def test_score_as_class(weave_active):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_score_with_custom_summarize(weave_active):
     class MyScorerOldstyle(weave.Scorer):
@@ -190,7 +182,6 @@ async def test_score_with_custom_summarize(weave_active):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_multiclass_f1_score(weave_active):
     evaluation = Evaluation(
