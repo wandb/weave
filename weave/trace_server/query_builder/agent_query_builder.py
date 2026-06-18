@@ -905,14 +905,24 @@ def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
 # ---------------------------------------------------------------------------
 
 
+# Max distinct values each per-group `groupUniqArray` retains. Bounds the
+# aggregate state for high-cardinality group keys (an unbounded groupUniqArray
+# accumulates every distinct value per group, which OOMs ClickHouse); far above
+# any real agent/provider/model count, so legitimate groups are unaffected.
+_GROUP_UNIQ_ARRAY_LIMIT = 1000
+
 # Aggregate SELECT list shared between grouped list queries.
 # The bundle is intentionally fixed because callers do not pick aggregates.
 # Fields that map to specific UI pivots (invocation_count, conversation_names)
 # are included alongside cross-cutting totals so all group_by shapes return the
 # same schema.
-_GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
+# Memory notes: `uniq` (not `uniqExact`) keeps conversation_count to a bounded
+# HLL state, and every `groupUniqArray` is capped at `_GROUP_UNIQ_ARRAY_LIMIT`.
+# Both are exact for the small cardinalities seen in practice but cannot blow up
+# on pathological group keys.
+_GROUPED_SPAN_AGGREGATES: str = f"""count() AS span_count,
                countIf(s.operation_name = 'invoke_agent') AS invocation_count,
-               uniqExact(s.conversation_id) AS conversation_count,
+               uniq(s.conversation_id) AS conversation_count,
                sum(s.input_tokens) AS total_input_tokens,
                sum(s.cache_creation_input_tokens) AS total_cache_creation_input_tokens,
                sum(s.cache_read_input_tokens) AS total_cache_read_input_tokens,
@@ -920,11 +930,11 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
                sum(s.reasoning_tokens) AS total_reasoning_tokens,
                sum(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)) AS total_duration_ms,
                countIf(s.status_code = 'ERROR') AS error_count,
-               groupUniqArray(s.agent_name) AS agent_names,
-               groupUniqArray(s.agent_version) AS agent_versions,
-               groupUniqArray(s.provider_name) AS provider_names,
-               groupUniqArray(s.request_model) AS request_models,
-               groupUniqArray(s.conversation_name) AS conversation_names,
+               groupUniqArray({_GROUP_UNIQ_ARRAY_LIMIT})(s.agent_name) AS agent_names,
+               groupUniqArray({_GROUP_UNIQ_ARRAY_LIMIT})(s.agent_version) AS agent_versions,
+               groupUniqArray({_GROUP_UNIQ_ARRAY_LIMIT})(s.provider_name) AS provider_names,
+               groupUniqArray({_GROUP_UNIQ_ARRAY_LIMIT})(s.request_model) AS request_models,
+               groupUniqArray({_GROUP_UNIQ_ARRAY_LIMIT})(s.conversation_name) AS conversation_names,
                min(s.started_at) AS first_seen,
                max(s.started_at) AS last_seen"""
 
