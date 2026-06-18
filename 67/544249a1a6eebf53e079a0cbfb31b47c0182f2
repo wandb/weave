@@ -1,0 +1,6 @@
+## Split of Google ADK plugin-core — slice 2/3 (model/chat spans)
+See slice 1 (andrew/google-adk-01-plugin-run) and tag bak-adk-old-plugincore for context + full original history.
+
+Adds: model callbacks (beforeModel/afterModel/onModelError → nested chat spans), setLlmRequest/ResponseAttributes + toolDefinitions + systemInstructionParts, childContext, errorTypeOf/errorMessageOf, closeShortCircuitedModelSpan + modelSpanKeyForEvent, InvocationState.modelSpans + finishInvocation model loop + onEvent short-circuit, semconv +TOOL_DEFINITIONS, model types. Also adds tool-callback NO-OP STUBS (return undefined) so the plugin structurally satisfies ADK's BasePlugin type for the real-runner model tests (records-model-errors, cached) — stub bodies are filled in slice 3.
+
+Built: restore full old plugin-core source, strip ONLY tool code (run+model lines stay byte-identical to the original). Verified 17/17 jest + lint clean.
