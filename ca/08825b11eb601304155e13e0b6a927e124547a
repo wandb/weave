@@ -66,3 +66,6 @@ Rebased onto origin/master (ba337cff57). Restack hit an import conflict in googl
 
 ## Session addendum — use semconv constants
 Inherited branch 01's gen_ai.* → ATTR_GEN_AI_* conversion + semconv import via restack (clean, no conflict — the genai-exclusion test adds no gen_ai attribute-key literals). Verified 19/19 jest, prettier + eslint clean.
+
+## Session addendum — reparented onto split plugin-core
+plugin-core was split into 3 PRs (run/model/tool). This branch was reparented (cherry-pick) from the old single plugin-core onto andrew/google-adk-03-plugin-tool. googleGenAI.ts source applied cleanly; the test auto-merged (the genai-exclusion describe + commonPatchGoogleGenAI import landed in non-conflicting regions of the reorganized test). Verified 21/21 jest + lint. Pre-split commit preserved at tag bak-adk-old-genai (8bb9046275).
