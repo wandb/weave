@@ -1195,7 +1195,6 @@ class FinishEvalRunModel(weave.Model):
 class TestPredictionsV2API:
     """Tests for Predictions V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_prediction_create(self, client):
         """Test creating a prediction via V2 API."""
         project_id = client.project_id
@@ -1227,7 +1226,6 @@ class PredictionTestModel(weave.Model):
         # Verify response
         assert pred_res.prediction_id is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_prediction_read(self, client):
         """Test reading a prediction via V2 API."""
         project_id = client.project_id
@@ -1269,7 +1267,6 @@ class ReadPredictionModel(weave.Model):
         assert read_res.inputs == {"question": "What is 2+2?"}
         assert read_res.output == "4"
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_prediction_read_with_none_inputs(self, client):
         """Test reading a prediction where the underlying call has None inputs.
 
@@ -1321,7 +1318,6 @@ class ReadPredictionModel(weave.Model):
         assert read_res.inputs == {}
         assert read_res.output == "some output"
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_prediction_list(self, client):
         """Test listing predictions via V2 API."""
         project_id = client.project_id
@@ -1363,7 +1359,6 @@ class ListPredictionModel(weave.Model):
         for pred_id in pred_ids:
             assert pred_id in returned_ids
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_prediction_delete(self, client):
         """Test deleting predictions via V2 API."""
         project_id = client.project_id
@@ -1405,7 +1400,6 @@ class DeletePredictionModel(weave.Model):
         # Verify deletion
         assert delete_res.num_deleted == 2
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_prediction_with_evaluation_run(self, client):
         """Test creating a prediction linked to an evaluation run."""
         project_id = client.project_id
@@ -1509,7 +1503,6 @@ class PredEvalRunModel(weave.Model):
 class TestScoresV2API:
     """Tests for Scores V2 API endpoints."""
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_score_create(self, client):
         """Test creating a score via V2 API."""
         project_id = client.project_id
@@ -1559,7 +1552,6 @@ class ScoreTestModel(weave.Model):
         # Verify response
         assert score_res.score_id is not None
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_score_read(self, client):
         """Test reading a score via V2 API."""
         project_id = client.project_id
@@ -1618,7 +1610,6 @@ class ReadScoreModel(weave.Model):
         assert read_res.scorer == scorer_ref
         assert read_res.value == 0.85
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_score_list(self, client):
         """Test listing scores via V2 API."""
         project_id = client.project_id
@@ -1677,7 +1668,6 @@ class ListScoreModel(weave.Model):
         for score_id in score_ids:
             assert score_id in returned_ids
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_score_delete(self, client):
         """Test deleting scores via V2 API."""
         project_id = client.project_id
@@ -1736,7 +1726,6 @@ class DeleteScoreModel(weave.Model):
         # Verify deletion
         assert delete_res.num_deleted == 2
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_score_with_evaluation_run(self, client):
         """Test creating a score linked to an evaluation run."""
         project_id = client.project_id

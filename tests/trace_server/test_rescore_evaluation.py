@@ -203,7 +203,6 @@ def test_rescore_without_wb_user_id_raises(client):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_prediction_list_filters_by_evaluation_run_id(client):
     """prediction_list(evaluation_run_id=X) must return only predictions for run X."""
     project_id = client.project_id
@@ -275,7 +274,6 @@ def test_prediction_list_filters_by_evaluation_run_id(client):
     assert preds_b[0].evaluation_run_id == run_b.evaluation_run_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_prediction_list_pagination(client):
     """prediction_list respects limit and offset."""
     project_id = client.project_id
