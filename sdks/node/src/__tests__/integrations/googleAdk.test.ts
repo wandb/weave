@@ -25,6 +25,7 @@ import {
 import {setGlobalClient} from '../../clientApi';
 import {clearWeaveTracerProvider} from '../../genai/provider';
 import {WeaveAdkPlugin} from '../../integrations/googleAdk';
+import {commonPatchGoogleGenAI} from '../../integrations/googleGenAI';
 import {initWithCustomTraceServer} from '../clientMock';
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 
@@ -64,10 +65,22 @@ function userMessage(text: string) {
   return {role: 'user', parts: [{text}]};
 }
 
-function textResponse(text: string): LlmResponse {
+function textResponse(
+  text: string,
+  usage?: {prompt: number; completion: number}
+): LlmResponse {
   return {
     content: {role: 'model', parts: [{text}]},
     turnComplete: true,
+    ...(usage
+      ? {
+          usageMetadata: {
+            promptTokenCount: usage.prompt,
+            candidatesTokenCount: usage.completion,
+            totalTokenCount: usage.prompt + usage.completion,
+          },
+        }
+      : {}),
   } as LlmResponse;
 }
 
@@ -88,7 +101,42 @@ function byOperation(spans: ReadableSpan[], operation: string): ReadableSpan[] {
   );
 }
 
-describe('Google ADK integration — run spans', () => {
+/** Narrows `span` to non-undefined, throwing (failing the test) if missing. */
+function requireSpan(span: ReadableSpan | undefined): ReadableSpan {
+  if (!span) {
+    throw new Error('expected span to be defined');
+  }
+  return span;
+}
+
+/**
+ * Sets an env var for the duration of `fn`, then restores it. The plugin
+ * reads these env vars live at span-build time, so this is how the env-var
+ * contracts get exercised through real span output.
+ */
+async function withEnv(
+  name: string,
+  value: string | undefined,
+  fn: () => Promise<void>
+): Promise<void> {
+  const previous = process.env[name];
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+  try {
+    await fn();
+  } finally {
+    if (previous === undefined) {
+      delete process.env[name];
+    } else {
+      process.env[name] = previous;
+    }
+  }
+}
+
+describe('Google ADK integration', () => {
   let traceServer: InMemoryTraceServer;
   let exporter: InMemorySpanExporter;
 
@@ -115,117 +163,431 @@ describe('Google ADK integration — run spans', () => {
     } as any;
   }
 
-  test('traces an agent run with its input and output messages', async () => {
-    const plugin = new WeaveAdkPlugin();
-    await plugin.beforeRunCallback({
-      invocationContext: invocationContext({
-        userContent: userMessage('What is the weather in Paris?'),
-      }),
-    });
-    await plugin.onEventCallback({
-      invocationContext: invocationContext(),
-      event: {
-        content: {role: 'model', parts: [{text: 'It is sunny in Paris.'}]},
-      } as any,
-    });
-    await plugin.afterRunCallback({invocationContext: invocationContext()});
+  function callbackContext(agentName = 'agent_a') {
+    return {invocationId: INVOCATION_ID, agentName} as any;
+  }
 
-    const [root] = byOperation(exporter.getFinishedSpans(), 'invoke_agent');
-    expect(root).toBeDefined();
-    expect(root.parentSpanId).toBeUndefined();
-    expect(root.name).toBe('invoke_agent agent_a');
-    expect(root.attributes).toMatchObject({
-      'gen_ai.operation.name': 'invoke_agent',
-      'gen_ai.agent.name': 'agent_a',
-      'gen_ai.provider.name': 'gemini',
-      'gen_ai.conversation.id': 'sess-1',
-      'gen_ai.input.messages': expect.stringContaining(
-        'What is the weather in Paris?'
-      ),
-      'gen_ai.output.messages': expect.stringContaining(
-        'It is sunny in Paris.'
-      ),
-    });
-  });
-
-  test('explicit plugin is safe with the real ADK runner', async () => {
-    const agent = new LlmAgent({
-      name: 'runner_agent',
-      description: 'runs through ADK',
-      model: new ScriptedLlm(TEST_MODEL, [[textResponse('hello from ADK')]]),
-    });
-    const runner = new InMemoryRunner({
-      agent,
-      appName: 'weave-adk-test',
-      plugins: [new WeaveAdkPlugin()],
-    });
-    const session = await runner.sessionService.createSession({
-      appName: 'weave-adk-test',
-      userId: 'user-1',
-    });
-
-    await runToCompletion(runner, {
-      userId: 'user-1',
-      sessionId: session.id,
-      newMessage: userMessage('hello'),
-    });
-
-    const [root] = byOperation(exporter.getFinishedSpans(), 'invoke_agent');
-    expect(root).toBeDefined();
-    expect(root.name).toBe('invoke_agent runner_agent');
-    expect(root.attributes).toMatchObject({
-      'gen_ai.agent.name': 'runner_agent',
-      'gen_ai.input.messages': expect.stringContaining('hello'),
-      'gen_ai.output.messages': expect.stringContaining('hello from ADK'),
-    });
-  });
-
-  test('records an event error on the root span', async () => {
-    const plugin = new WeaveAdkPlugin();
-    await plugin.beforeRunCallback({invocationContext: invocationContext()});
-    await plugin.onEventCallback({
-      invocationContext: invocationContext(),
-      event: {errorCode: 'BOOM', errorMessage: 'it broke'} as any,
-    });
-    await plugin.afterRunCallback({invocationContext: invocationContext()});
-
-    const [root] = byOperation(exporter.getFinishedSpans(), 'invoke_agent');
-    expect(root.status).toMatchObject({
-      code: 2, // SpanStatusCode.ERROR
-      message: expect.stringContaining('it broke'),
-    });
-  });
-
-  test('completed invocations unregister their beforeExit cleanup', async () => {
-    const beforeCount = process.listenerCount('beforeExit');
-
-    for (let i = 0; i < 12; i++) {
+  describe('run spans', () => {
+    test('traces an agent run with its input and output messages', async () => {
       const plugin = new WeaveAdkPlugin();
-      const ctx = invocationContext({invocationId: `listener-${i}`});
-      await plugin.beforeRunCallback({invocationContext: ctx});
-      await plugin.afterRunCallback({invocationContext: ctx});
+      await plugin.beforeRunCallback({
+        invocationContext: invocationContext({
+          userContent: userMessage('What is the weather in Paris?'),
+        }),
+      });
+      await plugin.onEventCallback({
+        invocationContext: invocationContext(),
+        event: {
+          content: {role: 'model', parts: [{text: 'It is sunny in Paris.'}]},
+        } as any,
+      });
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+
+      const [root] = byOperation(exporter.getFinishedSpans(), 'invoke_agent');
+      expect(root).toBeDefined();
+      expect(root.parentSpanId).toBeUndefined();
+      expect(root.name).toBe('invoke_agent agent_a');
+      expect(root.attributes).toMatchObject({
+        'gen_ai.operation.name': 'invoke_agent',
+        'gen_ai.agent.name': 'agent_a',
+        'gen_ai.provider.name': 'gemini',
+        'gen_ai.conversation.id': 'sess-1',
+        'gen_ai.input.messages': expect.stringContaining(
+          'What is the weather in Paris?'
+        ),
+        'gen_ai.output.messages': expect.stringContaining(
+          'It is sunny in Paris.'
+        ),
+      });
+    });
+
+    test('explicit plugin is safe with the real ADK runner', async () => {
+      const agent = new LlmAgent({
+        name: 'runner_agent',
+        description: 'runs through ADK',
+        model: new ScriptedLlm(TEST_MODEL, [[textResponse('hello from ADK')]]),
+      });
+      const runner = new InMemoryRunner({
+        agent,
+        appName: 'weave-adk-test',
+        plugins: [new WeaveAdkPlugin()],
+      });
+      const session = await runner.sessionService.createSession({
+        appName: 'weave-adk-test',
+        userId: 'user-1',
+      });
+
+      await runToCompletion(runner, {
+        userId: 'user-1',
+        sessionId: session.id,
+        newMessage: userMessage('hello'),
+      });
+
+      const [root] = byOperation(exporter.getFinishedSpans(), 'invoke_agent');
+      expect(root).toBeDefined();
+      expect(root.name).toBe('invoke_agent runner_agent');
+      expect(root.attributes).toMatchObject({
+        'gen_ai.agent.name': 'runner_agent',
+        'gen_ai.input.messages': expect.stringContaining('hello'),
+        'gen_ai.output.messages': expect.stringContaining('hello from ADK'),
+      });
+    });
+
+    test('records an event error on the root span', async () => {
+      const plugin = new WeaveAdkPlugin();
+      await plugin.beforeRunCallback({invocationContext: invocationContext()});
+      await plugin.onEventCallback({
+        invocationContext: invocationContext(),
+        event: {errorCode: 'BOOM', errorMessage: 'it broke'} as any,
+      });
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+
+      const [root] = byOperation(exporter.getFinishedSpans(), 'invoke_agent');
+      expect(root.status).toMatchObject({
+        code: 2, // SpanStatusCode.ERROR
+        message: expect.stringContaining('it broke'),
+      });
+    });
+
+    test('completed invocations unregister their beforeExit cleanup', async () => {
+      const beforeCount = process.listenerCount('beforeExit');
+
+      for (let i = 0; i < 12; i++) {
+        const plugin = new WeaveAdkPlugin();
+        const ctx = invocationContext({invocationId: `listener-${i}`});
+        await plugin.beforeRunCallback({invocationContext: ctx});
+        await plugin.afterRunCallback({invocationContext: ctx});
+      }
+
+      // The Weave tracer provider may register one process-level flush hook,
+      // but completed plugin instances should not add one listener each.
+      expect(
+        process.listenerCount('beforeExit') - beforeCount
+      ).toBeLessThanOrEqual(1);
+    });
+
+    test('callbacks are safe without an initialized weave client', async () => {
+      setGlobalClient(null);
+      try {
+        const plugin = new WeaveAdkPlugin();
+        await expect(
+          plugin.beforeRunCallback({invocationContext: invocationContext()})
+        ).resolves.toBeUndefined();
+        await expect(
+          plugin.afterRunCallback({invocationContext: invocationContext()})
+        ).resolves.toBeUndefined();
+        expect(exporter.getFinishedSpans()).toHaveLength(0);
+      } finally {
+        initWithCustomTraceServer(TEST_PROJECT, traceServer);
+      }
+    });
+  });
+
+  describe('model / chat spans', () => {
+    // Drives one model turn through the plugin callbacks and returns the
+    // resulting chat span, so env-driven attributes (provider name, content
+    // capture) can be asserted on real span output.
+    async function runOneChat(): Promise<ReadableSpan> {
+      const plugin = new WeaveAdkPlugin();
+      await plugin.beforeRunCallback({invocationContext: invocationContext()});
+      await plugin.beforeModelCallback({
+        callbackContext: callbackContext(),
+        llmRequest: {
+          model: TEST_MODEL,
+          contents: [{role: 'user', parts: [{text: 'hi'}]}],
+        } as any,
+      });
+      await plugin.afterModelCallback({
+        callbackContext: callbackContext(),
+        llmResponse: {content: {role: 'model', parts: [{text: 'hello'}]}},
+      });
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+      const [chat] = byOperation(exporter.getFinishedSpans(), 'chat');
+      return chat;
     }
 
-    // The Weave tracer provider may register one process-level flush hook,
-    // but completed plugin instances should not add one listener each.
-    expect(
-      process.listenerCount('beforeExit') - beforeCount
-    ).toBeLessThanOrEqual(1);
+    test('records model errors as span errors and still closes the run', async () => {
+      class ExplodingLlm extends BaseLlm {
+        // eslint-disable-next-line require-yield -- deliberately throws before yielding
+        async *generateContentAsync(): AsyncGenerator<LlmResponse, void> {
+          throw new Error('model exploded');
+        }
+        async connect(): Promise<never> {
+          throw new Error('not supported');
+        }
+      }
+
+      const agent = new LlmAgent({
+        name: 'fragile_agent',
+        description: 'fails',
+        model: new ExplodingLlm({model: TEST_MODEL}),
+      });
+      const runner = new InMemoryRunner({
+        agent,
+        appName: 'weave-adk-test',
+        plugins: [new WeaveAdkPlugin()],
+      });
+      const session = await runner.sessionService.createSession({
+        appName: 'weave-adk-test',
+        userId: 'user-1',
+      });
+
+      await runToCompletion(runner, {
+        userId: 'user-1',
+        sessionId: session.id,
+        newMessage: userMessage('boom'),
+      });
+
+      const spans = exporter.getFinishedSpans();
+      const chatSpans = byOperation(spans, 'chat');
+      const root = requireSpan(
+        byOperation(spans, 'invoke_agent').find(span => !span.parentSpanId)
+      );
+
+      expect(chatSpans).toHaveLength(1);
+      // 2 = SpanStatusCode.ERROR
+      expect(chatSpans[0].status).toMatchObject({
+        code: 2,
+        message: expect.stringContaining('model exploded'),
+      });
+      expect(root.status).toMatchObject({
+        code: 2,
+        message: expect.stringContaining('model exploded'),
+      });
+    });
+
+    test('closes chat spans when beforeModelCallback returns a cached response', async () => {
+      class FailIfCalledLlm extends BaseLlm {
+        // eslint-disable-next-line require-yield -- this test fails if ADK calls the model
+        async *generateContentAsync(): AsyncGenerator<LlmResponse, void> {
+          throw new Error('model should have been skipped');
+        }
+        async connect(): Promise<never> {
+          throw new Error('not supported');
+        }
+      }
+
+      const agent = new LlmAgent({
+        name: 'cached_agent',
+        description: 'serves cached responses',
+        model: new FailIfCalledLlm({model: TEST_MODEL}),
+        beforeModelCallback: () =>
+          textResponse('served from cache', {prompt: 1, completion: 1}),
+      });
+      const runner = new InMemoryRunner({
+        agent,
+        appName: 'weave-adk-test',
+        plugins: [new WeaveAdkPlugin()],
+      });
+      const session = await runner.sessionService.createSession({
+        appName: 'weave-adk-test',
+        userId: 'user-1',
+      });
+
+      await runToCompletion(runner, {
+        userId: 'user-1',
+        sessionId: session.id,
+        newMessage: userMessage('use the cache'),
+      });
+
+      const [chatSpan] = byOperation(exporter.getFinishedSpans(), 'chat');
+      expect(chatSpan).toMatchObject({
+        status: {code: 0}, // SpanStatusCode.UNSET — closed normally, not errored
+        attributes: {
+          'gen_ai.output.messages':
+            expect.stringContaining('served from cache'),
+        },
+      });
+      expect(
+        chatSpan.attributes['weave.google_adk.interrupted']
+      ).toBeUndefined();
+    });
+
+    test('streaming: partial responses do not close the chat span', async () => {
+      const plugin = new WeaveAdkPlugin();
+      await plugin.beforeRunCallback({
+        invocationContext: invocationContext(),
+      });
+      await plugin.beforeModelCallback({
+        callbackContext: callbackContext(),
+        llmRequest: {model: TEST_MODEL, contents: []} as any,
+      });
+      await plugin.afterModelCallback({
+        callbackContext: callbackContext(),
+        llmResponse: {
+          partial: true,
+          content: {role: 'model', parts: [{text: 'It is'}]},
+        },
+      });
+      await plugin.afterModelCallback({
+        callbackContext: callbackContext(),
+        llmResponse: {
+          content: {role: 'model', parts: [{text: 'It is sunny.'}]},
+          usageMetadata: {
+            promptTokenCount: 3,
+            candidatesTokenCount: 4,
+            totalTokenCount: 7,
+          },
+        },
+      });
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+
+      const chatSpans = byOperation(exporter.getFinishedSpans(), 'chat');
+      expect(chatSpans).toHaveLength(1);
+      expect(chatSpans[0].attributes).toMatchObject({
+        'gen_ai.output.messages': expect.stringContaining('It is sunny.'),
+        'gen_ai.usage.total_tokens': 7,
+      });
+    });
+
+    test('afterRun ends dangling spans and marks them interrupted', async () => {
+      const plugin = new WeaveAdkPlugin();
+      await plugin.beforeRunCallback({
+        invocationContext: invocationContext(),
+      });
+      await plugin.beforeModelCallback({
+        callbackContext: callbackContext(),
+        llmRequest: {model: TEST_MODEL, contents: []} as any,
+      });
+      // No afterModelCallback — simulates an aborted run.
+      await plugin.afterRunCallback({invocationContext: invocationContext()});
+
+      const spans = exporter.getFinishedSpans();
+      const chatSpans = byOperation(spans, 'chat');
+      expect(chatSpans).toHaveLength(1);
+      expect(chatSpans[0].attributes).toMatchObject({
+        'weave.google_adk.interrupted': true,
+      });
+      // Every started span was ended (it would not be finished otherwise).
+      expect(byOperation(spans, 'invoke_agent').length).toBeGreaterThan(0);
+    });
+
+    test('message content stays off spans when ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false', async () => {
+      await withEnv(
+        'ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS',
+        'false',
+        async () => {
+          const plugin = new WeaveAdkPlugin();
+          await plugin.beforeRunCallback({
+            invocationContext: invocationContext(),
+          });
+          await plugin.beforeModelCallback({
+            callbackContext: callbackContext(),
+            llmRequest: {
+              model: TEST_MODEL,
+              contents: [{role: 'user', parts: [{text: 'secret'}]}],
+            } as any,
+          });
+          await plugin.afterModelCallback({
+            callbackContext: callbackContext(),
+            llmResponse: {content: {role: 'model', parts: [{text: 'hush'}]}},
+          });
+          await plugin.afterRunCallback({
+            invocationContext: invocationContext(),
+          });
+
+          const spans = exporter.getFinishedSpans();
+          for (const span of spans) {
+            expect(span.attributes['gen_ai.input.messages']).toBeUndefined();
+            expect(span.attributes['gen_ai.output.messages']).toBeUndefined();
+          }
+          // Non-content attributes still flow.
+          const chatSpans = byOperation(spans, 'chat');
+          expect(chatSpans[0].attributes).toMatchObject({
+            'gen_ai.request.model': TEST_MODEL,
+          });
+        }
+      );
+    });
+
+    // provider.name must track how google-genai itself resolves the env var,
+    // including that "1" is NOT vertex (its stringToBoolean accepts only
+    // "true"), so the span reports the backend actually used.
+    const providerCases: Array<[string, string | undefined, string]> = [
+      ['unset', undefined, 'gemini'],
+      ['true', 'true', 'vertex_ai'],
+      ['TRUE', 'TRUE', 'vertex_ai'],
+      ['1', '1', 'gemini'],
+      ['false', 'false', 'gemini'],
+    ];
+    test.each(providerCases)(
+      'provider.name follows google-genai for GOOGLE_GENAI_USE_VERTEXAI=%s',
+      async (_label, value, expected) => {
+        await withEnv('GOOGLE_GENAI_USE_VERTEXAI', value, async () => {
+          const chat = await runOneChat();
+          expect(chat.attributes).toMatchObject({
+            'gen_ai.provider.name': expected,
+          });
+        });
+      }
+    );
+
+    // Content capture must match ADK's own gate: case-sensitive "true"/"1",
+    // and unset/empty defaults to capturing.
+    const captureCases: Array<[string, string, boolean]> = [
+      ['1', '1', true],
+      ['empty', '', true],
+      ['false', 'false', false],
+    ];
+    test.each(captureCases)(
+      'content capture follows ADK for ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=%s',
+      async (_label, value, shouldCapture) => {
+        await withEnv(
+          'ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS',
+          value,
+          async () => {
+            const chat = await runOneChat();
+            if (shouldCapture) {
+              expect(chat.attributes).toMatchObject({
+                'gen_ai.output.messages': expect.stringContaining('hello'),
+              });
+            } else {
+              expect(chat.attributes['gen_ai.output.messages']).toBeUndefined();
+            }
+          }
+        );
+      }
+    );
   });
 
-  test('callbacks are safe without an initialized weave client', async () => {
-    setGlobalClient(null);
-    try {
-      const plugin = new WeaveAdkPlugin();
-      await expect(
-        plugin.beforeRunCallback({invocationContext: invocationContext()})
-      ).resolves.toBeUndefined();
-      await expect(
-        plugin.afterRunCallback({invocationContext: invocationContext()})
-      ).resolves.toBeUndefined();
-      expect(exporter.getFinishedSpans()).toHaveLength(0);
-    } finally {
-      initWithCustomTraceServer(TEST_PROJECT, traceServer);
+  describe('google genai client exclusion', () => {
+    function fakeGenAIExports() {
+      class FakeModels {
+        async generateContent(..._args: any[]) {
+          return {text: 'ok'};
+        }
+        async generateContentStream(..._args: any[]) {
+          return (async function* () {})();
+        }
+      }
+      class FakeGoogleGenAI {
+        models: any;
+        constructor(public readonly options: any) {
+          this.models = new FakeModels();
+        }
+      }
+      return {GoogleGenAI: FakeGoogleGenAI};
     }
+
+    test('ADK-internal clients (x-goog-api-client: google-adk/…) are not wrapped', () => {
+      const exports = commonPatchGoogleGenAI(fakeGenAIExports());
+      const adkClient = new exports.GoogleGenAI({
+        apiKey: 'k',
+        httpOptions: {
+          headers: {
+            'x-goog-api-client': 'google-adk/1.2.0 gl-typescript/v24.0.0',
+            'user-agent': 'google-adk/1.2.0 gl-typescript/v24.0.0',
+          },
+        },
+      });
+      // Unwrapped: plain models object, no weave op replacement.
+      expect(adkClient.models.generateContent.name).toBe('generateContent');
+
+      const userClient = new exports.GoogleGenAI({apiKey: 'k'});
+      // Wrapped: generateContent is replaced by a weave op.
+      expect(userClient.models.generateContent.name).not.toBe(
+        'generateContent'
+      );
+    });
   });
 });

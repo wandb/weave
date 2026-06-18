@@ -42,15 +42,30 @@
  * ```
  */
 
-import {ROOT_CONTEXT, SpanStatusCode} from '@opentelemetry/api';
-import type {Attributes, Span as OtelSpan} from '@opentelemetry/api';
+import {
+  ROOT_CONTEXT,
+  SpanStatusCode,
+  trace as otelTrace,
+} from '@opentelemetry/api';
+import type {
+  Attributes,
+  Context as OtelContext,
+  Span as OtelSpan,
+} from '@opentelemetry/api';
 
 import type {
   BaseAgent as AdkBaseAgent,
   Event as AdkEvent,
   InvocationContext as AdkInvocationContext,
+  LlmRequest as AdkLlmRequest,
+  LlmResponse as AdkLlmResponse,
 } from '@google/adk';
-import type {Content as AdkContent, Part as AdkPart} from '@google/genai';
+import type {
+  Content as AdkContent,
+  FunctionDeclaration as AdkFunctionDeclaration,
+  GenerateContentConfig as AdkGenerateContentConfig,
+  Part as AdkPart,
+} from '@google/genai';
 import {getGlobalClient} from '../clientApi';
 import {getWeaveTracer} from '../genai/provider';
 import {
@@ -64,11 +79,28 @@ import {
   ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_OUTPUT_TYPE,
   ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_CHOICE_COUNT,
+  ATTR_GEN_AI_REQUEST_FREQUENCY_PENALTY,
+  ATTR_GEN_AI_REQUEST_MAX_TOKENS,
+  ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_REQUEST_PRESENCE_PENALTY,
+  ATTR_GEN_AI_REQUEST_SEED,
+  ATTR_GEN_AI_REQUEST_STOP_SEQUENCES,
+  ATTR_GEN_AI_REQUEST_TEMPERATURE,
+  ATTR_GEN_AI_REQUEST_TOP_P,
+  ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+  ATTR_GEN_AI_TOOL_DEFINITIONS,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../genai/semconv';
 import {warnOnce} from '../utils/warnOnce';
 
-/** Model/tool callback context; `invocationId`/`agentName` are getters on ADK's
- *  `ReadonlyContext`, which `@google/adk` does not export as this minimal shape. */
+/** Model/tool callback context; `invocationId`/`agentName` are getters on
+ *  ADK's `ReadonlyContext`, which `@google/adk` does not export as this shape. */
 interface AdkCallbackContext {
   invocationId: string;
   agentName: string;
@@ -81,8 +113,11 @@ const TRACER_NAME = 'weave.google_adk';
 const WEAVE_ATTR_PREFIX = 'weave.google_adk';
 
 const OPERATION_INVOKE_AGENT = 'invoke_agent';
+const OPERATION_CHAT = 'chat';
 const OUTPUT_TYPE_TEXT = 'text';
+const TOOL_DEFINITION_TYPE = 'function';
 
+const UNKNOWN_MODEL = 'unknown';
 // Marks spans force-ended at run end / process exit before completing.
 const ATTR_ADK_INTERRUPTED = `${WEAVE_ATTR_PREFIX}.interrupted`;
 const ATTR_ADK_INVOCATION_ID = `${WEAVE_ATTR_PREFIX}.invocation_id`;
@@ -113,6 +148,8 @@ type InvocationState = {
   invocationId: string;
   rootSpan: OtelSpan;
   conversationId: string | undefined;
+  /** agentName → in-flight chat span. */
+  modelSpans: Map<string, OtelSpan>;
   /** Content of the last non-partial event — the root span's output. */
   finalContent: AdkContent | null;
   rootErrorType: string | undefined;
@@ -280,6 +317,173 @@ function contentToOutputMessage(
   };
 }
 
+/**
+ * Normalizes ADK's polymorphic `config.systemInstruction` (string, Content,
+ * Part, or a list of those) into the parts-model wire shape.
+ */
+function systemInstructionParts(systemInstruction: unknown): WirePart[] {
+  if (systemInstruction == null) {
+    return [];
+  }
+  // A bare instruction string → a single text part.
+  if (typeof systemInstruction === 'string') {
+    return [{type: 'text', content: systemInstruction}];
+  }
+  // A list of any of these shapes → flatten each one recursively.
+  if (Array.isArray(systemInstruction)) {
+    return systemInstruction.flatMap(item => systemInstructionParts(item));
+  }
+  if (typeof systemInstruction === 'object') {
+    const content = systemInstruction as AdkContent;
+    // A Content (has `parts`) vs. a lone Part — distinguished by `parts`.
+    if (Array.isArray(content.parts)) {
+      return contentToParts(content);
+    }
+    const part = partToWire(systemInstruction as AdkPart);
+    return part ? [part] : [];
+  }
+  return [];
+}
+
+/** Tool definitions from `config.tools[].functionDeclarations` (schema, not
+ *  user data — emitted regardless of the message-content gate). */
+function toolDefinitions(
+  config: AdkGenerateContentConfig
+): Array<Record<string, unknown>> {
+  const definitions: Array<Record<string, unknown>> = [];
+  for (const tool of config.tools ?? []) {
+    const declarations = (
+      tool as {functionDeclarations?: AdkFunctionDeclaration[]} | null
+    )?.functionDeclarations;
+    if (!Array.isArray(declarations)) {
+      continue;
+    }
+    for (const declaration of declarations) {
+      definitions.push({
+        name: declaration?.name ?? '',
+        description: declaration?.description ?? '',
+        parameters: toJsonSafe(
+          declaration?.parameters ?? declaration?.parametersJsonSchema ?? null
+        ),
+        type: TOOL_DEFINITION_TYPE,
+      });
+    }
+  }
+  return definitions;
+}
+
+/** Request-side GenAI attributes from an ADK `LlmRequest`. */
+function setLlmRequestAttributes(
+  span: OtelSpan,
+  llmRequest: AdkLlmRequest
+): void {
+  const config = llmRequest.config;
+  if (config != null) {
+    if (config.temperature != null) {
+      span.setAttribute(ATTR_GEN_AI_REQUEST_TEMPERATURE, config.temperature);
+    }
+    if (config.topP != null) {
+      span.setAttribute(ATTR_GEN_AI_REQUEST_TOP_P, config.topP);
+    }
+    if (config.maxOutputTokens != null) {
+      span.setAttribute(ATTR_GEN_AI_REQUEST_MAX_TOKENS, config.maxOutputTokens);
+    }
+    if (config.frequencyPenalty != null) {
+      span.setAttribute(
+        ATTR_GEN_AI_REQUEST_FREQUENCY_PENALTY,
+        config.frequencyPenalty
+      );
+    }
+    if (config.presencePenalty != null) {
+      span.setAttribute(
+        ATTR_GEN_AI_REQUEST_PRESENCE_PENALTY,
+        config.presencePenalty
+      );
+    }
+    if (config.seed != null) {
+      span.setAttribute(ATTR_GEN_AI_REQUEST_SEED, config.seed);
+    }
+    if (config.stopSequences?.length) {
+      span.setAttribute(ATTR_GEN_AI_REQUEST_STOP_SEQUENCES, [
+        ...config.stopSequences,
+      ]);
+    }
+    if (config.candidateCount != null) {
+      span.setAttribute(
+        ATTR_GEN_AI_REQUEST_CHOICE_COUNT,
+        config.candidateCount
+      );
+    }
+    const definitions = toolDefinitions(config);
+    if (definitions.length > 0) {
+      span.setAttribute(ATTR_GEN_AI_TOOL_DEFINITIONS, jsonAttr(definitions));
+    }
+  }
+  if (captureMessageContent()) {
+    const instructions = systemInstructionParts(config?.systemInstruction);
+    if (instructions.length > 0) {
+      span.setAttribute(
+        ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+        jsonAttr(instructions)
+      );
+    }
+    if (llmRequest.contents.length > 0) {
+      span.setAttribute(
+        ATTR_GEN_AI_INPUT_MESSAGES,
+        jsonAttr(contentsToInputMessages(llmRequest.contents))
+      );
+    }
+  }
+}
+
+/** Response-side GenAI attributes from an ADK `LlmResponse`. */
+function setLlmResponseAttributes(
+  span: OtelSpan,
+  llmResponse: AdkLlmResponse
+): void {
+  const finishReason = finishReasonString(llmResponse.finishReason);
+  if (finishReason) {
+    span.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [finishReason]);
+  }
+  if (captureMessageContent() && llmResponse.content != null) {
+    span.setAttribute(
+      ATTR_GEN_AI_OUTPUT_MESSAGES,
+      jsonAttr([
+        contentToOutputMessage(llmResponse.content, llmResponse.finishReason),
+      ])
+    );
+    span.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
+  }
+  const usage = llmResponse.usageMetadata;
+  if (usage == null) {
+    return;
+  }
+  if (usage.promptTokenCount != null) {
+    span.setAttribute(ATTR_GEN_AI_USAGE_INPUT_TOKENS, usage.promptTokenCount);
+  }
+  if (usage.candidatesTokenCount != null) {
+    span.setAttribute(
+      ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+      usage.candidatesTokenCount
+    );
+  }
+  if (usage.totalTokenCount != null) {
+    span.setAttribute(ATTR_GEN_AI_USAGE_TOTAL_TOKENS, usage.totalTokenCount);
+  }
+  if (usage.thoughtsTokenCount != null) {
+    span.setAttribute(
+      ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+      usage.thoughtsTokenCount
+    );
+  }
+  if (usage.cachedContentTokenCount != null) {
+    span.setAttribute(
+      ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+      usage.cachedContentTokenCount
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
@@ -308,6 +512,10 @@ export class WeaveAdkPlugin {
 
   private tracer() {
     return getWeaveTracer(TRACER_NAME);
+  }
+
+  private childContext(parent: OtelSpan): OtelContext {
+    return otelTrace.setSpan(ROOT_CONTEXT, parent);
   }
 
   // -------------------------------------------------------------------------
@@ -379,6 +587,7 @@ export class WeaveAdkPlugin {
         invocationId,
         rootSpan,
         conversationId,
+        modelSpans: new Map(),
         finalContent: null,
         rootErrorType: undefined,
         rootErrorMessage: undefined,
@@ -398,6 +607,7 @@ export class WeaveAdkPlugin {
         return;
       }
       this.recordEventError(state, event);
+      this.closeShortCircuitedModelSpan(state, event);
       if (event.content == null) {
         return;
       }
@@ -453,15 +663,98 @@ export class WeaveAdkPlugin {
   // Model lifecycle
   // -------------------------------------------------------------------------
 
-  async beforeModelCallback(_params: unknown): Promise<undefined> {
+  async beforeModelCallback(params: {
+    callbackContext: AdkCallbackContext;
+    llmRequest: AdkLlmRequest;
+  }): Promise<undefined> {
+    this.guard(() => {
+      const ctx = params.callbackContext;
+      const state = this.invocations.get(ctx.invocationId);
+      if (!state || !ctx.agentName) {
+        return;
+      }
+      // Model calls are sequential per agent, so agentName cannot collide;
+      // a stale in-flight entry is left for the afterRun cleanup.
+      if (state.modelSpans.has(ctx.agentName)) {
+        return;
+      }
+      const model = params.llmRequest.model ?? UNKNOWN_MODEL;
+      const attributes: Attributes = {
+        [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_CHAT,
+        [ATTR_GEN_AI_PROVIDER_NAME]: providerName(),
+        [ATTR_GEN_AI_REQUEST_MODEL]: model,
+        [ATTR_GEN_AI_AGENT_NAME]: ctx.agentName,
+      };
+      if (state.conversationId) {
+        attributes[ATTR_GEN_AI_CONVERSATION_ID] = state.conversationId;
+      }
+      const span = this.tracer().startSpan(
+        `${OPERATION_CHAT} ${model}`,
+        {attributes},
+        this.childContext(state.rootSpan)
+      );
+      setLlmRequestAttributes(span, params.llmRequest);
+      state.modelSpans.set(ctx.agentName, span);
+    });
     return undefined;
   }
 
-  async afterModelCallback(_params: unknown): Promise<undefined> {
+  async afterModelCallback(params: {
+    callbackContext: AdkCallbackContext;
+    llmResponse: AdkLlmResponse;
+  }): Promise<undefined> {
+    this.guard(() => {
+      const ctx = params.callbackContext;
+      const state = this.invocations.get(ctx.invocationId);
+      if (!state || !ctx.agentName) {
+        return;
+      }
+      const response = params.llmResponse;
+      // Only the final (non-partial) streaming response has content + usage.
+      if (response.partial) {
+        return;
+      }
+      const span = state.modelSpans.get(ctx.agentName);
+      if (!span) {
+        return;
+      }
+      setLlmResponseAttributes(span, response);
+      if (response.errorCode) {
+        span.setAttribute(ATTR_ERROR_TYPE, response.errorCode);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: response.errorMessage ?? response.errorCode,
+        });
+      }
+      span.end();
+      state.modelSpans.delete(ctx.agentName);
+    });
     return undefined;
   }
 
-  async onModelErrorCallback(_params: unknown): Promise<undefined> {
+  async onModelErrorCallback(params: {
+    callbackContext: AdkCallbackContext;
+    llmRequest: AdkLlmRequest;
+    error: Error;
+  }): Promise<undefined> {
+    this.guard(() => {
+      const ctx = params.callbackContext;
+      const state = this.invocations.get(ctx.invocationId);
+      if (!state || !ctx.agentName) {
+        return;
+      }
+      const span = state.modelSpans.get(ctx.agentName);
+      if (!span) {
+        return;
+      }
+      span.setAttribute(ATTR_ERROR_TYPE, errorTypeOf(params.error));
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: errorMessageOf(params.error),
+      });
+      span.end();
+      state.modelSpans.delete(ctx.agentName);
+    });
     return undefined;
   }
 
@@ -526,6 +819,54 @@ export class WeaveAdkPlugin {
       event.errorMessage ?? event.errorCode ?? 'ADK event error';
   }
 
+  /**
+   * If a user/plugin before-model callback returns a cached LlmResponse, ADK
+   * skips its after-model callback. The yielded event is then our only signal
+   * that the chat span completed normally.
+   */
+  private closeShortCircuitedModelSpan(
+    state: InvocationState,
+    event: AdkEvent
+  ): void {
+    const key = this.modelSpanKeyForEvent(state, event);
+    if (!key) {
+      return;
+    }
+    const span = state.modelSpans.get(key);
+    if (!span) {
+      return;
+    }
+    if (event.content != null && captureMessageContent()) {
+      span.setAttribute(
+        ATTR_GEN_AI_OUTPUT_MESSAGES,
+        jsonAttr([contentToOutputMessage(event.content, null)])
+      );
+      span.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
+    }
+    if (event.errorCode || event.errorMessage) {
+      span.setAttribute(ATTR_ERROR_TYPE, event.errorCode ?? 'Error');
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: event.errorMessage ?? event.errorCode ?? 'ADK event error',
+      });
+    }
+    span.end();
+    state.modelSpans.delete(key);
+  }
+
+  private modelSpanKeyForEvent(
+    state: InvocationState,
+    event: AdkEvent
+  ): string | undefined {
+    if (event.author && state.modelSpans.has(event.author)) {
+      return event.author;
+    }
+    if (state.modelSpans.size === 1) {
+      return state.modelSpans.keys().next().value;
+    }
+    return undefined;
+  }
+
   private applyRootError(state: InvocationState): void {
     if (!state.rootErrorType && !state.rootErrorMessage) {
       return;
@@ -549,6 +890,12 @@ export class WeaveAdkPlugin {
     state: InvocationState,
     options: {interrupted: boolean}
   ): void {
+    for (const span of state.modelSpans.values()) {
+      span.setAttribute(ATTR_ADK_INTERRUPTED, true);
+      span.end();
+    }
+    state.modelSpans.clear();
+
     if (options.interrupted) {
       state.rootSpan.setAttribute(ATTR_ADK_INTERRUPTED, true);
     }
@@ -593,4 +940,18 @@ function unregisterBeforeExitHookIfUnused(): void {
   }
   process.off('beforeExit', runBeforeExitCleanups);
   beforeExitHookRegistered = false;
+}
+
+function errorTypeOf(error: unknown): string {
+  if (error instanceof Error && error.name) {
+    return error.name;
+  }
+  return 'Error';
+}
+
+function errorMessageOf(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }
