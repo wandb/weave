@@ -790,21 +790,29 @@ class AgentCustomAttrsSchemaRes(BaseModel):
 
 
 class AgentSearchReq(BaseModel):
-    """Full-text search across message content and span metadata.
+    """Query the `messages` table by content and/or span-level filters.
 
-    Scans the `messages` table (one row per message occurrence, populated
-    by an MV from spans) and returns matching span-level hits. The caller
-    groups by conversation for the response shape.
+    Scans the `messages` table (one row per message occurrence, populated by an
+    MV from spans) and returns matching span-level hits. Full-text search sets
+    `query`; structured retrieval (e.g. all messages in a trace) leaves `query`
+    empty and uses the filters below. The caller groups by conversation for the
+    response shape.
     """
 
     project_id: str
-    query: str
+    # Substring match on message content. Empty matches all (no content filter),
+    # turning this into structured retrieval over the filters below.
+    query: str = ""
 
+    trace_id: str | None = None
     roles: list[SearchMessageRole] | None = None
     conversation_id: str | None = None
     agent_name: str | None = None
     provider_name: str | None = None
     request_model: str | None = None
+    # Truncate message content to a preview (default) to keep search-UI payloads
+    # small; set False to return full content (e.g. for structured retrieval).
+    truncate_content: bool = True
     started_after: datetime.datetime | None = None
     started_before: datetime.datetime | None = None
 
