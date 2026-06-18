@@ -22,6 +22,7 @@
   "include": ["src/**/*", "types/**/*"],
   "exclude": [
     "examples",
+    "scripts",
     "dist",
     "node_modules",
     "src/__tests__/**/*"
