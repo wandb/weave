@@ -1,0 +1,30 @@
+## Conversation
+Reviewing the Google ADK TS stack, the user noted that several changes were
+unrelated to the ADK integration and asked to split them into a separate PR.
+The offending changes were the @typescript-eslint/consistent-type-imports
+cleanup that a prior session had bundled into the ADK stack base (see the
+slice-01 note: it was added only so whole-package `npm run lint` would pass on
+every ADK branch). This branch is that cleanup, extracted as its own PR.
+
+## Actions
+- Verified the consistent-type-imports errors PRE-EXIST on origin/master
+  (ran eslint on master's versions of the 6 files -> 9 errors). Since master
+  itself is red on whole-package lint, CI cannot gate on `eslint .`, so pulling
+  this fix out of the ADK stack does NOT make the ADK PRs red. => independent
+  PR off master, NOT a stack prerequisite.
+- Created this branch off the same master commit the ADK stack sat on
+  (a4091018a5), applied exactly the 6-file import-type conversions, and removed
+  them from ADK slice 01 (amended) so the ADK PRs carry only ADK changes.
+
+## Files (syntax-only, no runtime change)
+src/state.ts, src/clientApi.ts, src/weaveClient.ts, src/utils/urlToMediaPart.ts,
+src/integrations/openai-agents/messages.ts, src/__tests__/clientMock.ts
+
+## Verified
+eslint clean on all 6 files; tsc esm+cjs PASS.
+
+## Hints for Future Agents
+- This is a sibling of the andrew/google-adk-01..06 stack, both off master. It
+  is NOT in that stack. The ADK slice-01 note's "Session addendum — make full
+  package lint green at stack base" describes the original (now-removed)
+  bundling.
