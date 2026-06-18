@@ -17,15 +17,13 @@ Verification was rerun after this addendum across every surviving stack branch; 
 
 ---
 
-## Session addendum — final branch-green verification after base lint cleanup
-The user asked to run each PR in the stack and confirm it is green. Initial stack-owned checks passed, but full
-> weave@0.15.1 lint
-> eslint . failed on every branch due the same  errors in unrelated files. A mechanical  cleanup was amended into the bottom branch so every surviving PR can pass full package lint. This branch was restacked after that base cleanup and then rerun.
+## Session addendum - final branch-green verification after base lint cleanup
+The user asked to run each PR in the stack and confirm it is green. Initial stack-owned checks passed, but full sdks/node npm run lint failed on every branch due the same @typescript-eslint/consistent-type-imports errors in unrelated files. A mechanical import-type cleanup was amended into the bottom branch so every surviving PR can pass full package lint. This branch was restacked after that base cleanup and then rerun.
 
 Final verification for this branch:
 - cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (5 passed, 5 total)
-- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint <changed TypeScript files> (passed)
-- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check <changed TypeScript files> (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check changed TypeScript files (passed)
 - PATH=/opt/homebrew/opt/node/bin:$PATH npm run build (passed)
 - PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
 
