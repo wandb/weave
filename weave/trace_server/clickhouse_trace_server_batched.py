@@ -2601,10 +2601,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=req.base_digest,
             pb=pb,
         )
-        row_digest_result_query = self.ch_client.query(
-            query,
-            parameters=pb.get_params(),
-        )
+        row_digest_result_query = self._query(query, pb.get_params())
 
         if len(row_digest_result_query.result_rows) == 0:
             raise NotFoundError(f"Table {req.project_id}:{req.base_digest} not found")
@@ -2843,7 +2840,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 pb=pb,
             )
 
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        query_result = self._query(query, pb.get_params())
 
         tables = [
             ch_table_stats_to_table_stats_schema(row)
@@ -2897,7 +2894,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_files_storage_size=_default_true(req.include_file_storage_size),
             read_table=read_table,
         )
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        query_result = self._query(query, pb.get_params())
 
         if len(query_result.result_rows) != 1:
             raise RuntimeError("Unexpected number of results", query_result)
@@ -2934,8 +2931,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         stored_days = (
             RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
         )
-        insert_with_empty_query_retry(
-            self.ch_client,
+        self._insert(
             "project_ttl_settings",
             data=[
                 [
@@ -2947,8 +2943,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ],
             column_names=["project_id", "retention_days", "updated_at", "updated_by"],
         )
-        # Bypasses self._insert so we record the counter directly.
-        record_db_insert(table="project_ttl_settings", count=1)
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
@@ -3116,7 +3110,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
         rows = result.named_results()
 
         try:
@@ -3155,7 +3149,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
         )
-        result = self.ch_client.query(read_query, parameters=pb.get_params())
+        result = self._query(read_query, pb.get_params())
         res = result.named_results()
         try:
             row = next(res)
@@ -3545,9 +3539,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             annotator_id=annotator_id,
             pb=check_pb,
         )
-        check_result = self.ch_client.query(
-            check_query, parameters=check_pb.get_params()
-        )
+        check_result = self._query(check_query, check_pb.get_params())
         current_state = None
         has_record = False
 
@@ -3589,9 +3581,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_item_id=req.item_id,
             pb=existence_pb,
         )
-        item_check_result = self.ch_client.query(
-            item_check_query, parameters=existence_pb.get_params()
-        )
+        item_check_result = self._query(item_check_query, existence_pb.get_params())
         if not list(item_check_result.named_results()):
             raise ValueError(
                 f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
@@ -6148,9 +6138,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=req.digest,
             pb=pb,
         )
-        query_result = self.ch_client.query(
+        query_result = self._query(
             query,
-            parameters=pb.get_params(),
+            pb.get_params(),
             column_formats={"val_bytes": "bytes"},
         )
 
@@ -6229,7 +6219,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         pb = ParamBuilder()
         query = make_files_stats_query(project_id=req.project_id, pb=pb)
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
 
         if len(result.result_rows) == 0 or result.result_rows[0][0] is None:
             raise RuntimeError("No results found")
@@ -6301,7 +6291,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare()
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
@@ -6398,7 +6388,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare()
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
