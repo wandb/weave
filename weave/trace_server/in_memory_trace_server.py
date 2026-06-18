@@ -773,6 +773,18 @@ def _feedback_aggregate_matches(
     return True
 
 
+def _interpolated_quantile(durations: list[float], level: float) -> float | None:
+    """Interpolated quantile over a sorted list (ClickHouse `quantile()`)."""
+    if not durations:
+        return None
+    k = level * (len(durations) - 1)
+    f = int(k)
+    c = f + 1
+    if c >= len(durations):
+        return durations[-1]
+    return durations[f] + (k - f) * (durations[c] - durations[f])
+
+
 @dataclass(slots=True)
 class _CallRec:
     project_id: str
@@ -2218,6 +2230,46 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
+
+    def _calls_query_stream_for_eval_subtree(
+        self,
+        project_id: str,
+        eval_root_ids: list[str],
+        include_children: bool = True,
+    ) -> Iterator[tsi.CallSchema]:
+        columns = [
+            "id",
+            "parent_id",
+            "op_name",
+            "attributes",
+            "inputs",
+            "output",
+            "summary",
+            "started_at",
+            "ended_at",
+        ]
+        eval_root_children = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(parent_ids=eval_root_ids),
+                    columns=columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+            )
+        )
+        yield from eval_root_children
+        if include_children:
+            eval_root_children_ids = [c.id for c in eval_root_children]
+            if eval_root_children_ids:
+                yield from self.calls_query_stream(
+                    tsi.CallsQueryReq(
+                        project_id=project_id,
+                        filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
+                        columns=columns,
+                        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    )
+                )
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
@@ -4055,6 +4107,153 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             )
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
+
+    # ------------------------------------------------------------------
+    # Threads
+    # ------------------------------------------------------------------
+
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        """Stream threads with aggregated statistics, mirroring
+        make_threads_query: aggregates over turn calls (id == turn_id) with
+        argMin/argMax turn ids and interpolated turn-duration quantiles.
+        """
+        # ---- Select turn calls (id == turn_id) in the window for the requested threads ----
+        after_datetime = None
+        before_datetime = None
+        thread_ids = None
+        if req.filter is not None:
+            after_datetime = req.filter.after_datetime
+            before_datetime = req.filter.before_datetime
+            thread_ids = req.filter.thread_ids
+
+        with self.lock:
+            turn_calls = [
+                rec
+                for rec in self._calls.values()
+                if rec.project_id == req.project_id and rec.id == rec.turn_id
+            ]
+
+        # End-only part-merge stubs have no started_at and are invisible
+        # to reads, mirroring calls_query.
+        turn_calls = [rec for rec in turn_calls if rec.started_at is not None]
+        if after_datetime is not None:
+            after_dt = _ensure_tz(after_datetime)
+            turn_calls = [
+                rec
+                for rec in turn_calls
+                if rec.started_at is not None and rec.started_at > after_dt
+            ]
+        if before_datetime is not None:
+            before_dt = _ensure_tz(before_datetime)
+            turn_calls = [
+                rec
+                for rec in turn_calls
+                if rec.started_at is not None and rec.started_at < before_dt
+            ]
+
+        if thread_ids is not None and len(thread_ids) > 0:
+            turn_calls = [rec for rec in turn_calls if rec.thread_id in thread_ids]
+        else:
+            turn_calls = [
+                rec
+                for rec in turn_calls
+                if rec.thread_id is not None and rec.thread_id != ""
+            ]
+
+        # ---- Group turn calls by thread ----
+        grouped: dict[str | None, list[_CallRec]] = {}
+        for rec in turn_calls:
+            grouped.setdefault(rec.thread_id, []).append(rec)
+
+        # ---- Aggregate per-thread stats (span, first/last turn, duration quantiles) ----
+        threads: list[dict[str, Any]] = []
+        for thread_id, recs in grouped.items():
+            starts = [
+                (rec.started_at, rec.id) for rec in recs if rec.started_at is not None
+            ]
+            ends = [(rec.ended_at, rec.id) for rec in recs if rec.ended_at is not None]
+            start_time = min(start for start, _ in starts)
+            first_turn_id = min(starts, key=lambda pair: pair[0])[1]
+            last_updated = max(end for end, _ in ends) if ends else None
+            last_turn_id = (
+                max(ends, key=lambda pair: pair[0])[1] if ends else recs[0].id
+            )
+            durations = sorted(
+                (rec.ended_at - rec.started_at).total_seconds() * 1000.0
+                for rec in recs
+                if rec.ended_at is not None and rec.started_at is not None
+            )
+            threads.append(
+                {
+                    "thread_id": thread_id,
+                    "turn_count": len(recs),
+                    "start_time": start_time,
+                    "last_updated": last_updated,
+                    "first_turn_id": first_turn_id,
+                    "last_turn_id": last_turn_id,
+                    "p50_turn_duration_ms": _interpolated_quantile(durations, 0.5),
+                    "p99_turn_duration_ms": _interpolated_quantile(durations, 0.99),
+                }
+            )
+
+        # ---- Sort and paginate ----
+        valid_sort_fields = {
+            "thread_id",
+            "turn_count",
+            "start_time",
+            "last_updated",
+            "p50_turn_duration_ms",
+            "p99_turn_duration_ms",
+        }
+        if req.sort_by:
+            sort_terms = []
+            for sort in req.sort_by:
+                if sort.field not in valid_sort_fields:
+                    raise ValueError(
+                        f"Unsupported sort field: {sort.field}. Supported fields: {list(valid_sort_fields)}"
+                    )
+                sort_terms.append((sort.field, sort.direction))
+        else:
+            sort_terms = [("last_updated", "desc")]
+
+        threads = _ch_sorted_by_terms(threads, sort_terms, lambda row, term: row[term])
+
+        if req.offset is not None and req.offset > 0:
+            threads = threads[req.offset :]
+        if req.limit is not None and req.limit >= 0:
+            threads = threads[: req.limit]
+
+        # ---- Stream the surviving threads ----
+        for thread in threads:
+            start_time = thread["start_time"]
+            last_updated = thread["last_updated"]
+            if start_time is None or last_updated is None:
+                # Mirrors the ClickHouse stream: skip threads without valid
+                # timestamps.
+                continue
+
+            yield tsi.ThreadSchema(
+                thread_id=thread["thread_id"],
+                turn_count=thread["turn_count"],
+                start_time=_ensure_tz(start_time),
+                last_updated=_ensure_tz(last_updated),
+                first_turn_id=thread["first_turn_id"],
+                last_turn_id=thread["last_turn_id"],
+                p50_turn_duration_ms=thread["p50_turn_duration_ms"],
+                p99_turn_duration_ms=thread["p99_turn_duration_ms"],
+            )
+
+    # ------------------------------------------------------------------
+    # Annotation queues (mirrors the ClickHouse implementation: one mutable
+    # record per id, soft-deleted via deleted_at tombstones)
+    # ------------------------------------------------------------------
+
+    _QUEUE_SORT_FIELDS = frozenset({"id", "name", "created_at", "updated_at"})
+    _QUEUE_ITEM_SORT_FIELDS = frozenset(
+        {"call_started_at", "call_op_name", "created_at", "updated_at"}
+    )
 
 
 # ---------------------------------------------------------------------------
