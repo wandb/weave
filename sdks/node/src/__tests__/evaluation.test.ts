@@ -10,15 +10,6 @@ import {op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';
 import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 
-// Read all recorded calls back from the in-memory trace server (mirrors the
-// helper in evaluationLogger.test.ts).
-async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
-  await traceServer.waitForPendingOperations();
-  return traceServer.calls
-    .callsStreamQueryPost({project_id: projectId})
-    .then(result => result.calls);
-}
-
 const createMockDataset = () =>
   new Dataset({
     rows: [
@@ -205,7 +196,7 @@ describe('Evaluation - declarative eval metadata', () => {
 
     await evaluation.evaluate({model, nTrials: 2, maxConcurrency: 2});
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCalls = calls.filter(c =>
       c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
     );
@@ -247,7 +238,7 @@ describe('Evaluation - declarative eval metadata', () => {
       await evaluation.evaluate({model, maxConcurrency: 2});
     });
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCalls = calls.filter(c =>
       c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
     );

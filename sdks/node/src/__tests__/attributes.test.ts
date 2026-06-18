@@ -1,8 +1,6 @@
 import {withAttributes, op} from 'weave';
-
 import {initWithCustomTraceServer} from './clientMock';
 import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
-import {Settings} from '../settings';
 
 describe('attributes context', () => {
   const projectId = 'test-project';
@@ -12,14 +10,6 @@ describe('attributes context', () => {
     traceServer = new InMemoryTraceServer();
     initWithCustomTraceServer(projectId, traceServer);
   });
-
-  const getCalls = async () => {
-    await traceServer.waitForPendingOperations();
-    const result = await traceServer.calls.callsStreamQueryPost({
-      project_id: projectId,
-    });
-    return result.calls;
-  };
 
   test('propagates attributes to parent and child calls', async () => {
     const childOp = op(async function childOp() {
@@ -35,7 +25,7 @@ describe('attributes context', () => {
       await parentOp();
     });
 
-    const calls = await getCalls();
+    const calls = await traceServer.getCalls(projectId);
     const parentCall = calls.find(c => c.op_name?.includes('parentOp'));
     const childCall = calls.find(c => c.op_name?.includes('childOp'));
 
@@ -58,7 +48,7 @@ describe('attributes context', () => {
       await parentOp();
     });
 
-    const calls = await getCalls();
+    const calls = await traceServer.getCalls(projectId);
     const parentCall = calls.find(c => c.op_name?.includes('parentOp'));
     const childCall = calls.find(c => c.op_name?.includes('leafOp'));
 
@@ -82,11 +72,8 @@ describe('attributes context', () => {
       await leafOp();
     });
 
-    await traceServer.waitForPendingOperations();
-    const result = await traceServer.calls.callsStreamQueryPost({
-      project_id: projectId,
-    });
-    const leafCall = result.calls.find(c => c.op_name?.includes('leafOp'));
+    const calls = await traceServer.getCalls(projectId)
+    const leafCall = calls.find(c => c.op_name?.includes('leafOp'));
     expect(leafCall?.attributes?.tenant).toBe('acme');
     expect(leafCall?.attributes?.base).toBe('local'); // local overrides global
   });
