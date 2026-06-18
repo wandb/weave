@@ -198,3 +198,26 @@ Final verification for this branch:
 - PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
 - PATH=/opt/homebrew/opt/node/bin:$PATH node --import=weave/instrument --import=tsx examples/googleAdkSmoke.ts (passed)
 No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Actions (slice 06 — auto-instrumentation)
+No precision changes to slice-06-owned code. The lower-slice fixes were carried
+up by restack. Reviewed and deliberately LEFT AS-IS:
+- commonPatchGoogleADK(exports: any): matches the framework HookFn signature
+  `(exports: any, name, baseDir) => any` and every peer integration
+  (commonPatchGoogleGenAI/Anthropic/OpenAI). Tightening would fight HookFn.
+- patchRunnerClass(RunnerClass: any): prototype-surgery seam; consistent with
+  peer convention (no integration types the class it pulls off exports).
+- globalSingleton<{plugin: WeaveAdkPlugin | null}>: the `null` models genuine
+  lazy construction (plugin built on first runner use, not at module load).
+- AdkRunnerLike.pluginManager?: optional because a patched runner-like object
+  may not have it; checked with typeof guards at runtime.
+
+## Verified (cumulative top of stack)
+tsc esm+cjs PASS, prettier clean, eslint clean, jest 25/25. Pre-existing
+typecheck:examples failures (OpenAI SDK drift in unrelated examples +
+the untracked googleAdkWeaveCheck.ts scratch file) are NOT from this work —
+confirmed identical on the pre-change backup tag.
