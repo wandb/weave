@@ -143,15 +143,27 @@ async def test_span_sink_defers_insert_to_caller() -> None:
 
 @pytest.mark.asyncio
 async def test_ainsert_completion_spans_bulk_writes_on_executor() -> None:
-    """Collected spans are bulk-written once via the CH executor; empty no-ops."""
+    """Collected spans are bulk-written once via the CH executor, tagged with the
+    `completions_create_batch` insert path; empty input no-ops.
+    """
     ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
     srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
     spans = [object(), object()]
+    observed = {"thread_id": None, "path": None}
+
+    def _capture_insert(_spans: object) -> None:
+        observed["thread_id"] = threading.get_ident()
+        observed["path"] = _db_insert_path.get()
+
     try:
-        with patch.object(srv, "_insert_spans_sync") as insert_mock:
+        with patch.object(
+            srv, "_insert_spans_sync", side_effect=_capture_insert
+        ) as insert_mock:
             await srv.ainsert_completion_spans([])
             await srv.ainsert_completion_spans(spans)
         insert_mock.assert_called_once_with(spans)
+        assert observed["thread_id"] != threading.get_ident()
+        assert observed["path"] == "completions_create_batch"
     finally:
         ch_executor.shutdown(wait=True)
 

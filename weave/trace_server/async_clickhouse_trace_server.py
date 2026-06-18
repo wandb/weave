@@ -88,8 +88,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         Runs on `_ch_executor`; `list.append` is atomic under the GIL so
         concurrent judges can share one sink safely.
         """
-        if not req.track_llm_call:
-            return tsi.CompletionsCreateRes(response=res.response)
+        # `acompletions_create` already gates on `track_llm_call` before here.
         span, result = self._build_completion_call_span(
             req, prep, res, start_time, end_time
         )
@@ -107,13 +106,15 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._ch_executor, lambda: ctx.run(fn, *args))
 
+    @tag_db_insert_path("completions_create_batch")
     async def ainsert_completion_spans(
         self, spans: list[AgentSpanCHInsertable]
     ) -> None:
         """Bulk-insert spans collected via `span_sink` in one CH round-trip.
 
         Runs on `_ch_executor` so `self.ch_client` resolves to that thread's
-        client (it is thread-local).
+        client (it is thread-local). All-or-nothing: a failed insert drops the
+        whole batch's spans, so the caller must reprocess on error.
         """
         if not spans:
             return
