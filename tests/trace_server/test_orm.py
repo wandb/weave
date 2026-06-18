@@ -304,6 +304,19 @@ FROM users
 GLOBAL LEFT JOIN roles ON (table1.id = table2.id)"""
     )
 
+    join_query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "table1.id"}, {"$getField": "table2.id"}]}}
+    )
+    no_type = (
+        table1.select().fields(["id", "name"]).join(table2, join_query, global_=True)
+    )
+    assert (
+        no_type.prepare().sql
+        == """SELECT id, name
+FROM users
+GLOBAL JOIN roles ON (table1.id = table2.id)"""
+    )
+
 
 def test_group_by():
     table = Table(

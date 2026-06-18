@@ -184,6 +184,7 @@ class Table:
 
 
 Action = Literal["SELECT", "DELETE"]
+JoinType: TypeAlias = Literal["INNER", "LEFT", "RIGHT", "FULL", "CROSS"]
 
 
 @dataclass(slots=True)
@@ -197,7 +198,7 @@ class PreparedSelect:
 class Join:
     table: Table
     query: tsi.Query
-    join_type: str | None
+    join_type: JoinType | None
     global_: bool = False
 
 
@@ -241,7 +242,7 @@ class Select:
         self,
         table: Table,
         query: tsi.Query,
-        join_type: str | None = None,
+        join_type: JoinType | None = None,
         global_: bool = False,
     ) -> "Select":
         self.joins.append(Join(table, query, join_type, global_))

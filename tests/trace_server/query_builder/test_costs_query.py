@@ -528,7 +528,7 @@ def test_query_with_costs_and_feedback_order() -> None:
                                         '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
                                         '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
-        LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', ranked_prices.id))
+        GLOBAL LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', ranked_prices.id))
         WHERE (rank = {pb_8:UInt64})
         GROUP BY id,
                  started_at
@@ -994,7 +994,7 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
                                         '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
                                         '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
-        LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_5:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_5:String}, '/call/', ranked_prices.id))
+        GLOBAL LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_5:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_5:String}, '/call/', ranked_prices.id))
         WHERE (rank = {pb_9:UInt64})
         GROUP BY id,
                  started_at
