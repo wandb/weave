@@ -134,6 +134,7 @@ jobs:
             "dspy",
             "groq",
             "google_genai",
+            "google_adk",
             "instructor",
             "langchain",
             "litellm",

@@ -63,6 +63,11 @@ SHARDS_WITHOUT_EXTRAS = {
     "verifiers_test",
     "pandas_test",
     "scorers",
+    # google_adk is installed post-sync (see tests()) rather than via an
+    # extra: google-adk pins opentelemetry-sdk<=1.41.1, so locking it
+    # universally would drag every shard's shared resolution down to that
+    # ceiling. Keeping it out of the lock leaves the shared resolution alone.
+    "google_adk",
 }
 
 
@@ -87,6 +92,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "dspy",
         "gepa",
         "google_genai",
+        "google_adk",
         "groq",
         "instructor",
         "langchain_nvidia_ai_endpoints",
@@ -144,6 +150,13 @@ def tests(session: nox.Session, shard: str):
         # Keep the public extra broad for runtime compatibility, but exercise the
         # newer SDK span classes in CI.
         session.run("uv", "pip", "install", "--upgrade", "openai-agents>=0.14.7")
+
+    if shard == "google_adk":
+        # Installed here (not via an extra) so it stays out of the shared
+        # uv.lock — google-adk pins opentelemetry-sdk<=1.41.1, which weave now
+        # tolerates (the ADK integration vendors its GenAI semconv keys). This
+        # downgrades otel in this env only; weave works on the older semconv.
+        session.run("uv", "pip", "install", "google-adk>=2.2.0")
 
     env = {
         k: session.env.get(k) or os.getenv(k)
