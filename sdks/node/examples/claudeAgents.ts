@@ -1,18 +1,17 @@
 /**
- * Example: Claude Agent SDK integration with Weave
+ * Example: Claude Agent SDK integration with Weave — one multi-turn session.
  *
  * Demonstrates tracing the Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`)
  * with Weave. The SDK's `query()` is automatically instrumented via module
  * loader hooks when you import Weave — no manual setup required.
  *
- * Each run is emitted as GenAI agent spans (`invoke_agent` / `chat` /
- * `execute_tool`, grouped per session by `gen_ai.conversation.id`) to the
- * `/agents/otel` endpoints and surfaced in the Weave Agents tab.
- *
- * This example drives a few multi-step prompts with non-default options and
- * pretty-prints the full streamed transcript — model init, thinking, text,
- * tool calls, tool results, and the final result with usage/cost — so you can
- * see exactly what ends up on the spans.
+ * This runs a single conversation as a sequence of follow-up turns. Each turn
+ * is its own `query()` call (and its own `invoke_agent` root span), but the
+ * follow-ups pass `options.resume` with the first turn's `session_id`, so the
+ * SDK continues the same session and the integration stamps the same
+ * `gen_ai.conversation.id` on every span. The result: the turns group as one
+ * session in the Weave Agents tab, each turn expandable into its
+ * `chat` / `execute_tool` children.
  *
  * Requires `@anthropic-ai/claude-agent-sdk` to be installed and a Claude Code
  * auth setup (e.g. `ANTHROPIC_API_KEY`).
@@ -38,25 +37,26 @@ function stringifyToolResult(content: unknown): string {
   return typeof content === 'string' ? content : JSON.stringify(content);
 }
 
-interface RunStats {
+interface TurnResult {
+  sessionId?: string;
   costUsd: number;
   turns: number;
-  durationMs: number;
   toolCalls: number;
 }
 
-/** Run one agent prompt, printing each streamed message, and return its stats. */
-async function runPrompt(prompt: string, options: Options): Promise<RunStats> {
-  console.log(`\n=== Prompt: ${clip(prompt, 80)} ===`);
-  const stats: RunStats = {costUsd: 0, turns: 0, durationMs: 0, toolCalls: 0};
+/** Run one conversation turn, printing each streamed message, and return its stats. */
+async function runTurn(prompt: string, options: Options): Promise<TurnResult> {
+  console.log(`\n=== Turn: ${clip(prompt, 80)} ===`);
+  const result: TurnResult = {costUsd: 0, turns: 0, toolCalls: 0};
 
   for await (const message of query({prompt, options})) {
     switch (message.type) {
       case 'system':
         if (message.subtype === 'init') {
+          result.sessionId = message.session_id;
           console.log(
             `[session ${message.session_id}] model=${message.model} ` +
-              `tools=${message.tools.length} cwd=${message.cwd}`
+              `tools=${message.tools.length}`
           );
         }
         break;
@@ -68,7 +68,7 @@ async function runPrompt(prompt: string, options: Options): Promise<RunStats> {
           } else if (block.type === 'text') {
             console.log(`  💬 ${clip(block.text)}`);
           } else if (block.type === 'tool_use') {
-            stats.toolCalls += 1;
+            result.toolCalls += 1;
             console.log(
               `  🔧 ${block.name}(${clip(JSON.stringify(block.input), 80)})`
             );
@@ -90,18 +90,14 @@ async function runPrompt(prompt: string, options: Options): Promise<RunStats> {
         break;
 
       case 'result':
-        stats.costUsd = message.total_cost_usd ?? 0;
-        stats.turns = message.num_turns ?? 0;
-        stats.durationMs = message.duration_ms ?? 0;
+        result.sessionId ??= message.session_id;
+        result.costUsd = message.total_cost_usd ?? 0;
+        result.turns = message.num_turns ?? 0;
         if (message.subtype === 'success') {
           console.log(`  ✔ ${clip(message.result)}`);
         } else {
           console.log(`  ⚠ ended without success: ${message.subtype}`);
         }
-        console.log(
-          `  (cost $${stats.costUsd.toFixed(4)}, ${stats.turns} turns, ` +
-            `${stats.toolCalls} tool calls, ${stats.durationMs}ms)`
-        );
         break;
 
       default:
@@ -109,7 +105,7 @@ async function runPrompt(prompt: string, options: Options): Promise<RunStats> {
     }
   }
 
-  return stats;
+  return result;
 }
 
 async function main() {
@@ -118,33 +114,48 @@ async function main() {
   // The Claude Agent SDK is automatically instrumented via module loader hooks
   // when you import Weave — no manual setup required.
 
-  // Non-default options: pin the model, cap the agent loop, and restrict the
-  // toolset to read-only commands so the example is safe to run anywhere.
-  const options: Options = {
+  // Restrict the toolset to read-only commands so the example is safe to run
+  // anywhere; pin the model and cap each turn's agent loop.
+  const baseOptions: Options = {
     model: MODEL,
     maxTurns: 8,
     allowedTools: ['Bash', 'Read', 'Glob', 'Grep'],
     cwd: process.cwd(),
   };
 
-  const prompts = [
-    'List the files in the current directory, then summarize what this project does in two sentences.',
-    'How many TypeScript files are in this directory tree, and which one is the largest?',
+  // A single conversation: an initial ask followed by questions that only make
+  // sense given the earlier turns ("those", "what you found").
+  const turns = [
+    'List the TypeScript files in the current directory.',
+    'Of those, which file is the largest, and what is it responsible for?',
+    'Summarize what you learned about this project in one sentence.',
   ];
 
+  let sessionId: string | undefined;
   const totals = {costUsd: 0, turns: 0, toolCalls: 0};
-  for (const prompt of prompts) {
-    const stats = await runPrompt(prompt, options);
-    totals.costUsd += stats.costUsd;
-    totals.turns += stats.turns;
-    totals.toolCalls += stats.toolCalls;
+
+  for (const prompt of turns) {
+    // First turn starts the session; later turns resume it (same session_id →
+    // same gen_ai.conversation.id) so they form one session in the Agents tab.
+    const options: Options = sessionId
+      ? {...baseOptions, resume: sessionId}
+      : baseOptions;
+
+    const turn = await runTurn(prompt, options);
+    sessionId ??= turn.sessionId;
+    totals.costUsd += turn.costUsd;
+    totals.turns += turn.turns;
+    totals.toolCalls += turn.toolCalls;
   }
 
   console.log(
-    `\n=== ${prompts.length} runs: $${totals.costUsd.toFixed(4)}, ` +
-      `${totals.turns} turns, ${totals.toolCalls} tool calls ===`
+    `\n=== session ${sessionId}: ${turns.length} turns, ` +
+      `$${totals.costUsd.toFixed(4)}, ${totals.turns} model turns, ` +
+      `${totals.toolCalls} tool calls ===`
   );
-  console.log('View the agent traces in the Weave Agents tab.');
+  console.log(
+    'View the full session (all turns grouped) in the Weave Agents tab.'
+  );
 }
 
 main().catch(console.error);
