@@ -73,10 +73,18 @@ export interface SDKUserMessage {
   session_id?: string;
 }
 
+/**
+ * A `type: 'system'` message. The canonical one is the `subtype: 'init'`
+ * message carrying session metadata (`model`, `tools`, `cwd`, `mcp_servers`,
+ * `slash_commands`, …); other subtypes (status, task notifications, …) share
+ * the same `type`/`subtype` shape. There is no top-level `message` field — the
+ * payload is the structured fields themselves, which `serializeMessage` keeps.
+ */
 export interface SDKSystemMessage {
   type: 'system';
-  message: string;
+  subtype?: string;
   session_id?: string;
+  [k: string]: unknown;
 }
 
 export interface SDKResultMessage {
@@ -105,8 +113,9 @@ export type SDKMessage =
 /**
  * Normalize a streamed message into a plain, role-tagged object for use as call
  * inputs/outputs and in the accumulated message history. Mirrors the Python
- * integration's `_serialize_msg`: the nested API `message` is lifted to the top
- * level and a `role` is derived from the message `type`.
+ * integration's `_serialize_msg`: for `assistant`/`user` messages the nested
+ * API `message` is lifted to the top level; every other message (`system`, …)
+ * keeps its own top-level fields. A `role` is derived from the message `type`.
  */
 export function serializeMessage(msg: SDKMessage): Record<string, unknown> {
   switch (msg.type) {
@@ -114,9 +123,9 @@ export function serializeMessage(msg: SDKMessage): Record<string, unknown> {
       return {role: 'assistant', ...(msg as SDKAssistantMessage).message};
     case 'user':
       return {role: 'user', ...(msg as SDKUserMessage).message};
-    case 'system':
-      return {role: 'system', content: (msg as SDKSystemMessage).message};
     default: {
+      // `system` and all other message types carry their payload as top-level
+      // fields (the SDK has no nested `message` on them), so spread them as-is.
       const {type, ...rest} = msg as {type: string} & Record<string, unknown>;
       return {role: type, ...rest};
     }

@@ -78,11 +78,23 @@ describe('Claude Agent SDK — serializeMessage', () => {
     });
   });
 
-  test('system message string becomes content with role "system"', () => {
-    const msg = {type: 'system', message: 'session started'} as any;
+  test('system init message preserves its structured fields with role "system"', () => {
+    // The SDK's system messages (e.g. subtype "init") carry their payload as
+    // top-level fields, not under a nested `message`. serializeMessage must keep
+    // them rather than dropping everything into an undefined `content`.
+    const msg = {
+      type: 'system',
+      subtype: 'init',
+      model: 'claude-x',
+      tools: ['Bash', 'Read'],
+      cwd: '/repo',
+    } as any;
     expect(serializeMessage(msg)).toEqual({
       role: 'system',
-      content: 'session started',
+      subtype: 'init',
+      model: 'claude-x',
+      tools: ['Bash', 'Read'],
+      cwd: '/repo',
     });
   });
 });
