@@ -4,25 +4,19 @@
  * The SDK has no trace-processor hook (unlike `@openai/agents`) and runs the
  * model inside a spawned Claude Code subprocess, so the `@anthropic-ai/sdk`
  * patch never sees those calls. We therefore wrap the SDK's exported `query()`
- * and emit Weave calls from the streamed messages — mirroring the Python
- * `claude_agent_sdk` integration's wrap of `InternalClient.process_query`.
+ * and emit GenAI agent spans from the streamed messages through the shared
+ * Weave GenAI tracer — `invoke_agent`/`chat`/`execute_tool` spans to the
+ * `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentOtelTracer}.
  *
  * Instrumentation is automatic via the CJS/ESM module hooks (registered from
  * `integrations/hooks.ts`), the same mechanism used by the other integrations.
  *
- * Emission path: by default we emit native Weave calls ({@link ClaudeAgentTracer}).
- * When `shouldUseOtelV2()` is set, we instead emit GenAI agent spans
- * (`invoke_agent`/`chat`/`execute_tool`) to the new `/agents/otel` endpoints via
- * {@link ClaudeAgentOtelTracer} — the Agents-tab substrate.
- *
  * Out of scope for now (tracked as a follow-up): multi-turn / streaming-input
  * sessions (`query({prompt: <AsyncIterable>})` / `Query.streamInput`) get a
- * single root call/turn rather than one per turn.
+ * single root turn rather than one per turn.
  */
 import {getGlobalClient} from '../clientApi';
-import {shouldUseOtelV2} from '../settings';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {ClaudeAgentTracer, type AgentTracer} from './claude-agent-sdk/tracer';
 import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
 import type {SDKMessage, SDKResultMessage} from './claude-agent-sdk/messages';
 
@@ -41,7 +35,7 @@ const GENERATOR_MEMBERS = new Set<PropertyKey>([
 ]);
 
 /**
- * Wrap a `query()` so that iterating its result drives a {@link ClaudeAgentTracer}.
+ * Wrap a `query()` so that iterating its result drives a {@link ClaudeAgentOtelTracer}.
  * The returned object preserves the full `Query` interface: iteration is traced,
  * and every other member (`interrupt`, `setModel`, `streamInput`, …) is
  * forwarded to the underlying query.
@@ -55,12 +49,7 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
     }
 
     const prompt = typeof args?.prompt === 'string' ? args.prompt : undefined;
-    // OTel-V2 routes agent/session tracing to the new `/agents/otel` endpoints
-    // (the Agents tab); otherwise emit native Weave calls. Both drive the same
-    // streamed-message interface.
-    const tracer: AgentTracer = shouldUseOtelV2()
-      ? new ClaudeAgentOtelTracer({prompt})
-      : new ClaudeAgentTracer({client, prompt});
+    const tracer = new ClaudeAgentOtelTracer({prompt});
 
     async function* traced(): AsyncGenerator<unknown, void> {
       let result: SDKResultMessage | undefined;

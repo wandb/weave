@@ -1,23 +1,31 @@
-import {fixturePath, genProjectId, getCalls, launchAppFrom} from './utils';
+import {randomUUID} from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
-interface Call {
-  id?: string;
-  op_name?: string;
-  parent_id?: string | null;
-  trace_id?: string;
-  display_name?: string;
-  exception?: string | null;
-  attributes?: {kind?: string; integration?: {name?: string}};
-  output?: Record<string, unknown>;
-  summary?: {usage?: Record<string, Record<string, unknown>>};
+import {fixturePath, genProjectId, launchAppFrom} from './utils';
+
+interface CapturedSpan {
+  name: string;
+  spanId: string;
+  parentSpanId?: string;
+  traceId: string;
+  attributes: Record<string, unknown>;
+  statusCode: number;
 }
 
 describe('hostApps — claude-agent-sdk', () => {
-  test('auto-instruments the real @anthropic-ai/claude-agent-sdk query() and emits a full trace tree', async () => {
+  test('auto-instruments the real @anthropic-ai/claude-agent-sdk query() and emits a GenAI agent span tree', async () => {
     const projectId = genProjectId();
+    // The fixture writes its captured OTel spans here (it installs a capturing
+    // span processor via weave.init), so we assert the real emission path
+    // without standing up an OTLP receiver.
+    const spanFile = path.join(os.tmpdir(), `cas-otel-${randomUUID()}.json`);
+
     const result = await launchAppFrom({
       path: fixturePath('claude-agent-sdk'),
       projectId,
+      extraEnv: {SPAN_OUTPUT_FILE: spanFile},
     });
     if (result.exitCode !== 0) {
       throw new Error(
@@ -26,55 +34,51 @@ describe('hostApps — claude-agent-sdk', () => {
       );
     }
 
-    const calls = (await getCalls(projectId)) as Call[];
+    const spans = JSON.parse(
+      fs.readFileSync(spanFile, 'utf8')
+    ) as CapturedSpan[];
+    fs.rmSync(spanFile, {force: true});
 
-    // Root agent call, stamped with this integration's provenance.
-    const root = calls.find(c => c.op_name === 'claude_agent_sdk.query');
-    expect(root).toBeDefined();
-    expect(root!.parent_id).toBeFalsy();
-    expect(root!.attributes?.kind).toBe('agent');
-    expect(root!.attributes?.integration?.name).toBe('claude_agent_sdk');
-    expect(root!.exception).toBeFalsy();
-    expect(root!.output?.status).toBe('completed');
-    expect(root!.output?.result).toBe('There are two files.');
+    const findSpan = (name: string): CapturedSpan => {
+      const span = spans.find(s => s.name === name);
+      if (!span) {
+        throw new Error(
+          `no span named '${name}' (saw: ${spans.map(s => s.name).join(', ')})`
+        );
+      }
+      return span;
+    };
 
-    // Child calls, created from the streamed messages, all under the root.
-    const children = calls.filter(c => c.parent_id === root!.id);
-    const byOp = (op: string) => children.filter(c => c.op_name === op);
+    // Root invoke_agent span, stamped with this integration's provenance.
+    const invoke = findSpan('invoke_agent claude_agent_sdk');
+    expect(invoke.parentSpanId).toBeFalsy();
+    expect(invoke.attributes['gen_ai.operation.name']).toBe('invoke_agent');
+    expect(invoke.attributes['gen_ai.agent.name']).toBe('claude_agent_sdk');
+    expect(invoke.attributes['integration.name']).toBe('claude_agent_sdk');
+    // The fake CLI reports a session_id; it becomes the conversation id.
+    const conversationId = invoke.attributes['gen_ai.conversation.id'];
+    expect(conversationId).toBe('fake-session');
+    // Usage from the result message is lifted onto the root.
+    expect(invoke.attributes['gen_ai.usage.input_tokens']).toBe(8);
+    expect(invoke.attributes['gen_ai.usage.output_tokens']).toBe(12);
 
-    const thinking = byOp('claude_agent_sdk.thinking');
-    expect(thinking).toHaveLength(1);
-    expect(thinking[0].attributes?.kind).toBe('llm');
-    expect(thinking[0].output).toMatchObject({
-      thinking: 'I should list the files.',
-    });
+    // chat spans (one per assistant message) and the tool span hang off the
+    // root and share its trace + conversation id.
+    const chats = spans.filter(s => s.name === 'chat claude-fake');
+    expect(chats.length).toBeGreaterThanOrEqual(1);
+    expect(chats.every(c => c.parentSpanId === invoke.spanId)).toBe(true);
 
-    // Two assistant text turns → two text children.
-    const text = byOp('claude_agent_sdk.text');
-    expect(text).toHaveLength(2);
-    expect(text.every(c => c.attributes?.kind === 'llm')).toBe(true);
+    const tool = findSpan('execute_tool Bash');
+    expect(tool.attributes['gen_ai.operation.name']).toBe('execute_tool');
+    expect(tool.attributes['gen_ai.tool.name']).toBe('Bash');
+    expect(tool.attributes['gen_ai.tool.call.result']).toBe(
+      'main.mjs\npackage.json'
+    );
+    expect(tool.parentSpanId).toBe(invoke.spanId);
 
-    const tool = byOp('claude_agent_sdk.tool_use.Bash');
-    expect(tool).toHaveLength(1);
-    expect(tool[0].attributes?.kind).toBe('tool');
-    expect(tool[0].display_name).toBe('Bash(command="ls")');
-    // Finished by the matching tool_result (the user message), not left open.
-    expect(tool[0].output).toMatchObject({
-      tool_use_id: 'tool-1',
-      content: 'main.mjs\npackage.json',
-    });
-
-    // Per-model usage lifted onto the root, mapped to Weave's snake_case keys
-    // (the camelCase ModelUsage shape must not leak through).
-    const usage = root!.summary?.usage?.['claude-fake'];
-    expect(usage).toMatchObject({
-      requests: 1,
-      input_tokens: 8,
-      output_tokens: 12,
-    });
-    expect((usage as Record<string, unknown>).inputTokens).toBeUndefined();
-
-    // The whole tree shares the root's trace.
-    expect(calls.every(c => c.trace_id === root!.trace_id)).toBe(true);
+    for (const span of spans) {
+      expect(span.traceId).toBe(invoke.traceId);
+      expect(span.attributes['gen_ai.conversation.id']).toBe(conversationId);
+    }
   }, 60_000);
 });

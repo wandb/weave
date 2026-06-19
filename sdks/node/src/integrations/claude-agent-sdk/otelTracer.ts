@@ -56,7 +56,6 @@ import {
 } from '../../genai/semconv';
 import type {Message, MessagePart} from '../../genai';
 import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
-import type {AgentTracer} from './tracer';
 import {
   toWeaveUsage,
   type SDKAssistantMessage,
@@ -176,7 +175,7 @@ export interface ClaudeAgentOtelTracerOptions {
   tracer?: Tracer;
 }
 
-export class ClaudeAgentOtelTracer implements AgentTracer {
+export class ClaudeAgentOtelTracer {
   private readonly tracer: Tracer;
   private readonly invokeAgentSpan: Span;
   private readonly invokeAgentCtx: Context;

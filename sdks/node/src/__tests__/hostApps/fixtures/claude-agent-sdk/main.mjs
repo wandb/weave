@@ -6,35 +6,47 @@
 //
 // query() is pointed at a fake Claude Code executable (fake-claude-cli.mjs)
 // that emits a canned stream-json conversation, so this runs fully offline:
-// no API key, no network, no real model call. The integration should still
-// produce a `claude_agent_sdk.query` trace tree that the mock captures.
+// no API key, no network, no real model call. The integration emits GenAI
+// agent spans (invoke_agent / chat / execute_tool) to the `/agents/otel`
+// endpoints. Rather than stand up an OTLP receiver, we install a capturing
+// span processor via weave.init's `genai.spanProcessor` hook and write the
+// finished spans to SPAN_OUTPUT_FILE so the test can assert the real
+// end-to-end emission.
 //
-// Configuration comes from env vars set by the test driver:
-//   WF_TRACE_SERVER_URL — the spawned Python trace-server mock
-//   WANDB_API_KEY       — dummy; the mock accepts any auth
-//   WANDB_PROJECT       — `entity/project`, unique per-test for isolation
-//
-// Normally this runs via the Jest harness (`npx jest --selectProjects
-// hostApps`), which packs/installs `weave` into this directory and spawns the
-// mock. To run it by hand, launch it FROM THIS DIRECTORY — `weave` (and so
-// `--import=weave/instrument`) resolves from this package's node_modules, not
-// from the repo root, so `npm run start` here works but
-// `node --import=weave/instrument main.mjs` from elsewhere fails with
-// "Cannot find package 'weave'". On a fresh checkout node_modules is gitignored,
-// so install the packed tarball first:
-//   npm pack ../../../../.. --pack-destination /tmp/wp
-//   npm install --no-save /tmp/wp/weave-*.tgz
-//   WF_TRACE_SERVER_URL=http://127.0.0.1:6399 WANDB_API_KEY=dummy \
-//     WANDB_BASE_URL=http://localhost:0 WANDB_PROJECT=hostapps/manual \
-//     npm run start
-// (with the trace-server mock running: `uv run --project
-// services/weave-python/weave-public/trace_server_mock python -m
-// trace_server_mock --port=6399`).
+// Run it by hand from THIS directory (see the sibling note in the test driver);
+// `weave`/`--import=weave/instrument` resolves from this package's node_modules,
+// not the repo root.
 import * as weave from 'weave';
-import {query} from '@anthropic-ai/claude-agent-sdk';
+import {SimpleSpanProcessor} from '@opentelemetry/sdk-trace-base';
+import {writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
+import {query} from '@anthropic-ai/claude-agent-sdk';
 
-const client = await weave.init(process.env.WANDB_PROJECT);
+const captured = [];
+const captureExporter = {
+  export(spans, resultCallback) {
+    for (const span of spans) {
+      captured.push({
+        name: span.name,
+        spanId: span.spanContext().spanId,
+        parentSpanId: span.parentSpanId,
+        traceId: span.spanContext().traceId,
+        attributes: span.attributes,
+        statusCode: span.status.code,
+      });
+    }
+    resultCallback({code: 0});
+  },
+  shutdown() {
+    return Promise.resolve();
+  },
+};
+
+await weave.init(process.env.WANDB_PROJECT, {
+  // SimpleSpanProcessor exports synchronously on span end, so by the time the
+  // query() stream drains, every span is captured.
+  genai: {spanProcessor: new SimpleSpanProcessor(captureExporter)},
+});
 
 const fakeCli = fileURLToPath(
   new URL('./fake-claude-cli.mjs', import.meta.url)
@@ -47,4 +59,4 @@ for await (const message of query({
   console.log(`message: ${message.type}`);
 }
 
-await client.waitForBatchProcessing();
+writeFileSync(process.env.SPAN_OUTPUT_FILE, JSON.stringify(captured));

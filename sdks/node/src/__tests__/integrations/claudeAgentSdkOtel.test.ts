@@ -20,7 +20,6 @@ import {
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
 import {ClaudeAgentOtelTracer} from '../../integrations/claude-agent-sdk/otelTracer';
-import {patchClaudeAgentSdk} from '../../integrations/claudeAgentSdk';
 import {
   findSpan,
   setupExporterPerTest,
@@ -232,60 +231,5 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
     expect(invoke.status.message).toContain('boom');
-  });
-});
-
-describe('Claude Agent SDK — OTel gating via WEAVE_USE_OTEL_V2', () => {
-  setupGenAITestEnvironment();
-  const getExporter = setupExporterPerTest();
-
-  const original = process.env.WEAVE_USE_OTEL_V2;
-  beforeEach(() => {
-    process.env.WEAVE_USE_OTEL_V2 = 'true';
-  });
-  afterEach(() => {
-    if (original === undefined) {
-      delete process.env.WEAVE_USE_OTEL_V2;
-    } else {
-      process.env.WEAVE_USE_OTEL_V2 = original;
-    }
-  });
-
-  test('wrapQuery emits GenAI agent spans (not native calls) when OTel-V2 is on', async () => {
-    const sdk = {
-      query: (_args: any) => {
-        async function* gen() {
-          yield {
-            type: 'assistant',
-            session_id: 'sess-7',
-            message: {
-              model: 'claude-x',
-              stop_reason: 'end_turn',
-              content: [{type: 'text', text: 'hi'}],
-            },
-          };
-          yield {
-            type: 'result',
-            subtype: 'success',
-            session_id: 'sess-7',
-            is_error: false,
-            result: 'hi',
-            modelUsage: {'claude-x': {inputTokens: 1, outputTokens: 2}},
-          };
-        }
-        return gen() as any;
-      },
-    };
-    patchClaudeAgentSdk(sdk);
-
-    for await (const _msg of sdk.query({prompt: 'hi there'})) {
-      void _msg;
-    }
-
-    const spans = getExporter().getFinishedSpans();
-    const invoke = findSpan(spans, INVOKE);
-    expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-7');
-    expect(invoke.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(1);
-    expect(findSpan(spans, 'chat claude-x')).toBeDefined();
   });
 });
