@@ -10,13 +10,20 @@
  * Instrumentation is automatic via the CJS/ESM module hooks (registered from
  * `integrations/hooks.ts`), the same mechanism used by the other integrations.
  *
+ * Emission path: by default we emit native Weave calls ({@link ClaudeAgentTracer}).
+ * When `shouldUseOtelV2()` is set, we instead emit GenAI agent spans
+ * (`invoke_agent`/`chat`/`execute_tool`) to the new `/agents/otel` endpoints via
+ * {@link ClaudeAgentOtelTracer} — the Agents-tab substrate.
+ *
  * Out of scope for now (tracked as a follow-up): multi-turn / streaming-input
  * sessions (`query({prompt: <AsyncIterable>})` / `Query.streamInput`) get a
- * single root call rather than one per turn, and the OTel/`genai` path.
+ * single root call/turn rather than one per turn.
  */
 import {getGlobalClient} from '../clientApi';
+import {shouldUseOtelV2} from '../settings';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {ClaudeAgentTracer} from './claude-agent-sdk/tracer';
+import {ClaudeAgentTracer, type AgentTracer} from './claude-agent-sdk/tracer';
+import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
 import type {SDKMessage, SDKResultMessage} from './claude-agent-sdk/messages';
 
 // Marks an exports object whose `query` we've already wrapped, so repeated hook
@@ -48,7 +55,12 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
     }
 
     const prompt = typeof args?.prompt === 'string' ? args.prompt : undefined;
-    const tracer = new ClaudeAgentTracer({client, prompt});
+    // OTel-V2 routes agent/session tracing to the new `/agents/otel` endpoints
+    // (the Agents tab); otherwise emit native Weave calls. Both drive the same
+    // streamed-message interface.
+    const tracer: AgentTracer = shouldUseOtelV2()
+      ? new ClaudeAgentOtelTracer({prompt})
+      : new ClaudeAgentTracer({client, prompt});
 
     async function* traced(): AsyncGenerator<unknown, void> {
       let result: SDKResultMessage | undefined;
@@ -110,16 +122,46 @@ export function patchClaudeAgentSdk(exports: any): any {
   ) {
     return exports;
   }
-  exports.query = wrapQuery(exports.query);
+  const wrapped = wrapQuery(exports.query);
+
+  // Fast path: a writable `query` data property (the SDK's own bundled build
+  // and the plain test doubles). Mutate in place so callers already holding the
+  // module object observe the wrapped query, then mark it to avoid double-wrap.
   try {
-    Object.defineProperty(exports, PATCHED, {
-      value: true,
-      enumerable: false,
-    });
+    exports.query = wrapped;
+    if (exports.query === wrapped) {
+      try {
+        Object.defineProperty(exports, PATCHED, {
+          value: true,
+          enumerable: false,
+        });
+      } catch {
+        // Frozen module namespace — wrapping above still applied; skip the marker.
+      }
+      return exports;
+    }
   } catch {
-    // Frozen module namespace — wrapping above still applied; skip the marker.
+    // `query` is a getter-only export — fall through to the proxy below.
   }
-  return exports;
+
+  // Getter-only / non-configurable export. This is what a CJS interop layer
+  // (tsx/esbuild) produces for the ESM SDK's named exports — `exports.query`
+  // can be neither assigned nor redefined. Return a proxy that serves the
+  // wrapped `query` and forwards every other member (including `__esModule` and
+  // the remaining named exports) to the original. The require()/import hooks
+  // use this return value, so callers receive the wrapped query.
+  return new Proxy(exports, {
+    get(target, prop, receiver) {
+      if (prop === 'query') {
+        return wrapped;
+      }
+      // Report as patched so a second hook invocation on this view is a no-op.
+      if (prop === PATCHED) {
+        return true;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
 }
 
 /**

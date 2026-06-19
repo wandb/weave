@@ -30,6 +30,16 @@ import {
 
 const ROOT_OP = 'claude_agent_sdk.query';
 
+/**
+ * The shape both tracers expose so {@link wrapQuery} can drive either one from
+ * the streamed messages. `ClaudeAgentTracer` emits native Weave calls; the OTel
+ * variant ({@link ClaudeAgentOtelTracer}) emits GenAI agent spans.
+ */
+export interface AgentTracer {
+  processMessage(msg: SDKMessage): void;
+  finalize(result?: SDKResultMessage, error?: unknown): void;
+}
+
 // Integration provenance stamped onto every call this tracer produces.
 const CLAUDE_AGENT_SDK_INTEGRATION = libraryIntegration('claude_agent_sdk', {
   packageName: '@anthropic-ai/claude-agent-sdk',
@@ -69,7 +79,7 @@ function toolResultErrorMessage(result: ToolResultBlock): string {
   return 'Tool returned an error';
 }
 
-export class ClaudeAgentTracer {
+export class ClaudeAgentTracer implements AgentTracer {
   private readonly client: WeaveClient;
   private readonly callId = uuidv7();
   private readonly traceId = uuidv7();

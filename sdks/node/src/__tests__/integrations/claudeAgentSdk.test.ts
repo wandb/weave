@@ -562,4 +562,47 @@ describe('Claude Agent SDK — query() patch', () => {
       calls.filter(c => c.op_name === 'claude_agent_sdk.query')
     ).toHaveLength(1);
   });
+
+  test('wraps a getter-only query export (ESM→CJS interop) via the return value', async () => {
+    // The SDK ships as ESM (`sdk.mjs`). Loaded through a CJS interop layer
+    // (tsx/esbuild), its named exports become non-writable, non-configurable
+    // getters, so `exports.query = ...` throws. The hook must instead return a
+    // usable module view, mirroring how the require() loader uses the return.
+    const messages = [
+      {
+        type: 'assistant',
+        message: {model: 'claude-x', content: [{type: 'text', text: 'hi'}]},
+      },
+      {type: 'result', subtype: 'success', is_error: false, result: 'done'},
+    ];
+    const realQuery = (_args: any) => {
+      async function* gen() {
+        for (const m of messages) {
+          yield m;
+        }
+      }
+      return gen() as any;
+    };
+    const mod: any = {};
+    Object.defineProperty(mod, '__esModule', {value: true});
+    Object.defineProperty(mod, 'query', {
+      get: () => realQuery,
+      enumerable: true,
+    });
+
+    const patched = patchClaudeAgentSdk(mod);
+    // Other exports (e.g. the ESM interop marker) remain visible.
+    expect(patched.__esModule).toBe(true);
+
+    const seen: string[] = [];
+    for await (const m of patched.query({prompt: 'hi there'})) {
+      seen.push(m.type);
+    }
+    expect(seen).toEqual(['assistant', 'result']);
+
+    const calls = await server.getCalls(project);
+    const root = calls.find(c => c.op_name === 'claude_agent_sdk.query')!;
+    expect(root).toBeDefined();
+    expect(root.output.result).toBe('done');
+  });
 });
