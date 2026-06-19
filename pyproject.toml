@@ -412,9 +412,6 @@ disable = ["fixit.rules"]
 
 [dependency-groups]
 dev = [
-  # codegen
-  "tomlkit",
-  "python-multipart",
   # linting
   "prek",
   "jupyter",
@@ -465,7 +462,6 @@ test = [
   "clickhouse_connect==0.11.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
-  "freezegun",
   "rich",
 
   # Integration Tests
@@ -477,7 +473,6 @@ test = [
   "uvicorn>=0.27.0",
   "pillow",
   "moviepy<=1.0.3",
-  "filelock",
 
   # Media Generation
   "opencv-python", # Video generation
@@ -491,7 +486,6 @@ test = [
 
   "weave[trace_server]",
   "moto[s3]>=5.0.0",
-  "respx",
 ]
 
 [tool.uv]
