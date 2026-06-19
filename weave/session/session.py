@@ -63,7 +63,7 @@ except ImportError:
 if TYPE_CHECKING:
     from opentelemetry.context import Token as _OTelToken
     from opentelemetry.trace import Span as _OTelSpan
-    from opentelemetry.util.types import AttributeValue
+    from opentelemetry.util.types import Attributes
 
 
 # Re-export types for backwards compatibility with existing imports of
@@ -960,7 +960,7 @@ class Session(BaseModel):
     include_content: bool = True
     continue_parent_trace: bool = False
     # Attributes stamped on every span this session emits (e.g. an integration
-    # identity). dict[str, Any] like set_attributes — AttributeValue is a
+    # identity). dict[str, Any] like set_attributes — Attributes is a
     # TYPE_CHECKING-only import, but Pydantic resolves field types at runtime.
     attributes: dict[str, Any] = Field(default_factory=dict)
 
@@ -1047,7 +1047,7 @@ def start_session(
     session_name: str = "",
     include_content: bool = True,
     continue_parent_trace: bool = False,
-    attributes: dict[str, AttributeValue] | None = None,
+    attributes: Attributes = None,
 ) -> Session:
     """Create and activate a session. Sets the contextvar for cross-module access.
 
@@ -1289,7 +1289,7 @@ def log_turn(
     ended_at: datetime | None = None,
     include_content: bool = True,
     continue_parent_trace: bool = False,
-    attributes: dict[str, AttributeValue] | None = None,
+    attributes: Attributes = None,
 ) -> LogResult:
     """Imperatively emit one turn and its child spans to OTel.
 
@@ -1377,7 +1377,7 @@ def log_session(
     model: str = "",
     include_content: bool = True,
     continue_parent_trace: bool = False,
-    attributes: dict[str, AttributeValue] | None = None,
+    attributes: Attributes = None,
 ) -> LogResult:
     """Imperatively emit a complete session.
 
