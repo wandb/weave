@@ -1,11 +1,11 @@
 /**
  * OpenTelemetry (GenAI) tracer for the Claude Agent SDK.
  *
- * The OTel-V2 counterpart of {@link ClaudeAgentTracer}: instead of native Weave
- * calls, it emits GenAI-semconv agent spans through the shared Weave GenAI
- * tracer, which targets `/agents/otel/v1/traces` on the trace server (the
- * Agents tab) — the same substrate the pi-coding-agent and OpenAI-Agents OTel
- * integrations use. Selected by `wrapQuery` when `shouldUseOtelV2()` is true.
+ * Emits GenAI-semconv agent spans through the shared Weave GenAI tracer, which
+ * targets `/agents/otel/v1/traces` on the trace server (the Agents tab) — the
+ * same substrate the pi-coding-agent and OpenAI-Agents OTel integrations use.
+ * This is the integration's sole emission path; `wrapQuery` drives it for every
+ * `query()` call.
  *
  * Span shape, mapped from one `query()` message stream:
  *
@@ -243,6 +243,17 @@ export class ClaudeAgentOtelTracer {
     }
     this.finished = true;
 
+    // Late-bind the conversation id from the result if no earlier message
+    // carried a session_id (e.g. a result-only stream), so the turn still
+    // groups into its session.
+    if (this.conversationId == null && result?.session_id) {
+      this.conversationId = result.session_id;
+      this.invokeAgentSpan.setAttribute(
+        ATTR_GEN_AI_CONVERSATION_ID,
+        result.session_id
+      );
+    }
+
     // Sweep tool calls left open (interrupted stream or missing tool_result).
     for (const span of this.openToolSpans.values()) {
       span.setAttribute(ATTR_ERROR_TYPE, 'aborted');
@@ -300,8 +311,8 @@ export class ClaudeAgentOtelTracer {
     }
 
     // A thrown stream error, or a non-success terminal subtype, marks the root
-    // as failed (mirrors the native-call tracer's broadening of the Python
-    // `is_error`-only check).
+    // as failed — broadening the Python integration's `is_error`-only check so
+    // failed runs (error_max_turns, error_during_execution, …) surface as errors.
     const errored =
       error != null ||
       (result != null &&
@@ -334,6 +345,10 @@ export class ClaudeAgentOtelTracer {
 
     const content = msg.message?.content ?? [];
 
+    // Per-chat usage and input messages are intentionally omitted: the SDK only
+    // reports aggregate usage in the terminal result (lifted onto the root), and
+    // the stream doesn't expose the per-turn input context.
+    //
     // One `chat` span per assistant message, carrying the full response
     // (text + reasoning + tool_call parts) as gen_ai.output.messages.
     const chatSpan = this.tracer.startSpan(

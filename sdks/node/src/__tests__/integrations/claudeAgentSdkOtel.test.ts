@@ -232,4 +232,20 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
     expect(invoke.status.message).toContain('boom');
   });
+
+  test('late-binds the conversation id from the result when no earlier message carried one', () => {
+    // A result-only stream (no system/assistant turn) still groups into its
+    // session: finalize reads session_id off the result.
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
+    tracer.finalize({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      session_id: 'sess-late',
+      result: 'ok',
+    } as any);
+
+    const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
+    expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-late');
+  });
 });

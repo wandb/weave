@@ -59,7 +59,16 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
           if (msg && (msg as SDKMessage).type === 'result') {
             result = msg as SDKResultMessage;
           } else {
-            tracer.processMessage(msg as SDKMessage);
+            // Tracing must never break the caller's stream: swallow any
+            // mapping error (the message is still yielded below).
+            try {
+              tracer.processMessage(msg as SDKMessage);
+            } catch (err) {
+              console.warn(
+                'weave: claude_agent_sdk tracing error (ignored)',
+                err
+              );
+            }
           }
           yield msg;
         }
@@ -70,7 +79,13 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
         streamError = e;
         throw e;
       } finally {
-        tracer.finalize(result, streamError);
+        // Guard finalize too, so a tracing failure can't mask the real stream
+        // error being re-thrown from the catch above.
+        try {
+          tracer.finalize(result, streamError);
+        } catch (err) {
+          console.warn('weave: claude_agent_sdk finalize error (ignored)', err);
+        }
       }
     }
 
