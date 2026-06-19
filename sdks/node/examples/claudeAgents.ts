@@ -3,15 +3,11 @@
  *
  * Demonstrates tracing the Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`)
  * with Weave. The SDK's `query()` is automatically instrumented via module
- * loader hooks when you import Weave — no code change is needed to enable
- * either emission path below.
+ * loader hooks when you import Weave — no manual setup required.
  *
- * Emission path:
- *  - Default: native Weave calls — a `claude_agent_sdk.query` trace with child
- *    calls for the model's thinking, text, and tool use.
- *  - With `WEAVE_USE_OTEL_V2=true`: GenAI agent spans
- *    (`invoke_agent` / `chat` / `execute_tool`, grouped by session) emitted to
- *    the `/agents/otel` endpoints and surfaced in the Weave Agents tab.
+ * Each run is emitted as GenAI agent spans (`invoke_agent` / `chat` /
+ * `execute_tool`, grouped per session by `gen_ai.conversation.id`) to the
+ * `/agents/otel` endpoints and surfaced in the Weave Agents tab.
  *
  * Requires `@anthropic-ai/claude-agent-sdk` to be installed and a Claude Code
  * auth setup (e.g. `ANTHROPIC_API_KEY`).
