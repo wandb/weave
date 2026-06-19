@@ -1,10 +1,10 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import type OpenAIAgents from '@openai/agents';
-import {BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
+import {type BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
 import {globalSingleton} from './utils/globalSingleton';
-import {GenAIState} from './genai/context';
-import {WeaveClient} from './weaveClient';
-import {TracerProvider} from '@opentelemetry/api';
+import {type GenAIState} from './genai/context';
+import {type WeaveClient} from './weaveClient';
+import {type TracerProvider} from '@opentelemetry/api';
 
 /**
  * Holds all SDK-wide mutable state.

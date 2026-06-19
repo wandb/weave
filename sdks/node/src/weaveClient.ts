@@ -30,7 +30,7 @@ import {
   getOpWrappedFunction,
   isOp,
 } from './opType';
-import {makeSettings, Settings} from './settings';
+import {makeSettings, type Settings} from './settings';
 import {Table, TableRef, TableRowRef} from './table';
 import {linkAssetToRegistry} from './traceServerBindings/linkAssetToRegistry';
 import type {
