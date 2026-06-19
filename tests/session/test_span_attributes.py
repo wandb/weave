@@ -13,7 +13,15 @@ import logging
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from weave.session.session import LLM, Session, SubAgent, Tool, Turn, log_turn
+from weave.session.session import (
+    LLM,
+    Session,
+    SubAgent,
+    Tool,
+    Turn,
+    log_session,
+    log_turn,
+)
 
 # (class_label, factory, otel_span_name) — span_name is the full emitted name
 # (not a prefix) so SubAgent and Turn (both "invoke_agent") don't collide.
@@ -172,9 +180,16 @@ def test_session_attributes_on_every_streaming_span(
                 pass
             with turn.tool(name="Edit"):
                 pass
+            with turn.subagent(name="researcher"):
+                pass
     spans = otel_spans.get_finished_spans()
     names = {span.name for span in spans}
-    assert {"invoke_agent bot", "chat gpt-4o", "execute_tool Edit"} <= names
+    assert {
+        "invoke_agent bot",
+        "chat gpt-4o",
+        "execute_tool Edit",
+        "invoke_agent researcher",
+    } <= names
     for span in spans:
         assert span.attributes["weave.integration.name"] == "wb-agent"
         assert span.attributes["custom.tier"] == "gold"
@@ -192,6 +207,24 @@ def test_session_attributes_on_every_batch_span(
     )
     spans = otel_spans.get_finished_spans()
     assert len(spans) == 3
+    for span in spans:
+        assert span.attributes["weave.integration.name"] == "wb-agent"
+
+
+def test_session_attributes_on_every_log_session_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """log_session applies attributes to every turn root and child span."""
+    log_session(
+        turns=[
+            Turn(agent_name="bot", spans=[LLM(model="gpt-4o")]),
+            Turn(agent_name="bot", spans=[Tool(name="Edit")]),
+        ],
+        session_id="s",
+        attributes={"weave.integration.name": "wb-agent"},
+    )
+    spans = otel_spans.get_finished_spans()
+    assert len(spans) == 4  # two turn roots + one child each
     for span in spans:
         assert span.attributes["weave.integration.name"] == "wb-agent"
 

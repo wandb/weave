@@ -1052,7 +1052,11 @@ def start_session(
     """Create and activate a session. Sets the contextvar for cross-module access.
 
     ``attributes`` are stamped on every span this session emits (e.g. an
-    integration identity like ``weave.integration.*``).
+    integration identity like ``weave.integration.*``). Use custom,
+    non-semconv keys: set semantic-convention fields via the typed params
+    (``session_name``, ``model``, ...). A key that collides with a span's
+    own ``gen_ai.*`` / ``weave.*`` attribute is unsupported; which value
+    wins is path-dependent (streaming vs ``log_turn``).
     """
     session = Session(
         agent_name=agent_name,
@@ -1296,7 +1300,9 @@ def log_turn(
     the turn doesn't supply its own.
 
     ``attributes`` are stamped on every emitted span; the streaming path reads
-    these from the active session instead.
+    these from the active session instead. Use custom, non-semconv keys: a
+    key that collides with a span's own ``gen_ai.*`` / ``weave.*`` attribute
+    is unsupported (which value wins is path-dependent).
     """
     if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(session_id=session_id)
@@ -1378,7 +1384,9 @@ def log_session(
     Each Turn's ``.spans`` attribute provides its children. Auto-generates
     ``session_id`` if empty. By default each turn gets its own OTel trace.
 
-    ``attributes`` are stamped on every emitted span.
+    ``attributes`` are stamped on every emitted span. Use custom, non-semconv
+    keys: a key that collides with a span's own ``gen_ai.*`` / ``weave.*``
+    attribute is unsupported (which value wins is path-dependent).
     """
     sid = session_id or str(uuid.uuid4())
     if not _OTEL_AVAILABLE or should_disable_weave():
