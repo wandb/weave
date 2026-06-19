@@ -127,17 +127,19 @@ export function patchClaudeAgentSdk(exports: any): any {
  * Called once from `integrations/hooks.ts`.
  */
 export function instrumentClaudeAgentSdk(): void {
-  // Floor matches the 0.3.x message/usage shape this integration maps
-  // (nested `message`, camelCase `modelUsage`, result `subtype`).
+  // Floor pinned to the version whose message/usage shape this integration was
+  // validated against (camelCase `modelUsage`, result `subtype` enum, structured
+  // `system` messages) — the same version carried as a devDependency. Older
+  // 0.3.x builds pass through untraced rather than risk a silently-wrong shape.
   addCJSInstrumentation({
     moduleName: '@anthropic-ai/claude-agent-sdk',
     subPath: 'sdk.mjs',
-    version: '>= 0.3.0',
+    version: '>= 0.3.178',
     hook: patchClaudeAgentSdk,
   });
   addESMInstrumentation({
     moduleName: '@anthropic-ai/claude-agent-sdk',
-    version: '>= 0.3.0',
+    version: '>= 0.3.178',
     hook: patchClaudeAgentSdk,
   });
 }

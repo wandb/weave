@@ -191,10 +191,40 @@ function titleCase(s: string): string {
   );
 }
 
-/** Format tool input params as `k="v", k=v` (strings quoted, others bare). */
+/** Max characters of a single formatted tool-param value rendered in a display name. */
+const MAX_PARAM_VALUE_LENGTH = 100;
+
+/** Truncate to `maxLength` chars, appending "..." when longer. */
+function truncate(text: string, maxLength: number): string {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+/**
+ * Render one tool-input value for a display name: strings are quoted, objects
+ * and arrays are JSON-encoded (so they don't stringify to `[object Object]`),
+ * and every value is length-capped so a large input (e.g. a file write) can't
+ * produce an unbounded display name.
+ */
+function formatParamValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return `"${truncate(value, MAX_PARAM_VALUE_LENGTH)}"`;
+  }
+  if (value !== null && typeof value === 'object') {
+    let json: string;
+    try {
+      json = JSON.stringify(value) ?? String(value);
+    } catch {
+      json = String(value);
+    }
+    return truncate(json, MAX_PARAM_VALUE_LENGTH);
+  }
+  return String(value);
+}
+
+/** Format tool input params as `k="v", k=obj` (see {@link formatParamValue}). */
 function formatParams(params: Record<string, unknown>): string {
   return Object.entries(params)
-    .map(([k, v]) => (typeof v === 'string' ? `${k}="${v}"` : `${k}=${v}`))
+    .map(([k, v]) => `${k}=${formatParamValue(v)}`)
     .join(', ');
 }
 

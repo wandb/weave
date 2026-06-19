@@ -25,6 +25,19 @@ describe('Claude Agent SDK — display names', () => {
     );
   });
 
+  test('tool_use display name JSON-encodes object params instead of [object Object]', () => {
+    expect(toolUseDisplayName('Edit', {edits: [{old: 'a', new: 'b'}]})).toBe(
+      'Edit(edits=[{"old":"a","new":"b"}])'
+    );
+  });
+
+  test('tool_use display name caps very long param values', () => {
+    const long = 'x'.repeat(200);
+    const name = toolUseDisplayName('Write', {content: long});
+    expect(name.length).toBeLessThan(long.length);
+    expect(name).toContain('...');
+  });
+
   test('thinking display name is prefixed and abbreviated to 8 words', () => {
     expect(thinkingDisplayName('let me think about this')).toBe(
       'Thinking: let me think about this'
@@ -293,6 +306,99 @@ describe('Claude Agent SDK — tracer', () => {
       c => c.op_name === 'claude_agent_sdk.tool_use.Bash'
     )!;
     expect(tool.ended_at).toBeTruthy();
+    // A clean finish closes a leftover tool call without an exception.
+    expect(tool.exception).toBeUndefined();
+  });
+
+  test('summary falls back to aggregate usage keyed by root model when modelUsage is absent', async () => {
+    const tracer = new ClaudeAgentTracer({
+      client: requireGlobalClient(),
+      prompt: 'hi',
+    });
+    tracer.processMessage({
+      type: 'assistant',
+      message: {model: 'claude-y', content: [{type: 'text', text: 'hi'}]},
+    } as any);
+    tracer.finalize({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      // Aggregate usage only (snake_case, no per-model modelUsage).
+      usage: {input_tokens: 11, output_tokens: 4},
+    } as any);
+
+    const calls = await server.getCalls(project);
+    const root = calls.find(c => c.op_name === 'claude_agent_sdk.query')!;
+    expect(root.summary.usage['claude-y']).toMatchObject({
+      requests: 1,
+      input_tokens: 11,
+      output_tokens: 4,
+    });
+  });
+
+  test('a tool_result flagged is_error finishes the tool call with an exception', async () => {
+    const tracer = new ClaudeAgentTracer({
+      client: requireGlobalClient(),
+      prompt: 'p',
+    });
+    tracer.processMessage({
+      type: 'assistant',
+      message: {
+        model: 'm',
+        content: [
+          {type: 'tool_use', id: 'tu5', name: 'Bash', input: {command: 'boom'}},
+        ],
+      },
+    } as any);
+    tracer.processMessage({
+      type: 'user',
+      message: {
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'tu5',
+            content: 'command not found',
+            is_error: true,
+          },
+        ],
+      },
+    } as any);
+    tracer.finalize({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+    } as any);
+
+    const calls = await server.getCalls(project);
+    const tool = calls.find(
+      c => c.op_name === 'claude_agent_sdk.tool_use.Bash'
+    )!;
+    expect(tool.exception).toContain('command not found');
+  });
+
+  test('finalize with a stream error marks still-open tool calls as interrupted', async () => {
+    const tracer = new ClaudeAgentTracer({
+      client: requireGlobalClient(),
+      prompt: 'p',
+    });
+    tracer.processMessage({
+      type: 'assistant',
+      message: {
+        model: 'm',
+        content: [
+          {type: 'tool_use', id: 'tuX', name: 'Bash', input: {command: 'ls'}},
+        ],
+      },
+    } as any);
+    tracer.finalize(undefined, new Error('subprocess crashed'));
+
+    const calls = await server.getCalls(project);
+    const tool = calls.find(
+      c => c.op_name === 'claude_agent_sdk.tool_use.Bash'
+    )!;
+    expect(tool.exception).toContain('subprocess crashed');
+    const root = calls.find(c => c.op_name === 'claude_agent_sdk.query')!;
+    expect(root.output.status).toBe('error');
   });
 });
 
@@ -431,5 +537,29 @@ describe('Claude Agent SDK — query() patch', () => {
       seen.push(m.type);
     }
     expect(seen).toEqual(['assistant', 'result']);
+  });
+
+  test('patching twice does not double-wrap query()', async () => {
+    const sdk = fakeSdk([
+      {
+        type: 'assistant',
+        message: {model: 'claude-x', content: [{type: 'text', text: 'hi'}]},
+      },
+      {type: 'result', subtype: 'success', is_error: false},
+    ]);
+    patchClaudeAgentSdk(sdk);
+    const afterFirstPatch = sdk.query;
+    patchClaudeAgentSdk(sdk);
+    // The PATCHED marker makes the second patch a no-op — same wrapped fn.
+    expect(sdk.query).toBe(afterFirstPatch);
+
+    // And a single query() yields exactly one root call (not two layers).
+    for await (const _msg of sdk.query({prompt: 'hi'})) {
+      void _msg;
+    }
+    const calls = await server.getCalls(project);
+    expect(
+      calls.filter(c => c.op_name === 'claude_agent_sdk.query')
+    ).toHaveLength(1);
   });
 });

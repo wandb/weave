@@ -47,6 +47,28 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/** Extract a human-readable error message from a tool_result flagged `is_error`. */
+function toolResultErrorMessage(result: ToolResultBlock): string {
+  const {content} = result;
+  if (typeof content === 'string' && content) {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    const text = content
+      .map(block =>
+        block && typeof block === 'object' && 'text' in block
+          ? String((block as {text: unknown}).text)
+          : ''
+      )
+      .filter(Boolean)
+      .join('\n');
+    if (text) {
+      return text;
+    }
+  }
+  return 'Tool returned an error';
+}
+
 export class ClaudeAgentTracer {
   private readonly client: WeaveClient;
   private readonly callId = uuidv7();
@@ -107,8 +129,17 @@ export class ClaudeAgentTracer {
     }
     this.finished = true;
 
+    // If the stream threw, the still-open tool calls were interrupted — finish
+    // them WITH the exception rather than as silent successful completions. On a
+    // clean finish (no error), leftover open tool calls are closed without one.
+    const interrupted =
+      error != null
+        ? `Tool call interrupted: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        : undefined;
     for (const childId of this.openToolCalls.values()) {
-      this.endCall(childId, {});
+      this.endCall(childId, {}, {}, interrupted);
     }
     this.openToolCalls.clear();
 
@@ -236,7 +267,12 @@ export class ClaudeAgentTracer {
       const childId = this.openToolCalls.get(toolResult.tool_use_id);
       if (childId) {
         this.openToolCalls.delete(toolResult.tool_use_id);
-        this.endCall(childId, toolResult);
+        // A tool_result flagged `is_error` is the tool reporting failure —
+        // record it as an exception on the tool call, not a clean completion.
+        const exception = toolResult.is_error
+          ? toolResultErrorMessage(toolResult)
+          : undefined;
+        this.endCall(childId, toolResult, {}, exception);
       }
     }
   }
