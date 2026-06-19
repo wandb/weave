@@ -102,6 +102,29 @@ MOCK_STREAM_EVENTS = [
     },
 ]
 
+# Converse stream whose final metadata event carries prompt-caching token
+# counts (cacheReadInputTokens / cacheWriteInputTokens), as Bedrock returns
+# when prompt caching is used. These must reach the call summary just like the
+# non-streaming converse path.
+MOCK_STREAM_EVENTS_CACHE = [
+    {"messageStart": {"role": "assistant"}},
+    {"contentBlockDelta": {"delta": {"text": "Hello"}, "contentBlockIndex": 0}},
+    {"contentBlockStop": {"contentBlockIndex": 0}},
+    {"messageStop": {"stopReason": "end_turn"}},
+    {
+        "metadata": {
+            "usage": {
+                "inputTokens": 10,
+                "outputTokens": 5,
+                "totalTokens": 15,
+                "cacheReadInputTokens": 100,
+                "cacheWriteInputTokens": 200,
+            },
+            "metrics": {"latencyMs": 123},
+        }
+    },
+]
+
 # Converse stream emitting a reasoning block followed by a tool-use block.
 # A reasoning-capable, tool-bound Claude model produces these non-text deltas,
 # which the accumulator must not choke on.
@@ -524,6 +547,48 @@ def test_bedrock_converse_stream(
     assert output["usage"]["inputTokens"] == model_usage["prompt_tokens"] == 55
     assert output["usage"]["outputTokens"] == model_usage["completion_tokens"] == 30
     assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 85
+
+
+@mock_aws
+def test_bedrock_converse_stream_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """Streaming converse must record prompt-caching token counts in the call
+    summary, matching the non-streaming converse path. The accumulator
+    previously dropped cacheReadInputTokens / cacheWriteInputTokens from the
+    metadata event, so they never reached the finish handler.
+    """
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=converse_stream_make_api_call(MOCK_STREAM_EVENTS_CACHE),
+    ):
+        response = bedrock_client.converse_stream(
+            modelId=model_id,
+            system=[{"text": system_message}],
+            messages=messages,
+            inferenceConfig={"maxTokens": 30},
+        )
+        stream = response.get("stream")
+        assert stream is not None, "Stream not found in response"
+        # Consume the stream so the accumulator runs to completion.
+        list(stream)
+
+    calls = client.get_calls()
+    assert len(calls) == 1, "Expected exactly one trace call for the stream test"
+    call = calls[0]
+    assert call.exception is None
+
+    summary = call.summary
+    assert summary is not None, "Summary should not be None"
+    model_usage = summary["usage"][model_id]
+    assert model_usage["prompt_tokens"] == 10
+    assert model_usage["completion_tokens"] == 5
+    assert model_usage["total_tokens"] == 15
+    assert model_usage["cache_read_input_tokens"] == 100
+    assert model_usage["cache_creation_input_tokens"] == 200
 
 
 @mock_aws
