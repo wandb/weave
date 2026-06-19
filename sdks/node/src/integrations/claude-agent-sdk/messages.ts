@@ -11,39 +11,40 @@
 
 // ── Message shapes (subset of the SDK's `SDKMessage` union) ─────────────
 
-export interface TextBlock {
+interface TextBlock {
   type: 'text';
   text: string;
 }
 
-export interface ThinkingBlock {
+interface ThinkingBlock {
   type: 'thinking';
   thinking: string;
 }
 
-export interface ToolUseBlock {
+interface ToolUseBlock {
   type: 'tool_use';
   id: string;
   name: string;
   input: Record<string, unknown>;
 }
 
-export interface ToolResultBlock {
+interface ToolResultBlock {
   type: 'tool_result';
   tool_use_id: string;
   content?: unknown;
   is_error?: boolean;
 }
 
-export type ContentBlock =
-  | TextBlock
-  | ThinkingBlock
-  | ToolUseBlock
-  | ToolResultBlock
-  | {type: string; [k: string]: unknown};
+/**
+ * The content-block types the tracer reads. A closed discriminated union (no
+ * catch-all member) so a `switch (block.type)` narrows cleanly without casts;
+ * any other block kind the SDK emits is simply skipped by the tracer's default
+ * branches.
+ */
+type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock | ToolResultBlock;
 
 /** The raw Anthropic (`BetaMessage`) payload nested under an assistant message. */
-export interface AssistantAPIMessage {
+interface AssistantAPIMessage {
   id?: string;
   model?: string;
   content: ContentBlock[];
@@ -77,7 +78,7 @@ export interface SDKUserMessage {
  * the same `type`/`subtype` shape. There is no top-level `message` field — the
  * payload is the structured fields themselves.
  */
-export interface SDKSystemMessage {
+interface SDKSystemMessage {
   type: 'system';
   subtype?: string;
   session_id?: string;

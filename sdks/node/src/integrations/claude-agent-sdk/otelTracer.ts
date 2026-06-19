@@ -62,10 +62,6 @@ import {
   type SDKMessage,
   type SDKResultMessage,
   type SDKUserMessage,
-  type TextBlock,
-  type ThinkingBlock,
-  type ToolResultBlock,
-  type ToolUseBlock,
 } from './messages';
 
 const TRACER_NAME = 'claude-agent-sdk';
@@ -93,24 +89,19 @@ function assistantParts(
   for (const block of blocks) {
     switch (block.type) {
       case 'thinking':
-        parts.push({
-          type: 'reasoning',
-          content: (block as ThinkingBlock).thinking,
-        });
+        parts.push({type: 'reasoning', content: block.thinking});
         break;
       case 'text':
-        parts.push({type: 'text', content: (block as TextBlock).text});
+        parts.push({type: 'text', content: block.text});
         break;
-      case 'tool_use': {
-        const b = block as ToolUseBlock;
+      case 'tool_use':
         parts.push({
           type: 'tool_call',
-          toolCallId: b.id,
-          toolName: b.name,
-          arguments: JSON.stringify(b.input ?? {}),
+          toolCallId: block.id,
+          toolName: block.name,
+          arguments: JSON.stringify(block.input ?? {}),
         });
         break;
-      }
       default:
         break;
     }
@@ -119,8 +110,7 @@ function assistantParts(
 }
 
 /** Stringify tool-result content (string, content-block array, or other). */
-function toolResultText(result: ToolResultBlock): string {
-  const {content} = result;
+function toolResultText(content: unknown): string {
   if (typeof content === 'string') {
     return content;
   }
@@ -388,18 +378,17 @@ export class ClaudeAgentOtelTracer {
       if (block.type !== 'tool_use') {
         continue;
       }
-      const toolBlock = block as ToolUseBlock;
       const toolSpan = this.tracer.startSpan(
-        `execute_tool ${toolBlock.name}`,
+        `execute_tool ${block.name}`,
         {
           kind: SpanKind.INTERNAL,
           attributes: {
             ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
             [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
-            [ATTR_GEN_AI_TOOL_NAME]: toolBlock.name,
-            [ATTR_GEN_AI_TOOL_CALL_ID]: toolBlock.id,
+            [ATTR_GEN_AI_TOOL_NAME]: block.name,
+            [ATTR_GEN_AI_TOOL_CALL_ID]: block.id,
             [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: JSON.stringify(
-              toolBlock.input ?? {}
+              block.input ?? {}
             ),
             ...(this.conversationId
               ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
@@ -408,7 +397,7 @@ export class ClaudeAgentOtelTracer {
         },
         this.invokeAgentCtx
       );
-      this.openToolSpans.set(toolBlock.id, toolSpan);
+      this.openToolSpans.set(block.id, toolSpan);
     }
   }
 
@@ -420,18 +409,18 @@ export class ClaudeAgentOtelTracer {
       if (block.type !== 'tool_result') {
         continue;
       }
-      const result = block as ToolResultBlock;
-      const span = this.openToolSpans.get(result.tool_use_id);
+      const span = this.openToolSpans.get(block.tool_use_id);
       if (!span) {
         continue;
       }
-      this.openToolSpans.delete(result.tool_use_id);
-      span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, toolResultText(result));
-      if (result.is_error) {
+      this.openToolSpans.delete(block.tool_use_id);
+      const resultText = toolResultText(block.content);
+      span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, resultText);
+      if (block.is_error) {
         span.setAttribute(ATTR_ERROR_TYPE, 'tool_error');
         span.setStatus({
           code: SpanStatusCode.ERROR,
-          message: toolResultText(result),
+          message: resultText,
         });
       }
       span.end();
