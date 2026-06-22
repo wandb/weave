@@ -5,6 +5,11 @@ import {uuidv7} from 'uuidv7';
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
+  type AgentChatMessage as AgentChatMessageSchema,
+  type AgentTraceChatRes,
+  type AgentSchema,
+  type AgentSpanSchema,
+  type AgentVersionSchema,
   type CallSchema,
   type CallsQueryReq,
   type CallsFilter,
@@ -13,6 +18,8 @@ import {
   type SortBy,
   type StartedCallSchemaForInsert,
   type Api as TraceServerApi,
+  type HttpResponse,
+  type HTTPValidationError,
 } from './generated/traceServerApi';
 import {
   type AudioType,
@@ -30,7 +37,7 @@ import {
   getOpWrappedFunction,
   isOp,
 } from './opType';
-import {makeSettings, Settings} from './settings';
+import {makeSettings, type Settings} from './settings';
 import {Table, TableRef, TableRowRef} from './table';
 import {linkAssetToRegistry} from './traceServerBindings/linkAssetToRegistry';
 import type {
@@ -45,6 +52,8 @@ import type {Prompt} from './prompt';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
+
+export type Response<T extends unknown> = HttpResponse<T, HTTPValidationError>;
 
 /**
  * Serialized representation of a file blob stored in the Weave content store.
@@ -83,6 +92,97 @@ export interface GetCallsOptions {
   columns?: string[];
   expandColumns?: string[];
 }
+
+export type Agent = AgentSchema;
+export type AgentMessage = AgentChatMessageSchema;
+export type AgentSpan = AgentSpanSchema;
+export type AgentTurn = AgentTraceChatRes;
+export type AgentVersion = AgentVersionSchema;
+
+/**
+ * Options for {@link WeaveClient.getAgents}.
+ */
+export interface GetAgentsOptions {
+  agentName?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgents}.
+ */
+export type GetAgentsResult = {
+  agents: Agent[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentVersions}.
+ */
+export interface GetAgentVersionsOptions {
+  agentName: string;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 100
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentVersions}.
+ */
+export type GetAgentVersionsResult = {
+  versions: AgentVersion[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentSpans}.
+ */
+export interface GetAgentSpansOptions {
+  agentName?: string;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 100
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentSpans}.
+ */
+export type GetAgentSpansResult = {
+  spans: AgentSpan[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentTurn}.
+ */
+export interface GetAgentTurnOptions {
+  traceId: string;
+  includeFeedback?: boolean;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentTurn}.
+ */
+export type GetAgentTurnResult = AgentTurn;
 
 /**
  * Distinguishes the object-based getCalls options form from the legacy
@@ -200,6 +300,146 @@ export class WeaveClient {
     this.traceServerApi = traceServerApi;
     this.projectId = projectId;
     this.settings = makeSettings(settings);
+  }
+
+  /**
+   * List agents with aggregated stats.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgents({limit: 20});
+   *
+   * for (const agent of resp.data.agents) {
+   *   console.log(agent.agent_name, agent.total_input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public getAgents(
+    options: GetAgentsOptions = {}
+  ): Promise<Response<GetAgentsResult>> {
+    const params = {
+      project_id: this.projectId,
+      sort_by: options.sortBy,
+      limit: options.limit,
+      offset: options.offset,
+    };
+
+    if (options.agentName) {
+      Object.assign(params, {
+        filters: {agent_name: options.agentName},
+      });
+    }
+
+    return this.traceServerApi.agents.genaiAgentsQueryAgentsQueryPost(params);
+  }
+
+  /**
+   * List versions for a given agent.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentVersions({agentName: 'my-agent', limit: 20});
+   *
+   * for (const version of resp.data.versions) {
+   *   console.log(version.agent_version, version.total_input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public getAgentVersions(
+    options: GetAgentVersionsOptions
+  ): Promise<Response<GetAgentVersionsResult>> {
+    return this.traceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost(
+      {
+        project_id: this.projectId,
+        agent_name: options.agentName,
+        sort_by: options.sortBy,
+        limit: options.limit,
+        offset: options.offset,
+      }
+    );
+  }
+
+  /**
+   * Query agent spans, optionally filtered by agent name.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentSpans({agentName: 'my-agent', limit: 20});
+   *
+   * for (const span of resp.data.spans) {
+   *   console.log(span.span_id, span.span_name, span.input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public async getAgentSpans(
+    options: GetAgentSpansOptions
+  ): Promise<Response<GetAgentSpansResult>> {
+    const params = {
+      project_id: this.projectId,
+      sort_by: options.sortBy,
+      limit: options.limit,
+      offset: options.offset,
+    };
+
+    if (options.agentName) {
+      Object.assign(params, {
+        query: {
+          $expr: {
+            $eq: [{$getField: 'agent_name'}, {$literal: options.agentName}],
+          },
+        },
+      });
+    }
+    const resp =
+      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost(
+        params
+      );
+
+    return {
+      ...resp,
+      data: {
+        ...resp.data,
+        spans: resp.data.spans ?? [],
+      },
+    };
+  }
+
+  /**
+   * Get data (including messages) for a single turn (by traceId).
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentTurn({
+   *   traceId: '01997b8a-2c89-7c4d-9d0e-2f7e5b9a1b2c',
+   *   includeFeedback: true,
+   * });
+   *
+   * console.log(resp.data.root_span_name, resp.data.total_duration_ms);
+   *
+   * for (const message of resp.data.messages ?? []) {
+   *   if (message.user_message) console.log('user:', message.user_message);
+   *   if (message.assistant_message) console.log('assistant:', message.assistant_message);
+   * }
+   * ```
+   */
+  public getAgentTurn(
+    options: GetAgentTurnOptions
+  ): Promise<Response<GetAgentTurnResult>> {
+    return this.traceServerApi.agents.genaiTracesChatAgentsTracesChatPost({
+      project_id: this.projectId,
+      trace_id: options.traceId,
+      include_feedback: options.includeFeedback,
+    });
   }
 
   private scheduleBatchProcessing() {

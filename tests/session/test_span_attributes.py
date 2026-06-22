@@ -13,7 +13,15 @@ import logging
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from weave.session.session import LLM, Session, SubAgent, Tool, Turn
+from weave.session.session import (
+    LLM,
+    Session,
+    SubAgent,
+    Tool,
+    Turn,
+    log_session,
+    log_turn,
+)
 
 # (class_label, factory, otel_span_name) — span_name is the full emitted name
 # (not a prefix) so SubAgent and Turn (both "invoke_agent") don't collide.
@@ -153,3 +161,79 @@ def test_warns_when_span_already_ended(caplog: pytest.LogCaptureFixture) -> None
     messages = [record.message for record in caplog.records]
     assert any("set_attributes" in m and "span already ended" in m for m in messages)
     assert any("add_event" in m and "span already ended" in m for m in messages)
+
+
+# ---------------------------------------------------------------------------
+# Session attributes (stamped on every span)
+# ---------------------------------------------------------------------------
+
+
+def test_session_attributes_on_every_streaming_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A session's attributes land on the turn root and every child span."""
+    attrs = {"weave.integration.name": "wb-agent", "custom.tier": "gold"}
+    with Session(session_id="s", attributes=attrs) as session:
+        turn = session.start_turn(agent_name="bot")
+        with turn:
+            with turn.llm(model="gpt-4o"):
+                pass
+            with turn.tool(name="Edit"):
+                pass
+            with turn.subagent(name="researcher"):
+                pass
+    spans = otel_spans.get_finished_spans()
+    names = {span.name for span in spans}
+    assert {
+        "invoke_agent bot",
+        "chat gpt-4o",
+        "execute_tool Edit",
+        "invoke_agent researcher",
+    } <= names
+    for span in spans:
+        assert span.attributes["weave.integration.name"] == "wb-agent"
+        assert span.attributes["custom.tier"] == "gold"
+
+
+def test_session_attributes_on_every_batch_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """log_turn applies attributes to the turn and its child spans."""
+    log_turn(
+        session_id="s",
+        agent_name="bot",
+        spans=[LLM(model="gpt-4o"), Tool(name="Edit")],
+        attributes={"weave.integration.name": "wb-agent"},
+    )
+    spans = otel_spans.get_finished_spans()
+    assert len(spans) == 3
+    for span in spans:
+        assert span.attributes["weave.integration.name"] == "wb-agent"
+
+
+def test_session_attributes_on_every_log_session_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """log_session applies attributes to every turn root and child span."""
+    log_session(
+        turns=[
+            Turn(agent_name="bot", spans=[LLM(model="gpt-4o")]),
+            Turn(agent_name="bot", spans=[Tool(name="Edit")]),
+        ],
+        session_id="s",
+        attributes={"weave.integration.name": "wb-agent"},
+    )
+    spans = otel_spans.get_finished_spans()
+    assert len(spans) == 4  # two turn roots + one child each
+    for span in spans:
+        assert span.attributes["weave.integration.name"] == "wb-agent"
+
+
+def test_no_session_attributes_by_default(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    with Session(session_id="s") as session:
+        with session.start_turn(agent_name="bot"):
+            pass
+    span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")
+    assert "weave.integration.name" not in (span.attributes or {})

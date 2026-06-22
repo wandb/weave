@@ -618,6 +618,7 @@ class AgentWriteHandler:
     """
 
     _ch_client: CHClient
+    _insert_settings: dict[str, Any] | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -688,6 +689,7 @@ class AgentWriteHandler:
                 "spans",
                 data=[genai_span_to_row(s) for s in span_rows],
                 column_names=ALL_SPAN_INSERT_COLUMNS,
+                settings=self._insert_settings,
             )
             record_db_insert(table="spans", count=len(span_rows))
 
@@ -721,6 +723,7 @@ class AgentWriteHandler:
             "spans",
             data=[genai_span_to_row(span)],
             column_names=ALL_SPAN_INSERT_COLUMNS,
+            settings=self._insert_settings,
         )
         record_db_insert(table="spans", count=1)
 

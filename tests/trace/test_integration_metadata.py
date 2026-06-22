@@ -11,7 +11,6 @@ from __future__ import annotations
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.integrations.integration_metadata import (
     INTEGRATION_ATTRIBUTE_KEY,
     IntegrationMetadata,
@@ -127,7 +126,6 @@ def test_with_integration_metadata_preserves_existing_attributes():
 # --- op-level default attributes (end to end) ---------------------------------
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_level_attributes_land_on_call(client):
     @weave.op(attributes={"integration": {"name": "demo"}})
     def func():
@@ -138,7 +136,6 @@ def test_op_level_attributes_land_on_call(client):
     assert call.attributes["integration"] == {"name": "demo"}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_level_attributes_coexist_with_context(client):
     @weave.op(attributes={"integration": {"name": "demo"}})
     def func():
@@ -152,7 +149,6 @@ def test_op_level_attributes_coexist_with_context(client):
     assert call.attributes["env"] == "prod"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_context_attributes_override_op_level_on_collision(client):
     @weave.op(attributes={"integration": {"name": "demo"}})
     def func():
@@ -166,7 +162,6 @@ def test_context_attributes_override_op_level_on_collision(client):
     assert call.attributes["integration"] == "user-override"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_level_attributes_do_not_clobber_weave_subdict(client):
     @weave.op(kind="llm", attributes={"integration": {"name": "demo"}})
     def func():
@@ -187,7 +182,6 @@ def test_op_rejects_reserved_weave_key():
             return 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_without_attributes_has_no_integration_key(client):
     @weave.op
     def func():
@@ -198,7 +192,6 @@ def test_op_without_attributes_has_no_integration_key(client):
     assert "integration" not in call.attributes
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_level_attributes_on_async_call(client):
     @weave.op(attributes={"integration": {"name": "demo"}})
@@ -210,7 +203,6 @@ async def test_op_level_attributes_on_async_call(client):
     assert call.attributes["integration"] == {"name": "demo"}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_level_attributes_on_sync_generator(client):
     @weave.op(attributes={"integration": {"name": "demo"}})
     def gen():
@@ -222,7 +214,6 @@ def test_op_level_attributes_on_sync_generator(client):
     assert call.attributes["integration"] == {"name": "demo"}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_level_attributes_on_async_generator(client):
     @weave.op(attributes={"integration": {"name": "demo"}})
@@ -238,7 +229,6 @@ async def test_op_level_attributes_on_async_generator(client):
 # --- callback/tracer path (Family B: direct create_call) ----------------------
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_create_call_carries_integration_attributes(client):
     """Integrations that build attributes directly still land integration data."""
     attrs = {"trace_id": "t1"}

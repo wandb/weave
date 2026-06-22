@@ -2,13 +2,11 @@ import pytest
 from pydantic import BaseModel, Field
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import AnnotationSpec
 from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
 from weave.trace_server.trace_server_interface import FeedbackCreateReq, ObjQueryReq
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_human_feedback_basic(client):
     # create a human feedback spec
 
@@ -91,7 +89,6 @@ def test_human_feedback_basic(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_field_schema_with_pydantic_model(client):
     # Test using a Pydantic model as field_schema
     class FeedbackModel(BaseModel):
@@ -461,7 +458,6 @@ def test_annotation_spec_validate_return_value():
     assert not enum_spec.value_is_valid(123)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_feedback_sdk(weave_active):
     number_spec = AnnotationSpec(
         name="Number Rating",
