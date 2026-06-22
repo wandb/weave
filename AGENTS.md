@@ -219,15 +219,10 @@ and pins `"packageManager": "pnpm@10.8.1"` in `package.json`. Do **not** run
 `npm i`: npm's resolver crashes trying to dedupe pnpm's symlink `node_modules`
 (`TypeError: Cannot read properties of null (reading 'matches')`).
 
-Use `corepack pnpm`, which reads the pinned version and works regardless of any
-globally-installed pnpm. (A globally-installed recent pnpm may also fail here:
-newer pnpm requires Node ≥ 22.13 via `node:sqlite`, and the env's Node can be
-older. `corepack` sidesteps this by running the pinned pnpm@10.8.1.)
-
 ```
 cd sdks/node
-corepack pnpm install
-corepack pnpm run test
+pnpm install
+pnpm test
 ```
 
 To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
@@ -235,7 +230,7 @@ To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
 `pnpm install` builds it via the `prepare` script. Then:
 
 ```
-corepack pnpm exec tsx examples/claudeAgents.ts
+pnpm exec tsx examples/claudeAgents.ts
 ```
 
 ## Code Review & PR Guidelines
