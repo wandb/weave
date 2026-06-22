@@ -22,6 +22,7 @@ function createStreamFromCalls(calls: any[] = []) {
   });
   return stream;
 }
+
 function mockStreamResponse(
   api: jest.Mocked<TraceServerApi<any>>,
   calls: any[]
@@ -34,15 +35,23 @@ function mockStreamResponse(
   } as any);
 }
 
+type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
+  calls: {callsQueryStreamCallsStreamQueryPost: jest.Mock};
+  agents: {genaiAgentsQueryAgentsQueryPost: jest.Mock};
+};
+
 describe('WeaveClient', () => {
   let client: WeaveClient;
-  let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
+  let mockTraceServerApi: MockedTraceServer;
   let mockWandbServerApi: jest.Mocked<WandbServerApi>;
 
   beforeEach(() => {
     mockTraceServerApi = {
       calls: {
         callsQueryStreamCallsStreamQueryPost: jest.fn(),
+      },
+      agents: {
+        genaiAgentsQueryAgentsQueryPost: jest.fn(),
       },
     } as any;
     mockWandbServerApi = {} as any;
@@ -356,6 +365,62 @@ describe('WeaveClient', () => {
       expect(client.getCall('non-existent-id')).rejects.toThrow(
         'Call not found: non-existent-id'
       );
+    });
+  });
+
+  describe('getAgents', () => {
+    it('gets agents from the server', async () => {
+      const agents = [{agent_name: 'Assistant', total_input_tokens: 42}];
+      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockResolvedValue(
+        {data: {agents, total_count: 1}} as any
+      );
+
+      const result = await client.getAgents({
+        limit: 50,
+        offset: 10,
+        sortBy: [{field: 'last_seen', direction: 'desc'}],
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        sort_by: [{field: 'last_seen', direction: 'desc'}],
+        limit: 50,
+        offset: 10,
+      });
+
+      expect(result).toEqual({data: {agents, total_count: 1}});
+    });
+
+    it('gets agent by name', async () => {
+      const agents = [{agent_name: 'Assistant', total_input_tokens: 42}];
+      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockResolvedValue(
+        {data: {agents, total_count: 1}} as any
+      );
+
+      const result = await client.getAgents({
+        agentName: 'my-cool-agent',
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        filters: {
+          agent_name: 'my-cool-agent',
+        },
+      });
+
+      expect(result).toEqual({data: {agents, total_count: 1}});
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgents()).rejects.toThrow('boom');
     });
   });
 

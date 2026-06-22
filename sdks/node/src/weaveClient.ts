@@ -5,6 +5,7 @@ import {uuidv7} from 'uuidv7';
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
+  type AgentSchema,
   type CallSchema,
   type CallsQueryReq,
   type CallsFilter,
@@ -13,6 +14,8 @@ import {
   type SortBy,
   type StartedCallSchemaForInsert,
   type Api as TraceServerApi,
+  type HttpResponse,
+  type HTTPValidationError,
 } from './generated/traceServerApi';
 import {
   type AudioType,
@@ -45,6 +48,8 @@ import type {Prompt} from './prompt';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
+
+export type Response<T extends unknown> = HttpResponse<T, HTTPValidationError>;
 
 /**
  * Serialized representation of a file blob stored in the Weave content store.
@@ -83,6 +88,26 @@ export interface GetCallsOptions {
   columns?: string[];
   expandColumns?: string[];
 }
+
+export type Agent = AgentSchema;
+
+/**
+ * Options for {@link WeaveClient.getAgents}.
+ */
+export interface GetAgentsOptions {
+  agentName?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgents}.
+ */
+export type GetAgentsResult = {
+  agents: Agent[];
+  total_count?: number;
+};
 
 /**
  * Distinguishes the object-based getCalls options form from the legacy
@@ -200,6 +225,40 @@ export class WeaveClient {
     this.traceServerApi = traceServerApi;
     this.projectId = projectId;
     this.settings = makeSettings(settings);
+  }
+
+  /**
+   * List agents with aggregated stats.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgents({limit: 20});
+   *
+   * for (const agent of resp.data.agents) {
+   *   console.log(agent.agent_name, agent.total_input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public getAgents(
+    options: GetAgentsOptions = {}
+  ): Promise<Response<GetAgentsResult>> {
+    const params = {
+      project_id: this.projectId,
+      sort_by: options.sortBy,
+      limit: options.limit,
+      offset: options.offset,
+    };
+
+    if (options.agentName) {
+      Object.assign(params, {
+        filters: {agent_name: options.agentName},
+      });
+    }
+
+    return this.traceServerApi.agents.genaiAgentsQueryAgentsQueryPost(params);
   }
 
   private scheduleBatchProcessing() {
