@@ -423,6 +423,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     )!;
     expect(executeToolSpan.attributes).toMatchObject({
       'gen_ai.operation.name': 'execute_tool',
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.tool.name': 'test-function',
       'gen_ai.tool.call.arguments': '{"city":"Tokyo"}',
@@ -433,6 +434,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     const resp = spans.find(s => s.name === 'chat gpt-4o-mini')!;
     expect(resp.attributes).toMatchObject({
       'gen_ai.operation.name': 'chat',
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.provider.name': 'openai',
       'gen_ai.output.type': 'text',
@@ -454,6 +456,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     const gen = spans.find(s => s.name === 'chat gpt-3.5-turbo')!;
     expect(gen.attributes).toMatchObject({
       'gen_ai.operation.name': 'chat',
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.provider.name': 'openai',
       'gen_ai.output.type': 'text',
@@ -481,6 +484,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const handoff = spans.find(s => s.name === 'handoff Triage -> Specialist')!;
     expect(handoff.attributes).toMatchObject({
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.handoff.from_agent': 'Triage',
       'weave.openai_agents.handoff.to_agent': 'Specialist',
@@ -490,6 +494,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const guard = spans.find(s => s.name === 'guardrail test-guardrail')!;
     expect(guard.attributes).toMatchObject({
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.guardrail.name': 'test-guardrail',
       'weave.openai_agents.guardrail.triggered': false,
@@ -499,6 +504,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const transcription = spans.find(s => s.name === 'transcription')!;
     expect(transcription.attributes).toMatchObject({
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.transcription.model': 'whisper-1',
       'weave.openai_agents.transcription.input': 'base64audio',
@@ -510,6 +516,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const speech = spans.find(s => s.name === 'speech')!;
     expect(speech.attributes).toMatchObject({
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.speech.model': 'tts-1',
       'weave.openai_agents.speech.input': 'say hello',
@@ -521,6 +528,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const speechGroup = spans.find(s => s.name === 'speech_group')!;
     expect(speechGroup.attributes).toMatchObject({
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.speech_group.input': 'narration script',
       'weave.openai_agents.span_id': 'span-speech-group',
@@ -529,6 +537,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const mcp = spans.find(s => s.name === 'mcp_list_tools')!;
     expect(mcp.attributes).toMatchObject({
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.mcp.server': 'http://localhost:9000',
       'weave.openai_agents.mcp.result': ['search', 'fetch'],
@@ -539,6 +548,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     // CustomSpan uses the user-supplied name with no prefix.
     const custom = spans.find(s => s.name === 'my_step')!;
     expect(custom.attributes).toMatchObject({
+      'gen_ai.agent.name': 'test-agent',
       'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.custom.kind': 'cache_lookup',
       'weave.openai_agents.custom.hits': 3,
@@ -625,6 +635,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(executeToolSpan).toBeDefined();
     expect(executeToolSpan.attributes).toMatchObject({
       'gen_ai.operation.name': 'execute_tool',
+      'gen_ai.agent.name': 'Assistant',
       'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.tool.name': 'get_weather',
       // The Agents SDK serializes the tool's JSON args/result as strings

@@ -427,6 +427,11 @@ type TraceInfo = {
   openSpanIds: string[];
 };
 
+type SpanInfo = {
+  otelSpan: OtelSpan;
+  agentName: string | undefined;
+};
+
 /**
  * OTel-emitting TracingProcessor for the OpenAI Agents SDK.
  *
@@ -449,7 +454,7 @@ type TraceInfo = {
  * - `{custom}`
  */
 export class WeaveOtelTracingProcessor implements TracingProcessor {
-  private spansById = new Map<string, OtelSpan>();
+  private spansById = new Map<string, SpanInfo>();
   private tracesById = new Map<string, TraceInfo>();
 
   private getTraceInfo(traceId: string): TraceInfo {
@@ -476,7 +481,7 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
     if (!span.parentId) return undefined;
     const parent = this.spansById.get(span.parentId);
     if (!parent) return undefined;
-    return otelTrace.setSpan(otelContext.active(), parent);
+    return otelTrace.setSpan(otelContext.active(), parent.otelSpan);
   }
 
   async onTraceStart(trace: Trace): Promise<void> {
@@ -489,12 +494,12 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
     const openSpanIds = traceInfo.openSpanIds;
     // Sweep in LIFO order so child spans end before their parents.
     for (const spanId of openSpanIds.reverse()) {
-      const otelSpan = this.spansById.get(spanId);
-      if (!otelSpan) continue;
+      const span = this.spansById.get(spanId);
+      if (!span) continue;
 
       this.spansById.delete(spanId);
-      if (otelSpan.isRecording()) {
-        otelSpan.end();
+      if (span.otelSpan.isRecording()) {
+        span.otelSpan.end();
       }
     }
     this.tracesById.delete(trace.traceId);
@@ -509,16 +514,35 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
     );
     otelSpan.setAttribute(`${WEAVE_ATTR_PREFIX}.span_id`, span.spanId);
     otelSpan.setAttribute(`${WEAVE_ATTR_PREFIX}.trace_id`, span.traceId);
-    this.spansById.set(span.spanId, otelSpan);
+
+    this.spansById.set(span.spanId, {
+      otelSpan,
+      agentName: this.resolveAgentName(span),
+    });
 
     const traceInfo = this.getTraceInfo(span.traceId);
     traceInfo.openSpanIds.push(span.spanId);
   }
 
+  private resolveAgentName(span: Span<SpanData>): string | undefined {
+    if (span.spanData.type === 'agent') {
+      return span.spanData.name;
+    }
+
+    if (span.parentId) {
+      const parentSpanInfo = this.spansById.get(span.parentId);
+      if (parentSpanInfo) {
+        return parentSpanInfo.agentName;
+      }
+    }
+  }
+
   async onSpanEnd(span: Span<SpanData>): Promise<void> {
-    const otelSpan = this.spansById.get(span.spanId);
+    const spanInfo = this.spansById.get(span.spanId);
+    if (!spanInfo) return;
+    const {otelSpan, agentName} = spanInfo;
+
     this.spansById.delete(span.spanId);
-    if (!otelSpan) return;
 
     const traceInfo = this.getTraceInfo(span.traceId);
 
@@ -540,6 +564,7 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
       otelSpan.setAttributes({
         ...attrsForSpan(span),
         [ATTR_GEN_AI_CONVERSATION_ID]: traceInfo.conversationId,
+        [ATTR_GEN_AI_AGENT_NAME]: agentName,
       });
 
       if (span.error) {
@@ -573,7 +598,7 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
   }
 
   private endOpenSpans(): void {
-    for (const otelSpan of this.spansById.values()) {
+    for (const {otelSpan} of this.spansById.values()) {
       if (otelSpan.isRecording()) {
         otelSpan.end();
       }
