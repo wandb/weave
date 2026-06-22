@@ -48,7 +48,7 @@ type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
 describe('WeaveClient', () => {
   let client: WeaveClient;
   let mockTraceServerApi: MockedTraceServer;
-  
+
   beforeEach(() => {
     mockTraceServerApi = {
       calls: {
