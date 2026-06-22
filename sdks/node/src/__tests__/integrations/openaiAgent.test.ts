@@ -1,6 +1,7 @@
 import {
   Agent,
   run,
+  Runner,
   setTraceProcessors,
   setTracingDisabled,
   tool,
@@ -264,131 +265,145 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
   });
 
   test('starting and ending OpenaAI spans (via `with*`) emit `invoke_agent`, `execute_tool`, `chat`, `handoff`, `guardrail`, `transcription`, `speech`, `speech_group`, `mcp_list_tools` and custom OTel spans', async () => {
-    await withTrace('Test', async () => {
-      await withAgentSpan(async () => {}, {
-        spanId: 'span-agent',
-        data: {
-          name: 'test-agent',
-          tools: ['t1'],
-          handoffs: ['h1'],
-          output_type: 'text',
-        },
-      });
-      await withFunctionSpan(async () => {}, {
-        spanId: 'span-function',
-        data: {
-          name: 'test-function',
-          input: '{"city":"Tokyo"}',
-          output: 'sunny, 22C',
-        },
-      });
-      await withResponseSpan(async span => {
-        span.spanData._input = [
-          {role: 'user', content: 'What is the weather in Tokyo?'},
-        ];
-        span.spanData._response = {
-          object: 'response',
-          id: 'resp-abc',
-          model: 'gpt-4o-mini',
-          status: 'completed',
-          usage: {
-            input_tokens: 12,
-            output_tokens: 7,
-            input_tokens_details: {cached_tokens: 4},
-            output_tokens_details: {reasoning_tokens: 3},
+    await withTrace(
+      'Test',
+      async () => {
+        await withAgentSpan(
+          async () => {
+            await withFunctionSpan(async () => {}, {
+              spanId: 'span-function',
+              data: {
+                name: 'test-function',
+                input: '{"city":"Tokyo"}',
+                output: 'sunny, 22C',
+              },
+            });
+            await withResponseSpan(async span => {
+              span.spanData._input = [
+                {role: 'user', content: 'What is the weather in Tokyo?'},
+              ];
+              span.spanData._response = {
+                object: 'response',
+                id: 'resp-abc',
+                model: 'gpt-4o-mini',
+                status: 'completed',
+                usage: {
+                  input_tokens: 12,
+                  output_tokens: 7,
+                  input_tokens_details: {cached_tokens: 4},
+                  output_tokens_details: {reasoning_tokens: 3},
+                },
+                output: [
+                  {
+                    type: 'reasoning',
+                    summary: [
+                      {text: 'Tokyo is a city in Japan.'},
+                      {text: 'Sunny.'},
+                    ],
+                  },
+                  {
+                    type: 'function_call',
+                    callId: 'call-1',
+                    name: 'get_weather',
+                    arguments: '{"city":"Tokyo"}',
+                  },
+                  {
+                    type: 'function_call_output',
+                    callId: 'call-1',
+                    output: 'Tokyo: Sunny, 22C',
+                  },
+                  {
+                    type: 'message',
+                    role: 'assistant',
+                    content: [{type: 'output_text', text: 'Tokyo is sunny.'}],
+                  },
+                ],
+              };
+            });
+            await withGenerationSpan(async () => {}, {
+              data: {
+                model: 'gpt-3.5-turbo',
+                usage: {
+                  input_tokens: 9,
+                  output_tokens: 4,
+                  details: {
+                    cached_tokens: 2,
+                    reasoning_tokens: 1,
+                  },
+                },
+                input: [{role: 'user', content: 'hi'}],
+                output: [{role: 'assistant', content: 'hello'}],
+                model_config: {
+                  temperature: 0.7,
+                  top_p: 0.9,
+                  max_tokens: 200,
+                  frequency_penalty: 0.1,
+                  presence_penalty: 0.2,
+                  seed: 42,
+                  stop: 'STOP',
+                  n: 3,
+                  unknown_key: 'ignored',
+                },
+              },
+            });
+            await withGuardrailSpan(async () => {}, {
+              spanId: 'span-guardrail',
+              data: {name: 'test-guardrail', triggered: false},
+            });
+            await withHandoffSpan(async () => {}, {
+              spanId: 'span-handoff',
+              data: {from_agent: 'Triage', to_agent: 'Specialist'},
+            });
+            await withTranscriptionSpan(async () => {}, {
+              spanId: 'span-transcription',
+              data: {
+                input: {data: 'base64audio', format: 'pcm'},
+                output: 'hello world',
+                model: 'whisper-1',
+              },
+            });
+            await withSpeechSpan(async () => {}, {
+              spanId: 'span-speech',
+              data: {
+                input: 'say hello',
+                output: {data: 'base64audio', format: 'pcm'},
+                model: 'tts-1',
+              },
+            });
+            await withSpeechGroupSpan(async () => {}, {
+              spanId: 'span-speech-group',
+              data: {input: 'narration script'},
+            });
+            await withMCPListToolsSpan(async () => {}, {
+              spanId: 'span-mcp',
+              data: {
+                server: 'http://localhost:9000',
+                result: ['search', 'fetch'],
+              },
+            });
+            await withCustomSpan(async () => {}, {
+              spanId: 'span-custom',
+              data: {
+                name: 'my_step',
+                // Each non-null key in `data` becomes its own
+                // weave.openai_agents.custom.<key> attribute; null is dropped.
+                data: {kind: 'cache_lookup', hits: 3, miss: null},
+              },
+            });
           },
-          output: [
-            {
-              type: 'reasoning',
-              summary: [{text: 'Tokyo is a city in Japan.'}, {text: 'Sunny.'}],
+          {
+            spanId: 'span-agent',
+            data: {
+              name: 'test-agent',
+              tools: ['t1'],
+              handoffs: ['h1'],
+              output_type: 'text',
             },
-            {
-              type: 'function_call',
-              callId: 'call-1',
-              name: 'get_weather',
-              arguments: '{"city":"Tokyo"}',
-            },
-            {
-              type: 'function_call_output',
-              callId: 'call-1',
-              output: 'Tokyo: Sunny, 22C',
-            },
-            {
-              type: 'message',
-              role: 'assistant',
-              content: [{type: 'output_text', text: 'Tokyo is sunny.'}],
-            },
-          ],
-        };
-      });
-      await withGenerationSpan(async () => {}, {
-        data: {
-          model: 'gpt-3.5-turbo',
-          usage: {
-            input_tokens: 9,
-            output_tokens: 4,
-            details: {
-              cached_tokens: 2,
-              reasoning_tokens: 1,
-            },
-          },
-          input: [{role: 'user', content: 'hi'}],
-          output: [{role: 'assistant', content: 'hello'}],
-          model_config: {
-            temperature: 0.7,
-            top_p: 0.9,
-            max_tokens: 200,
-            frequency_penalty: 0.1,
-            presence_penalty: 0.2,
-            seed: 42,
-            stop: 'STOP',
-            n: 3,
-            unknown_key: 'ignored',
-          },
-        },
-      });
-      await withGuardrailSpan(async () => {}, {
-        spanId: 'span-guardrail',
-        data: {name: 'test-guardrail', triggered: false},
-      });
-      await withHandoffSpan(async () => {}, {
-        spanId: 'span-handoff',
-        data: {from_agent: 'Triage', to_agent: 'Specialist'},
-      });
-      await withTranscriptionSpan(async () => {}, {
-        spanId: 'span-transcription',
-        data: {
-          input: {data: 'base64audio', format: 'pcm'},
-          output: 'hello world',
-          model: 'whisper-1',
-        },
-      });
-      await withSpeechSpan(async () => {}, {
-        spanId: 'span-speech',
-        data: {
-          input: 'say hello',
-          output: {data: 'base64audio', format: 'pcm'},
-          model: 'tts-1',
-        },
-      });
-      await withSpeechGroupSpan(async () => {}, {
-        spanId: 'span-speech-group',
-        data: {input: 'narration script'},
-      });
-      await withMCPListToolsSpan(async () => {}, {
-        spanId: 'span-mcp',
-        data: {server: 'http://localhost:9000', result: ['search', 'fetch']},
-      });
-      await withCustomSpan(async () => {}, {
-        spanId: 'span-custom',
-        data: {
-          name: 'my_step',
-          // Each non-null key in `data` becomes its own
-          // weave.openai_agents.custom.<key> attribute; null is dropped.
-          data: {kind: 'cache_lookup', hits: 3, miss: null},
-        },
-      });
-    });
+          }
+        );
+      },
+      {groupId: 'some-conversation-id'}
+    );
 
     const spans = await emittedSpans();
     expect(spans).toHaveLength(11);
@@ -397,6 +412,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(agent.attributes).toMatchObject({
       'gen_ai.operation.name': 'invoke_agent',
       'gen_ai.agent.name': 'test-agent',
+      'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.provider.name': 'openai',
       'weave.openai_agents.agent.tools': ['t1'],
       'weave.openai_agents.agent.handoffs': ['h1'],
@@ -409,6 +425,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     )!;
     expect(executeToolSpan.attributes).toMatchObject({
       'gen_ai.operation.name': 'execute_tool',
+      'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.tool.name': 'test-function',
       'gen_ai.tool.call.arguments': '{"city":"Tokyo"}',
       'gen_ai.tool.call.result': 'sunny, 22C',
@@ -418,6 +435,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     const resp = spans.find(s => s.name === 'chat gpt-4o-mini')!;
     expect(resp.attributes).toMatchObject({
       'gen_ai.operation.name': 'chat',
+      'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.provider.name': 'openai',
       'gen_ai.output.type': 'text',
       'gen_ai.request.model': 'gpt-4o-mini',
@@ -438,6 +456,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     const gen = spans.find(s => s.name === 'chat gpt-3.5-turbo')!;
     expect(gen.attributes).toMatchObject({
       'gen_ai.operation.name': 'chat',
+      'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.provider.name': 'openai',
       'gen_ai.output.type': 'text',
       'gen_ai.request.model': 'gpt-3.5-turbo',
@@ -464,6 +483,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const handoff = spans.find(s => s.name === 'handoff Triage -> Specialist')!;
     expect(handoff.attributes).toMatchObject({
+      'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.handoff.from_agent': 'Triage',
       'weave.openai_agents.handoff.to_agent': 'Specialist',
       'weave.openai_agents.span_id': 'span-handoff',
@@ -472,6 +492,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const guard = spans.find(s => s.name === 'guardrail test-guardrail')!;
     expect(guard.attributes).toMatchObject({
+      'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.guardrail.name': 'test-guardrail',
       'weave.openai_agents.guardrail.triggered': false,
       'weave.openai_agents.span_id': 'span-guardrail',
@@ -480,6 +501,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const transcription = spans.find(s => s.name === 'transcription')!;
     expect(transcription.attributes).toMatchObject({
+      'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.transcription.model': 'whisper-1',
       'weave.openai_agents.transcription.input': 'base64audio',
       'weave.openai_agents.transcription.input_format': 'pcm',
@@ -490,6 +512,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const speech = spans.find(s => s.name === 'speech')!;
     expect(speech.attributes).toMatchObject({
+      'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.speech.model': 'tts-1',
       'weave.openai_agents.speech.input': 'say hello',
       'weave.openai_agents.speech.output': 'base64audio',
@@ -500,6 +523,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const speechGroup = spans.find(s => s.name === 'speech_group')!;
     expect(speechGroup.attributes).toMatchObject({
+      'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.speech_group.input': 'narration script',
       'weave.openai_agents.span_id': 'span-speech-group',
     });
@@ -507,6 +531,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const mcp = spans.find(s => s.name === 'mcp_list_tools')!;
     expect(mcp.attributes).toMatchObject({
+      'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.mcp.server': 'http://localhost:9000',
       'weave.openai_agents.mcp.result': ['search', 'fetch'],
       'weave.openai_agents.span_id': 'span-mcp',
@@ -516,6 +541,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     // CustomSpan uses the user-supplied name with no prefix.
     const custom = spans.find(s => s.name === 'my_step')!;
     expect(custom.attributes).toMatchObject({
+      'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.custom.kind': 'cache_lookup',
       'weave.openai_agents.custom.hits': 3,
       'weave.openai_agents.span_id': 'span-custom',
@@ -579,7 +605,8 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       ]),
     });
 
-    const result = await run(agent, 'What is the weather in Tokyo?');
+    const runner = new Runner({groupId: 'some-conversation-id'});
+    const result = await runner.run(agent, 'What is the weather in Tokyo?');
     expect(result.finalOutput).toBe('Tokyo is sunny.');
 
     const spans = await emittedSpans();
@@ -589,6 +616,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(agentSpan!.attributes).toMatchObject({
       'gen_ai.operation.name': 'invoke_agent',
       'gen_ai.agent.name': 'Assistant',
+      'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.provider.name': 'openai',
       'weave.openai_agents.agent.tools': ['get_weather'],
     });
@@ -599,6 +627,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(executeToolSpan).toBeDefined();
     expect(executeToolSpan.attributes).toMatchObject({
       'gen_ai.operation.name': 'execute_tool',
+      'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.tool.name': 'get_weather',
       // The Agents SDK serializes the tool's JSON args/result as strings
       // on the FunctionSpanData, which we lift straight to semconv.

@@ -125,18 +125,12 @@ function isoToMs(iso: string | null): number | undefined {
   return Number.isFinite(ms) ? ms : undefined;
 }
 
-function invokeAgentAttrs(
-  spanData: AgentSpanData,
-  conversationId: string
-): Attributes {
+function invokeAgentAttrs(spanData: AgentSpanData): Attributes {
   const attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
     [ATTR_GEN_AI_AGENT_NAME]: spanData.name ?? '',
     [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
   };
-  if (conversationId) {
-    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
-  }
   if (spanData.tools && spanData.tools.length > 0) {
     attrs[`${WEAVE_ATTR_PREFIX}.agent.tools`] = spanData.tools;
   }
@@ -149,17 +143,11 @@ function invokeAgentAttrs(
   return attrs;
 }
 
-function executeToolAttrs(
-  spanData: FunctionSpanData,
-  conversationId: string
-): Attributes {
+function executeToolAttrs(spanData: FunctionSpanData): Attributes {
   const attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
     [ATTR_GEN_AI_TOOL_NAME]: spanData.name ?? '',
   };
-  if (conversationId) {
-    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
-  }
   if (spanData.input) {
     attrs[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = spanData.input;
   }
@@ -203,13 +191,9 @@ function generationSpanUsageAttrs(
  * `chat` attrs for a ResponseSpan. Pulls data from Agents-SDK populated `_response`
  * attribute when present.
  */
-function responseChatAttrs(
-  spanData: ResponseSpanData,
-  conversationId: string
-): Attributes {
+function responseChatAttrs(spanData: ResponseSpanData): Attributes {
   let attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
-    [ATTR_GEN_AI_CONVERSATION_ID]: conversationId,
     [ATTR_GEN_AI_RESPONSE_ID]: spanData.response_id,
     [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     [ATTR_GEN_AI_OUTPUT_TYPE]: DEFAULT_CHAT_OUTPUT_TYPE,
@@ -250,13 +234,9 @@ function responseChatAttrs(
 /**
  * `chat` attrs for a GenerationSpan.
  */
-function generationChatAttrs(
-  spanData: GenerationSpanData,
-  conversationId: string
-): Attributes {
+function generationChatAttrs(spanData: GenerationSpanData): Attributes {
   const attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
-    [ATTR_GEN_AI_CONVERSATION_ID]: conversationId,
     [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     [ATTR_GEN_AI_OUTPUT_TYPE]: DEFAULT_CHAT_OUTPUT_TYPE,
     [ATTR_GEN_AI_REQUEST_MODEL]: spanData.model,
@@ -395,22 +375,19 @@ function customAttrs(spanData: CustomSpanData): Attributes {
   return out;
 }
 
-function attrsForSpan(
-  span: Span<SpanData>,
-  conversationId: string
-): Attributes {
+function attrsForSpan(span: Span<SpanData>): Attributes {
   switch (span.spanData.type) {
     case 'agent':
-      return invokeAgentAttrs(span.spanData, conversationId);
+      return invokeAgentAttrs(span.spanData);
 
     case 'function':
-      return executeToolAttrs(span.spanData, conversationId);
+      return executeToolAttrs(span.spanData);
 
     case 'response':
-      return responseChatAttrs(span.spanData, conversationId);
+      return responseChatAttrs(span.spanData);
 
     case 'generation':
-      return generationChatAttrs(span.spanData, conversationId);
+      return generationChatAttrs(span.spanData);
 
     case 'handoff':
       return handoffAttrs(span.spanData);
@@ -442,6 +419,14 @@ function attrsForSpan(
   }
 }
 
+type TraceInfo = {
+  conversationId: string;
+
+  // Used to sweep through opened spans `onTraceEnd` so we don't leak when
+  // the SDK ends a trace without closing every span.
+  openSpanIds: string[];
+};
+
 /**
  * OTel-emitting TracingProcessor for the OpenAI Agents SDK.
  *
@@ -465,10 +450,18 @@ function attrsForSpan(
  */
 export class WeaveOtelTracingProcessor implements TracingProcessor {
   private spansById = new Map<string, OtelSpan>();
-  private conversationIdsByTraceId = new Map<string, string>();
-  // Used to sweep through opened spans `onTraceEnd` so we don't leak when
-  // the SDK ends a trace without closing every span.
-  private openSpanIdsByTraceId = new Map<string, string[]>();
+  private tracesById = new Map<string, TraceInfo>();
+
+  private getTraceInfo(traceId: string): TraceInfo {
+    let traceInfo = this.tracesById.get(traceId);
+
+    if (!traceInfo) {
+      traceInfo = {conversationId: traceId, openSpanIds: []};
+      this.tracesById.set(traceId, traceInfo);
+    }
+
+    return traceInfo;
+  }
 
   private tracer() {
     return getWeaveTracer(TRACER_NAME);
@@ -487,18 +480,13 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
   }
 
   async onTraceStart(trace: Trace): Promise<void> {
-    this.conversationIdsByTraceId.set(
-      trace.traceId,
-      trace.groupId ?? trace.traceId
-    );
-    if (!this.openSpanIdsByTraceId.has(trace.traceId)) {
-      this.openSpanIdsByTraceId.set(trace.traceId, []);
-    }
+    const traceInfo = this.getTraceInfo(trace.traceId);
+    traceInfo.conversationId = trace.groupId ?? trace.traceId;
   }
 
   async onTraceEnd(trace: Trace): Promise<void> {
-    const openSpanIds = this.openSpanIdsByTraceId.get(trace.traceId) ?? [];
-    this.openSpanIdsByTraceId.delete(trace.traceId);
+    const traceInfo = this.getTraceInfo(trace.traceId);
+    const openSpanIds = traceInfo.openSpanIds;
     // Sweep in LIFO order so child spans end before their parents.
     for (const spanId of openSpanIds.reverse()) {
       const otelSpan = this.spansById.get(spanId);
@@ -509,7 +497,7 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
         otelSpan.end();
       }
     }
-    this.conversationIdsByTraceId.delete(trace.traceId);
+    this.tracesById.delete(trace.traceId);
   }
 
   async onSpanStart(span: Span<SpanData>): Promise<void> {
@@ -523,12 +511,8 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
     otelSpan.setAttribute(`${WEAVE_ATTR_PREFIX}.trace_id`, span.traceId);
     this.spansById.set(span.spanId, otelSpan);
 
-    const openSpanIds = this.openSpanIdsByTraceId.get(span.traceId);
-    if (openSpanIds) {
-      openSpanIds.push(span.spanId);
-    } else {
-      this.openSpanIdsByTraceId.set(span.traceId, [span.spanId]);
-    }
+    const traceInfo = this.getTraceInfo(span.traceId);
+    traceInfo.openSpanIds.push(span.spanId);
   }
 
   async onSpanEnd(span: Span<SpanData>): Promise<void> {
@@ -536,11 +520,11 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
     this.spansById.delete(span.spanId);
     if (!otelSpan) return;
 
-    const openSpanIds = this.openSpanIdsByTraceId.get(span.traceId);
-    if (openSpanIds) {
-      const idx = openSpanIds.indexOf(span.spanId);
-      if (idx >= 0) openSpanIds.splice(idx, 1);
-    }
+    const traceInfo = this.getTraceInfo(span.traceId);
+
+    traceInfo.openSpanIds = traceInfo.openSpanIds.filter(
+      id => id != span.spanId
+    );
 
     // Enrich-then-end. The enrichment block dispatches on span-data type
     // and may touch SDK payloads that could throw on unexpected shapes. End
@@ -553,10 +537,10 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
       // "chat" and gains the model suffix here).
       otelSpan.updateName(otelSpanName(span));
 
-      const conversationId =
-        this.conversationIdsByTraceId.get(span.traceId) ?? '';
-      const attrs = attrsForSpan(span, conversationId);
-      otelSpan.setAttributes(attrs);
+      otelSpan.setAttributes({
+        ...attrsForSpan(span),
+        [ATTR_GEN_AI_CONVERSATION_ID]: traceInfo.conversationId,
+      });
 
       if (span.error) {
         otelSpan.setStatus({
@@ -595,7 +579,6 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
       }
     }
     this.spansById.clear();
-    this.conversationIdsByTraceId.clear();
-    this.openSpanIdsByTraceId.clear();
+    this.tracesById.clear();
   }
 }
