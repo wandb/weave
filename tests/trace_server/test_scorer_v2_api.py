@@ -5,13 +5,11 @@ Tests verify that the Scorer V2 API correctly creates, reads, lists, and deletes
 
 import pytest
 
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_create_basic(trace_server):
     """Test creating a basic scorer object."""
     project_id = f"{TEST_ENTITY}/test_scorer_create_basic"
@@ -37,7 +35,6 @@ def score(output: str, target: str) -> dict:
     assert create_res.scorer.startswith("weave:///")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_create_without_description(trace_server):
     """Test creating a scorer without providing a description."""
     project_id = f"{TEST_ENTITY}/test_scorer_create_no_desc"
@@ -61,7 +58,6 @@ def score(output: str) -> dict:
     assert isinstance(create_res.scorer, str)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_read_basic(trace_server):
     """Test reading a specific scorer object."""
     project_id = f"{TEST_ENTITY}/test_scorer_read_basic"
@@ -98,7 +94,6 @@ def score(output: str, target: str) -> dict:
     assert read_res.score_op.startswith("weave:///") or len(read_res.score_op) > 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_read_not_found(trace_server):
     """Test reading a non-existent scorer raises NotFoundError."""
     project_id = f"{TEST_ENTITY}/test_scorer_read_not_found"
@@ -113,7 +108,6 @@ def test_scorer_read_not_found(trace_server):
         trace_server.scorer_read(read_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_list_basic(trace_server):
     """Test listing all scorers in a project."""
     project_id = f"{TEST_ENTITY}/test_scorer_list_basic"
@@ -143,7 +137,6 @@ def test_scorer_list_basic(trace_server):
         assert scorer.created_at is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_list_with_limit(trace_server):
     """Test listing scorers with a limit."""
     project_id = f"{TEST_ENTITY}/test_scorer_list_limit"
@@ -165,7 +158,6 @@ def test_scorer_list_with_limit(trace_server):
     assert len(scorers) == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_list_with_offset(trace_server):
     """Test listing scorers with an offset."""
     project_id = f"{TEST_ENTITY}/test_scorer_list_offset"
@@ -187,7 +179,6 @@ def test_scorer_list_with_offset(trace_server):
     assert len(scorers) == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_list_with_limit_and_offset(trace_server):
     """Test listing scorers with both limit and offset for pagination."""
     project_id = f"{TEST_ENTITY}/test_scorer_list_pagination"
@@ -218,7 +209,6 @@ def test_scorer_list_with_limit_and_offset(trace_server):
     assert len(scorers1_names & scorers2_names) == 0  # No overlap
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_list_empty_project(trace_server):
     """Test listing scorers in a project with no scorers."""
     project_id = f"{TEST_ENTITY}/test_scorer_list_empty"
@@ -229,7 +219,6 @@ def test_scorer_list_empty_project(trace_server):
     assert len(scorers) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_delete_single_version(trace_server):
     """Test deleting a single version of a scorer."""
     project_id = f"{TEST_ENTITY}/test_scorer_delete_single"
@@ -263,7 +252,6 @@ def test_scorer_delete_single_version(trace_server):
         trace_server.scorer_read(read_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_delete_all_versions(trace_server):
     """Test deleting all versions of a scorer (no digests specified)."""
     project_id = f"{TEST_ENTITY}/test_scorer_delete_all"
@@ -291,7 +279,6 @@ def test_scorer_delete_all_versions(trace_server):
     assert delete_res.num_deleted == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_delete_multiple_versions(trace_server):
     """Test deleting multiple specific versions of a scorer."""
     project_id = f"{TEST_ENTITY}/test_scorer_delete_multiple"
@@ -339,7 +326,6 @@ def test_scorer_delete_multiple_versions(trace_server):
         assert read_res.digest == digest
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_delete_not_found(trace_server):
     """Test deleting a non-existent scorer raises NotFoundError."""
     project_id = f"{TEST_ENTITY}/test_scorer_delete_not_found"
@@ -354,7 +340,6 @@ def test_scorer_delete_not_found(trace_server):
         trace_server.scorer_delete(delete_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_versioning(trace_server):
     """Test that creating multiple versions of a scorer increments version_index."""
     project_id = f"{TEST_ENTITY}/test_scorer_versioning"
@@ -380,7 +365,6 @@ def test_scorer_versioning(trace_server):
     assert len({v.digest for v in versions}) == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_with_special_characters(trace_server):
     """Test creating and reading a scorer with special characters in code."""
     project_id = f"{TEST_ENTITY}/test_scorer_special_chars"
@@ -412,7 +396,6 @@ def score(output: str) -> dict:
     assert read_res.score_op  # Should have a reference
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_with_unicode(trace_server):
     """Test creating and reading a scorer with unicode characters."""
     project_id = f"{TEST_ENTITY}/test_scorer_unicode"
@@ -444,7 +427,6 @@ def score(output: str) -> dict:
     assert "🌍" in read_res.description
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_list_after_deletion(trace_server):
     """Test that deleted scorers don't appear in list results."""
     project_id = f"{TEST_ENTITY}/test_scorer_list_after_deletion"
@@ -479,7 +461,6 @@ def test_scorer_list_after_deletion(trace_server):
     assert "delete_me" not in scorer_names_returned
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_complex_source_code(trace_server):
     """Test creating a scorer with complex multi-line source code."""
     project_id = f"{TEST_ENTITY}/test_scorer_complex_code"
@@ -539,7 +520,6 @@ def score(output: str, target: str) -> dict:
     assert read_res.description == "Complex JSON similarity scorer"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_scorer_list_with_missing_name_in_val(trace_server):
     """Regression test: scorer_list should not crash when val has no 'name' key.
 

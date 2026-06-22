@@ -20,6 +20,7 @@ import {WeaveObject, type WeaveObjectParameters} from './weaveObject';
 import {type Dataset, type DatasetRow} from './dataset';
 import {op} from './op';
 import {requireGlobalClient} from './clientApi';
+import {EVAL_META_KEY} from './constants';
 import {InternalCall} from './call';
 import {type CallStackEntry, type WeaveClient} from './weaveClient';
 import {type Op, type OpRef, type ParameterNamesOption} from './opType';
@@ -33,14 +34,14 @@ import {uuidv7} from 'uuidv7';
  * Attribute marker for imperative evaluation calls.
  * Applied to: evaluate, predict_and_score, predict, summarize calls.
  */
-const IMPERATIVE_EVAL_MARKER = {_weave_eval_meta: {imperative: true}};
+const IMPERATIVE_EVAL_MARKER = {[EVAL_META_KEY]: {imperative: true}};
 
 /**
  * Attribute marker for scorer calls in imperative evaluation.
  * Applied to: scorer.score calls.
  */
 const IMPERATIVE_SCORE_MARKER = {
-  _weave_eval_meta: {imperative: true, score: true},
+  [EVAL_META_KEY]: {imperative: true, score: true},
 };
 
 // ============================================================================

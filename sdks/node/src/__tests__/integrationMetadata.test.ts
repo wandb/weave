@@ -1,5 +1,4 @@
 import {op} from 'weave';
-
 import {initWithCustomTraceServer} from './clientMock';
 import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 import {
@@ -67,14 +66,6 @@ describe('op-level attributes', () => {
     initWithCustomTraceServer(projectId, traceServer);
   });
 
-  const getCalls = async () => {
-    await traceServer.waitForPendingOperations();
-    const result = await traceServer.calls.callsStreamQueryPost({
-      project_id: projectId,
-    });
-    return result.calls;
-  };
-
   test('op attributes stamp integration provenance on the call', async () => {
     const tracedOp = op(
       async function tracedOp() {
@@ -85,7 +76,7 @@ describe('op-level attributes', () => {
 
     await tracedOp();
 
-    const calls = await getCalls();
+    const calls = await traceServer.getCalls(projectId);
     const call = calls.find(c => c.op_name?.includes('tracedOp'));
     expect(call?.attributes?.integration?.name).toBe('demo');
     expect(call?.attributes?.integration?.version).toBe(packageVersion);
@@ -102,7 +93,7 @@ describe('op-level attributes', () => {
 
     await tracedOp();
 
-    const calls = await getCalls();
+    const calls = await traceServer.getCalls(projectId);
     const call = calls.find(c => c.op_name?.includes('kindOp'));
     expect(call?.attributes?.kind).toBe('llm');
   });

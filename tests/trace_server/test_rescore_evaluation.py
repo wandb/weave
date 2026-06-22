@@ -32,7 +32,6 @@ from weave.utils.project_id import from_project_id
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_evaluation_run_create_stores_source_evaluation_run_id(client):
     """source_evaluation_run_id written at create time must survive a read."""
     project_id = client.project_id
@@ -66,7 +65,6 @@ def test_evaluation_run_create_stores_source_evaluation_run_id(client):
     assert read_res.source_evaluation_run_id == source_run.evaluation_run_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_evaluation_run_without_source_has_none(client):
     """evaluation_run_read returns source_evaluation_run_id=None for normal runs."""
     project_id = client.project_id
@@ -205,7 +203,6 @@ def test_rescore_without_wb_user_id_raises(client):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_prediction_list_filters_by_evaluation_run_id(client):
     """prediction_list(evaluation_run_id=X) must return only predictions for run X."""
     project_id = client.project_id
@@ -277,7 +274,6 @@ def test_prediction_list_filters_by_evaluation_run_id(client):
     assert preds_b[0].evaluation_run_id == run_b.evaluation_run_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_prediction_list_pagination(client):
     """prediction_list respects limit and offset."""
     project_id = client.project_id

@@ -12,7 +12,7 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from tests.trace.util import FAKE_NOT_IMPLEMENTED, client_is_clickhouse
+from tests.trace.util import client_is_clickhouse
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
@@ -88,7 +88,6 @@ def create_call_with_usage(
     return call_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
     """Test basic SUM aggregation across multiple calls with known usage data."""
     project_id = client.project_id
@@ -179,7 +178,6 @@ def test_call_stats_date_range_limit_validation():
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_multiple_models(client: weave_client.WeaveClient):
     """Test that different models are tracked and aggregated separately."""
     project_id = client.project_id
@@ -243,7 +241,6 @@ def test_call_stats_multiple_models(client: weave_client.WeaveClient):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_all_aggregation_types(client: weave_client.WeaveClient):
     """Test SUM, AVG, MIN, MAX, COUNT aggregations compute correctly."""
     project_id = client.project_id
@@ -342,7 +339,6 @@ def test_call_stats_all_aggregation_types(client: weave_client.WeaveClient):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_percentiles(client: weave_client.WeaveClient):
     """Test percentile calculations (p50, p95, p99) with varied data."""
     project_id = client.project_id
@@ -407,7 +403,6 @@ def test_call_stats_percentiles(client: weave_client.WeaveClient):
     assert 90 <= p99 <= 100, f"p99 should be around 99, got {p99}"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     """Test that calls are grouped into correct time buckets based on started_at."""
     project_id = client.project_id
@@ -475,7 +470,6 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
     """Test op_names filter works correctly."""
     project_id = client.project_id
@@ -522,7 +516,6 @@ def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
     assert total_sum == 100, f"Expected 100 (only op1), got {total_sum}"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
     """Test trace_roots_only filter excludes child calls."""
     project_id = client.project_id
@@ -613,7 +606,6 @@ def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
     assert total_sum == 100, f"Expected 100 (root only), got {total_sum}"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
     """Test trace_ids filter limits to specific traces."""
     project_id = client.project_id
@@ -704,7 +696,6 @@ def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
     assert total_sum == 100, f"Expected 100 (trace_1 only), got {total_sum}"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_call_stats_call_metrics(client: weave_client.WeaveClient):
     """Test call-level metrics (latency, call_count, error_count)."""
     project_id = client.project_id

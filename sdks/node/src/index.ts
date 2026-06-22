@@ -11,11 +11,26 @@ export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
 export type {
   CallSchema,
   CallsFilter,
+  HttpResponse,
+  HTTPValidationError,
   Query,
   SortBy,
 } from './generated/traceServerApi';
 export type {Settings} from './settings';
-export type {GetCallsOptions, WeaveClient} from './weaveClient';
+export type {
+  Agent,
+  AgentSpan,
+  AgentVersion,
+  GetAgentsOptions,
+  GetAgentsResult,
+  GetAgentSpansOptions,
+  GetAgentSpansResult,
+  GetAgentVersionsOptions,
+  GetAgentVersionsResult,
+  GetCallsOptions,
+  Response,
+  WeaveClient,
+} from './weaveClient';
 export {
   wrapOpenAI,
   wrapGoogleGenAI,

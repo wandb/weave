@@ -4,7 +4,6 @@ from typing import Annotated, Any, Literal, get_type_hints
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.call import Call
 from weave.trace.op import (
     OpCallError,
@@ -213,7 +212,6 @@ def test_async_method_patching_passes_inspection(weave_obj, py_obj):
     assert inspect.ismethod(py_obj.amethod)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_sync_method_calls(weave_active, weave_obj):
     for x in range(3):
         weave_obj.method(x)
@@ -227,7 +225,6 @@ def test_sync_method_calls(weave_active, weave_obj):
     assert len(calls) == 6
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_async_method_calls(weave_active, weave_obj):
     for x in range(3):
@@ -269,7 +266,6 @@ async def test_gotten_object_method_is_callable_with_call_func(weave_active, wea
     assert call3.output == call4.output
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_postprocessing_funcs(client):
     def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         d = {}
@@ -305,7 +301,6 @@ def test_postprocessing_funcs(client):
     assert call.output == {"postprocessed_b": 2}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_call_display_name_str(client):
     @op(call_display_name="example")
     def func():
@@ -327,7 +322,6 @@ def test_op_call_display_name_callable_invalid():
             return 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_call_display_name_callable_lambda(client):
     @op(call_display_name=lambda call: f"{call.project_id}-123")
     def func():
@@ -341,7 +335,6 @@ def test_op_call_display_name_callable_lambda(client):
     assert call.display_name == "shawn/test-project-123"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_call_display_name_callable_func(client):
     def custom_display_name_func(call) -> str:
         reversed_project = call.project_id[::-1]
@@ -360,7 +353,6 @@ def test_op_call_display_name_callable_func(client):
     assert call.display_name == "wow-1844-tcejorp-tset/nwahs"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_call_display_name_callable_other_attributes(client):
     def custom_attribute_name(call):
         model = call.attributes["model"]
@@ -396,7 +388,6 @@ def test_op_call_display_name_callable_other_attributes(client):
     assert calls[1].display_name == "finetuned-gpt-4o__v0.1.3__2024-08-02"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_call_display_name_modified_dynamically(client):
     def custom_display_name1(call):
         return "wow"
@@ -422,7 +413,6 @@ def test_op_call_display_name_modified_dynamically(client):
     assert calls[2].display_name == "amazing"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_name(client):
     @op(name="custom_name")
     def func():
