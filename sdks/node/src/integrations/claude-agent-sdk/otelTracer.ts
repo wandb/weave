@@ -282,7 +282,8 @@ export class ClaudeAgentOtelTracer {
       if (result.num_turns != null) {
         this.invokeAgentSpan.setAttribute(ATTR_NUM_TURNS, result.num_turns);
       }
-      if (result.result != null) {
+      // `result` is only on the success member of the SDKResultMessage union.
+      if ('result' in result && result.result != null) {
         const output: Message[] = [{role: 'assistant', content: result.result}];
         this.invokeAgentSpan.setAttribute(
           ATTR_GEN_AI_OUTPUT_MESSAGES,
@@ -300,14 +301,18 @@ export class ClaudeAgentOtelTracer {
         (result.is_error ||
           (result.subtype != null && result.subtype !== 'success')));
     if (errored) {
+      // `result`/`errors` live on opposite members of the SDKResultMessage
+      // union — narrow with `in` before reading either.
+      const resultText =
+        result && 'result' in result ? result.result : undefined;
+      const errorsText =
+        result && 'errors' in result ? result.errors.join('; ') : undefined;
       const message =
         error != null
           ? error instanceof Error
             ? error.message
             : String(error)
-          : result?.result ||
-            (result?.errors && result.errors.join('; ')) ||
-            'Conversation ended with error';
+          : resultText || errorsText || 'Conversation ended with error';
       this.invokeAgentSpan.setAttribute(ATTR_ERROR_TYPE, 'agent_error');
       this.invokeAgentSpan.setStatus({
         code: SpanStatusCode.ERROR,
