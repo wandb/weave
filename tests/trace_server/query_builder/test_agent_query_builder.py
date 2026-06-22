@@ -379,7 +379,7 @@ def test_make_conversation_spans_query() -> None:
     query = make_conversation_spans_query(pb, "p1", ["conv-a", "conv-b"])
     expected = """
         SELECT s.conversation_id AS conversation_id,
-               arraySlice(arraySort(x -> x.1, groupArray(tuple(s.started_at, multiIf(s.operation_name = 'invoke_agent', 'agent', s.operation_name = 'execute_tool', 'tool', 'assistant'), s.trace_id, s.span_id, s.status_code, if(s.ended_at > s.started_at, toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), 0)))), -200) AS spans
+               arraySlice(arraySort(x -> (x.1, x.4), groupArray(tuple(s.started_at, multiIf(s.operation_name = 'invoke_agent', 'agent', s.operation_name = 'execute_tool', 'tool', 'assistant'), s.trace_id, s.span_id, s.status_code, if(s.ended_at > s.started_at, toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), 0)))), -200) AS spans
         FROM spans s
         WHERE s.project_id = {genai_0:String}
           AND s.conversation_id IN {genai_1:Array(String)}
@@ -402,7 +402,7 @@ def test_make_conversation_spans_query_with_time_range() -> None:
     )
     expected = """
         SELECT s.conversation_id AS conversation_id,
-               arraySlice(arraySort(x -> x.1, groupArray(tuple(s.started_at, multiIf(s.operation_name = 'invoke_agent', 'agent', s.operation_name = 'execute_tool', 'tool', 'assistant'), s.trace_id, s.span_id, s.status_code, if(s.ended_at > s.started_at, toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), 0)))), -200) AS spans
+               arraySlice(arraySort(x -> (x.1, x.4), groupArray(tuple(s.started_at, multiIf(s.operation_name = 'invoke_agent', 'agent', s.operation_name = 'execute_tool', 'tool', 'assistant'), s.trace_id, s.span_id, s.status_code, if(s.ended_at > s.started_at, toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), 0)))), -200) AS spans
         FROM spans s
         WHERE s.project_id = {genai_0:String}
           AND s.conversation_id IN {genai_1:Array(String)}

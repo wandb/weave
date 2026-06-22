@@ -610,18 +610,10 @@ class AgentConversationMessagePreview(BaseModel):
     text: str = ""
 
 
-# Coarse span kind from operation_name / status_code. Distinct from
-# AgentChatMessageType: the classifier only emits agent / tool / assistant
-# (+ unknown), not the full message taxonomy.
-ConversationSpanKind = Literal[
-    "user",
-    "assistant",
-    "tool",
-    "agent",
-    "handoff",
-    "compaction",
-    "unknown",
-]
+# Coarse span kind classified from operation_name / status_code. Distinct from
+# AgentChatMessageType: the classifier only emits these values, not the full
+# message taxonomy (which needs message bodies).
+ConversationSpanKind = Literal["agent", "tool", "assistant", "unknown"]
 
 
 class AgentConversationSpan(BaseModel):
@@ -633,28 +625,27 @@ class AgentConversationSpan(BaseModel):
     parent/child tree-walk order.
     """
 
-    kind: ConversationSpanKind = "unknown"
-    trace_id: str = ""
-    span_id: str = ""
-    status: StatusCodeLiteral = "UNSET"
-    duration_ms: int = 0
+    kind: ConversationSpanKind
+    trace_id: str
+    span_id: str
+    status: StatusCodeLiteral
+    duration_ms: int
 
 
 class AgentConversationSpanFeedback(BaseModel):
     """A feedback marker for a conversation's trace.
 
-    Positioned client-side by matching `trace_id` (turn) against the spans.
-    `tags` holds the human tags on this feedback (emoji reactions are tags too).
+    Positioned client-side by matching `trace_id` (turn) against the spans;
+    `trace_id` is None for conversation-level feedback.
     """
 
-    trace_id: str = ""
-    feedback_type: str = ""
+    trace_id: str | None = Field(
+        description="The turn this feedback is anchored to; None for conversation-level."
+    )
+    feedback_type: str
     tags: list[str] = Field(
         default_factory=list,
-        description=(
-            "Human tags on this feedback, skin-tone-detoned. Emoji tags are the "
-            "glyph itself (e.g. a thumbs-up); empty when it carries none."
-        ),
+        description="Arbitrary descriptive tags applied to this feedback.",
         examples=[["\U0001f44d"]],
     )
 
@@ -675,7 +666,9 @@ class AgentConversationSpansReq(BaseModel):
     """
 
     project_id: str
-    conversation_ids: list[str] = Field(default_factory=list)
+    conversation_ids: list[str] = Field(
+        default_factory=list, max_length=MAX_AGENT_QUERY_LIMIT
+    )
     started_after: AwareDatetime | None = None  # filter started_at >= start
     started_before: AwareDatetime | None = None  # filter started_at < end
 

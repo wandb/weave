@@ -1067,22 +1067,6 @@ def make_conversation_previews_query(
     """
 
 
-def _span_kind_sql(op_col: str) -> str:
-    """SQL expr mapping a span's `operation_name` to a ConversationSpanKind.
-
-    A span-level approximation of the chat taxonomy: agent invocations classify
-    as `agent`, tool executions as `tool`, and every other span (LLM / content)
-    as `assistant`. So this expr only ever emits those three of the
-    ConversationSpanKind values.
-    """
-    return (
-        "multiIf("
-        f"{op_col} = '{OP_INVOKE_AGENT}', 'agent', "
-        f"{op_col} = '{OP_EXECUTE_TOOL}', 'tool', "
-        "'assistant')"
-    )
-
-
 def make_conversation_spans_query(
     pb: ParamBuilder,
     project_id: str,
@@ -1092,26 +1076,13 @@ def make_conversation_spans_query(
     started_before: datetime.datetime | None = None,
     max_spans: int = MAX_CONVERSATION_SPANS,
 ) -> str:
-    """Per-conversation spans sequence for an explicit set of conversations.
+    """Per-conversation span sequence for an explicit set of conversations.
 
-    Mirrors `make_conversation_previews_query`: scoped to the page's already
-    computed `conversation_id IN (...)` so the scan is bounded by the
-    bloom-filter skip index plus the optional time range. Reads only narrow
-    scalar columns (no message bodies), so it stays cheap across a list page.
-
-    Returns one row per conversation with an `spans` array of per-span
-    tuples `(started_at, kind, trace_id, span_id, status_code, duration_ms)`
-    sorted by `started_at` and capped at `max_spans`, keeping the most recent
-    spans (the head is dropped beyond the cap) so the minimap reflects the
-    latest activity. `started_at` is carried only as the sort key; the handler
-    ignores it when building `AgentConversationSpan` rows.
-
-    `max_spans` bounds the returned (and wire) payload, not the intermediate
-    aggregation: `groupArray` still materializes the full per-conversation
-    tuple array before the sort + slice, so server-side memory is bounded by
-    page-size x spans-per-conversation. A `groupArraySorted(max_spans)` could
-    bound the intermediate too, but it sorts ascending (keeping the head), so
-    keeping the recent tail would need a descending sort key.
+    Scoped to `conversation_id IN (...)` and reads only scalar columns (no
+    message bodies). Returns one row per conversation with a `spans` array of
+    `(started_at, kind, trace_id, span_id, status_code, duration_ms)` tuples,
+    sorted by `(started_at, span_id)` and capped at `max_spans` keeping the most
+    recent; `started_at` is only the sort key and is dropped by the handler.
     """
     pid_slot = pb.add(project_id, param_type="String")
     ids_slot = pb.add(list(conversation_ids), param_type="Array(String)")
@@ -1132,12 +1103,19 @@ def make_conversation_spans_query(
         "toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), "
         "0)"
     )
-    kind = _span_kind_sql("s.operation_name")
+    # Coarse span kind from operation_name (see ConversationSpanKind): agent
+    # invocations -> agent, tool executions -> tool, everything else -> assistant.
+    kind = (
+        "multiIf("
+        f"s.operation_name = '{OP_INVOKE_AGENT}', 'agent', "
+        f"s.operation_name = '{OP_EXECUTE_TOOL}', 'tool', "
+        "'assistant')"
+    )
     return f"""
         SELECT s.conversation_id AS conversation_id,
                arraySlice(
                    arraySort(
-                       x -> x.1,
+                       x -> (x.1, x.4),
                        groupArray(
                            tuple(
                                s.started_at,
