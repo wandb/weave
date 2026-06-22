@@ -166,7 +166,7 @@ function usageAttributes(
   return attrs;
 }
 
-export interface ClaudeAgentOtelTracerOptions {
+interface ClaudeAgentOtelTracerOptions {
   /** The user prompt, when invoked as a string (recorded as input on the root). */
   prompt?: string;
   /** Tracer override (tests inject one backed by an in-memory exporter). */
