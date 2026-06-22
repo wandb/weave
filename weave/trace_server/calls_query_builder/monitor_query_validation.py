@@ -1,22 +1,8 @@
-"""Server-side validation for saved Monitor object queries.
+"""Server-side validation for saved Monitor object queries at obj_create time.
 
-A Monitor carries a `query` that the scoring worker runs every cycle. We reject
-queries referencing disallowed fields or that are structurally invalid at
-obj_create time, so a bad monitor fails loudly on save instead of silently
-erroring per scoring cycle.
-
-A monitor's `query` is validated against whichever schema the scoring worker
-will run it over, and that depends on what the monitor targets:
-
-- A regular monitor scores raw calls, so its query is validated against the
-  `calls_merged` schema (`op_name`, `attributes.*`, `inputs.*`, ...).
-- An agent monitor (one whose `op_names` include an agent-span op such as
-  `weave.genai.turn_ended`) scores agent spans, so its query is validated
-  against the agent-spans schema (`operation_name`, `agent_name`, ...) — the
-  same schema the agent Spans tab and the scoring worker's `agent_spans_query`
-  use. Validating an agent query against `calls_merged` would wrongly reject
-  legitimate agent-span fields, which made saving an agent signal with an
-  "only score turns matching" filter fail with a 422.
+Regular monitors validate against the `calls_merged` schema; agent monitors
+(op_names include an agent-span op) against the agent-spans schema, so logical
+fields like `operation_name` aren't wrongly rejected (the agent-signal 422).
 """
 
 from pydantic import ValidationError
@@ -63,13 +49,10 @@ def _validate_calls_query(query: tsi_query.Query) -> None:
 
 
 def _validate_agent_spans_query(query: tsi_query.Query) -> None:
-    """Reject an agent-spans query referencing a disallowed field or malformed structure.
+    """Like `_validate_calls_query`, but compiles against the agent-spans schema.
 
-    Mirrors `_validate_calls_query` but compiles against the agent-spans schema
-    via `compile_agent_query`, so logical agent-span fields like `operation_name`
-    / `agent_name` are accepted while truly unknown fields still fail loudly.
-    An unresolvable field raises `InvalidAgentFilterFieldError` (a ValueError),
-    which is remapped to InvalidRequest here.
+    Accepts logical agent-span fields (`operation_name`, ...) while still failing
+    loudly on unknown ones; `compile_agent_query` raises a ValueError remapped here.
     """
     try:
         compile_agent_query(query, ParamBuilder())
@@ -95,10 +78,8 @@ def _is_monitor_object(
 def _is_agent_monitor(val: object) -> bool:
     """Whether a Monitor targets agent spans, by its serialized `op_names`.
 
-    Agent monitors list an agent-span op literal (e.g. `weave.genai.turn_ended`)
-    in `op_names`. Those literals are stored verbatim — unlike regular op names,
-    they aren't normalized into `weave:///` refs on save — so a plain membership
-    check against `AGENT_SPAN_OP_NAMES` is sufficient.
+    Agent-span op literals are stored verbatim (not normalized to `weave:///`
+    refs), so a plain membership check against `AGENT_SPAN_OP_NAMES` suffices.
     """
     if not isinstance(val, dict):
         return False

@@ -121,13 +121,8 @@ OP_EXECUTE_TOOL = "execute_tool"
 # Agent-span monitor op names
 # ---------------------------------------------------------------------------
 
-# Op-name literals a Monitor lists in `op_names` to target agent turns instead
-# of regular call ops. A monitor carrying any of these scores agent spans, so
-# its `query` is validated against the agent-spans schema rather than the raw
-# calls schema (see `calls_query_builder.monitor_query_validation`).
-#
-# Mirrors `AGENT_SPAN_OP_NAMES` in `weave/flow/monitor.py` — keep in sync. Held
-# here as plain strings so the trace server can detect agent monitors without
-# importing `weave.flow`. `test_monitor_query_validation` asserts the two stay
-# equal.
+# Op-name literals a Monitor lists in `op_names` to target agent turns. Mirrors
+# `AGENT_SPAN_OP_NAMES` in `weave/flow/monitor.py` (kept here as plain strings so
+# the trace server needn't import `weave.flow`; a test asserts they stay equal),
+# and drives agent vs. calls query validation in `monitor_query_validation`.
 AGENT_SPAN_OP_NAMES: frozenset[str] = frozenset({"weave.genai.turn_ended"})

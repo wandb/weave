@@ -1,10 +1,8 @@
 """Unit tests for saved-Monitor query validation.
 
-`validate_monitor_query_fields` runs at obj_create time. A regular monitor's
-query is validated against the raw calls schema; an agent monitor's query (one
-whose `op_names` include an agent-span op) is validated against the agent-spans
-schema instead, so logical agent-span fields like `operation_name` /
-`agent_name` are accepted there but still rejected on a regular monitor.
+Agent monitors (op_names include an agent-span op) validate against the
+agent-spans schema, so logical fields like `operation_name` are accepted there
+but still rejected on a regular monitor (validated against the calls schema).
 """
 
 import pytest
