@@ -125,4 +125,6 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         )
 
     def _insert_spans_sync(self, spans: list[AgentSpanCHInsertable]) -> None:
-        AgentWriteHandler(self.ch_client).insert_spans(spans)
+        AgentWriteHandler(self.ch_client, self._async_insert_settings()).insert_spans(
+            spans
+        )
