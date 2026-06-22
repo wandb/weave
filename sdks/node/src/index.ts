@@ -19,8 +19,11 @@ export type {
 export type {Settings} from './settings';
 export type {
   Agent,
+  AgentVersion,
   GetAgentsOptions,
   GetAgentsResult,
+  GetAgentVersionsOptions,
+  GetAgentVersionsResult,
   GetCallsOptions,
   Response,
   WeaveClient,
