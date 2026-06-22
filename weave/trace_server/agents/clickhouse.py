@@ -337,7 +337,7 @@ class AgentQueryHandler:
         for cid, items in grouped.by_conversation_id.items():
             if cid in by_conv:
                 by_conv[cid].extend(
-                    span_feedback_marker(raw, trace_id="") for raw in items
+                    span_feedback_marker(raw, trace_id=None) for raw in items
                 )
         for tid, items in grouped.by_trace_id.items():
             conv_id = trace_to_conv.get(tid)

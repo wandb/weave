@@ -85,9 +85,13 @@ def _feedback_tags(feedback_type: str, raw: dict[str, Any]) -> list[str]:
 
 
 def span_feedback_marker(
-    raw: dict[str, Any], *, trace_id: str
+    raw: dict[str, Any], *, trace_id: str | None
 ) -> AgentConversationSpanFeedback:
-    """Shape a raw feedback row into a positioned spans feedback marker."""
+    """Shape a raw feedback row into a positioned feedback marker.
+
+    `trace_id` is the turn the feedback is anchored to, or None for
+    conversation-level feedback.
+    """
     feedback_type = safe_str(raw.get("feedback_type"))
     return AgentConversationSpanFeedback(
         trace_id=trace_id,
