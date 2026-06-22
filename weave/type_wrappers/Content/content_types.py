@@ -8,7 +8,9 @@ DataUrlContentType = Literal[
     "data_url", "data_url:base64", "data_url:encoding", "data_url:encoding:base64"
 ]
 
-ContentType = Literal["bytes", "text", "base64", "file", "url", DataUrlContentType]
+ContentType = Literal[
+    "bytes", "text", "base64", "file", "url", "reference", DataUrlContentType
+]
 
 ValidContentInputs = bytes | str | Path
 
@@ -28,6 +30,7 @@ class ResolvedContentArgsWithoutData(TypedDict):
     # Optional fields - can be omitted
     metadata: NotRequired[dict[str, Any]]
     extension: NotRequired[str]
+    reference_uri: NotRequired[str]
 
 
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):

@@ -1,4 +1,6 @@
 import base64
+import hashlib
+import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -8,8 +10,11 @@ from util import generate_media
 
 import weave
 from weave import Dataset
+from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.table import Table
+from weave.type_handlers.Content.content import save as save_content
 from weave.type_wrappers.Content.content import Content
+from weave.type_wrappers.Content.content_types import ResolvedContentArgs
 from weave.utils import http_requests as _http_requests
 
 
@@ -381,6 +386,51 @@ class TestWeaveContent:
         assert retrieved.extension == content.extension
         assert retrieved.mimetype == content.mimetype
         assert retrieved.size == content.size
+
+    def test_content_from_reference(self):
+        """Reference content records a URI, stores no bytes, and round-trips."""
+        uri = "s3://canva-media-prod/agent-outputs/polar-bear.png"
+        expected_digest = hashlib.sha256(uri.encode("utf-8")).hexdigest()
+
+        # mimetype + extension + filename inferred from the URI path
+        content = Content.from_reference(uri)
+        assert content.content_type == "reference"
+        assert content.reference_uri == uri
+        assert content.data == b""
+        assert content.size == 0
+        assert content.digest == expected_digest
+        assert content.mimetype == "image/png"
+        assert content.extension == ".png"
+        assert content.filename == "polar-bear.png"
+        assert content.input_type == "str"
+
+        # caller-asserted mimetype wins even when the URI has no extension
+        typed = Content.from_reference("s3://bucket/object", mimetype="video/mp4")
+        assert typed.mimetype == "video/mp4"
+        assert typed.extension == ".mp4"
+        assert typed.reference_uri == "s3://bucket/object"
+
+        # empty URI is rejected
+        with pytest.raises(ValueError, match="non-empty uri"):
+            Content.from_reference("")
+
+        # the serializer persists the URI in metadata.json with an empty content blob;
+        # bytes are resolved later via signed URL, never read here
+        art = MemTraceFilesArtifact()
+        save_content(content, art, "obj")
+        assert art.path_contents["content"] == b""
+        metadata = json.loads(art.path_contents["metadata.json"])
+        assert metadata["content_type"] == "reference"
+        assert metadata["reference_uri"] == uri
+
+        # reconstruction (what load() does after reading the empty content blob)
+        restored_args: ResolvedContentArgs = {"data": b"", **metadata}
+        restored = Content._from_resolved_args(restored_args)
+        assert restored.content_type == "reference"
+        assert restored.reference_uri == uri
+        assert restored.data == b""
+        assert restored.digest == expected_digest
+        assert restored.mimetype == "image/png"
 
     def test_content_in_dataset(
         self, image_file, audio_file, video_file, pdf_file, weave_active

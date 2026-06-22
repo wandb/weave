@@ -50,6 +50,7 @@ class Content(BaseModel, Generic[T]):
     - from_url()
     - from_base64()
     - from_data_url()
+    - from_reference()
     """
 
     # This is required due to some attribute setting done by our serialization layer
@@ -74,6 +75,13 @@ class Content(BaseModel, Generic[T]):
         ),
     ] = None
     extension: str | None = None
+
+    reference_uri: Annotated[
+        str | None,
+        Field(
+            description="External storage URI for reference content; bytes are never read or stored"
+        ),
+    ] = None
 
     _last_saved_path: Annotated[
         str | None, Field(description="Last path the file was saved to")
@@ -464,6 +472,51 @@ class Content(BaseModel, Generic[T]):
             "extension": extension,
             # Use requests-detected encoding if present, else utf-8
             "encoding": resp.encoding or "utf-8",
+        }
+
+        if metadata:
+            resolved_args["metadata"] = metadata
+
+        return cls.model_construct(**resolved_args)
+
+    @classmethod
+    def from_reference(
+        cls: type[Self],
+        uri: str,
+        /,
+        mimetype: str | None = None,
+        extension: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Self:
+        """Initializes Content as a reference to an object in external storage.
+
+        No bytes are read or stored: only the URI is recorded, resolved to a signed
+        URL at read time. `mimetype` is caller-asserted since bytes are never inspected.
+        """
+        if not uri:
+            raise ValueError("Content.from_reference requires a non-empty uri")
+
+        digest = hashlib.sha256(uri.encode("utf-8")).hexdigest()
+        url_basename = Path(urlparse(uri).path).name or None
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype,
+            extension=extension,
+            filename=url_basename,
+            buffer=None,
+        )
+        filename = url_basename or default_filename(extension, mimetype, digest)
+
+        resolved_args: ResolvedContentArgs = {
+            "data": b"",
+            "size": 0,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": filename,
+            "content_type": "reference",
+            "input_type": full_name(uri),
+            "extension": extension,
+            "encoding": "utf-8",
+            "reference_uri": uri,
         }
 
         if metadata:
