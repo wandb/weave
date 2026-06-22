@@ -13,8 +13,10 @@ from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
 
 def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
-    with artifact.new_file("content", binary=True) as f:
-        f.write(obj.data)
+    # Reference content holds no bytes; only the URI (in metadata) is persisted.
+    if obj.content_type != "reference":
+        with artifact.new_file("content", binary=True) as f:
+            f.write(obj.data)
 
     with artifact.new_file("metadata.json", binary=False) as f:
         metadata = obj.model_dump(exclude={"data"})
@@ -33,8 +35,11 @@ def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Content:
     with open(metadata_path) as f:
         metadata: ResolvedContentArgsWithoutData = json.load(f)
 
-    with open(artifact.path("content"), "rb") as f:
-        data = f.read()
+    if metadata["content_type"] == "reference":
+        data = b""
+    else:
+        with open(artifact.path("content"), "rb") as f:
+            data = f.read()
 
     resolved_args: ResolvedContentArgs = {"data": data, **metadata}
 

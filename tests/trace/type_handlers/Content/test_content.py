@@ -1,6 +1,5 @@
 import base64
 import hashlib
-import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -10,11 +9,8 @@ from util import generate_media
 
 import weave
 from weave import Dataset
-from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.table import Table
-from weave.type_handlers.Content.content import save as save_content
 from weave.type_wrappers.Content.content import Content
-from weave.type_wrappers.Content.content_types import ResolvedContentArgs
 from weave.utils import http_requests as _http_requests
 
 
@@ -387,7 +383,7 @@ class TestWeaveContent:
         assert retrieved.mimetype == content.mimetype
         assert retrieved.size == content.size
 
-    def test_content_from_reference(self):
+    def test_content_from_reference(self, weave_active):
         """Reference content records a URI, stores no bytes, and round-trips."""
         uri = "s3://canva-media-prod/agent-outputs/polar-bear.png"
         expected_digest = hashlib.sha256(uri.encode("utf-8")).hexdigest()
@@ -414,23 +410,16 @@ class TestWeaveContent:
         with pytest.raises(ValueError, match="non-empty uri"):
             Content.from_reference("")
 
-        # the serializer persists the URI in metadata.json with an empty content blob;
-        # bytes are resolved later via signed URL, never read here
-        art = MemTraceFilesArtifact()
-        save_content(content, art, "obj")
-        assert art.path_contents["content"] == b""
-        metadata = json.loads(art.path_contents["metadata.json"])
-        assert metadata["content_type"] == "reference"
-        assert metadata["reference_uri"] == uri
-
-        # reconstruction (what load() does after reading the empty content blob)
-        restored_args: ResolvedContentArgs = {"data": b"", **metadata}
-        restored = Content._from_resolved_args(restored_args)
-        assert restored.content_type == "reference"
-        assert restored.reference_uri == uri
-        assert restored.data == b""
-        assert restored.digest == expected_digest
-        assert restored.mimetype == "image/png"
+        # publish/get round-trips with no bytes stored: a reference object loads
+        # without reading a content blob (it is resolved later via signed URL)
+        ref = weave.publish(content, name="test_content_reference")
+        retrieved = ref.get()
+        assert isinstance(retrieved, Content)
+        assert retrieved.content_type == "reference"
+        assert retrieved.reference_uri == uri
+        assert retrieved.data == b""
+        assert retrieved.digest == expected_digest
+        assert retrieved.mimetype == "image/png"
 
     def test_content_in_dataset(
         self, image_file, audio_file, video_file, pdf_file, weave_active
