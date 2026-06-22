@@ -42,6 +42,7 @@ type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
     genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.Mock;
     genaiSearchAgentsSearchPost: jest.Mock;
     genaiSpansQueryAgentsSpansQueryPost: jest.Mock;
+    genaiTracesChatAgentsTracesChatPost: jest.Mock;
   };
 };
 
@@ -60,6 +61,7 @@ describe('WeaveClient', () => {
         genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.fn(),
         genaiSearchAgentsSearchPost: jest.fn(),
         genaiSpansQueryAgentsSpansQueryPost: jest.fn(),
+        genaiTracesChatAgentsTracesChatPost: jest.fn(),
       },
     } as any;
     mockWandbServerApi = {} as any;
@@ -541,6 +543,63 @@ describe('WeaveClient', () => {
       );
 
       await expect(client.getAgentSpans({})).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentTurn', () => {
+    it('gets turn data for a given trace id', async () => {
+      const chat = {
+        trace_id: 'trace-1',
+        root_span_name: 'my-op',
+        provider: 'openai',
+        total_duration_ms: 1234,
+        messages: [],
+        feedback: null,
+      };
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockResolvedValue(
+        {data: chat} as any
+      );
+
+      const result = await client.getAgentTurn({
+        traceId: 'trace-1',
+        includeFeedback: true,
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        trace_id: 'trace-1',
+        include_feedback: true,
+      });
+
+      expect(result).toEqual({data: chat});
+    });
+
+    it('passes undefined includeFeedback when omitted', async () => {
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockResolvedValue(
+        {data: {trace_id: 'trace-1'}} as any
+      );
+
+      await client.getAgentTurn({traceId: 'trace-1'});
+
+      expect(
+        mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        trace_id: 'trace-1',
+        include_feedback: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgentTurn({traceId: 'trace-1'})).rejects.toThrow(
+        'boom'
+      );
     });
   });
 

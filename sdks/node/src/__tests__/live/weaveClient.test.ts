@@ -736,4 +736,216 @@ describe('WeaveClient', () => {
       });
     });
   });
+
+  describe('getAgentTurn', () => {
+    vcrTest('gets turn data for a given trace id', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentTurn({
+        traceId: '86cc8e5a64b3bb1fbbf80cb377155950',
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "agent_name": "Assistant",
+          "agent_version": "",
+          "feedback": null,
+          "messages": [
+            {
+              "agent_handoff": null,
+              "agent_name": "User",
+              "agent_start": null,
+              "agent_version": null,
+              "assistant_message": null,
+              "context_compacted": null,
+              "feedback": null,
+              "span_id": null,
+              "started_at": "2026-06-16T22:10:34.631000",
+              "status_code": null,
+              "tool_call": null,
+              "type": "user_message",
+              "user_message": {
+                "content_refs": [],
+                "text": "When was the last time Liverpool won the EPL?",
+              },
+            },
+            {
+              "agent_handoff": null,
+              "agent_name": "Assistant",
+              "agent_start": {
+                "model": "",
+                "status": "UNSET",
+                "system_instructions": null,
+                "tool_definitions": null,
+              },
+              "agent_version": "",
+              "assistant_message": null,
+              "context_compacted": null,
+              "feedback": null,
+              "span_id": "c6153c0a6dc4010b",
+              "started_at": "2026-06-16T22:10:34.628000",
+              "status_code": "UNSET",
+              "tool_call": null,
+              "type": "agent_start",
+              "user_message": null,
+            },
+            {
+              "agent_handoff": null,
+              "agent_name": "Assistant",
+              "agent_start": null,
+              "agent_version": "",
+              "assistant_message": {
+                "content_refs": [],
+                "duration_ms": 1032,
+                "input_tokens": 133,
+                "model": "gpt-5.4-mini-2026-03-17",
+                "output_tokens": 33,
+                "reasoning_content": "",
+                "reasoning_tokens": 0,
+                "status": "UNSET",
+                "text": "Liverpool last won the English Premier League in the **2019–20 season**, clinching the title on **25 June 2020**.",
+              },
+              "context_compacted": null,
+              "feedback": null,
+              "span_id": "53fc733e2f6b3417",
+              "started_at": "2026-06-16T22:10:34.631000",
+              "status_code": "UNSET",
+              "tool_call": null,
+              "type": "assistant_message",
+              "user_message": null,
+            },
+          ],
+          "provider": "openai",
+          "root_span_name": "Assistant",
+          "status_code": "UNSET",
+          "total_duration_ms": 1040,
+          "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+        }
+      `);
+    });
+
+    vcrTest('includes feedback when requested', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentTurn({
+        traceId: '86cc8e5a64b3bb1fbbf80cb377155950',
+        includeFeedback: true,
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "agent_name": "Assistant",
+          "agent_version": "",
+          "feedback": [],
+          "messages": [
+            {
+              "agent_handoff": null,
+              "agent_name": "User",
+              "agent_start": null,
+              "agent_version": null,
+              "assistant_message": null,
+              "context_compacted": null,
+              "feedback": null,
+              "span_id": null,
+              "started_at": "2026-06-16T22:10:34.631000",
+              "status_code": null,
+              "tool_call": null,
+              "type": "user_message",
+              "user_message": {
+                "content_refs": [],
+                "text": "When was the last time Liverpool won the EPL?",
+              },
+            },
+            {
+              "agent_handoff": null,
+              "agent_name": "Assistant",
+              "agent_start": {
+                "model": "",
+                "status": "UNSET",
+                "system_instructions": null,
+                "tool_definitions": null,
+              },
+              "agent_version": "",
+              "assistant_message": null,
+              "context_compacted": null,
+              "feedback": null,
+              "span_id": "c6153c0a6dc4010b",
+              "started_at": "2026-06-16T22:10:34.628000",
+              "status_code": "UNSET",
+              "tool_call": null,
+              "type": "agent_start",
+              "user_message": null,
+            },
+            {
+              "agent_handoff": null,
+              "agent_name": "Assistant",
+              "agent_start": null,
+              "agent_version": "",
+              "assistant_message": {
+                "content_refs": [],
+                "duration_ms": 1032,
+                "input_tokens": 133,
+                "model": "gpt-5.4-mini-2026-03-17",
+                "output_tokens": 33,
+                "reasoning_content": "",
+                "reasoning_tokens": 0,
+                "status": "UNSET",
+                "text": "Liverpool last won the English Premier League in the **2019–20 season**, clinching the title on **25 June 2020**.",
+              },
+              "context_compacted": null,
+              "feedback": null,
+              "span_id": "53fc733e2f6b3417",
+              "started_at": "2026-06-16T22:10:34.631000",
+              "status_code": "UNSET",
+              "tool_call": null,
+              "type": "assistant_message",
+              "user_message": null,
+            },
+          ],
+          "provider": "openai",
+          "root_span_name": "Assistant",
+          "status_code": "UNSET",
+          "total_duration_ms": 1040,
+          "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+        }
+      `);
+    });
+
+    vcrTest('handles nonexistent trace id', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      const resp = await client.getAgentTurn({
+        traceId: 'nonexistent-trace-id',
+      });
+
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "agent_name": null,
+          "agent_version": null,
+          "feedback": null,
+          "messages": [],
+          "provider": null,
+          "root_span_name": null,
+          "status_code": null,
+          "total_duration_ms": null,
+          "trace_id": "nonexistent-trace-id",
+        }
+      `);
+    });
+
+    vcrTest('errors with invalid project id', async () => {
+      await authenticate();
+      const client = await init('nonexistent-project');
+
+      expect(
+        client.getAgentTurn({
+          traceId: '86cc8e5a64b3bb1fbbf80cb377155950',
+        })
+      ).rejects.toMatchObject({
+        data: null,
+        error: {
+          detail: 'Project not found',
+        },
+      });
+    });
+  });
 });

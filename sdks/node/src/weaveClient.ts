@@ -5,6 +5,8 @@ import {uuidv7} from 'uuidv7';
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
+  type AgentChatMessage as AgentChatMessageSchema,
+  type AgentTraceChatRes,
   type AgentSchema,
   type AgentSpanSchema,
   type AgentVersionSchema,
@@ -92,7 +94,9 @@ export interface GetCallsOptions {
 }
 
 export type Agent = AgentSchema;
+export type AgentMessage = AgentChatMessageSchema;
 export type AgentSpan = AgentSpanSchema;
+export type AgentTurn = AgentTraceChatRes;
 export type AgentVersion = AgentVersionSchema;
 
 /**
@@ -166,6 +170,19 @@ export type GetAgentSpansResult = {
   spans: AgentSpan[];
   total_count?: number;
 };
+
+/**
+ * Options for {@link WeaveClient.getAgentTurn}.
+ */
+export interface GetAgentTurnOptions {
+  traceId: string;
+  includeFeedback?: boolean;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentTurn}.
+ */
+export type GetAgentTurnResult = AgentTurn;
 
 /**
  * Distinguishes the object-based getCalls options form from the legacy
@@ -394,6 +411,35 @@ export class WeaveClient {
         spans: resp.data.spans ?? [],
       },
     };
+  }
+
+  /**
+   * Get data (including messages) for a single turn (by traceId).
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentTurn({
+   *   traceId: '01997b8a-2c89-7c4d-9d0e-2f7e5b9a1b2c',
+   *   includeFeedback: true,
+   * });
+   *
+   * console.log(resp.data.root_span_name, resp.data.total_duration_ms);
+   *
+   * for (const message of resp.data.messages ?? []) {
+   *   if (message.user_message) console.log('user:', message.user_message);
+   *   if (message.assistant_message) console.log('assistant:', message.assistant_message);
+   * }
+   * ```
+   */
+  public getAgentTurn(
+    options: GetAgentTurnOptions
+  ): Promise<Response<GetAgentTurnResult>> {
+    return this.traceServerApi.agents.genaiTracesChatAgentsTracesChatPost({
+      project_id: this.projectId,
+      trace_id: options.traceId,
+      include_feedback: options.includeFeedback,
+    });
   }
 
   private scheduleBatchProcessing() {
